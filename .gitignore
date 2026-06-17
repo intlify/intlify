@@ -30,6 +30,11 @@ dist-ssr
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# Specific cases
+tools/mf-parser-bench/.tmp
+tools/mf-parser-bench/results
+tools/mf-parser-bench/rs/target
+
 # others
 .plans
 .notes

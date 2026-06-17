@@ -1,0 +1,20 @@
+{
+  "name": "mf-parser-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "calibrate": "node scripts/calibrate.mjs",
+    "bench": "node scripts/setup.mjs && node scripts/preflight.mjs && node scripts/calibrate.mjs && bash scripts/mf-parser-hyperfine.sh && node report.mjs",
+    "bench:run": "bash scripts/mf-parser-hyperfine.sh",
+    "bench:smoke": "bash scripts/mf-parser-hyperfine.sh --warmup 1 --runs 2",
+    "report": "node report.mjs",
+    "js": "node js/run-parser.mjs"
+  },
+  "dependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.11",
+    "messageformat": "4.0.0"
+  }
+}

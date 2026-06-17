@@ -1,0 +1,55 @@
+{
+  "name": "mf2-app",
+  "format": "mf2",
+  "description": "Application-like MF2 messages for throughput measurements.",
+  "cases": [
+    {
+      "id": "nav-settings",
+      "source": "Settings",
+      "description": "Short navigation label.",
+      "tags": ["app", "short"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "form-required",
+      "source": "{$fieldName} is required.",
+      "description": "Form validation message.",
+      "tags": ["app", "validation", "variable"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "price-label",
+      "source": "{$amount :number minimumFractionDigits=2} including tax",
+      "description": "Price label with number formatting.",
+      "tags": ["app", "number", "option"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "notification-count",
+      "source": ".input {$count :number}\n.match $count\none {{You have {$count} unread notification.}}\n* {{You have {$count} unread notifications.}}",
+      "description": "Plural-like notification message.",
+      "tags": ["app", "match", "plural"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "cart-count",
+      "source": ".input {$count :number}\n.match $count\none {{Your cart has {$count} item.}}\n* {{Your cart has {$count} items.}}",
+      "description": "Cart item count message.",
+      "tags": ["app", "match", "cart"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "local-greeting",
+      "source": ".local $displayName = {$name :string}\n.match $displayName\n* {{Welcome back, {$displayName}.}}",
+      "description": "Local declaration used in an application greeting.",
+      "tags": ["app", "local", "match"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    }
+  ]
+}

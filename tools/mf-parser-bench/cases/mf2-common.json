@@ -1,0 +1,55 @@
+{
+  "name": "mf2-common",
+  "format": "mf2",
+  "description": "MF2 common subset expected to parse across the MF2 parser targets.",
+  "cases": [
+    {
+      "id": "plain-text",
+      "source": "Hello world",
+      "description": "Plain text message.",
+      "tags": ["simple", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "variable",
+      "source": "Hello {$name}",
+      "description": "Simple variable expression.",
+      "tags": ["variable", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "number-function",
+      "source": "{$count :number}",
+      "description": "Variable with function annotation.",
+      "tags": ["function", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "number-option",
+      "source": "{$amount :number minimumFractionDigits=2}",
+      "description": "Function option with literal value.",
+      "tags": ["function", "option", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "input-match",
+      "source": ".input {$count :number}\n.match $count\none {{You have {$count} notification.}}\n* {{You have {$count} notifications.}}",
+      "description": "Single selector message with input declaration.",
+      "tags": ["declaration", "match", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "local-match",
+      "source": ".local $greeting = {$name :string}\n.match $greeting\n* {{Hello {$greeting}}}",
+      "description": "Local declaration used as a selector.",
+      "tags": ["declaration", "local", "match", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    }
+  ]
+}

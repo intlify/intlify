@@ -1,0 +1,55 @@
+{
+  "name": "mf1-icu",
+  "format": "mf1-icu",
+  "description": "MF1 / ICU MessageFormat corpus for FormatJS parser reference measurements.",
+  "cases": [
+    {
+      "id": "plain-text",
+      "source": "Hello world",
+      "description": "Plain text ICU message.",
+      "tags": ["simple", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "argument",
+      "source": "Hello {name}",
+      "description": "Simple ICU argument.",
+      "tags": ["argument", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "plural",
+      "source": "{count, plural, one {one item} other {# items}}",
+      "description": "ICU plural message.",
+      "tags": ["plural", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "select",
+      "source": "{gender, select, female {she} male {he} other {they}}",
+      "description": "ICU select message.",
+      "tags": ["select", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "selectordinal",
+      "source": "{place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}",
+      "description": "ICU selectordinal message.",
+      "tags": ["selectordinal", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "number-and-plural",
+      "source": "Yo, {firstName} {lastName} has {numBooks, number, integer} {numBooks, plural, one {book} other {books}}.",
+      "description": "Mixed arguments with number and plural formatting.",
+      "tags": ["number", "plural", "icu"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "mf2-full",
+  "format": "mf2",
+  "description": "MF2 syntax coverage corpus for compatibility preflight. Not all cases are intended for throughput comparison.",
+  "cases": [
+    {
+      "id": "markup-link",
+      "source": "{#link href=|/docs|}Docs{/link}",
+      "description": "Markup with an option.",
+      "tags": ["full", "markup"],
+      "expected": "parse-ok",
+      "unsupportedBy": ["ox-content-parse", "ox-content-parse-and-validate"]
+    },
+    {
+      "id": "attribute",
+      "source": "{$name :string @id=|user-name|}",
+      "description": "Expression attribute.",
+      "tags": ["full", "attribute"],
+      "expected": "parse-ok",
+      "unsupportedBy": ["ox-content-parse", "ox-content-parse-and-validate"]
+    },
+    {
+      "id": "namespaced-function",
+      "source": "{$value :u:number}",
+      "description": "Namespaced function reference.",
+      "tags": ["full", "namespace"],
+      "expected": "parse-ok",
+      "unsupportedBy": ["ox-content-parse", "ox-content-parse-and-validate"]
+    },
+    {
+      "id": "quoted-literal-operand",
+      "source": "{|hello world| :string}",
+      "description": "Quoted literal operand.",
+      "tags": ["full", "literal"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "invalid-unclosed-placeholder",
+      "source": "Hello {$name",
+      "description": "Invalid message for parser error or recovery behavior.",
+      "tags": ["invalid", "recovery"],
+      "expected": "parse-error",
+      "unsupportedBy": []
+    }
+  ]
+}

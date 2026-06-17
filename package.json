@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bench:mf-parser": "vp run mf-parser-bench#bench",
+    "bench:mf-parser:smoke": "vp run mf-parser-bench#bench:smoke",
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev": "vp run website#dev",
     "prepare": "vp config"
