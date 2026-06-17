@@ -1,5 +1,5 @@
 {
-  "name": "intlify",
+  "name": "intlify-monorepo",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@kazupon/vp-config": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {

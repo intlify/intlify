@@ -1,17 +1,17 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig } from 'vite-plus'
 
 export default defineConfig({
   pack: {
     dts: {
-      tsgo: true,
+      tsgo: true
     },
-    exports: true,
+    exports: true
   },
   lint: {
     options: {
       typeAware: true,
-      typeCheck: true,
-    },
+      typeCheck: true
+    }
   },
-  fmt: {},
-});
+  fmt: {}
+})
