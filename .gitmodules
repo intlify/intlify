@@ -14,3 +14,15 @@
 	path = refers/mf2-tools
 	url = https://github.com/lucacasonato/mf2-tools.git
 	shallow = true
+[submodule "refers/proposal-intl-messageformat"]
+	path = refers/proposal-intl-messageformat
+	url = https://github.com/tc39/proposal-intl-messageformat.git
+	shallow = true
+[submodule "refers/message-format-wg"]
+	path = refers/message-format-wg
+	url = https://github.com/unicode-org/message-format-wg.git
+	shallow = true
+[submodule "refers/oxc"]
+	path = refers/oxc
+	url = https://github.com/oxc-project/oxc.git
+	shallow = true
