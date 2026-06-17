@@ -26,3 +26,11 @@
 	path = refers/oxc
 	url = https://github.com/oxc-project/oxc.git
 	shallow = true
+[submodule "refers/vize"]
+	path = refers/vize
+	url = https://github.com/ubugeeei-prod/vize.git
+	shallow = true
+[submodule "refers/corsa-bind"]
+	path = refers/corsa-bind
+	url = https://github.com/ubugeeei-prod/corsa-bind.git
+	shallow = true
