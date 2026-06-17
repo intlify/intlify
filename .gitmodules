@@ -1,0 +1,16 @@
+[submodule "refers/messageformat"]
+	path = refers/messageformat
+	url = https://github.com/messageformat/messageformat.git
+	shallow = true
+[submodule "refers/formatjs"]
+	path = refers/formatjs
+	url = https://github.com/formatjs/formatjs.git
+	shallow = true
+[submodule "refers/ox-content"]
+	path = refers/ox-content
+	url = https://github.com/ubugeeei-prod/ox-content.git
+	shallow = true
+[submodule "refers/mf2-tools"]
+	path = refers/mf2-tools
+	url = https://github.com/lucacasonato/mf2-tools.git
+	shallow = true
