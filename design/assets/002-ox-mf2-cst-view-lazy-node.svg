@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 lazy CST node views</title>
+  <desc id="desc">CstView lazily constructs lightweight CST node views from NodeId and flat CstStorage records without materializing a recursive tree object graph.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
+      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .view { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; }
+      .nodeview { fill: #eef2ff; stroke: #4338ca; stroke-width: 1.5; }
+      .call { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; }
+      .row { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
+      .row-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
+      .item { fill: #ffffff; stroke: #93c5fd; stroke-width: 1.2; }
+      .item-green { fill: #ffffff; stroke: #34d399; stroke-width: 1.2; }
+      .item-orange { fill: #ffffff; stroke: #fb923c; stroke-width: 1.2; }
+      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; }
+      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+      .tiny { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; font-weight: 550; letter-spacing: 0; }
+      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
+      .arrow { fill: none; stroke: #374151; stroke-width: 1.8; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #64748b; stroke-width: 1.5; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+      .line { fill: none; stroke: #64748b; stroke-width: 1.3; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1120" height="700" />
+  <rect class="frame" x="24" y="24" width="1072" height="652" rx="8" />
+
+  <text class="group-label" x="68" y="66">stored once</text>
+  <text class="group-label" x="442" y="66">lazy access layer</text>
+  <text class="group-label" x="780" y="66">on-demand node views</text>
+
+  <rect class="storage" x="56" y="92" width="330" height="520" rx="8" />
+  <text class="label" x="221" y="128" text-anchor="middle">CstStorage</text>
+  <text class="caption" x="221" y="150" text-anchor="middle">flat arrays, no recursive objects</text>
+
+  <rect class="row-alt" x="82" y="182" width="278" height="46" rx="6" />
+  <text class="small" x="102" y="202">nodes[0]</text>
+  <text class="tiny" x="102" y="219">Root { children: edges[0..1] }</text>
+
+  <rect class="row" x="82" y="238" width="278" height="46" rx="6" />
+  <text class="small" x="102" y="258">nodes[1]</text>
+  <text class="tiny" x="102" y="275">Message { children: edges[1..4] }</text>
+
+  <rect class="row-alt" x="82" y="294" width="278" height="46" rx="6" />
+  <text class="small" x="102" y="314">nodes[2]</text>
+  <text class="tiny" x="102" y="331">Text { tokens: 0..1 }</text>
+
+  <rect class="row" x="82" y="350" width="278" height="46" rx="6" />
+  <text class="small" x="102" y="370">nodes[3]</text>
+  <text class="tiny" x="102" y="387">Expression { tokens: 1..4 }</text>
+
+  <rect class="row-alt" x="82" y="420" width="278" height="42" rx="6" />
+  <text class="small" x="102" y="446">edges = [1, 2, 3, 4]</text>
+
+  <rect class="row" x="82" y="478" width="278" height="42" rx="6" />
+  <text class="small" x="102" y="504">tokens = [Text, {, $name, }]</text>
+
+  <rect class="row-alt" x="82" y="536" width="278" height="42" rx="6" />
+  <text class="small" x="102" y="562">spans = UTF-8 byte ranges</text>
+
+  <rect class="view" x="430" y="126" width="260" height="180" rx="8" />
+  <text class="label" x="560" y="162" text-anchor="middle">CstView</text>
+  <text class="caption" x="560" y="184" text-anchor="middle">borrowed accessor facade</text>
+
+  <rect class="item-green" x="462" y="212" width="196" height="32" rx="6" />
+  <text class="small" x="560" y="233" text-anchor="middle">node(NodeId)</text>
+
+  <rect class="item-green" x="462" y="254" width="196" height="32" rx="6" />
+  <text class="small" x="560" y="275" text-anchor="middle">children(CstNodeView)</text>
+
+  <rect class="call" x="430" y="356" width="260" height="180" rx="8" />
+  <text class="label" x="560" y="392" text-anchor="middle">Lazy View Construction</text>
+
+  <rect class="item-orange" x="462" y="422" width="196" height="30" rx="6" />
+  <text class="tiny" x="560" y="442" text-anchor="middle">view.node(NodeId(1))</text>
+
+  <rect class="item-orange" x="462" y="462" width="196" height="30" rx="6" />
+  <text class="tiny" x="560" y="482" text-anchor="middle">read nodes[1]</text>
+
+  <rect class="item-orange" x="462" y="502" width="196" height="30" rx="6" />
+  <text class="tiny" x="560" y="522" text-anchor="middle">resolve edges[1..4]</text>
+
+  <rect class="nodeview" x="748" y="98" width="316" height="220" rx="8" />
+  <text class="label" x="906" y="134" text-anchor="middle">CstNodeView</text>
+  <text class="caption" x="906" y="156" text-anchor="middle">small borrowed wrapper, created on demand</text>
+
+  <rect class="item" x="780" y="184" width="252" height="34" rx="6" />
+  <text class="small" x="906" y="206" text-anchor="middle">id: NodeId(1)</text>
+
+  <rect class="item" x="780" y="228" width="252" height="34" rx="6" />
+  <text class="small" x="906" y="250" text-anchor="middle">record: &amp;nodes[1]</text>
+
+  <rect class="item" x="780" y="272" width="252" height="34" rx="6" />
+  <text class="small" x="906" y="294" text-anchor="middle">view: &amp;CstView</text>
+
+  <rect class="nodeview" x="748" y="386" width="316" height="178" rx="8" />
+  <text class="label" x="906" y="422" text-anchor="middle">children()</text>
+  <text class="caption" x="906" y="444" text-anchor="middle">returns an iterator of lightweight node views</text>
+
+  <rect class="item" x="778" y="472" width="74" height="42" rx="6" />
+  <text class="tiny" x="815" y="490" text-anchor="middle">Text</text>
+  <text class="tiny" x="815" y="506" text-anchor="middle">NodeId 2</text>
+
+  <rect class="item" x="872" y="472" width="94" height="42" rx="6" />
+  <text class="tiny" x="919" y="490" text-anchor="middle">Expression</text>
+  <text class="tiny" x="919" y="506" text-anchor="middle">NodeId 3</text>
+
+  <rect class="item" x="986" y="472" width="48" height="42" rx="6" />
+  <text class="tiny" x="1010" y="490" text-anchor="middle">...</text>
+  <text class="tiny" x="1010" y="506" text-anchor="middle">4</text>
+
+  <path class="arrow" d="M 386 254 L 428 222" />
+  <path class="arrow" d="M 690 224 L 746 204" />
+  <path class="arrow" d="M 690 486 L 746 486" />
+  <path class="dash" d="M 906 318 L 906 384" />
+
+  <text class="caption" x="560" y="634" text-anchor="middle">No child Vec&lt;Node&gt; is allocated. Each traversal step resolves NodeId and ranges into flat storage, then returns tiny borrowed views.</text>
+</svg>

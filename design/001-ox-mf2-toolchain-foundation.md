@@ -1,137 +1,132 @@
-# ox-mf2 Toolchain Foundation Design
+# ox-mf2 Toolchain Foundation 設計
 
-## Purpose
+## 目的
 
-ox-mf2 is designed not only as a high-performance parser for MessageFormat 2.0 (MF2), but also as an MF2 toolchain foundation that can later support linting, formatting, compilation, diagnostics, and bindings.
+ox-mf2 は MessageFormat 2.0 (MF2) の高性能 parser であるだけでなく、将来的に lint、format、compile、diagnostics、bindings を支える MF2 toolchain foundation として設計する。
 
-The initial implementation will focus on the parser. However, token, trivia, span, NodeId, diagnostics, and the storage boundary are part of the initial design so that later tools can be added without breaking the foundation.
+初期実装は parser に集中する。ただし、token、trivia、span、NodeId、diagnostics、storage boundary は、後から tool を追加しても foundation を壊さないために、初期設計の一部として扱う。
 
-## Design Philosophy
+## 設計概要
 
-### MF2 toolchain foundation
+- Rust core を唯一の semantic implementation にする。
+- Phase 1 では、recovering / lossless / snapshot-friendly な parser foundation を構築する。
+- Phase 2 では、versioned Binary AST snapshot を public CST/AST view の標準境界にする。
+- N-API と WASM を主要な language binding target にする。
+- SemanticView は lossless Binary AST snapshot とは分離し、NodeId / Span にリンクする。
+- MessagePack は AST 表現ではなく、将来の LSP/editor transport 用に予約する。
+- Phase 1 の Rust parser / AST / performance 詳細は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) に置く。
+- Phase 2 の Binary AST、snapshot、binding、transport の実装寄りの詳細は [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md) に置く。
 
-The core design principle of ox-mf2 is **MF2 toolchain foundation**.
+## 設計思想
 
-The parser is central, but the goal is not only to build the fastest standalone parser. The foundation should support linting, formatting, compilation, runtime validation, editor integration, and benchmarking on top of the same core model.
+### MF2 toolchain foundation として設計する
 
-### Inherit oxc's high-performance design philosophy
+ox-mf2 の中心的な設計原則は **MF2 toolchain foundation** である。
 
-ox-mf2 will use some crates provided by oxc. However, this is not only about reusing crates; ox-mf2 also explicitly inherits high-performance design principles such as phase separation, data-oriented storage, allocation control, and benchmark-driven design.
+parser は中心的な存在だが、目的は単に最速の standalone parser を作ることではない。同じ core model の上に lint、format、compile、runtime validation、editor integration、benchmarking を載せられる foundation にする。
 
-- phase separation: make lexer, parse, semantic lower, diagnostics, format, and lint phases measurable independently
-- data-oriented storage: avoid relying only on pointer traversal, and use NodeId plus flat indexed storage to make later processing fast
-- stable identifiers: make AST/CST nodes, tokens, and sources referable by IDs
-- allocation control: avoid unnecessary heap allocation during the parse phase
-- benchmark-driven design: measure not only end-to-end performance but also each internal phase
+### oxc の高性能設計思想を継承する
 
-However, ox-mf2 will not directly adopt the same arena typed AST model as oxc. MF2 has a smaller syntax surface than JavaScript/TypeScript, and formatting/linting needs are central for an internationalization message format, so flat indexed storage will be the primary representation.
+ox-mf2 は oxc が提供する crate を一部利用する。ただし、これは crate の再利用だけではない。phase separation、data-oriented storage、allocation control、benchmark-driven design といった oxc の高性能設計思想も明示的に継承する。
 
-### Make the core extensible into a toolchain
+- phase separation: lexer、parse、semantic lower、diagnostics、format、lint の各 phase を独立して計測できるようにする。
+- data-oriented storage: pointer traversal だけに依存せず、NodeId と flat indexed storage によって後続処理を高速にする。
+- stable identifiers: AST/CST node、token、source を ID で参照できるようにする。
+- allocation control: parse phase 中の不要な heap allocation を避ける。
+- benchmark-driven design: end-to-end performance だけでなく、内部 phase ごとの性能も計測する。
 
-Existing dedicated parser toolchains show that it is effective to place the parser, CST/AST, semantic analysis, and diagnostics in the core, while keeping CLI, LSP, formatter, linter, and external toolchain integrations as adapters around it.
+ただし、ox-mf2 は oxc と同じ arena typed AST model をそのまま採用しない。MF2 は JavaScript/TypeScript より構文面が小さく、国際化メッセージフォーマットとして formatting / linting の重要度が高いため、flat indexed storage を主要表現にする。
 
-ox-mf2 will follow the same direction: the MF2-specific parser, CST, semantic model, and diagnostics form the core, and external toolchain integrations are designed as adapters. This keeps the core focused on MF2 while allowing it to expand into Node bindings, CLI, LSP, and other linter integrations.
+### core を toolchain へ拡張できるようにする
 
-### BinaryAST is not the initial internal representation
+既存の dedicated parser toolchain から、parser、CST/AST、semantic analysis、diagnostics を core に置き、CLI、LSP、formatter、linter、外部 toolchain integration を adapter として周囲に置く構成が有効であることが分かる。
 
-BinaryAST-style designs in ox-jsdoc and typescript-go are useful references for bindings, snapshots, persistence, and high-speed transfer.
+ox-mf2 も同じ方向を取る。MF2 専用 parser、CST、semantic model、diagnostics を core に置き、外部 toolchain integration は adapter として設計する。これにより core を MF2 に集中させつつ、Node bindings、CLI、LSP、各種 linter integration へ拡張できる。
 
-However, ox-mf2 will not start with BinaryAST as the primary internal representation. The initial representation will be flat indexed storage, and the external API will be centered on NodeId, TokenId, Span, and accessors. This keeps a storage boundary that allows the internals to move to BinaryAST or compact snapshots later.
+### Binary AST は初期内部表現ではない
 
-## Agreed Design Decisions
+ox-jsdoc や typescript-go の Binary AST-style design は、bindings、snapshots、persistence、高速 transfer の参考になる。
 
-### Initial responsibility
+ただし、ox-mf2 は Binary AST を最初の primary internal representation にはしない。Phase 1 の tool-facing syntax boundary は NodeId、TokenId、Span、accessors を中心にする。これにより storage boundary を保ち、parser construction path を Binary AST-first に強制せず、Phase 2 で public AST view を Binary AST snapshot へ移行できる。
 
-ox-mf2 is a `toolchain foundation`.
+## 合意済み設計判断
 
-The parser will be built first, but token, span, accessor, and storage boundary design are included from the beginning so that linting, formatting, and compilation can be added later.
+### 初期責務
 
-### Syntax tree
+ox-mf2 は `toolchain foundation` である。
 
-Use `Lossless CST + Semantic AST`.
+parser を最初に実装するが、token、span、accessor、storage boundary の設計も初期段階から含める。これにより、後から linting、formatting、compilation を追加できる。
+
+### 構文木
+
+`Lossless CST + SemanticModel` を採用する。
 
 ```text
 source
   -> lexer / token stream + trivia
   -> lossless CST
-  -> semantic AST / shared semantic model
+  -> SemanticModel / SemanticView
   -> linter / formatter / compiler
 ```
 
-The formatter primarily uses the CST, tokens, and trivia. The linter and compiler primarily use the semantic model.
+formatter は主に CST、tokens、trivia を使う。linter と compiler は主に semantic model を使う。
 
-### Parser error handling
+### Parser の error handling
 
-Use a `recovering parser`.
+`recovering parser` を採用する。
 
-Even when syntax errors are found, the parser should build a CST as far as possible and return diagnostics. The semantic AST / semantic model may be partially generated, or may not be generated at all, when there are fatal missing parts.
+syntax error が見つかっても、parser は可能な範囲で CST を構築し、diagnostics を返す。fatal な欠落がある場合、SemanticModel は部分的に生成されるか、まったく生成されないことがある。
 
-```rust
-ParseResult {
-  cst,
-  semantic: Option<SemanticModel>,
-  diagnostics,
-}
-```
+Phase 1 の result shape、recovery behavior、diagnostic cost model の詳細は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義する。
 
-### Internal memory representation
+### 内部メモリ表現
 
-Use `flat indexed storage`.
+`flat indexed storage` を採用する。
 
-```rust
-Ast {
-  nodes: Vec<NodeRecord>,
-  edges: Vec<NodeId>,
-  tokens: Vec<Token>,
-  trivia: Vec<Trivia>,
-  spans: Vec<Span>,
-}
-```
+core identifiers は stable な `u32` index を使い、span は UTF-8 byte offset を使う。同じ identifier model を construction-time CST storage、将来の Binary AST snapshot、SemanticView、diagnostics、formatter、linter、language bindings で共有する。
 
-The linter, formatter, and compiler should not depend directly on typed node structs. They should read through NodeId and accessors.
+linter、formatter、compiler は typed node struct に直接依存しない。NodeId と accessors を通して読む。
 
-```rust
-let kind = ast.kind(node_id);
-let span = ast.span(node_id);
-let children = ast.children(node_id);
-```
+internal storage は snapshot-friendly にする。ox-mf2 では、public typed AST を先に構築してから再帰的に Binary AST へ変換する設計を避ける。代わりに、parser と lowering phase は table-oriented records を生成し、SnapshotWriter が nodes、edges、tokens、trivia、inline span fields、strings、diagnostics を linear pass で emit できるようにする。
 
-### Formatter
+Phase 1 の Rust tool は construction-time flat indexed storage を直接扱ってよい。Phase 2 以降は、Rust、N-API、WASM、その他 consumer で共有される Binary AST decoder/accessor view を canonical public AST view にする。これにより public AST surface を言語間で揃えつつ、parser は効率的な internal construction table を使える。
 
-Use `format-preserving first`.
+Phase 1 の storage contract、identifier model、source/span rules の詳細は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義する。Phase 2 の Binary AST snapshot layout は [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md) で定義する。
 
-The formatter itself does not have to be part of the initial MVP. However, the parser/storage layer must retain token, trivia, original lexeme, delimiter span, recovery node, and source-map-like information so that a formatter can be built later.
+### Formatter（整形）
 
-The future formatter should support at least the following two modes.
+`format-preserving first` を採用する。
 
-- preserve mode: preserve the original representation as much as possible
-- canonical mode: format into the standard ox-mf2 style
+formatter 自体は初期 MVP に含めなくてもよい。ただし、parser/storage layer は token、trivia、original lexeme、delimiter span、recovery node、source-map-like information を保持し、後から formatter を構築できるようにする。
 
-### Linter
+Phase 2 以降、formatter の public AST input は Binary AST decoder/accessor view にする。Rust 実装は必要に応じて construction-time storage の internal fast path を持ってよいが、stable な public formatter surface は Rust、N-API、WASM consumer で共有される Binary AST view に揃える。
 
-Use `diagnostics foundation`.
+将来の formatter は少なくとも次の 2 mode を支援する。
 
-The initial MVP does not have to implement many lint rules, but the diagnostic model should be designed first so that parser errors and lint diagnostics can use the same foundation.
+- preserve mode: 可能な限り元の表現を保持する。
+- canonical mode: 標準的な ox-mf2 style に整形する。
 
-```rust
-Diagnostic {
-  source: SourceId,
-  span: Span,
-  severity: Severity,
-  code: DiagnosticCode,
-  message: CompactString,
-  labels: Vec<Label>,
-  help: Option<Help>,
-}
-```
+### Linter（検査）
 
-### Semantic AST / IR
+`diagnostics foundation` を採用する。
 
-Use a `shared semantic model`.
+初期 MVP で多くの lint rule を実装する必要はない。ただし、parser error と lint diagnostics が同じ foundation を使えるように、diagnostic model を先に設計する。
 
-This is not a low-level IR immediately before runtime execution. It is a semantic information model shared by the linter, compiler, and validation.
+Phase 2 以降、linter の public AST input は Binary AST decoder/accessor view にする。Rule implementation は Rust 内部の semantic fast path を使ってよいが、rule-facing / binding-facing traversal は、実用上可能な範囲で同じ public Binary AST view に寄せる。
 
-Candidate contents:
+core diagnostics は SourceId と UTF-8 byte Span を canonical location model にする。Label も byte span を持つ。CLI、LSP、editor integration は SourceStore を通して span を line/column または UTF-16 position に変換する責務を持つ。
+
+concrete diagnostic shape と success-path cost constraints は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義する。
+
+### SemanticModel / SemanticView（意味情報モデル）
+
+`shared semantic model` を採用する。
+
+これは runtime execution 直前の低レベル IR ではない。linter、compiler、validation が共有する semantic information model である。
+
+Phase 2 以降、public semantic surface は SemanticView とし、semantic facts を Binary AST NodeId と Span にリンクする。semantic information を初期 Binary AST snapshot に無理に入れない。Binary AST は lossless CST surface を扱い、SemanticView は declarations、references、selectors、variants、fallback/default information、duplicate keys、coverage metadata などの semantic facts を扱う。
+
+候補となる内容:
 
 - symbol table
 - variable declarations
@@ -144,75 +139,80 @@ Candidate contents:
 - reachability / coverage metadata
 - source span mapping
 
-### JS / Node binding
+### Language binding（言語 binding）
 
-Use `binding boundary only`.
+`Rust core as the single semantic implementation` を採用する。
 
-The initial MVP does not require an N-API or WASM implementation. However, the external API of the Rust core should be designed in a binding-friendly shape.
+ox-mf2 は MF2 parsing、CST construction、semantic analysis、diagnostics、formatting、linting を target language ごとに再実装しない。Rust core を MF2 semantics の唯一の実装にし、各 language binding はその core を包む薄い ergonomic wrapper にする。
 
-```rust
-parse(source, options) -> ParseResult
-lower(cst, options) -> SemanticModel
-diagnostics -> serializable model
-```
+初期 MVP では N-API、WASM、C ABI、その他 language bindings は必須ではない。ただし、Rust core の external API は最初から binding-friendly な形で設計する。
 
-Rust internal types should not be exposed directly to JS. The design should allow boundary types such as AstView and DiagnosticView.
+binding 実装の優先順位:
+
+1. N-API binding: intlify と JavaScript tooling integration の主要 Node.js target
+2. WASM binding: browser、playground、editor extension、edge runtime integration 向けの portable target
+3. C ABI binding design: 将来の Go、Swift、C#、Zig、Python FFI、より広い native language integration の foundation
+
+Rust internal types は他言語へ直接 expose しない。Binary AST decoder/accessor view、DiagnosticView、encoded snapshot view のような boundary type を許容する設計にする。
+
+binding layer は ergonomic surface であり、MF2 semantics を重複実装する場所ではない。JS、WASM、C ABI、Go、Swift、C#、その他 consumer は同じ Rust core を呼び出し、stable view、handle、diagnostics、formatted text、encoded snapshot を受け取る。
+
+language boundary を越えて full CST/AST output を返す場合、Phase 2 以降の canonical product boundary は nested JSON AST ではなく versioned Binary AST snapshot にする。Debug JSON や compatibility JSON は存在してよいが、standard hot-path representation にはしない。
+
+Phase 2 の Binary AST snapshot は lossless CST surface に集中する。semantic information は SemanticView または後続の semantic snapshot として別に expose する。N-API と WASM bindings は eager に materialized object tree を返すのではなく、lazy decoder/accessor を持つ result object を返す。raw snapshot bytes は default result に含めず、advanced/debug/transport API で明示的に取得できるようにする。
+
+MessagePack は ox-mf2 の CST/AST representation ではない。LSP、editor integration、daemon mode、repeated semantic queries のような long-lived language-service workflow における future transport として予約する。
+
+Binary AST、binding、snapshot、transport の詳細設計は [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md) で定義する。
 
 ### Parser API
 
-Use `parse_source + SourceStore`.
+`parse_source + SourceStore` を採用する。
 
-```rust
-let mut sources = SourceStore::new();
-let source_id = sources.add("messages/en.mf2", source_text);
-let result = Parser::new(&sources).parse_source(source_id, ParseOptions::default());
-```
+SourceStore は single parse、batch parse、diagnostics、editor boundary、将来の snapshot roots section に共通する source ownership layer である。convenience API も内部で source text を登録し、SourceId 経由で処理する。
 
-Provide a convenience API for one-shot use.
+MF2 workloads では、1 file、1 locale set、1 project に多数の message が含まれることが多いため、batch parsing は first-class API にする。path、locale、message_id、base_offset などの batch metadata は identity、diagnostics、fixtures、benchmarks、将来の snapshot root mapping のために使う。parser semantics を変えてはならない。
 
-```rust
-parse_message(source: &str) -> ParseResult
-```
+Phase 1 の parser APIs、SourceStore contract、ParseInput metadata、ParseOptions defaults、result types の詳細は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義する。snapshot-producing APIs は [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md) で定義する。
 
-The standard internal model is SourceId / SourceStore.
+### Suppression / directive comment（診断抑制）
 
-### Suppression / directive comment
+`diagnostic suppression boundary only` を採用する。
 
-Use `diagnostic suppression boundary only`.
+初期段階では、ox-mf2 は MF2 内の具体的な directive comment syntax を固定しない。ただし、diagnostic pipeline には diagnostics を suppress できる boundary を持たせる。
 
-At the initial stage, ox-mf2 will not fix a specific directive comment syntax inside MF2. However, the diagnostic pipeline should have a boundary where diagnostics can be suppressed.
+suppression は parser syntax policy ではなく diagnostic-layer concern として扱う。concrete suppression data shape は linter と language-service workflow が implementation phase に入った時点で定義できる。
 
-```rust
-Suppression {
-  source: SourceId,
-  span: Span,
-  target: SuppressionTarget,
-  reason: Option<CompactString>,
-}
-```
+### Benchmark（性能計測）
 
-### Benchmark
+`phase-separated benchmark` を採用する。
 
-Use `phase-separated benchmark`.
+CLI 全体に対する hyperfine measurement に加えて、internal performance を phase ごとに見えるようにする。
 
-In addition to hyperfine measurements for the whole CLI, internal performance should be visible per phase.
-
-Target phases:
+対象 phase:
 
 - lexer
 - parse_cst
 - lower_semantic
 - diagnostics
+- encode_snapshot
+- decode_snapshot
+- snapshot_accessor_traversal
+- snapshot_to_bytes_copy
+- binding_call
+- parse_batch_to_snapshot
 - format_preserve
 - format_canonical
 - e2e_parse
 - e2e_lint
 
-### Crate structure
+Phase 1 parser / AST / performance design は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で詳述する。
 
-Use `core split minimal`.
+### Crate 構成
 
-Initial candidates:
+`core split minimal` を採用する。
+
+初期候補:
 
 ```text
 crates/
@@ -222,7 +222,7 @@ crates/
   ox_mf2               # facade API
 ```
 
-Future candidates:
+将来候補:
 
 ```text
 ox_mf2_linter
@@ -233,23 +233,23 @@ ox_mf2_napi
 ox_mf2_wasm
 ```
 
-### Specification tracking
+### 仕様追跡
 
-Use `Unicode spec primary + TC39 proposal tracking`.
+`Unicode spec primary + TC39 proposal tracking` を採用する。
 
-Primary source:
+primary source:
 
 - `refers/message-format-wg/spec`
 
-Tracked source:
+tracked source:
 
 - `refers/proposal-intl-messageformat`
 
-The MF2 syntax and message data model should primarily follow the Unicode WG spec. Intl.MessageFormat API integration and ECMAScript-side behavior should track the TC39 proposal.
+MF2 syntax と message data model は主に Unicode WG spec に従う。Intl.MessageFormat API integration と ECMAScript 側の挙動は TC39 proposal を追跡する。
 
-### Conformance test
+### Conformance test（仕様適合性テスト）
 
-Use `spec fixtures + implementation fixtures`.
+`spec fixtures + implementation fixtures` を採用する。
 
 ```text
 fixtures/
@@ -266,13 +266,13 @@ fixtures/
   diagnostics/
 ```
 
-Spec fixtures are the basis for conformance checks, while implementation fixtures are used for compatibility and diff detection.
+spec fixtures は conformance checks の基礎であり、implementation fixtures は compatibility と diff detection のために使う。
 
-Spec fixtures are based on the Unicode Message Format WG spec and the TC39 proposal. Their purpose is to verify that ox-mf2 accepts syntactically valid MF2 and rejects syntax that is invalid according to the specification. In other words, the result of spec fixtures represents parser conformance.
+spec fixtures は Unicode Message Format WG spec と TC39 proposal に基づく。目的は、ox-mf2 が spec 上 valid な MF2 を受け入れ、spec 上 invalid な syntax を拒否することを確認することである。つまり、spec fixtures の結果は parser conformance を表す。
 
-Implementation fixtures are based on existing parser implementations and real-world messages. Their purpose is to observe behavioral differences between ox-mf2 and cases accepted or rejected by existing implementations, including edge cases, error recovery, MF1 compatibility cases, and messages from real projects. The result of implementation fixtures does not define spec conformance; it is compatibility information, diff detection, and design-decision input.
+implementation fixtures は既存 parser implementation と real-world messages に基づく。目的は、既存実装が accept/reject する case と ox-mf2 の差分を観測することであり、edge cases、error recovery、MF1 compatibility cases、real project messages を含む。implementation fixtures の結果は spec conformance を定義しない。compatibility information、diff detection、design-decision input として扱う。
 
-For example, spec fixtures may be structured as follows.
+たとえば、spec fixtures は次のように構成できる。
 
 ```text
 fixtures/spec/unicode-wg/valid/local-declaration.mf2
@@ -281,7 +281,7 @@ fixtures/spec/unicode-wg/invalid/unclosed-expression.mf2
 fixtures/spec/tc39/valid/intl-messageformat-api-options.mf2
 ```
 
-Implementation fixtures may be structured as follows.
+implementation fixtures は次のように構成できる。
 
 ```text
 fixtures/implementations/messageformat/accepted-edge-cases.mf2
@@ -290,28 +290,73 @@ fixtures/implementations/formatjs/mf1-compat-cases.mf1
 fixtures/implementations/ox-content/real-world-messages.mf2
 ```
 
-Implementation fixtures are not a substitute for the specification. Even if another implementation accepts a message, ox-mf2 may reject it when it violates the Unicode WG spec or the TC39 proposal. However, that difference should be recorded as compatibility input.
+implementation fixtures は specification の代替ではない。他の実装が message を受け入れても、それが Unicode WG spec または TC39 proposal に違反する場合、ox-mf2 は拒否してよい。ただし、その差分は compatibility input として記録する。
 
-## Initial Architecture
+## 初期アーキテクチャ
 
-![ox-mf2 initial architecture](./001-ox-mf2-initial-architecture.svg)
+![ox-mf2 initial architecture](./assets/001-ox-mf2-initial-architecture.svg)
 
-## Storage Boundary
+## Storage Boundary（保存境界）
 
-The storage boundary is the boundary between the internal storage representation and the tool-facing API.
+storage boundary は、internal storage representation と tool-facing API の境界である。
 
-![ox-mf2 storage boundary](./001-ox-mf2-storage-boundary.svg)
+![ox-mf2 storage boundary](./assets/001-ox-mf2-storage-boundary.svg)
 
-This boundary allows the initial implementation to use flat indexed storage while keeping the linter, formatter, and compiler APIs mostly stable even if the internal representation later moves to a BinaryAST-style compact storage.
+この boundary により、初期実装では flat indexed storage を使いながら、後から public AST view が Binary AST-style compact storage に移行しても、linter、formatter、compiler API をおおむね安定させられる。
 
-## Non-goals
+## Phase Plan（フェーズ計画）
 
-The initial stage does not aim to implement the following.
+### MVP / Phase 1
 
-- BinaryAST-first internal representation
+最初の phase は parser foundation に集中する。
+
+- lexer
+- recovering CST parser
+- diagnostics model
+- conformance fixtures
+- compatibility observation のための implementation fixtures
+- phase-separated benchmark
+- parser performance design
+- snapshot-friendly flat indexed storage
+- SourceStore / SourceId を持つ Rust facade API
+- Rust batch parsing API shape
+
+### Phase 2
+
+2 番目の phase では cross-language product boundary を追加する。
+
+- versioned Binary AST snapshot
+- SnapshotWriter
+- roots、sources、nodes、edges、tokens、optional trivia、diagnostics、diagnostic labels、string table、optional source text data、optional extended data の lossless CST snapshot sections
+- spans は separate section ではなく NodeRecord、TokenRecord、TriviaRecord、DiagnosticRecord に inline で保持する
+- Rust Binary AST decoder / accessor API
+- lazy decoder / accessor API を持つ N-API binding
+- portable decoder / accessor API を持つ WASM binding
+- shared snapshot buffer と shared string table を持つ first-class parseBatch API
+- SemanticView または将来の semantic snapshot として分離 expose される semantic model
+- stable C ABI implementation を必須にしない C ABI design preparation
+- snapshot encoding / decoding / binding benchmarks
+
+### Phase 3
+
+3 番目の phase では ox-mf2 をより広い tooling workflow へ拡張する。
+
+- formatter expansion
+- linter expansion
+- language service / LSP model
+- editor workflow cache と repeated query model
+- internal language-service sessions 用の optional MessagePack transport
+- parser、semantic、snapshot、transport、binding costs を分離する editor workflow benchmarks
+
+## 非目標
+
+初期段階では次を実装対象にしない。
+
+- Phase 1 における Binary AST-first internal representation
 - full linter ruleset
 - canonical formatter
 - N-API / WASM binding
+- MessagePack transport
 - complete Intl.MessageFormat runtime
 
-However, the initial design should include the boundaries needed to add them later.
+ただし、初期設計には後から追加するために必要な boundary を含める。

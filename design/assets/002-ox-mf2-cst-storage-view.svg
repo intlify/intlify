@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="720" viewBox="0 0 1120 720" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 CST storage and view</title>
+  <desc id="desc">Logical CST tree represented by flat indexed storage, read through CstView accessors, with SemanticModel side tables linking back by NodeId and Span.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
+      .tree { fill: #eef2ff; stroke: #4338ca; stroke-width: 1.5; }
+      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .view { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; }
+      .semantic { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; }
+      .node { fill: #ffffff; stroke: #818cf8; stroke-width: 1.2; }
+      .row { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
+      .row-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
+      .view-item { fill: #ffffff; stroke: #34d399; stroke-width: 1.2; }
+      .semantic-item { fill: #ffffff; stroke: #fb923c; stroke-width: 1.2; }
+      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; }
+      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+      .tiny { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; font-weight: 550; letter-spacing: 0; }
+      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
+      .arrow { fill: none; stroke: #374151; stroke-width: 1.8; marker-end: url(#arrow); }
+      .line { fill: none; stroke: #64748b; stroke-width: 1.3; }
+      .dash { fill: none; stroke: #c2410c; stroke-width: 1.5; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1120" height="720" />
+  <rect class="frame" x="24" y="24" width="1072" height="672" rx="8" />
+
+  <text class="group-label" x="68" y="62">logical view</text>
+  <text class="group-label" x="68" y="344">physical storage</text>
+  <text class="group-label" x="782" y="344">semantic side tables</text>
+
+  <rect class="tree" x="56" y="82" width="1008" height="210" rx="8" />
+  <text class="label" x="560" y="116" text-anchor="middle">Logical CST Tree</text>
+  <text class="caption" x="560" y="138" text-anchor="middle">Tools can traverse it as a tree, but nodes are stored as indexed records.</text>
+
+  <rect class="node" x="500" y="154" width="120" height="42" rx="8" />
+  <text class="small" x="560" y="172" text-anchor="middle">Root</text>
+  <text class="tiny" x="560" y="188" text-anchor="middle">NodeId 0</text>
+
+  <rect class="node" x="500" y="222" width="120" height="42" rx="8" />
+  <text class="small" x="560" y="240" text-anchor="middle">Message</text>
+  <text class="tiny" x="560" y="256" text-anchor="middle">NodeId 1</text>
+
+  <rect class="node" x="256" y="222" width="120" height="42" rx="8" />
+  <text class="small" x="316" y="240" text-anchor="middle">Text</text>
+  <text class="tiny" x="316" y="256" text-anchor="middle">NodeId 2</text>
+
+  <rect class="node" x="744" y="222" width="120" height="42" rx="8" />
+  <text class="small" x="804" y="240" text-anchor="middle">Expression</text>
+  <text class="tiny" x="804" y="256" text-anchor="middle">NodeId 3</text>
+
+  <rect class="node" x="910" y="222" width="120" height="42" rx="8" />
+  <text class="small" x="970" y="240" text-anchor="middle">Annotation</text>
+  <text class="tiny" x="970" y="256" text-anchor="middle">NodeId 4</text>
+
+  <path class="line" d="M 560 196 L 560 222" />
+  <path class="line" d="M 560 264 L 560 278 L 316 278 L 316 264" />
+  <path class="line" d="M 560 278 L 804 278 L 804 264" />
+  <path class="line" d="M 804 222 L 804 206 L 970 206 L 970 222" />
+
+  <rect class="storage" x="56" y="362" width="660" height="284" rx="8" />
+  <text class="label" x="386" y="396" text-anchor="middle">Flat CstStorage</text>
+  <text class="caption" x="386" y="418" text-anchor="middle">Tree relationships are ranges into flat arrays, not recursive objects.</text>
+
+  <rect class="row-alt" x="86" y="446" width="600" height="34" rx="6" />
+  <text class="small" x="104" y="467">nodes</text>
+  <text class="tiny" x="190" y="467">0: Root { first_child: 0, child_count: 1 }</text>
+  <text class="tiny" x="462" y="467">1: Message { first_child: 1, child_count: 3 }</text>
+
+  <rect class="row" x="86" y="488" width="600" height="34" rx="6" />
+  <text class="small" x="104" y="509">edges</text>
+  <text class="tiny" x="190" y="509">[1, 2, 3, 4]</text>
+  <text class="tiny" x="338" y="509">children(node 1) = edges[1..4]</text>
+
+  <rect class="row-alt" x="86" y="530" width="600" height="34" rx="6" />
+  <text class="small" x="104" y="551">tokens</text>
+  <text class="tiny" x="190" y="551">0: Text, 1: OpenBrace, 2: Identifier, 3: CloseBrace</text>
+
+  <rect class="row" x="86" y="572" width="600" height="34" rx="6" />
+  <text class="small" x="104" y="593">trivia</text>
+  <text class="tiny" x="190" y="593">whitespace and line breaks by Span</text>
+
+  <rect class="row-alt" x="86" y="614" width="600" height="34" rx="6" />
+  <text class="small" x="104" y="635">spans</text>
+  <text class="tiny" x="190" y="635">UTF-8 byte offsets, source text stays in SourceStore</text>
+
+  <rect class="view" x="756" y="372" width="308" height="150" rx="8" />
+  <text class="label" x="910" y="404" text-anchor="middle">CstView Accessors</text>
+  <rect class="view-item" x="784" y="426" width="120" height="30" rx="6" />
+  <text class="tiny" x="844" y="446" text-anchor="middle">kind(node)</text>
+  <rect class="view-item" x="916" y="426" width="120" height="30" rx="6" />
+  <text class="tiny" x="976" y="446" text-anchor="middle">children(node)</text>
+  <rect class="view-item" x="784" y="466" width="120" height="30" rx="6" />
+  <text class="tiny" x="844" y="486" text-anchor="middle">tokens(node)</text>
+  <rect class="view-item" x="916" y="466" width="120" height="30" rx="6" />
+  <text class="tiny" x="976" y="486" text-anchor="middle">source_slice(span)</text>
+
+  <rect class="semantic" x="756" y="546" width="308" height="100" rx="8" />
+  <text class="label" x="910" y="578" text-anchor="middle">SemanticModel</text>
+  <text class="caption" x="910" y="598" text-anchor="middle">side tables, not a replacement tree</text>
+  <rect class="semantic-item" x="784" y="612" width="120" height="26" rx="6" />
+  <text class="tiny" x="844" y="630" text-anchor="middle">declarations</text>
+  <rect class="semantic-item" x="916" y="612" width="120" height="26" rx="6" />
+  <text class="tiny" x="976" y="630" text-anchor="middle">references</text>
+
+  <path class="arrow" d="M 716 500 L 754 466" />
+  <path class="arrow" d="M 910 372 C 900 330 820 310 730 288" />
+  <path class="dash" d="M 804 546 C 746 520 690 504 620 488" />
+  <text class="caption" x="740" y="548">NodeId &amp; Span links</text>
+
+  <text class="caption" x="560" y="680" text-anchor="middle">Logical tree traversal is provided by CstView; storage remains compact flat arrays for parser performance and later snapshot encoding.</text>
+</svg>

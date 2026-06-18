@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="720" viewBox="0 0 1080 720" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 Binary AST and binding architecture</title>
+  <desc id="desc">Phase 2 architecture showing parser and lowering producing construction-time tables, SnapshotWriter emitting a versioned Binary AST snapshot, and shared decoder/accessor views for Rust, N-API, WASM, and future C ABI bindings.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
+      .phase { fill: #f8fafc; stroke: #9ca3af; stroke-width: 1.2; }
+      .core { fill: #eef2ff; stroke: #4338ca; stroke-width: 1.5; }
+      .writer { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; }
+      .snapshot { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.8; }
+      .decoder { fill: #fefce8; stroke: #a16207; stroke-width: 1.5; }
+      .future { fill: #f9fafb; stroke: #6b7280; stroke-width: 1.4; stroke-dasharray: 6 5; }
+      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0; }
+      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
+      .arrow { fill: none; stroke: #374151; stroke-width: 1.8; marker-end: url(#arrow); }
+      .branch { fill: none; stroke: #6b7280; stroke-width: 1.5; marker-end: url(#arrow); }
+      .dashed { fill: none; stroke: #6b7280; stroke-width: 1.4; stroke-dasharray: 6 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1080" height="720" />
+  <rect class="frame" x="24" y="24" width="1032" height="672" rx="8" />
+
+  <text class="group-label" x="70" y="64">phase 1 construction path</text>
+  <text class="group-label" x="454" y="64">phase 2 product boundary</text>
+  <text class="group-label" x="760" y="64">shared public views</text>
+
+  <rect class="phase" x="56" y="88" width="300" height="512" rx="8" />
+  <rect class="phase" x="390" y="88" width="300" height="512" rx="8" />
+  <rect class="phase" x="724" y="88" width="300" height="512" rx="8" />
+
+  <rect class="core" x="96" y="124" width="220" height="54" rx="8" />
+  <text class="label" x="206" y="156" text-anchor="middle">Parser / Lowering</text>
+
+  <rect class="core" x="96" y="218" width="220" height="74" rx="8" />
+  <text class="label" x="206" y="248" text-anchor="middle">Construction Tables</text>
+  <text class="caption" x="206" y="270" text-anchor="middle">nodes, edges, tokens, trivia</text>
+
+  <rect class="core" x="96" y="332" width="220" height="74" rx="8" />
+  <text class="label" x="206" y="362" text-anchor="middle">SourceStore</text>
+  <text class="caption" x="206" y="384" text-anchor="middle">SourceId, text, line index</text>
+
+  <rect class="core" x="96" y="448" width="220" height="74" rx="8" />
+  <text class="label" x="206" y="478" text-anchor="middle">Diagnostics</text>
+  <text class="caption" x="206" y="500" text-anchor="middle">SourceId + UTF-8 Span</text>
+
+  <rect class="writer" x="430" y="206" width="220" height="86" rx="8" />
+  <text class="label" x="540" y="242" text-anchor="middle">SnapshotWriter</text>
+  <text class="caption" x="540" y="264" text-anchor="middle">linear table encoding</text>
+
+  <rect class="snapshot" x="414" y="354" width="252" height="116" rx="8" />
+  <text class="label" x="540" y="392" text-anchor="middle">Versioned Binary AST</text>
+  <text class="label" x="540" y="416" text-anchor="middle">Snapshot</text>
+  <text class="caption" x="540" y="442" text-anchor="middle">header, sections, roots, diagnostics</text>
+
+  <rect class="decoder" x="768" y="112" width="212" height="58" rx="8" />
+  <text class="label" x="874" y="146" text-anchor="middle">Rust Decoder</text>
+
+  <rect class="decoder" x="768" y="210" width="212" height="58" rx="8" />
+  <text class="label" x="874" y="244" text-anchor="middle">N-API Decoder</text>
+
+  <rect class="decoder" x="768" y="308" width="212" height="58" rx="8" />
+  <text class="label" x="874" y="342" text-anchor="middle">WASM Decoder</text>
+
+  <rect class="future" x="768" y="406" width="212" height="58" rx="8" />
+  <text class="label" x="874" y="440" text-anchor="middle">Future C ABI</text>
+
+  <rect class="decoder" x="768" y="514" width="212" height="58" rx="8" />
+  <text class="label" x="874" y="548" text-anchor="middle">Accessor Views</text>
+
+  <path class="arrow" d="M 206 178 L 206 216" />
+  <path class="branch" d="M 316 255 L 428 249" />
+  <path class="branch" d="M 316 369 L 430 263" />
+  <path class="branch" d="M 316 485 L 430 277" />
+  <path class="arrow" d="M 540 292 L 540 352" />
+
+  <path class="arrow" d="M 666 412 L 714 412 L 714 141 L 766 141" />
+  <path class="arrow" d="M 666 412 L 714 412 L 714 239 L 766 239" />
+  <path class="arrow" d="M 666 412 L 714 412 L 714 337 L 766 337" />
+  <path class="dashed" d="M 666 412 L 714 412 L 714 435 L 766 435" />
+
+  <path class="branch" d="M 874 170 L 874 512" />
+  <path class="branch" d="M 874 268 L 874 512" />
+  <path class="branch" d="M 874 366 L 874 512" />
+  <path class="dashed" d="M 874 464 L 874 512" />
+
+  <text class="caption" x="206" y="632" text-anchor="middle">No public typed AST conversion path.</text>
+  <text class="caption" x="540" y="632" text-anchor="middle">Snapshot encoding is measured separately from parsing.</text>
+  <text class="caption" x="874" y="632" text-anchor="middle">Rust, N-API, and WASM share the public AST view.</text>
+</svg>
