@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="760" viewBox="0 0 960 760" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 initial architecture</title>
+  <desc id="desc">Initial ox-mf2 architecture showing SourceStore, Lexer, Recovering Parser, Lossless CST Storage, Semantic Lowering, Shared Semantic Model, Diagnostics, and external tool outputs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
+      .main { fill: #f8fafc; stroke: #374151; stroke-width: 1.5; }
+      .storage { fill: #eef2ff; stroke: #4338ca; stroke-width: 1.5; }
+      .semantic { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; }
+      .diagnostic { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; }
+      .tool { fill: #fefce8; stroke: #a16207; stroke-width: 1.5; }
+      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 15px; font-weight: 650; letter-spacing: 0; }
+      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 550; letter-spacing: 0; }
+      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+      .arrow { fill: none; stroke: #374151; stroke-width: 1.7; marker-end: url(#arrow); }
+      .branch { fill: none; stroke: #6b7280; stroke-width: 1.5; marker-end: url(#arrow); }
+      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="960" height="760" />
+  <rect class="frame" x="24" y="24" width="912" height="712" rx="8" />
+
+  <text class="group-label" x="128" y="64">input and parse pipeline</text>
+  <text class="group-label" x="674" y="64">derived views and tools</text>
+
+  <rect class="storage" x="320" y="48" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="81" text-anchor="middle">SourceStore</text>
+
+  <rect class="main" x="320" y="128" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="161" text-anchor="middle">Lexer</text>
+
+  <rect class="tool" x="680" y="108" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="134" text-anchor="middle">TokenStream</text>
+
+  <rect class="tool" x="680" y="164" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="190" text-anchor="middle">Trivia</text>
+
+  <rect class="main" x="320" y="232" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="265" text-anchor="middle">Recovering Parser</text>
+
+  <rect class="storage" x="320" y="336" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="369" text-anchor="middle">Lossless CST Storage</text>
+
+  <rect class="tool" x="680" y="342" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="368" text-anchor="middle">Formatter</text>
+
+  <rect class="semantic" x="320" y="440" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="473" text-anchor="middle">Semantic Lowering</text>
+
+  <rect class="semantic" x="320" y="544" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="577" text-anchor="middle">Shared Semantic Model</text>
+
+  <rect class="tool" x="680" y="512" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="538" text-anchor="middle">Linter</text>
+
+  <rect class="tool" x="680" y="568" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="594" text-anchor="middle">Compiler / Runtime IR</text>
+
+  <rect class="tool" x="680" y="624" width="190" height="42" rx="8" />
+  <text class="small" x="775" y="650" text-anchor="middle">Validation</text>
+
+  <rect class="diagnostic" x="108" y="610" width="230" height="54" rx="8" />
+  <text class="label" x="223" y="643" text-anchor="middle">Diagnostics</text>
+
+  <rect class="diagnostic" x="108" y="682" width="230" height="42" rx="8" />
+  <text class="small" x="223" y="708" text-anchor="middle">Reporter / Binding View / CLI</text>
+
+  <path class="arrow" d="M 470 102 L 470 126" />
+  <path class="arrow" d="M 470 182 L 470 230" />
+  <path class="arrow" d="M 470 286 L 470 334" />
+  <path class="arrow" d="M 470 390 L 470 438" />
+  <path class="arrow" d="M 470 494 L 470 542" />
+
+  <path class="branch" d="M 620 155 L 646 155 L 646 129 L 678 129" />
+  <path class="branch" d="M 620 155 L 646 155 L 646 185 L 678 185" />
+  <path class="branch" d="M 620 363 L 678 363" />
+
+  <path class="branch" d="M 620 571 L 646 571 L 646 533 L 678 533" />
+  <path class="branch" d="M 620 571 L 678 589" />
+  <path class="branch" d="M 620 571 L 646 571 L 646 645 L 678 645" />
+
+  <path class="arrow" d="M 320 571 L 223 571 L 223 608" />
+  <path class="arrow" d="M 223 664 L 223 680" />
+
+  <text class="caption" x="116" y="596">shared errors and warnings</text>
+  <text class="caption" x="680" y="92">lossless lexer output</text>
+  <text class="caption" x="680" y="326">format-preserving view</text>
+  <text class="caption" x="680" y="496">semantic consumers</text>
+</svg>
