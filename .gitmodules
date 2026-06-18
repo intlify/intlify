@@ -34,3 +34,11 @@
 	path = refers/corsa-bind
 	url = https://github.com/ubugeeei-prod/corsa-bind.git
 	shallow = true
+[submodule "refers/ox-jsdoc"]
+	path = refers/ox-jsdoc
+	url = https://github.com/kazupon/ox-jsdoc.git
+	shallow = true
+[submodule "refers/typescript-go"]
+	path = refers/typescript-go
+	url = https://github.com/microsoft/typescript-go.git
+	shallow = true
