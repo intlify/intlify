@@ -11,7 +11,7 @@
     <style>
       .bg { fill: none; }
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
-      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .lowering { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
       .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
       .boundary { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
@@ -32,7 +32,7 @@
       .semantic-arrow-fill { fill: #7e22ce; }
       @media (prefers-color-scheme: dark) {
         .frame { fill: #111827; stroke: #475569; }
-        .storage { fill: #1e293b; stroke: #64748b; }
+        .table { fill: #1e293b; stroke: #64748b; }
         .lowering { fill: #451a03; stroke: #f59e0b; }
         .semantic { fill: #3b0764; stroke: #c084fc; }
         .boundary { fill: #1e293b; stroke: #64748b; }
@@ -62,7 +62,7 @@
   <text class="group-label" x="414" y="66">lazy value extraction</text>
   <text class="group-label" x="784" y="66">semantic value records</text>
 
-  <rect class="storage" x="56" y="92" width="300" height="500" rx="8" />
+  <rect class="table" x="56" y="92" width="300" height="500" rx="8" />
   <text class="label" x="206" y="128" text-anchor="middle">CST keeps source form</text>
   <text class="caption" x="206" y="150" text-anchor="middle">Raw spans preserve sigils, delimiters, escapes.</text>
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
   <title id="title">ox-mf2 Phase 1 SemanticModel design</title>
-  <desc id="desc">Phase 1 SemanticModel is optionally lowered from CstStorage and CstView into side-table records that keep SemanticRef links back to NodeId and UTF-8 byte spans.</desc>
+  <desc id="desc">Phase 1 SemanticModel is optionally lowered from CstTables and CstView into side-table records that keep SemanticRef links back to NodeId and UTF-8 byte spans.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -11,7 +11,7 @@
     <style>
       .bg { fill: none; }
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
-      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .view { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.5; }
       .lowering { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
       .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
@@ -36,7 +36,7 @@
       .semantic-arrow-fill { fill: #7e22ce; }
       @media (prefers-color-scheme: dark) {
         .frame { fill: #111827; stroke: #475569; }
-        .storage { fill: #1e293b; stroke: #64748b; }
+        .table { fill: #1e293b; stroke: #64748b; }
         .view { fill: #134e4a; stroke: #2dd4bf; }
         .lowering { fill: #451a03; stroke: #f59e0b; }
         .semantic { fill: #3b0764; stroke: #c084fc; }
@@ -70,12 +70,12 @@
   <text class="group-label" x="414" y="66">optional lowering phase</text>
   <text class="group-label" x="784" y="66">semantic side tables</text>
 
-  <rect class="storage" x="56" y="92" width="300" height="488" rx="8" />
+  <rect class="table" x="56" y="92" width="300" height="488" rx="8" />
   <text class="label" x="206" y="128" text-anchor="middle">ParseResult syntax data</text>
   <text class="caption" x="206" y="150" text-anchor="middle">Always built before semantic lowering.</text>
 
   <rect class="row-alt" x="84" y="184" width="244" height="52" rx="6" />
-  <text class="small" x="106" y="206">CstStorage</text>
+  <text class="small" x="106" y="206">CstTables</text>
   <text class="tiny" x="106" y="222">nodes, edges, tokens, trivia</text>
 
   <rect class="view-item" x="84" y="252" width="244" height="52" rx="6" />

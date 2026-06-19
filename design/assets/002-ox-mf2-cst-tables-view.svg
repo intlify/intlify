@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="780" viewBox="0 0 1120 780" role="img" aria-labelledby="title desc">
-  <title id="title">ox-mf2 CST storage and view</title>
-  <desc id="desc">Logical CST tree represented by flat indexed storage, read through CstView accessors, with SemanticModel side tables linking back by NodeId and Span.</desc>
+  <title id="title">ox-mf2 CST tables and view</title>
+  <desc id="desc">Logical CST tree represented by flat indexed tables, read through CstView accessors, with SemanticModel side tables linking back by NodeId and Span.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -12,7 +12,7 @@
       .bg { fill: none; }
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
       .tree { fill: #eef2ff; stroke: #4f46e5; stroke-width: 1.5; }
-      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .view { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.5; }
       .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
       .node { fill: #ffffff; stroke: #6366f1; stroke-width: 1.2; }
@@ -33,7 +33,7 @@
       @media (prefers-color-scheme: dark) {
         .frame { fill: #111827; stroke: #475569; }
         .tree { fill: #1e1b4b; stroke: #818cf8; }
-        .storage { fill: #1e293b; stroke: #64748b; }
+        .table { fill: #1e293b; stroke: #64748b; }
         .view { fill: #134e4a; stroke: #2dd4bf; }
         .semantic { fill: #3b0764; stroke: #c084fc; }
         .node { fill: #312e81; stroke: #a5b4fc; }
@@ -59,7 +59,7 @@
   <rect class="frame" x="24" y="24" width="1072" height="732" rx="8" />
 
   <text class="group-label" x="68" y="62">logical view</text>
-  <text class="group-label" x="68" y="386">physical storage</text>
+  <text class="group-label" x="68" y="386">physical table</text>
   <text class="group-label" x="782" y="386">semantic side tables</text>
 
   <rect class="tree" x="56" y="82" width="1008" height="260" rx="8" />
@@ -93,8 +93,8 @@
   <path class="line" d="M 560 270 L 560 282" />
   <path class="line" d="M 830 270 L 830 282" />
 
-  <rect class="storage" x="56" y="406" width="660" height="302" rx="8" />
-  <text class="label" x="386" y="440" text-anchor="middle">Flat CstStorage</text>
+  <rect class="table" x="56" y="406" width="660" height="302" rx="8" />
+  <text class="label" x="386" y="440" text-anchor="middle">Flat CST tables</text>
   <text class="caption" x="386" y="462" text-anchor="middle">Tree relationships are ranges into flat arrays, not recursive objects.</text>
 
   <rect class="row-alt" x="86" y="490" width="600" height="34" rx="6" />
@@ -143,5 +143,5 @@
   <path class="dash" d="M 804 586 C 744 570 694 548 620 532" />
   <text class="caption" x="910" y="580" text-anchor="middle">NodeId &amp; Span links</text>
 
-  <text class="caption" x="560" y="742" text-anchor="middle">Logical tree traversal is provided by CstView; storage remains compact flat arrays for parser performance and later snapshot encoding.</text>
+  <text class="caption" x="560" y="742" text-anchor="middle">Logical tree traversal is provided by CstView; tables remain compact flat arrays for parser performance and later snapshot encoding.</text>
 </svg>

@@ -23,7 +23,7 @@
     .contract { fill:#0f766e; }
     .surface { fill:#475569; }
     .consumer { fill:#475569; }
-    .storage { fill:#334155; }
+    .table { fill:#334155; }
     @media (prefers-color-scheme: dark) {
       .title { fill:#f8fafc; }
       .subtitle { fill:#cbd5e1; }
@@ -77,7 +77,7 @@
 <text x="580" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Lazy accessors</text>
 <text x="580" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">read views on demand</text>
 
-<rect x="462" y="394" width="236" height="58" rx="7" class="storage"/>
+<rect x="462" y="394" width="236" height="58" rx="7" class="table"/>
 <text x="580" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Encoded snapshot</text>
 <text x="580" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">advanced transport API</text>
 

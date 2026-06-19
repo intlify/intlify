@@ -17,7 +17,7 @@
 <text x="540" y="34" font-size="19" class="title" text-anchor="middle" font-weight="700">Diagnostics Memory Layout</text>
 <text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">Diagnostics and diagnostic labels are fixed-record sections with source spans and StringRef messages.</text>
 <rect x="44" y="86" width="992" height="84" rx="6" class="surface" opacity="1"/>
-<text x="62" y="116" font-size="13" class="label" font-weight="700">Diagnostics storage</text>
+<text x="62" y="116" font-size="13" class="label" font-weight="700">Diagnostics table</text>
 <text x="62" y="138" font-size="11" class="muted">RootRecord ranges point to grouped DiagnosticRecord entries; labels are separate fixed records.</text>
 <rect x="44" y="202" width="992" height="164" rx="6" class="surface" opacity="1"/>
 <text x="62" y="232" font-size="13" class="label" font-weight="700">SectionRecord memory layout</text>

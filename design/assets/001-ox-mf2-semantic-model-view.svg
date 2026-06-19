@@ -22,7 +22,7 @@
     .contract { fill:#0f766e; }
     .surface { fill:#475569; }
     .consumer { fill:#475569; }
-    .storage { fill:#334155; }
+    .table { fill:#334155; }
     .phase { fill:#475569; }
     @media (prefers-color-scheme: dark) {
       .title { fill:#f8fafc; }
@@ -73,13 +73,13 @@
 
 <rect x="468" y="320" width="224" height="158" rx="8" class="semantic"/>
 <text x="580" y="348" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">SemanticModel</text>
-<rect x="490" y="372" width="82" height="30" rx="5" class="storage"/>
+<rect x="490" y="372" width="82" height="30" rx="5" class="table"/>
 <text x="531" y="392" font-size="9.5" fill="#ffffff" text-anchor="middle">symbols</text>
-<rect x="588" y="372" width="82" height="30" rx="5" class="storage"/>
+<rect x="588" y="372" width="82" height="30" rx="5" class="table"/>
 <text x="629" y="392" font-size="9.5" fill="#ffffff" text-anchor="middle">references</text>
-<rect x="490" y="414" width="82" height="30" rx="5" class="storage"/>
+<rect x="490" y="414" width="82" height="30" rx="5" class="table"/>
 <text x="531" y="434" font-size="9.5" fill="#ffffff" text-anchor="middle">selectors</text>
-<rect x="588" y="414" width="82" height="30" rx="5" class="storage"/>
+<rect x="588" y="414" width="82" height="30" rx="5" class="table"/>
 <text x="629" y="434" font-size="9.5" fill="#ffffff" text-anchor="middle">variants</text>
 <text x="580" y="462" font-size="10.5" fill="#e5e7eb" text-anchor="middle">fallback, duplicates, coverage</text>
 

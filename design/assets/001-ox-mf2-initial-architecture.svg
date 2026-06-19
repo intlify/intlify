@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="780" viewBox="0 0 960 780" role="img" aria-labelledby="title desc">
   <title id="title">ox-mf2 initial architecture</title>
-  <desc id="desc">Initial ox-mf2 architecture showing SourceStore, Lexer, Recovering Parser, Lossless CST Storage, Semantic Lowering, Shared Semantic Model, Diagnostics, and external tool outputs.</desc>
+  <desc id="desc">Initial ox-mf2 architecture showing SourceStore, Lexer, Recovering Parser, Lossless CST Table, Semantic Lowering, Shared Semantic Model, Diagnostics, and external tool outputs.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -9,7 +9,7 @@
       .bg { fill: none; }
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
       .main { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
-      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .semantic { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.5; }
       .diagnostic { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .tool { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
@@ -24,7 +24,7 @@
       @media (prefers-color-scheme: dark) {
         .frame { fill: #111827; stroke: #475569; }
         .main { fill: #1e293b; stroke: #64748b; }
-        .storage { fill: #1e293b; stroke: #64748b; }
+        .table { fill: #1e293b; stroke: #64748b; }
         .semantic { fill: #0f766e; stroke: #2dd4bf; }
         .diagnostic { fill: #1e293b; stroke: #64748b; }
         .tool { fill: #1e293b; stroke: #64748b; }
@@ -46,7 +46,7 @@
   <text class="group-label" x="128" y="64">input and parse pipeline</text>
   <text class="group-label" x="674" y="64">derived views and tools</text>
 
-  <rect class="storage" x="320" y="48" width="300" height="54" rx="8" />
+  <rect class="table" x="320" y="48" width="300" height="54" rx="8" />
   <text class="label" x="470" y="81" text-anchor="middle">SourceStore</text>
 
   <rect class="main" x="320" y="128" width="300" height="54" rx="8" />
@@ -61,8 +61,8 @@
   <rect class="main" x="320" y="232" width="300" height="54" rx="8" />
   <text class="label" x="470" y="265" text-anchor="middle">Recovering Parser</text>
 
-  <rect class="storage" x="320" y="336" width="300" height="54" rx="8" />
-  <text class="label" x="470" y="369" text-anchor="middle">Lossless CST Storage</text>
+  <rect class="table" x="320" y="336" width="300" height="54" rx="8" />
+  <text class="label" x="470" y="369" text-anchor="middle">Lossless CST Table</text>
 
   <rect class="tool" x="680" y="342" width="190" height="42" rx="8" />
   <text class="small" x="775" y="368" text-anchor="middle">Formatter</text>

@@ -10,9 +10,9 @@ foundation document は [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolch
 
 ox-mf2 は Rust core を唯一の semantic implementation にする。他言語で MF2 parsing、CST construction、semantic analysis、diagnostics、formatting、linting を再実装しない。
 
-Phase 1 では recovering parser と snapshot-friendly construction-time storage を作る。Phase 2 では versioned Binary AST snapshot を導入し、N-API、WASM、後続 language bindings、persistence、transport の product boundary にする。
+Phase 1 では recovering parser と snapshot-friendly construction-time tables を作る。Phase 2 では versioned Binary AST snapshot を導入し、N-API、WASM、後続 language bindings、persistence、transport の product boundary にする。
 
-Rust core の hot path は `CstStorage` / `CstView` / `SemanticModel` を維持する。Binary AST snapshot は Rust core の通常 parse output ではなく、language boundary、persistence、worker transfer、batch transfer のために `CstStorage` から encode される表現である。
+Rust core の hot path は `CstTables` / `CstView` / `SemanticModel` を維持する。Binary AST snapshot は Rust core の通常 parse output ではなく、language boundary、persistence、worker transfer、batch transfer のために `CstTables` から encode される表現である。
 
 この設計では次の path を避ける。
 
@@ -407,7 +407,7 @@ TriviaRecord {
 }
 ```
 
-TokenRecord.kind と TriviaRecord.kind も Phase 1 `SyntaxKind` の numeric value を直接格納する。node、token、trivia は同じ `SyntaxKind` family を共有するが、decoder/accessor は section context と helper predicate により node kind、token kind、trivia kind として扱う。decoder は TokenRecord.kind / TriviaRecord.kind についても unknown `SyntaxKind` numeric value を reject する。これにより parser storage、snapshot records、binding accessor の kind identity が一致し、snapshot encode 時の kind conversion table を不要にする。
+TokenRecord.kind と TriviaRecord.kind も Phase 1 `SyntaxKind` の numeric value を直接格納する。node、token、trivia は同じ `SyntaxKind` family を共有するが、decoder/accessor は section context と helper predicate により node kind、token kind、trivia kind として扱う。decoder は TokenRecord.kind / TriviaRecord.kind についても unknown `SyntaxKind` numeric value を reject する。これにより parser tables、snapshot records、binding accessor の kind identity が一致し、snapshot encode 時の kind conversion table を不要にする。
 
 formatter、特に preserve mode は、nested object tree に依存せず source を faithful に再構築するために token と trivia sections を使う。
 
@@ -451,7 +451,7 @@ DiagnosticLabelRecord {
 
 labels がない diagnostic は `label_count = 0` とする。decoder は `label_start + label_count <= diagnostic_labels.count` を検証する。help text は v1 snapshot record には含めず、必要になった時点で optional diagnostic-help section として追加する。
 
-public API は convenience のため diagnostics を別に返してもよいが、snapshot format は encoded result の一部として diagnostics を保持できなければならない。binding result の flat diagnostics array は snapshot 内の diagnostic records を root order で読んだ view であり、別の diagnostic storage ではない。
+public API は convenience のため diagnostics を別に返してもよいが、snapshot format は encoded result の一部として diagnostics を保持できなければならない。binding result の flat diagnostics array は snapshot 内の diagnostic records を root order で読んだ view であり、別の diagnostic table ではない。
 
 ## SemanticView（意味情報 view）
 
@@ -644,13 +644,13 @@ batch parsing では、bindings は 1 つの shared snapshot buffer を内部に
 
 `result.diagnostics` は root order の flat array として返す。single-message result では root 1 件分の diagnostics、batch result では `result.roots` order に grouped された全 diagnostics を表す。各 root handle からも `root.diagnostics()` のような lazy accessor で自分の diagnostics range を取得できる。
 
-flat diagnostics array と root-local diagnostics accessor は同じ snapshot diagnostics section を読む。binding は diagnostics を別 storage として複製しない。ただし JS/WASM ergonomics のため、consumer が `result.diagnostics` を読む時点で lightweight diagnostic view objects を materialize してよい。
+flat diagnostics array と root-local diagnostics accessor は同じ snapshot diagnostics section を読む。binding は diagnostics を別 table として複製しない。ただし JS/WASM ergonomics のため、consumer が `result.diagnostics` を読む時点で lightweight diagnostic view objects を materialize してよい。
 
 `include_source_text = false` の batch result では、各 root が `source_id` を持ち、source metadata は SourceRecord、input source text への参照は binding result 側に保持する。`include_source_text = true` の batch result では、snapshot 内に source text data を含めるため、worker transfer や persistence 後も snapshot 単体で source slice を解決できる。
 
 ## Formatter と Linter の入力
 
-Phase 2 以降、formatter と linter の public AST input は Binary AST decoder/accessor view にする。Rust implementation は必要に応じて construction-time storage または semantic model の internal fast path を持ってよいが、stable public traversal model は Rust、N-API、WASM consumer で共有される Binary AST view に揃える。
+Phase 2 以降、formatter と linter の public AST input は Binary AST decoder/accessor view にする。Rust implementation は必要に応じて construction-time tables または semantic model の internal fast path を持ってよいが、stable public traversal model は Rust、N-API、WASM consumer で共有される Binary AST view に揃える。
 
 ## MessagePack transport
 
@@ -701,8 +701,8 @@ snapshot と binding work を 1 つの parser number の中に隠してはなら
 
 Phase 2 benchmark は parser hot path、snapshot encoding、snapshot decoding、binding/export cost を分離して測る。
 
-- `parse_cst`: Rust parser が CstStorage を構築する cost。
-- `encode_snapshot`: 既存の CstStorage / diagnostics / source metadata から Binary AST snapshot bytes を構築する cost。
+- `parse_cst`: Rust parser が CstTables を構築する cost。
+- `encode_snapshot`: 既存の CstTables / diagnostics / source metadata から Binary AST snapshot bytes を構築する cost。
 - `decode_snapshot`: snapshot bytes を validation し、lazy SnapshotView / section index を構築する cost。node/token/string traversal は含めない。
 - `snapshot_accessor_traversal`: decoded SnapshotView から roots、nodes、tokens、trivia、diagnostics を lazy accessor で読む cost。
 - `snapshot_to_bytes_copy`: `result.snapshot.toBytes()` が internal buffer を copy して external bytes を返す cost。
