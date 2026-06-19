@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 760" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">SemanticModel and SemanticView</title>
+<desc id="desc">SemanticModel stores shared MF2 facts for linting, compilation, validation, diagnostics, and editor workflows. SemanticView exposes those facts separately from the lossless syntax snapshot and links them back by NodeId and Span.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#1f2937; }
+    .muted { fill:#6b7280; }
+    .small { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .foundation { fill:#f8fafc; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .source { fill:#475569; }
+    .syntax { fill:#475569; }
+    .semantic { fill:#0f766e; }
+    .diagnostic { fill:#334155; }
+    .contract { fill:#0f766e; }
+    .surface { fill:#475569; }
+    .consumer { fill:#475569; }
+    .storage { fill:#334155; }
+    .phase { fill:#475569; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .small { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .foundation { fill:#0f172a; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1160" height="760" fill="none"/>
+
+<text x="580" y="42" font-size="22" font-weight="700" class="title" text-anchor="middle">SemanticModel / SemanticView</text>
+<text x="580" y="70" font-size="13" class="subtitle" text-anchor="middle">Semantic facts are shared by tools, but remain separate from the lossless syntax surface.</text>
+
+<rect x="46" y="112" width="302" height="424" rx="10" class="panel" stroke-width="2"/>
+<text x="74" y="150" font-size="16" font-weight="700" class="label">Syntax surface</text>
+<text x="74" y="176" font-size="12" class="muted">Lossless data stays syntax-first.</text>
+<text x="74" y="196" font-size="12" class="muted">Tools can always map back to source.</text>
+
+<rect x="82" y="236" width="230" height="62" rx="7" class="source"/>
+<text x="197" y="260" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Source + spans</text>
+<text x="197" y="280" font-size="10.5" fill="#e5e7eb" text-anchor="middle">SourceId + UTF-8 byte Span</text>
+
+<rect x="82" y="326" width="230" height="62" rx="7" class="syntax"/>
+<text x="197" y="350" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Lossless CST</text>
+<text x="197" y="370" font-size="10.5" fill="#e5e7eb" text-anchor="middle">nodes, tokens, trivia</text>
+
+<rect x="82" y="416" width="230" height="62" rx="7" class="contract"/>
+<text x="197" y="440" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Binary AST snapshot</text>
+<text x="197" y="460" font-size="10.5" fill="#e5e7eb" text-anchor="middle">Phase 2 syntax boundary</text>
+
+<rect x="430" y="112" width="300" height="424" rx="10" class="foundation" stroke-width="2"/>
+<text x="458" y="150" font-size="16" font-weight="700" class="label">Semantic lowering</text>
+<text x="458" y="176" font-size="12" class="muted">The core derives facts once.</text>
+<text x="458" y="196" font-size="12" class="muted">Facts link back by NodeId and Span.</text>
+
+<rect x="468" y="228" width="224" height="56" rx="7" class="phase"/>
+<text x="580" y="251" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Resolve MF2 facts</text>
+<text x="580" y="270" font-size="10.5" fill="#e5e7eb" text-anchor="middle">selectors, variants, refs</text>
+
+<path d="M 580 290 L 580 312" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="468" y="320" width="224" height="158" rx="8" class="semantic"/>
+<text x="580" y="348" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">SemanticModel</text>
+<rect x="490" y="372" width="82" height="30" rx="5" class="storage"/>
+<text x="531" y="392" font-size="9.5" fill="#ffffff" text-anchor="middle">symbols</text>
+<rect x="588" y="372" width="82" height="30" rx="5" class="storage"/>
+<text x="629" y="392" font-size="9.5" fill="#ffffff" text-anchor="middle">references</text>
+<rect x="490" y="414" width="82" height="30" rx="5" class="storage"/>
+<text x="531" y="434" font-size="9.5" fill="#ffffff" text-anchor="middle">selectors</text>
+<rect x="588" y="414" width="82" height="30" rx="5" class="storage"/>
+<text x="629" y="434" font-size="9.5" fill="#ffffff" text-anchor="middle">variants</text>
+<text x="580" y="462" font-size="10.5" fill="#e5e7eb" text-anchor="middle">fallback, duplicates, coverage</text>
+
+<rect x="812" y="112" width="302" height="424" rx="10" class="panel" stroke-width="2"/>
+<text x="840" y="150" font-size="16" font-weight="700" class="label">Public semantic surface</text>
+<text x="840" y="176" font-size="12" class="muted">Consumers read a view.</text>
+<text x="840" y="196" font-size="12" class="muted">They do not reimplement MF2 rules.</text>
+
+<rect x="852" y="236" width="224" height="70" rx="7" class="semantic"/>
+<text x="964" y="264" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">SemanticView</text>
+<text x="964" y="286" font-size="10.5" fill="#e5e7eb" text-anchor="middle">facts queried by stable handles</text>
+
+<rect x="852" y="340" width="98" height="52" rx="7" class="consumer"/>
+<text x="901" y="370" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">Linter</text>
+<rect x="978" y="340" width="98" height="52" rx="7" class="consumer" opacity="0.86"/>
+<text x="1027" y="370" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">Compiler</text>
+
+<rect x="852" y="418" width="98" height="52" rx="7" class="consumer" opacity="0.86"/>
+<text x="901" y="449" font-size="10.8" font-weight="700" fill="#ffffff" text-anchor="middle">Validation</text>
+<rect x="978" y="418" width="98" height="52" rx="7" class="diagnostic"/>
+<text x="1027" y="441" font-size="10.5" font-weight="700" fill="#ffffff" text-anchor="middle">Diagnostics</text>
+<text x="1027" y="458" font-size="10.5" font-weight="700" fill="#ffffff" text-anchor="middle">editor</text>
+
+<path d="M 348 326 L 420 326" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M 730 324 L 802 324" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M 964 314 L 964 330" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="82" y="590" width="996" height="116" rx="10" class="foundation" stroke-width="2"/>
+<text x="110" y="626" font-size="15" font-weight="700" class="label">Separation rule</text>
+<rect x="110" y="650" width="284" height="34" rx="6" class="contract"/>
+<text x="252" y="672" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">Binary AST: lossless syntax surface</text>
+<rect x="438" y="650" width="284" height="34" rx="6" class="semantic"/>
+<text x="580" y="672" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">SemanticView: derived semantic facts</text>
+<rect x="766" y="650" width="284" height="34" rx="6" class="source"/>
+<text x="908" y="672" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">Link key: NodeId + SourceId + Span</text>
+</svg>

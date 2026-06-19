@@ -1,96 +1,105 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="720" viewBox="0 0 1080 720" role="img" aria-labelledby="title desc">
-  <title id="title">ox-mf2 Binary AST and binding architecture</title>
-  <desc id="desc">Phase 2 architecture showing parser and lowering producing construction-time tables, SnapshotWriter emitting a versioned Binary AST snapshot, and shared decoder/accessor views for Rust, N-API, WASM, and future C ABI bindings.</desc>
-  <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151" />
-    </marker>
-    <style>
-      .bg { fill: #ffffff; }
-      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
-      .phase { fill: #f8fafc; stroke: #9ca3af; stroke-width: 1.2; }
-      .core { fill: #eef2ff; stroke: #4338ca; stroke-width: 1.5; }
-      .writer { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; }
-      .snapshot { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.8; }
-      .decoder { fill: #fefce8; stroke: #a16207; stroke-width: 1.5; }
-      .future { fill: #f9fafb; stroke: #6b7280; stroke-width: 1.4; stroke-dasharray: 6 5; }
-      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0; }
-      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0; }
-      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
-      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
-      .arrow { fill: none; stroke: #374151; stroke-width: 1.8; marker-end: url(#arrow); }
-      .branch { fill: none; stroke: #6b7280; stroke-width: 1.5; marker-end: url(#arrow); }
-      .dashed { fill: none; stroke: #6b7280; stroke-width: 1.4; stroke-dasharray: 6 5; marker-end: url(#arrow); }
-    </style>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 842" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" role="img" aria-labelledby="title desc">
+<title id="title">Binary AST and Binding Architecture</title><desc id="desc">Phase 2 architecture: Rust parser storage is encoded by SnapshotWriter into a Binary AST snapshot, then exposed through shared decoder and accessor views for Rust, N-API, WASM, and future C ABI bindings.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/></marker><style>
+      .title { fill:#111827; }.subtitle { fill:#4b5563; }.label { fill:#374151; }.muted { fill:#6b7280; }
+      .panel { fill:#ffffff; stroke:#d1d5db; }.surface { fill:#f8fafc; stroke:#9ca3af; }
+      .ruler { stroke:#9ca3af; }.ruler-text { fill:#64748b; }.arrow { stroke:#4b5563; }.arrow-fill { fill:#4b5563; }
+      .hdr { fill:#2563eb; }.table { fill:#0891b2; }.root { fill:#0d9488; }.source { fill:#059669; }
+      .node { fill:#ea580c; }.edge { fill:#0284c7; }.token { fill:#16a34a; }.trivia { fill:#a16207; }
+      .diag { fill:#be185d; }.string { fill:#4f46e5; }.raw { fill:#0f766e; }.ext { fill:#9333ea; }
+      .pad { fill:#94a3b8; }.bad { fill:#dc2626; }.semantic { fill:#7c3aed; }.consumer { fill:#0e7490; }
+      @media (prefers-color-scheme: dark) {
+        .title { fill:#f8fafc; }.subtitle { fill:#cbd5e1; }.label { fill:#e5e7eb; }.muted { fill:#cbd5e1; }
+        .panel { fill:#111827; stroke:#475569; }.surface { fill:#0f172a; stroke:#64748b; }
+        .ruler { stroke:#64748b; }.ruler-text { fill:#cbd5e1; }.arrow { stroke:#cbd5e1; }.arrow-fill { fill:#cbd5e1; }
+      }
+</style></defs>
+<rect x="0" y="0" width="1080" height="842" fill="none"/>
+<text x="540" y="34" font-size="19" class="title" text-anchor="middle" font-weight="700">Binary AST and Binding Architecture</text>
+<text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">SnapshotWriter creates the product boundary; bindings share one lazy decoder/accessor model.</text>
 
-  <rect class="bg" width="1080" height="720" />
-  <rect class="frame" x="24" y="24" width="1032" height="672" rx="8" />
+<rect x="44" y="86" width="992" height="238" rx="6" class="surface"/>
+<text x="62" y="116" font-size="13" class="label" font-weight="700">Construction and snapshot boundary</text>
+<text x="62" y="138" font-size="11" class="muted">Phase 1 keeps parser hot-path storage; Phase 2 encodes it into the versioned Binary AST product.</text>
 
-  <text class="group-label" x="70" y="64">phase 1 construction path</text>
-  <text class="group-label" x="454" y="64">phase 2 product boundary</text>
-  <text class="group-label" x="760" y="64">shared public views</text>
+<rect x="82" y="178" width="210" height="74" rx="4" class="node" opacity="0.82"/>
+<text x="187" y="203" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="700">Parser / Lowering</text>
+<text x="187" y="222" font-size="8" fill="#e5e7eb" text-anchor="middle">recovering MF2 parser</text>
+<text x="187" y="238" font-size="8" fill="#e5e7eb" text-anchor="middle">single Rust semantics</text>
 
-  <rect class="phase" x="56" y="88" width="300" height="512" rx="8" />
-  <rect class="phase" x="390" y="88" width="300" height="512" rx="8" />
-  <rect class="phase" x="724" y="88" width="300" height="512" rx="8" />
+<rect x="334" y="178" width="210" height="74" rx="4" class="source" opacity="0.82"/>
+<text x="439" y="203" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="700">CstStorage tables</text>
+<text x="439" y="222" font-size="8" fill="#e5e7eb" text-anchor="middle">nodes / edges / tokens</text>
+<text x="439" y="238" font-size="8" fill="#e5e7eb" text-anchor="middle">sources / diagnostics</text>
 
-  <rect class="core" x="96" y="124" width="220" height="54" rx="8" />
-  <text class="label" x="206" y="156" text-anchor="middle">Parser / Lowering</text>
+<rect x="586" y="178" width="210" height="74" rx="4" class="semantic" opacity="0.82"/>
+<text x="691" y="203" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="700">SnapshotWriter</text>
+<text x="691" y="222" font-size="8" fill="#e5e7eb" text-anchor="middle">linear section encoding</text>
+<text x="691" y="238" font-size="8" fill="#e5e7eb" text-anchor="middle">measured separately</text>
 
-  <rect class="core" x="96" y="218" width="220" height="74" rx="8" />
-  <text class="label" x="206" y="248" text-anchor="middle">Construction Tables</text>
-  <text class="caption" x="206" y="270" text-anchor="middle">nodes, edges, tokens, trivia</text>
+<rect x="838" y="178" width="158" height="74" rx="4" class="raw" opacity="0.82"/>
+<text x="917" y="203" font-size="10.5" fill="#fff" text-anchor="middle" font-weight="700">Binary AST</text>
+<text x="917" y="222" font-size="8" fill="#e5e7eb" text-anchor="middle">versioned snapshot</text>
+<text x="917" y="238" font-size="8" fill="#e5e7eb" text-anchor="middle">shared buffer</text>
 
-  <rect class="core" x="96" y="332" width="220" height="74" rx="8" />
-  <text class="label" x="206" y="362" text-anchor="middle">SourceStore</text>
-  <text class="caption" x="206" y="384" text-anchor="middle">SourceId, text, line index</text>
+<path d="M 292 215 L 324 215" fill="none" class="arrow" stroke-width="1.6" marker-end="url(#arrow)"/>
+<path d="M 544 215 L 576 215" fill="none" class="arrow" stroke-width="1.6" marker-end="url(#arrow)"/>
+<path d="M 796 215 L 828 215" fill="none" class="arrow" stroke-width="1.6" marker-end="url(#arrow)"/>
+<text x="308" y="201" font-size="8.2" class="ruler-text" text-anchor="middle">build</text>
+<text x="560" y="201" font-size="8.2" class="ruler-text" text-anchor="middle">encode</text>
+<text x="812" y="201" font-size="8.2" class="ruler-text" text-anchor="middle">emit</text>
 
-  <rect class="core" x="96" y="448" width="220" height="74" rx="8" />
-  <text class="label" x="206" y="478" text-anchor="middle">Diagnostics</text>
-  <text class="caption" x="206" y="500" text-anchor="middle">SourceId + UTF-8 Span</text>
+<rect x="82" y="282" width="258" height="24" rx="4" class="bad" opacity="0.66"/>
+<text x="211" y="299" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">no public recursive typed AST conversion path</text>
+<rect x="374" y="282" width="258" height="24" rx="4" class="table" opacity="0.66"/>
+<text x="503" y="299" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">parse cost and snapshot encoding cost stay separate</text>
+<rect x="666" y="282" width="330" height="24" rx="4" class="raw" opacity="0.66"/>
+<text x="831" y="299" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">snapshot is the cross-language CST/AST product boundary</text>
 
-  <rect class="writer" x="430" y="206" width="220" height="86" rx="8" />
-  <text class="label" x="540" y="242" text-anchor="middle">SnapshotWriter</text>
-  <text class="caption" x="540" y="264" text-anchor="middle">linear table encoding</text>
+<rect x="44" y="360" width="992" height="286" rx="6" class="panel"/>
+<text x="62" y="390" font-size="13" class="label" font-weight="700">Shared decoder and language bindings</text>
+<text x="62" y="412" font-size="11" class="muted">Rust, N-API, WASM, and future C ABI read the same snapshot records through lazy accessors.</text>
 
-  <rect class="snapshot" x="414" y="354" width="252" height="116" rx="8" />
-  <text class="label" x="540" y="392" text-anchor="middle">Versioned Binary AST</text>
-  <text class="label" x="540" y="416" text-anchor="middle">Snapshot</text>
-  <text class="caption" x="540" y="442" text-anchor="middle">header, sections, roots, diagnostics</text>
+<rect x="82" y="444" width="206" height="70" rx="4" class="hdr" opacity="0.78"/>
+<text x="185" y="468" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">Rust SnapshotView</text>
+<text x="185" y="486" font-size="8" fill="#e5e7eb" text-anchor="middle">borrowed / owned view</text>
+<text x="185" y="501" font-size="8" fill="#e5e7eb" text-anchor="middle">low-level fast path</text>
 
-  <rect class="decoder" x="768" y="112" width="212" height="58" rx="8" />
-  <text class="label" x="874" y="146" text-anchor="middle">Rust Decoder</text>
+<rect x="316" y="444" width="206" height="70" rx="4" class="consumer" opacity="0.78"/>
+<text x="419" y="468" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">N-API binding</text>
+<text x="419" y="486" font-size="8" fill="#e5e7eb" text-anchor="middle">Node.js result object</text>
+<text x="419" y="501" font-size="8" fill="#e5e7eb" text-anchor="middle">SnapshotRef handles</text>
 
-  <rect class="decoder" x="768" y="210" width="212" height="58" rx="8" />
-  <text class="label" x="874" y="244" text-anchor="middle">N-API Decoder</text>
+<rect x="558" y="444" width="206" height="70" rx="4" class="consumer" opacity="0.66"/>
+<text x="661" y="468" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">WASM binding</text>
+<text x="661" y="486" font-size="8" fill="#e5e7eb" text-anchor="middle">portable accessor API</text>
+<text x="661" y="501" font-size="8" fill="#e5e7eb" text-anchor="middle">owned buffer lifetime</text>
 
-  <rect class="decoder" x="768" y="308" width="212" height="58" rx="8" />
-  <text class="label" x="874" y="342" text-anchor="middle">WASM Decoder</text>
+<rect x="792" y="444" width="206" height="70" rx="4" class="pad" opacity="0.74"/>
+<text x="895" y="468" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">Future C ABI</text>
+<text x="895" y="486" font-size="8" fill="#e5e7eb" text-anchor="middle">design preparation</text>
+<text x="895" y="501" font-size="8" fill="#e5e7eb" text-anchor="middle">same handle model</text>
 
-  <rect class="future" x="768" y="406" width="212" height="58" rx="8" />
-  <text class="label" x="874" y="440" text-anchor="middle">Future C ABI</text>
+<rect x="198" y="562" width="684" height="50" rx="4" class="raw" opacity="0.78"/>
+<text x="540" y="584" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">Shared decoder/accessor model</text>
+<text x="540" y="602" font-size="8" fill="#e5e7eb" text-anchor="middle">RootHandle / NodeHandle / TokenHandle = { snapshot, section-local id }</text>
 
-  <rect class="decoder" x="768" y="514" width="212" height="58" rx="8" />
-  <text class="label" x="874" y="548" text-anchor="middle">Accessor Views</text>
+<path d="M 185 514 L 185 542 L 352 542 L 352 556" fill="none" class="arrow" stroke-width="1.4" marker-end="url(#arrow)"/>
+<path d="M 419 514 L 419 552 L 456 552 L 456 556" fill="none" class="arrow" stroke-width="1.4" marker-end="url(#arrow)"/>
+<path d="M 661 514 L 661 552 L 624 552 L 624 556" fill="none" class="arrow" stroke-width="1.4" marker-end="url(#arrow)"/>
+<path d="M 895 514 L 895 542 L 728 542 L 728 556" fill="none" class="arrow" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="44" y="682" width="992" height="122" rx="6" class="surface"/>
+<text x="62" y="712" font-size="13" class="label" font-weight="700">Boundary invariants</text>
+<text x="62" y="734" font-size="11" class="muted">Bindings may differ by host runtime, but they do not change parser semantics or snapshot identity.</text>
 
-  <path class="arrow" d="M 206 178 L 206 216" />
-  <path class="branch" d="M 316 255 L 428 249" />
-  <path class="branch" d="M 316 369 L 430 263" />
-  <path class="branch" d="M 316 485 L 430 277" />
-  <path class="arrow" d="M 540 292 L 540 352" />
+<rect x="82" y="762" width="206" height="30" rx="4" class="source" opacity="0.72"/>
+<text x="185" y="782" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">external source text allowed</text>
 
-  <path class="arrow" d="M 666 412 L 714 412 L 714 141 L 766 141" />
-  <path class="arrow" d="M 666 412 L 714 412 L 714 239 L 766 239" />
-  <path class="arrow" d="M 666 412 L 714 412 L 714 337 L 766 337" />
-  <path class="dashed" d="M 666 412 L 714 412 L 714 435 L 766 435" />
+<rect x="316" y="762" width="206" height="30" rx="4" class="string" opacity="0.72"/>
+<text x="419" y="782" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">toBytes() returns a copy</text>
 
-  <path class="branch" d="M 874 170 L 874 512" />
-  <path class="branch" d="M 874 268 L 874 512" />
-  <path class="branch" d="M 874 366 L 874 512" />
-  <path class="dashed" d="M 874 464 L 874 512" />
+<rect x="554" y="762" width="206" height="30" rx="4" class="bad" opacity="0.72"/>
+<text x="657" y="782" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">no eager JS object tree</text>
 
-  <text class="caption" x="206" y="632" text-anchor="middle">No public typed AST conversion path.</text>
-  <text class="caption" x="540" y="632" text-anchor="middle">Snapshot encoding is measured separately from parsing.</text>
-  <text class="caption" x="874" y="632" text-anchor="middle">Rust, N-API, and WASM share the public AST view.</text>
+<rect x="792" y="762" width="206" height="30" rx="4" class="table" opacity="0.72"/>
+<text x="895" y="782" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">future native bindings fit</text>
 </svg>

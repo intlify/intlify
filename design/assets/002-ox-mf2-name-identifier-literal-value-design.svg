@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 Name Identifier Literal value design</title>
+  <desc id="desc">Phase 1 keeps raw source representation in the lossless CST, derives NameValue and LiteralValue lazily or during semantic lowering, and keeps StringRef and comparison keys linked back to source spans.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+    <marker id="semantic-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path class="semantic-arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+    <style>
+      .bg { fill: none; }
+      .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
+      .storage { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .lowering { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
+      .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
+      .boundary { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
+      .row { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
+      .row-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
+      .lowering-item { fill: #ffffff; stroke: #d97706; stroke-width: 1.2; }
+      .semantic-item { fill: #ffffff; stroke: #a855f7; stroke-width: 1.2; }
+      .note { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.2; }
+      .diagnostic { fill: #fff1f2; stroke: #fb7185; stroke-width: 1.2; }
+      .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; }
+      .small { fill: #374151; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+      .tiny { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; font-weight: 550; letter-spacing: 0; }
+      .caption { fill: #4b5563; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+      .group-label { fill: #6b7280; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; }
+      .arrow { fill: none; stroke: #374151; stroke-width: 1.8; marker-end: url(#arrow); }
+      .semantic-arrow { fill: none; stroke: #7e22ce; stroke-width: 1.8; marker-end: url(#semantic-arrow); }
+      .arrow-fill { fill: #374151; }
+      .semantic-arrow-fill { fill: #7e22ce; }
+      @media (prefers-color-scheme: dark) {
+        .frame { fill: #111827; stroke: #475569; }
+        .storage { fill: #1e293b; stroke: #64748b; }
+        .lowering { fill: #451a03; stroke: #f59e0b; }
+        .semantic { fill: #3b0764; stroke: #c084fc; }
+        .boundary { fill: #1e293b; stroke: #64748b; }
+        .row { fill: #1e293b; stroke: #475569; }
+        .row-alt { fill: #263449; stroke: #475569; }
+        .lowering-item { fill: #78350f; stroke: #fbbf24; }
+        .semantic-item { fill: #581c87; stroke: #d8b4fe; }
+        .note { fill: #0f766e; stroke: #5eead4; }
+        .diagnostic { fill: #881337; stroke: #fda4af; }
+        .label { fill: #f8fafc; }
+        .small { fill: #e5e7eb; }
+        .tiny { fill: #cbd5e1; }
+        .caption { fill: #cbd5e1; }
+        .group-label { fill: #cbd5e1; }
+        .arrow { stroke: #cbd5e1; }
+        .semantic-arrow { stroke: #c084fc; }
+        .arrow-fill { fill: #cbd5e1; }
+        .semantic-arrow-fill { fill: #c084fc; }
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1120" height="760" />
+  <rect class="frame" x="24" y="24" width="1072" height="712" rx="8" />
+
+  <text class="group-label" x="66" y="66">lossless syntax representation</text>
+  <text class="group-label" x="414" y="66">lazy value extraction</text>
+  <text class="group-label" x="784" y="66">semantic value records</text>
+
+  <rect class="storage" x="56" y="92" width="300" height="500" rx="8" />
+  <text class="label" x="206" y="128" text-anchor="middle">CST keeps source form</text>
+  <text class="caption" x="206" y="150" text-anchor="middle">Raw spans preserve sigils, delimiters, escapes.</text>
+
+  <rect class="row-alt" x="84" y="184" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="204">variable source</text>
+  <text class="tiny" x="106" y="220">$count includes the $ sigil</text>
+
+  <rect class="row" x="84" y="246" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="266">function identifier</text>
+  <text class="tiny" x="106" y="282">:number includes the : sigil</text>
+
+  <rect class="row-alt" x="84" y="308" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="328">markup identifier</text>
+  <text class="tiny" x="106" y="344">#b or /b keeps markup sigil</text>
+
+  <rect class="row" x="84" y="370" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="390">quoted literal</text>
+  <text class="tiny" x="106" y="406">delimiters and escapes stay raw</text>
+
+  <rect class="row-alt" x="84" y="432" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="452">unquoted literal</text>
+  <text class="tiny" x="106" y="468">source span is still canonical</text>
+
+  <rect class="diagnostic" x="84" y="510" width="244" height="48" rx="6" />
+  <text class="small" x="106" y="530">bidi marks / isolates</text>
+  <text class="tiny" x="106" y="546">preserved in source slices</text>
+
+  <rect class="lowering" x="410" y="92" width="300" height="500" rx="8" />
+  <text class="label" x="560" y="128" text-anchor="middle">ValueExtractor</text>
+  <text class="caption" x="560" y="150" text-anchor="middle">Runs lazily or during semantic lowering.</text>
+
+  <rect class="lowering-item" x="438" y="184" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="204" text-anchor="middle">strip syntax sigils</text>
+  <text class="tiny" x="560" y="220" text-anchor="middle">$, :, #, / are not data names</text>
+
+  <rect class="lowering-item" x="438" y="246" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="266" text-anchor="middle">decode literal value</text>
+  <text class="tiny" x="560" y="282" text-anchor="middle">quoted and unquoted can match</text>
+
+  <rect class="lowering-item" x="438" y="308" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="328" text-anchor="middle">skip bidi controls</text>
+  <text class="tiny" x="560" y="344" text-anchor="middle">matching ignores boundary marks</text>
+
+  <rect class="lowering-item" x="438" y="370" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="390" text-anchor="middle">compute comparison key</text>
+  <text class="tiny" x="560" y="406" text-anchor="middle">NFC path, outside parse hot path</text>
+
+  <rect class="note" x="438" y="432" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="452" text-anchor="middle">intern StringRef</text>
+  <text class="tiny" x="560" y="468" text-anchor="middle">StringPool now, StringId in Phase 2</text>
+
+  <rect class="boundary" x="438" y="510" width="244" height="48" rx="6" />
+  <text class="small" x="560" y="530" text-anchor="middle">hot path rule</text>
+  <text class="tiny" x="560" y="546" text-anchor="middle">parser does not eagerly cook values</text>
+
+  <rect class="semantic" x="768" y="92" width="296" height="500" rx="8" />
+  <text class="label" x="916" y="128" text-anchor="middle">SemanticModel values</text>
+  <text class="caption" x="916" y="150" text-anchor="middle">Logical values stay linked to source spans.</text>
+
+  <rect class="semantic-item" x="798" y="184" width="236" height="88" rx="6" />
+  <text class="small" x="916" y="207" text-anchor="middle">NameValue</text>
+  <text class="tiny" x="916" y="228" text-anchor="middle">source: Span, raw: Span</text>
+  <text class="tiny" x="916" y="245" text-anchor="middle">value: StringRef</text>
+  <text class="tiny" x="916" y="262" text-anchor="middle">comparison_key: Option&lt;StringRef&gt;</text>
+
+  <rect class="semantic-item" x="798" y="296" width="236" height="88" rx="6" />
+  <text class="small" x="916" y="319" text-anchor="middle">LiteralValue</text>
+  <text class="tiny" x="916" y="340" text-anchor="middle">source: Span, raw: Span</text>
+  <text class="tiny" x="916" y="357" text-anchor="middle">value: StringRef</text>
+  <text class="tiny" x="916" y="374" text-anchor="middle">quoted: bool</text>
+
+  <rect class="semantic-item" x="798" y="408" width="236" height="54" rx="6" />
+  <text class="small" x="916" y="431" text-anchor="middle">comparison model</text>
+  <text class="tiny" x="916" y="450" text-anchor="middle">compare value or comparison_key</text>
+
+  <rect class="note" x="798" y="486" width="236" height="48" rx="6" />
+  <text class="small" x="916" y="506" text-anchor="middle">diagnostic mapping</text>
+  <text class="tiny" x="916" y="522" text-anchor="middle">always return to source span</text>
+
+  <path class="arrow" d="M 356 342 L 408 342" />
+  <path class="semantic-arrow" d="M 710 342 L 766 342" />
+
+  <rect class="boundary" x="84" y="626" width="952" height="86" rx="8" />
+  <text class="label" x="112" y="656">Phase 1 boundary</text>
+  <text class="caption" x="112" y="680">CST remains lossless; SemanticModel owns only values needed for comparison and data-model conversion.</text>
+  <text class="caption" x="112" y="700">NFC normalization and cooked text stay out of the parser hot path.</text>
+</svg>

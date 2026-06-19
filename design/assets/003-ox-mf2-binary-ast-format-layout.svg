@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" role="img" aria-labelledby="title desc">
+<title id="title">Binary AST Format Layout</title><desc id="desc">Memory layout: header, section table, aligned typed sections, and raw byte sections.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/></marker><style>
+      .title { fill:#111827; }.subtitle { fill:#4b5563; }.label { fill:#374151; }.muted { fill:#6b7280; }
+      .panel { fill:#ffffff; stroke:#d1d5db; }.surface { fill:#f8fafc; stroke:#9ca3af; }
+      .ruler { stroke:#9ca3af; }.ruler-text { fill:#64748b; }.arrow { stroke:#4b5563; }.arrow-fill { fill:#4b5563; }
+      .hdr { fill:#2563eb; }.table { fill:#0891b2; }.root { fill:#0d9488; }.source { fill:#059669; }
+      .node { fill:#ea580c; }.edge { fill:#0284c7; }.token { fill:#16a34a; }.trivia { fill:#a16207; }
+      .diag { fill:#be185d; }.string { fill:#4f46e5; }.raw { fill:#0f766e; }.ext { fill:#9333ea; }
+      .pad { fill:#94a3b8; }.bad { fill:#dc2626; }.dark { fill:#111827; }
+      @media (prefers-color-scheme: dark) {
+        .title { fill:#f8fafc; }.subtitle { fill:#cbd5e1; }.label { fill:#e5e7eb; }.muted { fill:#cbd5e1; }
+        .panel { fill:#111827; stroke:#475569; }.surface { fill:#0f172a; stroke:#64748b; }
+        .ruler { stroke:#64748b; }.ruler-text { fill:#cbd5e1; }.arrow { stroke:#cbd5e1; }.arrow-fill { fill:#cbd5e1; }
+      }
+</style></defs>
+<rect x="0" y="0" width="1080" height="762" fill="none"/>
+<text x="540" y="34" font-size="19" class="title" text-anchor="middle" font-weight="700">Binary AST Format Layout</text>
+<text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">Memory layout: header, section table, aligned typed sections, and raw byte sections.</text>
+<rect x="44" y="86" width="992" height="154" rx="6" class="surface" opacity="1"/>
+<text x="62" y="116" font-size="13" class="label" font-weight="700">Snapshot buffer order</text>
+<path d="M 82 152 L 978 152" fill="none" class="arrow" stroke-width="1.5"/>
+<line x1="82" y1="145" x2="82" y2="161" class="ruler" stroke-width="1"/>
+<text x="82" y="140" font-size="8" class="ruler-text" text-anchor="middle">0</text>
+<line x1="194" y1="145" x2="194" y2="161" class="ruler" stroke-width="1"/>
+<text x="194" y="140" font-size="8" class="ruler-text" text-anchor="middle">8</text>
+<line x1="306" y1="145" x2="306" y2="161" class="ruler" stroke-width="1"/>
+<text x="306" y="140" font-size="8" class="ruler-text" text-anchor="middle">16</text>
+<line x1="418" y1="145" x2="418" y2="161" class="ruler" stroke-width="1"/>
+<text x="418" y="140" font-size="8" class="ruler-text" text-anchor="middle">24</text>
+<line x1="474" y1="145" x2="474" y2="161" class="ruler" stroke-width="1"/>
+<text x="474" y="140" font-size="8" class="ruler-text" text-anchor="middle">28</text>
+<line x1="530" y1="145" x2="530" y2="161" class="ruler" stroke-width="1"/>
+<text x="530" y="140" font-size="8" class="ruler-text" text-anchor="middle">32</text>
+<line x1="810" y1="145" x2="810" y2="161" class="ruler" stroke-width="1"/>
+<text x="810" y="140" font-size="8" class="ruler-text" text-anchor="middle">52</text>
+<line x1="978" y1="145" x2="978" y2="161" class="ruler" stroke-width="1"/>
+<text x="978" y="140" font-size="8" class="ruler-text" text-anchor="middle">64</text>
+<rect x="82" y="166" width="392" height="48" rx="3" class="hdr" opacity="0.86"/>
+<text x="278.0" y="187" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">SnapshotHeader</text>
+<text x="278.0" y="205" font-size="8" fill="#e5e7eb" text-anchor="middle">28 bytes</text>
+<rect x="474" y="166" width="56" height="48" rx="3" class="pad" opacity="0.54"/>
+<text x="502.0" y="187" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">pad</text>
+<text x="502.0" y="205" font-size="8" fill="#e5e7eb" text-anchor="middle">to byte 32</text>
+<rect x="530" y="166" width="280" height="48" rx="3" class="table" opacity="0.82"/>
+<text x="670.0" y="187" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">SectionRecord[0]</text>
+<text x="670.0" y="205" font-size="8" fill="#e5e7eb" text-anchor="middle">20 bytes</text>
+<rect x="810" y="166" width="168" height="48" rx="3" class="table" opacity="0.58"/>
+<text x="894.0" y="187" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">Section table ...</text>
+<text x="894.0" y="205" font-size="8" fill="#e5e7eb" text-anchor="middle">more records</text>
+<rect x="44" y="250" width="992" height="332" rx="6" class="surface" opacity="1"/>
+<text x="62" y="280" font-size="13" class="label" font-weight="700">Payload sections</text>
+<text x="62" y="302" font-size="11" class="muted">SectionRecord.offset points to these byte ranges; raw sections use record_size = 0.</text>
+<rect x="70" y="334" width="206" height="50" rx="4" class="root" opacity="0.78"/>
+<text x="173" y="355" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">roots</text>
+<text x="173" y="372" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 1 / 16B</text>
+<path d="M 276 359 L 302 359" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="308" y="334" width="206" height="50" rx="4" class="source" opacity="0.78"/>
+<text x="411" y="355" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">sources</text>
+<text x="411" y="372" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 2 / 32B</text>
+<path d="M 514 359 L 540 359" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="546" y="334" width="206" height="50" rx="4" class="node" opacity="0.78"/>
+<text x="649" y="355" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">nodes</text>
+<text x="649" y="372" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 3 / 24B</text>
+<path d="M 752 359 L 778 359" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="784" y="334" width="206" height="50" rx="4" class="edge" opacity="0.78"/>
+<text x="887" y="355" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">edges</text>
+<text x="887" y="372" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 4 / 8B</text>
+<rect x="70" y="414" width="206" height="50" rx="4" class="token" opacity="0.78"/>
+<text x="173" y="435" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">tokens</text>
+<text x="173" y="452" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 5 / 32B</text>
+<path d="M 276 439 L 302 439" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="308" y="414" width="206" height="50" rx="4" class="trivia" opacity="0.78"/>
+<text x="411" y="435" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">trivia</text>
+<text x="411" y="452" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 6 / 16B opt</text>
+<path d="M 514 439 L 540 439" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="546" y="414" width="206" height="50" rx="4" class="diag" opacity="0.78"/>
+<text x="649" y="435" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">diagnostics</text>
+<text x="649" y="452" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 7 / 28B opt</text>
+<path d="M 752 439 L 778 439" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="784" y="414" width="206" height="50" rx="4" class="diag" opacity="0.78"/>
+<text x="887" y="435" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">diag_labels</text>
+<text x="887" y="452" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 8 / 16B opt</text>
+<rect x="70" y="494" width="206" height="50" rx="4" class="string" opacity="0.78"/>
+<text x="173" y="515" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">string_offsets</text>
+<text x="173" y="532" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 9 / 8B</text>
+<path d="M 276 519 L 302 519" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="308" y="494" width="206" height="50" rx="4" class="raw" opacity="0.78"/>
+<text x="411" y="515" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">string_data</text>
+<text x="411" y="532" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 10 / raw</text>
+<path d="M 514 519 L 540 519" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="546" y="494" width="206" height="50" rx="4" class="raw" opacity="0.78"/>
+<text x="649" y="515" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">source_text</text>
+<text x="649" y="532" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 11 / raw opt</text>
+<path d="M 752 519 L 778 519" fill="none" class="arrow" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="784" y="494" width="206" height="50" rx="4" class="ext" opacity="0.78"/>
+<text x="887" y="515" font-size="9.5" fill="#fff" text-anchor="middle" font-weight="700">extended_data</text>
+<text x="887" y="532" font-size="7.8" fill="#e5e7eb" text-anchor="middle">kind 12 / raw opt</text>
+<rect x="44" y="628" width="992" height="106" rx="6" class="surface" opacity="1"/>
+<text x="62" y="658" font-size="13" class="label" font-weight="700">Alignment / decoder rules</text>
+<rect x="78" y="687" width="206" height="34" rx="4" class="hdr" opacity="0.72"/>
+<text x="181" y="709" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">Header 28B + pad</text>
+<rect x="316" y="687" width="206" height="34" rx="4" class="table" opacity="0.72"/>
+<text x="419" y="709" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">SectionRecord 20B</text>
+<rect x="554" y="687" width="206" height="34" rx="4" class="node" opacity="0.72"/>
+<text x="657" y="709" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">fixed records via record_size</text>
+<rect x="792" y="687" width="206" height="34" rx="4" class="raw" opacity="0.72"/>
+<text x="895" y="709" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">raw bytes via byte_len</text>
+</svg>

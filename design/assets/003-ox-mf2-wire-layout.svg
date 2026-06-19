@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 860" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" role="img" aria-labelledby="title desc">
+<title id="title">Binary AST Wire Layout</title><desc id="desc">Header and section table fields as byte ranges, including padding and alignment.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/></marker><style>
+      .title { fill:#111827; }.subtitle { fill:#4b5563; }.label { fill:#374151; }.muted { fill:#6b7280; }
+      .panel { fill:#ffffff; stroke:#d1d5db; }.surface { fill:#f8fafc; stroke:#9ca3af; }
+      .ruler { stroke:#9ca3af; }.ruler-text { fill:#64748b; }.arrow { stroke:#4b5563; }.arrow-fill { fill:#4b5563; }
+      .hdr { fill:#2563eb; }.table { fill:#0891b2; }.root { fill:#0d9488; }.source { fill:#059669; }
+      .node { fill:#ea580c; }.edge { fill:#0284c7; }.token { fill:#16a34a; }.trivia { fill:#a16207; }
+      .diag { fill:#be185d; }.string { fill:#4f46e5; }.raw { fill:#0f766e; }.ext { fill:#9333ea; }
+      .pad { fill:#94a3b8; }.bad { fill:#dc2626; }.dark { fill:#111827; }
+      @media (prefers-color-scheme: dark) {
+        .title { fill:#f8fafc; }.subtitle { fill:#cbd5e1; }.label { fill:#e5e7eb; }.muted { fill:#cbd5e1; }
+        .panel { fill:#111827; stroke:#475569; }.surface { fill:#0f172a; stroke:#64748b; }
+        .ruler { stroke:#64748b; }.ruler-text { fill:#cbd5e1; }.arrow { stroke:#cbd5e1; }.arrow-fill { fill:#cbd5e1; }
+      }
+</style></defs>
+<rect x="0" y="0" width="1080" height="860" fill="none"/>
+<text x="540" y="34" font-size="19" class="title" text-anchor="middle" font-weight="700">Binary AST Wire Layout</text>
+<text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">Header and section table fields as byte ranges, including padding and alignment.</text>
+<rect x="44" y="86" width="992" height="214" rx="6" class="surface" opacity="1"/>
+<text x="62" y="116" font-size="13" class="label" font-weight="700">SnapshotHeader</text>
+<text x="62" y="138" font-size="11" class="muted">Fixed 28-byte header; 4 padding bytes align the section table to byte 32.</text>
+<path d="M 82 172 L 978 172" fill="none" class="arrow" stroke-width="1.5"/>
+<line x1="82" y1="165" x2="82" y2="181" class="ruler" stroke-width="1"/>
+<text x="82" y="160" font-size="8" class="ruler-text" text-anchor="middle">0</text>
+<line x1="306" y1="165" x2="306" y2="181" class="ruler" stroke-width="1"/>
+<text x="306" y="160" font-size="8" class="ruler-text" text-anchor="middle">8</text>
+<line x1="418" y1="165" x2="418" y2="181" class="ruler" stroke-width="1"/>
+<text x="418" y="160" font-size="8" class="ruler-text" text-anchor="middle">12</text>
+<line x1="530" y1="165" x2="530" y2="181" class="ruler" stroke-width="1"/>
+<text x="530" y="160" font-size="8" class="ruler-text" text-anchor="middle">16</text>
+<line x1="642" y1="165" x2="642" y2="181" class="ruler" stroke-width="1"/>
+<text x="642" y="160" font-size="8" class="ruler-text" text-anchor="middle">20</text>
+<line x1="754" y1="165" x2="754" y2="181" class="ruler" stroke-width="1"/>
+<text x="754" y="160" font-size="8" class="ruler-text" text-anchor="middle">24</text>
+<line x1="810" y1="165" x2="810" y2="181" class="ruler" stroke-width="1"/>
+<text x="810" y="160" font-size="8" class="ruler-text" text-anchor="middle">26</text>
+<line x1="866" y1="165" x2="866" y2="181" class="ruler" stroke-width="1"/>
+<text x="866" y="160" font-size="8" class="ruler-text" text-anchor="middle">28</text>
+<line x1="978" y1="165" x2="978" y2="181" class="ruler" stroke-width="1"/>
+<text x="978" y="160" font-size="8" class="ruler-text" text-anchor="middle">32</text>
+<rect x="82" y="186" width="224" height="58" rx="3" class="hdr" opacity="0.86"/>
+<text x="194.0" y="207" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">magic</text>
+<text x="194.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">[u8; 8]</text>
+<rect x="306" y="186" width="56" height="58" rx="3" class="hdr" opacity="0.68"/>
+<text x="334.0" y="207" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">major</text>
+<text x="334.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="362" y="186" width="56" height="58" rx="3" class="hdr" opacity="0.78"/>
+<text x="390.0" y="207" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">minor</text>
+<text x="390.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="418" y="186" width="112" height="58" rx="3" class="hdr" opacity="0.64"/>
+<text x="474.0" y="207" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">features</text>
+<text x="474.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="530" y="186" width="112" height="58" rx="3" class="hdr" opacity="0.78"/>
+<text x="586.0" y="207" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">header_len</text>
+<text x="586.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="642" y="186" width="112" height="58" rx="3" class="hdr" opacity="0.64"/>
+<text x="698.0" y="207" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">table_off</text>
+<text x="698.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="754" y="186" width="56" height="58" rx="3" class="hdr" opacity="0.78"/>
+<text x="782.0" y="207" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">sec_count</text>
+<text x="782.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="810" y="186" width="56" height="58" rx="3" class="pad" opacity="0.58"/>
+<text x="838.0" y="207" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">reserved</text>
+<text x="838.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="866" y="186" width="112" height="58" rx="3" class="pad" opacity="0.45"/>
+<text x="922.0" y="207" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">pad</text>
+<text x="922.0" y="225" font-size="8" fill="#e5e7eb" text-anchor="middle">align 8</text>
+<rect x="44" y="332" width="992" height="164" rx="6" class="surface" opacity="1"/>
+<text x="62" y="362" font-size="13" class="label" font-weight="700">SectionRecord memory layout</text>
+<text x="62" y="384" font-size="11" class="muted">20-byte section table record; payload offset is buffer-relative and payload starts 8-byte aligned.</text>
+<path d="M 82 412 L 942 412" fill="none" class="arrow" stroke-width="1.5"/>
+<line x1="82" y1="405" x2="82" y2="421" class="ruler" stroke-width="1"/>
+<text x="82" y="400" font-size="8" class="ruler-text" text-anchor="middle">0</text>
+<line x1="254" y1="405" x2="254" y2="421" class="ruler" stroke-width="1"/>
+<text x="254" y="400" font-size="8" class="ruler-text" text-anchor="middle">4</text>
+<line x1="426" y1="405" x2="426" y2="421" class="ruler" stroke-width="1"/>
+<text x="426" y="400" font-size="8" class="ruler-text" text-anchor="middle">8</text>
+<line x1="598" y1="405" x2="598" y2="421" class="ruler" stroke-width="1"/>
+<text x="598" y="400" font-size="8" class="ruler-text" text-anchor="middle">12</text>
+<line x1="770" y1="405" x2="770" y2="421" class="ruler" stroke-width="1"/>
+<text x="770" y="400" font-size="8" class="ruler-text" text-anchor="middle">16</text>
+<line x1="856" y1="405" x2="856" y2="421" class="ruler" stroke-width="1"/>
+<text x="856" y="400" font-size="8" class="ruler-text" text-anchor="middle">18</text>
+<line x1="899" y1="405" x2="899" y2="421" class="ruler" stroke-width="1"/>
+<text x="899" y="400" font-size="8" class="ruler-text" text-anchor="middle">19</text>
+<line x1="942" y1="405" x2="942" y2="421" class="ruler" stroke-width="1"/>
+<text x="942" y="400" font-size="8" class="ruler-text" text-anchor="middle">20</text>
+<rect x="82" y="426" width="86" height="50" rx="3" class="table" opacity="0.86"/>
+<text x="125.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">kind</text>
+<text x="125.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">stable kind</text>
+<rect x="168" y="426" width="86" height="50" rx="3" class="table" opacity="0.68"/>
+<text x="211.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">flags</text>
+<text x="211.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">required</text>
+<rect x="254" y="426" width="172" height="50" rx="3" class="hdr" opacity="0.78"/>
+<text x="340.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">offset</text>
+<text x="340.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">u32 buffer offset</text>
+<rect x="426" y="426" width="172" height="50" rx="3" class="hdr" opacity="0.68"/>
+<text x="512.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">byte_len</text>
+<text x="512.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">count * record_size</text>
+<rect x="598" y="426" width="172" height="50" rx="3" class="hdr" opacity="0.78"/>
+<text x="684.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">count</text>
+<text x="684.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">u32 records</text>
+<rect x="770" y="426" width="86" height="50" rx="3" class="table" opacity="0.72"/>
+<text x="813.0" y="447" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">rec_size</text>
+<text x="813.0" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="856" y="426" width="43" height="50" rx="3" class="table" opacity="0.58"/>
+<text x="877.5" y="447" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">align</text>
+<text x="877.5" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">8</text>
+<rect x="899" y="426" width="43" height="50" rx="3" class="pad" opacity="0.58"/>
+<text x="920.5" y="447" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">res</text>
+<text x="920.5" y="465" font-size="8" fill="#e5e7eb" text-anchor="middle">0</text>
+<rect x="44" y="534" width="992" height="166" rx="6" class="surface" opacity="1"/>
+<text x="62" y="564" font-size="13" class="label" font-weight="700">Payload offsets</text>
+<text x="62" y="586" font-size="11" class="muted">SectionRecord.offset and byte_len are absolute byte ranges inside the snapshot buffer.</text>
+<path d="M 82 614 L 962 614" fill="none" class="arrow" stroke-width="1.5"/>
+<line x1="82" y1="607" x2="82" y2="623" class="ruler" stroke-width="1"/>
+<text x="82" y="602" font-size="8" class="ruler-text" text-anchor="middle">0</text>
+<line x1="346" y1="607" x2="346" y2="623" class="ruler" stroke-width="1"/>
+<text x="346" y="602" font-size="8" class="ruler-text" text-anchor="middle">12</text>
+<line x1="434" y1="607" x2="434" y2="623" class="ruler" stroke-width="1"/>
+<text x="434" y="602" font-size="8" class="ruler-text" text-anchor="middle">16</text>
+<line x1="610" y1="607" x2="610" y2="623" class="ruler" stroke-width="1"/>
+<text x="610" y="602" font-size="8" class="ruler-text" text-anchor="middle">24</text>
+<line x1="786" y1="607" x2="786" y2="623" class="ruler" stroke-width="1"/>
+<text x="786" y="602" font-size="8" class="ruler-text" text-anchor="middle">32</text>
+<line x1="962" y1="607" x2="962" y2="623" class="ruler" stroke-width="1"/>
+<text x="962" y="602" font-size="8" class="ruler-text" text-anchor="middle">40</text>
+<rect x="82" y="628" width="264" height="44" rx="3" class="table" opacity="0.76"/>
+<text x="214.0" y="649" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">section table</text>
+<text x="214.0" y="663" font-size="8" fill="#e5e7eb" text-anchor="middle">20B * count</text>
+<rect x="346" y="628" width="88" height="44" rx="3" class="pad" opacity="0.5"/>
+<text x="390.0" y="649" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">pad</text>
+<text x="390.0" y="663" font-size="8" fill="#e5e7eb" text-anchor="middle">to 8B</text>
+<rect x="434" y="628" width="176" height="44" rx="3" class="root" opacity="0.76"/>
+<text x="522.0" y="649" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">roots</text>
+<text x="522.0" y="663" font-size="8" fill="#e5e7eb" text-anchor="middle">8B aligned</text>
+<rect x="610" y="628" width="176" height="44" rx="3" class="node" opacity="0.76"/>
+<text x="698.0" y="649" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">nodes</text>
+<text x="698.0" y="663" font-size="8" fill="#e5e7eb" text-anchor="middle">8B aligned</text>
+<rect x="786" y="628" width="176" height="44" rx="3" class="raw" opacity="0.7"/>
+<text x="874.0" y="649" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">raw bytes</text>
+<text x="874.0" y="663" font-size="8" fill="#e5e7eb" text-anchor="middle">record_size=0</text>
+<rect x="44" y="724" width="992" height="106" rx="6" class="surface" opacity="1"/>
+<text x="62" y="754" font-size="13" class="label" font-weight="700">Alignment / decoder rules</text>
+<rect x="78" y="783" width="206" height="34" rx="4" class="hdr" opacity="0.72"/>
+<text x="181" y="805" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">little-endian numbers</text>
+<rect x="316" y="783" width="206" height="34" rx="4" class="table" opacity="0.72"/>
+<text x="419" y="805" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">section bounds checked</text>
+<rect x="554" y="783" width="206" height="34" rx="4" class="node" opacity="0.72"/>
+<text x="657" y="805" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">fixed byte_len = count * size</text>
+<rect x="792" y="783" width="206" height="34" rx="4" class="bad" opacity="0.72"/>
+<text x="895" y="805" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">unknown required -&gt; reject</text>
+</svg>

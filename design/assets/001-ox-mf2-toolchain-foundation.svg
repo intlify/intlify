@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 760" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">MF2 Toolchain Foundation</title>
+<desc id="desc">ox-mf2 starts with a parser, but the same Rust core model supports formatting, linting, compilation, runtime validation, editor integration, bindings, and benchmarks.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#1f2937; }
+    .muted { fill:#6b7280; }
+    .small { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .foundation { fill:#f8fafc; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .source { fill:#475569; }
+    .parse { fill:#475569; }
+    .syntax { fill:#475569; }
+    .semantic { fill:#0f766e; }
+    .diagnostic { fill:#334155; }
+    .contract { fill:#0f766e; }
+    .consumer { fill:#475569; }
+    .surface { fill:#0f766e; }
+    .note { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .small { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .foundation { fill:#0f172a; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note { fill:#475569; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1160" height="760" fill="none"/>
+
+<text x="580" y="42" font-size="22" font-weight="700" class="title" text-anchor="middle">MF2 toolchain foundation</text>
+<text x="580" y="70" font-size="13" class="subtitle" text-anchor="middle">Parser first, but designed as the shared foundation for MF2 tools and language integrations.</text>
+
+<rect x="46" y="108" width="318" height="494" rx="10" class="panel" stroke-width="2"/>
+<text x="74" y="148" font-size="16" font-weight="700" class="label">MF2 inputs</text>
+<text x="74" y="174" font-size="12" class="muted">Messages carry source identity.</text>
+<text x="74" y="194" font-size="12" class="muted">Batch metadata stays optional.</text>
+
+<rect x="78" y="214" width="254" height="58" rx="7" class="source"/>
+<text x="205" y="238" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Message sources</text>
+<text x="205" y="258" font-size="10.5" fill="#e5e7eb" text-anchor="middle">simple mode + complex mode</text>
+
+<rect x="78" y="304" width="254" height="58" rx="7" class="surface"/>
+<text x="205" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Batch metadata</text>
+<text x="205" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">locale, message_id</text>
+
+<rect x="78" y="394" width="254" height="58" rx="7" class="surface"/>
+<text x="205" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">SourceStore</text>
+<text x="205" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">stable SourceId owner</text>
+
+<rect x="78" y="484" width="254" height="58" rx="7" class="contract"/>
+<text x="205" y="508" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">First deliverable</text>
+<text x="205" y="528" font-size="10.5" fill="#e5e7eb" text-anchor="middle">fast recovering parser</text>
+
+<rect x="424" y="108" width="312" height="494" rx="10" class="foundation" stroke-width="2"/>
+<text x="452" y="148" font-size="16" font-weight="700" class="label">Single Rust core</text>
+<text x="452" y="174" font-size="12" class="muted">MF2 semantics live once.</text>
+<text x="452" y="194" font-size="12" class="muted">Tools read stable views.</text>
+
+<rect x="462" y="214" width="236" height="58" rx="7" class="parse"/>
+<text x="580" y="238" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Recovering parser</text>
+<text x="580" y="258" font-size="10.5" fill="#e5e7eb" text-anchor="middle">useful output on errors</text>
+
+<path d="M 580 278 L 580 296" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="462" y="304" width="236" height="58" rx="7" class="syntax"/>
+<text x="580" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Lossless syntax model</text>
+<text x="580" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">tokens, trivia, spans</text>
+
+<path d="M 580 368 L 580 386" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="462" y="394" width="236" height="58" rx="7" class="semantic"/>
+<text x="580" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Semantic facts</text>
+<text x="580" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">selectors, variants, refs</text>
+
+<path d="M 580 458 L 580 476" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="462" y="484" width="236" height="58" rx="7" class="diagnostic"/>
+<text x="580" y="508" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Diagnostics</text>
+<text x="580" y="528" font-size="10.5" fill="#e5e7eb" text-anchor="middle">labels and source spans</text>
+
+<rect x="796" y="108" width="318" height="494" rx="10" class="panel" stroke-width="2"/>
+<text x="824" y="148" font-size="16" font-weight="700" class="label">Toolchain adapters</text>
+<text x="824" y="174" font-size="12" class="muted">Each tool is an adapter.</text>
+<text x="824" y="194" font-size="12" class="muted">No second MF2 implementation.</text>
+
+<rect x="828" y="214" width="116" height="58" rx="7" class="consumer"/>
+<text x="886" y="249" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">Formatter</text>
+
+<rect x="966" y="214" width="116" height="58" rx="7" class="consumer" opacity="0.86"/>
+<text x="1024" y="249" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">Linter</text>
+
+<rect x="828" y="304" width="116" height="58" rx="7" class="consumer" opacity="0.86"/>
+<text x="886" y="339" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">Compiler</text>
+
+<rect x="966" y="304" width="116" height="58" rx="7" class="consumer"/>
+<text x="1024" y="330" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">Runtime</text>
+<text x="1024" y="349" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">validation</text>
+
+<rect x="828" y="394" width="116" height="58" rx="7" class="consumer"/>
+<text x="886" y="419" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">CLI / LSP</text>
+<text x="886" y="438" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">editor</text>
+
+<rect x="966" y="394" width="116" height="58" rx="7" class="consumer" opacity="0.86"/>
+<text x="1024" y="419" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">N-API</text>
+<text x="1024" y="438" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">WASM</text>
+
+<rect x="828" y="484" width="254" height="58" rx="7" class="surface"/>
+<text x="955" y="519" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">Benchmarking and conformance</text>
+
+<path d="M 364 378 L 414 378" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M 736 378 L 786 378" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+<rect x="88" y="640" width="984" height="74" rx="10" class="foundation" stroke-width="2"/>
+<text x="580" y="670" font-size="14" font-weight="700" class="label" text-anchor="middle">Design consequence</text>
+<text x="580" y="696" font-size="12" class="small" text-anchor="middle">Adding a formatter, linter, compiler, binding, or editor workflow should not create another MF2 implementation.</text>
+</svg>

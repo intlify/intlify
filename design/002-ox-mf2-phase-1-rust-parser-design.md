@@ -228,6 +228,8 @@ Phase 1 では parent pointer を node record に必須で持たせない。pare
 
 ## SemanticModel 設計
 
+![ox-mf2 Phase 1 SemanticModel design](./assets/002-ox-mf2-semantic-model-design.svg)
+
 `parse_semantic = true` の場合、CST から lightweight な SemanticModel を生成する。
 
 SemanticModel は runtime execution IR ではない。linter、compiler、validation が共有する意味情報である。
@@ -318,6 +320,8 @@ Data Model Errors の例:
 これらは parser syntax error として扱わない。ただし、Phase 1 の optional semantic validation が有効な場合に diagnostics として報告できるよう、SemanticModel は必要な source links を保持する。
 
 ## Name / Identifier / Literal value 設計
+
+![ox-mf2 Name / Identifier / Literal value design](./assets/002-ox-mf2-name-identifier-literal-value-design.svg)
 
 CST は source representation を lossless に保持する。一方、SemanticModel は比較や data model 変換に必要な logical value を扱う。
 

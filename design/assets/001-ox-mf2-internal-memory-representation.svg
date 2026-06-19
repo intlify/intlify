@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 780" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Internal Memory Representation</title>
+<desc id="desc">ox-mf2 builds flat indexed storage in Phase 1, exposes tools through stable identifiers and accessors, and keeps the storage snapshot-friendly for Phase 2.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#1f2937; }
+    .muted { fill:#6b7280; }
+    .small { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .foundation { fill:#f8fafc; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .source { fill:#475569; }
+    .parse { fill:#475569; }
+    .syntax { fill:#475569; }
+    .semantic { fill:#0f766e; }
+    .diagnostic { fill:#334155; }
+    .contract { fill:#0f766e; }
+    .surface { fill:#475569; }
+    .consumer { fill:#475569; }
+    .storage { fill:#334155; }
+    .note { fill:#475569; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .small { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .foundation { fill:#0f172a; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note { fill:#64748b; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1160" height="780" fill="none"/>
+
+<text x="580" y="42" font-size="22" font-weight="700" class="title" text-anchor="middle">Internal memory representation</text>
+<text x="580" y="70" font-size="13" class="subtitle" text-anchor="middle">Phase 1 builds flat indexed storage; tools read it through stable ids and accessors.</text>
+
+<rect x="46" y="112" width="270" height="430" rx="10" class="panel" stroke-width="2"/>
+<text x="74" y="150" font-size="16" font-weight="700" class="label">Construction path</text>
+<text x="74" y="176" font-size="12" class="muted">Parser work stays local.</text>
+<text x="74" y="196" font-size="12" class="muted">No public object tree first.</text>
+
+<rect x="82" y="236" width="198" height="62" rx="7" class="source"/>
+<text x="181" y="260" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Source text</text>
+<text x="181" y="280" font-size="10.5" fill="#e5e7eb" text-anchor="middle">UTF-8 bytes + SourceId</text>
+
+<path d="M 181 304 L 181 324" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="82" y="332" width="198" height="62" rx="7" class="parse"/>
+<text x="181" y="356" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Lexer / parser</text>
+<text x="181" y="376" font-size="10.5" fill="#e5e7eb" text-anchor="middle">tokens, trivia, recovery</text>
+
+<path d="M 181 400 L 181 420" fill="none" class="arrow" stroke-width="2" marker-end="url(#arrow)"/>
+
+<rect x="82" y="428" width="198" height="62" rx="7" class="contract"/>
+<text x="181" y="452" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Append records</text>
+<text x="181" y="472" font-size="10.5" fill="#e5e7eb" text-anchor="middle">return compact u32 ids</text>
+
+<rect x="374" y="112" width="412" height="430" rx="10" class="foundation" stroke-width="2"/>
+<text x="402" y="150" font-size="16" font-weight="700" class="label">Flat indexed storage</text>
+<text x="402" y="176" font-size="12" class="muted">Tree shape uses ids and ranges.</text>
+<text x="402" y="196" font-size="12" class="muted">Spans use UTF-8 byte offsets.</text>
+
+<rect x="414" y="236" width="154" height="62" rx="7" class="source"/>
+<text x="491" y="260" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">sources[]</text>
+<text x="491" y="280" font-size="10.5" fill="#e5e7eb" text-anchor="middle">SourceId</text>
+
+<rect x="592" y="236" width="154" height="62" rx="7" class="syntax"/>
+<text x="669" y="260" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">nodes[]</text>
+<text x="669" y="280" font-size="10.5" fill="#e5e7eb" text-anchor="middle">NodeId + span</text>
+
+<rect x="414" y="332" width="154" height="62" rx="7" class="consumer"/>
+<text x="491" y="356" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">edges[]</text>
+<text x="491" y="376" font-size="10.5" fill="#e5e7eb" text-anchor="middle">child ranges</text>
+
+<rect x="592" y="332" width="154" height="62" rx="7" class="surface"/>
+<text x="669" y="356" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">tokens[]</text>
+<text x="669" y="376" font-size="10.5" fill="#e5e7eb" text-anchor="middle">TokenId + span</text>
+
+<rect x="414" y="428" width="154" height="62" rx="7" class="parse"/>
+<text x="491" y="452" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">trivia[]</text>
+<text x="491" y="472" font-size="10.5" fill="#e5e7eb" text-anchor="middle">format preserving</text>
+
+<rect x="592" y="428" width="154" height="62" rx="7" class="diagnostic"/>
+<text x="669" y="452" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">diagnostics[]</text>
+<text x="669" y="472" font-size="10.5" fill="#e5e7eb" text-anchor="middle">labels + spans</text>
+
+<path d="M 316 363 L 364 363" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+<rect x="844" y="112" width="270" height="430" rx="10" class="panel" stroke-width="2"/>
+<text x="872" y="150" font-size="16" font-weight="700" class="label">Tool-facing views</text>
+<text x="872" y="176" font-size="12" class="muted">Tools depend on handles.</text>
+<text x="872" y="196" font-size="12" class="muted">Storage stays replaceable.</text>
+
+<rect x="880" y="236" width="198" height="62" rx="7" class="syntax"/>
+<text x="979" y="260" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">CstView</text>
+<text x="979" y="280" font-size="10.5" fill="#e5e7eb" text-anchor="middle">lazy node accessors</text>
+
+<rect x="880" y="332" width="198" height="62" rx="7" class="semantic"/>
+<text x="979" y="356" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">SemanticView</text>
+<text x="979" y="376" font-size="10.5" fill="#e5e7eb" text-anchor="middle">facts linked to NodeId</text>
+
+<rect x="880" y="428" width="198" height="62" rx="7" class="diagnostic"/>
+<text x="979" y="452" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">DiagnosticView</text>
+<text x="979" y="472" font-size="10.5" fill="#e5e7eb" text-anchor="middle">SourceId + Span</text>
+
+<path d="M 786 363 L 838 363" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+<rect x="82" y="596" width="996" height="164" rx="10" class="foundation" stroke-width="2"/>
+<text x="110" y="632" font-size="15" font-weight="700" class="label">Snapshot-friendly by construction</text>
+
+<text x="110" y="660" font-size="12" class="small">Phase 1 tools read construction-time storage directly.</text>
+<text x="110" y="684" font-size="12" class="small">Phase 2 emits snapshots with a linear writer.</text>
+<text x="110" y="708" font-size="12" class="small">No recursive public AST is materialized first.</text>
+
+<rect x="774" y="652" width="260" height="52" rx="7" class="storage"/>
+<text x="904" y="674" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">SnapshotWriter</text>
+<text x="904" y="694" font-size="10.5" fill="#e5e7eb" text-anchor="middle">linear emit from the same ids</text>
+</svg>

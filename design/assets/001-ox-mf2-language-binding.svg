@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 760" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Language Binding Architecture</title>
+<desc id="desc">Language bindings are thin adapters over the single Rust implementation. Stable handles, lazy accessors, snapshots, diagnostics, and semantic views cross the language boundary instead of Rust internal types or duplicated MF2 semantics.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#1f2937; }
+    .muted { fill:#6b7280; }
+    .small { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .foundation { fill:#f8fafc; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .source { fill:#475569; }
+    .parse { fill:#475569; }
+    .syntax { fill:#475569; }
+    .semantic { fill:#0f766e; }
+    .diagnostic { fill:#334155; }
+    .contract { fill:#0f766e; }
+    .surface { fill:#475569; }
+    .consumer { fill:#475569; }
+    .storage { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .small { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .foundation { fill:#0f172a; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1160" height="760" fill="none"/>
+
+<text x="580" y="42" font-size="22" font-weight="700" class="title" text-anchor="middle">Language binding architecture</text>
+<text x="580" y="70" font-size="13" class="subtitle" text-anchor="middle">Bindings wrap the Rust core; they do not become separate MF2 implementations.</text>
+
+<rect x="46" y="108" width="318" height="494" rx="10" class="panel" stroke-width="2"/>
+<text x="74" y="148" font-size="16" font-weight="700" class="label">Single Rust core</text>
+<text x="74" y="174" font-size="12" class="muted">MF2 rules live once.</text>
+<text x="74" y="194" font-size="12" class="muted">Targets call the same implementation.</text>
+
+<rect x="78" y="214" width="254" height="58" rx="7" class="parse"/>
+<text x="205" y="238" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Parser + CST</text>
+<text x="205" y="258" font-size="10.5" fill="#e5e7eb" text-anchor="middle">recovering, lossless core</text>
+
+<rect x="78" y="304" width="254" height="58" rx="7" class="semantic"/>
+<text x="205" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Semantic analysis</text>
+<text x="205" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">selectors, variants, refs</text>
+
+<rect x="78" y="394" width="254" height="58" rx="7" class="diagnostic"/>
+<text x="205" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Diagnostics</text>
+<text x="205" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">SourceId + Span labels</text>
+
+<rect x="78" y="484" width="254" height="58" rx="7" class="surface"/>
+<text x="205" y="508" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Tool operations</text>
+<text x="205" y="528" font-size="10.5" fill="#e5e7eb" text-anchor="middle">format, lint, compile</text>
+
+<rect x="424" y="108" width="312" height="494" rx="10" class="foundation" stroke-width="2"/>
+<text x="452" y="148" font-size="16" font-weight="700" class="label">Stable boundary</text>
+<text x="452" y="174" font-size="12" class="muted">No Rust internal structs cross.</text>
+<text x="452" y="194" font-size="12" class="muted">Consumers receive stable views.</text>
+
+<rect x="462" y="214" width="236" height="58" rx="7" class="contract"/>
+<text x="580" y="238" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Result handle</text>
+<text x="580" y="258" font-size="10.5" fill="#e5e7eb" text-anchor="middle">opaque owner of parse output</text>
+
+<rect x="462" y="304" width="236" height="58" rx="7" class="syntax"/>
+<text x="580" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Lazy accessors</text>
+<text x="580" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">read views on demand</text>
+
+<rect x="462" y="394" width="236" height="58" rx="7" class="storage"/>
+<text x="580" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Encoded snapshot</text>
+<text x="580" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">advanced transport API</text>
+
+<rect x="462" y="484" width="236" height="58" rx="7" class="semantic"/>
+<text x="580" y="508" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Semantic / diagnostic views</text>
+<text x="580" y="528" font-size="10.5" fill="#e5e7eb" text-anchor="middle">facts and labels by ids</text>
+
+<rect x="796" y="108" width="318" height="494" rx="10" class="panel" stroke-width="2"/>
+<text x="824" y="148" font-size="16" font-weight="700" class="label">Language adapters</text>
+<text x="824" y="174" font-size="12" class="muted">Adapters are ergonomic wrappers.</text>
+<text x="824" y="194" font-size="12" class="muted">They do not duplicate MF2 logic.</text>
+
+<rect x="828" y="214" width="254" height="58" rx="7" class="consumer"/>
+<text x="955" y="238" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">N-API binding</text>
+<text x="955" y="258" font-size="10.5" fill="#e5e7eb" text-anchor="middle">Node.js and intlify tooling</text>
+
+<rect x="828" y="304" width="254" height="58" rx="7" class="consumer" opacity="0.9"/>
+<text x="955" y="328" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">WASM binding</text>
+<text x="955" y="348" font-size="10.5" fill="#e5e7eb" text-anchor="middle">browser, editor, playground</text>
+
+<rect x="828" y="394" width="254" height="58" rx="7" class="contract"/>
+<text x="955" y="418" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">C ABI design prep</text>
+<text x="955" y="438" font-size="10.5" fill="#e5e7eb" text-anchor="middle">not required in initial MVP</text>
+
+<rect x="828" y="484" width="254" height="58" rx="7" class="surface"/>
+<text x="955" y="508" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Future native bindings</text>
+<text x="955" y="528" font-size="10.5" fill="#e5e7eb" text-anchor="middle">Go, Swift, C#, Zig, Python</text>
+
+<path d="M 364 378 L 414 378" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+<path d="M 736 378 L 786 378" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+<rect x="88" y="640" width="984" height="74" rx="10" class="foundation" stroke-width="2"/>
+<text x="580" y="670" font-size="14" font-weight="700" class="label" text-anchor="middle">Boundary rule</text>
+<text x="580" y="696" font-size="12" class="small" text-anchor="middle">Nested JSON is not the hot-path AST format; MessagePack is reserved for future LSP/editor transport.</text>
+</svg>
