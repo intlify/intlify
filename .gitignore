@@ -30,6 +30,9 @@ dist-ssr
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# playwright-cli
+.playwright-cli
+
 # Specific cases
 tools/mf-parser-bench/.tmp
 tools/mf-parser-bench/results
