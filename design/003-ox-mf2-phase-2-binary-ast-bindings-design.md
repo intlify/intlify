@@ -1,20 +1,20 @@
-# ox-mf2 Phase 2 Binary AST and Language Binding 詳細設計
+# ox-mf2 Phase 2 Binary AST and Language Binding Detailed Design
 
-## 目的
+## Purpose
 
-このドキュメントは、ox-mf2 の Phase 2 cross-language boundary に関する implementation-oriented design details を定義する。
+This document defines implementation-oriented design details for the Phase 2 cross-language boundary of ox-mf2.
 
-foundation document は [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md) である。このドキュメントは high-level philosophy と phase plan を定義する。本ドキュメントでは、Binary AST snapshot、language bindings、snapshot APIs、binding result boundaries、transport boundaries の lower-level shape を定義する。
+The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). It defines the high-level philosophy and phase plan. This document defines the lower-level shape of Binary AST snapshots, language bindings, snapshot APIs, binding result boundaries, and transport boundaries.
 
-## 基本方針
+## Basic Policy
 
-ox-mf2 は Rust core を唯一の semantic implementation にする。他言語で MF2 parsing、CST construction、semantic analysis、diagnostics、formatting、linting を再実装しない。
+ox-mf2 uses the Rust core as the single semantic implementation. MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, and linting are not reimplemented in other languages.
 
-Phase 1 では recovering parser と snapshot-friendly construction-time tables を作る。Phase 2 では versioned Binary AST snapshot を導入し、N-API、WASM、後続 language bindings、persistence、transport の product boundary にする。
+Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for N-API, WASM, later language bindings, persistence, and transport.
 
-Rust core の hot path は `CstTables` / `CstView` / `SemanticModel` を維持する。Binary AST snapshot は Rust core の通常 parse output ではなく、language boundary、persistence、worker transfer、batch transfer のために `CstTables` から encode される表現である。
+The Rust core hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust core parse output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
 
-この設計では次の path を避ける。
+This design avoids the following path.
 
 ```text
 public typed AST
@@ -22,7 +22,7 @@ public typed AST
   -> Binary AST snapshot
 ```
 
-意図する path は次のとおり。
+The intended path is as follows.
 
 ```text
 parser / lowering
@@ -34,15 +34,15 @@ parser / lowering
 
 ![ox-mf2 Binary AST and binding architecture](./assets/003-ox-mf2-binary-ast-binding-architecture.svg)
 
-## Identifier model（識別子モデル）
+## Identifier Model
 
-Binary AST snapshot は、[002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義される Phase 1 identifier model を継承し、snapshot entry point 用に RootId を追加する。
+Binary AST snapshot inherits the Phase 1 identifier model defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md), and adds RootId for snapshot entry points.
 
-snapshot 内では、RootId、NodeId、TokenId、TriviaId、SourceId は、それぞれ対応する section または source table への `u32` index のままにする。これらの id は optional にしない。`RootId = 0`、`NodeId = 0`、`TokenId = 0`、`TriviaId = 0`、`SourceId = 0` はすべて有効な index であり、none sentinel は定義しない。span は UTF-8 byte offset のままにし、source_id は含めない。source identity は record の `source_id` または root/source context から取得する。line/column と UTF-16 editor positions は display/editor boundary の責務であり、snapshot node fields にはしない。
+Inside a snapshot, RootId, NodeId, TokenId, TriviaId, and SourceId remain `u32` indexes into the corresponding section or source table. These ids are not optional. `RootId = 0`, `NodeId = 0`, `TokenId = 0`, `TriviaId = 0`, and `SourceId = 0` are all valid indexes, and no none sentinel is defined for them. Spans remain UTF-8 byte offsets and do not include source_id. Source identity is obtained from record `source_id` or root/source context. Line/column and UTF-16 editor positions belong to display/editor boundaries and are not stored in snapshot node fields.
 
-SourceStore と ParseInput も Phase 1 parser design で定義する。Phase 2 は同じ SourceId と ParseInput metadata を使い、snapshot roots section entries と binding result mappings を構築する。
+SourceStore and ParseInput are also defined in the Phase 1 parser design. Phase 2 uses the same SourceId and ParseInput metadata to build snapshot roots section entries and binding result mappings.
 
-## Parser と Snapshot API
+## Parser and Snapshot API
 
 Phase 2 snapshot APIs:
 
@@ -66,13 +66,13 @@ parse_batch_to_snapshot(
 ) -> BatchSnapshotResult
 ```
 
-`SourceStore`、`ParseInput`、`ParseOptions`、`ParseResult`、`ParseSessionResult` は [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) で定義する。snapshot generation は Phase 2 の独立した責務とし、parse cost と snapshot encoding cost を個別に計測できるようにする。
+`SourceStore`, `ParseInput`, `ParseOptions`, `ParseResult`, and `ParseSessionResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
-`parse_source_to_snapshot` は normal owned parse path から snapshot を作る convenience API である。`parse_session_to_snapshot` は `ParseWorkspace` を使った borrowed parse result から snapshot encoding だけを行う API であり、workspace reuse、benchmark、LSP のように allocation variance を抑えたい path で使う。どちらの場合も snapshot は input `SourceStore` / `ParseInput` metadata から SourceRecord と RootRecord を構築する。
+`parse_source_to_snapshot` is a convenience API that builds a snapshot from the normal owned parse path. `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. In both cases, the snapshot builds SourceRecord and RootRecord from input `SourceStore` / `ParseInput` metadata.
 
-## Options（オプション）
+## Options
 
-parse behavior と snapshot output は別々の option type を使う。parse behavior は Phase 1 の `ParseOptions` で定義し、このドキュメントでは snapshot-specific options のみを定義する。
+Parse behavior and snapshot output use separate option types. Parse behavior is defined by Phase 1 `ParseOptions`; this document defines only snapshot-specific options.
 
 ```rust
 SnapshotOptions {
@@ -83,22 +83,22 @@ SnapshotOptions {
 }
 ```
 
-snapshot options は MF2 parser semantics を変えてはならない。すでに parser が生成した data のうち、どれを snapshot に encode するかだけを決める。
+Snapshot options must not change MF2 parser semantics. They only decide which already-produced parser data is encoded into the snapshot.
 
-default:
+Defaults:
 
 - `include_diagnostics = true`
 - `include_source_text = false`
 - `include_trivia = true`
 - `preserve_whitespace = true`
 
-`include_source_text = false` を default にする。通常の binding parse result では、source text は caller / binding layer / SourceStore 側ですでに保持されているため、snapshot に重複して入れない方が size と transfer cost を抑えられる。
+`include_source_text = false` is the default. In normal binding parse results, source text is already retained by the caller, binding layer, or SourceStore, so duplicating it in the snapshot increases size and transfer cost.
 
-`include_source_text = true` は、snapshot 単体で `source_slice(source_id, span)` を解決したい場合に使う。主な用途は debug dump、persistence、worker transfer、fixture snapshot、外部 process への transport である。
+`include_source_text = true` is used when the snapshot alone must resolve `source_slice(source_id, span)`. Main uses are debug dump, persistence, worker transfer, fixture snapshots, and transport to external processes.
 
-## Result types（結果型）
+## Result Types
 
-この section の result type は Rust snapshot-producing API の形である。N-API / WASM binding の default public API は raw bytes を直接返さず、後述の result object と snapshot accessor で包む。
+The result types in this section are Rust snapshot-producing API shapes. The default public API for N-API / WASM bindings does not return raw bytes directly; it wraps them in the result object and snapshot accessor described later.
 
 ```rust
 SnapshotResult {
@@ -114,17 +114,17 @@ BatchSnapshotResult {
 }
 ```
 
-`SnapshotResult.root` は single input の RootId である。`BatchSnapshotResult.bytes` は共有 snapshot buffer である。`roots` は input order に対応する RootId array であり、各 root は RootRecord 経由で root node、source_id、diagnostic range だけを持つ。path、locale、message_id、base_offset、optional source text は `SourceRecord` 側に置く。これにより、batch parsing は多くの message 間で string tables と snapshot sections を共有できる。
+`SnapshotResult.root` is the RootId for a single input. `BatchSnapshotResult.bytes` is a shared snapshot buffer. `roots` is a RootId array corresponding to input order. Each root has only root node, source_id, and diagnostic range through RootRecord. Path, locale, message_id, base_offset, and optional source text live in SourceRecord. This lets batch parsing share string tables and snapshot sections across many messages.
 
-Rust snapshot-producing API は `bytes + RootId` を返し、self-referential な `RootHandle { snapshot, id }` を result struct に直接格納しない。RootHandle は decoded `SnapshotView` または binding result object が snapshot owner を持った後に作る accessor handle である。
+Rust snapshot-producing APIs return `bytes + RootId` and do not store a self-referential `RootHandle { snapshot, id }` directly in the result struct. RootHandle is created after a decoded `SnapshotView` or binding result object owns the snapshot.
 
-## Binary AST snapshot
+## Binary AST Snapshot
 
-Binary AST snapshot は、Phase 2 以降の canonical cross-language CST/AST product boundary であり persistence format である。Rust core の通常 parse output を置き換えるものではなく、2 つ目の semantic implementation でもない。
+Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust core parse output, and it is not a second semantic implementation.
 
 ![ox-mf2 Binary AST snapshot format layout](./assets/003-ox-mf2-binary-ast-format-layout.svg)
 
-Phase 2 snapshot は lossless CST surface に集中する。
+Phase 2 snapshot focuses on the lossless CST surface.
 
 - optional source text
 - string table
@@ -136,15 +136,15 @@ Phase 2 snapshot は lossless CST surface に集中する。
 - diagnostics
 - roots section / RootRecord entry points
 
-semantic model は Rust 内部で利用可能なままにし、SemanticView または後続の compact semantic snapshot として分離して expose する。
+The semantic model remains available inside Rust and is exposed separately as SemanticView or a later compact semantic snapshot.
 
-source metadata は core section である。source text bytes は optional `source text data` section である。snapshot は separate spans section を持たず、NodeRecord、TokenRecord、TriviaRecord、DiagnosticRecord に `span_start` / `span_end` を inline で持つ。`include_source_text = false` の場合、decoder は snapshot 単体では `source_slice(source_id, span)` を返せない。その場合、decoder/accessor は binding layer が保持する external source text を参照するか、source text unavailable として扱う。
+Source metadata is a core section. Source text bytes are an optional `source text data` section. The snapshot does not have a separate spans section; NodeRecord, TokenRecord, TriviaRecord, and DiagnosticRecord hold `span_start` / `span_end` inline. With `include_source_text = false`, the decoder cannot resolve `source_slice(source_id, span)` from the snapshot alone. In that case, the decoder/accessor uses external source text retained by the binding layer or reports source text unavailable.
 
-### Wire layout（wire layout）
+### Wire Layout
 
 ![ox-mf2 Binary AST wire layout](./assets/003-ox-mf2-wire-layout.svg)
 
-snapshot format は、固定長 header、section table、typed fixed-record sections を基本形にする。
+The snapshot format is based on a fixed-size header, section table, and typed fixed-record sections.
 
 ```text
 SnapshotHeader {
@@ -170,13 +170,13 @@ SectionRecord {
 }
 ```
 
-`SectionRecord.kind` は stable numeric enum である。一度割り当てた SectionKind number は再利用しない。section の意味を incompatible に変える場合は major version を上げる。
+`SectionRecord.kind` is a stable numeric enum. Once assigned, a SectionKind number is not reused. Changing the meaning of a section incompatibly requires a major version bump.
 
-snapshot header は wire format compatibility のために `major_version` と `minor_version` だけを持つ。patch version は snapshot header に入れず、crate / npm package / WASM package の release version で管理する。`major_version` は incompatible format change、`minor_version` は backward-compatible section、flag、metadata addition を表す。
+The snapshot header has only `major_version` and `minor_version` for wire format compatibility. Patch version is not stored in the snapshot header; it is managed by the crate / npm package / WASM package release version. `major_version` represents incompatible format changes, while `minor_version` represents backward-compatible additions to sections, flags, or metadata.
 
-新しい optional section の追加は minor version で許可する。既存 decoder は `SectionFlags.required = false` の unknown section を validation 後に skip できるため、既存 semantic を壊さない optional metadata、debug data、future semantic data は minor addition として扱える。新しい required section がないと snapshot を正しく解釈できない場合は major version を上げる。
+Adding a new optional section is allowed in a minor version. Existing decoders can skip unknown sections with `SectionFlags.required = false` after validation, so optional metadata, debug data, and future semantic data that do not change existing semantics can be minor additions. A new required section that is necessary to interpret the snapshot correctly requires a major version bump.
 
-`feature_flags` は v1 では全 bit reserved とし、`0` のみ許可する。v1 の拡張判定は section table と `SectionFlags.required` で行い、header-level feature flags は用途が明確になるまで使わない。
+`feature_flags` is fully reserved in v1 and only `0` is allowed. v1 extension detection uses the section table and `SectionFlags.required`; header-level feature flags are not used until a clear purpose exists.
 
 ```text
 SectionFlags {
@@ -184,15 +184,15 @@ SectionFlags {
 }
 ```
 
-unknown section の扱いは `SectionFlags.required` で判定する。decoder が知らない section kind でも、`required = false` かつ offset/size/alignment が valid であれば skip できる。`required = true` の unknown section は、その section を読めない decoder では snapshot を正しく解釈できない可能性があるため reject する。
+Unknown sections are handled using `SectionFlags.required`. An unknown section kind can be skipped if `required = false` and offset/size/alignment are valid. An unknown section with `required = true` is rejected because a decoder that cannot read it may be unable to interpret the snapshot correctly.
 
-すべての multi-byte numeric fields は little-endian とする。`offset` と `byte_len` は snapshot buffer 先頭からの byte offset / byte length である。Phase 2 では buffer offset、section length、record count、NodeId、TokenId、TriviaId、SourceId を `u32` domain に揃える。
+All multi-byte numeric fields are little-endian. `offset` and `byte_len` are byte offsets / byte lengths from the start of the snapshot buffer. In Phase 2, buffer offsets, section lengths, record counts, NodeId, TokenId, TriviaId, and SourceId are all in the `u32` domain.
 
-各 section の count は `SectionRecord.count` を唯一の source of truth とする。root count、node count、edge count、token count、trivia count はそれぞれ `roots`、`nodes`、`edges`、`tokens`、`trivia` section の count から読む。header には重複 count を置かない。
+Each section's count uses `SectionRecord.count` as the only source of truth. root count, node count, edge count, token count, and trivia count are read from the corresponding `roots`, `nodes`, `edges`, `tokens`, and `trivia` section counts. The header does not duplicate counts.
 
-section start は 8-byte alignment を基本にする。`record_size > 0` の section は typed fixed-record array として扱い、decoder は `offset + index * record_size` で lazy access する。`record_size = 0` の section は string data、source text data、extended variable data のような raw byte section として扱う。
+Section starts are 8-byte aligned by default. Sections with `record_size > 0` are typed fixed-record arrays, and decoders lazy-access `offset + index * record_size`. Sections with `record_size = 0` are raw byte sections, such as string data, source text data, and extended variable data.
 
-section table は `SectionKind` ごとに安定した ID を持つ。v1 section kinds:
+The section table has stable IDs per `SectionKind`. v1 section kinds:
 
 ```text
 0  = invalid/reserved
@@ -210,33 +210,33 @@ section table は `SectionKind` ごとに安定した ID を持つ。v1 section 
 12 = extended_data
 ```
 
-`SectionKind = 0` は valid section として使わない。decoder は `kind = 0` の section を invalid snapshot として reject する。
+`SectionKind = 0` is not a valid section. Decoders reject a section with `kind = 0`.
 
-nodes、edges、tokens、roots、sources、string offsets、string data は core sections とする。core sections は section table に存在し、`SectionFlags.required = true` でなければならない。missing core section、または `required = false` の core section は invalid snapshot として reject する。
+nodes, edges, tokens, roots, sources, string offsets, and string data are core sections. Core sections must exist in the section table with `SectionFlags.required = true`. A missing core section, or a core section with `required = false`, makes the snapshot invalid.
 
-core section の minimum count は、`roots.count >= 1`、`sources.count >= 1`、`nodes.count >= 1` とする。`edges.count` と `tokens.count` は `0` を許可する。string offsets は文字列がない場合 `count = 0` を許可し、string data は `byte_len = 0` を許可する。
+Minimum counts for core sections are `roots.count >= 1`, `sources.count >= 1`, and `nodes.count >= 1`. `edges.count` and `tokens.count` may be `0`. string offsets may have `count = 0` when there are no strings, and string data may have `byte_len = 0`.
 
-source text data、trivia、diagnostics、diagnostic labels、extended data は optional sections とする。optional sections は `SectionFlags.required = false` を基本にする。option または content に応じて空 section になってよい。存在しない optional section は `count = 0` と同等に扱う。
+source text data, trivia, diagnostics, diagnostic labels, and extended data are optional sections. Optional sections normally use `SectionFlags.required = false`. They may be empty depending on options or content. A missing optional section is equivalent to `count = 0`.
 
-decoder rules:
+Decoder rules:
 
-- incompatible major versions は reject する。
-- minor version differences は backward compatible な場合のみ accept する。
-- patch-level implementation differences は snapshot header では判定しない。
-- v1 decoder は `feature_flags != 0` を reject する。
-- unknown required features は reject する。
-- unknown required sections は、`SectionFlags.required = true` の場合 reject する。
-- unknown optional sections は、`SectionFlags.required = false` かつ `offset`、`byte_len`、`alignment` が valid なら skip する。
-- `offset + byte_len` が buffer length を超える section は reject する。
-- `record_size > 0` かつ `byte_len != count * record_size` の section は reject する。
+- reject incompatible major versions
+- accept minor version differences only when backward compatible
+- do not use the snapshot header to distinguish patch-level implementation differences
+- reject `feature_flags != 0` in v1
+- reject unknown required features
+- reject unknown required sections when `SectionFlags.required = true`
+- skip unknown optional sections when `SectionFlags.required = false` and `offset`, `byte_len`, and `alignment` are valid
+- reject sections where `offset + byte_len` exceeds buffer length
+- reject sections where `record_size > 0` and `byte_len != count * record_size`
 
-### Roots section
+### Roots Section
 
 ![ox-mf2 roots section](./assets/003-ox-mf2-roots-section.svg)
 
-roots section は core section である。RootRecord は batch input の entry point であり、metadata payload を持たない compact record にする。
+The roots section is a core section. RootRecord is the batch input entry point and stays compact without metadata payload.
 
-RootRecord array order は `parse_batch` input order と同じに固定する。`roots[i]` は `inputs[i]` に対応する。single input の snapshot も同じ layout を使い、`roots.count = 1` とする。
+RootRecord array order is fixed to `parse_batch` input order. `roots[i]` corresponds to `inputs[i]`. A single-input snapshot uses the same layout with `roots.count = 1`.
 
 ```text
 RootRecord {
@@ -247,21 +247,21 @@ RootRecord {
 }
 ```
 
-`root_node` は nodes section 内の valid NodeId であり、常に `root_node < nodes.count` を満たさなければならない。root none sentinel は定義しない。Phase 1 recovering parser は malformed input でも可能な限り root node と部分 CST を返すため、通常の parse failure は diagnostics と partial tree で表現する。snapshot を構築できない fatal error は snapshot result ではなく API error として扱う。
+`root_node` is a valid NodeId into the nodes section and must satisfy `root_node < nodes.count`. There is no root none sentinel. The Phase 1 recovering parser returns diagnostics and partial trees for normal parse failure whenever possible. Fatal errors that prevent snapshot construction are API errors, not snapshot results.
 
-`source_id` は SourceRecord を指す valid SourceId であり、常に `source_id < sources.count` を満たさなければならない。root-level source none sentinel は定義しない。path、locale、message_id、base_offset、optional source text は SourceRecord から読む。これにより RootRecord は fixed 16 bytes の entry point に留まり、source metadata の拡張と roots section の random access を分離できる。
+`source_id` is a valid SourceId pointing to SourceRecord and must satisfy `source_id < sources.count`. There is no root-level source none sentinel. Path, locale, message_id, base_offset, and optional source text are read from SourceRecord. This keeps RootRecord as a fixed 16-byte entry point and separates source metadata expansion from roots-section random access.
 
-`diagnostic_start` と `diagnostic_count` は diagnostics section 内の contiguous range を指す。diagnostics section は root order に沿って grouped layout にする。これにより decoder は `roots[i]` から diagnostics を O(1) で slice できる。
+`diagnostic_start` and `diagnostic_count` point to a contiguous range in the diagnostics section. Diagnostics are grouped by root order. This allows decoders to slice diagnostics from `roots[i]` in O(1).
 
-`include_diagnostics = false` の場合でも RootRecord の layout は変えない。`diagnostic_count = 0` とし、`diagnostic_start = 0` とする。diagnostics section と diagnostic labels section は空 section、または optional section として存在しない扱いにできる。decoder は RootRecord の record_size を option によって変えてはならない。
+When `include_diagnostics = false`, RootRecord layout does not change. `diagnostic_count = 0` and `diagnostic_start = 0`. The diagnostics section and diagnostic labels section may be empty or absent optional sections. Decoders must not vary RootRecord record_size by option.
 
-### String table（文字列テーブル）
+### String Table
 
 ![ox-mf2 string table](./assets/003-ox-mf2-string-table.svg)
 
-string table は snapshot metadata、diagnostic message、semantic-independent small strings、normalized strings など、source span だけでは表現できない文字列のために使う。original source text は string data に混ぜず、`include_source_text = true` の場合だけ dedicated `source text data` section に置く。
+The string table stores snapshot metadata, diagnostic messages, semantic-independent small strings, normalized strings, and other strings that cannot be represented by source spans alone. Original source text is not mixed into string data; it is stored in the dedicated `source text data` section only when `include_source_text = true`.
 
-string offsets section と string data section は core sections であり、文字列が 0 個でも必ず存在させる。その場合、string offsets section は `count = 0`、string data section は `byte_len = 0` にできる。
+The string offsets section and string data section are core sections and always exist, even with zero strings. In that case, string offsets can have `count = 0`, and string data can have `byte_len = 0`.
 
 ```text
 StringRef {
@@ -274,19 +274,19 @@ StringOffsetRecord {
 }
 ```
 
-`StringRef.id` は string offsets section 内の StringId である。decoder は `string_offsets[id]` を読み、そこから string data section の `offset..offset+len` を slice する。`StringId` は snapshot 内で canonical な interned string identity として扱う。
+`StringRef.id` is a StringId into the string offsets section. The decoder reads `string_offsets[id]` and slices `offset..offset+len` from the string data section. `StringId` is the canonical interned string identity inside the snapshot.
 
-`StringId = 0` は有効な string id であり、`string_offsets[0]` を指す。ただし string offsets section の `count = 0` の場合、有効な StringId は存在しない。optional string は `StringId = 0xFFFF_FFFF` を none sentinel とする。decoder は none sentinel を string offsets lookup してはならない。none sentinel 以外の StringId が `string offsets` section count 以上の場合は invalid snapshot として reject する。
+`StringId = 0` is a valid string id and points to `string_offsets[0]`. If the string offsets section has `count = 0`, no valid StringId exists. Optional strings use `StringId = 0xFFFF_FFFF` as the none sentinel. Decoders must not look up the none sentinel in string offsets. A non-sentinel StringId greater than or equal to string offsets count is invalid.
 
-decoder は consumer が読むときだけ UTF-8 strings を lazy に materialize する。
+Decoders materialize UTF-8 strings lazily, only when a consumer reads them.
 
-### Source text data section
+### Source Text Data Section
 
 ![ox-mf2 source text data section](./assets/003-ox-mf2-source-text-data-section.svg)
 
-source text data section は optional raw byte section である。`include_source_text = true` の場合、各 input の original MF2 source text を UTF-8 bytes としてこの section に格納する。`include_source_text = false` の場合、この section は存在しないか空 section になる。
+The source text data section is an optional raw byte section. When `include_source_text = true`, each input's original MF2 source text is stored in this section as UTF-8 bytes. When `include_source_text = false`, this section is absent or empty.
 
-v1 snapshot の source text data は UTF-8-valid source text のみを対象にする。ECMAScript String compatibility のために unpaired surrogate を含む input を扱う場合、binding/source boundary は external source text として保持し、`include_source_text = false` の snapshot と組み合わせる。WTF-8 または UTF-16 source text を snapshot 内に保存する必要が出た場合は、future version の optional section または format change として設計する。
+v1 snapshot source text data covers only UTF-8-valid source text. If an input with unpaired surrogates must be handled for ECMAScript String compatibility, the binding/source boundary keeps it as external source text and combines it with a snapshot using `include_source_text = false`. If storing WTF-8 or UTF-16 source text in snapshots becomes necessary, it should be designed as a future optional section or format change.
 
 ```text
 SourceTextRef {
@@ -296,19 +296,19 @@ SourceTextRef {
 }
 ```
 
-`offset` と `len` は source text data section 内の byte range である。`SourceTextRef.source_id = 0xFFFF_FFFF` は none sentinel であり、source text bytes が snapshot に含まれていないことを表す。none sentinel の場合、decoder は `offset` と `len` を参照してはならない。
+`offset` and `len` are byte ranges inside the source text data section. `SourceTextRef.source_id = 0xFFFF_FFFF` is the none sentinel and means source text bytes are not included in the snapshot. In the sentinel case, decoders must not use `offset` or `len`.
 
-通常の SourceId は none sentinel を持たないが、SourceTextRef は optional field なので sentinel を持つ。source text data は string table と分離するため、metadata strings の dedup、diagnostic strings、normalized strings の layout と original source text の lifetime / transfer policy を独立して扱える。
+Normal SourceId has no none sentinel, but SourceTextRef is an optional field and therefore has one. Source text data is separated from the string table so metadata string deduplication, diagnostic strings, normalized strings, and original source text lifetime / transfer policy can evolve independently.
 
-### Source section
+### Source Section
 
 ![ox-mf2 source section](./assets/003-ox-mf2-source-section.svg)
 
-source section は core section である。source record は source identity と metadata を持ち、source text bytes は持たない。
+The source section is a core section. Source records contain source identity and metadata, but not source text bytes.
 
-SourceRecord array order は `parse_batch` input order に固定しない。sources section は source identity による dedup を許可する。複数の RootRecord が同じ `source_id` を指してよい。root と source の対応は常に `RootRecord.source_id` で解決する。
+SourceRecord array order is not fixed to `parse_batch` input order. The sources section may deduplicate by source identity. Multiple RootRecords may point to the same `source_id`. Root-to-source mapping is always resolved through `RootRecord.source_id`.
 
-v1 snapshot format は source dedup key を定義しない。`path + base_offset + source text` のような identity rule は wire format に焼き込まない。SourceStore / binding が割り当てた SourceId を canonical source identity として扱い、snapshot はその mapping を encode する。
+v1 snapshot format does not define a source dedup key. Identity rules such as `path + base_offset + source text` are not baked into the wire format. SourceId assigned by SourceStore / binding is the canonical source identity, and the snapshot encodes that mapping.
 
 ```text
 SourceRecord {
@@ -321,23 +321,23 @@ SourceRecord {
 }
 ```
 
-SourceId は sources section への required index である。`SourceRecord.source_id` はその record 自身の sources section index と一致しなければならない。RootRecord、TokenRecord、TriviaRecord、DiagnosticRecord の `source_id` は none sentinel を持たず、常に `source_id < sources.count` を満たさなければならない。`SourceId = 0` は有効である。
+SourceId is a required index into the sources section. `SourceRecord.source_id` must match its own index in the sources section. RootRecord, TokenRecord, TriviaRecord, and DiagnosticRecord `source_id` fields have no none sentinel and must satisfy `source_id < sources.count`. `SourceId = 0` is valid.
 
-`path`、`locale`、`message_id` は optional metadata である。これらは `StringRef` field として常に SourceRecord に存在し、値がない場合は `StringId = 0xFFFF_FFFF` の none sentinel を使う。SourceRecord の record layout は metadata の有無によって変えない。
+`path`, `locale`, and `message_id` are optional metadata. They always exist as `StringRef` fields in SourceRecord, and use `StringId = 0xFFFF_FFFF` as the none sentinel when absent. SourceRecord layout does not vary by metadata presence.
 
-`base_offset` は UTF-8 byte offset である。optional にせず、未指定時は `0` を格納する。absolute byte position は `base_offset + span_start/end` で計算できる。UTF-16 code unit positions、line/column、LSP positions は binding/editor boundary で変換し、snapshot node fields には保存しない。
+`base_offset` is a UTF-8 byte offset. It is not optional; `0` is stored when unspecified. Absolute byte positions are computed as `base_offset + span_start/end`. UTF-16 code unit positions, line/column, and LSP positions are converted at the binding/editor boundary and are not stored in snapshot node fields.
 
-`include_source_text = false` の場合、`text.source_id = 0xFFFF_FFFF` とする。SourceRecord の record layout は変えない。roots section と diagnostics は SourceId と Span を保持するため、binding layer は外部 source text を使って location や source slice を解決できる。
+When `include_source_text = false`, `text.source_id = 0xFFFF_FFFF`. SourceRecord layout does not change. Roots and diagnostics retain SourceId and Span, so the binding layer can use external source text to resolve locations or source slices.
 
-`include_source_text = true` の場合、snapshot は source text を dedicated source text data section に格納する。`SourceRecord.text.source_id` は同じ record の `source_id` と一致しなければならない。large batch では SourceRecord ごとに text range を持ち、roots section は source metadata と root node を結びつける。
+When `include_source_text = true`, the snapshot stores source text in the dedicated source text data section. `SourceRecord.text.source_id` must equal the same record's `source_id`. In large batches, each SourceRecord has its own text range, and the roots section links source metadata to root nodes.
 
-source slice は SourceId と Span の組で解決する。`sourceSlice(span)` という表記は、`SourceView.sourceSlice(span)` や node/token handle 上の convenience accessor のように source context を持つ API を指す。snapshot 内の source text data または binding result が保持する external source text のどちらかから source text を解決できる場合だけ成功する。どちらも利用できない場合、decoder/accessor は silent `undefined` を返さず source text unavailable error を返す。
+Source slices are resolved with SourceId plus Span. `sourceSlice(span)` refers to APIs with source context, such as `SourceView.sourceSlice(span)` or convenience accessors on node/token handles. It succeeds only when source text can be resolved from snapshot source text data or from external source text retained by the binding result. If neither is available, the decoder/accessor returns a source text unavailable error instead of silent `undefined`.
 
-### Node section（node section）
+### Node Section
 
 ![ox-mf2 node section](./assets/003-ox-mf2-node-section.svg)
 
-snapshot node records は、可能な限り fixed-size にする。これにより NodeId を node section への直接 `u32` index として維持できる。
+Snapshot node records are fixed-size as much as possible. This keeps NodeId as a direct `u32` index into the node section.
 
 ```text
 NodeRecord {
@@ -351,13 +351,13 @@ NodeRecord {
 }
 ```
 
-`kind` は Phase 1 parser が使う `SyntaxKind` の numeric value をそのまま格納する。SnapshotWriter は NodeRecord.kind を別の snapshot-specific kind table に remap しない。`SyntaxKind` numeric value は snapshot compatibility contract の一部であり、一度公開した value は reorder、reuse、意味の incompatible 変更をしない。decoder は自身が知らない `SyntaxKind` numeric value を invalid snapshot として reject する。新しい kind を core NodeRecord / TokenRecord / TriviaRecord に出力する変更、または kind の意味を incompatible に変える変更は snapshot major version を上げる。
+`kind` stores the numeric value of the Phase 1 parser `SyntaxKind` directly. SnapshotWriter does not remap NodeRecord.kind through a snapshot-specific kind table. `SyntaxKind` numeric values are part of the snapshot compatibility contract: once published, values are not reordered, reused, or changed incompatibly. A decoder rejects unknown `SyntaxKind` numeric values. Emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord, or changing a kind's meaning incompatibly, requires a snapshot major version bump.
 
-`first_child` と `child_count` は edges section への range を表す。children は source order の EdgeRecord array として並び、各 edge が node または token を参照する。
+`first_child` and `child_count` represent a range in the edges section. Children are stored as an EdgeRecord array in source order, where each edge references either a node or a token.
 
-variable-length data や node-kind-specific data は、`data_ref` から参照される extended data section に置く。extended data section は `record_size = 0` の raw byte section である。`data_ref = 0xFFFF_FFFF` は none sentinel であり、その node に extended data がないことを表す。none sentinel 以外の `data_ref` は extended data section 内の valid byte offset でなければならない。NodeId / TokenId / TriviaId / SourceId は sentinel を持たないが、`data_ref` は optional field なので sentinel を持つ。
+Variable-length data or node-kind-specific data lives in the extended data section referenced by `data_ref`. The extended data section is a raw byte section with `record_size = 0`. `data_ref = 0xFFFF_FFFF` is the none sentinel and means the node has no extended data. Any non-sentinel `data_ref` must be a valid byte offset into the extended data section. NodeId / TokenId / TriviaId / SourceId have no sentinel, but `data_ref` is optional and therefore has one.
 
-extended data payload は必ず header を持つ。
+Extended data payloads always have a header.
 
 ```text
 ExtendedDataHeader {
@@ -367,13 +367,13 @@ ExtendedDataHeader {
 }
 ```
 
-`data_ref` は ExtendedDataHeader の先頭 byte offset を指す。`byte_len` は header を含む payload 全体の byte length である。decoder は `data_ref + byte_len <= extended_data.byte_len` を検証する。`kind` は node-kind-specific payload kind であり、NodeRecord.kind と互換でなければならない。互換でない場合は invalid snapshot として reject する。
+`data_ref` points to the first byte of ExtendedDataHeader. `byte_len` is the total payload length including the header. Decoders verify `data_ref + byte_len <= extended_data.byte_len`. `kind` is a node-kind-specific payload kind and must be compatible with NodeRecord.kind. If not, the snapshot is invalid.
 
-### Edge section
+### Edge Section
 
 ![ox-mf2 edge section](./assets/003-ox-mf2-edge-section.svg)
 
-edge section は core section である。EdgeRecord は CST の parent-child relationship を表す compact typed reference である。
+The edge section is a core section. EdgeRecord is a compact typed reference representing CST parent-child relationships.
 
 ```text
 EdgeRecord {
@@ -383,15 +383,15 @@ EdgeRecord {
 }
 ```
 
-`kind` は `node = 0` または `token = 1` を表す numeric enum である。他の値は invalid snapshot として reject する。`ref_id` は `kind = node` の場合は NodeId、`kind = token` の場合は TokenId である。decoder/accessor は NodeRecord の `first_child` / `child_count` から EdgeRecord range を読み、edge kind に応じて node view または token view を lazy に返す。`kind = node` の場合は `ref_id < nodes.count`、`kind = token` の場合は `ref_id < tokens.count` を満たさなければならない。
+`kind` is a numeric enum: `node = 0` or `token = 1`. Other values are invalid. If `kind = node`, `ref_id` is a NodeId; if `kind = token`, `ref_id` is a TokenId. The decoder/accessor reads the EdgeRecord range from NodeRecord `first_child` / `child_count` and lazily returns node views or token views according to edge kind. For `kind = node`, `ref_id < nodes.count` must hold; for `kind = token`, `ref_id < tokens.count` must hold.
 
-trivia は child edge に混ぜない。trivia は TokenRecord の leading/trailing trivia ranges から読む。これにより、syntax traversal は node/token children に集中し、formatter は token order と trivia range から source-preserving reconstruction を行える。
+Trivia is not mixed into child edges. Trivia is read from TokenRecord leading/trailing trivia ranges. This keeps syntax traversal focused on node/token children, while formatters reconstruct source-preserving output from token order and trivia ranges.
 
-### Token と Trivia sections
+### Token and Trivia Sections
 
 ![ox-mf2 token and trivia sections](./assets/003-ox-mf2-token-trivia-sections.svg)
 
-tokens と trivia は専用 snapshot section を持つ。TokenId と TriviaId はそれぞれの section への `u32` index である。
+Tokens and trivia have dedicated snapshot sections. TokenId and TriviaId are `u32` indexes into their respective sections.
 
 ```text
 TokenRecord {
@@ -415,21 +415,21 @@ TriviaRecord {
 }
 ```
 
-TokenRecord.kind と TriviaRecord.kind も Phase 1 `SyntaxKind` の numeric value を直接格納する。node、token、trivia は同じ `SyntaxKind` family を共有するが、decoder/accessor は section context と helper predicate により node kind、token kind、trivia kind として扱う。decoder は TokenRecord.kind / TriviaRecord.kind についても unknown `SyntaxKind` numeric value を reject する。これにより parser tables、snapshot records、binding accessor の kind identity が一致し、snapshot encode 時の kind conversion table を不要にする。
+TokenRecord.kind and TriviaRecord.kind also store the Phase 1 `SyntaxKind` numeric value directly. Nodes, tokens, and trivia share the same `SyntaxKind` family, while decoders/accessors interpret node kind, token kind, and trivia kind using section context and helper predicates. Decoders reject unknown `SyntaxKind` numeric values for TokenRecord.kind and TriviaRecord.kind too. This keeps kind identity identical across parser tables, snapshot records, and binding accessors, and removes the need for a kind conversion table during snapshot encoding.
 
-Phase 1 の internal `TokenRecord` は record size を抑えるため、`first_trivia` と leading/trailing count を持つ compact layout にできる。SnapshotWriter はそれを snapshot の `leading_trivia_start` / `leading_trivia_count` / `trailing_trivia_start` / `trailing_trivia_count` に線形に展開する。snapshot format は construction-time layout と完全同一である必要はないが、変換は per-token の arithmetic だけで済む形に保つ。
+The internal Phase 1 `TokenRecord` may use a compact layout with `first_trivia` and leading/trailing counts to reduce record size. SnapshotWriter expands it linearly into snapshot `leading_trivia_start` / `leading_trivia_count` / `trailing_trivia_start` / `trailing_trivia_count`. The snapshot format does not need to be byte-identical to construction-time layout, but the conversion should require only per-token arithmetic.
 
-formatter、特に preserve mode は、nested object tree に依存せず source を faithful に再構築するために token と trivia sections を使う。
+Formatters, especially preserve mode, use token and trivia sections to reconstruct source faithfully without relying on a nested object tree.
 
-`include_trivia = false` の場合でも TokenRecord の layout は変えない。`leading_trivia_count` と `trailing_trivia_count` は `0` にし、`leading_trivia_start` と `trailing_trivia_start` も `0` にする。trivia section は空 section、または optional section として存在しない扱いにできる。decoder は TokenRecord の record_size を option によって変えてはならない。
+When `include_trivia = false`, TokenRecord layout does not change. `leading_trivia_count` and `trailing_trivia_count` are `0`, and `leading_trivia_start` and `trailing_trivia_start` are also `0`. The trivia section may be empty or absent as an optional section. Decoders must not vary TokenRecord record_size by option.
 
-v1 の TokenRecord / TriviaRecord は `text_ref` を持たない。original token / trivia text は `source_id + span_start/span_end` で参照する。`include_source_text = false` の場合は external source text を使い、`include_source_text = true` の場合は `SourceRecord.text` が指す source text data section を使う。source span だけでは表現できない normalized text、cooked text、debug text が必要になった場合は、TokenRecord / TriviaRecord を太らせず、extended data または optional token-text section として追加する。
+v1 TokenRecord / TriviaRecord has no `text_ref`. Original token / trivia text is referenced by `source_id + span_start/span_end`. With `include_source_text = false`, external source text is used. With `include_source_text = true`, `SourceRecord.text` points to the source text data section. If normalized text, cooked text, or debug text becomes necessary and cannot be represented only by source spans, add extended data or an optional token-text section instead of growing TokenRecord / TriviaRecord.
 
-### Diagnostics section（診断 section）
+### Diagnostics Section
 
 ![ox-mf2 diagnostics section](./assets/003-ox-mf2-diagnostics-section.svg)
 
-`include_diagnostics = true` の場合、snapshot は diagnostics section を含む。これにより、snapshot は parse diagnostics を添付した状態で inspect または transport できる。
+When `include_diagnostics = true`, the snapshot includes a diagnostics section. This allows snapshots to be inspected or transported with parse diagnostics attached.
 
 ```text
 DiagnosticRecord {
@@ -444,11 +444,11 @@ DiagnosticRecord {
 }
 ```
 
-`severity` と `code` は compact numeric enum とする。`message` は indexed StringRef である。extension/custom diagnostics が human-readable string code を必要とする場合は、DiagnosticRecord を太らせず、将来 optional diagnostic-code string section を追加する。
+`severity` and `code` are compact numeric enums. `message` is an indexed StringRef. If extension/custom diagnostics need human-readable string codes, add a future optional diagnostic-code string section rather than growing DiagnosticRecord.
 
-diagnostic records は RootRecord の `diagnostic_start` / `diagnostic_count` で参照できるよう、root order に沿って grouped layout にする。各 DiagnosticRecord は SourceId と Span を持つため、同じ root に複数 source 由来の diagnostic を関連付ける必要が出ても表現できる。snapshot 内の root-local diagnostics は RootRecord の range が source of truth である。
+Diagnostic records are grouped by root order so RootRecord `diagnostic_start` / `diagnostic_count` can reference them. Each DiagnosticRecord has SourceId and Span, so it can still represent diagnostics from multiple sources associated with the same root. The RootRecord range is the source of truth for root-local diagnostics in the snapshot.
 
-diagnostic labels は separate diagnostic labels section に置く。DiagnosticRecord の `label_start` / `label_count` は DiagnosticLabelRecord array の contiguous range を指す。
+Diagnostic labels live in a separate diagnostic labels section. DiagnosticRecord `label_start` / `label_count` points to a contiguous range in the DiagnosticLabelRecord array.
 
 ```text
 DiagnosticLabelRecord {
@@ -459,17 +459,17 @@ DiagnosticLabelRecord {
 }
 ```
 
-labels がない diagnostic は `label_count = 0` とする。decoder は `label_start + label_count <= diagnostic_labels.count` を検証する。help text は v1 snapshot record には含めず、必要になった時点で optional diagnostic-help section として追加する。
+Diagnostics without labels use `label_count = 0`. Decoders verify `label_start + label_count <= diagnostic_labels.count`. Help text is not included in the v1 snapshot record; add it later as an optional diagnostic-help section when needed.
 
-public API は convenience のため diagnostics を別に返してもよいが、snapshot format は encoded result の一部として diagnostics を保持できなければならない。binding result の flat diagnostics array は snapshot 内の diagnostic records を root order で読んだ view であり、別の diagnostic table ではない。
+Public APIs may return diagnostics separately for convenience, but the snapshot format must be able to keep diagnostics as part of the encoded result. A flat diagnostics array in a binding result is a view over snapshot diagnostic records in root order, not a separate diagnostic table.
 
-## SemanticView（意味情報 view）
+## SemanticView
 
 ![ox-mf2 SemanticView](./assets/003-ox-mf2-semantic-view.svg)
 
-SemanticView は lossless Binary AST snapshot とは分離する。
+SemanticView is separate from the lossless Binary AST snapshot.
 
-Binary AST は CST、tokens、trivia、source spans を扱う。SemanticView は semantic facts を扱う。
+Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles semantic facts.
 
 - declarations
 - references
@@ -478,13 +478,13 @@ Binary AST は CST、tokens、trivia、source spans を扱う。SemanticView は
 - fallback/default information
 - duplicate keys
 - coverage metadata
-- NodeId と Span への links
+- links to NodeId and Span
 
-linter、compiler、validation は Binary AST decoder/accessor traversal と SemanticView を組み合わせて使える。
+Linters, compilers, and validators can combine Binary AST decoder/accessor traversal with SemanticView.
 
-## Decoder error boundary（decoder error 境界）
+## Decoder Error Boundary
 
-snapshot decode は panic ではなく typed error で失敗する。
+Snapshot decode fails with typed errors, not panics.
 
 Rust decoder API:
 
@@ -493,20 +493,20 @@ decode_snapshot(bytes: &[u8]) -> Result<SnapshotView<'_>, DecodeError>
 decode_snapshot_owned(bytes: Arc<[u8]>) -> Result<SnapshotViewOwned, DecodeError>
 ```
 
-`DecodeError` は invalid snapshot、unsupported version、missing required section、invalid section layout、invalid index、unknown required section、unknown `SyntaxKind`、invalid UTF-8 string、out-of-range source text、invalid extended data、diagnostic range mismatch などを表す。
+`DecodeError` covers invalid snapshot, unsupported version, missing required section, invalid section layout, invalid index, unknown required section, unknown `SyntaxKind`, invalid UTF-8 string, out-of-range source text, invalid extended data, diagnostic range mismatch, and similar failures.
 
-Rust API は invalid snapshot を `Result::Err(DecodeError)` として返す。decoder/accessor は untrusted bytes を扱う可能性があるため、validation failure で panic してはならない。internal invariant violation を debug assertion で検出することはできるが、public decode boundary では recoverable error として返す。
+Rust APIs return invalid snapshots as `Result::Err(DecodeError)`. Decoder/accessors may handle untrusted bytes, so validation failures must not panic. Internal invariant violations may use debug assertions, but public decode boundaries return recoverable errors.
 
-N-API と WASM bindings は Rust の `DecodeError` をそれぞれの language boundary に変換する。
+N-API and WASM bindings convert Rust `DecodeError` into their language boundaries.
 
-- N-API: `DecodeError` を JS exception または explicit `Result` object に変換する。
-- WASM: `DecodeError` を thrown JS error、または exported API の error result に変換する。
+- N-API: convert `DecodeError` into a JS exception or explicit `Result` object.
+- WASM: convert `DecodeError` into a thrown JS error or exported API error result.
 
-binding boundary は error code、message、optional section kind、optional offset、optional record index を保持できる shape にする。human-readable message は developer ergonomics のために返してよいが、programmatic handling は compact error code を基本にする。
+The binding boundary should preserve error code, message, optional section kind, optional offset, and optional record index. Human-readable messages may be returned for developer ergonomics, but compact error codes are the base for programmatic handling.
 
-## Snapshot buffer ownership（snapshot buffer 所有権）
+## Snapshot Buffer Ownership
 
-Rust decoder は borrowed view と owned view の両方を提供する。
+The Rust decoder provides both borrowed and owned views.
 
 ```rust
 pub struct SnapshotView<'a> {
@@ -520,17 +520,17 @@ pub struct SnapshotViewOwned {
 }
 ```
 
-`SnapshotView<'a>` は caller が snapshot bytes の lifetime を管理する。decode は section table と validation metadata を構築するだけで、nodes、tokens、strings を eager に materialize しない。これは Rust 内部 tests、benchmarks、temporary decode、zero-copy inspection に使う。
+`SnapshotView<'a>` requires the caller to manage the lifetime of snapshot bytes. Decode builds only the section table and validation metadata; it does not eagerly materialize nodes, tokens, or strings. This is used by Rust internal tests, benchmarks, temporary decode, and zero-copy inspection.
 
-`SnapshotViewOwned` は snapshot bytes を `Arc<[u8]>` として所有する。long-lived cache、daemon、LSP、binding object、worker handoff のように accessor が buffer より長く残る可能性がある境界では owned view を使う。
+`SnapshotViewOwned` owns snapshot bytes as `Arc<[u8]>`. Long-lived caches, daemons, LSP, binding objects, and worker handoff use owned views when accessors may outlive the original buffer owner.
 
-N-API と WASM bindings は基本的に owned/shared buffer を保持する。Node / Token / Trivia / Root handle は raw pointer ではなく、snapshot view object または shared buffer owner への参照を保持する。これにより JS GC、WASM object lifetime、worker transfer 後も dangling view を作らない。
+N-API and WASM bindings generally hold owned/shared buffers. Node / Token / Trivia / Root handles keep references to the snapshot view object or shared buffer owner, not raw pointers. This avoids dangling views after JS GC, WASM object lifetime changes, or worker transfer.
 
-binding は snapshot bytes を JS object tree に展開しない。JS/WASM consumer が node、token、string、diagnostic を読むときだけ accessor が snapshot buffer を slice して必要な値を返す。
+Bindings do not expand snapshot bytes into a JS object tree. Accessors slice the snapshot buffer and return values only when JS/WASM consumers read nodes, tokens, strings, or diagnostics.
 
-## Handle model（handle model）
+## Handle Model
 
-Root / Node / Token / Trivia の public handle は object pointer ではなく、snapshot owner と section-local id の組み合わせにする。
+Public Root / Node / Token / Trivia handles are pairs of snapshot owner and section-local id, not object pointers.
 
 ```text
 RootHandle   { snapshot: SnapshotRef, id: RootId }
@@ -539,17 +539,17 @@ TokenHandle  { snapshot: SnapshotRef, id: TokenId }
 TriviaHandle { snapshot: SnapshotRef, id: TriviaId }
 ```
 
-`SnapshotRef` は Rust では `SnapshotView` / `SnapshotViewOwned` への参照または owned view、N-API / WASM では snapshot buffer を保持する accessor object への参照である。handle 自体は snapshot bytes を複製しない。
+In Rust, `SnapshotRef` is a reference to `SnapshotView` / `SnapshotViewOwned` or an owned view. In N-API / WASM, it is a reference to an accessor object that owns the snapshot buffer. The handle itself does not copy snapshot bytes.
 
-RootId、NodeId、TokenId、TriviaId は snapshot-local identity である。異なる snapshot に属する handle の id 値が同じでも同一 node/token/trivia とはみなさない。handle equality は snapshot identity と id の両方で判定する。
+RootId, NodeId, TokenId, and TriviaId are snapshot-local identities. Equal id values from different snapshots do not mean the same node/token/trivia. Handle equality is based on both snapshot identity and id.
 
-handle construction 時には `id < section.count` を検証する。children traversal、root lookup、token trivia lookup は同じ `SnapshotRef` を持つ lightweight handle を返す。これにより lazy accessor は materialized object tree を作らず、GC-managed language でも dangling pointer を避けられる。
+Handle construction validates `id < section.count`. Children traversal, root lookup, and token trivia lookup return lightweight handles with the same `SnapshotRef`. This lets lazy accessors avoid materializing object trees and avoids dangling pointers in GC-managed languages.
 
-Rust low-level API は performance-sensitive path のために `SnapshotView` と raw id を別々に受け取る accessor も提供してよい。ただし public binding API は `{ snapshot, id }` handle model を標準にする。
+Rust low-level APIs may also provide accessors that take `SnapshotView` and raw ids separately for performance-sensitive paths. However, the public binding API standardizes the `{ snapshot, id }` handle model.
 
-## Accessor traversal API（accessor traversal API）
+## Accessor Traversal API
 
-N-API / WASM の public traversal API は iterator を主表現にせず、array-like snapshot view を基本にする。
+The N-API / WASM public traversal API uses array-like snapshot views as the primary representation, not iterators.
 
 ```ts
 type ChildHandle = NodeHandle | TokenHandle
@@ -572,33 +572,33 @@ trivia.kind(): SyntaxKind
 trivia.span(): Span
 ```
 
-`node.children()` は source order の lightweight child handles array を返す。これは subtree を materialize する API ではなく、各 element は `{ snapshot, id }` handle である。MF2 message は一般的な source file に比べて小さいため、default API は ergonomics を優先する。
+`node.children()` returns a lightweight child handle array in source order. It does not materialize a subtree; each element is a `{ snapshot, id }` handle. MF2 messages are smaller than general source files, so the default API favors ergonomics.
 
-allocation-sensitive path では `node.childCount()` と `node.childAt(index)` を使う。これにより consumer は child handle array の allocation を避けて indexed traversal できる。Rust low-level API は `SnapshotView` と raw id/index を受け取る allocation-free accessor を提供してよい。
+Allocation-sensitive paths use `node.childCount()` and `node.childAt(index)` to avoid allocating child handle arrays. Rust low-level APIs may provide allocation-free accessors that take `SnapshotView` plus raw id/index.
 
-indexed accessor に out-of-range index が渡された場合、binding は silent `undefined` を返さず error にする。N-API では `RangeError`、WASM では exported API の error result または thrown JS error に変換する。formatter/linter が traversal bug を早く検出できるよう、invalid accessor usage は明示的に失敗させる。
+If an out-of-range index is passed to an indexed accessor, the binding returns an explicit error instead of silent `undefined`. N-API converts this to `RangeError`; WASM converts it to an exported API error result or thrown JS error. Invalid accessor usage fails loudly so formatter/linter traversal bugs are found early.
 
-JS iterator は convenience として追加してもよいが、primary compatibility surface にはしない。binding の標準 traversal contract は array-like methods と indexed accessors で定義する。
+JS iterators may be added as convenience APIs, but they are not the primary compatibility surface. The standard binding traversal contract is defined by array-like methods and indexed accessors.
 
-## Bindings（言語 binding）
+## Bindings
 
 ![ox-mf2 language bindings](./assets/003-ox-mf2-language-bindings.svg)
 
-binding 実装の優先順位:
+Binding implementation priority:
 
-1. N-API binding: intlify と JavaScript tooling integration の主要 Node.js target
-2. WASM binding: browser、playground、editor extension、edge runtime integration 向けの portable target
-3. C ABI binding design: 将来の Go、Swift、C#、Zig、Python FFI、より広い native language integration の foundation
+1. N-API binding: the primary Node.js target for intlify and JavaScript tooling integration
+2. WASM binding: portable target for browsers, playgrounds, editor extensions, and edge runtime integration
+3. C ABI binding design: foundation for future Go, Swift, C#, Zig, Python FFI, and broader native language integration
 
-Phase 2 では stable C ABI implementation を必須にしない。C ABI は design preparation に留める。ただし snapshot record layout、numeric error codes、handle ids、buffer ownership、`toBytes()` copy semantics、decode error boundary は C ABI friendly に保つ。N-API / WASM が Rust core と異なる semantic implementation を持たないよう、将来の C ABI も同じ snapshot decoder/accessor model を共有できる形にする。
+Phase 2 does not require a stable C ABI implementation. C ABI remains design preparation. However, snapshot record layout, numeric error codes, handle ids, buffer ownership, `toBytes()` copy semantics, and decode error boundary stay C-ABI-friendly. Future C ABI can share the same snapshot decoder/accessor model so N-API / WASM do not carry different semantic implementations from the Rust core.
 
-N-API と WASM bindings は、eager に materialized JS object tree を返すのではなく、lazy decoder/accessor を持つ result object を返す。default public API は raw snapshot bytes を直接返さない。snapshot bytes は result/accessor object の内部 buffer として保持する。
+N-API and WASM bindings return result objects with lazy decoder/accessors instead of eagerly materialized JS object trees. The default public API does not return raw snapshot bytes directly. Snapshot bytes are retained as an internal buffer in the result/accessor object.
 
-binding は original source text を caller 側または binding result 側で保持できる。default snapshot は `include_source_text = false` なので、decoder/accessor が context-bound `sourceSlice(span)` を提供する場合は、snapshot bytes ではなく external source text を参照する。
+Bindings may retain original source text on the caller side or in the binding result. Since the default snapshot uses `include_source_text = false`, context-bound `sourceSlice(span)` reads external source text, not snapshot bytes, when provided by the decoder/accessor.
 
-binding result が external source text を保持している場合、context-bound `sourceSlice(span)` は `include_source_text = false` でも成功してよい。binding result が source text を保持しておらず、snapshot に source text data も含まれていない場合、`sourceSlice(span)` は source text unavailable error を返す。
+If the binding result keeps external source text, context-bound `sourceSlice(span)` may succeed even with `include_source_text = false`. If the binding result does not keep source text and the snapshot has no source text data, `sourceSlice(span)` returns a source text unavailable error.
 
-single-message binding shape:
+Single-message binding shape:
 
 ```ts
 type ParseInputObject = {
@@ -619,9 +619,9 @@ result.root
 result.snapshot
 ```
 
-`parseMessage(source)` は simple convenience overload である。`parseMessage({ source, path?, locale?, messageId?, baseOffset? })` は SourceRecord metadata を指定する標準 object form であり、single input でも batch input と同じ metadata handling を使う。
+`parseMessage(source)` is a simple convenience overload. `parseMessage({ source, path?, locale?, messageId?, baseOffset? })` is the standard object form for SourceRecord metadata and uses the same metadata handling as batch input even for single input.
 
-batch binding shape:
+Batch binding shape:
 
 ```ts
 const result = parseBatch(items: ParseInputObject[])
@@ -632,69 +632,69 @@ result.diagnostics
 result.snapshot
 ```
 
-`parseBatch(items)` は `{ source, path?, locale?, messageId?, baseOffset? }[]` を標準入力にする。`source` だけが parser semantics を決める required field であり、`path`、`locale`、`messageId`、`baseOffset` は SourceRecord metadata、diagnostics mapping、LSP/editor mapping、benchmark/reporting、root mapping のための optional metadata である。
+`parseBatch(items)` takes `{ source, path?, locale?, messageId?, baseOffset? }[]` as standard input. Only `source` is required and determines parser semantics. `path`, `locale`, `messageId`, and `baseOffset` are optional metadata for SourceRecord metadata, diagnostics mapping, LSP/editor mapping, benchmarking/reporting, and root mapping.
 
-binding は `messageId` を snapshot/Rust 側の `message_id` に、`baseOffset` を `base_offset` に変換する。`baseOffset` は UTF-8 byte offset とし、未指定時は `0` として扱う。JavaScript string の UTF-16 position conversion は binding/editor boundary の責務であり、snapshot node fields には保存しない。
+Bindings map `messageId` to snapshot/Rust `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset and defaults to `0`. JavaScript string UTF-16 position conversion is a binding/editor boundary responsibility and is not stored in snapshot node fields.
 
-`result.roots[i]` は常に `items[i]` に対応する。sources section は source identity による dedup を許可するため、複数 root が同じ SourceRecord を指すことはあるが、batch result の root order は input order から変えない。
+`result.roots[i]` always corresponds to `items[i]`. The sources section may deduplicate by source identity, so multiple roots may point to the same SourceRecord, but batch result root order does not change from input order.
 
-`result.source` と `result.sources` は SourceRecord-backed SourceView であり、raw source string ではない。source text が必要な場合は `sourceSlice(span)` または SourceView の accessor を使う。batch では sources section が dedup されるため、`result.sources` の order は input order ではなく SourceId order である。
+`result.source` and `result.sources` are SourceRecord-backed SourceViews, not raw source strings. Use `sourceSlice(span)` or SourceView accessors to read source text. In batch results, `result.sources` order is SourceId order, not input order, because the sources section may be deduplicated.
 
-`result.snapshot` は raw bytes ではなく accessor object である。root、node、token、trivia、diagnostic、source metadata は accessor 経由で lazy に読む。raw snapshot bytes は default result shape に含めない。
+`result.snapshot` is an accessor object, not raw bytes. Root, node, token, trivia, diagnostic, and source metadata are read lazily through accessors. Raw snapshot bytes are not included in the default result shape.
 
-debug、fixture、persistence、worker transfer、external process transport のような advanced use case では、明示 API で snapshot bytes を取り出せるようにする。
+Advanced use cases such as debug, fixtures, persistence, worker transfer, and external process transport can explicitly extract snapshot bytes.
 
 ```ts
 const bytes = result.snapshot.toBytes()
 ```
 
-`toBytes()` は内部 snapshot buffer の copy を返す。binding は internal buffer を直接 expose しない。これにより consumer が returned bytes を保持、mutate、worker transfer しても、既存の accessor object の lifetime と validation invariant を壊さない。
+`toBytes()` returns a copy of the internal snapshot buffer. The binding does not expose the internal buffer directly. This prevents consumers from retaining, mutating, or transferring returned bytes in a way that breaks the lifetime or validation invariants of existing accessor objects.
 
-batch parsing では、bindings は 1 つの shared snapshot buffer を内部に保持し、input item ごとの root handles、diagnostics、snapshot accessor を返す。nodes と strings は consumer が読むときだけ materialize する。
+Batch parsing keeps one shared snapshot buffer internally and returns root handles, diagnostics, and a snapshot accessor for each input item. Nodes and strings are materialized only when consumers read them.
 
-`result.diagnostics` は root order の flat array として返す。single-message result では root 1 件分の diagnostics、batch result では `result.roots` order に grouped された全 diagnostics を表す。各 root handle からも `root.diagnostics()` のような lazy accessor で自分の diagnostics range を取得できる。
+`result.diagnostics` is a flat array in root order. In a single-message result, it contains diagnostics for one root. In a batch result, it contains all diagnostics grouped by `result.roots` order. Each root handle can also expose its own diagnostics range through a lazy accessor such as `root.diagnostics()`.
 
-flat diagnostics array と root-local diagnostics accessor は同じ snapshot diagnostics section を読む。binding は diagnostics を別 table として複製しない。ただし JS/WASM ergonomics のため、consumer が `result.diagnostics` を読む時点で lightweight diagnostic view objects を materialize してよい。
+The flat diagnostics array and root-local diagnostics accessor read the same snapshot diagnostics section. Bindings do not duplicate diagnostics into another table. For JS/WASM ergonomics, lightweight diagnostic view objects may be materialized when consumers read `result.diagnostics`.
 
-`include_source_text = false` の batch result では、各 root が `source_id` を持ち、source metadata は SourceRecord、input source text への参照は binding result 側に保持する。`include_source_text = true` の batch result では、snapshot 内に source text data を含めるため、worker transfer や persistence 後も snapshot 単体で source slice を解決できる。
+With `include_source_text = false` in a batch result, each root has a `source_id`, source metadata is in SourceRecord, and input source text references are retained by the binding result. With `include_source_text = true`, source text data is included in the snapshot so the snapshot alone can resolve source slices after worker transfer or persistence.
 
-## Formatter と Linter の入力
+## Formatter and Linter Input
 
-Phase 2 以降、formatter と linter の public AST input は Binary AST decoder/accessor view にする。Rust implementation は必要に応じて construction-time tables または semantic model の internal fast path を持ってよいが、stable public traversal model は Rust、N-API、WASM consumer で共有される Binary AST view に揃える。
+From Phase 2 onward, public AST input for formatter and linter is the Binary AST decoder/accessor view. Rust implementations may use construction-time tables or semantic model internal fast paths when needed, but the stable public traversal model is aligned with the Binary AST view shared by Rust, N-API, and WASM consumers.
 
-## MessagePack transport
+## MessagePack Transport
 
-MessagePack は ox-mf2 の CST/AST representation ではない。
+MessagePack is not the CST/AST representation of ox-mf2.
 
-これは LSP、editor integration、daemon mode、repeated semantic queries のような long-lived language-service workflows に対する future transport の候補である。standard CST/AST product boundary は versioned Binary AST snapshot のままにする。
+It is a future transport candidate for long-lived language-service workflows such as LSP, editor integration, daemon mode, and repeated semantic queries. The standard CST/AST product boundary remains the versioned Binary AST snapshot.
 
-将来 MessagePack transport を追加する場合、その overhead は parser、semantic lowering、snapshot encoding、binding costs とは別に計測しなければならない。
+If MessagePack transport is added later, its overhead must be measured separately from parser, semantic lowering, snapshot encoding, and binding costs.
 
-## Snapshot test strategy
+## Snapshot Test Strategy
 
-Phase 2 snapshot tests は binary golden fixtures と decoded structural fixtures の両方を持つ。
+Phase 2 snapshot tests use both binary golden fixtures and decoded structural fixtures.
 
-binary golden fixtures:
+Binary golden fixtures:
 
-- snapshot header、section table、record layout、alignment、endianness、required/optional section flags を検証する。
-- versioned wire format の accidental change を検出する。
-- `include_source_text`、`include_trivia`、`include_diagnostics` の option combinations を含める。
-- invalid snapshot fixtures を用意し、decoder が panic ではなく `DecodeError` で reject することを確認する。
+- validate snapshot header, section table, record layout, alignment, endianness, and required/optional section flags
+- detect accidental changes to the versioned wire format
+- include option combinations for `include_source_text`, `include_trivia`, and `include_diagnostics`
+- include invalid snapshot fixtures and verify decoders reject them with `DecodeError`, not panic
 
-decoded structural fixtures:
+Decoded structural fixtures:
 
-- decoder/accessor から得られる roots、sources、nodes、edges、tokens、trivia、diagnostics、labels、strings を review しやすい text または JSON snapshot として保持する。
-- binary layout の byte-level change と semantic structure の change を分けて review できるようにする。
-- root order、source dedup、diagnostic grouping、token/trivia spans、`SyntaxKind` numeric values を確認する。
-- binary bytes の完全一致だけでは読みにくい CST/diagnostics regressions を検出する。
+- keep decoded roots, sources, nodes, edges, tokens, trivia, diagnostics, labels, and strings as reviewable text or JSON snapshots
+- separate byte-level binary layout changes from semantic structure changes during review
+- check root order, source deduplication, diagnostic grouping, token/trivia spans, and `SyntaxKind` numeric values
+- detect CST/diagnostics regressions that are hard to review from exact binary bytes alone
 
-binary golden は wire compatibility を守るための contract test であり、decoded structural fixture は implementation behavior を説明可能に保つための review aid である。snapshot format version を意図的に変更する場合は、binary fixture、decoded fixture、format changelog を同じ変更で更新する。
+Binary golden fixtures are contract tests for wire compatibility. Decoded structural fixtures are review aids that keep implementation behavior explainable. When intentionally changing the snapshot format version, update binary fixtures, decoded fixtures, and the format changelog in the same change.
 
-## Benchmarks（性能計測）
+## Benchmarks
 
-snapshot と binding work を 1 つの parser number の中に隠してはならない。
+Snapshot and binding work must not be hidden inside one parser number.
 
-関連する benchmark phases:
+Relevant benchmark phases:
 
 - lexer
 - parse_cst
@@ -709,14 +709,14 @@ snapshot と binding work を 1 つの parser number の中に隠してはなら
 - lsp_jsonrpc
 - lsp_msgpack
 
-Phase 2 benchmark は parser hot path、snapshot encoding、snapshot decoding、binding/export cost を分離して測る。
+Phase 2 benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and binding/export cost separately.
 
-- `parse_cst`: Rust parser が CstTables を構築する cost。
-- `encode_snapshot`: 既存の CstTables / diagnostics / source metadata から Binary AST snapshot bytes を構築する cost。
-- `decode_snapshot`: snapshot bytes を validation し、lazy SnapshotView / section index を構築する cost。node/token/string traversal は含めない。
-- `snapshot_accessor_traversal`: decoded SnapshotView から roots、nodes、tokens、trivia、diagnostics を lazy accessor で読む cost。
-- `snapshot_to_bytes_copy`: `result.snapshot.toBytes()` が internal buffer を copy して external bytes を返す cost。
-- `binding_call`: N-API / WASM boundary を通って result object と handle を返す cost。parse / encode / decode とは別に測る。
-- `parse_batch_to_snapshot`: batch parse と shared snapshot encode の combined product path。single-message parser baseline と混ぜない。
+- `parse_cst`: cost for the Rust parser to build CstTables.
+- `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
+- `decode_snapshot`: cost to validate snapshot bytes and build lazy SnapshotView / section index. It does not include node/token/string traversal.
+- `snapshot_accessor_traversal`: cost to read roots, nodes, tokens, trivia, and diagnostics lazily from a decoded SnapshotView.
+- `snapshot_to_bytes_copy`: cost for `result.snapshot.toBytes()` to copy the internal buffer and return external bytes.
+- `binding_call`: cost to cross N-API / WASM boundary and return result object plus handles. This is measured separately from parse / encode / decode.
+- `parse_batch_to_snapshot`: combined product path for batch parse plus shared snapshot encoding. Do not mix it with the single-message parser baseline.
 
-benchmark report は少なくとも `parse_cst`、`parse_cst + encode_snapshot`、`decode_snapshot`、`snapshot_accessor_traversal`、`snapshot_to_bytes_copy` を別系列で出す。external parser との single-message 比較では、`parse_message` 相当、つまり snapshot encoding と binding materialization を含まない `parse_cst` を primary baseline にする。snapshot/binding 系の数字は ox-mf2 の product boundary cost として別に提示する。
+Benchmark reports include at least separate series for `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline is `parse_message` equivalent, meaning `parse_cst` without snapshot encoding or binding materialization. Snapshot/binding numbers are reported separately as ox-mf2 product-boundary cost.

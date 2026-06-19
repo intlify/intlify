@@ -1,46 +1,46 @@
-# ox-mf2 Phase 1 Rust Parser / AST / Performance 設計
+# ox-mf2 Phase 1 Rust Parser / AST / Performance Design
 
-## 目的
+## Purpose
 
-このドキュメントは、Rust MF2 parser の Phase 1 実装設計を定義する。対象は parser performance だけではなく、lossless CST、SemanticModel、SyntaxKind、token/trivia、accessor、diagnostics、recovery、test/benchmark の設計を含む。
+This document defines the Phase 1 implementation design for the Rust MF2 parser. It covers not only parser performance, but also lossless CST, SemanticModel, SyntaxKind, token/trivia, accessors, diagnostics, recovery, tests, and benchmarks.
 
-foundation document は [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md) である。Binary AST と binding の詳細は [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md) に置く。このドキュメントは、Binary AST snapshot encoding が Phase 2 の product boundary になる前の parser implementation path に集中する。
+The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). Binary AST and binding details live in [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md). This document focuses on the parser implementation path before Binary AST snapshot encoding becomes the Phase 2 product boundary.
 
-この設計は ox-jsdoc の performance design から、parser/semantic separation、source lifetime の明確化、allocation discipline、scanner/parser boundary、measurement-driven optimization といった考え方を取り入れる。
+This design takes several ideas from the ox-jsdoc performance design: parser/semantic separation, clear source lifetime, allocation discipline, scanner/parser boundaries, and measurement-driven optimization.
 
-## 目標
+## Goals
 
-Phase 1 では、高速で、recoverable で、formatter/linter work に十分な lossless 性を持ち、Phase 2 snapshot encoding に備えた Rust parser core を作る。
+Phase 1 builds a Rust parser core that is fast, recoverable, lossless enough for formatter/linter work, and ready for Phase 2 snapshot encoding.
 
-主要な目標:
+Primary goals:
 
-1. parse hot path を小さく保つ。
-2. 後続 tool が必要とする tokens、trivia、spans、source slices を保持する。
-3. parser work を semantic lowering と validation から分離する。
-4. public typed AST object graph を避ける。
-5. 後から SnapshotWriter に渡せる table-oriented records を使う。
-6. parser、diagnostics、recovery、allocation cost を個別に計測できるようにする。
-7. formatter/linter/compiler が使える stable accessor surface を Phase 1 から用意する。
-8. Unicode WG spec に追従しやすい SyntaxKind と fixture-driven test structure を持つ。
+1. Keep the parse hot path small.
+2. Preserve tokens, trivia, spans, and source slices required by downstream tools.
+3. Separate parser work from semantic lowering and validation.
+4. Avoid a public typed AST object graph.
+5. Use table-oriented records that can later be passed to SnapshotWriter.
+6. Make parser, diagnostics, recovery, and allocation costs measurable separately.
+7. Provide a stable accessor surface for formatters, linters, and compilers from Phase 1.
+8. Provide SyntaxKind and fixture-driven tests that can track the Unicode WG spec.
 
-## 非目標
+## Non-Goals
 
-Phase 1 では次の最適化を対象にしない。
+Phase 1 does not target the following optimizations.
 
-- normal parse output の一部として Binary AST snapshot encoding を行うこと
+- Binary AST snapshot encoding as part of the normal parse output
 - N-API / WASM boundary overhead
 - MessagePack / LSP transport
 - full semantic validation
 - canonical formatting
 - complete linter rule execution
 - public recursive typed AST hierarchy
-- final Binary AST snapshot schema の固定
+- final Binary AST snapshot schema freeze
 
-これらは後続 phase の対象である。Phase 1 は、parser foundation を書き直さずにこれらを追加できる形に parser を整える。
+These belong to later phases. Phase 1 shapes the parser so that these capabilities can be added without rewriting the parser foundation.
 
-## Phase Separation（phase 分離）
+## Phase Separation
 
-parser は parsing 中にすべての correctness work を行わない。
+The parser does not perform all correctness work during parsing.
 
 ```text
 source
@@ -51,86 +51,86 @@ source
   -> later formatter / linter / compiler
 ```
 
-parser の責務:
+Parser responsibilities:
 
-- MF2 syntax を認識する。
-- lossless CST tables を構築する。
-- tokens、trivia、original lexemes、byte spans を保持する。
-- 可能な範囲で recover する。
-- parser diagnostics を報告する。
+- Recognize MF2 syntax.
+- Build lossless CST tables.
+- Preserve tokens, trivia, original lexemes, and byte spans.
+- Recover where possible.
+- Report parser diagnostics.
 
-parser の非責務:
+Parser non-responsibilities:
 
 - final selector coverage analysis
-- syntax-adjacent な case を超える duplicate declaration policy
+- duplicate declaration policy beyond syntax-adjacent cases
 - runtime message resolution
 - locale-aware behavior
 - formatter style decisions
 - linter rule policy
 - Intl.MessageFormat API behavior
 
-semantic lowering と validation は、後から CST を解釈できる。
+Semantic lowering and validation can interpret the CST later.
 
-## Phase 1 の成果物
+## Phase 1 Deliverables
 
-Phase 1 は「速い parser」だけではなく、後続 tool を壊さずに追加するための Rust core foundation を作る。
+Phase 1 is not only "a fast parser"; it builds the Rust core foundation needed to add later tools without breaking downstream consumers.
 
-Phase 1 の成果物:
+Phase 1 deliverables:
 
-- `SourceStore`: source text、path、line index、SourceId を管理する。
-- `Scanner`: source bytes を読み、token/trivia を認識する parser-internal component。
-- `Parser`: recovering CST parser。syntax を認識し、CstTables と diagnostics を生成する。
-- `ParseWorkspace`: repeated parse、batch parse、benchmark、LSP 向けに再利用できる public workspace。
-- `SyntaxKind`: message mode、node、token、trivia、error、missing node を分類する stable な kind enum。
-- `CstTables`: nodes、edges、tokens、trivia を持つ flat indexed tables。spans は各 record に inline で保持する。
-- `CstView`: NodeId / TokenId / Span から CST を読む accessor surface。
-- `SemanticModel`: optional semantic lowering の結果。linter/compiler/validation のための共有意味情報。
-- `Diagnostic`: parser diagnostics と将来の lint diagnostics が共有する location model。
-- `Fixture runner`: spec fixtures、implementation fixtures、recovery fixtures を実行する test harness。
-- `Benchmark harness`: phase-separated benchmarks と hyperfine CLI benchmarks。
+- `SourceStore`: manages source text, path, line index, and SourceId.
+- `Scanner`: parser-internal component that reads source bytes and recognizes tokens/trivia.
+- `Parser`: recovering CST parser that recognizes syntax and produces CstTables plus diagnostics.
+- `ParseWorkspace`: public workspace reusable for repeated parse, batch parse, benchmarks, and LSP.
+- `SyntaxKind`: stable compact kind enum for message modes, nodes, tokens, trivia, errors, and missing nodes.
+- `CstTables`: flat indexed tables containing nodes, edges, tokens, and trivia. Spans are stored inline in records.
+- `CstView`: accessor surface for reading CST from NodeId / TokenId / Span.
+- `SemanticModel`: optional semantic lowering result shared by linter/compiler/validation.
+- `Diagnostic`: shared location model for parser diagnostics and future lint diagnostics.
+- `Fixture runner`: test harness for spec fixtures, implementation fixtures, and recovery fixtures.
+- `Benchmark harness`: phase-separated benchmarks and hyperfine CLI benchmarks.
 
-Phase 1 の時点では Binary AST snapshot を標準出力にしない。ただし、CstTables と accessor は Phase 2 の SnapshotWriter に線形変換しやすい形にする。
+Phase 1 does not make Binary AST snapshot the standard output. However, CstTables and accessors are shaped so that Phase 2 SnapshotWriter can encode them with a linear transformation.
 
-## AST / CST の用語整理
+## AST / CST Terminology
 
-ox-mf2 では、Phase 1 の primary parse output は `CstTables` である。これは lossless syntax tree であり、formatter と recovery diagnostics の基礎になる。
+In ox-mf2, the primary Phase 1 parse output is `CstTables`. This is a lossless syntax tree and the basis for formatters and recovery diagnostics.
 
-一般的に、CST と AST は目的が異なる。
+CST and AST have different purposes.
 
-- CST, Concrete Syntax Tree: source text の構文上の形をできるだけ失わずに表す tree。tokens、delimiter、trivia、escape、missing/error node、source span など、元の source を復元・診断・整形するための情報を持つ。
-- AST, Abstract Syntax Tree: 構文の表面表現を抽象化し、意味処理しやすい形にした tree。delimiter、trivia、括弧、quote の有無などは省かれることが多く、declaration、reference、selector、variant などの意味単位を扱いやすい。
+- CST, Concrete Syntax Tree: represents the concrete source syntax as losslessly as possible. It keeps tokens, delimiters, trivia, escapes, missing/error nodes, and source spans needed to reconstruct, diagnose, and format the original source.
+- AST, Abstract Syntax Tree: abstracts away surface syntax and is easier to process semantically. It often omits delimiters, trivia, parentheses, and quote presence, and focuses on semantic units such as declarations, references, selectors, and variants.
 
-MF2 では formatter、diagnostics、recovery、preserve-mode formatting が重要なので、Phase 1 の基礎表現は CST にする。一方で、linter、compiler、validation には AST 的な意味情報が必要になるため、CST から `SemanticModel` を lowering する。
+MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is lowered from the CST.
 
-`CstTables + CstView + optional SemanticModel` は、概念的には tree だが、物理的には flat indexed tables と side tables で表現する。
+`CstTables + CstView + optional SemanticModel` is conceptually a tree, but physically represented as flat indexed tables and side tables.
 
 ![ox-mf2 CST tables and view](./assets/002-ox-mf2-cst-tables-view.svg)
 
-このドキュメントでは次の用語を使い分ける。
+This document uses the following terms.
 
-- CST: token、trivia、delimiter、error/missing node、byte span を保持する lossless syntax tree。
-- SemanticModel: CST から lowering される意味情報モデル。declaration、reference、selector、variant などを扱う。
-- Binary AST snapshot: Phase 2 以降の cross-language public CST/AST view。Phase 1 の通常 parse output ではない。
-- typed AST object graph: Rust struct の再帰的な木。Phase 1 の public API としては採用しない。
+- CST: a lossless syntax tree that preserves tokens, trivia, delimiters, error/missing nodes, and byte spans.
+- SemanticModel: semantic information lowered from CST, such as declarations, references, selectors, and variants.
+- Binary AST snapshot: the Phase 2 cross-language public CST/AST view. It is not the normal Phase 1 parse output.
+- typed AST object graph: a recursive Rust struct tree. It is not adopted as the Phase 1 public API.
 
-つまり、Phase 1 で「AST が必要か」という問いへの答えは、recursive typed AST ではなく、`CstTables + CstView + optional SemanticModel` が必要、という設計にする。
+Therefore, the answer to "does Phase 1 need an AST?" is: it needs `CstTables + CstView + optional SemanticModel`, not a recursive typed AST.
 
-## SyntaxKind 設計
+## SyntaxKind Design
 
-`SyntaxKind` は parser、CstTables、diagnostics、formatter、linter、snapshot encoding の共通分類になる。
+`SyntaxKind` is the shared classification used by parser, CstTables, diagnostics, formatter, linter, and snapshot encoding.
 
-設計方針:
+Design policy:
 
-- `SyntaxKind` は compact な integer representation を持つ。
-- node kind、token kind、trivia kind、error kind、missing kind を同じ enum family で扱えるようにする。
-- Phase 2 の Binary AST snapshot では `SyntaxKind` の numeric value を NodeRecord / TokenRecord / TriviaRecord の `kind: u16` として直接 encode する。
-- 一度公開した numeric value は snapshot compatibility contract の一部として扱い、reorder、reuse、意味の incompatible 変更をしない。新しい kind は新しい value を割り当てる。
-- snapshot decoder は自身が知らない `SyntaxKind` numeric value を invalid snapshot として reject する。新しい kind を core NodeRecord / TokenRecord / TriviaRecord に出力する変更は既存 decoder との互換性に影響するため、major version change と decoder/accessor update を伴う。backward compatibility を保ちたい場合は、既存の `Unknown` / `Error` / `Missing` kind または optional section で表現する。
-- Rust public API では enum ordering に意味を持たせず、数値比較に依存した consumer code を推奨しない。
-- spec 変更に追従しやすいように、kind は grammar category に沿って管理する。
-- formatter/linter が kind 判定しやすいように、helper predicate を用意する。
+- `SyntaxKind` has a compact integer representation.
+- Node kinds, token kinds, trivia kinds, error kinds, and missing kinds live in the same enum family.
+- In Phase 2 Binary AST snapshots, the numeric `SyntaxKind` value is encoded directly as `kind: u16` in NodeRecord / TokenRecord / TriviaRecord.
+- Once published, numeric values are part of the snapshot compatibility contract. Do not reorder, reuse, or change their meaning incompatibly. Add new kinds with new values.
+- Snapshot decoders reject unknown `SyntaxKind` numeric values. Emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord affects compatibility and requires a major version change plus decoder/accessor updates. If backward compatibility is required, represent the case with an existing `Unknown` / `Error` / `Missing` kind or an optional section.
+- Rust public APIs should not give semantic meaning to enum ordering, and consumer code should not rely on numeric comparison.
+- Manage kinds by grammar category so spec changes are easy to track.
+- Provide helper predicates so formatters and linters can test kind categories efficiently.
 
-想定する category:
+Expected categories:
 
 ```text
 Root / Message / SimpleMessage / ComplexMessage
@@ -145,13 +145,13 @@ Trivia / Whitespace / Bidi
 Error / Missing / Unknown
 ```
 
-`SyntaxKind` は spec の syntax category と 1:1 に固定しすぎない。implementation 上の recovery node、missing node、grouping node が必要になるためである。ただし、spec conformance fixtures からどの kind が生成されるかは snapshot test で追跡する。
+`SyntaxKind` is not fixed as a strict 1:1 mapping to spec syntax categories. Implementation recovery nodes, missing nodes, and grouping nodes are needed. However, spec conformance fixtures track which kinds are produced.
 
-parser tables と snapshot encoding は同じ numeric representation を使う。SnapshotWriter は `SyntaxKind` を別の wire kind table に remap せず、construction-time tables の kind value をそのまま書き出す。これにより encode cost と compatibility surface を小さくし、Phase 1 の parser records と Phase 2 の snapshot records の対応を単純にする。
+Parser tables and snapshot encoding use the same numeric representation. SnapshotWriter does not remap `SyntaxKind` into a separate wire kind table. It writes the construction-time kind value directly. This keeps encode cost and compatibility surface small and makes the relationship between Phase 1 parser records and Phase 2 snapshot records simple.
 
-## CST construction 設計
+## CST Construction Design
 
-parser は accepted syntax を table-oriented records として commit する。
+The parser commits accepted syntax as table-oriented records.
 
 ```rust
 #[repr(C)]
@@ -173,40 +173,40 @@ pub(crate) struct CstEdgeRecord {
 }
 ```
 
-`first_child` / `child_count` は edge table への range を表す。`CstEdgeRecord.kind` は node または token を表し、`ref_id` は NodeId または TokenId を指す。token は CST children として edge table から辿れるが、token payload 自体は token table に保持する。
+`first_child` / `child_count` represent a range in the edge table. `CstEdgeRecord.kind` identifies node or token, and `ref_id` points to NodeId or TokenId. Tokens are reachable as CST children through the edge table, while token payloads stay in the token table.
 
-trivia は child edge に混ぜない。token に leading/trailing trivia range を持たせる。これにより `CstView` の syntax traversal は node/token children を返し、formatter は token order と trivia ranges から source-preserving reconstruction を行う。
+Trivia is not mixed into child edges. Tokens hold leading/trailing trivia ranges. This lets `CstView` syntax traversal return node/token children, while formatters reconstruct source-preserving output from token order and trivia ranges.
 
-重要な制約:
+Important constraints:
 
-- parser は node を作った後に public typed AST へ変換しない。
-- span は source byte offset のみを保持する。
-- delimiter span や original lexeme は token/trivia/span から復元できるようにする。
-- recovery node と missing node も通常 node と同じ table に入れる。
-- malformed input でも、可能な限り root node と部分 CST を返す。
+- The parser does not build a public typed AST and then convert it to tables.
+- Spans store source byte offsets only.
+- Delimiter spans and original lexemes must be recoverable from token/trivia/span data.
+- Recovery nodes and missing nodes are stored in the same table as normal nodes.
+- Malformed input should still return a root node and partial CST whenever possible.
 
-### Record layout / size budget
+### Record Layout / Size Budget
 
-Phase 1 の construction-time records は、Phase 2 の Binary AST snapshot に線形変換しやすいよう、`u32` index と fixed-size fields を中心にする。ただし、Phase 1 の Rust layout は public ABI ではない。`#[repr(C)]` は implementation 内の size/alignment を安定させ、snapshot encoding と benchmark を単純にするために使う。
+Phase 1 construction-time records are centered on `u32` indexes and fixed-size fields so that Phase 2 Binary AST snapshot encoding is mostly linear. The Rust layout in Phase 1 is not a public ABI. `#[repr(C)]` is used only to stabilize implementation size/alignment and simplify snapshot encoding and benchmarks.
 
-record size budget:
+Record size budget:
 
 | Record | Target size | Notes |
 | --- | --: | --- |
-| `CstNodeRecord` | 24 bytes | `kind: u16`、`flags: u16`、span、child range、`data_ref` |
-| `CstEdgeRecord` | 8 bytes | node/token target を `ref_id` で参照する |
-| `TokenRecord` | 24 bytes 以下 | token kind、SourceId、span、compact trivia range |
-| `TriviaRecord` | 16 bytes 以下 | trivia kind、SourceId、span |
-| `DiagnosticRecord` | 32 bytes 以下 | SourceId、span、severity、code、message ref、label range |
-| `DiagnosticLabelRecord` | 16 bytes 以下 | SourceId、span、message ref |
+| `CstNodeRecord` | 24 bytes | `kind: u16`, `flags: u16`, span, child range, `data_ref` |
+| `CstEdgeRecord` | 8 bytes | references node/token targets by `ref_id` |
+| `TokenRecord` | 24 bytes or less | token kind, SourceId, span, compact trivia range |
+| `TriviaRecord` | 16 bytes or less | trivia kind, SourceId, span |
+| `DiagnosticRecord` | 32 bytes or less | SourceId, span, severity, code, message ref, label range |
+| `DiagnosticLabelRecord` | 16 bytes or less | SourceId, span, message ref |
 
-implementation では `size_of::<T>()` の unit test を置き、意図しない field 追加で cache locality が悪化しないようにする。record を太らせる情報は、まず `data_ref`、semantic side table、diagnostic label table、将来の optional section に逃がす。
+Implementation should include `size_of::<T>()` unit tests to prevent accidental field growth from hurting cache locality. Data that would make records larger should first be moved to `data_ref`, semantic side tables, diagnostic label tables, or future optional sections.
 
-## CST accessor 設計
+## CST Accessor Design
 
-後続 tool は `CstTables` の raw tables に直接依存しない。`CstView` を通して読む。
+Downstream tools do not depend directly on raw `CstTables`. They read through `CstView`.
 
-`CstView` は recursive tree object を事前構築しない。`NodeId` が要求された時点で、`CstTables` の node record と edge range を参照する軽量な `CstNodeView` を作り、`children()` などの traversal API で次の node view を lazy に返す。
+`CstView` does not eagerly build a recursive object tree. When a `NodeId` is requested, it creates a lightweight `CstNodeView` that references the node record and edge range in `CstTables`; traversal APIs such as `children()` lazily return the next node views.
 
 ![ox-mf2 lazy CST node views](./assets/002-ox-mf2-cst-view-lazy-node.svg)
 
@@ -218,7 +218,7 @@ CstView {
 }
 ```
 
-想定する accessor:
+Expected accessors:
 
 ```rust
 kind(node: NodeId) -> SyntaxKind
@@ -232,7 +232,7 @@ trailing_trivia(token: TokenId) -> TriviaRange
 source_slice(span: Span) -> &str
 ```
 
-想定する lightweight node view:
+Expected lightweight node view:
 
 ```rust
 CstNodeView<'a> {
@@ -242,17 +242,17 @@ CstNodeView<'a> {
 }
 ```
 
-Phase 1 では parent pointer を node record に必須で持たせない。parent query が必要な tool では、必要に応じて traversal index を構築する。常時 parent pointer を持つと node record が大きくなり、parse hot path と memory traffic に影響するためである。
+Phase 1 does not require parent pointers in node records. Tools that need parent queries can build a traversal index as needed. Keeping parent pointers out of every node record avoids increasing parse hot-path memory traffic.
 
-## SemanticModel 設計
+## SemanticModel Design
 
 ![ox-mf2 Phase 1 SemanticModel design](./assets/002-ox-mf2-semantic-model-design.svg)
 
-`parse_semantic = true` の場合、CST から lightweight な SemanticModel を生成する。
+When `parse_semantic = true`, a lightweight SemanticModel is produced from the CST.
 
-SemanticModel は runtime execution IR ではない。linter、compiler、validation が共有する意味情報である。
+SemanticModel is not a runtime execution IR. It is shared semantic information for linter, compiler, and validation.
 
-Phase 1 の最小 semantic model:
+Minimal Phase 1 semantic model:
 
 ```rust
 SemanticModel {
@@ -278,7 +278,7 @@ enum SemanticMessageKind {
 }
 ```
 
-各 semantic record は必ず source 上の NodeId と Span に戻れるようにする。
+Every semantic record must link back to a source NodeId and Span.
 
 ```rust
 SemanticRef {
@@ -287,19 +287,19 @@ SemanticRef {
 }
 ```
 
-Phase 1 で行う semantic lowering:
+Phase 1 semantic lowering performs:
 
-- message mode の記録
-- data model 上の message kind の記録
-- local/input declarations の収集
-- variable references の収集
-- patterns、expressions、markups の収集
-- literals、functions、options、attributes の収集
-- matcher selector の収集
-- variants と fallback/default marker の収集
-- syntax-adjacent な duplicate や missing semantic anchor の検出
+- record message mode
+- record data-model message kind
+- collect local/input declarations
+- collect variable references
+- collect patterns, expressions, and markups
+- collect literals, functions, options, and attributes
+- collect matcher selectors
+- collect variants and fallback/default markers
+- detect syntax-adjacent duplicates or missing semantic anchors
 
-Phase 1 で行わない semantic validation:
+Phase 1 does not perform:
 
 - complete selector coverage
 - locale-aware behavior
@@ -307,26 +307,26 @@ Phase 1 で行わない semantic validation:
 - Intl.MessageFormat constructor/runtime behavior
 - full linter rule policy
 
-SemanticModel は CST を置き換えない。formatter は CST を使い、linter/compiler/validation は SemanticModel と CST view を組み合わせて使う。
+SemanticModel does not replace CST. Formatters use CST; linters, compilers, and validators combine SemanticModel with CstView.
 
-`MessageMode` は syntax 上の `simple-message` / `complex-message` を表す。`SemanticMessageKind` は data model 上の `PatternMessage` / `SelectMessage` を表す。simple message は常に `Pattern` だが、complex message は quoted pattern body なら `Pattern`、matcher body なら `Select` になる。
+`MessageMode` represents syntactic `simple-message` / `complex-message`. `SemanticMessageKind` represents data-model `PatternMessage` / `SelectMessage`. A simple message is always `Pattern`; a complex message is `Pattern` when its body is a quoted pattern and `Select` when its body is a matcher.
 
-### Data Model validation boundary
+### Data Model Validation Boundary
 
-MF2 spec は、well-formed syntax に対する _Syntax Errors_ と、message structure の validity に対する _Data Model Errors_ を分けている。
+The MF2 spec separates _Syntax Errors_ for malformed syntax from _Data Model Errors_ for invalid message structure.
 
-Phase 1 parser は Syntax Errors を主に扱う。Data Model Errors は SemanticModel を使った validation layer の責務にする。
+The Phase 1 parser primarily handles Syntax Errors. Data Model Errors belong to the validation layer that uses SemanticModel.
 
-Phase 1 で validation layer に渡せるようにしておくべき情報:
+Information that Phase 1 should expose to validation:
 
-- declarations と暗黙 input variable の参照
-- selectors と selector count
-- variants と key count
+- declarations and implicit input variable references
+- selectors and selector count
+- variants and key count
 - catch-all key `*`
 - option identifiers
-- literal key の source span と cooked value
+- source span and cooked value for literal keys
 
-Data Model Errors の例:
+Examples of Data Model Errors:
 
 - Variant Key Mismatch
 - Missing Fallback Variant
@@ -335,30 +335,30 @@ Data Model Errors の例:
 - Duplicate Option Name
 - Duplicate Variant
 
-これらは parser syntax error として扱わない。ただし、Phase 1 の optional semantic validation が有効な場合に diagnostics として報告できるよう、SemanticModel は必要な source links を保持する。
+These are not parser syntax errors. However, when optional semantic validation is enabled in Phase 1, SemanticModel keeps the source links needed to report them as diagnostics.
 
-## Name / Identifier / Literal value 設計
+## Name / Identifier / Literal Value Design
 
 ![ox-mf2 Name / Identifier / Literal value design](./assets/002-ox-mf2-name-identifier-literal-value-design.svg)
 
-CST は source representation を lossless に保持する。一方、SemanticModel は比較や data model 変換に必要な logical value を扱う。
+CST preserves the source representation losslessly. SemanticModel handles logical values needed for comparison and data-model conversion.
 
-spec 上の重要な差分:
+Important spec differences:
 
-- variable name の source は `$` を含むが、data model の `name` は `$` を含まない。
-- function identifier の source は `:` を含むが、data model の `name` は `:` を含まない。
-- markup identifier の source は `#` または `/` を含むが、data model の `name` は sigil を含まない。
-- quoted literal と unquoted literal は source representation が異なっても、同じ string value なら semantic value として区別しない。
-- name の前後にある bidi marks / isolates は source には残すが、name/identifier/unquoted literal value の matching では存在しないものとして扱う。
-- name と literal key の比較は NFC 適用後の code point sequence として扱う。
+- A variable name source includes `$`, but the data-model `name` does not.
+- A function identifier source includes `:`, but the data-model `name` does not.
+- A markup identifier source includes `#` or `/`, but the data-model `name` does not include the sigil.
+- Quoted and unquoted literals are not semantically distinct if they have the same string value.
+- Bidi marks / isolates around names remain in source, but are ignored for name/identifier/unquoted literal matching.
+- Name and literal-key comparison uses code point sequences after NFC normalization.
 
-Phase 1 の方針:
+Phase 1 policy:
 
-- parser は cooked value を hot path で作らない。
-- CST は raw source span、delimiter、escape sequence を保持する。
-- SemanticModel は必要になった value だけを lazy または lowering phase で計算する。
-- cooked value と comparison key は source span へ戻れる record として保持する。
-- NFC normalization は parse hot path ではなく semantic validation / comparison path に閉じ込める。
+- The parser does not create cooked values on the hot path.
+- CST keeps raw source spans, delimiters, and escape sequences.
+- SemanticModel computes values lazily or during lowering only when needed.
+- Cooked values and comparison keys are records that can link back to source spans.
+- NFC normalization is confined to semantic validation / comparison paths, not parse hot paths.
 
 ```rust
 NameValue {
@@ -376,15 +376,15 @@ LiteralValue {
 }
 ```
 
-`StringRef` は Phase 1 では interned string table または owned string pool を指す抽象名とする。Phase 2 では Binary AST snapshot の indexed StringRef、つまり string offsets section への StringId に対応付けられる。
+`StringRef` is an abstract name for an interned string table or owned string pool in Phase 1. In Phase 2 it maps to the indexed StringRef of the Binary AST snapshot, that is, a StringId into the string offsets section.
 
-## Grammar / spec tracking 設計
+## Grammar / Spec Tracking Design
 
-parser grammar は `refers/message-format-wg/spec` を primary source とする。ECMAScript API integration や Intl.MessageFormat 側の挙動は `refers/proposal-intl-messageformat` を tracking source とする。
+The parser grammar uses `refers/message-format-wg/spec` as the primary source. ECMAScript API integration and Intl.MessageFormat behavior are tracked through `refers/proposal-intl-messageformat`.
 
-Phase 1 の grammar 実装では、spec category ごとに parser function を分け、benchmark と fixture を対応付ける。
+The Phase 1 grammar implementation splits parser functions by spec category and pairs each group with benchmarks and fixtures.
 
-想定する parser function group:
+Expected parser function groups:
 
 ```text
 parse_message
@@ -407,7 +407,7 @@ parse_name
 parse_identifier
 ```
 
-各 group は次を持つ。
+Each group has:
 
 - valid spec fixtures
 - invalid spec fixtures
@@ -415,11 +415,11 @@ parse_identifier
 - focused micro benchmark
 - syntax kind snapshot
 
-これにより、spec 変更時に grammar、SyntaxKind、diagnostics、performance impact を分けて確認できる。
+This lets grammar, SyntaxKind, diagnostics, and performance impact be reviewed separately when the spec changes.
 
-## Message mode 設計
+## Message Mode Design
 
-MF2 syntax は message を `simple-message` と `complex-message` に分ける。
+MF2 syntax distinguishes `simple-message` and `complex-message`.
 
 ```abnf
 message = simple-message / complex-message
@@ -428,7 +428,7 @@ simple-message  = o [simple-start pattern]
 complex-message = o *(declaration o) complex-body o
 ```
 
-Phase 1 parser は、この区別を明示的に扱う。
+The Phase 1 parser handles this distinction explicitly.
 
 ```rust
 enum MessageMode {
@@ -437,28 +437,28 @@ enum MessageMode {
 }
 ```
 
-`parse_message` は mode を判定して、CST に `SimpleMessage` または `ComplexMessage` node を作る。mode は単なる semantic metadata ではなく、whitespace、body structure、recovery point に影響する syntax-level decision である。
+`parse_message` detects the mode and creates either a `SimpleMessage` or `ComplexMessage` node in the CST. Mode is not just semantic metadata; it affects whitespace, body structure, and recovery points at the syntax level.
 
-### Simple message
+### Simple Message
 
-simple message は single pattern を含む。empty string も valid simple message である。
+A simple message contains a single pattern. The empty string is also a valid simple message.
 
-simple message では、message 先頭と末尾の whitespace は significant であり、message text の一部として扱う。したがって parser は simple message の leading/trailing whitespace を discardable trivia として捨ててはならない。
+In a simple message, whitespace at the start and end of the message is significant and part of the message text. Therefore the parser must not discard leading/trailing whitespace as trivia.
 
-Phase 1 の扱い:
+Phase 1 behavior:
 
-- `SimpleMessage` node は pattern 相当の child/token range を持つ。
-- leading/trailing whitespace は text token または pattern 内の source span として保持する。
-- declarations、matcher、quoted-pattern-only complex body は simple message として扱わない。
-- first non-whitespace character の制約に違反する場合は、complex message として parse できるか試し、できなければ parser diagnostic を返す。
+- `SimpleMessage` node has a child/token range equivalent to a pattern.
+- Leading/trailing whitespace is preserved as a text token or a source span inside the pattern.
+- Declarations, matchers, and quoted-pattern-only complex bodies are not treated as simple messages.
+- If the first non-whitespace character violates the constraint, the parser tries complex parsing first; if that fails, it returns a parser diagnostic.
 
-### Complex message
+### Complex Message
 
-complex message は optional declarations と complex body から成る message である。complex body は `quoted-pattern` または `matcher` であるため、declarations も matcher も持たない `{{ ... }}` の quoted-pattern-only message も complex message である。
+A complex message consists of optional declarations and a complex body. The complex body is either a `quoted-pattern` or a `matcher`, so `{{ ... }}` without declarations or a matcher is still a complex message.
 
-complex message は、optional whitespace `o` の後に `.input`、`.local`、`.match` のいずれかの keyword、または quoted pattern `{{` で始まる。
+A complex message starts after optional whitespace `o` with `.input`, `.local`, `.match`, or quoted pattern `{{`.
 
-complex message は次の構造を持つ。
+Complex message structure:
 
 ```text
 ComplexMessage
@@ -466,39 +466,39 @@ ComplexMessage
   complex_body
 ```
 
-complex body は `quoted-pattern` または `matcher` である。
+The complex body is `quoted-pattern` or `matcher`.
 
 ```text
 ComplexBody = QuotedPattern | Matcher
 ```
 
-complex message では、message 先頭と末尾の whitespace は significant ではない。parser はそれらを syntax trivia として保持してよいが、message text としては扱わない。
+In complex messages, leading and trailing message whitespace is not significant. The parser may preserve it as syntax trivia, but it is not message text.
 
-Phase 1 の扱い:
+Phase 1 behavior:
 
-- `.input` と `.local` は declaration list として parse する。
-- `.match` は matcher body として parse する。
-- `{{ ... }}` は quoted pattern body として parse する。
-- declarations を持たない `{{ ... }}` も complex message として parse する。
-- declarations の後に complex body がない場合は recovery diagnostic を返す。
-- matcher variant の quoted pattern は variant の child として保持する。
+- `.input` and `.local` are parsed as declaration lists.
+- `.match` is parsed as a matcher body.
+- `{{ ... }}` is parsed as a quoted pattern body.
+- `{{ ... }}` without declarations is still parsed as a complex message.
+- If declarations are not followed by a complex body, return a recovery diagnostic.
+- A matcher variant's quoted pattern is preserved as a variant child.
 
-### Mode 判定と recovery
+### Mode Detection and Recovery
 
-mode 判定は parse hot path に入るため、小さく保つ。
+Mode detection is on the parse hot path and must remain small.
 
-判定の基本方針:
+Basic policy:
 
-1. source の先頭から optional whitespace `o`、つまり `ws` または `bidi`、を skip して mode 判定に必要な範囲だけを見る。
-2. skip 後の先頭が `.input`、`.local`、`.match`、または `{{` なら complex candidate とする。
-3. complex candidate が成立しない場合、recover しながら complex parse を継続するか、simple message として扱う方が有用かを parser diagnostic とともに選ぶ。
-4. simple message と判定した場合、leading/trailing whitespace を text として保持する。
+1. From the beginning of the source, skip only optional whitespace `o`, meaning `ws` or `bidi`, far enough to decide the mode.
+2. If the first significant input is `.input`, `.local`, `.match`, or `{{`, treat it as a complex candidate.
+3. If the complex candidate does not succeed, choose whether to recover as complex parsing or treat it as a simple message, with parser diagnostics.
+4. If the message is simple, preserve leading/trailing whitespace as text.
 
-ambiguous または malformed な input では、mode 判定自体も recovery 対象にする。たとえば `.` で始まる keyword 風の入力で declaration や matcher が壊れている場合、単純に simple text へ落とすと有用な diagnostic を失うため、complex candidate として扱う方を優先する。
+Ambiguous or malformed input makes mode detection part of recovery. For example, if input begins with a `.` that looks like a keyword but the declaration or matcher is broken, treating it as complex usually preserves better diagnostics than simply falling back to simple text.
 
-## Parser API の契約
+## Parser API Contract
 
-primary parser API は SourceStore と SourceId を使う。
+The primary parser API uses SourceStore and SourceId.
 
 ```rust
 parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> ParseResult
@@ -513,14 +513,14 @@ parse_source_session<'a>(
 ) -> ParseSessionResult<'a>
 ```
 
-API の使い分け:
+API roles:
 
-- `parse_source`: SourceStore を明示的に管理したい通常の Rust core API。diagnostics、line/column conversion、batch 前処理、editor integration に向く。
-- `parse_message`: one-shot parse 用の convenience API。test、REPL、small utility、benchmark smoke に向く。
-- `parse_batch`: 複数 message を一括 parse する API。locale file、project-wide analysis、benchmark corpus、将来の shared snapshot buffer に向く。
-- `parse_source_session`: advanced API。repeated parse、benchmark、LSP、batch worker で allocation を再利用し、workspace に borrow された result view を返す。
+- `parse_source`: normal Rust core API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
+- `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests.
+- `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
+- `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.
 
-default API は owned `ParseResult` を返す。advanced API は workspace lifetime に紐づく borrowed `ParseSessionResult` を返す。public API としては `ParseWorkspace` を 1 つだけ expose し、内部では parser 用 workspace と semantic 用 workspace を分離する。
+Default APIs return owned `ParseResult`. Advanced APIs return `ParseSessionResult` tied to the workspace lifetime. Public API exposes a single `ParseWorkspace`, while internally separating parser workspace and semantic workspace.
 
 ```rust
 pub struct ParseWorkspace {
@@ -549,13 +549,13 @@ impl ParseWorkspace {
 }
 ```
 
-`clear()` と `reset()` は capacity を保持して中身だけ消す。memory release は `shrink_to_fit()` または `drop(ParseWorkspace)` に明示的に任せる。これにより、benchmark と batch parse で allocation variance を抑えられる。
+`clear()` and `reset()` keep capacity and clear only contents. Memory is released explicitly through `shrink_to_fit()` or `drop(ParseWorkspace)`. This reduces allocation variance in benchmarks and batch parsing.
 
-`semantic` component は `parse_semantic = true` の場合だけ実際に使う。`parse_semantic = false` の parser-only hot path では、semantic lowering 用の table growth や string allocation を発生させない。
+The `semantic` component is used only when `parse_semantic = true`. When `parse_semantic = false`, the parser-only hot path does not grow semantic tables or allocate semantic strings.
 
-owned `ParseResult` は caller が保持できる materialized result であり、zero-copy reuse path ではない。allocation reuse を主目的にする場合は `ParseSessionResult` を使う。benchmarks では owned materialization と borrowed session を分けて report する。
+Owned `ParseResult` is a materialized result that the caller can keep; it is not the zero-copy reuse path. Use `ParseSessionResult` when allocation reuse is the main goal. Benchmarks report owned materialization and borrowed session paths separately.
 
-`parse_source` の使用例:
+`parse_source` example:
 
 ```rust
 let mut sources = SourceStore::new();
@@ -576,7 +576,7 @@ for diagnostic in &result.diagnostics {
 }
 ```
 
-`ParseWorkspace` の使用例:
+`ParseWorkspace` example:
 
 ```rust
 let mut workspace = ParseWorkspace::new();
@@ -588,7 +588,7 @@ for source_id in source_ids {
 }
 ```
 
-borrowed session API の使用例:
+Borrowed session API example:
 
 ```rust
 let mut workspace = ParseWorkspace::with_capacity(ParseCapacity::default());
@@ -598,7 +598,7 @@ let session = parse_source_session(&sources, source_id, &mut workspace, options)
 let root = session.cst.root();
 ```
 
-`parse_message` の使用例:
+`parse_message` example:
 
 ```rust
 let result = parse_message("Hello, {$name}!");
@@ -607,7 +607,7 @@ assert!(result.diagnostics.is_empty());
 let root = result.cst.root();
 ```
 
-`parse_batch` の使用例:
+`parse_batch` example:
 
 ```rust
 let inputs = vec![
@@ -634,9 +634,9 @@ for item in result.items {
 }
 ```
 
-`parse_message(source)` は convenience API である。内部では SourceFile を SourceStore に登録し、SourceId で parse する。
+`parse_message(source)` is a convenience API. Internally it registers a SourceFile in SourceStore and parses by SourceId.
 
-MF2 workloads では、1 file、1 locale set、1 project に多数の message が含まれることが多いため、batch parsing は Phase 1 から first-class API にする。
+MF2 workloads often contain many messages in one file, locale set, or project. Therefore batch parsing is a first-class API from Phase 1.
 
 ```text
 ParseInput {
@@ -648,9 +648,9 @@ ParseInput {
 }
 ```
 
-parser semantics を決めるのは `source` だけである。`path`、`locale`、`message_id`、`base_offset` は diagnostics、batch result mapping、LSP document identity、locale-aware workflows、project fixtures、benchmark reports、将来の snapshot roots section entries のための metadata である。
+Only `source` determines parser semantics. `path`, `locale`, `message_id`, and `base_offset` are metadata for diagnostics, batch result mapping, LSP document identity, locale-aware workflows, project fixtures, benchmark reports, and future snapshot roots entries.
 
-`base_offset` は UTF-8 byte offset とする。API input では省略可能でも、内部 representation と snapshot metadata では optional にしない。未指定時は `0` を使う。Rust parser / snapshot hot path は UTF-16 position conversion を行わない。LSP、editor、JavaScript API が UTF-16 code unit positions を必要とする場合は binding/editor boundary で変換する。
+`base_offset` is a UTF-8 byte offset. Even if optional in API input, it is not optional in the internal representation and snapshot metadata; `0` is used when unspecified. The Rust parser / snapshot hot path does not perform UTF-16 position conversion. LSP, editor, and JavaScript APIs that need UTF-16 code unit positions convert at the binding/editor boundary.
 
 ```rust
 ParseOptions {
@@ -660,13 +660,13 @@ ParseOptions {
 }
 ```
 
-default:
+Defaults:
 
 - `recovery = true`
 - `parse_semantic = false`
 - `collect_trivia = true`
 
-Phase 1 の `ParseResult` は snapshot bytes を含まない。
+Phase 1 `ParseResult` does not contain snapshot bytes.
 
 ```rust
 ParseResult {
@@ -682,9 +682,9 @@ ParseSessionResult<'a> {
 }
 ```
 
-`ParseResult` は workspace から detach された owned result である。`ParseSessionResult` は workspace 内の tables と diagnostic buffers を参照する borrowed result であり、次の `workspace.clear()` / `workspace.reset()` までだけ有効である。通常 API は `ParseResult` を返し、performance-sensitive な repeated parse だけ `ParseSessionResult` を使う。
+`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
-batch result は各 ParseInput から SourceId と ParseResult への mapping を保持しなければならない。
+Batch results must preserve the mapping from each ParseInput to SourceId and ParseResult.
 
 ```rust
 BatchParseResult {
@@ -697,27 +697,27 @@ BatchParseItem {
 }
 ```
 
-facade は convenience のため aggregate diagnostics を expose してもよい。ただし canonical mapping は source ごとに保持する。これにより、identity semantics を変えずに batch result を将来の snapshot roots section entries へ移行できる。
+The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
 
-`parse_semantic` の default は `false` にする。parser throughput と semantic lowering throughput を分離して測定できるようにするためである。
+`parse_semantic` defaults to `false` so parser throughput and semantic lowering throughput can be measured separately.
 
-## Parallel parsing 設計
+## Parallel Parsing Design
 
-ox-mf2 は multi-threaded parsing を考慮する。ただし、Phase 1 では単一 message の内部を細かく並列化しない。MF2 は message 単位の syntax surface が比較的小さいため、単一 message 内で thread を分けるより、project / locale file / benchmark corpus に含まれる多数の message を message 単位で並列 parse する方が自然である。
+ox-mf2 considers multi-threaded parsing, but Phase 1 does not split a single message internally across threads. MF2 messages are usually small compared with source files, so message-level parallelism across project / locale files / benchmark corpora is more natural.
 
-基本方針:
+Basic policy:
 
-- `parse_message` と `parse_source` は single-message parse として deterministic に保つ。
-- `parse_batch` は message 単位の parallelism を許可する。
-- 各 worker は `ParseWorkspace` を thread-local に持ち、parser state、CstTables、diagnostics buffer、temporary allocation を共有しない。
-- SourceStore は parse 開始前に SourceId を確定し、parse 中は immutable に読む。
-- BatchParseResult は入力順の mapping を保持し、parallel execution の完了順に依存しない。
-- diagnostics は `SourceId + Span` を持つため、worker 間で source identity を共有できる。
-- formatter/linter/compiler が後続で使う accessor surface は、parallel parse の有無に関係なく同じにする。
+- `parse_message` and `parse_source` remain deterministic single-message parsers.
+- `parse_batch` may use message-level parallelism.
+- Each worker owns a thread-local `ParseWorkspace` and does not share parser state, CstTables, diagnostic buffers, or temporary allocation.
+- SourceStore assigns SourceId before parsing and is read immutably during parsing.
+- BatchParseResult preserves input-order mapping and does not depend on parallel completion order.
+- Diagnostics carry `SourceId + Span`, so source identity can be shared across workers.
+- The accessor surface used by formatter/linter/compiler is the same regardless of parallel parsing.
 
-`parse_batch` の parallelism は parser semantics を変えてはならない。parallel / sequential の違いは execution strategy だけであり、CST、SemanticModel、diagnostics の内容と順序は同じであるべきである。
+`parse_batch` parallelism must not change parser semantics. The only difference between parallel and sequential execution is strategy; CST, SemanticModel, diagnostics, and result ordering should be the same.
 
-Batch execution の制御は parse semantics とは別に扱う。
+Batch execution is controlled separately from parse semantics.
 
 ```rust
 BatchParseOptions {
@@ -732,18 +732,18 @@ enum BatchExecution {
 }
 ```
 
-default は実装初期では `Sequential` でもよい。ただし API と table design は、後から `Parallel` を default または feature-gated にしても壊れない形にする。`preserve_order` は default `true` とし、結果 mapping と diagnostics ordering を入力順で安定させる。
+The initial default may be `Sequential`, but the API and table design should allow `Parallel` to become the default or a feature-gated option later. `preserve_order` defaults to `true`, keeping result mapping and diagnostic ordering stable by input order.
 
-実装上の制約:
+Implementation constraints:
 
-- parser は shared mutable global state を持たない。
-- string interning や cooked value cache を導入する場合、parse hot path では worker-local にし、global table merge は batch 後に行う。
-- SourceStore は `Sync` にできる immutable data layout を目指す。
-- CstTables と ParseResult は worker から main thread へ move できるよう `Send` を満たす設計にする。
-- Rayon などの executor は実装詳細に留め、public API が特定 executor に依存しないようにする。
-- WASM target や embedded target では thread が使えない場合があるため、sequential fallback を必ず持つ。
+- The parser has no shared mutable global state.
+- If string interning or cooked value caches are introduced, keep them worker-local on the parse hot path; global table merging happens after the batch.
+- SourceStore should use immutable data layout that can be `Sync`.
+- CstTables and ParseResult should be `Send` so workers can move results to the main thread.
+- Executors such as Rayon are implementation details; the public API does not depend on a specific executor.
+- WASM and embedded targets may not support threads, so sequential fallback is mandatory.
 
-benchmark では、single-thread と multi-thread を分けて測定する。
+Benchmarks measure single-thread and multi-thread separately.
 
 ```text
 parse_message_single
@@ -752,23 +752,23 @@ parse_batch_parallel
 parse_batch_parallel_with_semantic
 ```
 
-外部 parser との比較では `parse_message_single` を primary baseline にする。`parse_batch_parallel` は ox-mf2 の project-scale throughput として別軸で測定する。
+External parser comparison uses `parse_message_single` as the primary baseline. `parse_batch_parallel` is reported separately as project-scale ox-mf2 throughput.
 
-## Source と Span の契約
+## Source and Span Contract
 
-SourceStore は single parse、batch parse、diagnostics、将来の snapshot roots section に共通する source ownership layer である。
+SourceStore is the common source ownership layer for single parse, batch parse, diagnostics, and future snapshot roots sections.
 
-span は UTF-8 byte offsets とする。
+Spans are UTF-8 byte offsets.
 
 ```text
 Span = { start: u32, end: u32 }
 ```
 
-Span は source_id を含まない。source identity は ParseInput、SourceStore、diagnostics、snapshot records の `source_id`、または current root/source context から取得する。
+Span does not include source_id. Source identity comes from ParseInput, SourceStore, diagnostics, snapshot record `source_id`, or current root/source context.
 
-line / column positions は SourceStore から導出し、各 node には保存しない。
+Line/column positions are derived from SourceStore; they are not stored on each node.
 
-SourceStore は source text と line indexes を所有する。
+SourceStore owns source text and line indexes.
 
 ```text
 SourceFile {
@@ -779,15 +779,15 @@ SourceFile {
 }
 ```
 
-source length または span が `u32` に収まらない場合、parser は reject するか fatal diagnostic を出す。
+If source length or span does not fit in `u32`, the parser rejects it or emits a fatal diagnostic.
 
-### Source encoding policy
+### Source Encoding Policy
 
-Phase 1 の Rust convenience API は `&str` を受け取るため、内部 source text は UTF-8 として扱う。この場合、core span は UTF-8 byte offsets でよい。
+The Phase 1 Rust convenience API takes `&str`, so internal source text is treated as UTF-8. In this case, core spans can be UTF-8 byte offsets.
 
-一方、MF2 syntax spec は UTF-16 based implementation との互換性のため、quoted literal などで unpaired surrogate code points を許容する。Rust `&str` は unpaired surrogate を表現できないため、Phase 1 の `&str` API だけで ECMAScript String の全入力を表現できるとはみなさない。
+However, the MF2 syntax spec allows unpaired surrogate code points for compatibility with UTF-16-based implementations in places such as quoted literals. Rust `&str` cannot represent unpaired surrogates, so the Phase 1 `&str` API alone is not considered capable of representing every ECMAScript String input.
 
-そのため、SourceStore は将来 `SourceText` abstraction を持てる設計にしておく。
+Therefore SourceStore is designed so that it can later introduce a `SourceText` abstraction.
 
 ```rust
 enum SourceText {
@@ -797,11 +797,11 @@ enum SourceText {
 }
 ```
 
-Phase 1 の parser hot path は UTF-8 fast path を優先する。N-API / WASM binding で ECMAScript String compatibility が必要になった場合、WTF-8 または UTF-16 ingestion を binding/source boundary で追加し、core span model と editor-facing UTF-16 positions の mapping を明示的に測定する。
+The Phase 1 parser hot path prioritizes the UTF-8 fast path. If N-API / WASM bindings need ECMAScript String compatibility, WTF-8 or UTF-16 ingestion can be added at the binding/source boundary, and the mapping between core spans and editor-facing UTF-16 positions must be measured explicitly.
 
-## Identifier model（識別子モデル）
+## Identifier Model
 
-core identifiers は `u32` index を使う。
+Core identifiers use `u32` indexes.
 
 ```rust
 pub struct NodeId(u32);
@@ -816,19 +816,19 @@ pub struct Span {
 }
 ```
 
-同じ identifier model を construction-time CST tables、将来の Binary AST snapshots、SemanticView、diagnostics、formatter、linter、language bindings で使う。
+The same identifier model is used by construction-time CST tables, future Binary AST snapshots, SemanticView, diagnostics, formatters, linters, and language bindings.
 
-Span は source_id を含まない。source identity は record/context 側で保持する。
+Span does not include source_id. Source identity is held by the record or context.
 
-`NodeId = 0`、`EdgeId = 0`、`TokenId = 0`、`TriviaId = 0`、`SourceId = 0` はすべて有効な index とする。optional table reference の none sentinel は `u32::MAX` とする。required reference は none sentinel を使ってはならない。
+`NodeId = 0`, `EdgeId = 0`, `TokenId = 0`, `TriviaId = 0`, and `SourceId = 0` are all valid indexes. Optional table references use `u32::MAX` as the none sentinel. Required references must not use the none sentinel.
 
-recoverable parse failure は diagnostics と partial CST で表現する。root node すら構築できない fatal failure は parse result 内の sentinel ではなく API error として扱う。
+Recoverable parse failure is represented by diagnostics and partial CST. Fatal failure where even the root node cannot be built is represented as an API error, not a sentinel in the parse result.
 
-line / column positions は必要なときに SourceStore line indexes から導出する。UTF-16 columns、grapheme-aware columns、LSP-facing positions は display/editor boundary の責務であり、core parser span model には含めない。
+Line/column positions are derived from SourceStore line indexes when needed. UTF-16 columns, grapheme-aware columns, and LSP-facing positions belong to display/editor boundaries and are not part of the core parser span model.
 
-## CstTables の契約
+## CstTables Contract
 
-Phase 1 は flat indexed CST tables を使う。
+Phase 1 uses flat indexed CST tables.
 
 ```rust
 CstTables {
@@ -839,19 +839,19 @@ CstTables {
 }
 ```
 
-rules:
+Rules:
 
-- `NodeId`、`EdgeId`、`TokenId`、`TriviaId`、`SourceId` は `u32` newtype indexes とする。
-- node records は小さく、table-oriented に保つ。
-- span は separate span table / span_id にせず、CstNodeRecord、TokenRecord、TriviaRecord、Diagnostic に inline で保持する。
-- child relationships は edge table への range として表現する。
-- token と trivia tables は preserve-mode formatting に十分な lossless 性を持つ。
-- parser code は public typed AST を構築してから table へ変換しない。
-- construction-time records は Phase 2 snapshot sections に十分近い形にし、SnapshotWriter が linear pass で encode できるようにする。
+- `NodeId`, `EdgeId`, `TokenId`, `TriviaId`, and `SourceId` are `u32` newtype indexes.
+- Node records stay small and table-oriented.
+- Spans are stored inline in CstNodeRecord, TokenRecord, TriviaRecord, and Diagnostic, not as a separate span table / span_id.
+- Child relationships are represented as ranges into the edge table.
+- Token and trivia tables are lossless enough for preserve-mode formatting.
+- Parser code does not build a public typed AST and then convert it to tables.
+- Construction-time records are close enough to Phase 2 snapshot sections that SnapshotWriter can encode them in a linear pass.
 
-## Scanner / Parser boundary（scanner/parser 境界）
+## Scanner / Parser Boundary
 
-Phase 1 architecture は internal scanner helpers と recovering CST parser から始める。
+Phase 1 architecture starts with internal scanner helpers and a recovering CST parser.
 
 ```text
 source text
@@ -860,19 +860,19 @@ source text
   -> CST node records
 ```
 
-Phase 1 では public token stream を expose しない。public token API は、CST shape が固まる前に 2 つ目の compatibility surface を作ってしまう。
+Phase 1 does not expose a public token stream. A public token API would create a second compatibility surface before CST shape is stable.
 
-full pre-tokenization pass を唯一の architecture として要求しない。MF2 は JavaScript/TypeScript より小さいため、必須の `Vec<Token>` pass は不要な allocation と span duplication を増やす可能性がある。ただし、lossless CST と formatter support には token が必要なので、parser は accepted tokens を最終 token table に保存してよい。
+A full pre-tokenization pass is not required as the only architecture. MF2 is smaller than JavaScript/TypeScript, so a mandatory `Vec<Token>` pass may add unnecessary allocation and span duplication. However, lossless CST and formatter support require tokens, so the parser may store accepted tokens into the final token table.
 
-scanner は Rust の `char` iterator を主経路にしない。source は UTF-8 bytes として読み、span は UTF-8 byte offset のまま保持する。common path は ASCII fast path、必要な箇所だけ Unicode slow path に分ける。
+The scanner does not use Rust `char` iteration as the main path. It reads source as UTF-8 bytes and keeps spans as UTF-8 byte offsets. The common path is split into an ASCII fast path and Unicode slow paths only where needed.
 
 ASCII fast path:
 
-- MF2 delimiter: `{`、`}`、`.`、`@`、`|`、`=`、`:`、`$`、`/`、`*`
-- keywords: `.input`、`.local`、`.match`
+- MF2 delimiters: `{`, `}`, `.`, `@`, `|`, `=`, `:`, `$`, `/`, `*`
+- keywords: `.input`, `.local`, `.match`
 - ASCII whitespace
-- plain text run
-- names / identifiers の ASCII prefix
+- plain text runs
+- ASCII prefixes of names / identifiers
 
 Unicode slow path:
 
@@ -880,9 +880,9 @@ Unicode slow path:
 - bidi marks / isolates
 - Unicode whitespace
 - quoted literal escape validation
-- NFC comparison key が必要な semantic path
+- NFC comparison keys needed by semantic paths
 
-通常 text は 1 byte ずつ token 化しない。simple mode / complex mode のどちらでも、次の delimiter または mode-specific boundary までまとめて読む text-run scan を使う。
+Normal text is not tokenized byte by byte. In both simple mode and complex mode, text-run scanning reads until the next delimiter or mode-specific boundary.
 
 ```text
 "Hello {$name}!"
@@ -893,9 +893,9 @@ Unicode slow path:
   -> TextRun("!")
 ```
 
-これにより、一般的な翻訳 message で token 数、branch 数、table push 回数を抑えられる。
+This reduces token count, branch count, and table pushes for typical translation messages.
 
-意図する v1 boundary:
+Intended v1 boundary:
 
 ```text
 internal scanner helpers
@@ -907,13 +907,13 @@ internal scanner helpers
 - arena rollback
 ```
 
-## Checkpoint と Recovery の契約
+## Checkpoint and Recovery Contract
 
-recovery は default で有効にする。
+Recovery is enabled by default.
 
-checkpoint は parser 内部 state である。小さく保ち、CST nodes、tokens、trivia、diagnostics、source text を所有してはならない。
+Checkpoints are internal parser state. They stay small and do not own CST nodes, tokens, trivia, diagnostics, or source text.
 
-代表的な shape:
+Representative shape:
 
 ```rust
 struct Checkpoint {
@@ -927,68 +927,68 @@ struct Checkpoint {
 }
 ```
 
-checkpoint rules:
+Checkpoint rules:
 
-1. checkpoints は ambiguous または recoverable な region の周辺だけで使う。
-2. 実用上可能な範囲で、解釈が accepted されるまで nodes/tokens を commit しない。
-3. speculative records を push した場合は、rollback 時に table lengths を truncate する。
-4. cascade より、役に立つ diagnostic を 1 つ出すことを優先する。
-5. recovery nodes は formatter と diagnostics に十分な spans と source text を保持する。
+1. Use checkpoints only around ambiguous or recoverable regions.
+2. Where practical, do not commit nodes/tokens until an interpretation is accepted.
+3. If speculative records are pushed, rollback truncates table lengths.
+4. Prefer one useful diagnostic over diagnostic cascades.
+5. Recovery nodes keep enough spans and source text for formatters and diagnostics.
 
-想定される recovery points:
+Expected recovery points:
 
-- simple / complex mode 判定の失敗
+- simple / complex mode detection failure
 - unclosed placeholder / expression
 - malformed declaration
 - incomplete matcher
 - malformed variant key
 - invalid markup boundary
 - unclosed quoted literal
-- nested syntax 内の unexpected end of input
+- unexpected end of input inside nested syntax
 
-## Allocation の契約
+## Allocation Contract
 
-parse hot path では不要な heap allocation を避ける。
+The parse hot path avoids unnecessary heap allocation.
 
-rules:
+Rules:
 
-- source-derived text は owned string ではなく span または string reference として保存する。
-- successful parse path では diagnostic message allocation を発生させない。
-- input size から良い見積もりができる場合は `Vec::with_capacity` または local pre-sizing を使う。
-- repeated parse、batch parse、benchmark、LSP では `ParseWorkspace` を再利用する。
-- `ParseWorkspace::clear()` / `reset()` は capacity を保持し、`shrink_to_fit()` だけが明示的な capacity release を行う。
-- workspace 内の table builders は `reserve_for_source_len(source.len())` で source length から保守的に pre-reserve できる。
-- temporary allocation は可能な範囲で stack-local に保つ。
-- parsing 中に normalized strings を allocate しない。
-- normalize や unescape は、必要になったときに semantic、formatter、runtime-oriented layer で行う。
+- Store source-derived text as spans or string references, not owned strings.
+- Successful parse paths do not allocate diagnostic messages.
+- Use `Vec::with_capacity` or local pre-sizing when input size gives a useful estimate.
+- Reuse `ParseWorkspace` for repeated parse, batch parse, benchmarks, and LSP.
+- `ParseWorkspace::clear()` / `reset()` keep capacity; only `shrink_to_fit()` explicitly releases capacity.
+- Workspace table builders can conservatively pre-reserve using `reserve_for_source_len(source.len())`.
+- Keep temporary allocation stack-local where practical.
+- Do not allocate normalized strings during parsing.
+- Normalize and unescape only when needed in semantic, formatter, or runtime-oriented layers.
 
-allocator policy:
+Allocator policy:
 
-- parser public API は特定 allocator を契約にしない。
-- default benchmark は Rust default allocator または system allocator を明記する。
-- stress benchmark では grow-in-place を抑える allocator や allocation counting allocator を追加検討する。
-- allocator の差で改善した数字を parser algorithm の改善と混同しない。
+- The public parser API does not contract on a specific allocator.
+- Default benchmarks state the Rust default allocator or system allocator being used.
+- Stress benchmarks may add a grow-in-place-resistant allocator or allocation-counting allocator.
+- Do not confuse allocator-driven improvements with parser algorithm improvements.
 
-owned strings を許容する場所:
+Owned strings are allowed in:
 
-- SourceStore 内の source ownership
-- error path 上の dynamic diagnostic arguments
-- 後続の snapshot string table construction
-- 後続の binding/debug serialization
+- source ownership inside SourceStore
+- dynamic diagnostic arguments on error paths
+- later snapshot string table construction
+- later binding/debug serialization
 
-## Token と Trivia の方針
+## Token and Trivia Policy
 
-`collect_trivia` の default は `true` とする。
+`collect_trivia` defaults to `true`.
 
-parser は trivia を収集する。これは、この project が lossless CST、preserve-mode formatting、diagnostics、将来の Binary AST snapshots を明示的に対象にしているためである。
+The parser collects trivia because this project explicitly targets lossless CST, preserve-mode formatting, diagnostics, and future Binary AST snapshots.
 
-parser-only experiments 用に `collect_trivia = false` mode を用意してもよい。ただし、それは通常の toolchain mode ではない。
+The parser may provide `collect_trivia = false` for parser-only experiments. That is not the normal toolchain mode.
 
-両方の mode を support する場合、benchmarks はそれぞれ別に report しなければならない。
+When both modes are supported, benchmarks must report them separately.
 
-## Token / Trivia record 設計
+## Token / Trivia Record Design
 
-token と trivia は source text を copy せず、span で参照する。
+Tokens and trivia refer to source text through spans and do not copy text.
 
 ```rust
 TokenRecord {
@@ -1011,27 +1011,27 @@ TriviaRecord {
 }
 ```
 
-token text は `SourceStore` と `Span` から取得する。normal parse path では token text を owned string にしない。
+Token text is read from `SourceStore` and `Span`. The normal parse path does not store token text as owned strings.
 
-Phase 1 の `TokenRecord` は record size を抑えるため、leading/trailing trivia を 1 つの compact range と 2 つの count で表す。`first_trivia` は token に属する最初の trivia index で、先頭 `leading_trivia_count` 件を leading trivia、続く `trailing_trivia_count` 件を trailing trivia として読む。Phase 2 の Binary AST snapshot が separate `leading_trivia_start` / `trailing_trivia_start` を必要とする場合、SnapshotWriter はこの compact range から線形に展開する。
+To keep record size small, the Phase 1 `TokenRecord` represents leading/trailing trivia as one compact range plus two counts. `first_trivia` points to the first trivia item belonging to the token. The first `leading_trivia_count` items are leading trivia, and the next `trailing_trivia_count` items are trailing trivia. If the Phase 2 Binary AST snapshot needs separate `leading_trivia_start` / `trailing_trivia_start`, SnapshotWriter expands this compact range linearly.
 
-trivia の扱い:
+Trivia handling:
 
-- syntax 上の `ws` は trivia table に入れる。対象は `SP`、`HTAB`、`CR`、`LF`、`U+3000` である。
-- syntax 上の `bidi` は `Bidi` trivia または dedicated token flag として保持する。`o` と `s` の判定では `ws` と `bidi` の違いが必要になる。
-- preserve-mode formatter に必要な trivia は default で保持する。
-- `collect_trivia = false` では trivia record を省略できるが、diagnostic span と token span は維持する。この場合、`first_trivia = 0`、`leading_trivia_count = 0`、`trailing_trivia_count = 0` とする。
-- malformed input の recovery 中に読み飛ばした text も、可能な限り trivia または error token として span を保持する。
+- Syntax `ws` goes into the trivia table. It includes `SP`, `HTAB`, `CR`, `LF`, and `U+3000`.
+- Syntax `bidi` is stored as `Bidi` trivia or a dedicated token flag. The distinction between `ws` and `bidi` is needed for `o` and `s`.
+- Trivia needed by preserve-mode formatting is kept by default.
+- With `collect_trivia = false`, trivia records may be omitted, but diagnostic spans and token spans remain. In that case, `first_trivia = 0`, `leading_trivia_count = 0`, and `trailing_trivia_count = 0`.
+- Text skipped during recovery should preserve spans as trivia or error tokens whenever possible.
 
-delimiter token の扱い:
+Delimiter token handling:
 
-- `{`、`}`、`|`、`.`、`@`、`*` などの delimiter は token として保持する。
-- node span は delimiter を含む syntactic region を指す。
-- formatter が delimiter の有無、位置、original spacing を復元できるようにする。
+- Delimiters such as `{`, `}`, `|`, `.`, `@`, and `*` are stored as tokens.
+- Node spans point to syntactic regions including delimiters.
+- Formatters can reconstruct delimiter presence, position, and original spacing.
 
-## Diagnostics cost の契約
+## Diagnostics Cost Contract
 
-core diagnostics は SourceId と UTF-8 byte Span を使う。
+Core diagnostics use SourceId and UTF-8 byte Span.
 
 ```rust
 DiagnosticRecord {
@@ -1053,21 +1053,21 @@ DiagnosticLabelRecord {
 }
 ```
 
-`DiagnosticRecord` と `DiagnosticLabelRecord` は parser-internal compact representation である。public `Diagnostic` はこれらを SourceStore と diagnostic catalog で解決した view / owned facade として expose してよい。
+`DiagnosticRecord` and `DiagnosticLabelRecord` are parser-internal compact representations. Public `Diagnostic` may be exposed as a view / owned facade resolved through SourceStore and the diagnostic catalog.
 
-diagnostics は success path で安価でなければならない。
+Diagnostics must be cheap on the success path.
 
-- fully valid input では diagnostic allocation を行わない。
-- 実用上可能な範囲で static diagnostic catalog を使う。
-- `severity` と `code` は compact numeric enum にする。
-- human-readable message は `message_ref` から取得する。
-- 動的な message text が必要な場合だけ interned string / diagnostic argument table に逃がす。
-- labels は span-based にする。
-- diagnostics 内に source snippets を copy しない。
-- diagnostic construction は error path のみで行う。
-- recovery は diagnostic cascade を避ける。
+- Fully valid input performs no diagnostic allocation.
+- Use a static diagnostic catalog where practical.
+- `severity` and `code` are compact numeric enums.
+- Human-readable messages are obtained from `message_ref`.
+- Dynamic message text escapes into an interned string / diagnostic argument table only when needed.
+- Labels are span-based.
+- Diagnostics do not copy source snippets.
+- Diagnostic construction is on error paths only.
+- Recovery avoids diagnostic cascades.
 
-parser diagnostics は parser-focused に保つ。例:
+Parser diagnostics stay parser-focused. Examples:
 
 - invalid token
 - unexpected token
@@ -1078,54 +1078,54 @@ parser diagnostics は parser-focused に保つ。例:
 - invalid variant boundary
 - span overflow
 
-semantic diagnostics は後続 phase に属する。例:
+Semantic diagnostics belong to later phases. Examples:
 
 - unreachable variant
-- syntax だけでは不十分な duplicate semantic key
+- duplicate semantic key that cannot be decided from syntax alone
 - selector coverage failure
 - function / option validation policy
 - runtime fallback behavior
 
-## Hot path と cold path
+## Hot Path and Cold Path
 
-parser は common path を直接的で branch-light に保つ。
+The parser keeps common paths direct and branch-light.
 
-推奨 pattern:
+Recommended patterns:
 
-- byte または token kind に対する direct `match` dispatch
-- 実用上可能な小さな Copy token/scanner state
-- measurement によって必要性が示された場合のみ tiny cursor helpers を inline する。
-- measurement によって必要性が示された場合のみ diagnostic-heavy path に cold error helpers を置く。
-- parser core では virtual dispatch を避ける。
-- mode flags を compact に保つ。
-- common node records を小さく保つ。
+- direct `match` dispatch on byte or token kind
+- small Copy token/scanner state where practical
+- inline tiny cursor helpers only when benchmarks show they matter
+- move diagnostic-heavy paths to cold helpers only when benchmarks show they matter
+- avoid virtual dispatch in parser core
+- keep mode flags compact
+- keep common node records small
 
-`#[inline(always)]` や `#[cold]` のような low-level annotation を推測で追加しない。対象 path が重要であることを benchmark evidence が示した場合だけ追加する。
+Do not add low-level annotations such as `#[inline(always)]` or `#[cold]` by guesswork. Add them only when benchmark evidence shows the path matters.
 
-## Test strategy
+## Test Strategy
 
-Phase 1 の test は parser correctness、CST stability、recovery quality、semantic lowering、performance guard を分けて扱う。
+Phase 1 tests separate parser correctness, CST stability, recovery quality, semantic lowering, and performance guards.
 
-test category:
+Test categories:
 
-- spec conformance tests: Unicode WG spec と TC39 proposal に基づく valid/invalid fixtures。
-- message mode tests: simple message と complex message の判定、whitespace significance、empty simple message を確認する。
-- CST snapshot tests: input から生成される SyntaxKind tree、token/trivia、span の snapshot。
-- recovery tests: malformed input に対して root CST と useful diagnostics が返ることを確認する。
-- semantic lowering tests: declarations、references、selectors、variants が NodeId / Span に正しく link することを確認する。
-- data model validation tests: Variant Key Mismatch、Missing Fallback Variant、Duplicate Declaration などを parser syntax error と分けて確認する。
-- source mapping tests: UTF-8 byte span から line/column、UTF-16 boundary への変換を確認する。
-- batch parse tests: ParseInput metadata、SourceId、diagnostics mapping が壊れないことを確認する。
-- parallel batch tests: sequential と parallel で CST、SemanticModel、diagnostics、result ordering が一致することを確認する。
-- benchmark smoke tests: benchmark corpus と CLI command が実行可能であることを確認する。
+- spec conformance tests: valid/invalid fixtures based on Unicode WG spec and TC39 proposal
+- message mode tests: simple/complex mode detection, whitespace significance, empty simple message
+- CST snapshot tests: SyntaxKind tree, token/trivia, and span snapshots generated from input
+- recovery tests: malformed input returns a root CST and useful diagnostics
+- semantic lowering tests: declarations, references, selectors, and variants link correctly to NodeId / Span
+- data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
+- source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
+- batch parse tests: ParseInput metadata, SourceId, and diagnostic mapping remain stable
+- parallel batch tests: sequential and parallel modes produce the same CST, SemanticModel, diagnostics, and result ordering
+- benchmark smoke tests: benchmark corpus and CLI commands are runnable
 
-CST snapshot は public compatibility contract そのものではない。ただし、parser implementation の意図しない変化を検出するために使う。spec change に伴って snapshot が変わる場合は、fixture と changelog を一緒に更新する。
+CST snapshots are not themselves the public compatibility contract. They are used to detect unintended parser implementation changes. When spec changes intentionally alter snapshots, fixtures and changelog are updated together.
 
-recovery tests では、diagnostic の数だけでなく、最初の有用な diagnostic、span、以降の CST 継続性を確認する。diagnostic cascade を増やす変更は regression とみなす。
+Recovery tests check not only diagnostic count, but also the first useful diagnostic, its span, and whether CST continues after the error. Increasing diagnostic cascades is treated as a regression.
 
-## Benchmark 方針
+## Benchmark Policy
 
-performance work は measurement-driven でなければならない。
+Performance work must be measurement-driven.
 
 Phase 1 benchmark levels:
 
@@ -1142,7 +1142,7 @@ Phase 1 benchmark levels:
    - parse_cst with trivia
    - parse_cst without trivia
    - cst_view traversal
-   - malformed input に対する parse_cst + diagnostics
+   - parse_cst + diagnostics for malformed input
    - parse_cst + semantic lowering
    - source span to line/column conversion
    - parse_batch sequential
@@ -1156,24 +1156,24 @@ Phase 1 benchmark levels:
    - malformed/recovery corpus
 
 4. CLI benchmarks
-   - parser CLI commands に対する hyperfine
-   - 関係する場合は cold run と warm run を分ける。
+   - hyperfine on parser CLI commands
+   - cold runs and warm runs when relevant
 
-benchmark matrix を 1 つの数字に潰してはならない。
+Do not collapse the benchmark matrix into one number.
 
-reproducibility policy:
+Reproducibility policy:
 
-- `parse_message` は SourceStore 登録を含む case と含まない case を分ける。
-- `ParseWorkspace` reuse あり / なしを分ける。
-- capacity pre-reserve あり / なしを分ける。
-- owned `ParseResult` materialization と borrowed `ParseSessionResult` を分ける。
-- valid corpus、invalid corpus、recovery-heavy corpus を分ける。
-- `collect_trivia = true` と `collect_trivia = false` を分ける。
-- `parse_semantic = false` と `parse_semantic = true` を分ける。
-- allocator 条件を benchmark report に明記する。
-- hyperfine では warmup、minimum runs、setup command、working directory、CLI startup included/excluded を固定する。
+- separate `parse_message` with and without SourceStore registration
+- separate `ParseWorkspace` reuse and no reuse
+- separate capacity pre-reserve and no pre-reserve
+- separate owned `ParseResult` materialization and borrowed `ParseSessionResult`
+- separate valid corpus, invalid corpus, and recovery-heavy corpus
+- separate `collect_trivia = true` and `collect_trivia = false`
+- separate `parse_semantic = false` and `parse_semantic = true`
+- state allocator conditions in benchmark reports
+- fix hyperfine warmup, minimum runs, setup command, working directory, and whether CLI startup is included
 
-他 parser との primary comparison は、まず `parse_message` 相当を対象にする。ox-mf2 内部の micro/component benchmark では scanner、parser、semantic lowering、source mapping、snapshot encode を分ける。
+Primary comparison with other parsers targets `parse_message` equivalents first. Internal ox-mf2 micro/component benchmarks separate scanner, parser, semantic lowering, source mapping, and snapshot encode.
 
 Relevant phase names:
 
@@ -1193,9 +1193,9 @@ e2e_parse
 e2e_lint
 ```
 
-## Benchmark corpus（計測 corpus）
+## Benchmark Corpus
 
-corpus は少なくとも次の buckets を含める。
+The corpus includes at least the following buckets:
 
 - simple messages
 - complex messages
@@ -1214,26 +1214,26 @@ corpus は少なくとも次の buckets を含める。
 - large batches
 - malformed/recoverable messages
 
-fixture roles:
+Fixture roles:
 
-- spec fixtures は conformance を検証する。
-- implementation fixtures は compatibility differences を観測する。
-- generated fixtures は scale に対する stress をかける。
-- real project fixtures は実用的な intlify workloads を表す。
+- spec fixtures validate conformance
+- implementation fixtures observe compatibility differences
+- generated fixtures stress scale
+- real project fixtures represent practical intlify workloads
 
-## 外部 baseline
+## External Baselines
 
-external baselines は context として使う。唯一の performance guard にしない。
+External baselines are used as context, not as the only performance guard.
 
-想定される baselines:
+Expected baselines:
 
 - `messageformat`
 - `mf2-tools`
-- relevant な場合は `formatjs`
+- `formatjs` where relevant
 - `ox-content`
-- 該当する場合は current intlify parser paths
+- current intlify parser paths where relevant
 
-comparison では何を計測しているかを明示しなければならない。
+Comparisons must state exactly what is being measured.
 
 - parser only
 - parser plus diagnostics
@@ -1241,16 +1241,16 @@ comparison では何を計測しているかを明示しなければならない
 - parser plus snapshot encoding
 - CLI startup included or excluded
 
-## Regression rules（性能退行の判断基準）
+## Regression Rules
 
-performance change は次の質問に答えられる必要がある。
+Every performance change should answer these questions.
 
-- common parser hot path を改善しているか。
-- CstTables の memory traffic を増やしていないか。
-- recovery を悪化させていないか。
-- trivia と source fidelity を保持しているか。
-- parser から semantic lowering に work を移しているか。その移動は意図的か。
-- parser-only numbers を改善する一方で batch や formatter/linter use を悪化させていないか。
-- snapshot、binding、CLI overhead を parser timing に隠していないか。
+- Does it improve the common parser hot path?
+- Does it increase CstTables memory traffic?
+- Does it make recovery worse?
+- Does it preserve trivia and source fidelity?
+- Does it move work from parser to semantic lowering? If yes, is that intentional?
+- Does it improve parser-only numbers while making batch or formatter/linter usage worse?
+- Does it hide snapshot, binding, or CLI overhead inside parser timing?
 
-望ましい tradeoff は、常に最速の parser-only number とは限らない。ox-mf2 は toolchain foundation であるため、parser performance は diagnostics、formatter、linter、semantic lowering、Phase 2 Binary AST snapshot encoding が必要とする data を保持しなければならない。
+The desirable tradeoff is not always the fastest parser-only number. ox-mf2 is a toolchain foundation, so parser performance must preserve the data required by diagnostics, formatters, linters, semantic lowering, and Phase 2 Binary AST snapshot encoding.
