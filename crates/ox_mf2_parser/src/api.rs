@@ -9,7 +9,7 @@
 
 use crate::diagnostic::{Diagnostic, DiagnosticView};
 use crate::parser::run_parse;
-use crate::semantic::{lower as lower_semantic, SemanticModel, SemanticView};
+use crate::semantic::{lower_into as lower_semantic_into, SemanticModel, SemanticView};
 use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId;
 use crate::tables::CstTables;
@@ -163,8 +163,10 @@ pub fn parse_source_session<'a>(
     run_parse(sources, source_id, workspace, options);
 
     if options.parse_semantic {
-        let model = lower_semantic(sources, source_id, &workspace.parser.tables);
-        workspace.semantic.model = Some(model);
+        // Reuse the workspace-held SemanticModel's capacity instead of
+        // allocating a fresh model every session.
+        let model = workspace.semantic.model.get_or_insert_with(SemanticModel::default);
+        lower_semantic_into(sources, source_id, &workspace.parser.tables, model);
     } else {
         workspace.semantic.model = None;
     }
@@ -235,7 +237,9 @@ fn materialise(
 ) -> ParseResult {
     let cst = workspace.parser.tables.clone();
     let semantic = if options.parse_semantic {
-        Some(lower_semantic(sources, source_id, &cst))
+        let mut model = SemanticModel::default();
+        lower_semantic_into(sources, source_id, &cst, &mut model);
+        Some(model)
     } else {
         None
     };

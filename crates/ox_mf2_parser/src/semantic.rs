@@ -196,13 +196,30 @@ impl<'a> SemanticView<'a> {
     }
 }
 
-/// Lower a [`CstView`] into a [`SemanticModel`]. The caller decides whether
-/// to invoke this — controlled by [`crate::ParseOptions::parse_semantic`].
+/// Lower a [`CstView`] into a fresh [`SemanticModel`]. Convenience wrapper
+/// around [`lower_into`] that allocates a new model — prefer the latter
+/// when you already own a model whose capacity can be reused (LSP, batch
+/// loops, the borrowed-session workspace).
 pub fn lower(sources: &SourceStore, source_id: SourceId, tables: &CstTables) -> SemanticModel {
-    let view = CstView::new(sources, source_id, tables);
     let mut model = SemanticModel::default();
+    lower_into(sources, source_id, tables, &mut model);
+    model
+}
+
+/// Lower a [`CstView`] into a caller-owned [`SemanticModel`]. The model is
+/// cleared first so all `Vec` capacities are reused. Used by
+/// [`crate::ParseWorkspace`] so repeated semantic lowering does not
+/// re-allocate the record tables.
+pub fn lower_into(
+    sources: &SourceStore,
+    source_id: SourceId,
+    tables: &CstTables,
+    model: &mut SemanticModel,
+) {
+    reset_model(model);
+    let view = CstView::new(sources, source_id, tables);
     let Some(root) = view.root() else {
-        return model;
+        return;
     };
 
     // Top-level child should be SimpleMessage or ComplexMessage.
@@ -212,17 +229,36 @@ pub fn lower(sources: &SourceStore, source_id: SourceId, tables: &CstTables) -> 
             SyntaxKind::SimpleMessage => {
                 model.mode = MessageMode::Simple;
                 model.kind = SemanticMessageKind::Pattern;
-                lower_message_children(&message_node, &mut model);
+                lower_message_children(&message_node, model);
             }
             SyntaxKind::ComplexMessage => {
                 model.mode = MessageMode::Complex;
                 model.kind = SemanticMessageKind::Pattern; // refined below
-                lower_message_children(&message_node, &mut model);
+                lower_message_children(&message_node, model);
             }
             _ => {}
         }
     }
-    model
+}
+
+/// Drain every record vector while preserving capacity. Mirrors
+/// `ParseWorkspace::clear` so a `lower_into` call into a reused model
+/// behaves identically to lowering into a fresh one.
+fn reset_model(model: &mut SemanticModel) {
+    model.mode = MessageMode::default();
+    model.kind = SemanticMessageKind::default();
+    model.declarations.clear();
+    model.references.clear();
+    model.patterns.clear();
+    model.expressions.clear();
+    model.markups.clear();
+    model.literals.clear();
+    model.functions.clear();
+    model.options.clear();
+    model.attributes.clear();
+    model.selectors.clear();
+    model.variants.clear();
+    model.diagnostics.clear();
 }
 
 fn lower_message_children(node: &CstNodeView<'_>, model: &mut SemanticModel) {
@@ -264,15 +300,20 @@ fn lower_message_children(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                 if let Some(placeholder) =
                     find_first_node(&n, SyntaxKind::Placeholder)
                 {
+                    let refs_before = model.references.len();
                     collect_placeholder(&placeholder, model);
                     // `collect_placeholder` registers the declared variable
-                    // as a reference too — drop that last entry so input
+                    // as a reference too — drop that entry so input
                     // declarations don't shadow themselves as a reference.
                     if let Some(var) = variable.or(placeholder_var) {
-                        if let Some(last) = model.references.last() {
-                            if last.semantic_ref.node == var.node {
-                                model.references.pop();
-                            }
+                        if let Some((idx, _)) = model
+                            .references
+                            .iter()
+                            .enumerate()
+                            .skip(refs_before)
+                            .find(|(_, r)| r.semantic_ref.node == var.node)
+                        {
+                            model.references.remove(idx);
                         }
                     }
                 }
@@ -284,9 +325,25 @@ fn lower_message_children(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                     kind: DeclarationKind::Local,
                     variable,
                 });
-                // Walk the right-hand-side expression for references.
-                walk_for_references(&n, model);
-                walk_for_expressions(&n, model);
+                // Walk the RHS expression once; the unified walker collects
+                // references + expressions + functions + options + attrs +
+                // literals in a single pass. The declared variable itself
+                // (the LHS) is also a Variable in the tree; drop the last
+                // reference if it points at the declared variable so we
+                // don't double-count the binding as a use.
+                let refs_before = model.references.len();
+                walk_expression_subtree(&n, model);
+                if let Some(decl_var) = variable {
+                    if let Some((idx, _)) = model
+                        .references
+                        .iter()
+                        .enumerate()
+                        .skip(refs_before)
+                        .find(|(_, r)| r.semantic_ref.node == decl_var.node)
+                    {
+                        model.references.remove(idx);
+                    }
+                }
             }
             SyntaxKind::ComplexBody => {
                 for body_child in n.children() {
@@ -341,22 +398,21 @@ fn collect_placeholder(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                     semantic_ref: semantic_ref(&n),
                     kind: ExpressionKind::Variable,
                 });
-                walk_for_references(&n, model);
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::LiteralExpression => {
                 model.expressions.push(ExpressionRecord {
                     semantic_ref: semantic_ref(&n),
                     kind: ExpressionKind::Literal,
                 });
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::FunctionExpression => {
                 model.expressions.push(ExpressionRecord {
                     semantic_ref: semantic_ref(&n),
                     kind: ExpressionKind::Function,
                 });
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::Markup => {
                 let kind = detect_markup_kind(&n);
@@ -367,7 +423,7 @@ fn collect_placeholder(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                 // Markup carries options and attributes too — walk into the
                 // node so duplicate-option-name / `u:dir` markup linting can
                 // see them from the semantic model alone.
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             _ => {}
         }
@@ -466,65 +522,77 @@ fn collect_matcher(node: &CstNodeView<'_>, model: &mut SemanticModel) {
     }
 }
 
-fn walk_for_references(node: &CstNodeView<'_>, model: &mut SemanticModel) {
-    if node.kind() == SyntaxKind::Variable {
-        let semantic_ref = semantic_ref_of(*node);
-        model.references.push(ReferenceRecord {
-            semantic_ref,
-            name_span: semantic_ref.span,
-        });
-        return;
-    }
-    for child in node.children() {
-        if let CstChild::Node(n) = child {
-            walk_for_references(&n, model);
-        }
-    }
-}
-
-fn walk_for_expressions(node: &CstNodeView<'_>, model: &mut SemanticModel) {
+/// Single-pass walk over an expression subtree that collects references,
+/// functions, options, attributes, and literals at the same time. Replaces
+/// the previous `walk_for_references` + `walk_for_expressions` pair, which
+/// traversed the same subtree twice.
+fn walk_expression_subtree(node: &CstNodeView<'_>, model: &mut SemanticModel) {
     for child in node.children() {
         let CstChild::Node(n) = child else { continue };
         match n.kind() {
+            SyntaxKind::Variable => {
+                let semantic_ref = semantic_ref_of(n);
+                model.references.push(ReferenceRecord {
+                    semantic_ref,
+                    name_span: semantic_ref.span,
+                });
+                // Variables have no expression-bearing children, so no
+                // recursion is needed.
+            }
             SyntaxKind::Function => {
-                let identifier_span = find_first_node(&n, SyntaxKind::Identifier)
-                    .map(|id| id.span())
-                    .unwrap_or_default();
+                let identifier_span =
+                    first_direct_child_node_span(&n, SyntaxKind::Identifier);
                 model.functions.push(FunctionRecord {
                     semantic_ref: semantic_ref(&n),
                     identifier_span,
                 });
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::Option => {
-                let identifier_span = find_first_node(&n, SyntaxKind::Identifier)
-                    .map(|id| id.span())
-                    .unwrap_or_default();
+                let identifier_span =
+                    first_direct_child_node_span(&n, SyntaxKind::Identifier);
                 model.options.push(OptionRecord {
                     semantic_ref: semantic_ref(&n),
                     identifier_span,
                 });
-                walk_for_expressions(&n, model);
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::Attribute => {
-                let identifier_span = find_first_node(&n, SyntaxKind::Identifier)
-                    .map(|id| id.span())
-                    .unwrap_or_default();
+                let identifier_span =
+                    first_direct_child_node_span(&n, SyntaxKind::Identifier);
                 model.attributes.push(AttributeRecord {
                     semantic_ref: semantic_ref(&n),
                     identifier_span,
                 });
+                walk_expression_subtree(&n, model);
             }
             SyntaxKind::QuotedLiteral | SyntaxKind::UnquotedLiteral => {
                 model.literals.push(LiteralRecord {
                     semantic_ref: semantic_ref(&n),
                     is_quoted: n.kind() == SyntaxKind::QuotedLiteral,
                 });
-                walk_for_expressions(&n, model);
             }
-            _ => walk_for_expressions(&n, model),
+            _ => walk_expression_subtree(&n, model),
         }
     }
+}
+
+/// Lookup helper for the common case where the desired child is a *direct*
+/// child of the given node (e.g. `Function -> Identifier`). Avoids the
+/// O(subtree) recursion of [`find_first_node`] when the caller knows the
+/// structure is shallow.
+fn first_direct_child_node_span(
+    node: &CstNodeView<'_>,
+    kind: SyntaxKind,
+) -> Span {
+    for child in node.children() {
+        if let CstChild::Node(n) = child {
+            if n.kind() == kind {
+                return n.span();
+            }
+        }
+    }
+    Span::default()
 }
 
 fn find_first_node<'a>(node: &CstNodeView<'a>, kind: SyntaxKind) -> Option<CstNodeView<'a>> {

@@ -23,48 +23,29 @@
 use crate::api::ParseOptions;
 use crate::diagnostic::{DiagnosticCode, DiagnosticLabelRecord, DiagnosticSink};
 use crate::scanner::{
-    detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, scan_name, scan_quoted_text_run,
-    scan_text_run, scan_unquoted_literal, ScannerState, TriviaMode,
+    detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, peek_trivia, scan_name,
+    scan_quoted_text_run, scan_text_run, scan_unquoted_literal, TriviaMode,
 };
 use crate::scanner::Cursor;
 use crate::semantic::MessageMode;
 use crate::source::SourceStore;
 use crate::span::{NodeId, SourceId, Span, TokenId};
 use crate::syntax_kind::SyntaxKind;
-use crate::tables::{BuilderLengths, CstBuilder};
+use crate::tables::CstBuilder;
 use crate::workspace::ParseWorkspace;
 
-/// Speculative parser state used by recovery points.
-///
-/// A checkpoint captures four things atomically: the scanner offset, the
-/// builder lengths (so any nodes / edges / tokens / trivia pushed during a
-/// failed attempt can be truncated), the diagnostic length (so cascades
-/// from a discarded branch do not surface to the caller), and the
-/// `pending_trivia_start` (so the next token's leading-trivia anchor is
-/// restored to its pre-speculation value).
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Checkpoint {
-    pub builder: BuilderLengths,
-    pub diagnostic_len: u32,
-    pub scanner_state: ScannerState,
-    pub pending_trivia_start: u32,
-}
-
 /// Result of [`Parser::eat_trivia`]: how many `ws` and `bidi` runs were
-/// consumed. Lets callers enforce `s = *bidi ws o` by checking `ws_runs >= 1`
-/// without re-scanning the source.
+/// consumed. Returned for parity with [`crate::scanner::PeekTrivia`] —
+/// hot-path speculative branches now peek instead of consuming, but the
+/// real commit still exposes the counts for any future caller that needs
+/// them (e.g. lint passes over committed trivia).
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct TriviaConsumed {
     pub ws_runs: u32,
+    #[allow(dead_code)] // mirrored from PeekTrivia; reserved for future
+                       // span-aware `s` validation that distinguishes bidi-
+                       // only runs from bidi+ws sequences.
     pub bidi_runs: u32,
-}
-
-impl TriviaConsumed {
-    /// True if at least one `ws` was seen, satisfying the `s` requirement.
-    #[inline]
-    pub fn satisfies_required_s(self) -> bool {
-        self.ws_runs > 0
-    }
 }
 
 /// Parser entry point invoked by every owned and borrowed-session API.
@@ -121,33 +102,6 @@ struct Parser<'src, 'ws> {
     /// Index into the trivia table where the next token's leading trivia
     /// begins. Updated each time we scan a `ws` / `bidi` run.
     pending_trivia_start: u32,
-}
-
-impl Parser<'_, '_> {
-    /// Snapshot the cursor, builder lengths, diagnostic length, and the
-    /// pending-trivia anchor so a speculative parse can be rolled back
-    /// without leaking partial nodes, cascading diagnostics, or duplicated
-    /// trivia records.
-    pub(crate) fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
-            builder: self.builder.lengths(),
-            diagnostic_len: self.diagnostics.records.len() as u32,
-            scanner_state: self.cursor.state(),
-            pending_trivia_start: self.pending_trivia_start,
-        }
-    }
-
-    /// Restore state captured by [`Self::checkpoint`]. Truncates any trivia
-    /// committed during the speculative branch so the next attempt re-scans
-    /// from the same byte without duplicating records.
-    pub(crate) fn rollback(&mut self, cp: Checkpoint) {
-        self.cursor.restore(cp.scanner_state);
-        self.builder.rollback_to(cp.builder);
-        self.diagnostics
-            .records
-            .truncate(cp.diagnostic_len as usize);
-        self.pending_trivia_start = cp.pending_trivia_start;
-    }
 }
 
 impl Parser<'_, '_> {
@@ -497,33 +451,33 @@ impl Parser<'_, '_> {
 
         // *(s option) — each option requires `s` before it.
         loop {
-            let cp = self.checkpoint();
-            let consumed = self.eat_trivia(TriviaMode::Required);
-            if self.peek_option_start() {
-                if !consumed.satisfies_required_s() {
-                    let at = self.cursor.offset();
-                    self.diagnostics.push(
-                        self.source,
-                        Span::new(at, at),
-                        DiagnosticCode::MissingRequiredWhitespace,
-                    );
-                }
-                let opt = self.parse_option();
-                self.builder.push_node_edge(opt);
-            } else {
-                self.rollback(cp);
+            let peek = peek_trivia(&self.cursor);
+            if !Self::is_option_start_byte(peek.next_byte) {
                 break;
             }
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
+                self.diagnostics.push(
+                    self.source,
+                    Span::new(at, at),
+                    DiagnosticCode::MissingRequiredWhitespace,
+                );
+            }
+            self.eat_trivia(TriviaMode::Required);
+            let opt = self.parse_option();
+            self.builder.push_node_edge(opt);
         }
 
         // *(s attribute)
         self.parse_attributes_zero_or_more();
 
         // [o "/"] — only valid on the open form (turns it into standalone).
+        // Lookahead past optional `o` so the negative path (no slash) costs
+        // nothing beyond a cursor copy.
         if is_open {
-            let cp = self.checkpoint();
-            self.eat_trivia(TriviaMode::Optional);
-            if self.cursor.peek_byte() == Some(b'/') {
+            let peek = peek_trivia(&self.cursor);
+            if peek.next_byte == Some(b'/') {
+                self.eat_trivia(TriviaMode::Optional);
                 let slash_start = self.cursor.offset();
                 let _ = self.cursor.bump_byte();
                 let tok = self.commit_token(
@@ -531,8 +485,6 @@ impl Parser<'_, '_> {
                     Span::new(slash_start, self.cursor.offset()),
                 );
                 self.builder.push_token_edge(tok);
-            } else {
-                self.rollback(cp);
             }
         }
     }
@@ -560,25 +512,24 @@ impl Parser<'_, '_> {
     }
 
     fn maybe_parse_function(&mut self) {
-        // `[s function]` — the leading `s` requires at least one `ws`. When a
-        // `:` follows without it (e.g. `{$x:number}`), emit a diagnostic but
-        // still parse the function to keep recovery progressing.
-        let cp = self.checkpoint();
-        let consumed = self.eat_trivia(TriviaMode::Required);
-        if self.cursor.peek_byte() == Some(b':') {
-            if !consumed.satisfies_required_s() {
-                let at = self.cursor.offset();
-                self.diagnostics.push(
-                    self.source,
-                    Span::new(at, at),
-                    DiagnosticCode::MissingRequiredWhitespace,
-                );
-            }
-            let func = self.parse_function();
-            self.builder.push_node_edge(func);
-        } else {
-            self.rollback(cp);
+        // `[s function]` — the leading `s` requires at least one `ws`.
+        // Lookahead non-destructively so the common "no function follows"
+        // path costs no checkpoint/rollback and no trivia commit.
+        let peek = peek_trivia(&self.cursor);
+        if peek.next_byte != Some(b':') {
+            return;
         }
+        if !peek.satisfies_required_s() {
+            let at = peek.end_offset;
+            self.diagnostics.push(
+                self.source,
+                Span::new(at, at),
+                DiagnosticCode::MissingRequiredWhitespace,
+            );
+        }
+        self.eat_trivia(TriviaMode::Required);
+        let func = self.parse_function();
+        self.builder.push_node_edge(func);
     }
 
     fn parse_function(&mut self) -> NodeId {
@@ -595,43 +546,37 @@ impl Parser<'_, '_> {
         }
         let ident = self.parse_identifier();
         self.builder.push_node_edge(ident);
-        // *(s option) — each option requires `s` before it.
+        // *(s option) — each option requires `s` before it. Non-destructive
+        // lookahead drops the "no more options" branch off the hot path.
         loop {
-            let cp = self.checkpoint();
-            let consumed = self.eat_trivia(TriviaMode::Required);
-            if self.peek_option_start() {
-                if !consumed.satisfies_required_s() {
-                    let at = self.cursor.offset();
-                    self.diagnostics.push(
-                        self.source,
-                        Span::new(at, at),
-                        DiagnosticCode::MissingRequiredWhitespace,
-                    );
-                }
-                let opt = self.parse_option();
-                self.builder.push_node_edge(opt);
-            } else {
-                self.rollback(cp);
+            let peek = peek_trivia(&self.cursor);
+            if !Self::is_option_start_byte(peek.next_byte) {
                 break;
             }
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
+                self.diagnostics.push(
+                    self.source,
+                    Span::new(at, at),
+                    DiagnosticCode::MissingRequiredWhitespace,
+                );
+            }
+            self.eat_trivia(TriviaMode::Required);
+            let opt = self.parse_option();
+            self.builder.push_node_edge(opt);
         }
         let end = self.cursor.offset();
         self.builder.finish_node(pending, end)
     }
 
-    fn peek_option_start(&self) -> bool {
+    #[inline]
+    fn is_option_start_byte(b: Option<u8>) -> bool {
         // option starts with `identifier`, which starts with name-start
-        // (or namespace name-start). The ASCII fast path covers A-Z, a-z,
-        // +, _, plus optional bidi.
-        let Some(b) = self.cursor.peek_byte() else {
-            return false;
-        };
-        if b < 0x80 {
-            matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'_')
-        } else {
-            // Could be a bidi mark introducing the identifier — accept and
-            // let the scanner decide.
-            true
+        // (ASCII fast path) or any non-ASCII byte (deferred to scanner).
+        match b {
+            Some(b) if b < 0x80 => matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'_'),
+            Some(_) => true,
+            None => false,
         }
     }
 
@@ -670,24 +615,24 @@ impl Parser<'_, '_> {
 
     fn parse_attributes_zero_or_more(&mut self) {
         // `*(s attribute)` — each attribute requires `s` before it.
+        // Non-destructive lookahead avoids paying checkpoint/rollback when
+        // there is no attribute (the common case).
         loop {
-            let cp = self.checkpoint();
-            let consumed = self.eat_trivia(TriviaMode::Required);
-            if self.cursor.peek_byte() == Some(b'@') {
-                if !consumed.satisfies_required_s() {
-                    let at = self.cursor.offset();
-                    self.diagnostics.push(
-                        self.source,
-                        Span::new(at, at),
-                        DiagnosticCode::MissingRequiredWhitespace,
-                    );
-                }
-                let attr = self.parse_attribute();
-                self.builder.push_node_edge(attr);
-            } else {
-                self.rollback(cp);
+            let peek = peek_trivia(&self.cursor);
+            if peek.next_byte != Some(b'@') {
                 break;
             }
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
+                self.diagnostics.push(
+                    self.source,
+                    Span::new(at, at),
+                    DiagnosticCode::MissingRequiredWhitespace,
+                );
+            }
+            self.eat_trivia(TriviaMode::Required);
+            let attr = self.parse_attribute();
+            self.builder.push_node_edge(attr);
         }
     }
 
@@ -707,10 +652,11 @@ impl Parser<'_, '_> {
         let ident = self.parse_identifier();
         self.builder.push_node_edge(ident);
 
-        // Optional `[o "=" o literal]` — speculate to see if there's an `=`.
-        let cp = self.checkpoint();
-        self.eat_trivia(TriviaMode::Optional);
-        if self.cursor.peek_byte() == Some(b'=') {
+        // Optional `[o "=" o literal]` — peek past optional `o` to see if
+        // there's an `=`, no checkpoint/rollback needed.
+        let peek = peek_trivia(&self.cursor);
+        if peek.next_byte == Some(b'=') {
+            self.eat_trivia(TriviaMode::Optional);
             let eq_start = self.cursor.offset();
             let _ = self.cursor.bump_byte();
             let tok = self.commit_token(
@@ -721,8 +667,6 @@ impl Parser<'_, '_> {
             self.eat_trivia(TriviaMode::Optional);
             let lit = self.parse_literal();
             self.builder.push_node_edge(lit);
-        } else {
-            self.rollback(cp);
         }
 
         let end = self.cursor.offset();
@@ -945,16 +889,18 @@ impl Parser<'_, '_> {
                 }
             }
             KeywordHit::Local => {
-                // `.local s variable` — `s` is required.
-                let s_at = self.cursor.offset();
-                let consumed = self.eat_trivia(TriviaMode::Required);
-                if !consumed.satisfies_required_s() {
+                // `.local s variable` — `s` is required. Peek first so the
+                // diagnostic anchors precisely at the variable's `$`.
+                let peek = peek_trivia(&self.cursor);
+                if !peek.satisfies_required_s() {
+                    let at = peek.end_offset;
                     self.diagnostics.push(
                         self.source,
-                        Span::new(s_at, s_at),
+                        Span::new(at, at),
                         DiagnosticCode::MissingRequiredWhitespace,
                     );
                 }
+                self.eat_trivia(TriviaMode::Required);
                 let var = self.parse_variable();
                 self.builder.push_node_edge(var);
                 self.eat_trivia(TriviaMode::Optional);
@@ -996,93 +942,87 @@ impl Parser<'_, '_> {
         );
         self.builder.push_token_edge(tok);
 
-        // 1*(s selector) — each selector requires `s` before it.
+        // 1*(s selector) — each selector requires `s` before it. Lookahead
+        // first so the "no more selectors" exit is checkpoint-free.
         loop {
-            let cp = self.checkpoint();
-            let consumed = self.eat_trivia(TriviaMode::Required);
-            if self.cursor.peek_byte() == Some(b'$') {
-                if !consumed.satisfies_required_s() {
-                    let at = self.cursor.offset();
-                    self.diagnostics.push(
-                        self.source,
-                        Span::new(at, at),
-                        DiagnosticCode::MissingRequiredWhitespace,
-                    );
-                }
-                let sel_start = self.cursor.offset();
-                let sel_pending = self.builder.start_node(SyntaxKind::Selector, sel_start);
-                let var = self.parse_variable();
-                self.builder.push_node_edge(var);
-                let sel_end = self.cursor.offset();
-                let sel_id = self.builder.finish_node(sel_pending, sel_end);
-                self.builder.push_node_edge(sel_id);
-            } else {
-                self.rollback(cp);
+            let peek = peek_trivia(&self.cursor);
+            if peek.next_byte != Some(b'$') {
                 break;
             }
-        }
-
-        // variant *(o variant) — `o` between variants is optional.
-        loop {
-            let cp = self.checkpoint();
-            self.eat_trivia(TriviaMode::Optional);
-            if self.peek_variant_start() {
-                let variant = self.parse_variant();
-                self.builder.push_node_edge(variant);
-            } else {
-                self.rollback(cp);
-                break;
-            }
-        }
-
-        let end = self.cursor.offset();
-        self.builder.finish_node(pending, end)
-    }
-
-    fn peek_variant_start(&self) -> bool {
-        // variant-key = `*` (catch-all) | quoted-literal (`|...|`) |
-        // unquoted-literal (`1*name-char`). `name-char` includes DIGIT,
-        // `-`, and `.`, so the lookahead must accept those too — otherwise
-        // exact numeric keys like `1 {{one}}` would be rejected.
-        let Some(b) = self.cursor.peek_byte() else {
-            return false;
-        };
-        if matches!(b, b'*' | b'|') {
-            return true;
-        }
-        if b < 0x80 {
-            // ASCII name-char = ALPHA / DIGIT / `+` / `_` / `-` / `.`.
-            return matches!(
-                b,
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
-            );
-        }
-        true
-    }
-
-    fn parse_variant(&mut self) -> NodeId {
-        let start = self.cursor.offset();
-        let pending = self.builder.start_node(SyntaxKind::Variant, start);
-
-        // key *(s key) — adjacent keys require `s`.
-        loop {
-            let key = self.parse_variant_key();
-            self.builder.push_node_edge(key);
-
-            let cp = self.checkpoint();
-            let consumed = self.eat_trivia(TriviaMode::Required);
-            if !self.peek_variant_key_start() {
-                self.rollback(cp);
-                break;
-            }
-            if !consumed.satisfies_required_s() {
-                let at = self.cursor.offset();
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
                 self.diagnostics.push(
                     self.source,
                     Span::new(at, at),
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
+            self.eat_trivia(TriviaMode::Required);
+            let sel_start = self.cursor.offset();
+            let sel_pending = self.builder.start_node(SyntaxKind::Selector, sel_start);
+            let var = self.parse_variable();
+            self.builder.push_node_edge(var);
+            let sel_end = self.cursor.offset();
+            let sel_id = self.builder.finish_node(sel_pending, sel_end);
+            self.builder.push_node_edge(sel_id);
+        }
+
+        // variant *(o variant) — `o` between variants is optional.
+        loop {
+            let peek = peek_trivia(&self.cursor);
+            if !Self::is_variant_start_byte(peek.next_byte) {
+                break;
+            }
+            self.eat_trivia(TriviaMode::Optional);
+            let variant = self.parse_variant();
+            self.builder.push_node_edge(variant);
+        }
+
+        let end = self.cursor.offset();
+        self.builder.finish_node(pending, end)
+    }
+
+    #[inline]
+    fn is_variant_start_byte(b: Option<u8>) -> bool {
+        // variant-key = `*` (catch-all) | quoted-literal (`|...|`) |
+        // unquoted-literal (`1*name-char`). `name-char` includes DIGIT,
+        // `-`, and `.`, so the lookahead must accept those too — otherwise
+        // exact numeric keys like `1 {{one}}` would be rejected.
+        match b {
+            Some(b'*' | b'|') => true,
+            Some(b) if b < 0x80 => matches!(
+                b,
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
+            ),
+            Some(_) => true,
+            None => false,
+        }
+    }
+
+    fn parse_variant(&mut self) -> NodeId {
+        let start = self.cursor.offset();
+        let pending = self.builder.start_node(SyntaxKind::Variant, start);
+
+        // key *(s key) — adjacent keys require `s`. Lookahead so the loop
+        // exits without paying checkpoint/rollback when the next token is
+        // the quoted-pattern boundary `{{`.
+        loop {
+            let key = self.parse_variant_key();
+            self.builder.push_node_edge(key);
+
+            let peek = peek_trivia(&self.cursor);
+            if !Self::is_variant_key_start_byte(peek.next_byte) {
+                break;
+            }
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
+                self.diagnostics.push(
+                    self.source,
+                    Span::new(at, at),
+                    DiagnosticCode::MissingRequiredWhitespace,
+                );
+            }
+            self.eat_trivia(TriviaMode::Required);
         }
 
         // o quoted-pattern
@@ -1102,17 +1042,18 @@ impl Parser<'_, '_> {
         self.builder.finish_node(pending, end)
     }
 
-    fn peek_variant_key_start(&self) -> bool {
-        // Same coverage as `peek_variant_start` — adjacent variant keys may
-        // begin with any `name-char`, not just `name-start`.
-        let Some(b) = self.cursor.peek_byte() else {
-            return false;
-        };
-        matches!(
-            b,
-            b'*' | b'|'
-                | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
-        ) || b >= 0x80
+    #[inline]
+    fn is_variant_key_start_byte(b: Option<u8>) -> bool {
+        // Same coverage as `is_variant_start_byte` — adjacent variant keys
+        // may begin with any `name-char`, not just `name-start`.
+        match b {
+            Some(b) => matches!(
+                b,
+                b'*' | b'|'
+                    | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
+            ) || b >= 0x80,
+            None => false,
+        }
     }
 
     fn parse_variant_key(&mut self) -> NodeId {
@@ -1197,87 +1138,128 @@ impl Parser<'_, '_> {
     // ───────────────────────── trivia helpers ──────────────────────────
 
     /// Scan a run of `ws` / `bidi` characters. When `collect_trivia` is on,
-    /// each one is committed as a trivia record and the accumulated leading-
-    /// trivia range is attached to whichever token is committed next.
+    /// each contiguous same-kind run is committed as a *single* trivia
+    /// record (NOT one per character) so the trivia table stays small even
+    /// on whitespace-heavy inputs. The accumulated leading-trivia range is
+    /// attached to whichever token is committed next.
     ///
-    /// Returns counts of `ws` and `bidi` consumed so callers can enforce the
-    /// `s = *bidi ws o` requirement without re-scanning the source.
+    /// Returns counts of `ws` and `bidi` runs consumed so callers can enforce
+    /// the `s = *bidi ws o` requirement (`ws_runs > 0`) without re-scanning
+    /// the source.
     fn eat_trivia(&mut self, mode: TriviaMode) -> TriviaConsumed {
         let _ = mode; // mode currently informational; classifier matches both
         let mut stats = TriviaConsumed::default();
         if !self.options.collect_trivia {
-            loop {
-                match self.cursor.peek_byte() {
-                    None => break,
-                    Some(b) if b < 0x80 => {
-                        if !is_ws_byte(b) {
-                            break;
-                        }
-                        let _ = self.cursor.bump_byte();
-                        stats.ws_runs += 1;
-                    }
-                    Some(_) => {
-                        let Some((c, len)) = self.cursor.peek_char() else { break };
-                        if is_ws_char(c) {
-                            self.cursor.set_offset(self.cursor.offset() + len);
-                            stats.ws_runs += 1;
-                        } else if is_bidi_char(c) {
-                            self.cursor.set_offset(self.cursor.offset() + len);
-                            stats.bidi_runs += 1;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
+            self.consume_trivia_skipping(&mut stats);
             return stats;
         }
 
         let trivia_start = self.builder.lengths().trivia;
+        // Active run state: kind being collected and the byte offset where
+        // the current run started. `None` means we haven't started a run.
+        let mut run_kind: Option<SyntaxKind> = None;
+        let mut run_start: u32 = self.cursor.offset();
         loop {
-            let span_start = self.cursor.offset();
-            match self.cursor.peek_byte() {
-                None => break,
-                Some(b) if b < 0x80 => {
-                    if !is_ws_byte(b) {
-                        break;
-                    }
-                    let _ = self.cursor.bump_byte();
+            let Some(b) = self.cursor.peek_byte() else { break };
+            // Classify the next codepoint into the run kind it belongs to.
+            let (kind, advance) = if b < 0x80 {
+                if is_ws_byte(b) {
+                    (SyntaxKind::WhitespaceTrivia, 1u32)
+                } else {
+                    break;
+                }
+            } else {
+                let Some((c, len)) = self.cursor.peek_char() else { break };
+                if is_ws_char(c) {
+                    (SyntaxKind::WhitespaceTrivia, len)
+                } else if is_bidi_char(c) {
+                    (SyntaxKind::BidiTrivia, len)
+                } else {
+                    break;
+                }
+            };
+            // Switch runs when the kind changes: flush the current run
+            // record, then start a new one at the byte we are about to
+            // consume.
+            match run_kind {
+                Some(cur) if cur != kind => {
+                    let here = self.cursor.offset();
                     let _ = self.builder.push_trivia(
-                        SyntaxKind::WhitespaceTrivia,
+                        cur,
                         self.source,
-                        Span::new(span_start, self.cursor.offset()),
+                        Span::new(run_start, here),
                     );
-                    stats.ws_runs += 1;
+                    Self::bump_run_count(&mut stats, cur);
+                    run_start = here;
                 }
-                Some(_) => {
-                    let Some((c, len)) = self.cursor.peek_char() else { break };
-                    if is_ws_char(c) {
-                        self.cursor.set_offset(self.cursor.offset() + len);
-                        let _ = self.builder.push_trivia(
-                            SyntaxKind::WhitespaceTrivia,
-                            self.source,
-                            Span::new(span_start, self.cursor.offset()),
-                        );
-                        stats.ws_runs += 1;
-                    } else if is_bidi_char(c) {
-                        self.cursor.set_offset(self.cursor.offset() + len);
-                        let _ = self.builder.push_trivia(
-                            SyntaxKind::BidiTrivia,
-                            self.source,
-                            Span::new(span_start, self.cursor.offset()),
-                        );
-                        stats.bidi_runs += 1;
-                    } else {
-                        break;
-                    }
+                Some(_) => {}
+                None => {
+                    run_start = self.cursor.offset();
                 }
+            }
+            run_kind = Some(kind);
+            self.cursor.set_offset(self.cursor.offset() + advance);
+        }
+        if let Some(cur) = run_kind {
+            let here = self.cursor.offset();
+            if here > run_start {
+                let _ = self.builder.push_trivia(
+                    cur,
+                    self.source,
+                    Span::new(run_start, here),
+                );
+                Self::bump_run_count(&mut stats, cur);
             }
         }
         if stats.ws_runs + stats.bidi_runs > 0 {
             self.pending_trivia_start = trivia_start;
         }
         stats
+    }
+
+    /// Skip-only trivia consumption (used when `collect_trivia = false`).
+    /// Counts runs in the same way the collecting path does so callers can
+    /// still enforce `s = *bidi ws o`.
+    fn consume_trivia_skipping(&mut self, stats: &mut TriviaConsumed) {
+        let mut current: Option<SyntaxKind> = None;
+        loop {
+            let Some(b) = self.cursor.peek_byte() else { break };
+            let (kind, advance) = if b < 0x80 {
+                if is_ws_byte(b) {
+                    (SyntaxKind::WhitespaceTrivia, 1u32)
+                } else {
+                    break;
+                }
+            } else {
+                let Some((c, len)) = self.cursor.peek_char() else { break };
+                if is_ws_char(c) {
+                    (SyntaxKind::WhitespaceTrivia, len)
+                } else if is_bidi_char(c) {
+                    (SyntaxKind::BidiTrivia, len)
+                } else {
+                    break;
+                }
+            };
+            if current != Some(kind) {
+                if let Some(prev) = current {
+                    Self::bump_run_count(stats, prev);
+                }
+                current = Some(kind);
+            }
+            self.cursor.set_offset(self.cursor.offset() + advance);
+        }
+        if let Some(prev) = current {
+            Self::bump_run_count(stats, prev);
+        }
+    }
+
+    #[inline]
+    fn bump_run_count(stats: &mut TriviaConsumed, kind: SyntaxKind) {
+        if matches!(kind, SyntaxKind::WhitespaceTrivia) {
+            stats.ws_runs += 1;
+        } else {
+            stats.bidi_runs += 1;
+        }
     }
 
     /// Commit a token whose `first_trivia` / `leading_trivia_count` are

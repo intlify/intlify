@@ -167,7 +167,11 @@ pub(crate) fn is_bidi_char(c: char) -> bool {
 }
 
 /// `text-char = %x01-5B / %x5D-7A / %x7C / %x7E-10FFFF` — excludes NULL,
-/// `\` (0x5C), `{` (0x7B), `}` (0x7D).
+/// `\` (0x5C), `{` (0x7B), `}` (0x7D). The scanner's text-run path uses
+/// `memchr` over those four single-byte delimiters instead of calling this
+/// per-codepoint; the predicate stays for spec-conformance tests and any
+/// future per-codepoint validators.
+#[allow(dead_code)]
 #[inline]
 pub(crate) fn is_text_char(c: char) -> bool {
     let cp = c as u32;
@@ -175,6 +179,9 @@ pub(crate) fn is_text_char(c: char) -> bool {
 }
 
 /// `quoted-char = %x01-5B / %x5D-7B / %x7D-10FFFF` — excludes NULL, `\`, `|`.
+/// Same role as [`is_text_char`]: the hot path uses `memchr`; this predicate
+/// stays for the spec test and future per-codepoint validators.
+#[allow(dead_code)]
 #[inline]
 pub(crate) fn is_quoted_char(c: char) -> bool {
     let cp = c as u32;
@@ -333,48 +340,108 @@ pub enum TriviaMode {
     Required,
 }
 
-/// Scan a `text-char` / `escaped-char` run inside a `pattern`. Stops at the
-/// next `{`, `}`, `\`, or NULL — those are handled by the parser.
-pub(crate) fn scan_text_run(cursor: &mut Cursor<'_>) -> Span {
-    let start = cursor.offset();
+/// Non-destructive lookahead past `o` / `s` trivia.
+///
+/// The parser's speculative branches (e.g. `[s function]`, `*(s option)`)
+/// need to know two things before committing trivia to the workspace: how
+/// much whitespace would be consumed, and what the next significant byte is.
+/// Walking the cursor on a *copy* lets the parser decide whether to skip
+/// the construct entirely (no trivia commit, no rollback) or commit and
+/// proceed. The classifier is identical to [`super::Parser::eat_trivia`]
+/// minus the trivia record push side-effect.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct PeekTrivia {
+    /// Byte offset of the first non-trivia byte (== `cursor.offset()` if no
+    /// trivia is present).
+    pub end_offset: u32,
+    /// Number of contiguous-`ws` runs encountered.
+    pub ws_runs: u32,
+    /// Number of contiguous-`bidi` runs encountered.
+    #[allow(dead_code)] // reserved for span-aware `s` validation that needs
+                       // to distinguish bidi-only runs from bidi+ws.
+    pub bidi_runs: u32,
+    /// First significant byte after the trivia, or `None` at EOF.
+    pub next_byte: Option<u8>,
+}
+
+impl PeekTrivia {
+    /// True when at least one `ws` was seen, satisfying the `s` requirement.
+    #[inline]
+    pub fn satisfies_required_s(self) -> bool {
+        self.ws_runs > 0
+    }
+}
+
+/// Walk past trivia on a *copy* of `cursor` without mutating the parser's
+/// own cursor or committing any trivia records. The caller decides whether
+/// to commit by re-running [`super::Parser::eat_trivia`] for real, or to
+/// abandon the speculation entirely.
+pub(crate) fn peek_trivia(cursor: &Cursor<'_>) -> PeekTrivia {
+    let mut probe = *cursor;
+    let mut ws_runs = 0u32;
+    let mut bidi_runs = 0u32;
     loop {
-        let Some(b) = cursor.peek_byte() else { break };
+        let Some(b) = probe.peek_byte() else {
+            break;
+        };
         if b < 0x80 {
-            // ASCII fast path: cannot be `{`, `}`, `\`, or NULL.
-            if b == 0x00 || b == b'\\' || b == b'{' || b == b'}' {
-                break;
+            if is_ws_byte(b) {
+                probe.set_offset(probe.offset() + 1);
+                ws_runs += 1;
+                continue;
             }
-            cursor.offset += 1;
+            break;
+        }
+        let Some((c, len)) = probe.peek_char() else {
+            break;
+        };
+        if is_ws_char(c) {
+            probe.set_offset(probe.offset() + len);
+            ws_runs += 1;
+        } else if is_bidi_char(c) {
+            probe.set_offset(probe.offset() + len);
+            bidi_runs += 1;
         } else {
-            let Some((c, len)) = cursor.peek_char() else { break };
-            if !is_text_char(c) {
-                break;
-            }
-            cursor.offset += len;
+            break;
         }
     }
+    PeekTrivia {
+        end_offset: probe.offset(),
+        ws_runs,
+        bidi_runs,
+        next_byte: probe.peek_byte(),
+    }
+}
+
+/// Scan a `text-char` / `escaped-char` run inside a `pattern`. Stops at the
+/// next `{`, `}`, `\`, or NULL.
+///
+/// The MF2 ABNF defines `text-char = %x01-5B / %x5D-7A / %x7C / %x7E-10FFFF`,
+/// so the only stopping codepoints are `\` (0x5C), `{` (0x7B), `}` (0x7D),
+/// and NUL (0x00) — all single-byte ASCII. UTF-8 continuation bytes are
+/// always ≥ 0x80, so they cannot masquerade as a delimiter. That lets us
+/// jump straight to the next delimiter with `memchr` instead of decoding
+/// each codepoint individually.
+pub(crate) fn scan_text_run(cursor: &mut Cursor<'_>) -> Span {
+    let start = cursor.offset();
+    let haystack = &cursor.bytes[start as usize..];
+    let stop_delim = memchr::memchr3(b'\\', b'{', b'}', haystack).unwrap_or(haystack.len());
+    let stop_null = memchr::memchr(0x00, &haystack[..stop_delim]).unwrap_or(stop_delim);
+    cursor.offset = start + stop_null as u32;
     cursor.span_from(start)
 }
 
 /// Scan a `quoted-char` / `escaped-char` run inside `|...|`. Stops at the
 /// next `|`, `\`, or NULL.
+///
+/// Same byte-search trick as [`scan_text_run`]: `quoted-char` excludes only
+/// `\` (0x5C), `|` (0x7C), and NUL — all single-byte ASCII.
 pub(crate) fn scan_quoted_text_run(cursor: &mut Cursor<'_>) -> Span {
     let start = cursor.offset();
-    loop {
-        let Some(b) = cursor.peek_byte() else { break };
-        if b < 0x80 {
-            if b == 0x00 || b == b'\\' || b == b'|' {
-                break;
-            }
-            cursor.offset += 1;
-        } else {
-            let Some((c, len)) = cursor.peek_char() else { break };
-            if !is_quoted_char(c) {
-                break;
-            }
-            cursor.offset += len;
-        }
-    }
+    let haystack = &cursor.bytes[start as usize..];
+    let stop_delim = memchr::memchr2(b'\\', b'|', haystack).unwrap_or(haystack.len());
+    let stop_null = memchr::memchr(0x00, &haystack[..stop_delim]).unwrap_or(stop_delim);
+    cursor.offset = start + stop_null as u32;
     cursor.span_from(start)
 }
 
@@ -386,18 +453,32 @@ pub(crate) fn scan_name(cursor: &mut Cursor<'_>) -> Option<Span> {
     // Optional leading bidi marks.
     skip_bidi(cursor);
 
-    // name-start
-    let saved = cursor.checkpoint();
-    let Some((c, len)) = cursor.peek_char() else {
+    // name-start — ASCII fast path: the most common name-start byte (ALPHA,
+    // `+`, `_`) is single-byte, so check that first and skip the manual
+    // UTF-8 decode unless the byte is in the supplementary range.
+    let Some(b0) = cursor.peek_byte() else {
         cursor.restore(ScannerState::new(start));
         return None;
     };
-    if !is_name_start(c) {
-        cursor.restore(saved);
-        cursor.set_offset(start);
-        return None;
+    if b0 < 0x80 {
+        if !matches!(b0, b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'_') {
+            cursor.restore(ScannerState::new(start));
+            return None;
+        }
+        cursor.offset += 1;
+    } else {
+        let saved = cursor.checkpoint();
+        let Some((c, len)) = cursor.peek_char() else {
+            cursor.restore(ScannerState::new(start));
+            return None;
+        };
+        if !is_name_start(c) {
+            cursor.restore(saved);
+            cursor.set_offset(start);
+            return None;
+        }
+        cursor.offset += len;
     }
-    cursor.offset += len;
 
     // *name-char
     loop {
@@ -462,6 +543,13 @@ pub(crate) fn scan_unquoted_literal(cursor: &mut Cursor<'_>) -> Option<Span> {
 
 fn skip_bidi(cursor: &mut Cursor<'_>) {
     loop {
+        // All `bidi` codepoints live in the non-ASCII Unicode range
+        // (0x061C, 0x200E, 0x200F, 0x2066-0x2069) — so an ASCII byte at
+        // the cursor immediately disqualifies the slow UTF-8 decode below.
+        let Some(b) = cursor.peek_byte() else { break };
+        if b < 0x80 {
+            break;
+        }
         let Some((c, len)) = cursor.peek_char() else { break };
         if !is_bidi_char(c) {
             break;

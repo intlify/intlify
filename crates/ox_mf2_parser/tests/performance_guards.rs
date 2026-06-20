@@ -94,7 +94,29 @@ fn workspace_reuse_does_not_regrow_capacity() {
     assert_eq!(workspace.frame_starts_capacity(), frame_cap_after_warmup);
 }
 
-// ── 4. CstView traversal completeness ────────────────────────────────────
+// ── 4. trivia runs collapse contiguous same-kind characters ─────────────
+
+#[test]
+fn trivia_runs_collapse_contiguous_whitespace() {
+    // Three spaces between `.local` and `$x` used to produce three
+    // WhitespaceTrivia records (one per byte). After P3 each contiguous
+    // same-kind run becomes a single record — three spaces ⇒ one record.
+    // Source fidelity is preserved because each record's span still
+    // covers the whole run.
+    let result = parse_message(".local   $x = {$y}\n{{Hi}}");
+    // Whitespace runs that the parser commits as trivia (each becomes
+    // exactly one record):
+    //   ".local" ␣␣␣ "$x" ␣ "=" ␣ "{$y}" \n "{{Hi}}"
+    //          ^^^      ^      ^         ^^
+    assert_eq!(
+        result.cst.trivia_count(),
+        4,
+        "expected one trivia record per ws run, got {}",
+        result.cst.trivia_count(),
+    );
+}
+
+// ── 5. CstView traversal completeness ───────────────────────────────────
 
 #[test]
 fn cst_view_traversal_visits_every_node_and_token() {

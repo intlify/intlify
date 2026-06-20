@@ -199,7 +199,15 @@ pub(crate) struct CstBuilder {
     pub(crate) frame_starts: Vec<u32>,
 }
 
+/// Snapshot of all builder lengths at a single moment. Originally used by
+/// the parser's speculative checkpoint/rollback path; P2 replaced those
+/// sites with non-destructive trivia lookahead, so the parser only reads
+/// `trivia` from this struct today. The other fields stay so that
+/// `rollback_to` remains a single-shot operation if a future recovery path
+/// needs it, and so the struct's stable shape can outlive the current
+/// caller mix.
 #[derive(Debug, Default, Clone, Copy)]
+#[allow(dead_code)] // see above — fields read only by `rollback_to`.
 pub(crate) struct BuilderLengths {
     pub nodes: u32,
     pub edges: u32,
@@ -228,6 +236,10 @@ impl CstBuilder {
     /// Truncate every table back to the captured lengths. Drops any frame
     /// starts above the captured depth and trims the shared edge stack so
     /// speculative children pushed inside the rolled-back branch disappear.
+    /// Currently exercised only by the table-level unit test — the parser's
+    /// speculative branches were rewritten to use non-destructive lookahead
+    /// in P2. Kept for any future recovery path that needs full rollback.
+    #[allow(dead_code)]
     pub fn rollback_to(&mut self, lengths: BuilderLengths) {
         self.tables.nodes.truncate(lengths.nodes as usize);
         self.tables.edges.truncate(lengths.edges as usize);

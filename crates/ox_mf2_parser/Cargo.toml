@@ -17,6 +17,9 @@ default = []
 # rayon = ["dep:rayon"]
 
 [dependencies]
+# SIMD-accelerated byte search for the scanner's text/quoted-text fast paths.
+# Used to jump to the next delimiter without per-byte iteration.
+memchr = "2.7"
 
 [dev-dependencies]
 

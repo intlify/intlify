@@ -205,6 +205,9 @@ dependencies = [
 [[package]]
 name = "ox_mf2_parser"
 version = "0.0.0"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "proc-macro2"
