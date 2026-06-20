@@ -30,26 +30,38 @@ fi
 
 # Phases reported here mirror design/002 §"Benchmark Policy". Each
 # hyperfine command runs ONE phase so wall-clock numbers stay separated.
-hyperfine \
-  --warmup "${WARMUP}" \
-  --runs "${RUNS}" \
-  --command-name 'parse_message_owned' \
-  "${BIN} --phase parse_message_owned --iterations ${ITERATIONS} ${INPUT_FLAG[*]}"
+# Phases are grouped so cross-parser comparisons pick the right baseline.
 
+# Parser-core baselines — compare with other parsers.
 hyperfine \
   --warmup "${WARMUP}" \
   --runs "${RUNS}" \
-  --command-name 'parse_cst (workspace reuse)' \
-  "${BIN} --phase parse_cst --iterations ${ITERATIONS} --reuse-workspace --reserve ${INPUT_FLAG[*]}"
-
-hyperfine \
-  --warmup "${WARMUP}" \
-  --runs "${RUNS}" \
-  --command-name 'parse_cst_no_trivia' \
+  --command-name 'parser-core: parse_cst_no_trivia' \
   "${BIN} --phase parse_cst_no_trivia --iterations ${ITERATIONS} --reuse-workspace --reserve ${INPUT_FLAG[*]}"
 
 hyperfine \
   --warmup "${WARMUP}" \
   --runs "${RUNS}" \
-  --command-name 'lower_semantic' \
+  --command-name 'parser-core: parse_cst (with trivia)' \
+  "${BIN} --phase parse_cst --iterations ${ITERATIONS} --reuse-workspace --reserve ${INPUT_FLAG[*]}"
+
+# Optional / downstream cost — pair with one of the parser-core baselines.
+hyperfine \
+  --warmup "${WARMUP}" \
+  --runs "${RUNS}" \
+  --command-name 'downstream: lower_semantic' \
   "${BIN} --phase lower_semantic --iterations ${ITERATIONS} --reuse-workspace --reserve ${INPUT_FLAG[*]}"
+
+hyperfine \
+  --warmup "${WARMUP}" \
+  --runs "${RUNS}" \
+  --command-name 'downstream: owned_materialize (clone-only)' \
+  "${BIN} --phase owned_materialize --iterations ${ITERATIONS} --reuse-workspace --reserve ${INPUT_FLAG[*]}"
+
+# Convenience API — NOT a parser-core baseline (includes fresh sources +
+# workspace + line-index build + owned materialise on every iteration).
+hyperfine \
+  --warmup "${WARMUP}" \
+  --runs "${RUNS}" \
+  --command-name 'convenience: parse_message_owned' \
+  "${BIN} --phase parse_message_owned --iterations ${ITERATIONS} ${INPUT_FLAG[*]}"

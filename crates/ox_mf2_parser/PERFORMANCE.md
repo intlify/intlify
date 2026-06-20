@@ -34,6 +34,21 @@ Before merging anything that touches the parser hot path, the scanner, recovery,
 - [ ] `crates/ox_mf2_parser/benches/hyperfine.sh` runs cleanly. Numbers do not need to improve for every change — but a regression must be acknowledged in the PR description.
 - [ ] When publishing comparison numbers, include the seven facts from `benches/README.md` ("When publishing comparison numbers, always state…").
 
+### Phase categories — pick the right baseline before quoting numbers
+
+The `ox-mf2-bench` CLI groups phases by what they measure. Quoting a number from the wrong category leads to misleading cross-parser comparisons.
+
+- **Parser-core baselines** (compare with other parsers):
+  - `parse_cst_no_trivia` — workspace-reused, borrowed result, no trivia
+  - `parse_cst` — same, with trivia
+- **Optional / downstream cost** (always include alongside a baseline):
+  - `lower_semantic` — parser-core + `SemanticModel` lowering
+  - `owned_materialize` — only the `CstTables.clone()` + diagnostic materialise cost paid by `parse_source` / `parse_message` on top of the borrowed-session path
+- **Convenience APIs** (NOT parser-core, include extra setup work):
+  - `parse_message_owned` — fresh `SourceStore` + line-index + fresh `ParseWorkspace` + owned materialise per iteration
+
+When publishing numbers, name the phase explicitly (e.g. "ox-mf2 parse_cst_no_trivia") so readers know what is being timed.
+
 ## Snapshots
 
 - [ ] `cargo test -p ox_mf2_parser --test fixtures` is green. If you intentionally changed parser shape, regenerate with `UPDATE_SNAPSHOTS=1 cargo test -p ox_mf2_parser --test fixtures` and review every diff manually before committing — accidental reshapes are exactly what the snapshots are here to catch.

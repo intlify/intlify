@@ -2,20 +2,40 @@
 //!
 //! Designed for use with `hyperfine` and the `tools/mf-parser-bench`
 //! orchestrator. Each invocation does ONE thing so that benchmark numbers
-//! never mix unrelated phases:
+//! never mix unrelated phases. Phases are grouped by what they measure so
+//! external comparisons can pick the right baseline:
 //!
-//! - `--phase parse_message_owned` — convenience parse path that materialises
-//!   an owned `ParseResult`.
-//! - `--phase parse_cst` — `parse_source_session` with workspace reuse,
-//!   borrowed result, default `collect_trivia = true`.
-//! - `--phase parse_cst_no_trivia` — same but `collect_trivia = false`.
+//! Parser-core baselines (compare against other parsers):
+//!
+//! - `--phase parse_cst_no_trivia` — `parse_source_session` with workspace
+//!   reuse, borrowed result, `collect_trivia = false`. Closest to a pure
+//!   "tokenise + build CST" parser benchmark.
+//! - `--phase parse_cst` — same but `collect_trivia = true`. Adds the cost
+//!   of pushing trivia records to the workspace.
+//!
+//! Optional / downstream cost (always include alongside a baseline):
+//!
 //! - `--phase lower_semantic` — `parse_source_session` with
-//!   `parse_semantic = true`.
+//!   `parse_semantic = true`. Measures parser-core + `SemanticModel` lowering.
+//! - `--phase owned_materialize` — parses once with workspace reuse and
+//!   then measures only the per-iteration cost of cloning `CstTables` and
+//!   materialising diagnostics into an owned `ParseResult`.
+//!
+//! Convenience APIs (NOT parser-core baselines — they include source
+//! registration / line-index construction / owned materialisation):
+//!
+//! - `--phase parse_message_owned` — convenience `parse_message` call,
+//!   freshly allocating sources / workspace and materialising an owned
+//!   `ParseResult` every iteration.
+//!
+//! View / diagnostic / batch phases:
+//!
 //! - `--phase cst_view_traversal` — parse once, then iterate the full CST
 //!   `--iterations` times to isolate traversal cost.
-//! - `--phase diagnostics` — re-emits diagnostics through `DiagnosticView`.
-//! - `--phase source_mapping` — converts every diagnostic span to
-//!   line/column via `SourceStore`.
+//! - `--phase diagnostics` — parse once, then iterate `DiagnosticView`
+//!   N times (requires a malformed input).
+//! - `--phase source_mapping` — parse once, then resolve every diagnostic
+//!   span to line/column N times (requires a malformed input).
 //! - `--phase parse_batch_sequential` — runs `parse_batch` over a corpus.
 //!
 //! Switches that change parser semantics or measured cost:
@@ -54,6 +74,7 @@ enum Phase {
     ParseCst,
     ParseCstNoTrivia,
     LowerSemantic,
+    OwnedMaterialize,
     CstViewTraversal,
     Diagnostics,
     SourceMapping,
@@ -119,6 +140,7 @@ fn parse_phase(name: &str) -> Result<Phase, String> {
         "parse_cst" => Phase::ParseCst,
         "parse_cst_no_trivia" => Phase::ParseCstNoTrivia,
         "lower_semantic" => Phase::LowerSemantic,
+        "owned_materialize" => Phase::OwnedMaterialize,
         "cst_view_traversal" => Phase::CstViewTraversal,
         "diagnostics" => Phase::Diagnostics,
         "source_mapping" => Phase::SourceMapping,
@@ -132,11 +154,18 @@ fn print_help() {
     println!();
     println!("Usage: ox-mf2-bench --phase <PHASE> [options]");
     println!();
-    println!("Phases:");
-    println!("  parse_message_owned          parse_message → owned ParseResult");
-    println!("  parse_cst                    parse_source_session (workspace + borrowed view)");
-    println!("  parse_cst_no_trivia          parse_cst with --no-collect-trivia");
-    println!("  lower_semantic               parse_source_session with --parse-semantic");
+    println!("Phases (parser-core baselines — compare against other parsers):");
+    println!("  parse_cst_no_trivia          parser-core, borrowed result, trivia disabled");
+    println!("  parse_cst                    parser-core, borrowed result, trivia enabled");
+    println!();
+    println!("Phases (optional / downstream cost — include alongside a baseline):");
+    println!("  lower_semantic               parser-core + SemanticModel lowering");
+    println!("  owned_materialize            CstTables.clone + diagnostic materialise only");
+    println!();
+    println!("Phases (convenience APIs — NOT parser-core, include extra setup):");
+    println!("  parse_message_owned          parse_message → owned ParseResult (fresh sources/workspace)");
+    println!();
+    println!("Phases (view / diagnostic / batch):");
     println!("  cst_view_traversal           parse once, traverse CST N times");
     println!("  diagnostics                  parse once, iterate DiagnosticView N times");
     println!("  source_mapping               parse once, resolve every diagnostic span to line/col");
@@ -204,6 +233,7 @@ fn main() -> ExitCode {
         Phase::ParseCst => run_parse_cst(&args, true),
         Phase::ParseCstNoTrivia => run_parse_cst(&args, false),
         Phase::LowerSemantic => run_lower_semantic(&args),
+        Phase::OwnedMaterialize => run_owned_materialize(&args),
         Phase::CstViewTraversal => run_cst_view_traversal(&args),
         Phase::Diagnostics => run_diagnostics(&args),
         Phase::SourceMapping => run_source_mapping(&args),
@@ -307,6 +337,43 @@ fn run_lower_semantic(args: &Args) -> Result<PhaseSummary, String> {
         if let Some(s) = session.semantic {
             units += s.references().len() + s.expressions().len();
         }
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: units,
+    })
+}
+
+/// Measure only the cost of cloning `CstTables` and materialising
+/// diagnostics into an owned `ParseResult`, with the parse itself amortised
+/// outside the loop. Use this to separate "what does owning a parse cost"
+/// from parser-core throughput.
+fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
+    let input = read_input(args)?;
+    let iters = args.iterations.max(1);
+    let options = options_for(args, true, false);
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: &input,
+        ..Default::default()
+    });
+    let mut workspace = ParseWorkspace::new();
+    if args.reserve {
+        workspace.reserve_for_source_len(input.len());
+    }
+    let session = parse_source_session(&sources, id, &mut workspace, options);
+    // Clone what `parse_source` would materialise into an owned
+    // `ParseResult` once, outside the measured loop.
+    let baseline_cst = session.cst.tables().clone();
+    let baseline_diags: Vec<_> = session.diagnostics.iter().collect();
+    let mut units = 0usize;
+    // Per iteration: re-clone the tables and re-materialise the diagnostic
+    // list. This is the cost that the owned API pays on top of the
+    // borrowed-session path.
+    for _ in 0..iters {
+        let cst = baseline_cst.clone();
+        let diags = baseline_diags.clone();
+        units += cst.node_count() + diags.len();
     }
     Ok(PhaseSummary {
         iterations: iters,
