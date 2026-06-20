@@ -65,16 +65,18 @@ pub(crate) struct TriviaRecord {
     pub span_end: u32,
 }
 
-/// Builder-time staging slot for a pending node. The node record itself is
-/// not pushed into [`CstTables::nodes`] until the children have been
-/// resolved; this lets `first_child` and `child_count` be filled in linearly.
-#[allow(dead_code)] // wired through the parser in Milestones 6/7.
+/// Builder-time staging slot for a pending node. Each `start_node` pushes a
+/// new edge frame onto [`CstBuilder::frames`]; child edges are appended to
+/// that frame and only flushed into [`CstTables::edges`] when the matching
+/// `finish_node` runs. This keeps each node's `[first_child, first_child +
+/// child_count)` range pointing strictly at its direct children, even when
+/// nested children pushed their own edges first.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PendingNode {
     pub kind: SyntaxKind,
     pub flags: u16,
     pub span_start: u32,
-    pub edge_mark: u32,
+    pub frame_depth: u32,
 }
 
 /// Flat indexed CST tables — the Phase 1 parser's primary output.
@@ -131,6 +133,7 @@ impl CstTables {
         self.trivia.clear();
     }
 
+
     pub fn reserve(&mut self, capacity: &CstCapacity) {
         self.nodes.reserve(capacity.nodes);
         self.edges.reserve(capacity.edges);
@@ -176,23 +179,27 @@ pub struct CstCapacity {
 }
 
 /// Builder API used by the parser to commit nodes, edges, tokens, and trivia.
-/// Recovery checkpoints capture table lengths and roll back via [`Self::rollback_to`].
-#[allow(dead_code)] // wired through the parser in Milestones 6/7.
+///
+/// Each `start_node` pushes an edge frame; each `finish_node` pops it and
+/// flushes its accumulated edges into [`CstTables::edges`] in a contiguous
+/// run. Recovery checkpoints snapshot table lengths + frame depths and roll
+/// back via [`Self::rollback_to`].
 #[derive(Debug, Default)]
 pub(crate) struct CstBuilder {
     pub(crate) tables: CstTables,
+    pub(crate) frames: Vec<Vec<CstEdgeRecord>>,
 }
 
-#[allow(dead_code)] // wired through the parser in Milestones 6/7.
+#[allow(dead_code)] // consumed by the M7 recovery harness once checkpoints land.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct BuilderLengths {
     pub nodes: u32,
     pub edges: u32,
     pub tokens: u32,
     pub trivia: u32,
+    pub frame_depth: u32,
 }
 
-#[allow(dead_code)] // wired through the parser in Milestones 6/7.
 impl CstBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -204,32 +211,49 @@ impl CstBuilder {
             edges: self.tables.edges.len() as u32,
             tokens: self.tables.tokens.len() as u32,
             trivia: self.tables.trivia.len() as u32,
+            frame_depth: self.frames.len() as u32,
         }
     }
 
+    /// Truncate every table back to the captured lengths. Frames above the
+    /// captured depth are popped; the frame at the captured depth retains the
+    /// number of edges it had at checkpoint time (callers must therefore
+    /// `lengths()` *before* pushing speculative edges into the current frame).
+    #[allow(dead_code)] // consumed by the M7 recovery harness.
     pub fn rollback_to(&mut self, lengths: BuilderLengths) {
         self.tables.nodes.truncate(lengths.nodes as usize);
         self.tables.edges.truncate(lengths.edges as usize);
         self.tables.tokens.truncate(lengths.tokens as usize);
         self.tables.trivia.truncate(lengths.trivia as usize);
+        self.frames.truncate(lengths.frame_depth as usize);
     }
 
-    /// Begin a node. Returns a marker that captures the edge buffer mark; all
-    /// edges pushed before [`Self::finish_node`] become this node's children.
+    /// Begin a node. Pushes a fresh edge frame onto the stack; subsequent
+    /// `push_node_edge` / `push_token_edge` calls append to that frame.
     pub fn start_node(&mut self, kind: SyntaxKind, span_start: u32) -> PendingNode {
+        let depth = self.frames.len() as u32;
+        self.frames.push(Vec::new());
         PendingNode {
             kind,
             flags: 0,
             span_start,
-            edge_mark: self.tables.edges.len() as u32,
+            frame_depth: depth,
         }
     }
 
-    /// Finish a node previously started with [`Self::start_node`]. Returns
-    /// the new [`NodeId`].
+    /// Finish the most recently started node. Pops its edge frame, flushes
+    /// the edges contiguously into [`CstTables::edges`], and records the
+    /// `first_child` / `child_count` range on the node record.
     pub fn finish_node(&mut self, pending: PendingNode, span_end: u32) -> NodeId {
-        let first_child = pending.edge_mark;
-        let child_count = self.tables.edges.len() as u32 - first_child;
+        debug_assert_eq!(
+            pending.frame_depth as usize,
+            self.frames.len() - 1,
+            "finish_node out of nesting order"
+        );
+        let mut children = self.frames.pop().expect("frame for pending node");
+        let first_child = self.tables.edges.len() as u32;
+        let child_count = children.len() as u32;
+        self.tables.edges.append(&mut children);
         let id = NodeId::new(self.tables.nodes.len() as u32);
         self.tables.nodes.push(CstNodeRecord {
             kind: pending.kind.as_u16(),
@@ -243,23 +267,28 @@ impl CstBuilder {
         id
     }
 
-    /// Attach an already-built node as the next child edge of the current
-    /// pending node.
+    /// Append a node-edge to the current pending node's frame.
     pub fn push_node_edge(&mut self, child: NodeId) {
-        self.tables.edges.push(CstEdgeRecord {
-            kind: CstEdgeKind::Node as u16,
-            flags: 0,
-            ref_id: child.raw(),
-        });
+        self.frames
+            .last_mut()
+            .expect("a node must be started before pushing edges")
+            .push(CstEdgeRecord {
+                kind: CstEdgeKind::Node as u16,
+                flags: 0,
+                ref_id: child.raw(),
+            });
     }
 
-    /// Attach a token as the next child edge of the current pending node.
+    /// Append a token-edge to the current pending node's frame.
     pub fn push_token_edge(&mut self, token: TokenId) {
-        self.tables.edges.push(CstEdgeRecord {
-            kind: CstEdgeKind::Token as u16,
-            flags: 0,
-            ref_id: token.raw(),
-        });
+        self.frames
+            .last_mut()
+            .expect("a node must be started before pushing edges")
+            .push(CstEdgeRecord {
+                kind: CstEdgeKind::Token as u16,
+                flags: 0,
+                ref_id: token.raw(),
+            });
     }
 
     /// Commit a token record. Tokens are not children unless wired up via

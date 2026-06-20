@@ -57,7 +57,6 @@ impl<'src> Cursor<'src> {
         self.offset
     }
 
-    #[allow(dead_code)]
     #[inline]
     pub fn len(&self) -> u32 {
         self.bytes.len() as u32
@@ -110,7 +109,6 @@ impl<'src> Cursor<'src> {
 
     /// Try to consume an exact ASCII byte sequence. Returns `true` and
     /// advances on success; leaves the cursor untouched on failure.
-    #[allow(dead_code)]
     pub fn try_eat(&mut self, prefix: &[u8]) -> bool {
         let end = self.offset as usize + prefix.len();
         if end > self.bytes.len() {
@@ -130,7 +128,6 @@ impl<'src> Cursor<'src> {
     }
 
     /// Decode and consume the next Unicode scalar value.
-    #[allow(dead_code)]
     pub fn bump_char(&mut self) -> Option<(char, u32)> {
         let (c, len) = self.peek_char()?;
         self.offset += len;
@@ -148,41 +145,40 @@ impl<'src> Cursor<'src> {
 
 /// `ws = SP / HTAB / CR / LF / %x3000`
 #[inline]
-pub(crate) fn is_ws_byte(b: u8) -> bool {
+pub fn is_ws_byte(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\r' | b'\n')
 }
 
 #[inline]
-pub(crate) fn is_ws_char(c: char) -> bool {
+pub fn is_ws_char(c: char) -> bool {
     is_ws_byte(c as u32 as u8 & 0xFF) && (c as u32) < 0x80 || c as u32 == 0x3000
 }
 
 /// `bidi = %x061C / %x200E / %x200F / %x2066-2069`
 #[inline]
-pub(crate) fn is_bidi_char(c: char) -> bool {
+pub fn is_bidi_char(c: char) -> bool {
     matches!(c as u32, 0x061C | 0x200E | 0x200F | 0x2066..=0x2069)
 }
 
 /// `text-char = %x01-5B / %x5D-7A / %x7C / %x7E-10FFFF` — excludes NULL,
 /// `\` (0x5C), `{` (0x7B), `}` (0x7D).
 #[inline]
-pub(crate) fn is_text_char(c: char) -> bool {
+pub fn is_text_char(c: char) -> bool {
     let cp = c as u32;
     cp != 0 && cp != 0x5C && cp != 0x7B && cp != 0x7D
 }
 
 /// `quoted-char = %x01-5B / %x5D-7B / %x7D-10FFFF` — excludes NULL, `\`, `|`.
 #[inline]
-pub(crate) fn is_quoted_char(c: char) -> bool {
+pub fn is_quoted_char(c: char) -> bool {
     let cp = c as u32;
     cp != 0 && cp != 0x5C && cp != 0x7C
 }
 
 /// `simple-start-char` — excludes NULL, HTAB, LF, CR, SP, `.`, `\`, `{`,
-/// `}`, IDEOGRAPHIC SPACE. Consumed when stricter mode-detection lands.
-#[allow(dead_code)]
+/// `}`, IDEOGRAPHIC SPACE.
 #[inline]
-pub(crate) fn is_simple_start_char(c: char) -> bool {
+pub fn is_simple_start_char(c: char) -> bool {
     let cp = c as u32;
     !matches!(
         cp,
@@ -190,11 +186,9 @@ pub(crate) fn is_simple_start_char(c: char) -> bool {
     )
 }
 
-/// `escaped-char` second byte — `\\`, `{`, `|`, `}`. Used by the M7
-/// `InvalidEscape` recovery diagnostic.
-#[allow(dead_code)]
+/// `escaped-char` second byte — `\\`, `{`, `|`, `}`.
 #[inline]
-pub(crate) fn is_escape_target(b: u8) -> bool {
+pub fn is_escape_target(b: u8) -> bool {
     matches!(b, b'\\' | b'{' | b'|' | b'}')
 }
 
@@ -219,7 +213,7 @@ pub fn ascii_is_name_char(b: u8) -> Option<bool> {
 }
 
 /// `name-start` — full spec including Unicode.
-pub(crate) fn is_name_start(c: char) -> bool {
+pub fn is_name_start(c: char) -> bool {
     let cp = c as u32;
     if cp < 0xA1 {
         return matches!(cp, 0x2B | 0x5F | 0x41..=0x5A | 0x61..=0x7A);
@@ -228,7 +222,7 @@ pub(crate) fn is_name_start(c: char) -> bool {
 }
 
 /// `name-char = name-start / DIGIT / "-" / "."`
-pub(crate) fn is_name_char(c: char) -> bool {
+pub fn is_name_char(c: char) -> bool {
     let cp = c as u32;
     if cp < 0xA1 {
         return matches!(
@@ -272,7 +266,7 @@ fn is_unicode_name_codepoint(cp: u32) -> bool {
 
 /// Returns true if `prefix` starts with a `.` followed by an ASCII keyword.
 #[inline]
-pub(crate) fn detect_keyword(cursor: &Cursor<'_>) -> Option<KeywordHit> {
+pub fn detect_keyword(cursor: &Cursor<'_>) -> Option<KeywordHit> {
     if cursor.peek_byte() != Some(b'.') {
         return None;
     }
@@ -322,7 +316,7 @@ impl KeywordHit {
 /// Scan whitespace and bidi marks. Returns the span covered. Used to fill
 /// `ws` and `o` / `s` regions of the grammar. Trivia collection happens at
 /// the parser layer using the returned span.
-pub(crate) fn scan_trivia(cursor: &mut Cursor<'_>, mode: TriviaMode) -> Span {
+pub fn scan_trivia(cursor: &mut Cursor<'_>, mode: TriviaMode) -> Span {
     let start = cursor.offset();
     loop {
         let Some(b) = cursor.peek_byte() else { break };
@@ -371,7 +365,7 @@ impl TriviaMode {
 
 /// Scan a `text-char` / `escaped-char` run inside a `pattern`. Stops at the
 /// next `{`, `}`, `\`, or NULL — those are handled by the parser.
-pub(crate) fn scan_text_run(cursor: &mut Cursor<'_>) -> Span {
+pub fn scan_text_run(cursor: &mut Cursor<'_>) -> Span {
     let start = cursor.offset();
     loop {
         let Some(b) = cursor.peek_byte() else { break };
@@ -394,7 +388,7 @@ pub(crate) fn scan_text_run(cursor: &mut Cursor<'_>) -> Span {
 
 /// Scan a `quoted-char` / `escaped-char` run inside `|...|`. Stops at the
 /// next `|`, `\`, or NULL.
-pub(crate) fn scan_quoted_text_run(cursor: &mut Cursor<'_>) -> Span {
+pub fn scan_quoted_text_run(cursor: &mut Cursor<'_>) -> Span {
     let start = cursor.offset();
     loop {
         let Some(b) = cursor.peek_byte() else { break };
@@ -416,7 +410,7 @@ pub(crate) fn scan_quoted_text_run(cursor: &mut Cursor<'_>) -> Span {
 
 /// Scan a `name` lexeme. Per spec `name = [bidi] name-start *name-char [bidi]`.
 /// Returns `None` if no valid `name-start` is at the cursor.
-pub(crate) fn scan_name(cursor: &mut Cursor<'_>) -> Option<Span> {
+pub fn scan_name(cursor: &mut Cursor<'_>) -> Option<Span> {
     let start = cursor.offset();
 
     // Optional leading bidi marks.
