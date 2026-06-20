@@ -3,6 +3,13 @@
 //! `SourceStore` owns source text, optional metadata, and per-file line-start
 //! indexes. Spans use UTF-8 byte offsets. Line / column conversion goes
 //! through [`SourceStore::location`].
+//!
+//! Line-start indexes are computed lazily — building the index walks the
+//! entire source text, but a parse that emits no diagnostics never asks for
+//! a line/column resolution and therefore never pays that cost. The
+//! `OnceLock` keeps initialisation single-shot and `Send + Sync`-safe.
+
+use std::sync::OnceLock;
 
 use crate::span::{SourceId, Span};
 
@@ -23,7 +30,12 @@ pub struct SourceFileInput<'a> {
 }
 
 /// Owned source file registered in [`SourceStore`].
-#[derive(Debug, Clone)]
+///
+/// The line-start index is computed lazily on the first call to
+/// [`Self::line_starts`] (and therefore on the first
+/// [`SourceStore::location`] resolution). Parses that succeed without
+/// diagnostics never trigger the computation.
+#[derive(Debug, Clone, Default)]
 pub struct SourceFile {
     pub id: SourceId,
     pub path: Option<String>,
@@ -31,7 +43,10 @@ pub struct SourceFile {
     pub message_id: Option<String>,
     pub base_offset: u32,
     pub text: String,
-    pub line_starts: Vec<u32>,
+    /// Lazily-computed byte offsets of each line start. Use
+    /// [`Self::line_starts`] to read — never touch this field directly so
+    /// the lazy contract stays enforced.
+    pub(crate) line_starts: OnceLock<Vec<u32>>,
 }
 
 impl SourceFile {
@@ -46,12 +61,22 @@ impl SourceFile {
         self.text.is_empty()
     }
 
+    /// Line-start byte offsets, computed on demand and cached for the life
+    /// of the source file. The first call walks the text; subsequent calls
+    /// return the cached slice.
+    pub fn line_starts(&self) -> &[u32] {
+        self.line_starts
+            .get_or_init(|| compute_line_starts(&self.text))
+            .as_slice()
+    }
+
     /// Line index (0-based) for a byte `offset` clamped to the source length.
     fn line_index_for_offset(&self, offset: u32) -> u32 {
         let len = self.len();
         let offset = offset.min(len);
+        let line_starts = self.line_starts();
         // `line_starts` is sorted; partition_point gives the next line.
-        let index = self.line_starts.partition_point(|&start| start <= offset);
+        let index = line_starts.partition_point(|&start| start <= offset);
         index.saturating_sub(1) as u32
     }
 }
@@ -126,16 +151,18 @@ impl SourceStore {
             return Err(SourceStoreError::SourceTooLarge);
         }
         let id = SourceId::new(self.files.len() as u32);
-        let text = input.source.to_owned();
-        let line_starts = compute_line_starts(&text);
         self.files.push(SourceFile {
             id,
             path: input.path.map(str::to_owned),
             locale: input.locale.map(str::to_owned),
             message_id: input.message_id.map(str::to_owned),
             base_offset: input.base_offset.unwrap_or(0),
-            text,
-            line_starts,
+            text: input.source.to_owned(),
+            // Line index stays unevaluated until `SourceFile::line_starts`
+            // is first called — the success path of a parse never touches
+            // it, so the per-source registration cost stays O(source.len)
+            // for the text copy only.
+            line_starts: OnceLock::new(),
         });
         Ok(id)
     }
@@ -179,13 +206,14 @@ impl SourceStore {
     }
 
     /// Resolve a 1-based line/column for the start of `span` inside `source`.
+    /// Triggers lazy line-index initialisation on the first call per file.
     pub fn location(&self, source: SourceId, span: Span) -> SourceLocation {
         let Some(file) = self.get(source) else {
             return SourceLocation::default();
         };
         let line0 = file.line_index_for_offset(span.start);
         let line_start = file
-            .line_starts
+            .line_starts()
             .get(line0 as usize)
             .copied()
             .unwrap_or(0);
@@ -292,6 +320,31 @@ mod tests {
         let store = SourceStore::new();
         assert!(store.get(SourceId::new(5)).is_none());
         assert!(store.get(SourceId::NONE).is_none());
+    }
+
+    #[test]
+    fn line_starts_are_lazy_until_location_is_called() {
+        let mut store = SourceStore::new();
+        let id = store.add(SourceFileInput {
+            source: "a\nb\nc\nd",
+            ..Default::default()
+        });
+        // Fresh registration must not have populated the line index yet.
+        let file = store.get(id).unwrap();
+        assert!(
+            file.line_starts.get().is_none(),
+            "line_starts should stay unevaluated until first read"
+        );
+        // First location() resolution materialises and caches it.
+        let _ = store.location(id, Span::at(3));
+        let file = store.get(id).unwrap();
+        assert!(
+            file.line_starts.get().is_some(),
+            "line_starts should be cached after first location()"
+        );
+        // Subsequent reads return the same slice (no reset).
+        let starts = file.line_starts();
+        assert_eq!(starts, &[0, 2, 4, 6]);
     }
 
     #[test]
