@@ -13,6 +13,13 @@ const environment = await readOptionalJson(resolve(tmpDir, 'environment.json'))
 const preflight = await readOptionalJson(resolve(tmpDir, 'preflight.json'))
 const calibration = await readOptionalJson(resolve(tmpDir, 'calibration.json'))
 
+// Join hyperfine wall-clock with the normalized runner output so we can
+// report µs/parse, which is the only fair comparison across targets that
+// use different iteration counts.
+const normalizedByTarget = new Map(
+  normalized.map(file => [`${file.data.target}__${file.data.corpus}`, file.data])
+)
+
 const report = renderReport({
   rawResults,
   normalized,
@@ -90,16 +97,29 @@ function renderReport({ rawResults, normalized, environment, preflight, calibrat
     '',
     '## Hyperfine Results',
     '',
+    'Hyperfine wall-clock per invocation. Each invocation runs',
+    '`calibration.iterations × corpus.cases` parses, so the `mean ms`',
+    'column is NOT directly comparable across targets — use the',
+    '`µs/parse` column instead (computed as `mean / total_parses`).',
+    '',
     table(
-      ['suite', 'target', 'mean ms', 'stddev ms', 'relative in suite'],
-      withRelative(rawResults).map(result => [
+      ['suite', 'target', 'mean ms', 'stddev ms', 'µs/parse', 'relative (µs/parse)'],
+      withRelativePerParse(rawResults).map(result => [
         result.suite,
         result.command,
         ms(result.mean),
         ms(result.stddev),
-        `${result.relative.toFixed(2)}x`
+        result.perParseUs == null ? '?' : result.perParseUs.toFixed(3),
+        result.relative == null ? '?' : `${result.relative.toFixed(2)}x`
       ])
     ),
+    '',
+    '## Per-Parse Comparison',
+    '',
+    'Sorted by suite then by µs/parse, with relative cost vs the fastest',
+    'parser in the suite.',
+    '',
+    perParseRanking(rawResults),
     '',
     '## Workload Summaries',
     '',
@@ -155,6 +175,73 @@ function withRelative(results) {
     ...result,
     relative: result.mean / minBySuite.get(result.suite)
   }))
+}
+
+function corpusForSuite(suite) {
+  // Suites are named `<corpus>-<runtime>` (e.g. mf2-common-rust, mf1-icu-js).
+  // Strip the trailing runtime token to get the corpus name.
+  const parts = suite.split('-')
+  if (parts.length <= 1) {
+    return suite
+  }
+  parts.pop()
+  return parts.join('-')
+}
+
+function perParseUs(result) {
+  const corpus = corpusForSuite(result.suite)
+  const data = normalizedByTarget.get(`${result.command}__${corpus}`)
+  if (!data || !data.totalParses) {
+    return null
+  }
+  return (result.mean * 1000 * 1000) / data.totalParses
+}
+
+function withRelativePerParse(results) {
+  const enriched = results.map(result => ({ ...result, perParseUs: perParseUs(result) }))
+  const minBySuite = new Map()
+  for (const r of enriched) {
+    if (r.perParseUs == null) {
+      continue
+    }
+    const m = minBySuite.get(r.suite)
+    if (m == null || r.perParseUs < m) {
+      minBySuite.set(r.suite, r.perParseUs)
+    }
+  }
+  return enriched.map(r => ({
+    ...r,
+    relative: r.perParseUs == null ? null : r.perParseUs / minBySuite.get(r.suite)
+  }))
+}
+
+function perParseRanking(results) {
+  const enriched = withRelativePerParse(results).filter(r => r.perParseUs != null)
+  const groups = new Map()
+  for (const r of enriched) {
+    if (!groups.has(r.suite)) {
+      groups.set(r.suite, [])
+    }
+    groups.get(r.suite).push(r)
+  }
+  const out = []
+  for (const [suite, items] of [...groups.entries()].sort()) {
+    items.sort((a, b) => a.perParseUs - b.perParseUs)
+    out.push(`### ${suite}`, '')
+    out.push(
+      table(
+        ['rank', 'target', 'µs/parse', 'vs fastest'],
+        items.map((item, index) => [
+          String(index + 1),
+          item.command,
+          item.perParseUs.toFixed(3),
+          `${item.relative.toFixed(2)}x`
+        ])
+      )
+    )
+    out.push('')
+  }
+  return out.join('\n')
 }
 
 function table(headers, rows) {

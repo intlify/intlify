@@ -100,7 +100,9 @@ run_suite \
   rust ox-content-parse \
   rust ox-content-parse-and-validate \
   rust mf2-tools-parse \
-  rust mf2-tools-parse-and-analyze
+  rust mf2-tools-parse-and-analyze \
+  rust ox-mf2-parse \
+  rust ox-mf2-parse-and-lower
 
 run_suite \
   mf2-app-js \
@@ -116,7 +118,9 @@ run_suite \
   rust ox-content-parse \
   rust ox-content-parse-and-validate \
   rust mf2-tools-parse \
-  rust mf2-tools-parse-and-analyze
+  rust mf2-tools-parse-and-analyze \
+  rust ox-mf2-parse \
+  rust ox-mf2-parse-and-lower
 
 run_suite \
   mf1-icu-js \

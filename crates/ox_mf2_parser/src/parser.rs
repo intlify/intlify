@@ -19,7 +19,7 @@ use crate::api::ParseOptions;
 use crate::diagnostic::{DiagnosticCode, DiagnosticLabelRecord, DiagnosticSink};
 use crate::scanner::{
     detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, scan_name, scan_quoted_text_run,
-    scan_text_run, scan_trivia, ScannerState, TriviaMode,
+    scan_text_run, scan_trivia, scan_unquoted_literal, ScannerState, TriviaMode,
 };
 use crate::scanner::Cursor;
 use crate::semantic::MessageMode;
@@ -433,23 +433,72 @@ impl<'src, 'ws> Parser<'src, 'ws> {
         self.parse_attributes_zero_or_more();
     }
 
-    /// Markup body is parsed in a follow-up commit; for now we consume a
-    /// best-effort identifier so the placeholder still has a useful span.
+    /// `markup = "{" o "#" identifier *(s option) *(s attribute) o ["/"] "}"`
+    /// or `"{" o "/" identifier *(s option) *(s attribute) o "}"`.
+    /// The opening `{` and the closing `}` are handled by parse_expression;
+    /// this body covers the sigil, identifier, options, attributes, and the
+    /// optional standalone-marker `/`.
     fn parse_markup_body(&mut self) {
-        // Consume `#` or `/` sigil token.
-        if matches!(self.cursor.peek_byte(), Some(b'#') | Some(b'/')) {
-            let sigil_start = self.cursor.offset();
-            let b = self.cursor.bump_byte().unwrap();
-            let kind = if b == b'#' {
-                SyntaxKind::HashToken
-            } else {
-                SyntaxKind::SlashToken
-            };
-            let tok = self.commit_token(kind, Span::new(sigil_start, self.cursor.offset()));
-            self.builder.push_token_edge(tok);
-        }
+        // Sigil: `#` for open / standalone, `/` for close.
+        let is_open = match self.cursor.peek_byte() {
+            Some(b'#') => {
+                let sigil_start = self.cursor.offset();
+                let _ = self.cursor.bump_byte();
+                let tok = self.commit_token(
+                    SyntaxKind::HashToken,
+                    Span::new(sigil_start, self.cursor.offset()),
+                );
+                self.builder.push_token_edge(tok);
+                true
+            }
+            Some(b'/') => {
+                let sigil_start = self.cursor.offset();
+                let _ = self.cursor.bump_byte();
+                let tok = self.commit_token(
+                    SyntaxKind::SlashToken,
+                    Span::new(sigil_start, self.cursor.offset()),
+                );
+                self.builder.push_token_edge(tok);
+                false
+            }
+            _ => true,
+        };
+
         let ident = self.parse_identifier();
         self.builder.push_node_edge(ident);
+
+        // *(s option)
+        loop {
+            let saved = self.cursor.checkpoint();
+            self.eat_trivia(TriviaMode::Required);
+            if self.peek_option_start() {
+                let opt = self.parse_option();
+                self.builder.push_node_edge(opt);
+            } else {
+                self.cursor.restore(saved);
+                break;
+            }
+        }
+
+        // *(s attribute)
+        self.parse_attributes_zero_or_more();
+
+        // [o "/"] — only valid on the open form (turns it into standalone).
+        if is_open {
+            let saved = self.cursor.checkpoint();
+            self.eat_trivia(TriviaMode::Optional);
+            if self.cursor.peek_byte() == Some(b'/') {
+                let slash_start = self.cursor.offset();
+                let _ = self.cursor.bump_byte();
+                let tok = self.commit_token(
+                    SyntaxKind::SlashToken,
+                    Span::new(slash_start, self.cursor.offset()),
+                );
+                self.builder.push_token_edge(tok);
+            } else {
+                self.cursor.restore(saved);
+            }
+        }
     }
 
     // ───────────────────────── variable / function / option / attribute ─
@@ -632,7 +681,9 @@ impl<'src, 'ws> Parser<'src, 'ws> {
     fn parse_unquoted_literal(&mut self) -> NodeId {
         let start = self.cursor.offset();
         let pending = self.builder.start_node(SyntaxKind::UnquotedLiteral, start);
-        if let Some(span) = scan_name(&mut self.cursor) {
+        // unquoted-literal = 1*name-char (NOT name = [bidi] name-start *name-char [bidi]).
+        // Allow DIGIT-leading values like `2` in `option=2`.
+        if let Some(span) = scan_unquoted_literal(&mut self.cursor) {
             let tok = self.commit_token(SyntaxKind::NameToken, span);
             self.builder.push_token_edge(tok);
         } else {

@@ -14,6 +14,8 @@ MF2:
 - `ox-content-parse-and-validate`
 - `mf2-tools-parse`
 - `mf2-tools-parse-and-analyze`
+- `ox-mf2-parse`
+- `ox-mf2-parse-and-lower`
 
 MF1 / ICU:
 

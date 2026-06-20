@@ -461,6 +461,41 @@ pub(crate) fn scan_name(cursor: &mut Cursor<'_>) -> Option<Span> {
     Some(Span::new(start, cursor.offset()))
 }
 
+/// Scan an `unquoted-literal = 1*name-char` lexeme. Distinct from `scan_name`
+/// because the spec allows an unquoted literal to start with any `name-char`
+/// (including DIGIT), not just `name-start`.
+pub(crate) fn scan_unquoted_literal(cursor: &mut Cursor<'_>) -> Option<Span> {
+    let start = cursor.offset();
+    skip_bidi(cursor);
+    let mut produced = false;
+    loop {
+        let Some(b) = cursor.peek_byte() else { break };
+        if b < 0x80 {
+            match ascii_is_name_char(b) {
+                Some(true) => {
+                    cursor.offset += 1;
+                    produced = true;
+                }
+                _ => break,
+            }
+        } else {
+            let Some((c, len)) = cursor.peek_char() else { break };
+            if !is_name_char(c) {
+                break;
+            }
+            cursor.offset += len;
+            produced = true;
+        }
+    }
+    skip_bidi(cursor);
+    if produced {
+        Some(Span::new(start, cursor.offset()))
+    } else {
+        cursor.set_offset(start);
+        None
+    }
+}
+
 fn skip_bidi(cursor: &mut Cursor<'_>) {
     loop {
         let Some((c, len)) = cursor.peek_char() else { break };
