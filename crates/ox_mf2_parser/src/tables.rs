@@ -65,18 +65,19 @@ pub(crate) struct TriviaRecord {
     pub span_end: u32,
 }
 
-/// Builder-time staging slot for a pending node. Each `start_node` pushes a
-/// new edge frame onto [`CstBuilder::frames`]; child edges are appended to
-/// that frame and only flushed into [`CstTables::edges`] when the matching
-/// `finish_node` runs. This keeps each node's `[first_child, first_child +
-/// child_count)` range pointing strictly at its direct children, even when
-/// nested children pushed their own edges first.
+/// Builder-time staging slot for a pending node. Every active node remembers
+/// the offset at which its child edges begin inside the shared
+/// [`CstBuilder::pending_edges`] stack. `finish_node` drains the contiguous
+/// range `[edge_start, pending_edges.len())` into [`CstTables::edges`] in
+/// post-order, so each node's `[first_child, first_child + child_count)`
+/// range points strictly at its direct children.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PendingNode {
     pub kind: SyntaxKind,
     pub flags: u16,
     pub span_start: u32,
     pub frame_depth: u32,
+    pub edge_start: u32,
 }
 
 /// Flat indexed CST tables — the Phase 1 parser's primary output.
@@ -180,17 +181,24 @@ pub struct CstCapacity {
 
 /// Builder API used by the parser to commit nodes, edges, tokens, and trivia.
 ///
-/// Each `start_node` pushes an edge frame; each `finish_node` pops it and
-/// flushes its accumulated edges into [`CstTables::edges`] in a contiguous
-/// run. Recovery checkpoints snapshot table lengths + frame depths and roll
-/// back via [`Self::rollback_to`].
+/// All in-flight child edges share a single staging stack
+/// ([`Self::pending_edges`]). Each active `start_node` only records its
+/// `edge_start` offset into that stack via [`PendingNode::edge_start`]; the
+/// matching `finish_node` drains the contiguous range into
+/// [`CstTables::edges`]. Recovery checkpoints snapshot table lengths, frame
+/// depth, and the pending-edge stack length, and roll back via
+/// [`Self::rollback_to`].
 #[derive(Debug, Default)]
 pub(crate) struct CstBuilder {
     pub(crate) tables: CstTables,
-    pub(crate) frames: Vec<Vec<CstEdgeRecord>>,
+    /// Single shared staging stack — all open nodes contribute to it. Each
+    /// pending node owns the range `[edge_start, pending_edges.len())` at
+    /// any given moment.
+    pub(crate) pending_edges: Vec<CstEdgeRecord>,
+    /// One entry per active `start_node`, holding its `edge_start` offset.
+    pub(crate) frame_starts: Vec<u32>,
 }
 
-#[allow(dead_code)] // consumed by the M7 recovery harness once checkpoints land.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct BuilderLengths {
     pub nodes: u32,
@@ -198,6 +206,7 @@ pub(crate) struct BuilderLengths {
     pub tokens: u32,
     pub trivia: u32,
     pub frame_depth: u32,
+    pub pending_edges: u32,
 }
 
 impl CstBuilder {
@@ -211,49 +220,56 @@ impl CstBuilder {
             edges: self.tables.edges.len() as u32,
             tokens: self.tables.tokens.len() as u32,
             trivia: self.tables.trivia.len() as u32,
-            frame_depth: self.frames.len() as u32,
+            frame_depth: self.frame_starts.len() as u32,
+            pending_edges: self.pending_edges.len() as u32,
         }
     }
 
-    /// Truncate every table back to the captured lengths. Frames above the
-    /// captured depth are popped; the frame at the captured depth retains the
-    /// number of edges it had at checkpoint time (callers must therefore
-    /// `lengths()` *before* pushing speculative edges into the current frame).
-    #[allow(dead_code)] // consumed by the M7 recovery harness.
+    /// Truncate every table back to the captured lengths. Drops any frame
+    /// starts above the captured depth and trims the shared edge stack so
+    /// speculative children pushed inside the rolled-back branch disappear.
     pub fn rollback_to(&mut self, lengths: BuilderLengths) {
         self.tables.nodes.truncate(lengths.nodes as usize);
         self.tables.edges.truncate(lengths.edges as usize);
         self.tables.tokens.truncate(lengths.tokens as usize);
         self.tables.trivia.truncate(lengths.trivia as usize);
-        self.frames.truncate(lengths.frame_depth as usize);
+        self.frame_starts.truncate(lengths.frame_depth as usize);
+        self.pending_edges.truncate(lengths.pending_edges as usize);
     }
 
-    /// Begin a node. Pushes a fresh edge frame onto the stack; subsequent
-    /// `push_node_edge` / `push_token_edge` calls append to that frame.
+    /// Begin a node. Records the current edge-stack length as this node's
+    /// `edge_start` and pushes it to the frame stack. Subsequent
+    /// `push_*_edge` calls append to the shared `pending_edges` stack;
+    /// `finish_node` later drains the range belonging to this node.
     pub fn start_node(&mut self, kind: SyntaxKind, span_start: u32) -> PendingNode {
-        let depth = self.frames.len() as u32;
-        self.frames.push(Vec::new());
+        let edge_start = self.pending_edges.len() as u32;
+        let depth = self.frame_starts.len() as u32;
+        self.frame_starts.push(edge_start);
         PendingNode {
             kind,
             flags: 0,
             span_start,
             frame_depth: depth,
+            edge_start,
         }
     }
 
-    /// Finish the most recently started node. Pops its edge frame, flushes
-    /// the edges contiguously into [`CstTables::edges`], and records the
-    /// `first_child` / `child_count` range on the node record.
+    /// Finish the most recently started node. Drains the contiguous range
+    /// `[edge_start, pending_edges.len())` into [`CstTables::edges`] and
+    /// records the node with the resulting `first_child` / `child_count`.
     pub fn finish_node(&mut self, pending: PendingNode, span_end: u32) -> NodeId {
         debug_assert_eq!(
             pending.frame_depth as usize,
-            self.frames.len() - 1,
+            self.frame_starts.len() - 1,
             "finish_node out of nesting order"
         );
-        let mut children = self.frames.pop().expect("frame for pending node");
+        let edge_start = self.frame_starts.pop().expect("frame for pending node");
+        debug_assert_eq!(edge_start, pending.edge_start);
         let first_child = self.tables.edges.len() as u32;
-        let child_count = children.len() as u32;
-        self.tables.edges.append(&mut children);
+        let child_count = (self.pending_edges.len() as u32) - edge_start;
+        self.tables
+            .edges
+            .extend(self.pending_edges.drain(edge_start as usize..));
         let id = NodeId::new(self.tables.nodes.len() as u32);
         self.tables.nodes.push(CstNodeRecord {
             kind: pending.kind.as_u16(),
@@ -267,28 +283,32 @@ impl CstBuilder {
         id
     }
 
-    /// Append a node-edge to the current pending node's frame.
+    /// Append a node-edge to the active pending node's range on the shared
+    /// edge stack.
     pub fn push_node_edge(&mut self, child: NodeId) {
-        self.frames
-            .last_mut()
-            .expect("a node must be started before pushing edges")
-            .push(CstEdgeRecord {
-                kind: CstEdgeKind::Node as u16,
-                flags: 0,
-                ref_id: child.raw(),
-            });
+        debug_assert!(
+            !self.frame_starts.is_empty(),
+            "a node must be started before pushing edges"
+        );
+        self.pending_edges.push(CstEdgeRecord {
+            kind: CstEdgeKind::Node as u16,
+            flags: 0,
+            ref_id: child.raw(),
+        });
     }
 
-    /// Append a token-edge to the current pending node's frame.
+    /// Append a token-edge to the active pending node's range on the shared
+    /// edge stack.
     pub fn push_token_edge(&mut self, token: TokenId) {
-        self.frames
-            .last_mut()
-            .expect("a node must be started before pushing edges")
-            .push(CstEdgeRecord {
-                kind: CstEdgeKind::Token as u16,
-                flags: 0,
-                ref_id: token.raw(),
-            });
+        debug_assert!(
+            !self.frame_starts.is_empty(),
+            "a node must be started before pushing edges"
+        );
+        self.pending_edges.push(CstEdgeRecord {
+            kind: CstEdgeKind::Token as u16,
+            flags: 0,
+            ref_id: token.raw(),
+        });
     }
 
     /// Commit a token record. Tokens are not children unless wired up via
