@@ -37,6 +37,9 @@ dist-ssr
 target
 **/target
 
+# Editor / sed backups
+*.bak
+
 # Specific cases
 tools/mf-parser-bench/.tmp
 tools/mf-parser-bench/results
