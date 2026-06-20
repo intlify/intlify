@@ -13,6 +13,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 - In Phase 2, make a versioned Binary AST snapshot the standard boundary for the public CST/AST view.
 - Treat N-API and WASM as the primary language binding targets.
 - Keep SemanticView separate from the lossless Binary AST snapshot and link it to NodeId / Span.
+- Treat the Unicode WG interchange data model as an on-demand compatibility surface, not as a Phase 1 or Phase 2 deliverable.
 - Reserve MessagePack for future LSP/editor transport, not as an AST representation.
 - The Rust parser / AST / performance details for Phase 1 live in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 - The implementation-oriented details for Phase 2 Binary AST, snapshots, bindings, and transport live in [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md).
@@ -145,6 +146,18 @@ Candidate contents:
 - reachability / coverage metadata
 - source span mapping
 
+### Unicode WG Interchange Data Model
+
+Adopt `defer until compatibility surface is needed`.
+
+The Unicode WG data model in `refers/message-format-wg/spec/data-model` is an interchange representation for messages. It is useful for cross-implementation compatibility, JSON/YAML exchange, legacy format conversion, and translation-format integration, but it is not required to be the internal representation of an implementation.
+
+ox-mf2 therefore does not make the WG data model a mandatory Phase 1 or Phase 2 output. Phase 1 focuses on `CstTables + CstView + SemanticModel`, and Phase 2 focuses on the Binary AST snapshot and language binding boundary.
+
+When a compatibility surface is needed, ox-mf2 can add a dedicated `DataModelView` / `InterchangeDataModel` API that exports and imports the WG data model from the existing semantic layer. The important constraint is that `SemanticModel` must retain enough information to derive the WG data model later, including message kind, declarations, selectors, variants, patterns, expressions, markup, options, attributes, and cooked literal values.
+
+This keeps the hot parser and binding path compact while preserving a clear path for future compatibility APIs.
+
 ### Language Binding
 
 ![ox-mf2 language binding architecture](./assets/001-ox-mf2-language-binding.svg)
@@ -248,12 +261,13 @@ Adopt `Unicode spec primary + TC39 proposal tracking`.
 Primary source:
 
 - `refers/message-format-wg/spec`
+- `refers/message-format-wg/spec/data-model`
 
 Tracked source:
 
 - `refers/proposal-intl-messageformat`
 
-MF2 syntax and the message data model primarily follow the Unicode WG spec. Intl.MessageFormat API integration and ECMAScript-side behavior track the TC39 proposal.
+MF2 syntax and the message data model primarily follow the Unicode WG spec. The data model is tracked as a future compatibility/export surface, not as the parser's primary internal representation. Intl.MessageFormat API integration and ECMAScript-side behavior track the TC39 proposal.
 
 ### Conformance Tests
 
@@ -361,6 +375,7 @@ The third phase expands ox-mf2 into broader tooling workflows.
 The initial stage does not implement the following.
 
 - Binary AST-first internal representation in Phase 1
+- Unicode WG data model import/export API unless a compatibility surface is required
 - full linter ruleset
 - canonical formatter
 - N-API / WASM binding
