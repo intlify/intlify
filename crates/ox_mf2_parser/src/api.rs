@@ -9,7 +9,7 @@
 
 use crate::diagnostic::{Diagnostic, DiagnosticView};
 use crate::parser::run_parse;
-use crate::semantic::{SemanticModel, SemanticView};
+use crate::semantic::{lower as lower_semantic, SemanticModel, SemanticView};
 use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId;
 use crate::tables::CstTables;
@@ -143,12 +143,23 @@ pub fn parse_source_session<'a>(
     workspace.clear();
     run_parse(sources, source_id, workspace, &options);
 
+    if options.parse_semantic {
+        let model = lower_semantic(sources, source_id, &workspace.parser.tables);
+        workspace.semantic.model = Some(model);
+    } else {
+        workspace.semantic.model = None;
+    }
+
     let cst = CstView::new(sources, source_id, &workspace.parser.tables);
     let diagnostics = DiagnosticView {
         sources,
         records: &workspace.parser.diagnostics,
     };
-    let semantic = None; // SemanticView lands with Milestone 8.
+    let semantic = workspace
+        .semantic
+        .model
+        .as_ref()
+        .map(|m| SemanticView::new(m, &workspace.parser.tables));
     ParseSessionResult {
         source: source_id,
         cst,
@@ -196,7 +207,7 @@ fn materialise(
 ) -> ParseResult {
     let cst = workspace.parser.tables.clone();
     let semantic = if options.parse_semantic {
-        Some(SemanticModel::default())
+        Some(lower_semantic(sources, source_id, &cst))
     } else {
         None
     };

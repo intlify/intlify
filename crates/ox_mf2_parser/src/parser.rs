@@ -35,6 +35,8 @@ use crate::workspace::ParseWorkspace;
 /// builder lengths (so any nodes / edges / tokens / trivia pushed during a
 /// failed attempt can be truncated) and the diagnostic length (so cascades
 /// from a discarded branch do not surface to the caller).
+#[allow(dead_code)] // `offset` is redundant with scanner_state.offset but
+                    // mirrors the design/002 schema; M11 benchmarks will read it.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Checkpoint {
     pub offset: u32,

@@ -80,11 +80,29 @@ impl ParserWorkspace {
 /// Internal semantic-side workspace.
 #[derive(Debug, Default)]
 pub(crate) struct SemanticWorkspace {
-    // Concrete buffers land with Milestone 8.
+    pub model: Option<crate::semantic::SemanticModel>,
 }
 
 impl SemanticWorkspace {
-    pub fn clear(&mut self) {}
+    pub fn clear(&mut self) {
+        if let Some(model) = self.model.as_mut() {
+            // Reuse capacity rather than dropping the SemanticModel — vector
+            // clears keep their backing allocation so repeated parse loops
+            // stay allocation-flat.
+            model.declarations.clear();
+            model.references.clear();
+            model.patterns.clear();
+            model.expressions.clear();
+            model.markups.clear();
+            model.literals.clear();
+            model.functions.clear();
+            model.options.clear();
+            model.attributes.clear();
+            model.selectors.clear();
+            model.variants.clear();
+            model.diagnostics.clear();
+        }
+    }
 }
 
 /// Reusable workspace for repeated parse, batch parse, benchmarks, and LSP.
