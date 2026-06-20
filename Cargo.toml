@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+# Excluding refers/* keeps git-submodule workspaces out of our workspace
+# member list. Excluding tools/mf-parser-bench/rs keeps the benchmark CLI
+# standalone (it also declares its own `[workspace]` so cargo unambiguously
+# resolves path deps against its own workspace).
 exclude = ["refers/*", "tools/mf-parser-bench/rs"]
 
 [workspace.package]

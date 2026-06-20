@@ -19,3 +19,7 @@ default = []
 [dependencies]
 
 [dev-dependencies]
+
+[[bin]]
+name = "ox-mf2-bench"
+path = "src/bin/ox_mf2_bench.rs"

@@ -127,6 +127,7 @@ version = "0.0.0"
 dependencies = [
  "mf2_parser",
  "ox_content_i18n",
+ "ox_mf2_parser",
  "serde",
  "serde_json",
 ]
@@ -200,6 +201,10 @@ dependencies = [
  "serde_yaml",
  "thiserror",
 ]
+
+[[package]]
+name = "ox_mf2_parser"
+version = "0.0.0"
 
 [[package]]
 name = "proc-macro2"

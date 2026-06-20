@@ -240,6 +240,36 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
                 diagnostics: diagnostics.len(),
             })
         }
+        "ox-mf2-parse" => {
+            // Phase 1 parser entry point equivalent to mf2-tools-parse — no
+            // semantic lowering, default options.
+            let result = ox_mf2_parser::parse_message(black_box(source));
+            Ok(TargetResult {
+                checksum: (size_of_val(black_box(&result.cst))
+                    + result.cst.node_count() as usize
+                    + result.cst.token_count() as usize) as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
+        "ox-mf2-parse-and-lower" => {
+            let mut options = ox_mf2_parser::ParseOptions::default();
+            options.parse_semantic = true;
+            let mut sources = ox_mf2_parser::SourceStore::new();
+            let id = sources.add(ox_mf2_parser::SourceFileInput {
+                source: black_box(source),
+                ..Default::default()
+            });
+            let result = ox_mf2_parser::parse_source(&sources, id, options);
+            let semantic_size = result
+                .semantic
+                .as_ref()
+                .map(|s| s.declarations.len() + s.expressions.len() + s.patterns.len())
+                .unwrap_or(0);
+            Ok(TargetResult {
+                checksum: (result.cst.node_count() + semantic_size) as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
         _ => Err(format!("Unknown Rust parser target: {target}")),
     }
 }
