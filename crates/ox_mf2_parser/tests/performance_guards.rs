@@ -79,12 +79,19 @@ fn workspace_reuse_does_not_regrow_capacity() {
         let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
     }
     let cap_after_warmup = workspace.node_capacity();
+    let pending_cap_after_warmup = workspace.pending_edges_capacity();
+    let frame_cap_after_warmup = workspace.frame_starts_capacity();
 
     // Many more iterations of the same source must not regrow capacity.
     for _ in 0..1024 {
         let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
     }
     assert_eq!(workspace.node_capacity(), cap_after_warmup);
+    // Staging stacks belong to the workspace too — their capacity must
+    // survive repeated parses, otherwise the per-node allocation that F5
+    // removed sneaks back in via the builder's own staging vectors.
+    assert_eq!(workspace.pending_edges_capacity(), pending_cap_after_warmup);
+    assert_eq!(workspace.frame_starts_capacity(), frame_cap_after_warmup);
 }
 
 // ── 4. CstView traversal completeness ────────────────────────────────────

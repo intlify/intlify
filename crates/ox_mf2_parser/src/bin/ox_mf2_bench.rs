@@ -394,8 +394,9 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
         ..Default::default()
     });
     let result = parse_source(&sources, id, ParseOptions::default());
-    // If the input is valid, fall back to mapping every token's span so the
-    // phase always does meaningful work and isn't an empty loop.
+    // The phase measures `SourceStore::location` on diagnostic spans. A valid
+    // input has no diagnostics, so the inner loop would do zero work and the
+    // hyperfine number would be meaningless — refuse the run instead.
     if result.diagnostics.is_empty() {
         return Err("source_mapping phase requires at least one diagnostic; \
                     pass a malformed --input-text such as 'Hello, {$name'"

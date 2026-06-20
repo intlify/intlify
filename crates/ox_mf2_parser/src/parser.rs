@@ -85,10 +85,13 @@ pub(crate) fn run_parse(
     let mut labels: Vec<DiagnosticLabelRecord> = Vec::new();
 
     let mut builder = CstBuilder::new();
-    // Move pre-allocated tables out of the workspace into the builder so the
-    // parser can grow them without aliasing trouble; we swap them back when
-    // parsing finishes.
+    // Move pre-allocated tables AND staging stacks out of the workspace into
+    // the builder so the parser can grow them without aliasing trouble; we
+    // swap them back when parsing finishes. Keeping the staging stacks in
+    // the workspace lets repeated parses reuse their capacity.
     core::mem::swap(&mut builder.tables, &mut workspace.parser.tables);
+    core::mem::swap(&mut builder.pending_edges, &mut workspace.parser.pending_edges);
+    core::mem::swap(&mut builder.frame_starts, &mut workspace.parser.frame_starts);
 
     {
         let sink = DiagnosticSink::new(&mut workspace.parser.diagnostics, &mut labels);
@@ -103,8 +106,10 @@ pub(crate) fn run_parse(
         parser.parse_root();
     }
 
-    // Restore tables to the workspace.
+    // Restore everything to the workspace.
     core::mem::swap(&mut builder.tables, &mut workspace.parser.tables);
+    core::mem::swap(&mut builder.pending_edges, &mut workspace.parser.pending_edges);
+    core::mem::swap(&mut builder.frame_starts, &mut workspace.parser.frame_starts);
 }
 
 struct Parser<'src, 'ws> {

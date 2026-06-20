@@ -7,7 +7,7 @@
 //! Capacity is released only on [`Self::shrink_to_fit`] or [`Drop`].
 
 use crate::diagnostic::DiagnosticRecord;
-use crate::tables::{CstCapacity, CstTables};
+use crate::tables::{CstCapacity, CstEdgeRecord, CstTables};
 
 /// Pre-sizing hint passed to [`ParseWorkspace::with_capacity`].
 #[derive(Debug, Default, Clone, Copy)]
@@ -49,16 +49,27 @@ impl ParseCapacity {
 }
 
 /// Internal parser-side workspace.
+///
+/// `pending_edges` and `frame_starts` live here (not inside the short-lived
+/// `CstBuilder`) so their capacity is preserved across repeated parses —
+/// the parser swaps the buffers into a builder for the duration of one
+/// `run_parse` and swaps them back when it finishes.
 #[derive(Debug, Default)]
 pub(crate) struct ParserWorkspace {
     pub tables: CstTables,
     pub diagnostics: Vec<DiagnosticRecord>,
+    pub pending_edges: Vec<CstEdgeRecord>,
+    pub frame_starts: Vec<u32>,
 }
 
 impl ParserWorkspace {
     pub fn clear(&mut self) {
         self.tables.clear();
         self.diagnostics.clear();
+        // The staging stacks must be empty after a balanced parse; clearing
+        // is a no-op on the success path but keeps capacity reserved.
+        self.pending_edges.clear();
+        self.frame_starts.clear();
     }
 
     pub fn reserve(&mut self, capacity: &ParseCapacity) {
@@ -69,11 +80,21 @@ impl ParserWorkspace {
             trivia: capacity.trivia,
         });
         self.diagnostics.reserve(capacity.diagnostics);
+        // Staging-stack peaks are bounded by the live counts at any moment.
+        // `pending_edges` is bounded by the deepest unfinished subtree
+        // (≤ total edges); reserving the full edge estimate is generous but
+        // amortises across reuse. `frame_starts` follows nesting depth, which
+        // is typically very small (≤ ~16 for MF2), but we reserve a slot per
+        // node estimate as a safe upper bound.
+        self.pending_edges.reserve(capacity.edges);
+        self.frame_starts.reserve(capacity.nodes);
     }
 
     pub fn shrink_to_fit(&mut self) {
         self.tables.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
+        self.pending_edges.shrink_to_fit();
+        self.frame_starts.shrink_to_fit();
     }
 }
 
@@ -154,6 +175,16 @@ impl ParseWorkspace {
     #[doc(hidden)]
     pub fn diagnostic_capacity(&self) -> usize {
         self.parser.diagnostics.capacity()
+    }
+
+    #[doc(hidden)]
+    pub fn pending_edges_capacity(&self) -> usize {
+        self.parser.pending_edges.capacity()
+    }
+
+    #[doc(hidden)]
+    pub fn frame_starts_capacity(&self) -> usize {
+        self.parser.frame_starts.capacity()
     }
 }
 
