@@ -1,0 +1,21 @@
+[package]
+name = "ox_mf2_parser"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ox-mf2 Phase 1 MF2 parser core (CST, SemanticModel, diagnostics, recovery)."
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Reserved for Phase 1 follow-up:
+# rayon = ["dep:rayon"]
+
+[dependencies]
+
+[dev-dependencies]
