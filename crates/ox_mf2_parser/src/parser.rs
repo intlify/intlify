@@ -30,7 +30,11 @@ use crate::tables::{BuilderLengths, CstBuilder};
 use crate::workspace::ParseWorkspace;
 
 /// Speculative parser state used by recovery points.
-#[allow(dead_code)] // populated when the recovery harness wires through (Milestone 7).
+///
+/// A checkpoint captures three things atomically: the scanner offset, the
+/// builder lengths (so any nodes / edges / tokens / trivia pushed during a
+/// failed attempt can be truncated) and the diagnostic length (so cascades
+/// from a discarded branch do not surface to the caller).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Checkpoint {
     pub offset: u32,
@@ -88,6 +92,32 @@ struct Parser<'src, 'ws> {
     /// Index into the trivia table where the next token's leading trivia
     /// begins. Updated each time we scan a `ws` / `bidi` run.
     pending_trivia_start: u32,
+}
+
+impl<'src, 'ws> Parser<'src, 'ws> {
+    /// Snapshot the cursor, builder lengths, and diagnostic length so a
+    /// speculative parse can be rolled back without leaking partial nodes
+    /// or cascading diagnostics into the caller.
+    #[allow(dead_code)] // used by ambiguous-region recovery; kept generic for M10 fixture-driven cases.
+    pub(crate) fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            offset: self.cursor.offset(),
+            builder: self.builder.lengths(),
+            diagnostic_len: self.diagnostics.records.len() as u32,
+            scanner_state: self.cursor.state(),
+        }
+    }
+
+    /// Restore state captured by [`Self::checkpoint`].
+    #[allow(dead_code)]
+    pub(crate) fn rollback(&mut self, cp: Checkpoint) {
+        self.cursor.restore(cp.scanner_state);
+        self.builder.rollback_to(cp.builder);
+        self.diagnostics
+            .records
+            .truncate(cp.diagnostic_len as usize);
+        self.pending_trivia_start = cp.builder.trivia;
+    }
 }
 
 impl<'src, 'ws> Parser<'src, 'ws> {
