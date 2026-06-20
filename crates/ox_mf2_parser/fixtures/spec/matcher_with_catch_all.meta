@@ -1,0 +1,4 @@
+spec_section = "syntax.md#matcher"
+production = "matcher"
+description = "matcher with a single catch-all variant"
+diagnostics_expected = "0"

@@ -1,0 +1,4 @@
+spec_section = "syntax.md#expression"
+production = "variable-expression"
+description = "placeholder opened with { but never closed"
+diagnostics_expected = "1"

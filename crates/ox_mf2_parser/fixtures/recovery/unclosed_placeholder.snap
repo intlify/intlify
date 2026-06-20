@@ -1,0 +1,15 @@
+Root @ 0..13
+  SimpleMessage @ 0..13
+    Pattern @ 0..13
+      Text @ 0..7
+        TOKEN TextToken @ 0..7 "Hello, "
+      Placeholder @ 7..13
+        VariableExpression @ 7..13
+          TOKEN LeftBraceToken @ 7..8 "{"
+          Variable @ 8..13
+            TOKEN DollarToken @ 8..9 "$"
+            Name @ 9..13
+              TOKEN NameToken @ 9..13 "name"
+          Missing @ 13..13
+--diagnostics--
+UnclosedExpression @ 7..13 (line 1, col 8): unclosed placeholder expression

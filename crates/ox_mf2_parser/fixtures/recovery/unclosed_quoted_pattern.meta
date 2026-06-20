@@ -1,0 +1,4 @@
+spec_section = "syntax.md#quoted-pattern"
+production = "quoted-pattern"
+description = "quoted-pattern opened with {{ but never closed"
+diagnostics_expected = "1"
