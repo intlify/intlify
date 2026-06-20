@@ -1,0 +1,3 @@
+.match $price
+1.5 {{one and a half}}
+* {{other}}

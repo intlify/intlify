@@ -1,0 +1,31 @@
+Root @ 0..48
+  ComplexMessage @ 0..48
+    ComplexBody @ 0..48
+      Matcher @ 0..48
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 7..13
+          Variable @ 7..13
+            TOKEN DollarToken @ 7..8 "$"
+            Name @ 8..13
+              TOKEN NameToken @ 8..13 "price"
+        Variant @ 14..36
+          VariantKey @ 14..17
+            UnquotedLiteral @ 14..17
+              TOKEN NameToken @ 14..17 "1.5"
+          QuotedPattern @ 18..36
+            TOKEN LeftDoubleBraceToken @ 18..20 "{{"
+            Pattern @ 20..34
+              Text @ 20..34
+                TOKEN TextToken @ 20..34 "one and a half"
+            TOKEN RightDoubleBraceToken @ 34..36 "}}"
+        Variant @ 37..48
+          CatchAllKey @ 37..38
+            TOKEN StarToken @ 37..38 "*"
+          QuotedPattern @ 39..48
+            TOKEN LeftDoubleBraceToken @ 39..41 "{{"
+            Pattern @ 41..46
+              Text @ 41..46
+                TOKEN TextToken @ 41..46 "other"
+            TOKEN RightDoubleBraceToken @ 46..48 "}}"
+--diagnostics--
+(none)

@@ -1,0 +1,17 @@
+Root @ 0..11
+  SimpleMessage @ 0..11
+    Pattern @ 0..11
+      Placeholder @ 0..11
+        VariableExpression @ 0..11
+          TOKEN LeftBraceToken @ 0..1 "{"
+          Variable @ 1..3
+            TOKEN DollarToken @ 1..2 "$"
+            Name @ 2..3
+              TOKEN NameToken @ 2..3 "x"
+          Function @ 3..10
+            TOKEN ColonToken @ 3..4 ":"
+            Identifier @ 4..10
+              TOKEN NameToken @ 4..10 "number"
+          TOKEN RightBraceToken @ 10..11 "}"
+--diagnostics--
+MissingRequiredWhitespace @ 3..3 (line 1, col 4): missing required whitespace between productions

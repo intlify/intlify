@@ -1,0 +1,4 @@
+spec_section = "syntax.md#expression"
+production = "variable-expression"
+description = "variable expression with function but no required whitespace before ':'"
+diagnostics_expected = "1"

@@ -52,6 +52,12 @@ pub enum DiagnosticCode {
     InvalidEscape = 12,
     /// Mode detection failed; recovered as a simple message.
     AmbiguousMessageMode = 13,
+    /// A required `s` separator (at least one `ws`) was missing between
+    /// adjacent productions (e.g. `.local$x`, `{$x:func}`, `{#tag@attr}`).
+    MissingRequiredWhitespace = 14,
+    /// A `namespace ":"` was given but the trailing `name` was absent
+    /// (e.g. `{:foo:}`, `{#ns:}`).
+    MissingIdentifierName = 15,
 }
 
 impl DiagnosticCode {
@@ -85,6 +91,10 @@ impl DiagnosticCode {
             Self::AmbiguousMessageMode => {
                 "ambiguous message mode; recovered as a simple message"
             }
+            Self::MissingRequiredWhitespace => {
+                "missing required whitespace between productions"
+            }
+            Self::MissingIdentifierName => "missing identifier name after ':'",
         }
     }
 
@@ -217,7 +227,7 @@ pub struct DiagnosticRef<'a> {
     pub(crate) record: &'a DiagnosticRecord,
 }
 
-impl<'a> DiagnosticRef<'a> {
+impl DiagnosticRef<'_> {
     pub fn code(&self) -> DiagnosticCode {
         self.record.code()
     }
@@ -261,7 +271,7 @@ pub struct DiagnosticIter<'a> {
     cursor: usize,
 }
 
-impl<'a> Iterator for DiagnosticIter<'a> {
+impl Iterator for DiagnosticIter<'_> {
     type Item = Diagnostic;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -281,22 +291,43 @@ fn diagnostic_severity_from_u8(value: u8) -> DiagnosticSeverity {
 }
 
 fn diagnostic_code_from_u16(value: u16) -> DiagnosticCode {
-    use DiagnosticCode::*;
     match value {
-        v if v == UnexpectedEndOfInput as u16 => UnexpectedEndOfInput,
-        v if v == UnclosedExpression as u16 => UnclosedExpression,
-        v if v == UnclosedQuotedLiteral as u16 => UnclosedQuotedLiteral,
-        v if v == UnclosedQuotedPattern as u16 => UnclosedQuotedPattern,
-        v if v == InvalidDeclarationStart as u16 => InvalidDeclarationStart,
-        v if v == InvalidMatcherSyntax as u16 => InvalidMatcherSyntax,
-        v if v == InvalidVariantBoundary as u16 => InvalidVariantBoundary,
-        v if v == InvalidMarkupBoundary as u16 => InvalidMarkupBoundary,
-        v if v == MissingComplexBody as u16 => MissingComplexBody,
-        v if v == UnexpectedToken as u16 => UnexpectedToken,
-        v if v == SpanOverflow as u16 => SpanOverflow,
-        v if v == InvalidEscape as u16 => InvalidEscape,
-        v if v == AmbiguousMessageMode as u16 => AmbiguousMessageMode,
-        _ => Unspecified,
+        v if v == DiagnosticCode::UnexpectedEndOfInput as u16 => {
+            DiagnosticCode::UnexpectedEndOfInput
+        }
+        v if v == DiagnosticCode::UnclosedExpression as u16 => DiagnosticCode::UnclosedExpression,
+        v if v == DiagnosticCode::UnclosedQuotedLiteral as u16 => {
+            DiagnosticCode::UnclosedQuotedLiteral
+        }
+        v if v == DiagnosticCode::UnclosedQuotedPattern as u16 => {
+            DiagnosticCode::UnclosedQuotedPattern
+        }
+        v if v == DiagnosticCode::InvalidDeclarationStart as u16 => {
+            DiagnosticCode::InvalidDeclarationStart
+        }
+        v if v == DiagnosticCode::InvalidMatcherSyntax as u16 => {
+            DiagnosticCode::InvalidMatcherSyntax
+        }
+        v if v == DiagnosticCode::InvalidVariantBoundary as u16 => {
+            DiagnosticCode::InvalidVariantBoundary
+        }
+        v if v == DiagnosticCode::InvalidMarkupBoundary as u16 => {
+            DiagnosticCode::InvalidMarkupBoundary
+        }
+        v if v == DiagnosticCode::MissingComplexBody as u16 => DiagnosticCode::MissingComplexBody,
+        v if v == DiagnosticCode::UnexpectedToken as u16 => DiagnosticCode::UnexpectedToken,
+        v if v == DiagnosticCode::SpanOverflow as u16 => DiagnosticCode::SpanOverflow,
+        v if v == DiagnosticCode::InvalidEscape as u16 => DiagnosticCode::InvalidEscape,
+        v if v == DiagnosticCode::AmbiguousMessageMode as u16 => {
+            DiagnosticCode::AmbiguousMessageMode
+        }
+        v if v == DiagnosticCode::MissingRequiredWhitespace as u16 => {
+            DiagnosticCode::MissingRequiredWhitespace
+        }
+        v if v == DiagnosticCode::MissingIdentifierName as u16 => {
+            DiagnosticCode::MissingIdentifierName
+        }
+        _ => DiagnosticCode::Unspecified,
     }
 }
 
@@ -376,9 +407,11 @@ mod tests {
             SpanOverflow,
             InvalidEscape,
             AmbiguousMessageMode,
+            MissingRequiredWhitespace,
+            MissingIdentifierName,
         ] {
             let msg = code.static_message();
-            assert!(!msg.is_empty(), "missing message for {:?}", code);
+            assert!(!msg.is_empty(), "missing message for {code:?}");
         }
     }
 

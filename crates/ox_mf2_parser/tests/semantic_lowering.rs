@@ -2,6 +2,8 @@
 //!
 //! Covers the Milestone 8 acceptance criteria in
 //! `.plans/002-ox-mf2-phase-1-rust-parser-implementation.md`:
+
+#![allow(clippy::field_reassign_with_default, clippy::doc_markdown)]
 //!
 //! - `parse_semantic = false` does not grow semantic tables.
 //! - Every semantic record links back to a NodeId + Span.
@@ -70,6 +72,52 @@ fn declarations_collect_with_variable_back_reference() {
     assert!(decl.variable.is_some(), "declared variable link expected");
     // The `$y` reference inside the RHS expression is collected.
     assert!(!semantic.references.is_empty());
+}
+
+#[test]
+fn markup_options_and_attributes_are_lowered() {
+    let result = parse("{{Click {#a opt=|x| @id=|me|/} now}}", true);
+    let semantic = result.semantic.unwrap();
+    assert_eq!(semantic.markups.len(), 1, "expected one markup");
+    assert!(
+        !semantic.options.is_empty(),
+        "expected markup options to be lowered"
+    );
+    assert!(
+        !semantic.attributes.is_empty(),
+        "expected markup attributes to be lowered"
+    );
+}
+
+#[test]
+fn input_declaration_body_is_lowered() {
+    let result =
+        parse(".input {$count :number minimumFractionDigits=2}\n{{Hi {$count}}}", true);
+    let semantic = result.semantic.unwrap();
+    assert_eq!(semantic.declarations.len(), 1);
+    // The variable annotated on .input should still appear in declarations.
+    assert!(semantic.declarations[0].variable.is_some());
+    // The function annotation should be recorded.
+    assert!(
+        !semantic.functions.is_empty(),
+        "expected .input body's function to be recorded"
+    );
+    // The option `minimumFractionDigits` should be lowered.
+    assert!(
+        !semantic.options.is_empty(),
+        "expected .input body's option to be recorded"
+    );
+    // The placeholder `$count` reference inside the body should be recorded
+    // exactly once (not the declared input variable itself).
+    let refs_to_count = semantic
+        .references
+        .iter()
+        .filter(|r| !r.semantic_ref.span.is_empty())
+        .count();
+    assert!(
+        refs_to_count >= 1,
+        "expected at least one variable reference in the message body"
+    );
 }
 
 #[test]

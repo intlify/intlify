@@ -12,7 +12,7 @@
 //! - No selector coverage analysis, no duplicate-name policy, no runtime
 //!   fallback resolution.
 //!
-//! See `design/002-ox-mf2-phase-1-rust-parser-design.md` §"SemanticModel
+//! See `design/002-ox-mf2-phase-1-rust-parser-design.md` §"`SemanticModel`
 //! Design" for the longer-form rationale.
 
 use crate::diagnostic::Diagnostic;
@@ -256,6 +256,26 @@ fn lower_message_children(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                     kind: DeclarationKind::Input,
                     variable: variable.or(placeholder_var),
                 });
+                // Walk the input declaration body so its expression / function
+                // / options / attributes / literal references land in the
+                // semantic tables. Skip the declared variable itself (it
+                // already lives in `DeclarationRecord::variable`) by walking
+                // the placeholder subtree only.
+                if let Some(placeholder) =
+                    find_first_node(&n, SyntaxKind::Placeholder)
+                {
+                    collect_placeholder(&placeholder, model);
+                    // `collect_placeholder` registers the declared variable
+                    // as a reference too — drop that last entry so input
+                    // declarations don't shadow themselves as a reference.
+                    if let Some(var) = variable.or(placeholder_var) {
+                        if let Some(last) = model.references.last() {
+                            if last.semantic_ref.node == var.node {
+                                model.references.pop();
+                            }
+                        }
+                    }
+                }
             }
             SyntaxKind::LocalDeclaration => {
                 let variable = find_first_node(&n, SyntaxKind::Variable).map(semantic_ref_of);
@@ -344,6 +364,10 @@ fn collect_placeholder(node: &CstNodeView<'_>, model: &mut SemanticModel) {
                     semantic_ref: semantic_ref(&n),
                     kind,
                 });
+                // Markup carries options and attributes too — walk into the
+                // node so duplicate-option-name / `u:dir` markup linting can
+                // see them from the semantic model alone.
+                walk_for_expressions(&n, model);
             }
             _ => {}
         }
@@ -364,8 +388,10 @@ fn detect_markup_kind(node: &CstNodeView<'_>) -> MarkupKind {
     }
     match (saw_hash, saw_slash) {
         (true, true) => MarkupKind::Standalone,
-        (true, false) => MarkupKind::Open,
         (false, true) => MarkupKind::Close,
+        // (true, false) and the (false, false) fallback both mean "open" —
+        // the parser only emits a sigil-less markup node when recovery
+        // synthesises one, in which case Open is the safest default.
         _ => MarkupKind::Open,
     }
 }

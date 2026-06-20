@@ -1,0 +1,21 @@
+Root @ 0..16
+  SimpleMessage @ 0..16
+    Pattern @ 0..16
+      Placeholder @ 0..16
+        FunctionExpression @ 0..16
+          TOKEN LeftBraceToken @ 0..1 "{"
+          Function @ 1..15
+            TOKEN ColonToken @ 1..2 ":"
+            Identifier @ 2..4
+              TOKEN NameToken @ 2..4 "fn"
+            Option @ 5..15
+              Identifier @ 5..9
+                TOKEN NameToken @ 5..8 "opt"
+                TOKEN ColonToken @ 8..9 ":"
+                Missing @ 9..9
+              TOKEN EqualsToken @ 9..10 "="
+              UnquotedLiteral @ 10..15
+                TOKEN NameToken @ 10..15 "value"
+          TOKEN RightBraceToken @ 15..16 "}"
+--diagnostics--
+MissingIdentifierName @ 8..9 (line 1, col 9): missing identifier name after ':'

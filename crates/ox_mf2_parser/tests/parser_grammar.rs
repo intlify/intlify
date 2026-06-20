@@ -149,6 +149,38 @@ fn input_declaration_followed_by_quoted_pattern() {
 }
 
 #[test]
+fn matcher_accepts_numeric_exact_keys() {
+    let (sources, result) = parse(".match $count\n0 {{none}}\n1 {{one}}\n* {{other}}");
+    assert!(
+        result.diagnostics.is_empty(),
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+    let view = CstView::new(&sources, result.source, &result.cst);
+    let root = view.root().unwrap();
+    let kinds = collect_kinds(root);
+    assert!(kinds.contains(&SyntaxKind::Matcher));
+    // Three variants (0, 1, *).
+    let variant_count = kinds.iter().filter(|k| **k == SyntaxKind::Variant).count();
+    assert_eq!(variant_count, 3);
+    let variant_key_count = kinds
+        .iter()
+        .filter(|k| **k == SyntaxKind::VariantKey)
+        .count();
+    assert_eq!(variant_key_count, 2, "expected two numeric VariantKeys");
+}
+
+#[test]
+fn matcher_accepts_fractional_exact_key() {
+    let (_, result) = parse(".match $price\n1.5 {{half}}\n* {{other}}");
+    assert!(
+        result.diagnostics.is_empty(),
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn local_declaration_followed_by_matcher() {
     let (sources, result) = parse(".local $x = {$y}\n.match $x\n* {{fallback}}");
     assert!(

@@ -16,6 +16,9 @@
 //! - Predicates (`is_ws`, `is_bidi`, `is_text_char`, `is_name_start`, etc.)
 //!   match the WG spec ABNF byte-for-byte; tests pin the exclusion edges.
 
+#![allow(clippy::while_let_loop)] // explicit loop {} + Some(b) else-break is
+                                   // clearer for the byte/codepoint dual paths.
+
 use crate::span::Span;
 
 /// Snapshotable scanner state. Embedded inside `parser::Checkpoint`.
@@ -154,7 +157,7 @@ pub(crate) fn is_ws_byte(b: u8) -> bool {
 
 #[inline]
 pub(crate) fn is_ws_char(c: char) -> bool {
-    is_ws_byte(c as u32 as u8 & 0xFF) && (c as u32) < 0x80 || c as u32 == 0x3000
+    is_ws_byte(c as u32 as u8) && (c as u32) < 0x80 || c as u32 == 0x3000
 }
 
 /// `bidi = %x061C / %x200E / %x200F / %x2066-2069`
@@ -242,7 +245,7 @@ pub(crate) fn is_name_char(c: char) -> bool {
 /// Shared body of [`is_name_start`] / [`is_name_char`] for code points
 /// `>= 0xA1`. Encodes the ranges from `message.abnf` directly.
 fn is_unicode_name_codepoint(cp: u32) -> bool {
-    if cp > 0x10FFFD {
+    if cp > 0x0010_FFFD {
         return false;
     }
     // BidiControl: 0x061C, 0x200E-0x200F, 0x202A-0x202E, 0x2066-0x2069
@@ -288,7 +291,7 @@ pub(crate) fn detect_keyword(cursor: &Cursor<'_>) -> Option<KeywordHit> {
     None
 }
 
-impl<'src> Cursor<'src> {
+impl Cursor<'_> {
     /// Read-only `try_eat` that does not advance the cursor.
     #[inline]
     pub(crate) fn try_eat_at_offset(&self, prefix: &[u8]) -> bool {
@@ -309,64 +312,25 @@ pub enum KeywordHit {
 
 impl KeywordHit {
     pub const fn length(self) -> u32 {
+        // All three keywords are `.<five-letter-name>` → 6 bytes.
         match self {
-            Self::Input => 6,  // ".input"
-            Self::Local => 6,  // ".local"
-            Self::Match => 6,  // ".match"
+            Self::Input | Self::Local | Self::Match => 6,
         }
     }
 }
 
 // ─────────────────────────── Scan routines ───────────────────────────────
 
-/// Scan whitespace and bidi marks. Returns the span covered. Used to fill
-/// `ws` and `o` / `s` regions of the grammar. Trivia collection happens at
-/// the parser layer using the returned span.
-pub(crate) fn scan_trivia(cursor: &mut Cursor<'_>, mode: TriviaMode) -> Span {
-    let start = cursor.offset();
-    loop {
-        let Some(b) = cursor.peek_byte() else { break };
-        if b < 0x80 {
-            if !(mode.allow_ws() && is_ws_byte(b)) {
-                break;
-            }
-            cursor.offset += 1;
-        } else {
-            // Slow path — only Unicode whitespace (`\u{3000}`) or bidi marks
-            // can extend trivia.
-            let Some((c, len)) = cursor.peek_char() else { break };
-            let is_unicode_ws = c as u32 == 0x3000;
-            let is_bidi = is_bidi_char(c);
-            let accept = (mode.allow_ws() && is_unicode_ws) || (mode.allow_bidi() && is_bidi);
-            if !accept {
-                break;
-            }
-            cursor.offset += len;
-        }
-    }
-    cursor.span_from(start)
-}
-
-/// Trivia scan flavour.
+/// Trivia scan flavour. The parser layer scans `ws` / `bidi` directly through
+/// [`Parser::eat_trivia`] and uses this enum only to document intent — the
+/// classifier is the same in both cases. `Required` callers must also verify
+/// that at least one `ws` was consumed to satisfy the spec `s = *bidi ws o`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TriviaMode {
     /// Spec `o = *(ws / bidi)`.
     Optional,
-    /// Spec `s = *bidi ws o` — at least one `ws` must exist, but the helper
-    /// itself just skips the run; the parser decides if it was enough.
+    /// Spec `s = *bidi ws o`.
     Required,
-}
-
-impl TriviaMode {
-    #[inline]
-    pub const fn allow_ws(self) -> bool {
-        true
-    }
-
-    #[inline]
-    pub const fn allow_bidi(self) -> bool {
-        true
-    }
 }
 
 /// Scan a `text-char` / `escaped-char` run inside a `pattern`. Stops at the
@@ -604,7 +568,7 @@ mod tests {
         assert!(!is_text_char('}'));
         assert!(!is_text_char('\\'));
 
-        assert!(is_quoted_char('|') == false);
+        assert!(!is_quoted_char('|'));
         assert!(is_quoted_char('a'));
 
         assert!(!is_simple_start_char('.'));
@@ -643,16 +607,6 @@ mod tests {
         }
         assert!(detect_keyword(&Cursor::new(".other")).is_none());
         assert!(detect_keyword(&Cursor::new("input")).is_none());
-    }
-
-    #[test]
-    fn scan_trivia_skips_ws_and_bidi() {
-        let mut c = Cursor::new("\t \u{200E}\u{3000}rest");
-        let span = scan_trivia(&mut c, TriviaMode::Optional);
-        assert_eq!(span.start, 0);
-        // \t + ' ' + LRM(3 bytes) + IDEOGRAPHIC SPACE(3 bytes) = 1+1+3+3 = 8
-        assert_eq!(span.end, 8);
-        assert_eq!(c.peek_byte(), Some(b'r'));
     }
 
     #[test]

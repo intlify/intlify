@@ -1,0 +1,24 @@
+Root @ 0..14
+  SimpleMessage @ 0..14
+    Pattern @ 0..14
+      Placeholder @ 0..14
+        LiteralExpression @ 0..14
+          TOKEN LeftBraceToken @ 0..1 "{"
+          QuotedLiteral @ 1..4
+            TOKEN PipeToken @ 1..2 "|"
+            TOKEN QuotedTextToken @ 2..3 "x"
+            TOKEN PipeToken @ 3..4 "|"
+          Attribute @ 5..13
+            TOKEN AtToken @ 5..6 "@"
+            Identifier @ 6..9
+              TOKEN NameToken @ 6..8 "ns"
+              TOKEN ColonToken @ 8..9 ":"
+              Missing @ 9..9
+            TOKEN EqualsToken @ 9..10 "="
+            QuotedLiteral @ 10..13
+              TOKEN PipeToken @ 10..11 "|"
+              TOKEN QuotedTextToken @ 11..12 "v"
+              TOKEN PipeToken @ 12..13 "|"
+          TOKEN RightBraceToken @ 13..14 "}"
+--diagnostics--
+MissingIdentifierName @ 8..9 (line 1, col 9): missing identifier name after ':'
