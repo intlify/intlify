@@ -32,5 +32,9 @@ cast_lossless = "allow"
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+# Full (fat) LTO — slower to link but lets the inliner cross every
+# crate boundary in the workspace, including the parser <-> scanner
+# split. Measured against the bench harness, full LTO consistently
+# beats thin on the parser hot path.
+lto = "fat"
 codegen-units = 1
