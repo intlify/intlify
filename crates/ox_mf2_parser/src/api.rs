@@ -98,12 +98,12 @@ pub fn parse_message(_source: &str) -> ParseResult {
 
 pub fn parse_source_session<'a>(
     sources: &'a SourceStore,
-    _source_id: SourceId,
+    source_id: SourceId,
     workspace: &'a mut ParseWorkspace,
     _options: ParseOptions,
 ) -> ParseSessionResult<'a> {
     workspace.clear();
-    let cst = CstView::new(sources, &workspace.parser.tables);
+    let cst = CstView::new(sources, source_id, &workspace.parser.tables);
     let diagnostics = DiagnosticView {
         sources,
         records: &workspace.parser.diagnostics,

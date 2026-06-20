@@ -37,6 +37,9 @@ pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView
 pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore};
 pub use span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
 pub use syntax_kind::SyntaxKind;
-pub use tables::CstTables;
-pub use view::{CstChildren, CstNodeView, CstView};
+pub use tables::{CstCapacity, CstTables};
+pub use view::{
+    CstChild, CstChildren, CstNodeTokens, CstNodeView, CstTokenView, CstTriviaRange,
+    CstTriviaView, CstView,
+};
 pub use workspace::{ParseCapacity, ParseWorkspace};
