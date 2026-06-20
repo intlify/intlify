@@ -281,21 +281,21 @@ fn is_unicode_name_codepoint(cp: u32) -> bool {
 }
 
 /// Returns true if `prefix` starts with a `.` followed by an ASCII keyword.
+///
+/// Branches on the second byte (`i`/`l`/`m`) before reaching for the full
+/// 6-byte compare so a hit costs exactly one cheap dispatch + one
+/// `try_eat_at_offset` instead of running every candidate sequentially.
 #[inline]
 pub(crate) fn detect_keyword(cursor: &Cursor<'_>) -> Option<KeywordHit> {
     if cursor.peek_byte() != Some(b'.') {
         return None;
     }
-    if cursor.try_eat_at_offset(b".input") {
-        return Some(KeywordHit::Input);
+    match cursor.peek_byte_at(1) {
+        Some(b'i') if cursor.try_eat_at_offset(b".input") => Some(KeywordHit::Input),
+        Some(b'l') if cursor.try_eat_at_offset(b".local") => Some(KeywordHit::Local),
+        Some(b'm') if cursor.try_eat_at_offset(b".match") => Some(KeywordHit::Match),
+        _ => None,
     }
-    if cursor.try_eat_at_offset(b".local") {
-        return Some(KeywordHit::Local);
-    }
-    if cursor.try_eat_at_offset(b".match") {
-        return Some(KeywordHit::Match);
-    }
-    None
 }
 
 impl Cursor<'_> {

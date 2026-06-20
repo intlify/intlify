@@ -240,6 +240,11 @@ impl CstBuilder {
         Self::default()
     }
 
+    /// Snapshot every staging length at once. The parser hot path now
+    /// reads individual fields directly off the backing vectors (see
+    /// `commit_token` / `eat_trivia`), so this is only used by the
+    /// rollback path and the table-level unit tests.
+    #[allow(dead_code)]
     pub fn lengths(&self) -> BuilderLengths {
         BuilderLengths {
             nodes: self.tables.nodes.len() as u32,

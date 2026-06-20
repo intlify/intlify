@@ -6,7 +6,7 @@
 //! batch parsing, benchmark loops, and LSP sessions stay allocation-flat.
 //! Capacity is released only on [`Self::shrink_to_fit`] or [`Drop`].
 
-use crate::diagnostic::DiagnosticRecord;
+use crate::diagnostic::{DiagnosticLabelRecord, DiagnosticRecord};
 use crate::tables::{CstCapacity, CstEdgeRecord, CstTables};
 
 /// Pre-sizing hint passed to [`ParseWorkspace::with_capacity`].
@@ -50,14 +50,16 @@ impl ParseCapacity {
 
 /// Internal parser-side workspace.
 ///
-/// `pending_edges` and `frame_starts` live here (not inside the short-lived
-/// `CstBuilder`) so their capacity is preserved across repeated parses —
-/// the parser swaps the buffers into a builder for the duration of one
-/// `run_parse` and swaps them back when it finishes.
+/// `pending_edges`, `frame_starts`, and `labels` live here (not inside the
+/// short-lived `CstBuilder` / temporary in `run_parse`) so their capacity
+/// is preserved across repeated parses — the parser borrows the buffers
+/// for the duration of one `run_parse` and they stay reserved between
+/// calls.
 #[derive(Debug, Default)]
 pub(crate) struct ParserWorkspace {
     pub tables: CstTables,
     pub diagnostics: Vec<DiagnosticRecord>,
+    pub labels: Vec<DiagnosticLabelRecord>,
     pub pending_edges: Vec<CstEdgeRecord>,
     pub frame_starts: Vec<u32>,
 }
@@ -66,6 +68,7 @@ impl ParserWorkspace {
     pub fn clear(&mut self) {
         self.tables.clear();
         self.diagnostics.clear();
+        self.labels.clear();
         // The staging stacks must be empty after a balanced parse; clearing
         // is a no-op on the success path but keeps capacity reserved.
         self.pending_edges.clear();
@@ -93,6 +96,7 @@ impl ParserWorkspace {
     pub fn shrink_to_fit(&mut self) {
         self.tables.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
+        self.labels.shrink_to_fit();
         self.pending_edges.shrink_to_fit();
         self.frame_starts.shrink_to_fit();
     }

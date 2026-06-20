@@ -21,7 +21,7 @@
                                    // hot parsing routines.
 
 use crate::api::ParseOptions;
-use crate::diagnostic::{DiagnosticCode, DiagnosticLabelRecord, DiagnosticSink};
+use crate::diagnostic::{DiagnosticCode, DiagnosticSink};
 use crate::scanner::{
     detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, peek_trivia, scan_name,
     scan_quoted_text_run, scan_text_run, scan_unquoted_literal, TriviaMode,
@@ -61,21 +61,23 @@ pub(crate) fn run_parse(
 
     let cursor = Cursor::new(&file.text);
 
-    // Temporary label-record buffer. Phase 1 never emits labels, but the
-    // sink keeps the API ready for Milestone 8 semantic diagnostics.
-    let mut labels: Vec<DiagnosticLabelRecord> = Vec::new();
-
     let mut builder = CstBuilder::new();
     // Move pre-allocated tables AND staging stacks out of the workspace into
     // the builder so the parser can grow them without aliasing trouble; we
     // swap them back when parsing finishes. Keeping the staging stacks in
-    // the workspace lets repeated parses reuse their capacity.
+    // the workspace lets repeated parses reuse their capacity. `labels` is
+    // taken by mutable reference further down rather than swapped because
+    // it has no aliasing problem (only the diagnostic sink touches it).
     core::mem::swap(&mut builder.tables, &mut workspace.parser.tables);
     core::mem::swap(&mut builder.pending_edges, &mut workspace.parser.pending_edges);
     core::mem::swap(&mut builder.frame_starts, &mut workspace.parser.frame_starts);
 
     {
-        let sink = DiagnosticSink::new(&mut workspace.parser.diagnostics, &mut labels);
+        let (diagnostics_buf, labels_buf) = (
+            &mut workspace.parser.diagnostics,
+            &mut workspace.parser.labels,
+        );
+        let sink = DiagnosticSink::new(diagnostics_buf, labels_buf);
         let mut parser = Parser {
             cursor,
             source: source_id,
@@ -1154,7 +1156,9 @@ impl Parser<'_, '_> {
             return stats;
         }
 
-        let trivia_start = self.builder.lengths().trivia;
+        // Direct field read — the BuilderLengths struct path packed five
+        // other fields we don't need on the hot trivia commit path.
+        let trivia_start = self.builder.tables.trivia.len() as u32;
         // Active run state: kind being collected and the byte offset where
         // the current run started. `None` means we haven't started a run.
         let mut run_kind: Option<SyntaxKind> = None;
@@ -1265,7 +1269,10 @@ impl Parser<'_, '_> {
     /// Commit a token whose `first_trivia` / `leading_trivia_count` are
     /// resolved from the trivia accumulated since the last commit.
     fn commit_token(&mut self, kind: SyntaxKind, span: Span) -> TokenId {
-        let trivia_len_now = self.builder.lengths().trivia;
+        // Direct field read — commit_token runs per committed token, the
+        // BuilderLengths struct path was packing five other fields each
+        // call only to discard them.
+        let trivia_len_now = self.builder.tables.trivia.len() as u32;
         let first_trivia = self.pending_trivia_start;
         let leading_count = trivia_len_now.saturating_sub(first_trivia) as u16;
         let id = self.builder.push_token(
