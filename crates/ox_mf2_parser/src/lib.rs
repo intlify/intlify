@@ -31,7 +31,10 @@ pub use api::{
     BatchParseItem, BatchParseOptions, BatchParseResult, ParseInput, ParseOptions, ParseResult,
     ParseSessionResult,
 };
-pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticSeverity, DiagnosticView};
+pub use diagnostic::{
+    Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef,
+    DiagnosticSeverity, DiagnosticView,
+};
 pub use scanner::ScannerState;
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
 pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore};

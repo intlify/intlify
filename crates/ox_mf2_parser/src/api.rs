@@ -189,7 +189,7 @@ pub fn parse_batch(inputs: &[ParseInput<'_>], options: BatchParseOptions) -> Bat
 }
 
 fn materialise(
-    _sources: &SourceStore,
+    sources: &SourceStore,
     source_id: SourceId,
     workspace: &ParseWorkspace,
     options: ParseOptions,
@@ -200,8 +200,12 @@ fn materialise(
     } else {
         None
     };
-    // Public Diagnostic conversion lands with Milestone 4.
-    let diagnostics = Vec::new();
+    let diagnostics = DiagnosticView {
+        sources,
+        records: &workspace.parser.diagnostics,
+    }
+    .iter()
+    .collect();
     ParseResult {
         source: source_id,
         cst,
