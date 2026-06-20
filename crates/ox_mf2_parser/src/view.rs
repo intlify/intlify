@@ -6,7 +6,7 @@
 //! allocation-free for formatters, linters, and snapshot writers.
 
 use crate::source::SourceStore;
-use crate::span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId};
+use crate::span::{NodeId, SourceId, Span, TokenId, TriviaId};
 use crate::syntax_kind::SyntaxKind;
 use crate::tables::{CstEdgeKind, CstTables};
 
@@ -128,30 +128,30 @@ impl<'a> CstNodeView<'a> {
     }
 
     pub fn kind(&self) -> SyntaxKind {
-        let rec = self.view.tables.node(self.id).expect("valid node id");
+        // The id was minted by the parser into the same `view.tables`, so
+        // the unchecked accessor is safe. Single index instead of
+        // `.get(...).expect(...)`.
+        let rec = self.view.tables.node_at(self.id);
         kind_from_u16(rec.kind)
     }
 
     pub fn span(&self) -> Span {
-        let rec = self.view.tables.node(self.id).expect("valid node id");
+        let rec = self.view.tables.node_at(self.id);
         Span::new(rec.span_start, rec.span_end)
     }
 
     pub fn child_count(&self) -> u32 {
-        self.view
-            .tables
-            .node(self.id)
-            .map_or(0, |rec| rec.child_count)
+        self.view.tables.node_at(self.id).child_count
     }
 
     /// Iterator over all children — nodes or tokens — in source order.
     pub fn children(&self) -> CstChildren<'a> {
-        let rec = self.view.tables.node(self.id).expect("valid node id");
+        let rec = self.view.tables.node_at(self.id);
+        let edges = self.view.tables.edges_for(rec);
         CstChildren {
             view: self.view,
-            start: rec.first_child,
-            end: rec.first_child + rec.child_count,
-            cursor: rec.first_child,
+            edges,
+            cursor: 0,
         }
     }
 
@@ -180,22 +180,22 @@ impl<'a> CstTokenView<'a> {
     }
 
     pub fn kind(&self) -> SyntaxKind {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         kind_from_u16(rec.kind)
     }
 
     pub fn span(&self) -> Span {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         Span::new(rec.span_start, rec.span_end)
     }
 
     pub fn source_id(&self) -> SourceId {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         SourceId::new(rec.source_id)
     }
 
     pub fn text(&self) -> &'a str {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         self.view
             .sources
             .slice_in(SourceId::new(rec.source_id), Span::new(rec.span_start, rec.span_end))
@@ -203,7 +203,7 @@ impl<'a> CstTokenView<'a> {
 
     /// Compact leading-trivia range belonging to this token.
     pub fn leading_trivia(&self) -> CstTriviaRange<'a> {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         CstTriviaRange {
             view: self.view,
             start: rec.first_trivia,
@@ -214,7 +214,7 @@ impl<'a> CstTokenView<'a> {
 
     /// Compact trailing-trivia range belonging to this token.
     pub fn trailing_trivia(&self) -> CstTriviaRange<'a> {
-        let rec = self.view.tables.token(self.id).expect("valid token id");
+        let rec = self.view.tables.token_at(self.id);
         let start = rec.first_trivia + u32::from(rec.leading_trivia_count);
         let end = start + u32::from(rec.trailing_trivia_count);
         CstTriviaRange {
@@ -243,34 +243,37 @@ impl<'a> CstTriviaView<'a> {
     }
 
     pub fn kind(&self) -> SyntaxKind {
-        let rec = self.view.tables.trivia(self.id).expect("valid trivia id");
+        let rec = self.view.tables.trivia_at(self.id);
         kind_from_u16(rec.kind)
     }
 
     pub fn span(&self) -> Span {
-        let rec = self.view.tables.trivia(self.id).expect("valid trivia id");
+        let rec = self.view.tables.trivia_at(self.id);
         Span::new(rec.span_start, rec.span_end)
     }
 
     pub fn source_id(&self) -> SourceId {
-        let rec = self.view.tables.trivia(self.id).expect("valid trivia id");
+        let rec = self.view.tables.trivia_at(self.id);
         SourceId::new(rec.source_id)
     }
 
     pub fn text(&self) -> &'a str {
-        let rec = self.view.tables.trivia(self.id).expect("valid trivia id");
+        let rec = self.view.tables.trivia_at(self.id);
         self.view
             .sources
             .slice_in(SourceId::new(rec.source_id), Span::new(rec.span_start, rec.span_end))
     }
 }
 
-/// Iterator over a contiguous edge range yielding [`CstChild`] values.
+/// Iterator over a contiguous edge slice yielding [`CstChild`] values.
+///
+/// Holds a slice into the table's edge buffer rather than table-range
+/// indices, so each `next()` reads exactly one record without a second
+/// bounds-check pass through `CstTables::edge`.
 #[derive(Debug, Clone, Copy)]
 pub struct CstChildren<'a> {
     pub(crate) view: CstView<'a>,
-    pub(crate) start: u32,
-    pub(crate) end: u32,
+    pub(crate) edges: &'a [crate::tables::CstEdgeRecord],
     pub(crate) cursor: u32,
 }
 
@@ -283,12 +286,8 @@ impl<'a> Iterator for CstChildren<'a> {
     type Item = CstChild<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.end {
-            return None;
-        }
-        let edge_id = EdgeId::new(self.cursor);
+        let edge = self.edges.get(self.cursor as usize)?;
         self.cursor += 1;
-        let edge = self.view.tables.edge(edge_id)?;
         let kind = if edge.kind == CstEdgeKind::Token as u16 {
             CstChild::Token(CstTokenView::new(self.view, TokenId::new(edge.ref_id)))
         } else {
@@ -298,7 +297,7 @@ impl<'a> Iterator for CstChildren<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = (self.end - self.cursor) as usize;
+        let remaining = self.edges.len().saturating_sub(self.cursor as usize);
         (remaining, Some(remaining))
     }
 }
@@ -307,7 +306,7 @@ impl ExactSizeIterator for CstChildren<'_> {}
 
 impl CstChildren<'_> {
     pub fn reset(&mut self) {
-        self.cursor = self.start;
+        self.cursor = 0;
     }
 }
 
@@ -348,9 +347,14 @@ impl<'a> Iterator for CstTriviaRange<'a> {
         if self.cursor >= self.end {
             return None;
         }
+        // Out-of-range here would mean the parser handed us a bogus
+        // first_trivia/leading_trivia_count pair — never expected on the
+        // success path. Mirror the safe-Option contract for defensive use.
+        if self.cursor as usize >= self.view.tables.trivia_count() {
+            return None;
+        }
         let id = TriviaId::new(self.cursor);
         self.cursor += 1;
-        self.view.tables.trivia(id)?;
         Some(CstTriviaView::new(self.view, id))
     }
 

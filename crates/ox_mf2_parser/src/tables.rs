@@ -9,7 +9,7 @@
 //! Record layouts are pinned by `size_of` tests so accidental field growth
 //! shows up at compile time rather than as a cache regression later.
 
-use crate::span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
+use crate::span::{NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
 use crate::syntax_kind::SyntaxKind;
 
 /// Edge-payload kind: does the edge point at a node or a token?
@@ -149,24 +149,42 @@ impl CstTables {
         self.trivia.shrink_to_fit();
     }
 
+    // The optional `.get(...)` accessors used to back every public view
+    // method; P8 replaced them with `_at` shortcuts (always-in-bounds for
+    // parser-produced ids). Keep them `#[allow(dead_code)]` only if a
+    // future bounded-lookup caller resurfaces them — for now they would
+    // just bit-rot, so drop them.
+
+    // ── crate-internal fast accessors ──────────────────────────────────
+    //
+    // Callers below trust that the parser only ever hands them ids it
+    // produced itself, so the bounds check is amortised by indexing
+    // straight into the backing vector. The `_at` accessors panic in
+    // `debug` builds and use the slice's bounds check in `release`; the
+    // public `view::CstView` keeps the `Option` form for untrusted callers.
+
     #[inline]
-    pub(crate) fn node(&self, id: NodeId) -> Option<&CstNodeRecord> {
-        self.nodes.get(id.index())
+    pub(crate) fn node_at(&self, id: NodeId) -> &CstNodeRecord {
+        &self.nodes[id.index()]
     }
 
     #[inline]
-    pub(crate) fn token(&self, id: TokenId) -> Option<&TokenRecord> {
-        self.tokens.get(id.index())
+    pub(crate) fn token_at(&self, id: TokenId) -> &TokenRecord {
+        &self.tokens[id.index()]
     }
 
     #[inline]
-    pub(crate) fn trivia(&self, id: TriviaId) -> Option<&TriviaRecord> {
-        self.trivia.get(id.index())
+    pub(crate) fn trivia_at(&self, id: TriviaId) -> &TriviaRecord {
+        &self.trivia[id.index()]
     }
 
+    /// Slice covering exactly the direct children of `node`. Replaces the
+    /// per-edge `tables.edge(id)?` lookup in hot traversal paths.
     #[inline]
-    pub(crate) fn edge(&self, id: EdgeId) -> Option<&CstEdgeRecord> {
-        self.edges.get(id.index())
+    pub(crate) fn edges_for(&self, node: &CstNodeRecord) -> &[CstEdgeRecord] {
+        let start = node.first_child as usize;
+        let end = start + node.child_count as usize;
+        &self.edges[start..end]
     }
 }
 
@@ -395,7 +413,7 @@ mod tests {
         b.push_token_edge(token);
         let node_id = b.finish_node(pending, 5);
 
-        let node = b.tables.node(node_id).unwrap();
+        let node = b.tables.node_at(node_id);
         assert_eq!(node.kind, SyntaxKind::Pattern.as_u16());
         assert_eq!(node.span_start, 0);
         assert_eq!(node.span_end, 5);
