@@ -1,6 +1,8 @@
 //! Batch-parse contract tests.
 //!
 //! Covers the Milestone 9 acceptance criteria:
+
+#![allow(clippy::field_reassign_with_default, dead_code)]
 //!
 //! - input order is preserved
 //! - `SourceId` <-> `ParseInput` metadata stays consistent
@@ -9,7 +11,7 @@
 //!   already satisfies this because the loop holds a single workspace).
 
 use ox_mf2_parser::{
-    parse_batch, BatchParseOptions, CstTables, ParseInput, ParseResult,
+    parse_batch, BatchExecution, BatchParseOptions, CstTables, ParseInput, ParseResult,
 };
 
 /// Compile-time `Send` assertion. If parser state ever picks up a `!Send`
@@ -100,6 +102,48 @@ fn batch_each_result_has_independent_cst_state() {
     assert!(count_a > 0);
     assert!(count_b > 0);
     assert_ne!(count_a, count_b);
+}
+
+#[test]
+fn batch_default_runs_sequentially_and_is_not_degraded() {
+    let inputs = vec![ParseInput {
+        source: "Hi",
+        ..Default::default()
+    }];
+    let result = parse_batch(&inputs, BatchParseOptions::default());
+    assert_eq!(result.execution, BatchExecution::Sequential);
+    assert!(!result.degraded);
+}
+
+#[test]
+fn batch_parallel_request_falls_back_to_sequential_and_is_marked_degraded() {
+    let inputs = vec![
+        ParseInput {
+            source: "Hello",
+            ..Default::default()
+        },
+        ParseInput {
+            source: "World",
+            ..Default::default()
+        },
+    ];
+    let mut options = BatchParseOptions::default();
+    options.execution = BatchExecution::Parallel;
+    options.max_threads = Some(4);
+    options.preserve_order = false;
+    let result = parse_batch(&inputs, options);
+    assert_eq!(
+        result.execution,
+        BatchExecution::Sequential,
+        "Phase 1 only implements sequential execution"
+    );
+    assert!(
+        result.degraded,
+        "Parallel request must be reported as degraded until Phase 2 lands"
+    );
+    // Order must still be preserved even when the caller asked for parallel.
+    assert_eq!(result.items[0].result.source, result.items[0].source);
+    assert_eq!(result.items[1].result.source, result.items[1].source);
 }
 
 #[test]

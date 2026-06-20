@@ -8,9 +8,9 @@
 //!    locality assumptions hold).
 //! 2. Diagnostic record buffers do not grow on a valid input's success
 //!    path (no allocated message strings, no orphan records).
-//! 3. ParseWorkspace reuse keeps allocator pressure flat across repeated
+//! 3. `ParseWorkspace` reuse keeps allocator pressure flat across repeated
 //!    parses of the same source (capacity is preserved, not regrown).
-//! 4. CstView traversal of a known input does not silently skip nodes.
+//! 4. `CstView` traversal of a known input does not silently skip nodes.
 //! 5. Recovery fixtures still produce exactly one useful diagnostic
 //!    rather than a cascade.
 

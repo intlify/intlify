@@ -123,6 +123,7 @@ impl Span {
 
     /// Inclusive cover of two spans (smallest span that contains both).
     #[inline]
+    #[must_use]
     pub fn cover(self, other: Self) -> Self {
         Self {
             start: self.start.min(other.start),

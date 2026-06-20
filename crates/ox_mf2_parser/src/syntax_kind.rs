@@ -11,13 +11,14 @@
 /// Shared classification for nodes, tokens, trivia, errors, and missing
 /// productions. Compact `u16` representation that is stored directly in node,
 /// token, and trivia records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u16)]
 #[non_exhaustive]
 pub enum SyntaxKind {
     // ── Sentinel ───────────────────────────────────────────────────────────
     /// Uninitialised slot. Never emitted by the parser; used as a default to
     /// detect forgotten initialisation in table builders.
+    #[default]
     Tombstone = 0,
 
     // ── Root / messages (1..10) ────────────────────────────────────────────
@@ -151,12 +152,6 @@ pub enum SyntaxKind {
     Missing = 301,
     /// Reserved escape hatch for future / forward-compatibility decoders.
     Unknown = 302,
-}
-
-impl Default for SyntaxKind {
-    fn default() -> Self {
-        Self::Tombstone
-    }
 }
 
 impl SyntaxKind {

@@ -3,6 +3,12 @@
 //! snapshot against the matching `.snap`. Set `UPDATE_SNAPSHOTS=1` in the
 //! environment to regenerate snapshots after an intentional change.
 
+#![allow(
+    clippy::format_push_string,
+    clippy::field_reassign_with_default,
+    clippy::manual_assert
+)]
+
 use ox_mf2_parser::{
     parse_source, CstChild, CstNodeView, CstView, ParseOptions, SourceFileInput, SourceStore,
     SyntaxKind,

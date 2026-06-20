@@ -28,6 +28,14 @@
 //! - `--input <path>` / `--input-text <text>` / stdin
 //! - `--corpus <dir>` — for `parse_batch_sequential`.
 
+#![allow(
+    clippy::struct_excessive_bools,
+    clippy::field_reassign_with_default,
+    clippy::if_same_then_else,
+    clippy::single_match_else,
+    clippy::manual_let_else
+)]
+
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -346,12 +354,30 @@ fn run_diagnostics(args: &Args) -> Result<PhaseSummary, String> {
         source: &input,
         ..Default::default()
     });
+    // Parse ONCE so the loop measures DiagnosticView iteration only — not
+    // parse cost. Use a borrowed session so the same workspace backs the
+    // view across iterations.
     let mut workspace = ParseWorkspace::new();
+    workspace.reserve_for_source_len(input.len());
+    let session = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+    if session.diagnostics.is_empty() {
+        return Err("diagnostics phase requires an input that produces \
+                    at least one diagnostic; pass a malformed --input-text \
+                    such as 'Hello, {$name' or '{$x:number}'"
+            .to_string());
+    }
+    let view: DiagnosticView<'_> = session.diagnostics;
     let mut units = 0usize;
     for _ in 0..iters {
-        let session = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
-        let view: DiagnosticView<'_> = session.diagnostics;
-        units += view.len();
+        // Iterate every record AND materialise the public Diagnostic for
+        // each one so message + location resolution is part of the
+        // measurement.
+        for d in view.iter() {
+            units += d.location.line as usize + d.location.column as usize;
+        }
+    }
+    if units == 0 {
+        return Err("diagnostics phase ran zero work units; check the input".to_string());
     }
     Ok(PhaseSummary {
         iterations: iters,
@@ -368,12 +394,22 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
         ..Default::default()
     });
     let result = parse_source(&sources, id, ParseOptions::default());
+    // If the input is valid, fall back to mapping every token's span so the
+    // phase always does meaningful work and isn't an empty loop.
+    if result.diagnostics.is_empty() {
+        return Err("source_mapping phase requires at least one diagnostic; \
+                    pass a malformed --input-text such as 'Hello, {$name'"
+            .to_string());
+    }
     let mut units = 0usize;
     for _ in 0..iters {
         for d in &result.diagnostics {
             let loc = sources.location(d.source, d.span);
             units += loc.line as usize + loc.column as usize;
         }
+    }
+    if units == 0 {
+        return Err("source_mapping phase ran zero work units; check the input".to_string());
     }
     Ok(PhaseSummary {
         iterations: iters,

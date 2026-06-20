@@ -95,7 +95,7 @@ pub enum CstChild<'a> {
     Token(CstTokenView<'a>),
 }
 
-impl<'a> CstChild<'a> {
+impl CstChild<'_> {
     pub fn span(&self) -> Span {
         match self {
             CstChild::Node(n) => n.span(),
@@ -274,6 +274,11 @@ pub struct CstChildren<'a> {
     pub(crate) cursor: u32,
 }
 
+// `CstChildren` is `Copy` for trivial reuse from callers; the iterator state
+// is a single u32 cursor so the cost of "consume-by-copy" is the same as
+// taking a mutable borrow. Tools that need fresh traversal just call `reset`
+// or copy the iterator before driving it.
+#[allow(clippy::copy_iterator)]
 impl<'a> Iterator for CstChildren<'a> {
     type Item = CstChild<'a>;
 
@@ -298,9 +303,9 @@ impl<'a> Iterator for CstChildren<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for CstChildren<'a> {}
+impl ExactSizeIterator for CstChildren<'_> {}
 
-impl<'a> CstChildren<'a> {
+impl CstChildren<'_> {
     pub fn reset(&mut self) {
         self.cursor = self.start;
     }
@@ -312,6 +317,7 @@ pub struct CstNodeTokens<'a> {
     pub(crate) children: CstChildren<'a>,
 }
 
+#[allow(clippy::copy_iterator)]
 impl<'a> Iterator for CstNodeTokens<'a> {
     type Item = CstTokenView<'a>;
 
@@ -334,6 +340,7 @@ pub struct CstTriviaRange<'a> {
     pub(crate) cursor: u32,
 }
 
+#[allow(clippy::copy_iterator)]
 impl<'a> Iterator for CstTriviaRange<'a> {
     type Item = CstTriviaView<'a>;
 
@@ -343,9 +350,7 @@ impl<'a> Iterator for CstTriviaRange<'a> {
         }
         let id = TriviaId::new(self.cursor);
         self.cursor += 1;
-        if self.view.tables.trivia(id).is_none() {
-            return None;
-        }
+        self.view.tables.trivia(id)?;
         Some(CstTriviaView::new(self.view, id))
     }
 
@@ -355,9 +360,9 @@ impl<'a> Iterator for CstTriviaRange<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for CstTriviaRange<'a> {}
+impl ExactSizeIterator for CstTriviaRange<'_> {}
 
-impl<'a> CstTriviaRange<'a> {
+impl CstTriviaRange<'_> {
     pub fn reset(&mut self) {
         self.cursor = self.start;
     }
