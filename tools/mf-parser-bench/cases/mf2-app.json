@@ -50,6 +50,14 @@
       "tags": ["app", "local", "match"],
       "expected": "parse-ok",
       "unsupportedBy": []
+    },
+    {
+      "id": "article-body-paragraph",
+      "source": "An article body paragraph showing the parser on a long text run. Translators usually produce sentences far longer than placeholder-only snippets, so a realistic application corpus needs at least one entry whose bulk is plain text. The parser walks until the next delimiter — here only a final period stops the run after the body finishes. Welcome, {$reader}, and enjoy the rest of the post.",
+      "description": "Long single-line app body with one trailing placeholder (text-run heavy).",
+      "tags": ["app", "text-heavy"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
     }
   ]
 }
