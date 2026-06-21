@@ -1,0 +1,60 @@
+# Normalize text files to LF in the repository regardless of platform.
+* text=auto eol=lf
+
+# Keep common source and config files consistently LF.
+*.md      text=auto eol=lf
+*.markdown text=auto eol=lf
+*.txt     text=auto eol=lf
+*.yml     text=auto eol=lf
+*.yaml    text=auto eol=lf
+*.json    text=auto eol=lf
+*.toml    text=auto eol=lf
+*.rs      text=auto eol=lf
+*.ts      text=auto eol=lf
+*.tsx     text=auto eol=lf
+*.js      text=auto eol=lf
+*.jsx     text=auto eol=lf
+*.mjs     text=auto eol=lf
+*.cjs     text=auto eol=lf
+*.html    text=auto eol=lf
+*.css     text=auto eol=lf
+*.scss    text=auto eol=lf
+*.sass    text=auto eol=lf
+*.vue     text=auto eol=lf
+*.xml     text=auto eol=lf
+*.sh      text=auto eol=lf
+*.sql     text=auto eol=lf
+*.graphql text=auto eol=lf
+*.gql     text=auto eol=lf
+*.svg     text=auto eol=lf
+*.lock    text=auto eol=lf
+
+# Exclude binaries from conversion.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.webp    binary
+*.avif    binary
+*.heic    binary
+*.ico     binary
+*.bmp     binary
+*.tiff    binary
+*.zip     binary
+*.jar     binary
+*.gz      binary
+*.tgz     binary
+*.bz2     binary
+*.xz      binary
+*.7z      binary
+*.pdf     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.otf     binary
+*.eot     binary
+*.wasm    binary
+*.so      binary
+*.dll     binary
+*.exe     binary
+*.class   binary
