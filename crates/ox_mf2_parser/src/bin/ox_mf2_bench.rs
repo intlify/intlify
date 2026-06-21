@@ -53,7 +53,10 @@
     clippy::field_reassign_with_default,
     clippy::if_same_then_else,
     clippy::single_match_else,
-    clippy::manual_let_else
+    clippy::manual_let_else,
+    // run_allocations reports per-iteration averages; the precision loss
+    // converting `usize` counts to `f64` is acceptable for a display value.
+    clippy::cast_precision_loss
 )]
 
 use std::fs;
@@ -68,6 +71,19 @@ use ox_mf2_parser::{
     SourceFileInput, SourceStore,
 };
 
+// `--phase allocations` routes every allocation in this binary through
+// `stats_alloc` so the runner can report per-iteration alloc count / bytes
+// for any parse path. Gated behind `bench-alloc` because wrapping the
+// allocator is a non-trivial overhead for all the wall-clock phases.
+#[cfg(feature = "bench-alloc")]
+use std::alloc::System;
+#[cfg(feature = "bench-alloc")]
+use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
+
+#[cfg(feature = "bench-alloc")]
+#[global_allocator]
+static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     ParseMessageOwned,
@@ -79,6 +95,7 @@ enum Phase {
     Diagnostics,
     SourceMapping,
     ParseBatchSequential,
+    Allocations,
 }
 
 #[derive(Debug, Default)]
@@ -145,6 +162,7 @@ fn parse_phase(name: &str) -> Result<Phase, String> {
         "diagnostics" => Phase::Diagnostics,
         "source_mapping" => Phase::SourceMapping,
         "parse_batch_sequential" => Phase::ParseBatchSequential,
+        "allocations" => Phase::Allocations,
         other => return Err(format!("unknown phase: {other}")),
     })
 }
@@ -170,6 +188,9 @@ fn print_help() {
     println!("  diagnostics                  parse once, iterate DiagnosticView N times");
     println!("  source_mapping               parse once, resolve every diagnostic span to line/col");
     println!("  parse_batch_sequential       parse_batch over --corpus <dir>/*.mf2");
+    println!();
+    println!("Phases (allocator inspection — requires `--features bench-alloc` build):");
+    println!("  allocations                  report alloc count + bytes per parse iteration");
     println!();
     println!("Options:");
     println!("  --iterations N               inner repeat count (default 1)");
@@ -238,6 +259,7 @@ fn main() -> ExitCode {
         Phase::Diagnostics => run_diagnostics(&args),
         Phase::SourceMapping => run_source_mapping(&args),
         Phase::ParseBatchSequential => run_parse_batch_sequential(&args),
+        Phase::Allocations => run_allocations(&args),
     };
     match result {
         Ok(summary) => {
@@ -483,6 +505,68 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
         iterations: iters,
         work_units: units,
     })
+}
+
+/// Allocator-focused measurement. Parses the input N times with workspace
+/// reuse and reports both the aggregate alloc count / byte total and the
+/// per-iteration averages, so it is obvious whether the steady-state cost
+/// of one parse is zero allocations (P3-P8 ideal) or some small number.
+///
+/// Requires the `bench-alloc` feature so the global allocator is wrapped
+/// in `stats_alloc::INSTRUMENTED_SYSTEM`. Without that feature the phase
+/// returns a descriptive error explaining how to rebuild.
+#[cfg(feature = "bench-alloc")]
+fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
+    let input = read_input(args)?;
+    let iters = args.iterations.max(1);
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: &input,
+        ..Default::default()
+    });
+    let mut workspace = ParseWorkspace::new();
+    if args.reserve {
+        workspace.reserve_for_source_len(input.len());
+    }
+    // Warm the workspace so the first iteration's lazy growth is not
+    // attributed to the steady state.
+    let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+
+    let region = Region::new(GLOBAL);
+    let mut total_nodes = 0usize;
+    for _ in 0..iters {
+        let session =
+            parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+        total_nodes += session.cst.tables().node_count();
+    }
+    let stats = region.change();
+    // Net = allocations - deallocations gives the steady-state retained
+    // bytes (should hover at 0 when workspace reuse is healthy). Bytes
+    // allocated is the gross throughput through the allocator.
+    let net_bytes = stats.bytes_allocated as i64 - stats.bytes_deallocated as i64;
+    eprintln!(
+        "allocations: iters={iters} alloc_calls={alloc} dealloc_calls={dealloc} \
+         bytes_allocated={bytes_alloc} bytes_deallocated={bytes_dealloc} \
+         net_bytes={net} alloc_per_iter={apk:.2} bytes_per_iter={bpk:.2}",
+        alloc = stats.allocations,
+        dealloc = stats.deallocations,
+        bytes_alloc = stats.bytes_allocated,
+        bytes_dealloc = stats.bytes_deallocated,
+        net = net_bytes,
+        apk = stats.allocations as f64 / iters as f64,
+        bpk = stats.bytes_allocated as f64 / iters as f64,
+    );
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: total_nodes,
+    })
+}
+
+#[cfg(not(feature = "bench-alloc"))]
+fn run_allocations(_args: &Args) -> Result<PhaseSummary, String> {
+    Err("allocations phase requires `--features bench-alloc`; rebuild with \
+         `cargo build --release -p ox_mf2_parser --bin ox-mf2-bench --features bench-alloc`"
+        .to_string())
 }
 
 fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
