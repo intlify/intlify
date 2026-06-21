@@ -1,0 +1,11 @@
+Root @ 0..17
+  ComplexMessage @ 0..17
+    ComplexBody @ 0..17
+      QuotedPattern @ 0..17
+        TOKEN LeftDoubleBraceToken @ 0..2 "{{"
+        Pattern @ 2..15
+          Text @ 2..15
+            TOKEN TextToken @ 2..15 "Hello, world!"
+        TOKEN RightDoubleBraceToken @ 15..17 "}}"
+--diagnostics--
+(none)

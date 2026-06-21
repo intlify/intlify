@@ -115,18 +115,26 @@ fn run() -> Result<(), String> {
         return Err(format!("No benchmark cases for {target} / {}", corpus.name));
     }
 
-    let started = Instant::now();
-    let mut checksum = 0_u64;
+    let session_inputs =
+        if target == "ox-mf2-parse-session" || target == "ox-mf2-parse-session-no-trivia" {
+            Some(prepare_ox_mf2_session_inputs(&cases))
+        } else {
+            None
+        };
 
-    for _ in 0..args.iterations {
-        for case in &cases {
-            let result = run_target(target, &case.source)?;
-            checksum = checksum
-                .wrapping_add(result.checksum)
-                .wrapping_add(case.source.len() as u64)
-                .wrapping_add(result.diagnostics as u64);
-        }
-    }
+    let started = Instant::now();
+    let checksum = if let Some((sources, source_ids, max_source_len)) = session_inputs {
+        let collect_trivia = target == "ox-mf2-parse-session";
+        run_ox_mf2_parse_session(
+            &sources,
+            &source_ids,
+            max_source_len,
+            args.iterations,
+            collect_trivia,
+        )
+    } else {
+        run_generic_target_loop(target, &cases, args.iterations)?
+    };
 
     let input_bytes = cases.iter().map(|case| case.source.len()).sum();
     let summary = Summary {
@@ -207,8 +215,8 @@ fn run_preflight(target: &str, corpus: &Corpus) -> PreflightReport {
 fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
     match target {
         "ox-content-parse" => {
-            let message =
-                ox_content_i18n::mf2::parse(black_box(source)).map_err(|error| error.to_string())?;
+            let message = ox_content_i18n::mf2::parse(black_box(source))
+                .map_err(|error| error.to_string())?;
             Ok(TargetResult {
                 checksum: size_of_val(black_box(&message)) as u64,
                 diagnostics: 0,
@@ -240,8 +248,152 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
                 diagnostics: diagnostics.len(),
             })
         }
+        "ox-mf2-parse" => {
+            // Phase 1 parser entry point equivalent to mf2-tools-parse — no
+            // semantic lowering, default options.
+            let result = ox_mf2_parser::parse_message(black_box(source));
+            Ok(TargetResult {
+                checksum: (size_of_val(black_box(&result.cst))
+                    + result.cst.node_count() as usize
+                    + result.cst.token_count() as usize) as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
+        "ox-mf2-parse-session" => {
+            let mut sources = ox_mf2_parser::SourceStore::new();
+            let id = sources.add(ox_mf2_parser::SourceFileInput {
+                source: black_box(source),
+                ..Default::default()
+            });
+            let mut workspace = ox_mf2_parser::ParseWorkspace::new();
+            workspace.reserve_for_source_len(source.len());
+            let result = ox_mf2_parser::parse_source_session(
+                &sources,
+                id,
+                &mut workspace,
+                ox_mf2_parser::ParseOptions::default(),
+            );
+            let tables = black_box(result.cst.tables());
+            Ok(TargetResult {
+                checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
+                    as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
+        "ox-mf2-parse-session-no-trivia" => {
+            let mut options = ox_mf2_parser::ParseOptions::default();
+            options.collect_trivia = false;
+            let mut sources = ox_mf2_parser::SourceStore::new();
+            let id = sources.add(ox_mf2_parser::SourceFileInput {
+                source: black_box(source),
+                ..Default::default()
+            });
+            let mut workspace = ox_mf2_parser::ParseWorkspace::new();
+            workspace.reserve_for_source_len(source.len());
+            let result = ox_mf2_parser::parse_source_session(&sources, id, &mut workspace, options);
+            let tables = black_box(result.cst.tables());
+            Ok(TargetResult {
+                checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
+                    as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
+        "ox-mf2-parse-and-lower" => {
+            let mut options = ox_mf2_parser::ParseOptions::default();
+            options.parse_semantic = true;
+            let mut sources = ox_mf2_parser::SourceStore::new();
+            let id = sources.add(ox_mf2_parser::SourceFileInput {
+                source: black_box(source),
+                ..Default::default()
+            });
+            let result = ox_mf2_parser::parse_source(&sources, id, options);
+            let semantic_size = result
+                .semantic
+                .as_ref()
+                .map(|s| s.declarations.len() + s.expressions.len() + s.patterns.len())
+                .unwrap_or(0);
+            Ok(TargetResult {
+                checksum: (result.cst.node_count() + semantic_size) as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
         _ => Err(format!("Unknown Rust parser target: {target}")),
     }
+}
+
+fn run_generic_target_loop(
+    target: &str,
+    cases: &[&Case],
+    iterations: usize,
+) -> Result<u64, String> {
+    let mut checksum = 0_u64;
+
+    for _ in 0..iterations {
+        for case in cases {
+            let result = run_target(target, &case.source)?;
+            checksum = checksum
+                .wrapping_add(result.checksum)
+                .wrapping_add(case.source.len() as u64)
+                .wrapping_add(result.diagnostics as u64);
+        }
+    }
+
+    Ok(checksum)
+}
+
+fn prepare_ox_mf2_session_inputs(
+    cases: &[&Case],
+) -> (
+    ox_mf2_parser::SourceStore,
+    Vec<(ox_mf2_parser::SourceId, usize)>,
+    usize,
+) {
+    let mut sources = ox_mf2_parser::SourceStore::with_capacity(cases.len());
+    let mut source_ids = Vec::with_capacity(cases.len());
+    let mut max_source_len = 0;
+
+    for case in cases {
+        let source_len = case.source.len();
+        max_source_len = max_source_len.max(source_len);
+        let id = sources.add(ox_mf2_parser::SourceFileInput {
+            source: &case.source,
+            ..Default::default()
+        });
+        source_ids.push((id, source_len));
+    }
+
+    (sources, source_ids, max_source_len)
+}
+
+fn run_ox_mf2_parse_session(
+    sources: &ox_mf2_parser::SourceStore,
+    source_ids: &[(ox_mf2_parser::SourceId, usize)],
+    max_source_len: usize,
+    iterations: usize,
+    collect_trivia: bool,
+) -> u64 {
+    let mut options = ox_mf2_parser::ParseOptions::default();
+    options.collect_trivia = collect_trivia;
+
+    let mut workspace = ox_mf2_parser::ParseWorkspace::new();
+    workspace.reserve_for_source_len(max_source_len);
+
+    let mut checksum = 0_u64;
+    for _ in 0..iterations {
+        for &(source_id, source_len) in source_ids {
+            let result =
+                ox_mf2_parser::parse_source_session(sources, source_id, &mut workspace, options);
+            let tables = black_box(result.cst.tables());
+            checksum = checksum
+                .wrapping_add(
+                    (tables.node_count() + tables.token_count() + tables.trivia_count()) as u64,
+                )
+                .wrapping_add(source_len as u64)
+                .wrapping_add(result.diagnostics.len() as u64);
+        }
+    }
+
+    checksum
 }
 
 fn select_benchmark_cases<'a>(corpus: &'a Corpus, target: &str) -> Vec<&'a Case> {
@@ -260,7 +412,8 @@ fn read_corpus(cases_dir: Option<&PathBuf>, name: &str) -> Result<Corpus, String
     let path = cases_dir.join(format!("{name}.json"));
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-    serde_json::from_str(&source).map_err(|error| format!("Failed to parse {}: {error}", path.display()))
+    serde_json::from_str(&source)
+        .map_err(|error| format!("Failed to parse {}: {error}", path.display()))
 }
 
 fn parse_args(values: impl Iterator<Item = String>) -> Result<Args, String> {
@@ -274,7 +427,9 @@ fn parse_args(values: impl Iterator<Item = String>) -> Result<Args, String> {
         match value.as_str() {
             "--target" => args.target = Some(next_arg(&mut values, "--target")?),
             "--corpus" => args.corpus = Some(next_arg(&mut values, "--corpus")?),
-            "--cases-dir" => args.cases_dir = Some(PathBuf::from(next_arg(&mut values, "--cases-dir")?)),
+            "--cases-dir" => {
+                args.cases_dir = Some(PathBuf::from(next_arg(&mut values, "--cases-dir")?))
+            }
             "--iterations" => {
                 let value = next_arg(&mut values, "--iterations")?;
                 args.iterations = value

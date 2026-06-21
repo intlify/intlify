@@ -1,0 +1,4 @@
+spec_section = "syntax.md#message"
+production = "simple-message"
+description = "empty input is a valid simple-message"
+diagnostics_expected = "0"

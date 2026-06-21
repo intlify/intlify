@@ -50,6 +50,22 @@
       "tags": ["declaration", "local", "match", "common"],
       "expected": "parse-ok",
       "unsupportedBy": []
+    },
+    {
+      "id": "long-plain-text",
+      "source": "This is a long plain text message that contains no placeholders at all. It exists so the parser core can be measured on a text-heavy input that exercises the text-run scan path rather than the delimiter handling. The MF2 grammar text-char production covers almost every Unicode codepoint, so realistic translation strings stay in this fast path for the bulk of their length.",
+      "description": "Long plain-text message with no placeholders (text-run scan path).",
+      "tags": ["simple", "text-heavy", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
+    },
+    {
+      "id": "long-text-with-variables",
+      "source": "Dear {$customer}, thank you for your recent purchase on {$siteName}. Your order number is {$orderId} and we expect delivery to {$shippingAddress} within a few business days. If you have any questions, please reply to this email.",
+      "description": "Long text interleaved with several variable placeholders.",
+      "tags": ["variable", "text-heavy", "common"],
+      "expected": "parse-ok",
+      "unsupportedBy": []
     }
   ]
 }

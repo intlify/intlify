@@ -14,6 +14,10 @@ MF2:
 - `ox-content-parse-and-validate`
 - `mf2-tools-parse`
 - `mf2-tools-parse-and-analyze`
+- `ox-mf2-parse`
+- `ox-mf2-parse-session`
+- `ox-mf2-parse-session-no-trivia`
+- `ox-mf2-parse-and-lower`
 
 MF1 / ICU:
 
@@ -87,6 +91,19 @@ Generated artifacts are not tracked by git.
 - `results/raw/*.md`: `hyperfine --export-markdown`
 - `results/normalized/*.json`: workload summaries emitted by the runners
 - `results/reports/latest.md`: aggregated report
+
+## Build profile
+
+The bench harness builds with `lto = "fat"` and `codegen-units = 1` by default (see `rs/Cargo.toml`). That matches what a production deployment of any of the benched parsers would use.
+
+For local "how fast can it go on _this_ machine?" measurements you can layer `target-cpu=native` on top — it gives the compiler permission to emit instructions that only run on the host CPU (e.g. M1 SIMD):
+
+```sh
+RUSTFLAGS="-C target-cpu=native" vp run mf-parser-bench#setup
+RUSTFLAGS="-C target-cpu=native" vp run mf-parser-bench#bench
+```
+
+Do NOT commit the resulting binary or quote those numbers as production figures — they are not portable across CPUs. PGO (profile-guided optimisation) was evaluated and gave no measurable improvement on top of fat LTO for this workload, so it is not part of the default build.
 
 ## Validation
 

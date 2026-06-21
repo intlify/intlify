@@ -1,0 +1,4 @@
+spec_section = "syntax.md#matcher"
+production = "variant"
+description = "adjacent variant keys without required whitespace"
+diagnostics_expected = "1"

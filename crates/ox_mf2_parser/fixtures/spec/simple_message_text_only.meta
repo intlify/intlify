@@ -1,0 +1,4 @@
+spec_section = "syntax.md#simple-message"
+production = "simple-message"
+description = "plain text simple-message"
+diagnostics_expected = "0"

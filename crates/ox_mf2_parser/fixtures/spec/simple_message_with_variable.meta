@@ -1,0 +1,4 @@
+spec_section = "syntax.md#expression"
+production = "variable-expression"
+description = "simple-message containing a variable placeholder"
+diagnostics_expected = "0"

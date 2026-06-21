@@ -1,0 +1,36 @@
+Root @ 0..43
+  ComplexMessage @ 0..43
+    ComplexBody @ 0..43
+      Matcher @ 0..43
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 7..9
+          Variable @ 7..9
+            TOKEN DollarToken @ 7..8 "$"
+            Name @ 8..9
+              TOKEN NameToken @ 8..9 "x"
+        Variant @ 10..28
+          VariantKey @ 10..13
+            UnquotedLiteral @ 10..13
+              TOKEN NameToken @ 10..13 "one"
+          VariantKey @ 13..18
+            QuotedLiteral @ 13..18
+              TOKEN PipeToken @ 13..14 "|"
+              TOKEN QuotedTextToken @ 14..17 "two"
+              TOKEN PipeToken @ 17..18 "|"
+          QuotedPattern @ 19..28
+            TOKEN LeftDoubleBraceToken @ 19..21 "{{"
+            Pattern @ 21..26
+              Text @ 21..26
+                TOKEN TextToken @ 21..26 "combo"
+            TOKEN RightDoubleBraceToken @ 26..28 "}}"
+        Variant @ 29..43
+          CatchAllKey @ 29..30
+            TOKEN StarToken @ 29..30 "*"
+          QuotedPattern @ 31..43
+            TOKEN LeftDoubleBraceToken @ 31..33 "{{"
+            Pattern @ 33..41
+              Text @ 33..41
+                TOKEN TextToken @ 33..41 "fallback"
+            TOKEN RightDoubleBraceToken @ 41..43 "}}"
+--diagnostics--
+MissingRequiredWhitespace @ 13..13 (line 2, col 4): missing required whitespace between productions

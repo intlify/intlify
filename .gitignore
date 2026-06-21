@@ -33,6 +33,13 @@ dist-ssr
 # playwright-cli
 .playwright-cli
 
+# Rust build artefacts (workspace and crate-local target dirs)
+target
+**/target
+
+# Editor / sed backups
+*.bak
+
 # Specific cases
 tools/mf-parser-bench/.tmp
 tools/mf-parser-bench/results
@@ -41,3 +48,4 @@ tools/mf-parser-bench/rs/target
 # others
 .plans
 .notes
+.reviews

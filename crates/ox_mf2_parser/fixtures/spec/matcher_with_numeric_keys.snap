@@ -1,0 +1,41 @@
+Root @ 0..46
+  ComplexMessage @ 0..46
+    ComplexBody @ 0..46
+      Matcher @ 0..46
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 7..13
+          Variable @ 7..13
+            TOKEN DollarToken @ 7..8 "$"
+            Name @ 8..13
+              TOKEN NameToken @ 8..13 "count"
+        Variant @ 14..24
+          VariantKey @ 14..15
+            UnquotedLiteral @ 14..15
+              TOKEN NameToken @ 14..15 "0"
+          QuotedPattern @ 16..24
+            TOKEN LeftDoubleBraceToken @ 16..18 "{{"
+            Pattern @ 18..22
+              Text @ 18..22
+                TOKEN TextToken @ 18..22 "none"
+            TOKEN RightDoubleBraceToken @ 22..24 "}}"
+        Variant @ 25..34
+          VariantKey @ 25..26
+            UnquotedLiteral @ 25..26
+              TOKEN NameToken @ 25..26 "1"
+          QuotedPattern @ 27..34
+            TOKEN LeftDoubleBraceToken @ 27..29 "{{"
+            Pattern @ 29..32
+              Text @ 29..32
+                TOKEN TextToken @ 29..32 "one"
+            TOKEN RightDoubleBraceToken @ 32..34 "}}"
+        Variant @ 35..46
+          CatchAllKey @ 35..36
+            TOKEN StarToken @ 35..36 "*"
+          QuotedPattern @ 37..46
+            TOKEN LeftDoubleBraceToken @ 37..39 "{{"
+            Pattern @ 39..44
+              Text @ 39..44
+                TOKEN TextToken @ 39..44 "other"
+            TOKEN RightDoubleBraceToken @ 44..46 "}}"
+--diagnostics--
+(none)

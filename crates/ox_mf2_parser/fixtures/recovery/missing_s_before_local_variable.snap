@@ -1,0 +1,26 @@
+Root @ 0..22
+  ComplexMessage @ 0..22
+    LocalDeclaration @ 0..15
+      TOKEN LocalKeyword @ 0..6 ".local"
+      Variable @ 6..8
+        TOKEN DollarToken @ 6..7 "$"
+        Name @ 7..8
+          TOKEN NameToken @ 7..8 "x"
+      TOKEN EqualsToken @ 9..10 "="
+      Placeholder @ 11..15
+        VariableExpression @ 11..15
+          TOKEN LeftBraceToken @ 11..12 "{"
+          Variable @ 12..14
+            TOKEN DollarToken @ 12..13 "$"
+            Name @ 13..14
+              TOKEN NameToken @ 13..14 "y"
+          TOKEN RightBraceToken @ 14..15 "}"
+    ComplexBody @ 16..22
+      QuotedPattern @ 16..22
+        TOKEN LeftDoubleBraceToken @ 16..18 "{{"
+        Pattern @ 18..20
+          Text @ 18..20
+            TOKEN TextToken @ 18..20 "Hi"
+        TOKEN RightDoubleBraceToken @ 20..22 "}}"
+--diagnostics--
+MissingRequiredWhitespace @ 6..6 (line 1, col 7): missing required whitespace between productions

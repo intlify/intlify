@@ -1,0 +1,36 @@
+[package]
+name = "ox_mf2_parser"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ox-mf2 Phase 1 MF2 parser core (CST, SemanticModel, diagnostics, recovery)."
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Enables the `--phase allocations` mode in the bench binary by routing
+# the global allocator through `stats_alloc` so per-iteration alloc
+# count / byte totals can be reported. OFF by default — wrapping the
+# allocator affects every other phase's wall-clock measurement.
+bench-alloc = ["dep:stats_alloc"]
+# Reserved for Phase 1 follow-up:
+# rayon = ["dep:rayon"]
+
+[dependencies]
+# SIMD-accelerated byte search for the scanner's text/quoted-text fast paths.
+# Used to jump to the next delimiter without per-byte iteration.
+memchr = "2.7"
+# Optional allocator-counting wrapper used only by the bench binary's
+# `--phase allocations` mode (gated behind the `bench-alloc` feature).
+stats_alloc = { version = "0.1", optional = true }
+
+[dev-dependencies]
+
+[[bin]]
+name = "ox-mf2-bench"
+path = "src/bin/ox_mf2_bench.rs"

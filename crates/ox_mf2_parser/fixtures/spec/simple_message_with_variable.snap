@@ -1,0 +1,17 @@
+Root @ 0..15
+  SimpleMessage @ 0..15
+    Pattern @ 0..15
+      Text @ 0..7
+        TOKEN TextToken @ 0..7 "Hello, "
+      Placeholder @ 7..14
+        VariableExpression @ 7..14
+          TOKEN LeftBraceToken @ 7..8 "{"
+          Variable @ 8..13
+            TOKEN DollarToken @ 8..9 "$"
+            Name @ 9..13
+              TOKEN NameToken @ 9..13 "name"
+          TOKEN RightBraceToken @ 13..14 "}"
+      Text @ 14..15
+        TOKEN TextToken @ 14..15 "!"
+--diagnostics--
+(none)

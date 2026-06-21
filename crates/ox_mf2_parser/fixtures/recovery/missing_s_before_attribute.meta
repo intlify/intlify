@@ -1,0 +1,4 @@
+spec_section = "syntax.md#markup"
+production = "markup"
+description = "markup with attribute but no required whitespace before '@'"
+diagnostics_expected = "1"

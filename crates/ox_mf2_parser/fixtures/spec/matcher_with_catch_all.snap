@@ -1,0 +1,21 @@
+Root @ 0..24
+  ComplexMessage @ 0..24
+    ComplexBody @ 0..24
+      Matcher @ 0..24
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 7..9
+          Variable @ 7..9
+            TOKEN DollarToken @ 7..8 "$"
+            Name @ 8..9
+              TOKEN NameToken @ 8..9 "x"
+        Variant @ 10..24
+          CatchAllKey @ 10..11
+            TOKEN StarToken @ 10..11 "*"
+          QuotedPattern @ 12..24
+            TOKEN LeftDoubleBraceToken @ 12..14 "{{"
+            Pattern @ 14..22
+              Text @ 14..22
+                TOKEN TextToken @ 14..22 "fallback"
+            TOKEN RightDoubleBraceToken @ 22..24 "}}"
+--diagnostics--
+(none)

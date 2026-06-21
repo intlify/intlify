@@ -1,0 +1,4 @@
+.match $count
+0 {{none}}
+1 {{one}}
+* {{other}}

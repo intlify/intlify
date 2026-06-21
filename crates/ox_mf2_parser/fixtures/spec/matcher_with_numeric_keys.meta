@@ -1,0 +1,4 @@
+spec_section = "syntax.md#matcher"
+production = "key"
+description = "matcher with exact-match numeric variant keys (DIGIT-leading unquoted literal)"
+diagnostics_expected = "0"

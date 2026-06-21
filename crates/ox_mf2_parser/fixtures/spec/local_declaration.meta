@@ -1,0 +1,4 @@
+spec_section = "syntax.md#local-declaration"
+production = "local-declaration"
+description = "local-declaration followed by quoted-pattern"
+diagnostics_expected = "0"

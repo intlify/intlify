@@ -1,0 +1,4 @@
+spec_section = "syntax.md#markup"
+production = "identifier"
+description = "markup identifier with namespace separator but no trailing name"
+diagnostics_expected = "1"

@@ -1,0 +1,4 @@
+spec_section = "syntax.md#quoted-pattern"
+production = "complex-message"
+description = "quoted-pattern body without declarations"
+diagnostics_expected = "0"

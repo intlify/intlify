@@ -1,0 +1,7 @@
+Root @ 0..13
+  SimpleMessage @ 0..13
+    Pattern @ 0..13
+      Text @ 0..13
+        TOKEN TextToken @ 0..13 "Hello, world!"
+--diagnostics--
+(none)

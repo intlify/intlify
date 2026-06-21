@@ -1,0 +1,4 @@
+spec_section = "syntax.md#matcher"
+production = "match-statement"
+description = "match-statement without required whitespace between '.match' and selector"
+diagnostics_expected = "1"

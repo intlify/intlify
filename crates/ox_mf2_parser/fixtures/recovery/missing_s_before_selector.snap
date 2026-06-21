@@ -1,0 +1,21 @@
+Root @ 0..23
+  ComplexMessage @ 0..23
+    ComplexBody @ 0..23
+      Matcher @ 0..23
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 6..8
+          Variable @ 6..8
+            TOKEN DollarToken @ 6..7 "$"
+            Name @ 7..8
+              TOKEN NameToken @ 7..8 "x"
+        Variant @ 9..23
+          CatchAllKey @ 9..10
+            TOKEN StarToken @ 9..10 "*"
+          QuotedPattern @ 11..23
+            TOKEN LeftDoubleBraceToken @ 11..13 "{{"
+            Pattern @ 13..21
+              Text @ 13..21
+                TOKEN TextToken @ 13..21 "fallback"
+            TOKEN RightDoubleBraceToken @ 21..23 "}}"
+--diagnostics--
+MissingRequiredWhitespace @ 6..6 (line 1, col 7): missing required whitespace between productions

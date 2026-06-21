@@ -498,7 +498,7 @@ Ambiguous or malformed input makes mode detection part of recovery. For example,
 
 ## Parser API Contract
 
-The primary parser API uses SourceStore and SourceId.
+The primary parser API uses SourceStore and SourceId for caller-managed and batch parsing. The `parse_message` convenience API keeps the same `ParseResult` shape but may bypass SourceStore registration on the successful one-shot path.
 
 ```rust
 parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> ParseResult
@@ -516,7 +516,7 @@ parse_source_session<'a>(
 API roles:
 
 - `parse_source`: normal Rust core API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
-- `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests.
+- `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests. The valid-input hot path parses directly from the borrowed `&str`; malformed inputs may build a temporary SourceStore only to materialize diagnostic locations.
 - `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
 - `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.
 
@@ -634,7 +634,7 @@ for item in result.items {
 }
 ```
 
-`parse_message(source)` is a convenience API. Internally it registers a SourceFile in SourceStore and parses by SourceId.
+`parse_message(source)` is a convenience API. It parses with `SourceId(0)` and does not need to retain a SourceStore on the successful path because `ParseResult` owns CST tables and diagnostics. If diagnostics are emitted, the implementation may register a temporary SourceFile in SourceStore to resolve line/column information before returning owned diagnostics.
 
 MF2 workloads often contain many messages in one file, locale set, or project. Therefore batch parsing is a first-class API from Phase 1.
 

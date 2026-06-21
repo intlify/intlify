@@ -1,0 +1,10 @@
+Root @ 0..14
+  ComplexMessage @ 0..14
+    ComplexBody @ 0..14
+      QuotedPattern @ 0..14
+        TOKEN LeftDoubleBraceToken @ 0..2 "{{"
+        Pattern @ 2..14
+          Text @ 2..14
+            TOKEN TextToken @ 2..14 "unterminated"
+--diagnostics--
+UnclosedQuotedPattern @ 0..14 (line 1, col 1): unclosed quoted pattern
