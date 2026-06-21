@@ -16,8 +16,16 @@ const calibration = await readOptionalJson(resolve(tmpDir, 'calibration.json'))
 // Join hyperfine wall-clock with the normalized runner output so we can
 // report µs/parse, which is the only fair comparison across targets that
 // use different iteration counts.
+//
+// Key is the normalized file basename (`<target>__<corpus>[.<variant>]`)
+// NOT just `<target>__<corpus>`: when the harness has been re-run across
+// multiple feature branches the same `(target, corpus)` pair has one entry
+// per variant (e.g. `…__mf2-app.json` plus `…__mf2-app.source-copy-review.json`),
+// and indexing by `<target>__<corpus>` alone would silently let one variant
+// overwrite another in the Map — picking up an iteration count that does
+// not match the hyperfine row and producing wildly wrong µs/parse values.
 const normalizedByTarget = new Map(
-  normalized.map(file => [`${file.data.target}__${file.data.corpus}`, file.data])
+  normalized.map(file => [file.name.replace(/\.json$/, ''), file.data])
 )
 
 const report = renderReport({
@@ -178,19 +186,34 @@ function withRelative(results) {
 }
 
 function corpusForSuite(suite) {
-  // Suites are named `<corpus>-<runtime>` (e.g. mf2-common-rust, mf1-icu-js).
-  // Strip the trailing runtime token to get the corpus name.
-  const parts = suite.split('-')
+  // Suites are named `<corpus>-<runtime>` (e.g. mf2-common-rust, mf1-icu-js)
+  // optionally followed by `.<variant>` for side-by-side branch experiments
+  // (e.g. `mf2-app-rust.feature-phase-1`). Strip the variant first, then
+  // drop the trailing runtime token to get the corpus name.
+  const base = suite.split('.', 1)[0]
+  const parts = base.split('-')
   if (parts.length <= 1) {
-    return suite
+    return base
   }
   parts.pop()
   return parts.join('-')
 }
 
+function variantForSuite(suite) {
+  // Returns the leading `.` so callers can append the suffix directly to
+  // a normalized-file key (`<target>__<corpus>` + variant). Empty string
+  // for plain suites such as `mf2-common-rust`.
+  const dot = suite.indexOf('.')
+  return dot === -1 ? '' : suite.slice(dot)
+}
+
 function perParseUs(result) {
+  // Key must include the suite variant so a `(target, corpus)` pair with
+  // multiple normalized files (one per branch experiment) maps to the
+  // iteration count that actually produced this hyperfine row.
   const corpus = corpusForSuite(result.suite)
-  const data = normalizedByTarget.get(`${result.command}__${corpus}`)
+  const variant = variantForSuite(result.suite)
+  const data = normalizedByTarget.get(`${result.command}__${corpus}${variant}`)
   if (!data || !data.totalParses) {
     return null
   }
