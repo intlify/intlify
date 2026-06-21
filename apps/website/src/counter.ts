@@ -1,5 +1,6 @@
 /**
  * This is just an example, so you can safely delete all default props below
+ *
  * @param element - The HTML button element to attach the counter functionality to
  */
 export function setupCounter(element: HTMLButtonElement) {
