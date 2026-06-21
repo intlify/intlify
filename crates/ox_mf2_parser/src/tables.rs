@@ -289,9 +289,16 @@ impl CstBuilder {
         }
     }
 
-    /// Finish the most recently started node. Drains the contiguous range
+    /// Finish the most recently started node. Copies the contiguous range
     /// `[edge_start, pending_edges.len())` into [`CstTables::edges`] and
     /// records the node with the resulting `first_child` / `child_count`.
+    ///
+    /// The drained range is always a *suffix* of `pending_edges` and
+    /// `CstEdgeRecord` is `Copy`, so the previous `extend(drain(..))` is
+    /// replaced with `extend_from_slice + truncate`. That avoids the
+    /// `Drain` iterator dispatch on every `finish_node` call (one per CST
+    /// node) and lets the copy go through the `Vec::extend_from_slice`
+    /// specialisation that bulk-copies the `Copy` slice.
     pub fn finish_node(&mut self, pending: PendingNode, span_end: u32) -> NodeId {
         debug_assert_eq!(
             pending.frame_depth as usize,
@@ -301,10 +308,12 @@ impl CstBuilder {
         let edge_start = self.frame_starts.pop().expect("frame for pending node");
         debug_assert_eq!(edge_start, pending.edge_start);
         let first_child = self.tables.edges.len() as u32;
-        let child_count = (self.pending_edges.len() as u32) - edge_start;
+        let edge_start_us = edge_start as usize;
+        let child_count = (self.pending_edges.len() - edge_start_us) as u32;
         self.tables
             .edges
-            .extend(self.pending_edges.drain(edge_start as usize..));
+            .extend_from_slice(&self.pending_edges[edge_start_us..]);
+        self.pending_edges.truncate(edge_start_us);
         let id = NodeId::new(self.tables.nodes.len() as u32);
         self.tables.nodes.push(CstNodeRecord {
             kind: pending.kind.as_u16(),

@@ -356,9 +356,10 @@ pub(crate) struct PeekTrivia {
     pub end_offset: u32,
     /// Number of contiguous-`ws` runs encountered.
     pub ws_runs: u32,
-    /// Number of contiguous-`bidi` runs encountered.
-    #[allow(dead_code)] // reserved for span-aware `s` validation that needs
-                       // to distinguish bidi-only runs from bidi+ws.
+    /// Number of contiguous-`bidi` runs encountered. Used by
+    /// `Parser::commit_peeked_trivia` so the run counts can be reused when
+    /// `collect_trivia = false` lets the parser skip directly to
+    /// `end_offset` instead of rescanning.
     pub bidi_runs: u32,
     /// First significant byte after the trivia, or `None` at EOF.
     pub next_byte: Option<u8>,

@@ -24,7 +24,7 @@ use crate::api::ParseOptions;
 use crate::diagnostic::{DiagnosticCode, DiagnosticSink};
 use crate::scanner::{
     detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, peek_trivia, scan_name,
-    scan_quoted_text_run, scan_text_run, scan_unquoted_literal, TriviaMode,
+    scan_quoted_text_run, scan_text_run, scan_unquoted_literal, PeekTrivia, TriviaMode,
 };
 use crate::scanner::Cursor;
 use crate::semantic::MessageMode;
@@ -207,20 +207,20 @@ impl Parser<'_, '_> {
             match self.cursor.peek_byte() {
                 None => break,
                 Some(b'{') => {
-                    if mode.is_quoted() && self.cursor.peek_byte_at(1) == Some(b'}') {
-                        // `{}` cannot appear in a quoted pattern; let the
-                        // outer body handle the boundary.
-                    }
+                    // In a quoted pattern, `{` opens a placeholder; the
+                    // `}}` closing sequence is handled by the outer
+                    // `parse_quoted_pattern` after `parse_pattern` returns.
+                    // The lookahead at `{}` is informational only — let
+                    // `parse_placeholder` produce an empty-expression
+                    // diagnostic in that case instead of branching here.
                     let placeholder = self.parse_placeholder();
                     self.builder.push_node_edge(placeholder);
                 }
                 Some(b'}') if mode.is_quoted() => break,
                 Some(_) => {
-                    let text_node = self.parse_text();
-                    if text_node.is_none() {
+                    let Some(id) = self.parse_text() else {
                         break;
-                    }
-                    let id = text_node.unwrap();
+                    };
                     self.builder.push_node_edge(id);
                 }
             }
@@ -465,7 +465,8 @@ impl Parser<'_, '_> {
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
-            self.eat_trivia(TriviaMode::Required);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
             let opt = self.parse_option();
             self.builder.push_node_edge(opt);
         }
@@ -479,7 +480,7 @@ impl Parser<'_, '_> {
         if is_open {
             let peek = peek_trivia(&self.cursor);
             if peek.next_byte == Some(b'/') {
-                self.eat_trivia(TriviaMode::Optional);
+                self.commit_peeked_trivia(peek, TriviaMode::Optional);
                 let slash_start = self.cursor.offset();
                 let _ = self.cursor.bump_byte();
                 let tok = self.commit_token(
@@ -529,7 +530,8 @@ impl Parser<'_, '_> {
                 DiagnosticCode::MissingRequiredWhitespace,
             );
         }
-        self.eat_trivia(TriviaMode::Required);
+        // Reuse the just-measured peek instead of re-scanning trivia.
+        self.commit_peeked_trivia(peek, TriviaMode::Required);
         let func = self.parse_function();
         self.builder.push_node_edge(func);
     }
@@ -563,7 +565,8 @@ impl Parser<'_, '_> {
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
-            self.eat_trivia(TriviaMode::Required);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
             let opt = self.parse_option();
             self.builder.push_node_edge(opt);
         }
@@ -632,7 +635,8 @@ impl Parser<'_, '_> {
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
-            self.eat_trivia(TriviaMode::Required);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
             let attr = self.parse_attribute();
             self.builder.push_node_edge(attr);
         }
@@ -658,7 +662,8 @@ impl Parser<'_, '_> {
         // there's an `=`, no checkpoint/rollback needed.
         let peek = peek_trivia(&self.cursor);
         if peek.next_byte == Some(b'=') {
-            self.eat_trivia(TriviaMode::Optional);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Optional);
             let eq_start = self.cursor.offset();
             let _ = self.cursor.bump_byte();
             let tok = self.commit_token(
@@ -832,15 +837,14 @@ impl Parser<'_, '_> {
         // Declarations *(declaration o). `.match` is part of complex-body,
         // not a declaration — break on it so parse_complex_body can route it.
         loop {
-            match detect_keyword(&self.cursor) {
-                Some(crate::scanner::KeywordHit::Input | crate::scanner::KeywordHit::Local) => {
-                    let kw = detect_keyword(&self.cursor).unwrap();
-                    let decl = self.parse_declaration(kw);
-                    self.builder.push_node_edge(decl);
-                    self.eat_trivia(TriviaMode::Optional);
-                }
-                _ => break,
-            }
+            let Some(kw @ (crate::scanner::KeywordHit::Input | crate::scanner::KeywordHit::Local)) =
+                detect_keyword(&self.cursor)
+            else {
+                break;
+            };
+            let decl = self.parse_declaration(kw);
+            self.builder.push_node_edge(decl);
+            self.eat_trivia(TriviaMode::Optional);
         }
 
         // Complex body
@@ -902,7 +906,8 @@ impl Parser<'_, '_> {
                         DiagnosticCode::MissingRequiredWhitespace,
                     );
                 }
-                self.eat_trivia(TriviaMode::Required);
+                // Reuse the just-measured peek instead of re-scanning trivia.
+                self.commit_peeked_trivia(peek, TriviaMode::Required);
                 let var = self.parse_variable();
                 self.builder.push_node_edge(var);
                 self.eat_trivia(TriviaMode::Optional);
@@ -959,7 +964,8 @@ impl Parser<'_, '_> {
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
-            self.eat_trivia(TriviaMode::Required);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
             let sel_start = self.cursor.offset();
             let sel_pending = self.builder.start_node(SyntaxKind::Selector, sel_start);
             let var = self.parse_variable();
@@ -975,7 +981,8 @@ impl Parser<'_, '_> {
             if !Self::is_variant_start_byte(peek.next_byte) {
                 break;
             }
-            self.eat_trivia(TriviaMode::Optional);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Optional);
             let variant = self.parse_variant();
             self.builder.push_node_edge(variant);
         }
@@ -1024,7 +1031,8 @@ impl Parser<'_, '_> {
                     DiagnosticCode::MissingRequiredWhitespace,
                 );
             }
-            self.eat_trivia(TriviaMode::Required);
+            // Reuse the just-measured peek instead of re-scanning trivia.
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
         }
 
         // o quoted-pattern
@@ -1219,6 +1227,35 @@ impl Parser<'_, '_> {
             self.pending_trivia_start = trivia_start;
         }
         stats
+    }
+
+    /// Commit trivia whose extent was already measured by [`peek_trivia`].
+    ///
+    /// On the speculative trivia path (`option` / `attribute` / `function`
+    /// / selector / variant loops) the parser first peeks to decide
+    /// whether the construct exists, then calls `eat_trivia` to actually
+    /// consume the whitespace. That second call re-scans the same bytes
+    /// — wasted work on whitespace-heavy inputs.
+    ///
+    /// When `collect_trivia = false` (parser-core baseline benchmarks and
+    /// any caller that does not care about trivia records) the second
+    /// scan adds nothing: this helper just advances the cursor to the
+    /// already-known `peek.end_offset` and reuses the peek's run counts.
+    /// When `collect_trivia = true` source-fidelity requires preserving
+    /// per-run trivia records, so the implementation falls back to the
+    /// usual scanning commit path; the speedup there is bounded by the
+    /// scanner work that has to happen anyway.
+    fn commit_peeked_trivia(&mut self, peek: PeekTrivia, mode: TriviaMode) -> TriviaConsumed {
+        if !self.options.collect_trivia {
+            // Fast path: peek already proved no trivia records are needed
+            // and where the next significant byte lives.
+            self.cursor.set_offset(peek.end_offset);
+            return TriviaConsumed {
+                ws_runs: peek.ws_runs,
+                bidi_runs: peek.bidi_runs,
+            };
+        }
+        self.eat_trivia(mode)
     }
 
     /// Skip-only trivia consumption (used when `collect_trivia = false`).

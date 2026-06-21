@@ -36,7 +36,13 @@
 //!   N times (requires a malformed input).
 //! - `--phase source_mapping` — parse once, then resolve every diagnostic
 //!   span to line/column N times (requires a malformed input).
-//! - `--phase parse_batch_sequential` — runs `parse_batch` over a corpus.
+//! - `--phase parse_batch_session` — parser-core baseline: one
+//!   `SourceStore`, one reused `ParseWorkspace`, `parse_source_session`
+//!   over the corpus. NO owned materialisation. Use this when comparing
+//!   parser-core throughput across many inputs.
+//! - `--phase parse_batch_sequential` — `parse_batch` over a corpus with
+//!   owned `ParseResult` per item (clone + diagnostic materialise). This
+//!   is the owned batch API cost, not parser-core.
 //!
 //! Switches that change parser semantics or measured cost:
 //!
@@ -94,6 +100,7 @@ enum Phase {
     CstViewTraversal,
     Diagnostics,
     SourceMapping,
+    ParseBatchSession,
     ParseBatchSequential,
     Allocations,
 }
@@ -161,6 +168,7 @@ fn parse_phase(name: &str) -> Result<Phase, String> {
         "cst_view_traversal" => Phase::CstViewTraversal,
         "diagnostics" => Phase::Diagnostics,
         "source_mapping" => Phase::SourceMapping,
+        "parse_batch_session" => Phase::ParseBatchSession,
         "parse_batch_sequential" => Phase::ParseBatchSequential,
         "allocations" => Phase::Allocations,
         other => return Err(format!("unknown phase: {other}")),
@@ -187,7 +195,9 @@ fn print_help() {
     println!("  cst_view_traversal           parse once, traverse CST N times");
     println!("  diagnostics                  parse once, iterate DiagnosticView N times");
     println!("  source_mapping               parse once, resolve every diagnostic span to line/col");
-    println!("  parse_batch_sequential       parse_batch over --corpus <dir>/*.mf2");
+    println!("  parse_batch_session          parser-core: one SourceStore + one ParseWorkspace,");
+    println!("                                borrowed parse_source_session over --corpus");
+    println!("  parse_batch_sequential       owned parse_batch over --corpus (clone + materialise)");
     println!();
     println!("Phases (allocator inspection — requires `--features bench-alloc` build):");
     println!("  allocations                  report alloc count + bytes per parse iteration");
@@ -258,6 +268,7 @@ fn main() -> ExitCode {
         Phase::CstViewTraversal => run_cst_view_traversal(&args),
         Phase::Diagnostics => run_diagnostics(&args),
         Phase::SourceMapping => run_source_mapping(&args),
+        Phase::ParseBatchSession => run_parse_batch_session(&args),
         Phase::ParseBatchSequential => run_parse_batch_sequential(&args),
         Phase::Allocations => run_allocations(&args),
     };
@@ -512,6 +523,12 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
 /// per-iteration averages, so it is obvious whether the steady-state cost
 /// of one parse is zero allocations (P3-P8 ideal) or some small number.
 ///
+/// Honours `--collect-trivia` / `--no-collect-trivia` / `--parse-semantic`
+/// the same way the timing phases do: any combination is measurable so
+/// regression checks can target the exact parse path that changed (for
+/// example "did adding a semantic-lowering optimisation introduce a hidden
+/// allocation per call?").
+///
 /// Requires the `bench-alloc` feature so the global allocator is wrapped
 /// in `stats_alloc::INSTRUMENTED_SYSTEM`. Without that feature the phase
 /// returns a descriptive error explaining how to rebuild.
@@ -519,6 +536,9 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
 fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
+    // Same plumbing as the parser-core timing phases so the measured
+    // allocations match the path under test, not a hard-coded default.
+    let options = options_for(args, true, false);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
@@ -530,13 +550,12 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     }
     // Warm the workspace so the first iteration's lazy growth is not
     // attributed to the steady state.
-    let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+    let _ = parse_source_session(&sources, id, &mut workspace, options);
 
     let region = Region::new(GLOBAL);
     let mut total_nodes = 0usize;
     for _ in 0..iters {
-        let session =
-            parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+        let session = parse_source_session(&sources, id, &mut workspace, options);
         total_nodes += session.cst.tables().node_count();
     }
     let stats = region.change();
@@ -545,9 +564,12 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     // allocated is the gross throughput through the allocator.
     let net_bytes = stats.bytes_allocated as i64 - stats.bytes_deallocated as i64;
     eprintln!(
-        "allocations: iters={iters} alloc_calls={alloc} dealloc_calls={dealloc} \
+        "allocations: iters={iters} collect_trivia={ct} parse_semantic={ps} \
+         alloc_calls={alloc} dealloc_calls={dealloc} \
          bytes_allocated={bytes_alloc} bytes_deallocated={bytes_dealloc} \
          net_bytes={net} alloc_per_iter={apk:.2} bytes_per_iter={bpk:.2}",
+        ct = options.collect_trivia,
+        ps = options.parse_semantic,
         alloc = stats.allocations,
         dealloc = stats.deallocations,
         bytes_alloc = stats.bytes_allocated,
@@ -567,6 +589,54 @@ fn run_allocations(_args: &Args) -> Result<PhaseSummary, String> {
     Err("allocations phase requires `--features bench-alloc`; rebuild with \
          `cargo build --release -p ox_mf2_parser --bin ox-mf2-bench --features bench-alloc`"
         .to_string())
+}
+
+/// Parser-core batch baseline. Builds one [`SourceStore`] from `--corpus`,
+/// keeps a single [`ParseWorkspace`] alive for the entire run, and walks
+/// each input through [`parse_source_session`] — the same primitive that
+/// `parse_batch` calls internally, but WITHOUT the owned `ParseResult`
+/// clone + diagnostic materialisation that turns it into the public batch
+/// API. Use this when comparing ox-mf2 parser-core throughput against
+/// other parsers' minimal-cost paths over many small messages.
+fn run_parse_batch_session(args: &Args) -> Result<PhaseSummary, String> {
+    let dir = args
+        .corpus_dir
+        .as_ref()
+        .ok_or("parse_batch_session requires --corpus <dir>")?;
+    let corpus = read_corpus(dir)?;
+    let iters = args.iterations.max(1);
+    let options = options_for(args, true, false);
+    let mut sources = SourceStore::new();
+    let mut ids = Vec::with_capacity(corpus.len());
+    let mut max_source_len = 0usize;
+    for (path, text) in &corpus {
+        let id = sources.add(SourceFileInput {
+            source: text,
+            path: Some(path),
+            ..Default::default()
+        });
+        ids.push(id);
+        if text.len() > max_source_len {
+            max_source_len = text.len();
+        }
+    }
+    let mut workspace = ParseWorkspace::new();
+    if args.reserve {
+        // Reserve once for the largest input in the corpus so the workspace
+        // does not regrow across rounds.
+        workspace.reserve_for_source_len(max_source_len);
+    }
+    let mut units = 0usize;
+    for _ in 0..iters {
+        for &id in &ids {
+            let session = parse_source_session(&sources, id, &mut workspace, options);
+            units += session.cst.tables().node_count();
+        }
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: units,
+    })
 }
 
 fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
