@@ -41,4 +41,3 @@ jobs:
           online-audits: true
           persona: regular
           version: latest
-          advanced-security: false
