@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "automerge": true,
+  "extends": ["config:recommended", ":preserveSemverRanges", "helpers:pinGitHubActionDigests"],
+  "labels": ["deps"],
+  "major": {
+    "automerge": false
+  },
+  "minimumReleaseAge": "7 days"
+}
