@@ -15,6 +15,7 @@ MF2:
 - `mf2-tools-parse`
 - `mf2-tools-parse-and-analyze`
 - `ox-mf2-parse`
+- `ox-mf2-parse-session-no-trivia`
 - `ox-mf2-parse-and-lower`
 
 MF1 / ICU:

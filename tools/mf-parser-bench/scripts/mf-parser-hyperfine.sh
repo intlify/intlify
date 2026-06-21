@@ -102,6 +102,7 @@ run_suite \
   rust mf2-tools-parse \
   rust mf2-tools-parse-and-analyze \
   rust ox-mf2-parse \
+  rust ox-mf2-parse-session-no-trivia \
   rust ox-mf2-parse-and-lower
 
 run_suite \
@@ -120,6 +121,7 @@ run_suite \
   rust mf2-tools-parse \
   rust mf2-tools-parse-and-analyze \
   rust ox-mf2-parse \
+  rust ox-mf2-parse-session-no-trivia \
   rust ox-mf2-parse-and-lower
 
 run_suite \

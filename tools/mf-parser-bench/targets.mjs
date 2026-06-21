@@ -63,6 +63,13 @@ export const RUST_TARGETS = [
     description: 'ox_mf2_parser::parse_message(source) — Phase 1 CST only'
   },
   {
+    name: 'ox-mf2-parse-session-no-trivia',
+    runtime: 'rust',
+    format: 'mf2',
+    description:
+      'ox_mf2_parser::parse_source_session(source, collect_trivia=false) — borrowed CST, reused workspace'
+  },
+  {
     name: 'ox-mf2-parse-and-lower',
     runtime: 'rust',
     format: 'mf2',
