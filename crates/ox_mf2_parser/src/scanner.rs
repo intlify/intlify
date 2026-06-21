@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Scanner cursor and lexical helpers.
 //!
 //! The scanner is parser-internal. It reads source bytes through [`Cursor`]

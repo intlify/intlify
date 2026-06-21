@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! `ox-mf2-bench` — benchmark harness CLI.
 //!
 //! Designed for use with `hyperfine` and the `tools/mf-parser-bench`

@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! End-to-end smoke tests for the public parse API.
 //!
 //! These do not assert on grammar — the grammar lands in Milestone 6 — they

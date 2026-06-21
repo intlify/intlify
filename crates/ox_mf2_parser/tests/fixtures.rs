@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Fixture runner: walks `crates/ox_mf2_parser/fixtures/{spec,recovery,
 //! implementation}/`, parses each `.mf2`, and diffs the deterministic
 //! snapshot against the matching `.snap`. Set `UPDATE_SNAPSHOTS=1` in the

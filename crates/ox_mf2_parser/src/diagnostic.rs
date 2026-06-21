@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Compact parser diagnostic model.
 //!
 //! The parser commits [`DiagnosticRecord`] entries into the workspace; labels

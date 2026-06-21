@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! `CstView`: lazy accessor surface over [`crate::CstTables`].
 //!
 //! `CstView` does not materialise a recursive object graph. Each accessor

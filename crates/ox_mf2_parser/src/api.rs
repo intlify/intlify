@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Public parser API.
 //!
 //! `parse_message` and `parse_source` are owned-result entry points. They

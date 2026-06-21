@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Semantic lowering tests.
 //!
 //! Covers the Milestone 8 acceptance criteria in

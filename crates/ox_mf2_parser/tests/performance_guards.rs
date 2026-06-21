@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Performance regression guards for Phase 1.
 //!
 //! These tests do not measure wall-clock time — they sit alongside the

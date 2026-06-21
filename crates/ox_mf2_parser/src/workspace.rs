@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! `ParseWorkspace`: reusable allocation scratch space.
 //!
 //! Public callers see a single [`ParseWorkspace`] that bundles a parser-side

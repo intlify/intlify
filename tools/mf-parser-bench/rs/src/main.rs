@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 use std::env;
 use std::fs;
 use std::hint::black_box;

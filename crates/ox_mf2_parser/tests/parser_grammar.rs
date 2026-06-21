@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Coarse-grained grammar tests for the Phase 1 parser.
 //!
 //! Each test exercises a vertical slice from `design/002` and the WG spec

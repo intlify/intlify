@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Flat indexed CST tables: nodes / edges / tokens / trivia.
 //!
 //! Phase 1 represents the CST as four `Vec`s of fixed-size records, addressed

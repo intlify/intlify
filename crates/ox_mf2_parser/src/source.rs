@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Source ownership: `SourceStore`, `SourceFile`, `SourceFileInput`.
 //!
 //! `SourceStore` owns source text, optional metadata, and per-file line-start

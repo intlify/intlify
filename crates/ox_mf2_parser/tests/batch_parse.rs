@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Batch-parse contract tests.
 //!
 //! Covers the Milestone 9 acceptance criteria:

@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Recursive-descent MF2 parser.
 //!
 //! The parser drives an internal [`crate::scanner::Cursor`] over the source
@@ -1360,4 +1363,3 @@ impl PatternMode {
         matches!(self, PatternMode::Quoted)
     }
 }
-

@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Recovery / malformed-input fixtures.
 //!
 //! For each malformed input we lock in:

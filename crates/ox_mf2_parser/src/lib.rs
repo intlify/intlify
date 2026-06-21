@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! ox-mf2 Phase 1 MF2 parser core.
 //!
 //! This crate provides the Rust core for parsing

@@ -171,20 +171,6 @@ function renderReport({ rawResults, normalized, environment, preflight, calibrat
   return `${lines.join('\n')}\n`
 }
 
-function withRelative(results) {
-  const minBySuite = new Map()
-  for (const result of results) {
-    const min = minBySuite.get(result.suite)
-    if (min == null || result.mean < min) {
-      minBySuite.set(result.suite, result.mean)
-    }
-  }
-  return results.map(result => ({
-    ...result,
-    relative: result.mean / minBySuite.get(result.suite)
-  }))
-}
-
 function corpusForSuite(suite) {
   // Suites are named `<corpus>-<runtime>` (e.g. mf2-common-rust, mf1-icu-js)
   // optionally followed by `.<variant>` for side-by-side branch experiments
@@ -248,7 +234,7 @@ function perParseRanking(results) {
     groups.get(r.suite).push(r)
   }
   const out = []
-  for (const [suite, items] of [...groups.entries()].sort()) {
+  for (const [suite, items] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     items.sort((a, b) => a.perParseUs - b.perParseUs)
     out.push(`### ${suite}`, '')
     out.push(

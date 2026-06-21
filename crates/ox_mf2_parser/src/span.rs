@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! ID newtypes, [`Span`], and the optional-reference sentinel.
 //!
 //! The Phase 1 identifier model uses `u32` indexes. `0` is a valid index for

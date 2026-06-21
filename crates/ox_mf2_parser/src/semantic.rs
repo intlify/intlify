@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! Optional `SemanticModel` lowered from `CstTables`.
 //!
 //! Only built when [`crate::ParseOptions::parse_semantic`] is `true`. The

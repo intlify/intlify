@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check-rust-headers": "node scripts/check-rust-headers.js",
     "bench:mf-parser": "vp run mf-parser-bench#bench",
     "bench:mf-parser:smoke": "vp run mf-parser-bench#bench:smoke",
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev": "vp run website#dev",
+    "check": "vp run check-rust-headers && vp check",
     "prepare": "vp config"
   },
   "devDependencies": {

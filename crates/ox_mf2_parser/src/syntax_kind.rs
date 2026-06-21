@@ -1,3 +1,6 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
 //! `SyntaxKind` enum shared by parser, tables, diagnostics, and snapshots.
 //!
 //! Numeric values are part of the Phase 2 Binary AST snapshot wire format
