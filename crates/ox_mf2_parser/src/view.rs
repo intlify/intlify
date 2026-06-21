@@ -79,7 +79,8 @@ impl<'a> CstView<'a> {
     }
 
     pub fn token_kind(&self, token: TokenId) -> SyntaxKind {
-        self.token(token).map_or(SyntaxKind::Tombstone, |t| t.kind())
+        self.token(token)
+            .map_or(SyntaxKind::Tombstone, |t| t.kind())
     }
 
     pub fn token_span(&self, token: TokenId) -> Span {
@@ -199,9 +200,10 @@ impl<'a> CstTokenView<'a> {
 
     pub fn text(&self) -> &'a str {
         let rec = self.view.tables.token_at(self.id);
-        self.view
-            .sources
-            .slice_in(SourceId::new(rec.source_id), Span::new(rec.span_start, rec.span_end))
+        self.view.sources.slice_in(
+            SourceId::new(rec.source_id),
+            Span::new(rec.span_start, rec.span_end),
+        )
     }
 
     /// Compact leading-trivia range belonging to this token.
@@ -262,9 +264,10 @@ impl<'a> CstTriviaView<'a> {
 
     pub fn text(&self) -> &'a str {
         let rec = self.view.tables.trivia_at(self.id);
-        self.view
-            .sources
-            .slice_in(SourceId::new(rec.source_id), Span::new(rec.span_start, rec.span_end))
+        self.view.sources.slice_in(
+            SourceId::new(rec.source_id),
+            Span::new(rec.span_start, rec.span_end),
+        )
     }
 }
 
@@ -458,14 +461,7 @@ mod tests {
 
         let mut b = CstBuilder::new();
         let text_pending = b.start_node(SyntaxKind::Text, 0);
-        let token_id = b.push_token(
-            SyntaxKind::TextToken,
-            source_id,
-            Span::new(0, 5),
-            0,
-            0,
-            0,
-        );
+        let token_id = b.push_token(SyntaxKind::TextToken, source_id, Span::new(0, 5), 0, 0, 0);
         b.push_token_edge(token_id);
         let text_id = b.finish_node(text_pending, 5);
 

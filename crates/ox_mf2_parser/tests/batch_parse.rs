@@ -56,10 +56,7 @@ fn batch_preserves_input_order_and_metadata() {
     let result = parse_batch(&inputs, BatchParseOptions::default());
     assert_eq!(result.items.len(), 3);
     for (i, item) in result.items.iter().enumerate() {
-        let file = result
-            .sources
-            .get(item.source)
-            .expect("source registered");
+        let file = result.sources.get(item.source).expect("source registered");
         match i {
             0 => {
                 assert_eq!(file.path.as_deref(), Some("a.mf2"));

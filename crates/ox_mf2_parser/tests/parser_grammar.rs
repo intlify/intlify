@@ -49,7 +49,11 @@ fn empty_simple_message_is_valid() {
     let kinds = collect_kinds(root);
     assert_eq!(
         &kinds[..3],
-        &[SyntaxKind::Root, SyntaxKind::SimpleMessage, SyntaxKind::Pattern]
+        &[
+            SyntaxKind::Root,
+            SyntaxKind::SimpleMessage,
+            SyntaxKind::Pattern
+        ]
     );
 }
 

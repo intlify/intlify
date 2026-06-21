@@ -104,9 +104,7 @@ pub enum SourceStoreError {
 impl core::fmt::Display for SourceStoreError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::SourceTooLarge => {
-                f.write_str("source length exceeds u32::MAX byte offsets")
-            }
+            Self::SourceTooLarge => f.write_str("source length exceeds u32::MAX byte offsets"),
         }
     }
 }
@@ -215,11 +213,7 @@ impl SourceStore {
             return SourceLocation::default();
         };
         let line0 = file.line_index_for_offset(span.start);
-        let line_start = file
-            .line_starts()
-            .get(line0 as usize)
-            .copied()
-            .unwrap_or(0);
+        let line_start = file.line_starts().get(line0 as usize).copied().unwrap_or(0);
         let column0 = span.start.saturating_sub(line_start);
         SourceLocation {
             line: line0 + 1,

@@ -30,13 +30,12 @@ pub mod view;
 pub mod workspace;
 
 pub use api::{
-    parse_batch, parse_message, parse_source, parse_source_session, BatchExecution,
-    BatchParseItem, BatchParseOptions, BatchParseResult, ParseInput, ParseOptions, ParseResult,
-    ParseSessionResult,
+    parse_batch, parse_message, parse_source, parse_source_session, BatchExecution, BatchParseItem,
+    BatchParseOptions, BatchParseResult, ParseInput, ParseOptions, ParseResult, ParseSessionResult,
 };
 pub use diagnostic::{
-    Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef,
-    DiagnosticSeverity, DiagnosticView,
+    Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef, DiagnosticSeverity,
+    DiagnosticView,
 };
 pub use scanner::ScannerState;
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
@@ -45,7 +44,7 @@ pub use span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
 pub use syntax_kind::SyntaxKind;
 pub use tables::{CstCapacity, CstTables};
 pub use view::{
-    CstChild, CstChildren, CstNodeTokens, CstNodeView, CstTokenView, CstTriviaRange,
-    CstTriviaView, CstView,
+    CstChild, CstChildren, CstNodeTokens, CstNodeView, CstTokenView, CstTriviaRange, CstTriviaView,
+    CstView,
 };
 pub use workspace::{ParseCapacity, ParseWorkspace};

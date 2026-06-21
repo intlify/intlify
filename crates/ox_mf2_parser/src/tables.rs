@@ -137,7 +137,6 @@ impl CstTables {
         self.trivia.clear();
     }
 
-
     pub fn reserve(&mut self, capacity: &CstCapacity) {
         self.nodes.reserve(capacity.nodes);
         self.edges.reserve(capacity.edges);
@@ -383,12 +382,7 @@ impl CstBuilder {
         id
     }
 
-    pub fn push_trivia(
-        &mut self,
-        kind: SyntaxKind,
-        source: SourceId,
-        span: Span,
-    ) -> TriviaId {
+    pub fn push_trivia(&mut self, kind: SyntaxKind, source: SourceId, span: Span) -> TriviaId {
         let id = TriviaId::new(self.tables.trivia.len() as u32);
         self.tables.trivia.push(TriviaRecord {
             kind: kind.as_u16(),

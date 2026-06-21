@@ -14,7 +14,11 @@ use ox_mf2_parser::{
 #[test]
 fn parse_message_returns_owned_result() {
     let result = parse_message("Hello");
-    assert!(result.diagnostics.is_empty(), "unexpected diagnostics: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.diagnostics
+    );
     // Root, SimpleMessage, Pattern, Text — see design/002 §"Message Mode".
     assert!(result.cst.node_count() >= 4);
 }

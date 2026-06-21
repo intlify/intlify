@@ -91,12 +91,8 @@ impl DiagnosticCode {
             Self::UnexpectedToken => "unexpected token",
             Self::SpanOverflow => "source length exceeds u32::MAX byte offsets",
             Self::InvalidEscape => "invalid escape sequence",
-            Self::AmbiguousMessageMode => {
-                "ambiguous message mode; recovered as a simple message"
-            }
-            Self::MissingRequiredWhitespace => {
-                "missing required whitespace between productions"
-            }
+            Self::AmbiguousMessageMode => "ambiguous message mode; recovered as a simple message",
+            Self::MissingRequiredWhitespace => "missing required whitespace between productions",
             Self::MissingIdentifierName => "missing identifier name after ':'",
         }
     }
@@ -441,7 +437,10 @@ mod tests {
         let diag = view.iter().next().unwrap();
         assert_eq!(diag.code, DiagnosticCode::UnclosedExpression);
         assert_eq!(diag.location, SourceLocation { line: 2, column: 1 });
-        assert_eq!(diag.message, DiagnosticCode::UnclosedExpression.static_message());
+        assert_eq!(
+            diag.message,
+            DiagnosticCode::UnclosedExpression.static_message()
+        );
         assert_eq!(diag.severity, DiagnosticSeverity::Error);
     }
 }

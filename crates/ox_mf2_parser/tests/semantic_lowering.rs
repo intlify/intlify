@@ -44,7 +44,10 @@ fn simple_message_is_pattern() {
     assert!(!semantic.patterns.is_empty());
     assert!(!semantic.expressions.is_empty());
     assert_eq!(semantic.references.len(), 1);
-    assert_eq!(semantic.references[0].name_span.start, semantic.references[0].semantic_ref.span.start);
+    assert_eq!(
+        semantic.references[0].name_span.start,
+        semantic.references[0].semantic_ref.span.start
+    );
 }
 
 #[test]
@@ -94,8 +97,10 @@ fn markup_options_and_attributes_are_lowered() {
 
 #[test]
 fn input_declaration_body_is_lowered() {
-    let result =
-        parse(".input {$count :number minimumFractionDigits=2}\n{{Hi {$count}}}", true);
+    let result = parse(
+        ".input {$count :number minimumFractionDigits=2}\n{{Hi {$count}}}",
+        true,
+    );
     let semantic = result.semantic.unwrap();
     assert_eq!(semantic.declarations.len(), 1);
     // The variable annotated on .input should still appear in declarations.

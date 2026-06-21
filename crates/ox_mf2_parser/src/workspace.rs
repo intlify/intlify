@@ -23,7 +23,13 @@ pub struct ParseCapacity {
 }
 
 impl ParseCapacity {
-    pub const fn new(nodes: usize, edges: usize, tokens: usize, trivia: usize, diagnostics: usize) -> Self {
+    pub const fn new(
+        nodes: usize,
+        edges: usize,
+        tokens: usize,
+        trivia: usize,
+        diagnostics: usize,
+    ) -> Self {
         Self {
             nodes,
             edges,
@@ -208,7 +214,10 @@ mod tests {
         assert!(diag_cap >= 16);
 
         // Push some scratch then clear — capacity must be preserved.
-        ws.parser.tables.nodes.push(crate::tables::CstNodeRecord::default());
+        ws.parser
+            .tables
+            .nodes
+            .push(crate::tables::CstNodeRecord::default());
         ws.parser.diagnostics.push(DiagnosticRecord::default());
         ws.clear();
         assert_eq!(ws.parser.tables.nodes.len(), 0);

@@ -20,7 +20,7 @@
 //!   match the WG spec ABNF byte-for-byte; tests pin the exclusion edges.
 
 #![allow(clippy::while_let_loop)] // explicit loop {} + Some(b) else-break is
-                                   // clearer for the byte/codepoint dual paths.
+                                  // clearer for the byte/codepoint dual paths.
 
 use crate::span::Span;
 
@@ -226,9 +226,7 @@ pub fn ascii_is_name_char(b: u8) -> Option<bool> {
     if b >= 0x80 {
         return None;
     }
-    Some(
-        matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'),
-    )
+    Some(matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'))
 }
 
 /// `name-start` — full spec including Unicode.
@@ -496,7 +494,9 @@ pub(crate) fn scan_name(cursor: &mut Cursor<'_>) -> Option<Span> {
                 Some(false) | None => break,
             }
         } else {
-            let Some((c, len)) = cursor.peek_char() else { break };
+            let Some((c, len)) = cursor.peek_char() else {
+                break;
+            };
             if !is_name_char(c) {
                 break;
             }
@@ -528,7 +528,9 @@ pub(crate) fn scan_unquoted_literal(cursor: &mut Cursor<'_>) -> Option<Span> {
                 _ => break,
             }
         } else {
-            let Some((c, len)) = cursor.peek_char() else { break };
+            let Some((c, len)) = cursor.peek_char() else {
+                break;
+            };
             if !is_name_char(c) {
                 break;
             }
@@ -554,7 +556,9 @@ fn skip_bidi(cursor: &mut Cursor<'_>) {
         if b < 0x80 {
             break;
         }
-        let Some((c, len)) = cursor.peek_char() else { break };
+        let Some((c, len)) = cursor.peek_char() else {
+            break;
+        };
         if !is_bidi_char(c) {
             break;
         }

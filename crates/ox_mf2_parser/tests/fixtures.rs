@@ -156,7 +156,11 @@ fn fixture_corpus_matches_snapshots() {
                     failures.push(format!(
                         "[{bucket}/{stem}] expected {expected} diagnostics, got {} ({:?})",
                         result.diagnostics.len(),
-                        result.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>(),
+                        result
+                            .diagnostics
+                            .iter()
+                            .map(|d| d.code)
+                            .collect::<Vec<_>>(),
                     ));
                 }
             }

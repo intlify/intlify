@@ -4,12 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check-rust-headers": "node scripts/check-rust-headers.js",
+    "check:rust-headers": "node scripts/check-rust-headers.js",
+    "check:rust": "cargo check && cargo fmt --all -- --check",
+    "check:rust-all-targets": "cargo check --all-targets",
     "bench:mf-parser": "vp run mf-parser-bench#bench",
     "bench:mf-parser:smoke": "vp run mf-parser-bench#bench:smoke",
+    "fmt:rust": "cargo fmt --all",
+    "fmt": "vp run fmt:rust && vp fmt",
     "ready": "vpr check && vp run -r test && vp run -r build",
     "dev": "vp run website#dev",
-    "check": "vp run check-rust-headers && vp check",
+    "check": "vp run check:rust-headers && vp run check:rust && vp check",
     "prepare": "vp config"
   },
   "devDependencies": {

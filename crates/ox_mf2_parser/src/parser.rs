@@ -87,8 +87,14 @@ pub(crate) fn run_parse_text(
     // taken by mutable reference further down rather than swapped because
     // it has no aliasing problem (only the diagnostic sink touches it).
     core::mem::swap(&mut builder.tables, &mut workspace.parser.tables);
-    core::mem::swap(&mut builder.pending_edges, &mut workspace.parser.pending_edges);
-    core::mem::swap(&mut builder.frame_starts, &mut workspace.parser.frame_starts);
+    core::mem::swap(
+        &mut builder.pending_edges,
+        &mut workspace.parser.pending_edges,
+    );
+    core::mem::swap(
+        &mut builder.frame_starts,
+        &mut workspace.parser.frame_starts,
+    );
 
     {
         let (diagnostics_buf, labels_buf) = (
@@ -109,8 +115,14 @@ pub(crate) fn run_parse_text(
 
     // Restore everything to the workspace.
     core::mem::swap(&mut builder.tables, &mut workspace.parser.tables);
-    core::mem::swap(&mut builder.pending_edges, &mut workspace.parser.pending_edges);
-    core::mem::swap(&mut builder.frame_starts, &mut workspace.parser.frame_starts);
+    core::mem::swap(
+        &mut builder.pending_edges,
+        &mut workspace.parser.pending_edges,
+    );
+    core::mem::swap(
+        &mut builder.frame_starts,
+        &mut workspace.parser.frame_starts,
+    );
 }
 
 struct Parser<'src, 'ws> {

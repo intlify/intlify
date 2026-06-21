@@ -332,21 +332,13 @@ fn first_direct_node_child<'a>(
 }
 
 #[inline]
-fn first_direct_child_span(
-    tables: &CstTables,
-    rec: &CstNodeRecord,
-    kind: SyntaxKind,
-) -> Span {
+fn first_direct_child_span(tables: &CstTables, rec: &CstNodeRecord, kind: SyntaxKind) -> Span {
     first_direct_node_child(tables, rec, kind)
         .map(|(_, r)| span_of(r))
         .unwrap_or_default()
 }
 
-fn lower_message_children(
-    tables: &CstTables,
-    node_rec: &CstNodeRecord,
-    model: &mut SemanticModel,
-) {
+fn lower_message_children(tables: &CstTables, node_rec: &CstNodeRecord, model: &mut SemanticModel) {
     for (n_id, n_rec) in iter_node_children(tables, node_rec) {
         let kind = n_rec.kind;
         if kind == SyntaxKind::Pattern as u16 {
