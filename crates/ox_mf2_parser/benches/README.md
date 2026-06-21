@@ -11,7 +11,7 @@ The Phase 1 parser ships two benchmark integration points:
 
 2. **External baseline tool** — `tools/mf-parser-bench/rs` now ships two extra targets, `ox-mf2-parse` and `ox-mf2-parse-and-lower`, that sit alongside the existing `ox-content-*` / `mf2-tools-*` targets so the JS-orchestrated comparison runs all parsers against the same corpus.
 
-`benches/hyperfine.sh` is a thin wrapper that builds the release binary and runs hyperfine across `parse_message_owned`, `parse_cst`, `parse_cst_no_trivia`, and `lower_semantic`. Each phase is invoked separately so the resulting hyperfine summary keeps the phases on distinct rows rather than collapsing them into one number.
+`benches/hyperfine.sh` is a thin wrapper that builds the release binary and runs hyperfine across `parse_message_owned`, `parse_cst`, `parse_cst_no_trivia`, `lower_semantic`, and batch-style `owned_materialize`. Each phase is invoked separately so the resulting hyperfine summary keeps the phases on distinct rows rather than collapsing them into one number.
 
 When publishing comparison numbers, always state:
 

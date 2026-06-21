@@ -116,7 +116,6 @@ pub struct BatchParseResult {
     pub degraded: bool,
 }
 
-
 #[derive(Debug, Default, Clone)]
 pub struct BatchParseItem {
     pub source: SourceId,
@@ -130,14 +129,12 @@ pub fn parse_source(
     options: ParseOptions,
 ) -> ParseResult {
     let mut workspace = ParseWorkspace::new();
-    let source_len = sources
-        .get(source_id)
-        .map_or(0, |f| f.text.len());
+    let source_len = sources.get(source_id).map_or(0, |f| f.text.len());
     workspace.reserve_for_source_len(source_len);
 
     run_parse(sources, source_id, &mut workspace, options);
 
-    materialise(sources, source_id, &workspace, options)
+    materialise_owned_workspace(sources, source_id, workspace, options)
 }
 
 /// One-shot convenience parser. Registers `source` in a fresh
@@ -165,7 +162,10 @@ pub fn parse_source_session<'a>(
     if options.parse_semantic {
         // Reuse the workspace-held SemanticModel's capacity instead of
         // allocating a fresh model every session.
-        let model = workspace.semantic.model.get_or_insert_with(SemanticModel::default);
+        let model = workspace
+            .semantic
+            .model
+            .get_or_insert_with(SemanticModel::default);
         lower_semantic_into(sources, source_id, &workspace.parser.tables, model);
     } else {
         workspace.semantic.model = None;
@@ -236,6 +236,34 @@ fn materialise(
     options: ParseOptions,
 ) -> ParseResult {
     let cst = workspace.parser.tables.clone();
+    let semantic = if options.parse_semantic {
+        let mut model = SemanticModel::default();
+        lower_semantic_into(sources, source_id, &cst, &mut model);
+        Some(model)
+    } else {
+        None
+    };
+    let diagnostics = DiagnosticView {
+        sources,
+        records: &workspace.parser.diagnostics,
+    }
+    .iter()
+    .collect();
+    ParseResult {
+        source: source_id,
+        cst,
+        semantic,
+        diagnostics,
+    }
+}
+
+fn materialise_owned_workspace(
+    sources: &SourceStore,
+    source_id: SourceId,
+    mut workspace: ParseWorkspace,
+    options: ParseOptions,
+) -> ParseResult {
+    let cst = core::mem::take(&mut workspace.parser.tables);
     let semantic = if options.parse_semantic {
         let mut model = SemanticModel::default();
         lower_semantic_into(sources, source_id, &cst, &mut model);

@@ -18,14 +18,15 @@
 //! - `--phase lower_semantic` — `parse_source_session` with
 //!   `parse_semantic = true`. Measures parser-core + `SemanticModel` lowering.
 //! - `--phase owned_materialize` — parses once with workspace reuse and
-//!   then measures only the per-iteration cost of cloning `CstTables` and
-//!   materialising diagnostics into an owned `ParseResult`.
+//!   then measures the batch-style cost of cloning `CstTables` and
+//!   materialising diagnostics into an owned `ParseResult`. One-shot
+//!   `parse_source` moves the final tables instead of cloning them.
 //!
 //! Convenience APIs (NOT parser-core baselines — they include source
-//! registration / line-index construction / owned materialisation):
+//! registration / line-index construction / owned result construction):
 //!
 //! - `--phase parse_message_owned` — convenience `parse_message` call,
-//!   freshly allocating sources / workspace and materialising an owned
+//!   freshly allocating sources / workspace and constructing an owned
 //!   `ParseResult` every iteration.
 //!
 //! View / diagnostic / batch phases:
@@ -186,7 +187,9 @@ fn print_help() {
     println!();
     println!("Phases (optional / downstream cost — include alongside a baseline):");
     println!("  lower_semantic               parser-core + SemanticModel lowering");
-    println!("  owned_materialize            CstTables.clone + diagnostic materialise only");
+    println!(
+        "  owned_materialize            batch-style CstTables.clone + diagnostic materialise only"
+    );
     println!();
     println!("Phases (convenience APIs — NOT parser-core, include extra setup):");
     println!("  parse_message_owned          parse_message → owned ParseResult (fresh sources/workspace)");
@@ -377,10 +380,13 @@ fn run_lower_semantic(args: &Args) -> Result<PhaseSummary, String> {
     })
 }
 
-/// Measure only the cost of cloning `CstTables` and materialising
+/// Measure the batch-style cost of cloning `CstTables` and materialising
 /// diagnostics into an owned `ParseResult`, with the parse itself amortised
-/// outside the loop. Use this to separate "what does owning a parse cost"
-/// from parser-core throughput.
+/// outside the loop.
+///
+/// One-shot `parse_source` / `parse_message` move the final CST tables out of
+/// their disposable workspace. `parse_batch` still keeps one workspace alive
+/// across items, so it must clone table data into each owned result.
 fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
@@ -395,14 +401,14 @@ fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
         workspace.reserve_for_source_len(input.len());
     }
     let session = parse_source_session(&sources, id, &mut workspace, options);
-    // Clone what `parse_source` would materialise into an owned
+    // Clone what the reusable-workspace owned path materialises into a
     // `ParseResult` once, outside the measured loop.
     let baseline_cst = session.cst.tables().clone();
     let baseline_diags: Vec<_> = session.diagnostics.iter().collect();
     let mut units = 0usize;
     // Per iteration: re-clone the tables and re-materialise the diagnostic
-    // list. This is the cost that the owned API pays on top of the
-    // borrowed-session path.
+    // list. This is the cost that reusable-workspace owned APIs pay on top
+    // of the borrowed-session path.
     for _ in 0..iters {
         let cst = baseline_cst.clone();
         let diags = baseline_diags.clone();
