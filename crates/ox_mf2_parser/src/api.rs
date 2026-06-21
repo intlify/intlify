@@ -146,7 +146,7 @@ pub fn parse_source(
 /// line/column materialisation.
 pub fn parse_message(source: &str) -> ParseResult {
     assert!(
-        source.len() <= u32::MAX as usize,
+        u32::try_from(source.len()).is_ok(),
         "source length fits in u32"
     );
     let source_id = SourceId::new(0);
