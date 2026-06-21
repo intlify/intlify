@@ -115,15 +115,23 @@ fn run() -> Result<(), String> {
         return Err(format!("No benchmark cases for {target} / {}", corpus.name));
     }
 
-    let session_inputs = if target == "ox-mf2-parse-session-no-trivia" {
-        Some(prepare_ox_mf2_session_inputs(&cases))
-    } else {
-        None
-    };
+    let session_inputs =
+        if target == "ox-mf2-parse-session" || target == "ox-mf2-parse-session-no-trivia" {
+            Some(prepare_ox_mf2_session_inputs(&cases))
+        } else {
+            None
+        };
 
     let started = Instant::now();
     let checksum = if let Some((sources, source_ids, max_source_len)) = session_inputs {
-        run_ox_mf2_parse_session_no_trivia(&sources, &source_ids, max_source_len, args.iterations)
+        let collect_trivia = target == "ox-mf2-parse-session";
+        run_ox_mf2_parse_session(
+            &sources,
+            &source_ids,
+            max_source_len,
+            args.iterations,
+            collect_trivia,
+        )
     } else {
         run_generic_target_loop(target, &cases, args.iterations)?
     };
@@ -251,6 +259,27 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
                 diagnostics: result.diagnostics.len(),
             })
         }
+        "ox-mf2-parse-session" => {
+            let mut sources = ox_mf2_parser::SourceStore::new();
+            let id = sources.add(ox_mf2_parser::SourceFileInput {
+                source: black_box(source),
+                ..Default::default()
+            });
+            let mut workspace = ox_mf2_parser::ParseWorkspace::new();
+            workspace.reserve_for_source_len(source.len());
+            let result = ox_mf2_parser::parse_source_session(
+                &sources,
+                id,
+                &mut workspace,
+                ox_mf2_parser::ParseOptions::default(),
+            );
+            let tables = black_box(result.cst.tables());
+            Ok(TargetResult {
+                checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
+                    as u64,
+                diagnostics: result.diagnostics.len(),
+            })
+        }
         "ox-mf2-parse-session-no-trivia" => {
             let mut options = ox_mf2_parser::ParseOptions::default();
             options.collect_trivia = false;
@@ -264,7 +293,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
             let result = ox_mf2_parser::parse_source_session(&sources, id, &mut workspace, options);
             let tables = black_box(result.cst.tables());
             Ok(TargetResult {
-                checksum: (tables.node_count() + tables.token_count()) as u64,
+                checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
+                    as u64,
                 diagnostics: result.diagnostics.len(),
             })
         }
@@ -335,14 +365,15 @@ fn prepare_ox_mf2_session_inputs(
     (sources, source_ids, max_source_len)
 }
 
-fn run_ox_mf2_parse_session_no_trivia(
+fn run_ox_mf2_parse_session(
     sources: &ox_mf2_parser::SourceStore,
     source_ids: &[(ox_mf2_parser::SourceId, usize)],
     max_source_len: usize,
     iterations: usize,
+    collect_trivia: bool,
 ) -> u64 {
     let mut options = ox_mf2_parser::ParseOptions::default();
-    options.collect_trivia = false;
+    options.collect_trivia = collect_trivia;
 
     let mut workspace = ox_mf2_parser::ParseWorkspace::new();
     workspace.reserve_for_source_len(max_source_len);
@@ -354,7 +385,9 @@ fn run_ox_mf2_parse_session_no_trivia(
                 ox_mf2_parser::parse_source_session(sources, source_id, &mut workspace, options);
             let tables = black_box(result.cst.tables());
             checksum = checksum
-                .wrapping_add((tables.node_count() + tables.token_count()) as u64)
+                .wrapping_add(
+                    (tables.node_count() + tables.token_count() + tables.trivia_count()) as u64,
+                )
                 .wrapping_add(source_len as u64)
                 .wrapping_add(result.diagnostics.len() as u64);
         }
