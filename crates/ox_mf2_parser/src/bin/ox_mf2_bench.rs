@@ -22,12 +22,13 @@
 //!   materialising diagnostics into an owned `ParseResult`. One-shot
 //!   `parse_source` moves the final tables instead of cloning them.
 //!
-//! Convenience APIs (NOT parser-core baselines — they include source
-//! registration / line-index construction / owned result construction):
+//! Convenience APIs (NOT parser-core baselines — they include fresh workspace
+//! setup and owned result construction; malformed inputs may also build a
+//! temporary source store for diagnostic locations):
 //!
 //! - `--phase parse_message_owned` — convenience `parse_message` call,
-//!   freshly allocating sources / workspace and constructing an owned
-//!   `ParseResult` every iteration.
+//!   freshly allocating a workspace and constructing an owned `ParseResult`
+//!   every iteration.
 //!
 //! View / diagnostic / batch phases:
 //!
@@ -83,9 +84,9 @@ use ox_mf2_parser::{
 // for any parse path. Gated behind `bench-alloc` because wrapping the
 // allocator is a non-trivial overhead for all the wall-clock phases.
 #[cfg(feature = "bench-alloc")]
-use std::alloc::System;
-#[cfg(feature = "bench-alloc")]
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
+#[cfg(feature = "bench-alloc")]
+use std::alloc::System;
 
 #[cfg(feature = "bench-alloc")]
 #[global_allocator]
@@ -197,10 +198,14 @@ fn print_help() {
     println!("Phases (view / diagnostic / batch):");
     println!("  cst_view_traversal           parse once, traverse CST N times");
     println!("  diagnostics                  parse once, iterate DiagnosticView N times");
-    println!("  source_mapping               parse once, resolve every diagnostic span to line/col");
+    println!(
+        "  source_mapping               parse once, resolve every diagnostic span to line/col"
+    );
     println!("  parse_batch_session          parser-core: one SourceStore + one ParseWorkspace,");
     println!("                                borrowed parse_source_session over --corpus");
-    println!("  parse_batch_sequential       owned parse_batch over --corpus (clone + materialise)");
+    println!(
+        "  parse_batch_sequential       owned parse_batch over --corpus (clone + materialise)"
+    );
     println!();
     println!("Phases (allocator inspection — requires `--features bench-alloc` build):");
     println!("  allocations                  report alloc count + bytes per parse iteration");
@@ -228,7 +233,9 @@ fn read_input(args: &Args) -> Result<String, String> {
         return fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()));
     }
     let mut s = String::new();
-    io::stdin().read_to_string(&mut s).map_err(|e| e.to_string())?;
+    io::stdin()
+        .read_to_string(&mut s)
+        .map_err(|e| e.to_string())?;
     Ok(s)
 }
 
@@ -238,8 +245,8 @@ fn read_corpus(dir: &PathBuf) -> Result<Vec<(String, String)>, String> {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "mf2") {
-            let text = fs::read_to_string(&path)
-                .map_err(|e| format!("read {}: {e}", path.display()))?;
+            let text =
+                fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
             out.push((path.display().to_string(), text));
         }
     }
@@ -280,7 +287,9 @@ fn main() -> ExitCode {
             if args.print_result {
                 println!(
                     "{} iterations: {} elapsed: {:?}",
-                    summary.iterations, summary.work_units, start.elapsed()
+                    summary.iterations,
+                    summary.work_units,
+                    start.elapsed()
                 );
             }
             ExitCode::SUCCESS
@@ -592,9 +601,11 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
 
 #[cfg(not(feature = "bench-alloc"))]
 fn run_allocations(_args: &Args) -> Result<PhaseSummary, String> {
-    Err("allocations phase requires `--features bench-alloc`; rebuild with \
+    Err(
+        "allocations phase requires `--features bench-alloc`; rebuild with \
          `cargo build --release -p ox_mf2_parser --bin ox-mf2-bench --features bench-alloc`"
-        .to_string())
+            .to_string(),
+    )
 }
 
 /// Parser-core batch baseline. Builds one [`SourceStore`] from `--corpus`,
@@ -663,7 +674,11 @@ fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
     let mut units = 0usize;
     for _ in 0..iters {
         let result = parse_batch(&inputs, BatchParseOptions::default());
-        units += result.items.iter().map(|i| i.result.cst.node_count()).sum::<usize>();
+        units += result
+            .items
+            .iter()
+            .map(|i| i.result.cst.node_count())
+            .sum::<usize>();
     }
     Ok(PhaseSummary {
         iterations: iters,

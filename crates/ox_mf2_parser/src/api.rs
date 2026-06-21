@@ -8,7 +8,7 @@
 //! Concrete parsing behaviour is filled in by Milestones 5, 6, 7, 8, and 9.
 
 use crate::diagnostic::{Diagnostic, DiagnosticView};
-use crate::parser::run_parse;
+use crate::parser::{run_parse, run_parse_text};
 use crate::semantic::{lower_into as lower_semantic_into, SemanticModel, SemanticView};
 use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId;
@@ -137,15 +137,20 @@ pub fn parse_source(
     materialise_owned_workspace(sources, source_id, workspace, options)
 }
 
-/// One-shot convenience parser. Registers `source` in a fresh
-/// [`SourceStore`] and returns an owned [`ParseResult`].
+/// One-shot convenience parser. Parses `source` directly and returns an owned
+/// [`ParseResult`]. The success path does not allocate a temporary
+/// [`SourceStore`]; malformed inputs build one only when diagnostics need
+/// line/column materialisation.
 pub fn parse_message(source: &str) -> ParseResult {
-    let mut sources = SourceStore::new();
-    let source_id = sources.add(SourceFileInput {
-        source,
-        ..Default::default()
-    });
-    parse_source(&sources, source_id, ParseOptions::default())
+    assert!(
+        source.len() <= u32::MAX as usize,
+        "source length fits in u32"
+    );
+    let source_id = SourceId::new(0);
+    let mut workspace = ParseWorkspace::new();
+    workspace.reserve_for_source_len(source.len());
+    run_parse_text(source, source_id, &mut workspace, ParseOptions::default());
+    materialise_one_shot_message(source, source_id, workspace)
 }
 
 /// Reuse `workspace` to parse `source_id`. Returns a [`ParseSessionResult`]
@@ -281,6 +286,36 @@ fn materialise_owned_workspace(
         source: source_id,
         cst,
         semantic,
+        diagnostics,
+    }
+}
+
+fn materialise_one_shot_message(
+    source: &str,
+    source_id: SourceId,
+    mut workspace: ParseWorkspace,
+) -> ParseResult {
+    let cst = core::mem::take(&mut workspace.parser.tables);
+    let diagnostics = if workspace.parser.diagnostics.is_empty() {
+        Vec::new()
+    } else {
+        let mut sources = SourceStore::with_capacity(1);
+        let actual_source_id = sources.add(SourceFileInput {
+            source,
+            ..Default::default()
+        });
+        debug_assert_eq!(actual_source_id, source_id);
+        DiagnosticView {
+            sources: &sources,
+            records: &workspace.parser.diagnostics,
+        }
+        .iter()
+        .collect()
+    };
+    ParseResult {
+        source: source_id,
+        cst,
+        semantic: None,
         diagnostics,
     }
 }

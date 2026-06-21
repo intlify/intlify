@@ -16,17 +16,17 @@
 //! malformed input is held in `Error` / `Missing` nodes.
 
 #![allow(clippy::while_let_loop)] // explicit loop {} + Some(_) else-break is
-                                   // clearer than nested while-let across the
-                                   // many byte/codepoint dual paths in the
-                                   // hot parsing routines.
+                                  // clearer than nested while-let across the
+                                  // many byte/codepoint dual paths in the
+                                  // hot parsing routines.
 
 use crate::api::ParseOptions;
 use crate::diagnostic::{DiagnosticCode, DiagnosticSink};
+use crate::scanner::Cursor;
 use crate::scanner::{
     detect_keyword, is_bidi_char, is_ws_byte, is_ws_char, peek_trivia, scan_name,
     scan_quoted_text_run, scan_text_run, scan_unquoted_literal, PeekTrivia, TriviaMode,
 };
-use crate::scanner::Cursor;
 use crate::semantic::MessageMode;
 use crate::source::SourceStore;
 use crate::span::{NodeId, SourceId, Span, TokenId};
@@ -43,8 +43,8 @@ use crate::workspace::ParseWorkspace;
 pub(crate) struct TriviaConsumed {
     pub ws_runs: u32,
     #[allow(dead_code)] // mirrored from PeekTrivia; reserved for future
-                       // span-aware `s` validation that distinguishes bidi-
-                       // only runs from bidi+ws sequences.
+    // span-aware `s` validation that distinguishes bidi-
+    // only runs from bidi+ws sequences.
     pub bidi_runs: u32,
 }
 
@@ -59,7 +59,22 @@ pub(crate) fn run_parse(
         return;
     };
 
-    let cursor = Cursor::new(&file.text);
+    run_parse_text(&file.text, source_id, workspace, options);
+}
+
+/// Parse a borrowed source string directly.
+///
+/// This is used by one-shot convenience APIs that do not need to retain a
+/// `SourceStore` after parsing. Callers that need source metadata,
+/// diagnostics mapping across files, or public `CstView` construction should
+/// keep using [`run_parse`].
+pub(crate) fn run_parse_text(
+    source: &str,
+    source_id: SourceId,
+    workspace: &mut ParseWorkspace,
+    options: ParseOptions,
+) {
+    let cursor = Cursor::new(source);
 
     let mut builder = CstBuilder::new();
     // Move pre-allocated tables AND staging stacks out of the workspace into
@@ -165,7 +180,9 @@ impl Parser<'_, '_> {
                 }
                 break;
             }
-            let Some((c, len)) = peek.peek_char() else { break };
+            let Some((c, len)) = peek.peek_char() else {
+                break;
+            };
             if is_ws_char(c) || is_bidi_char(c) {
                 peek.set_offset(peek.offset() + len);
                 continue;
@@ -1057,11 +1074,13 @@ impl Parser<'_, '_> {
         // Same coverage as `is_variant_start_byte` — adjacent variant keys
         // may begin with any `name-char`, not just `name-start`.
         match b {
-            Some(b) => matches!(
-                b,
-                b'*' | b'|'
-                    | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
-            ) || b >= 0x80,
+            Some(b) => {
+                matches!(
+                    b,
+                    b'*' | b'|'
+                        | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'_' | b'-' | b'.'
+                ) || b >= 0x80
+            }
             None => false,
         }
     }
@@ -1092,7 +1111,10 @@ impl Parser<'_, '_> {
         if self.cursor.peek_byte() == Some(b'{') && self.cursor.peek_byte_at(1) == Some(b'{') {
             let qp = self.parse_quoted_pattern();
             self.builder.push_node_edge(qp);
-        } else if matches!(detect_keyword(&self.cursor), Some(crate::scanner::KeywordHit::Match)) {
+        } else if matches!(
+            detect_keyword(&self.cursor),
+            Some(crate::scanner::KeywordHit::Match)
+        ) {
             let matcher_start = self.cursor.offset();
             let matcher = self.parse_match_body_recovered(matcher_start);
             self.builder.push_node_edge(matcher);
@@ -1172,7 +1194,9 @@ impl Parser<'_, '_> {
         let mut run_kind: Option<SyntaxKind> = None;
         let mut run_start: u32 = self.cursor.offset();
         loop {
-            let Some(b) = self.cursor.peek_byte() else { break };
+            let Some(b) = self.cursor.peek_byte() else {
+                break;
+            };
             // Classify the next codepoint into the run kind it belongs to.
             let (kind, advance) = if b < 0x80 {
                 if is_ws_byte(b) {
@@ -1181,7 +1205,9 @@ impl Parser<'_, '_> {
                     break;
                 }
             } else {
-                let Some((c, len)) = self.cursor.peek_char() else { break };
+                let Some((c, len)) = self.cursor.peek_char() else {
+                    break;
+                };
                 if is_ws_char(c) {
                     (SyntaxKind::WhitespaceTrivia, len)
                 } else if is_bidi_char(c) {
@@ -1196,11 +1222,9 @@ impl Parser<'_, '_> {
             match run_kind {
                 Some(cur) if cur != kind => {
                     let here = self.cursor.offset();
-                    let _ = self.builder.push_trivia(
-                        cur,
-                        self.source,
-                        Span::new(run_start, here),
-                    );
+                    let _ = self
+                        .builder
+                        .push_trivia(cur, self.source, Span::new(run_start, here));
                     Self::bump_run_count(&mut stats, cur);
                     run_start = here;
                 }
@@ -1215,11 +1239,9 @@ impl Parser<'_, '_> {
         if let Some(cur) = run_kind {
             let here = self.cursor.offset();
             if here > run_start {
-                let _ = self.builder.push_trivia(
-                    cur,
-                    self.source,
-                    Span::new(run_start, here),
-                );
+                let _ = self
+                    .builder
+                    .push_trivia(cur, self.source, Span::new(run_start, here));
                 Self::bump_run_count(&mut stats, cur);
             }
         }
@@ -1264,7 +1286,9 @@ impl Parser<'_, '_> {
     fn consume_trivia_skipping(&mut self, stats: &mut TriviaConsumed) {
         let mut current: Option<SyntaxKind> = None;
         loop {
-            let Some(b) = self.cursor.peek_byte() else { break };
+            let Some(b) = self.cursor.peek_byte() else {
+                break;
+            };
             let (kind, advance) = if b < 0x80 {
                 if is_ws_byte(b) {
                     (SyntaxKind::WhitespaceTrivia, 1u32)
@@ -1272,7 +1296,9 @@ impl Parser<'_, '_> {
                     break;
                 }
             } else {
-                let Some((c, len)) = self.cursor.peek_char() else { break };
+                let Some((c, len)) = self.cursor.peek_char() else {
+                    break;
+                };
                 if is_ws_char(c) {
                     (SyntaxKind::WhitespaceTrivia, len)
                 } else if is_bidi_char(c) {
@@ -1312,14 +1338,9 @@ impl Parser<'_, '_> {
         let trivia_len_now = self.builder.tables.trivia.len() as u32;
         let first_trivia = self.pending_trivia_start;
         let leading_count = trivia_len_now.saturating_sub(first_trivia) as u16;
-        let id = self.builder.push_token(
-            kind,
-            self.source,
-            span,
-            first_trivia,
-            leading_count,
-            0,
-        );
+        let id = self
+            .builder
+            .push_token(kind, self.source, span, first_trivia, leading_count, 0);
         self.pending_trivia_start = trivia_len_now;
         id
     }

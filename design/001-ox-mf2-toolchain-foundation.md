@@ -190,7 +190,7 @@ The detailed design for Binary AST, bindings, snapshots, and transport is define
 
 Adopt `parse_source + SourceStore`.
 
-SourceStore is the common source ownership layer for single parse, batch parse, diagnostics, editor boundaries, and future snapshot roots sections. Convenience APIs also register source text internally and process through SourceId.
+SourceStore is the common source ownership layer for `parse_source`, batch parse, diagnostics, editor boundaries, and future snapshot roots sections. The `parse_message` convenience API may parse directly from the borrowed `&str` on the successful one-shot path, while still using a temporary SourceStore when diagnostics need line/column materialization.
 
 MF2 workloads often contain many messages in one file, one locale set, or one project, so batch parsing is a first-class API. Batch metadata such as path, locale, message_id, and base_offset is used for identity, diagnostics, fixtures, benchmarks, and future snapshot root mapping. It must not change parser semantics.
 
