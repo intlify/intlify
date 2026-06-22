@@ -61,14 +61,16 @@ parse_session_to_snapshot(
 
 parse_batch_to_snapshot(
   inputs: &[ParseInput],
-  parse_options: ParseOptions,
+  batch_options: BatchParseOptions,
   snapshot_options: SnapshotOptions,
 ) -> BatchSnapshotResult
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `ParseResult`, and `ParseSessionResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, and `ParseSessionResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
 `parse_source_to_snapshot` is a convenience API that builds a snapshot from the normal owned parse path. `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. In both cases, the snapshot builds SourceRecord and RootRecord from input `SourceStore` / `ParseInput` metadata.
+
+`parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
 
 ## Options
 
@@ -79,7 +81,6 @@ SnapshotOptions {
   include_diagnostics: bool,
   include_source_text: bool,
   include_trivia: bool,
-  preserve_whitespace: bool,
 }
 ```
 
@@ -90,11 +91,12 @@ Defaults:
 - `include_diagnostics = true`
 - `include_source_text = false`
 - `include_trivia = true`
-- `preserve_whitespace = true`
 
 `include_source_text = false` is the default. In normal binding parse results, source text is already retained by the caller, binding layer, or SourceStore, so duplicating it in the snapshot increases size and transfer cost.
 
 `include_source_text = true` is used when the snapshot alone must resolve `source_slice(source_id, span)`. Main uses are debug dump, persistence, worker transfer, fixture snapshots, and transport to external processes.
+
+Whether whitespace / bidi trivia is collected by the parser is controlled by Phase 1 `ParseOptions.collect_trivia`. `SnapshotOptions.include_trivia` only controls whether already-produced trivia records are encoded into the snapshot. If a snapshot is built from a parse result produced with `collect_trivia = false`, there is no trivia to encode even when `include_trivia = true`.
 
 ## Result Types
 
@@ -111,10 +113,12 @@ BatchSnapshotResult {
   bytes: Vec<u8>,
   roots: Vec<RootId>,
   diagnostics: Vec<Diagnostic>,
+  execution: BatchExecution,
+  degraded: bool,
 }
 ```
 
-`SnapshotResult.root` is the RootId for a single input. `BatchSnapshotResult.bytes` is a shared snapshot buffer. `roots` is a RootId array corresponding to input order. Each root has only root node, source_id, and diagnostic range through RootRecord. Path, locale, message_id, base_offset, and optional source text live in SourceRecord. This lets batch parsing share string tables and snapshot sections across many messages.
+`SnapshotResult.root` is the RootId for a single input. `BatchSnapshotResult.bytes` is a shared snapshot buffer. `roots` is a RootId array corresponding to input order. `execution` is the batch strategy that actually ran, and `degraded` reports whether the requested strategy was downgraded. Each root has only root node, source_id, and diagnostic range through RootRecord. Path, locale, message_id, base_offset, and optional source text live in SourceRecord. This lets batch parsing share string tables and snapshot sections across many messages.
 
 Rust snapshot-producing APIs return `bytes + RootId` and do not store a self-referential `RootHandle { snapshot, id }` directly in the result struct. RootHandle is created after a decoded `SnapshotView` or binding result object owns the snapshot.
 
@@ -697,26 +701,38 @@ Snapshot and binding work must not be hidden inside one parser number.
 Relevant benchmark phases:
 
 - lexer
+- parse_message_owned
 - parse_cst
+- parse_cst_no_trivia
 - lower_semantic
+- owned_materialize
 - diagnostics
+- source_mapping
+- parse_batch_session
+- parse_batch_sequential
 - encode_snapshot
 - decode_snapshot
+- snapshot_accessor_traversal
 - snapshot_to_bytes_copy
 - binding_call
-- parse_batch
 - parse_batch_to_snapshot
 - lsp_jsonrpc
 - lsp_msgpack
 
 Phase 2 benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and binding/export cost separately.
 
-- `parse_cst`: cost for the Rust parser to build CstTables.
+- `parse_message_owned`: convenience `parse_message` path, including fresh workspace setup and owned `ParseResult` materialization.
+- `parse_cst`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = true`.
+- `parse_cst_no_trivia`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = false`.
+- `lower_semantic`: parser-core cost plus `SemanticModel` lowering.
+- `owned_materialize`: cost to create an owned `ParseResult` from borrowed session / table output.
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
 - `decode_snapshot`: cost to validate snapshot bytes and build lazy SnapshotView / section index. It does not include node/token/string traversal.
 - `snapshot_accessor_traversal`: cost to read roots, nodes, tokens, trivia, and diagnostics lazily from a decoded SnapshotView.
 - `snapshot_to_bytes_copy`: cost for `result.snapshot.toBytes()` to copy the internal buffer and return external bytes.
 - `binding_call`: cost to cross N-API / WASM boundary and return result object plus handles. This is measured separately from parse / encode / decode.
+- `parse_batch_session`: cost to parse a corpus with one `SourceStore` and one reused `ParseWorkspace` through borrowed session results.
+- `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `parse_batch_to_snapshot`: combined product path for batch parse plus shared snapshot encoding. Do not mix it with the single-message parser baseline.
 
-Benchmark reports include at least separate series for `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline is `parse_message` equivalent, meaning `parse_cst` without snapshot encoding or binding materialization. Snapshot/binding numbers are reported separately as ox-mf2 product-boundary cost.
+Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot/binding numbers are reported separately as ox-mf2 product-boundary cost.
