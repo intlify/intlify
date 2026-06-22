@@ -1,16 +1,18 @@
-# ox-mf2 Phase 2 Binary AST and Language Binding Detailed Design
+# ox-mf2 Phase 2 Binary AST Snapshot Design
 
 ## Purpose
 
-This document defines implementation-oriented design details for the Phase 2 cross-language boundary of ox-mf2.
+This document defines implementation-oriented design details for the Phase 2 Binary AST snapshot of ox-mf2.
 
-The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). It defines the high-level philosophy and phase plan. This document defines the lower-level shape of Binary AST snapshots, language bindings, snapshot APIs, binding result boundaries, and transport boundaries.
+The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). It defines the high-level philosophy and phase plan. This document defines the lower-level shape of Binary AST snapshots, snapshot-producing APIs, decoder/accessor APIs, snapshot ownership, wire compatibility, tests, and snapshot-specific benchmarks.
+
+Language binding design is defined separately in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md). Tooling and transport design is defined separately in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md).
 
 ## Basic Policy
 
 ox-mf2 uses the Rust core as the single semantic implementation. MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, and linting are not reimplemented in other languages.
 
-Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for N-API, WASM, later language bindings, persistence, and transport.
+Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for cross-language CST/AST views, persistence, worker transfer, and batch transfer.
 
 The Rust core hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust core parse output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
 
@@ -29,7 +31,7 @@ parser / lowering
   -> snapshot-friendly construction tables
   -> SnapshotWriter
   -> versioned Binary AST snapshot
-  -> N-API / WASM / persistence decoder-accessor view
+  -> decoder-accessor view
 ```
 
 ![ox-mf2 Binary AST and binding architecture](./assets/003-ox-mf2-binary-ast-binding-architecture.svg)
@@ -100,7 +102,7 @@ Whether whitespace / bidi trivia is collected by the parser is controlled by Pha
 
 ## Result Types
 
-The result types in this section are Rust snapshot-producing API shapes. The default public API for N-API / WASM bindings does not return raw bytes directly; it wraps them in the result object and snapshot accessor described later.
+The result types in this section are Rust snapshot-producing API shapes. Language bindings may wrap these bytes in higher-level result objects, but the snapshot layer itself returns encoded bytes plus root identity and diagnostics.
 
 ```rust
 SnapshotResult {
@@ -467,25 +469,6 @@ Diagnostics without labels use `label_count = 0`. Decoders verify `label_start +
 
 Public APIs may return diagnostics separately for convenience, but the snapshot format must be able to keep diagnostics as part of the encoded result. A flat diagnostics array in a binding result is a view over snapshot diagnostic records in root order, not a separate diagnostic table.
 
-## SemanticView
-
-![ox-mf2 SemanticView](./assets/003-ox-mf2-semantic-view.svg)
-
-SemanticView is separate from the lossless Binary AST snapshot.
-
-Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles semantic facts.
-
-- declarations
-- references
-- selectors
-- variants
-- fallback/default information
-- duplicate keys
-- coverage metadata
-- links to NodeId and Span
-
-Linters, compilers, and validators can combine Binary AST decoder/accessor traversal with SemanticView.
-
 ## Decoder Error Boundary
 
 Snapshot decode fails with typed errors, not panics.
@@ -501,12 +484,7 @@ decode_snapshot_owned(bytes: Arc<[u8]>) -> Result<SnapshotViewOwned, DecodeError
 
 Rust APIs return invalid snapshots as `Result::Err(DecodeError)`. Decoder/accessors may handle untrusted bytes, so validation failures must not panic. Internal invariant violations may use debug assertions, but public decode boundaries return recoverable errors.
 
-N-API and WASM bindings convert Rust `DecodeError` into their language boundaries.
-
-- N-API: convert `DecodeError` into a JS exception or explicit `Result` object.
-- WASM: convert `DecodeError` into a thrown JS error or exported API error result.
-
-The binding boundary should preserve error code, message, optional section kind, optional offset, and optional record index. Human-readable messages may be returned for developer ergonomics, but compact error codes are the base for programmatic handling.
+Language bindings convert Rust `DecodeError` into their own error boundaries as defined in the binding design. The snapshot layer preserves error code, message, optional section kind, optional offset, and optional record index so bindings and tests can handle decode failures programmatically.
 
 ## Snapshot Buffer Ownership
 
@@ -526,11 +504,9 @@ pub struct SnapshotViewOwned {
 
 `SnapshotView<'a>` requires the caller to manage the lifetime of snapshot bytes. Decode builds only the section table and validation metadata; it does not eagerly materialize nodes, tokens, or strings. This is used by Rust internal tests, benchmarks, temporary decode, and zero-copy inspection.
 
-`SnapshotViewOwned` owns snapshot bytes as `Arc<[u8]>`. Long-lived caches, daemons, LSP, binding objects, and worker handoff use owned views when accessors may outlive the original buffer owner.
+`SnapshotViewOwned` owns snapshot bytes as `Arc<[u8]>`. Long-lived caches, daemons, language bindings, LSP, and worker handoff use owned views when accessors may outlive the original buffer owner.
 
-N-API and WASM bindings generally hold owned/shared buffers. Node / Token / Trivia / Root handles keep references to the snapshot view object or shared buffer owner, not raw pointers. This avoids dangling views after JS GC, WASM object lifetime changes, or worker transfer.
-
-Bindings do not expand snapshot bytes into a JS object tree. Accessors slice the snapshot buffer and return values only when JS/WASM consumers read nodes, tokens, strings, or diagnostics.
+Accessors do not expand snapshot bytes into a recursive object tree. They slice the snapshot buffer and return values only when consumers read nodes, tokens, strings, or diagnostics.
 
 ## Handle Model
 
@@ -543,17 +519,17 @@ TokenHandle  { snapshot: SnapshotRef, id: TokenId }
 TriviaHandle { snapshot: SnapshotRef, id: TriviaId }
 ```
 
-In Rust, `SnapshotRef` is a reference to `SnapshotView` / `SnapshotViewOwned` or an owned view. In N-API / WASM, it is a reference to an accessor object that owns the snapshot buffer. The handle itself does not copy snapshot bytes.
+In Rust, `SnapshotRef` is a reference to `SnapshotView` / `SnapshotViewOwned` or an owned view. In bindings, the equivalent reference is a language-specific accessor object that owns or shares the snapshot buffer. The handle itself does not copy snapshot bytes.
 
 RootId, NodeId, TokenId, and TriviaId are snapshot-local identities. Equal id values from different snapshots do not mean the same node/token/trivia. Handle equality is based on both snapshot identity and id.
 
 Handle construction validates `id < section.count`. Children traversal, root lookup, and token trivia lookup return lightweight handles with the same `SnapshotRef`. This lets lazy accessors avoid materializing object trees and avoids dangling pointers in GC-managed languages.
 
-Rust low-level APIs may also provide accessors that take `SnapshotView` and raw ids separately for performance-sensitive paths. However, the public binding API standardizes the `{ snapshot, id }` handle model.
+Rust low-level APIs may also provide accessors that take `SnapshotView` and raw ids separately for performance-sensitive paths. Language bindings standardize their own ergonomic handle API on top of this snapshot handle model.
 
 ## Accessor Traversal API
 
-The N-API / WASM public traversal API uses array-like snapshot views as the primary representation, not iterators.
+The snapshot accessor model uses array-like views as the primary representation, not recursive materialized trees.
 
 ```ts
 type ChildHandle = NodeHandle | TokenHandle
@@ -580,99 +556,9 @@ trivia.span(): Span
 
 Allocation-sensitive paths use `node.childCount()` and `node.childAt(index)` to avoid allocating child handle arrays. Rust low-level APIs may provide allocation-free accessors that take `SnapshotView` plus raw id/index.
 
-If an out-of-range index is passed to an indexed accessor, the binding returns an explicit error instead of silent `undefined`. N-API converts this to `RangeError`; WASM converts it to an exported API error result or thrown JS error. Invalid accessor usage fails loudly so formatter/linter traversal bugs are found early.
+If an out-of-range index is passed to an indexed accessor, the accessor returns an explicit error instead of silently returning an empty value. Invalid accessor usage fails loudly so formatter/linter traversal bugs are found early.
 
-JS iterators may be added as convenience APIs, but they are not the primary compatibility surface. The standard binding traversal contract is defined by array-like methods and indexed accessors.
-
-## Bindings
-
-![ox-mf2 language bindings](./assets/003-ox-mf2-language-bindings.svg)
-
-Binding implementation priority:
-
-1. N-API binding: the primary Node.js target for intlify and JavaScript tooling integration
-2. WASM binding: portable target for browsers, playgrounds, editor extensions, and edge runtime integration
-3. C ABI binding design: foundation for future Go, Swift, C#, Zig, Python FFI, and broader native language integration
-
-Phase 2 does not require a stable C ABI implementation. C ABI remains design preparation. However, snapshot record layout, numeric error codes, handle ids, buffer ownership, `toBytes()` copy semantics, and decode error boundary stay C-ABI-friendly. Future C ABI can share the same snapshot decoder/accessor model so N-API / WASM do not carry different semantic implementations from the Rust core.
-
-N-API and WASM bindings return result objects with lazy decoder/accessors instead of eagerly materialized JS object trees. The default public API does not return raw snapshot bytes directly. Snapshot bytes are retained as an internal buffer in the result/accessor object.
-
-Bindings may retain original source text on the caller side or in the binding result. Since the default snapshot uses `include_source_text = false`, context-bound `sourceSlice(span)` reads external source text, not snapshot bytes, when provided by the decoder/accessor.
-
-If the binding result keeps external source text, context-bound `sourceSlice(span)` may succeed even with `include_source_text = false`. If the binding result does not keep source text and the snapshot has no source text data, `sourceSlice(span)` returns a source text unavailable error.
-
-Single-message binding shape:
-
-```ts
-type ParseInputObject = {
-  source: string
-  path?: string
-  locale?: string
-  messageId?: string
-  baseOffset?: number
-}
-
-const result = parseMessage(source)
-const input: ParseInputObject = { source, locale: 'en', messageId: 'hello' }
-const resultWithMetadata = parseMessage(input)
-
-result.diagnostics
-result.source
-result.root
-result.snapshot
-```
-
-`parseMessage(source)` is a simple convenience overload. `parseMessage({ source, path?, locale?, messageId?, baseOffset? })` is the standard object form for SourceRecord metadata and uses the same metadata handling as batch input even for single input.
-
-Batch binding shape:
-
-```ts
-const result = parseBatch(items: ParseInputObject[])
-
-result.sources
-result.roots
-result.diagnostics
-result.snapshot
-```
-
-`parseBatch(items)` takes `{ source, path?, locale?, messageId?, baseOffset? }[]` as standard input. Only `source` is required and determines parser semantics. `path`, `locale`, `messageId`, and `baseOffset` are optional metadata for SourceRecord metadata, diagnostics mapping, LSP/editor mapping, benchmarking/reporting, and root mapping.
-
-Bindings map `messageId` to snapshot/Rust `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset and defaults to `0`. JavaScript string UTF-16 position conversion is a binding/editor boundary responsibility and is not stored in snapshot node fields.
-
-`result.roots[i]` always corresponds to `items[i]`. The sources section may deduplicate by source identity, so multiple roots may point to the same SourceRecord, but batch result root order does not change from input order.
-
-`result.source` and `result.sources` are SourceRecord-backed SourceViews, not raw source strings. Use `sourceSlice(span)` or SourceView accessors to read source text. In batch results, `result.sources` order is SourceId order, not input order, because the sources section may be deduplicated.
-
-`result.snapshot` is an accessor object, not raw bytes. Root, node, token, trivia, diagnostic, and source metadata are read lazily through accessors. Raw snapshot bytes are not included in the default result shape.
-
-Advanced use cases such as debug, fixtures, persistence, worker transfer, and external process transport can explicitly extract snapshot bytes.
-
-```ts
-const bytes = result.snapshot.toBytes()
-```
-
-`toBytes()` returns a copy of the internal snapshot buffer. The binding does not expose the internal buffer directly. This prevents consumers from retaining, mutating, or transferring returned bytes in a way that breaks the lifetime or validation invariants of existing accessor objects.
-
-Batch parsing keeps one shared snapshot buffer internally and returns root handles, diagnostics, and a snapshot accessor for each input item. Nodes and strings are materialized only when consumers read them.
-
-`result.diagnostics` is a flat array in root order. In a single-message result, it contains diagnostics for one root. In a batch result, it contains all diagnostics grouped by `result.roots` order. Each root handle can also expose its own diagnostics range through a lazy accessor such as `root.diagnostics()`.
-
-The flat diagnostics array and root-local diagnostics accessor read the same snapshot diagnostics section. Bindings do not duplicate diagnostics into another table. For JS/WASM ergonomics, lightweight diagnostic view objects may be materialized when consumers read `result.diagnostics`.
-
-With `include_source_text = false` in a batch result, each root has a `source_id`, source metadata is in SourceRecord, and input source text references are retained by the binding result. With `include_source_text = true`, source text data is included in the snapshot so the snapshot alone can resolve source slices after worker transfer or persistence.
-
-## Formatter and Linter Input
-
-From Phase 2 onward, public AST input for formatter and linter is the Binary AST decoder/accessor view. Rust implementations may use construction-time tables or semantic model internal fast paths when needed, but the stable public traversal model is aligned with the Binary AST view shared by Rust, N-API, and WASM consumers.
-
-## MessagePack Transport
-
-MessagePack is not the CST/AST representation of ox-mf2.
-
-It is a future transport candidate for long-lived language-service workflows such as LSP, editor integration, daemon mode, and repeated semantic queries. The standard CST/AST product boundary remains the versioned Binary AST snapshot.
-
-If MessagePack transport is added later, its overhead must be measured separately from parser, semantic lowering, snapshot encoding, and binding costs.
+Language-specific iterator helpers may be added as convenience APIs, but they are not the snapshot compatibility surface. The snapshot traversal contract is defined by array-like methods and indexed accessors.
 
 ## Snapshot Test Strategy
 
@@ -696,7 +582,7 @@ Binary golden fixtures are contract tests for wire compatibility. Decoded struct
 
 ## Benchmarks
 
-Snapshot and binding work must not be hidden inside one parser number.
+Snapshot work must not be hidden inside one parser number.
 
 Relevant benchmark phases:
 
@@ -714,12 +600,9 @@ Relevant benchmark phases:
 - decode_snapshot
 - snapshot_accessor_traversal
 - snapshot_to_bytes_copy
-- binding_call
 - parse_batch_to_snapshot
-- lsp_jsonrpc
-- lsp_msgpack
 
-Phase 2 benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and binding/export cost separately.
+Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and snapshot accessor cost separately.
 
 - `parse_message_owned`: convenience `parse_message` path, including fresh workspace setup and owned `ParseResult` materialization.
 - `parse_cst`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = true`.
@@ -729,10 +612,9 @@ Phase 2 benchmarks measure parser hot path, snapshot encoding, snapshot decoding
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
 - `decode_snapshot`: cost to validate snapshot bytes and build lazy SnapshotView / section index. It does not include node/token/string traversal.
 - `snapshot_accessor_traversal`: cost to read roots, nodes, tokens, trivia, and diagnostics lazily from a decoded SnapshotView.
-- `snapshot_to_bytes_copy`: cost for `result.snapshot.toBytes()` to copy the internal buffer and return external bytes.
-- `binding_call`: cost to cross N-API / WASM boundary and return result object plus handles. This is measured separately from parse / encode / decode.
+- `snapshot_to_bytes_copy`: cost to copy snapshot bytes from an owned snapshot buffer into a caller-owned byte buffer.
 - `parse_batch_session`: cost to parse a corpus with one `SourceStore` and one reused `ParseWorkspace` through borrowed session results.
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `parse_batch_to_snapshot`: combined product path for batch parse plus shared snapshot encoding. Do not mix it with the single-message parser baseline.
 
-Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot/binding numbers are reported separately as ox-mf2 product-boundary cost.
+Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot numbers are reported separately as ox-mf2 product-boundary cost.

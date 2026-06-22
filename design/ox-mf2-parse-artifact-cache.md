@@ -124,4 +124,4 @@ Captured as `.reviews/005-ox-mf2-ox-content-mf2-parser-optimization-notes.md` Re
 
 - Eviction policy: LRU? unbounded? per-dictionary capped? The right answer depends on whether the cache lives in an LSP (bounded by open documents) or a one-shot checker (unbounded for the run).
 - Hashing: blake3 (fast, large) vs xxhash (faster, smaller, non-crypto). Non-crypto is fine — the cache is not a security boundary.
-- Persistence: should cache entries survive across CLI invocations? Binary AST snapshots (see `design/003`) are the right durable representation; the in-memory cache is for one process lifetime.
+- Persistence: should cache entries survive across CLI invocations? Binary AST snapshots (see [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md)) are the right durable representation; the in-memory cache is for one process lifetime.

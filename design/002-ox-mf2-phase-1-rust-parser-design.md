@@ -4,7 +4,7 @@
 
 This document defines the Phase 1 implementation design for the Rust MF2 parser. It covers not only parser performance, but also lossless CST, SemanticModel, SyntaxKind, token/trivia, accessors, diagnostics, recovery, tests, and benchmarks.
 
-The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). Binary AST and binding details live in [003-ox-mf2-phase-2-binary-ast-bindings-design.md](./003-ox-mf2-phase-2-binary-ast-bindings-design.md). This document focuses on the parser implementation path before Binary AST snapshot encoding becomes the Phase 2 product boundary.
+The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). Binary AST snapshot details live in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md), and language binding details live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md). This document focuses on the parser implementation path before Binary AST snapshot encoding becomes the Phase 2 product boundary.
 
 This design takes several ideas from the ox-jsdoc performance design: parser/semantic separation, clear source lifetime, allocation discipline, scanner/parser boundaries, and measurement-driven optimization.
 
