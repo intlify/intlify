@@ -15,6 +15,7 @@
     "ready": "vpr check && vp run -r test && vp run -r build",
     "dev": "vp run website#dev",
     "check": "vp run check:rust && vp check",
+    "test": "cargo test --all-targets && vp test",
     "prepare": "vp config"
   },
   "devDependencies": {
