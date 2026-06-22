@@ -221,15 +221,23 @@ CstView {
 Expected accessors:
 
 ```rust
-kind(node: NodeId) -> SyntaxKind
-span(node: NodeId) -> Span
-children(node: NodeId) -> CstChildren
-tokens(node: NodeId) -> TokenRange  // convenience view derived from child edges
-token_kind(token: TokenId) -> SyntaxKind
-token_span(token: TokenId) -> Span
-leading_trivia(token: TokenId) -> TriviaRange
-trailing_trivia(token: TokenId) -> TriviaRange
-source_slice(span: Span) -> &str
+CstView::source() -> SourceId
+CstView::root() -> Option<CstNodeView>
+CstView::node(id: NodeId) -> Option<CstNodeView>
+CstView::token(id: TokenId) -> Option<CstTokenView>
+CstView::trivia(id: TriviaId) -> Option<CstTriviaView>
+CstView::source_slice(span: Span) -> &str
+
+CstNodeView::kind() -> SyntaxKind
+CstNodeView::span() -> Span
+CstNodeView::children() -> CstChildren
+CstNodeView::tokens() -> CstNodeTokens
+
+CstTokenView::kind() -> SyntaxKind
+CstTokenView::span() -> Span
+CstTokenView::text() -> &str
+CstTokenView::leading_trivia() -> CstTriviaRange
+CstTokenView::trailing_trivia() -> CstTriviaRange
 ```
 
 Expected lightweight node view:
@@ -237,8 +245,7 @@ Expected lightweight node view:
 ```rust
 CstNodeView<'a> {
   id: NodeId,
-  record: &'a CstNodeRecord,
-  view: &'a CstView<'a>,
+  view: CstView<'a>,
 }
 ```
 
@@ -503,7 +510,7 @@ The primary parser API uses SourceStore and SourceId for caller-managed and batc
 ```rust
 parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> ParseResult
 parse_message(source: &str) -> ParseResult
-parse_batch(inputs: &[ParseInput], options: ParseOptions) -> BatchParseResult
+parse_batch(inputs: &[ParseInput], options: BatchParseOptions) -> BatchParseResult
 
 parse_source_session<'a>(
   sources: &'a SourceStore,
@@ -627,7 +634,7 @@ let inputs = vec![
   },
 ];
 
-let result = parse_batch(&inputs, ParseOptions::default());
+let result = parse_batch(&inputs, BatchParseOptions::default());
 
 for item in result.items {
   println!("source={:?}, diagnostics={}", item.source, item.result.diagnostics.len());
@@ -670,60 +677,30 @@ Phase 1 `ParseResult` does not contain snapshot bytes.
 
 ```rust
 ParseResult {
+  source: SourceId,
   cst: CstTables,
   semantic: Option<SemanticModel>,
   diagnostics: Vec<Diagnostic>,
 }
 
 ParseSessionResult<'a> {
+  source: SourceId,
   cst: CstView<'a>,
   semantic: Option<SemanticView<'a>>,
   diagnostics: DiagnosticView<'a>,
 }
 ```
 
-`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
+`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
-Batch results must preserve the mapping from each ParseInput to SourceId and ParseResult.
-
-```rust
-BatchParseResult {
-  items: Vec<BatchParseItem>,
-}
-
-BatchParseItem {
-  source: SourceId,
-  result: ParseResult,
-}
-```
-
-The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
-
-`parse_semantic` defaults to `false` so parser throughput and semantic lowering throughput can be measured separately.
-
-## Parallel Parsing Design
-
-ox-mf2 considers multi-threaded parsing, but Phase 1 does not split a single message internally across threads. MF2 messages are usually small compared with source files, so message-level parallelism across project / locale files / benchmark corpora is more natural.
-
-Basic policy:
-
-- `parse_message` and `parse_source` remain deterministic single-message parsers.
-- `parse_batch` may use message-level parallelism.
-- Each worker owns a thread-local `ParseWorkspace` and does not share parser state, CstTables, diagnostic buffers, or temporary allocation.
-- SourceStore assigns SourceId before parsing and is read immutably during parsing.
-- BatchParseResult preserves input-order mapping and does not depend on parallel completion order.
-- Diagnostics carry `SourceId + Span`, so source identity can be shared across workers.
-- The accessor surface used by formatter/linter/compiler is the same regardless of parallel parsing.
-
-`parse_batch` parallelism must not change parser semantics. The only difference between parallel and sequential execution is strategy; CST, SemanticModel, diagnostics, and result ordering should be the same.
-
-Batch execution is controlled separately from parse semantics.
+Batch parsing uses a separate option type so execution strategy can evolve without changing parse semantics.
 
 ```rust
 BatchParseOptions {
   execution: BatchExecution,
   max_threads: Option<usize>,
   preserve_order: bool,
+  parse: ParseOptions,
 }
 
 enum BatchExecution {
@@ -732,7 +709,59 @@ enum BatchExecution {
 }
 ```
 
-The initial default may be `Sequential`, but the API and table design should allow `Parallel` to become the default or a feature-gated option later. `preserve_order` defaults to `true`, keeping result mapping and diagnostic ordering stable by input order.
+Defaults:
+
+- `execution = BatchExecution::Sequential`
+- `max_threads = None`
+- `preserve_order = true`
+- `parse = ParseOptions::default()`
+
+Batch results must preserve the mapping from each ParseInput to SourceId and ParseResult.
+
+```rust
+BatchParseResult {
+  sources: SourceStore,
+  items: Vec<BatchParseItem>,
+  execution: BatchExecution,
+  degraded: bool,
+}
+
+BatchParseItem {
+  source: SourceId,
+  result: ParseResult,
+}
+```
+
+The returned `sources` store owns the batch source text and metadata used by diagnostics and result mapping. `execution` reports the mode that actually ran. `degraded` is `true` when the requested execution mode was not honoured.
+
+Phase 1 implements `BatchExecution::Sequential`. Requesting `BatchExecution::Parallel` falls back to sequential execution, returns `execution = BatchExecution::Sequential`, and sets `degraded = true`. `max_threads` and `preserve_order` are reserved for the future parallel implementation; the current sequential implementation always preserves input order.
+
+The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
+
+`parse_semantic` defaults to `false` so parser throughput and semantic lowering throughput can be measured separately.
+
+## Parallel Parsing Design
+
+ox-mf2 considers multi-threaded parsing, but Phase 1 does not implement parallel execution. MF2 messages are usually small compared with source files, so future parallelism should be message-level parallelism across project / locale files / benchmark corpora, not internal splitting of a single message.
+
+Current Phase 1 behavior:
+
+- `parse_message`, `parse_source`, and `parse_source_session` are deterministic single-message parsers.
+- `parse_batch` always runs sequentially.
+- Requesting `BatchExecution::Parallel` does not fail; it degrades to sequential execution.
+- A degraded batch result returns `execution = BatchExecution::Sequential` and `degraded = true`.
+- Result order is always input order.
+
+Future parallel implementation policy:
+
+- `parse_batch` may use message-level parallelism.
+- Each worker owns a thread-local `ParseWorkspace` and does not share parser state, CstTables, diagnostic buffers, or temporary allocation.
+- SourceStore assigns SourceId before parsing and is read immutably during parsing.
+- BatchParseResult preserves input-order mapping and does not depend on parallel completion order.
+- Diagnostics carry `SourceId + Span`, so source identity can be shared across workers.
+- The accessor surface used by formatter/linter/compiler is the same regardless of parallel parsing.
+
+`parse_batch` parallelism must not change parser semantics. The only difference between parallel and sequential execution is strategy; CST, SemanticModel, diagnostics, and result ordering should be the same.
 
 Implementation constraints:
 
@@ -743,16 +772,9 @@ Implementation constraints:
 - Executors such as Rayon are implementation details; the public API does not depend on a specific executor.
 - WASM and embedded targets may not support threads, so sequential fallback is mandatory.
 
-Benchmarks measure single-thread and multi-thread separately.
+Benchmarks must not report a parallel number until a real parallel implementation exists. Phase 1 reports `parse_batch_session` and `parse_batch_sequential`. Future parallel benchmarks should be added as separate phase names, such as `parse_batch_parallel` and `parse_batch_parallel_with_semantic`.
 
-```text
-parse_message_single
-parse_batch_sequential
-parse_batch_parallel
-parse_batch_parallel_with_semantic
-```
-
-External parser comparison uses `parse_message_single` as the primary baseline. `parse_batch_parallel` is reported separately as project-scale ox-mf2 throughput.
+External parser comparison uses parser-core single-message phases, primarily `parse_cst_no_trivia` and `parse_cst`, rather than degraded batch execution. `parse_batch_session` and future parallel phases are reported separately as project-scale ox-mf2 throughput.
 
 ## Source and Span Contract
 
@@ -911,27 +933,30 @@ internal scanner helpers
 
 Recovery is enabled by default.
 
-Checkpoints are internal parser state. They stay small and do not own CST nodes, tokens, trivia, diagnostics, or source text.
+Checkpoint / rollback is an internal parser mechanism, not a public API contract. The current Phase 1 parser avoids checkpoint work on common speculative branches by using non-destructive lookahead. For example, optional trivia and delimiter-sensitive branches first peek with a copied cursor, then commit only after the parser knows the branch is accepted.
 
-Representative shape:
+The table builder still keeps a full rollback primitive for future recovery paths and table-level tests, but the parser hot path should not depend on it for ordinary "is this optional construct present?" decisions.
+
+Representative rollback marker:
 
 ```rust
-struct Checkpoint {
-  offset: u32,
+struct BuilderLengths {
   node_len: u32,
   edge_len: u32,
   token_len: u32,
   trivia_len: u32,
-  diagnostic_len: u32,
-  scanner_state: ScannerState,
+  frame_depth: u32,
+  pending_edge_len: u32,
 }
 ```
 
-Checkpoint rules:
+Cursor-only scanner checkpoints remain cheap and `Copy`, but they should be used for source offset restoration, not as a reason to commit CST records speculatively.
 
-1. Use checkpoints only around ambiguous or recoverable regions.
+Recovery rules:
+
+1. Prefer non-destructive lookahead over checkpoint/rollback on the hot path.
 2. Where practical, do not commit nodes/tokens until an interpretation is accepted.
-3. If speculative records are pushed, rollback truncates table lengths.
+3. If a future recovery path must push speculative records, rollback truncates all affected table and staging lengths in one operation.
 4. Prefer one useful diagnostic over diagnostic cascades.
 5. Recovery nodes keep enough spans and source text for formatters and diagnostics.
 
@@ -1116,7 +1141,8 @@ Test categories:
 - data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
 - source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
 - batch parse tests: ParseInput metadata, SourceId, and diagnostic mapping remain stable
-- parallel batch tests: sequential and parallel modes produce the same CST, SemanticModel, diagnostics, and result ordering
+- batch execution fallback tests: requesting `BatchExecution::Parallel` in Phase 1 returns sequential results with `degraded = true`
+- future parallel batch tests: once parallel execution is implemented, sequential and parallel modes produce the same CST, SemanticModel, diagnostics, and result ordering
 - benchmark smoke tests: benchmark corpus and CLI commands are runnable
 
 CST snapshots are not themselves the public compatibility contract. They are used to detect unintended parser implementation changes. When spec changes intentionally alter snapshots, fixtures and changelog are updated together.
@@ -1138,15 +1164,17 @@ Phase 1 benchmark levels:
    - markup syntax
 
 2. Component benchmarks
+   - parse_message_owned
    - parse_cst
-   - parse_cst with trivia
-   - parse_cst without trivia
-   - cst_view traversal
-   - parse_cst + diagnostics for malformed input
-   - parse_cst + semantic lowering
-   - source span to line/column conversion
-   - parse_batch sequential
-   - parse_batch parallel
+   - parse_cst_no_trivia
+   - lower_semantic
+   - owned_materialize
+   - cst_view_traversal
+   - diagnostics for malformed input
+   - source_mapping
+   - parse_batch_session
+   - parse_batch_sequential
+   - allocations
 
 3. Corpus benchmarks
    - real locale files
@@ -1173,25 +1201,41 @@ Reproducibility policy:
 - state allocator conditions in benchmark reports
 - fix hyperfine warmup, minimum runs, setup command, working directory, and whether CLI startup is included
 
-Primary comparison with other parsers targets `parse_message` equivalents first. Internal ox-mf2 micro/component benchmarks separate scanner, parser, semantic lowering, source mapping, and snapshot encode.
+Primary comparison with other parsers targets the closest available parse-only equivalent first. For ox-mf2, `parse_cst_no_trivia` and `parse_cst` are the parser-core baselines; `parse_message_owned` is reported when comparing public convenience APIs. Internal ox-mf2 micro/component benchmarks separate scanner, parser, semantic lowering, source mapping, owned materialization, and snapshot encode.
 
 Relevant phase names:
 
 ```text
 lexer
+parse_message_owned
 parse_cst
 parse_cst_no_trivia
-cst_view_traversal
 lower_semantic
+owned_materialize
+cst_view_traversal
 diagnostics
 source_mapping
+parse_batch_session
 parse_batch_sequential
-parse_batch_parallel
+allocations
 encode_snapshot   // Phase 2
 decode_snapshot   // Phase 2
 e2e_parse
 e2e_lint
 ```
+
+Phase meanings:
+
+- `parse_message_owned`: convenience `parse_message` path with fresh workspace setup and owned result construction. This is useful for API ergonomics and smoke comparisons, but it is not the pure parser-core baseline.
+- `parse_cst`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = true`.
+- `parse_cst_no_trivia`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = false`.
+- `lower_semantic`: parser-core plus `SemanticModel` lowering.
+- `owned_materialize`: cost of converting the session/table output into an owned `ParseResult`.
+- `parse_batch_session`: one `SourceStore` and one reused `ParseWorkspace` over a corpus, returning borrowed session results.
+- `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
+- `allocations`: allocation count and bytes for a selected parse path.
+
+External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, semantic lowering, or CLI startup.
 
 ## Benchmark Corpus
 
