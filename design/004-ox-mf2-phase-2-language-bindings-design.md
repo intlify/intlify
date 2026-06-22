@@ -12,6 +12,8 @@ ox-mf2 uses the Rust core as the single semantic implementation. Bindings are er
 
 Bindings must not expose a nested JSON AST as the standard hot-path output. The standard public CST/AST view is a lazy accessor over the versioned Binary AST snapshot. Debug JSON may exist, but it is not the compatibility boundary.
 
+![ox-mf2 Binary AST and binding architecture](./assets/003-ox-mf2-binary-ast-binding-architecture.svg)
+
 ## Binding Targets
 
 Binding implementation priority:
@@ -64,7 +66,7 @@ result.snapshot
 
 Bindings map `messageId` to Rust/snapshot `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset and defaults to `0`. JavaScript string UTF-16 position conversion is a binding/editor boundary responsibility and is not stored in snapshot node fields.
 
-`result.roots[i]` always corresponds to `items[i]`. The sources section may deduplicate by source identity, so multiple roots may point to the same SourceRecord, but batch result root order does not change from input order.
+`result.roots[i]` always corresponds to `items[i]`. The snapshot format allows multiple roots to point to the same SourceRecord, but the v0.1 default writer does not deduplicate SourceRecord entries. Batch result root order does not change from input order.
 
 ## Snapshot Accessor Boundary
 
@@ -116,7 +118,7 @@ Bindings may retain original source text on the caller side or in the binding re
 
 If the binding result keeps external source text, context-bound `sourceSlice(span)` may succeed even with `include_source_text = false`. If the binding result does not keep source text and the snapshot has no source text data, `sourceSlice(span)` returns a source text unavailable error.
 
-`result.source` and `result.sources` are SourceRecord-backed SourceViews, not raw source strings. Use `sourceSlice(span)` or SourceView accessors to read source text. In batch results, `result.sources` order is SourceId order, not input order, because the sources section may be deduplicated.
+`result.source` and `result.sources` are SourceRecord-backed SourceViews, not raw source strings. Use `sourceSlice(span)` or SourceView accessors to read source text. In batch results, `result.sources` order is SourceId order, not input order. In v0.1 default writer output this usually matches input order, but consumers must not rely on that because the snapshot format permits shared SourceRecord entries.
 
 With `include_source_text = false` in a batch result, each root has a `source_id`, source metadata is in SourceRecord, and input source text references are retained by the binding result. With `include_source_text = true`, source text data is included in the snapshot so the snapshot alone can resolve source slices after worker transfer or persistence.
 
