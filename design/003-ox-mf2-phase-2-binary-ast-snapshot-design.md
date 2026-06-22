@@ -56,6 +56,12 @@ parse_source_to_snapshot(
   snapshot_options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError>
 
+parse_result_to_snapshot(
+  sources: &SourceStore,
+  result: &ParseResult,
+  snapshot_options: SnapshotOptions,
+) -> Result<SnapshotResult, SnapshotWriteError>
+
 parse_session_to_snapshot(
   session: &ParseSessionResult<'_>,
   snapshot_options: SnapshotOptions,
@@ -66,11 +72,26 @@ parse_batch_to_snapshot(
   batch_options: BatchParseOptions,
   snapshot_options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
+
+parse_batch_result_to_snapshot(
+  result: &BatchParseResult,
+  snapshot_options: SnapshotOptions,
+) -> Result<BatchSnapshotResult, SnapshotWriteError>
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, and `ParseSessionResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
-`parse_source_to_snapshot` is a convenience API that builds a snapshot from the normal owned parse path. `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. In both cases, the snapshot builds SourceRecord and RootRecord from input `SourceStore` / `ParseInput` metadata.
+`parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
+
+`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources` using `result.source`. The `sources` store must contain the SourceId carried by the result. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+
+If a `ParseResult` was produced by the `parse_message(source)` convenience API without SourceStore registration, callers that need a snapshot must either parse through `parse_source` / `SourceStore` or register equivalent source metadata before calling `parse_result_to_snapshot`. SnapshotWriter must not invent path, locale, message_id, base_offset, or source text ownership that is not present in SourceStore metadata.
+
+`parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / SourceId reachable from the session.
+
+`parse_batch_to_snapshot` is a convenience API equivalent to `parse_batch` followed by `parse_batch_result_to_snapshot`.
+
+`parse_batch_result_to_snapshot` encodes an already produced `BatchParseResult` without reparsing. It uses `BatchParseResult.sources` for SourceRecord metadata and encodes `BatchParseResult.items` in input order as RootRecord entries. This preserves the original batch `execution` / `degraded` values and keeps parse cost separate from snapshot encode cost.
 
 `parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
 
