@@ -10,6 +10,17 @@ Language binding design is defined separately in [004-ox-mf2-phase-2-language-bi
 
 Intentional Binary AST format changes are tracked in [003-ox-mf2-binary-ast-format-changelog.md](./003-ox-mf2-binary-ast-format-changelog.md).
 
+## Document Structure
+
+This document is organized in implementation order.
+
+1. Basic policy and identifier model
+2. Snapshot-producing APIs, options, and result types
+3. SnapshotWriter responsibilities and canonical encoding rules
+4. Binary AST snapshot wire format and sections
+5. Decoder, ownership, handle, and accessor APIs
+6. Tests and benchmarks
+
 ## Basic Policy
 
 ox-mf2 uses the Rust core as the single semantic implementation. MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, and linting are not reimplemented in other languages.
@@ -40,11 +51,15 @@ parser / lowering
 
 Binary AST snapshot inherits the Phase 1 identifier model defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md), and adds RootId for snapshot entry points.
 
-Inside a snapshot, RootId, NodeId, TokenId, TriviaId, and SourceId remain `u32` indexes into the corresponding section or source table. These ids are not optional. `RootId = 0`, `NodeId = 0`, `TokenId = 0`, `TriviaId = 0`, and `SourceId = 0` are all valid indexes, and no none sentinel is defined for them. Spans remain UTF-8 byte offsets and do not include source_id. Source identity is obtained from record `source_id` or root/source context. Line/column and UTF-16 editor positions belong to display/editor boundaries and are not stored in snapshot node fields.
+Inside a snapshot, RootId, NodeId, TokenId, TriviaId, and SourceId remain `u32` indexes into the corresponding section or source table. These ids are snapshot-local. Phase 1 SourceId values are used by SnapshotWriter to look up SourceStore metadata, but they are remapped to compact snapshot-local SourceId values when SourceRecord entries are emitted. These ids are not optional. `RootId = 0`, `NodeId = 0`, `TokenId = 0`, `TriviaId = 0`, and `SourceId = 0` are all valid indexes, and no none sentinel is defined for them. Spans remain UTF-8 byte offsets and do not include source_id. Source identity is obtained from record `source_id` or root/source context. Line/column and UTF-16 editor positions belong to display/editor boundaries and are not stored in snapshot node fields.
 
-SourceStore and ParseInput are also defined in the Phase 1 parser design. Phase 2 uses the same SourceId and ParseInput metadata to build snapshot roots section entries and root-to-source mappings.
+SourceStore and ParseInput are also defined in the Phase 1 parser design. Phase 2 uses Phase 1 SourceId and ParseInput metadata to build snapshot-local SourceRecord entries and root-to-source mappings.
 
-## Parser and Snapshot API
+## Snapshot-Producing API
+
+This section defines the public Rust entry points that create Binary AST snapshot bytes. It covers both convenience APIs that parse and encode in one call and APIs that encode an already produced Phase 1 parse result.
+
+### API Entry Points
 
 Phase 2 snapshot APIs:
 
@@ -83,11 +98,11 @@ parse_batch_result_to_snapshot(
 
 `parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
 
-`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources` using `result.source`. The `sources` store must contain the SourceId carried by the result. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources` using `result.source`. The `sources` store must contain the Phase 1 SourceId carried by the result. SnapshotWriter then maps that Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
 
 If a `ParseResult` was produced by the `parse_message(source)` convenience API without SourceStore registration, callers that need a snapshot must either parse through `parse_source` / `SourceStore` or register equivalent source metadata before calling `parse_result_to_snapshot`. SnapshotWriter must not invent path, locale, message_id, base_offset, or source text ownership that is not present in SourceStore metadata.
 
-`parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / SourceId reachable from the session.
+`parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / Phase 1 SourceId reachable from the session, then emits snapshot-local SourceIds.
 
 `parse_batch_to_snapshot` is a convenience API equivalent to `parse_batch` followed by `parse_batch_result_to_snapshot`.
 
@@ -95,11 +110,11 @@ If a `ParseResult` was produced by the `parse_message(source)` convenience API w
 
 `parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
 
-`parse_session_to_snapshot` uses the `SourceStore` and `SourceId` reachable from `ParseSessionResult` / `CstView` as the only source metadata. It does not accept a second metadata argument. Passing independent metadata would create two sources of truth for path, locale, message_id, base_offset, and source text availability.
+`parse_session_to_snapshot` uses the `SourceStore` and Phase 1 SourceId reachable from `ParseSessionResult` / `CstView` as the only source metadata. It does not accept a second metadata argument. Passing independent metadata would create two sources of truth for path, locale, message_id, base_offset, and source text availability.
 
 Parser diagnostics and writer errors are different failure classes. Recoverable parser syntax errors are represented as diagnostics plus a partial CST root and can be encoded into a snapshot. `SnapshotWriteError` means the writer cannot produce a valid snapshot, such as missing root, invalid source id, or `u32` overflow. In batch snapshot APIs, any `SnapshotWriteError` fails the entire call and returns `Err`; partial snapshot bytes are not returned.
 
-## Options
+### Snapshot Options
 
 Parse behavior and snapshot output use separate option types. Parse behavior is defined by Phase 1 `ParseOptions`; this document defines only snapshot-specific options.
 
@@ -127,7 +142,7 @@ Whether whitespace / bidi trivia is collected by the parser is controlled by Pha
 
 When `include_trivia = true` but the parse result was produced with `collect_trivia = false`, SnapshotWriter encodes no trivia. TokenRecord trivia starts and counts are written as `0`, and the optional trivia section is omitted because it is empty. SnapshotWriter must not rescan source text to reconstruct trivia.
 
-## Result Types
+### Result Types
 
 The result types in this section are Rust snapshot-producing API shapes. Higher-level APIs may wrap these bytes in result objects, but the snapshot layer itself returns encoded bytes plus root identity and diagnostics.
 
@@ -161,6 +176,8 @@ Snapshot-producing APIs return `Vec<u8>`. SnapshotWriter naturally assembles the
 
 ## SnapshotWriter Design
 
+### Build Phases
+
 SnapshotWriter builds the snapshot in two phases.
 
 1. Build section-local records and byte buffers.
@@ -181,6 +198,10 @@ The final assemble phase owns these responsibilities:
 - verify that the final buffer length matches the computed layout
 
 SnapshotWriter may pre-size section builders from `CstTables` counts and SourceStore metadata. It should avoid recursive AST conversion and should encode from table-oriented records in linear passes.
+
+SnapshotWriter maintains a temporary Phase 1 SourceId to snapshot-local SourceId map while building roots, sources, tokens, trivia, and diagnostics. The map is not encoded as a snapshot section. It exists only to keep the snapshot compact and to avoid requiring SourceStore SourceId numeric values to be dense from zero for every emitted snapshot.
+
+### Encode-Time Errors
 
 SnapshotWriter returns `SnapshotWriteError` for encode-time failures.
 
@@ -214,6 +235,8 @@ v0.1 writer uses checked conversion and checked arithmetic for all `u32` fields.
 
 The writer must not truncate `usize` into `u32`.
 
+### Section Emission
+
 SnapshotWriter emits sections in stable `SectionKind` order.
 
 ```text
@@ -245,6 +268,8 @@ Decoders treat a missing optional section as an empty section. This keeps `inclu
 
 Empty required sections still receive an aligned `offset`. The `offset` represents the section start and must satisfy `offset <= snapshot.len()` and the normal alignment rule even when `byte_len = 0`. Optional empty sections are omitted instead of being represented with `byte_len = 0`.
 
+### Explicit Wire Encoding
+
 Snapshot records are encoded explicitly; Rust struct memory is never dumped directly.
 
 Each fixed-record section has a specified wire `record_size`. SnapshotWriter writes every numeric field with explicit little-endian operations such as `write_u16_le` and `write_u32_le`. Decoder accessors read fields from fixed byte offsets using explicit little-endian operations.
@@ -269,16 +294,20 @@ v0.1 fixed record sizes:
 | `DiagnosticLabelRecord` |  16 bytes |
 | `ExtendedDataHeader`    |   8 bytes |
 
-The `DiagnosticRecord` wire layout includes an explicit reserved byte after `severity` so that the record is 28 bytes and every following multi-byte field starts at a stable offset. Decoder validation requires reserved bytes to be `0`.
+The `TokenRecord` wire layout includes an explicit `reserved_tail` field so that the record is 36 bytes and future token-local compact metadata can be added without changing the v0.1 field offsets. The `DiagnosticRecord` wire layout includes an explicit reserved byte after `severity` so that the record is 28 bytes and every following multi-byte field starts at a stable offset. Decoder validation requires reserved bytes to be `0`.
 
 All v0.1 reserved fields must be zero.
 
 - `SnapshotHeader.reserved = 0`
+- `SnapshotHeader.reserved_tail = 0`
 - `SectionRecord.reserved = 0`
+- `TokenRecord.reserved_tail = 0`
 - `DiagnosticRecord` reserved byte = `0`
 - any future reserved field in v0.1 must be `0`
 
 Decoders reject non-zero reserved fields.
+
+### Alignment and Canonical Output
 
 v0.1 section alignment is fixed to 8 bytes.
 
@@ -303,7 +332,9 @@ v0.1 writer output is canonical for the same parser output, input order, SourceS
 
 Persistent caches that store snapshot bytes must include at least the snapshot format version and parser/package version in the cache key. A source hash alone is not sufficient for durable snapshot cache correctness.
 
-## Binary AST Snapshot
+## Binary AST Snapshot Format
+
+### Format Overview
 
 Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust core parse output, and it is not a second semantic implementation.
 
@@ -341,6 +372,7 @@ SnapshotHeader {
   section_table_offset: u32,
   section_count: u16,
   reserved: u16,
+  reserved_tail: u32,
 }
 
 SectionRecord {
@@ -365,6 +397,8 @@ minor_version = 1
 feature_flags = 0
 header_len = 32
 section_table_offset = 32
+reserved = 0
+reserved_tail = 0
 ```
 
 In v0.1, the section table starts immediately after the fixed 32-byte header. `section_table_offset` must equal `header_len`, and both must be `32`. The field remains in the header for future evolution, but v0.1 decoders reject other values.
@@ -479,7 +513,7 @@ When `include_diagnostics = false`, RootRecord layout does not change. `diagnost
 
 ![ox-mf2 string table](./assets/003-ox-mf2-string-table.svg)
 
-The string table stores snapshot metadata, diagnostic messages, semantic-independent small strings, normalized strings, and other strings that cannot be represented by source spans alone. Original source text is not mixed into string data; it is stored in the dedicated `source text data` section only when `include_source_text = true`.
+In v0.1, the string table stores snapshot metadata and diagnostic messages. It does not store source-derived text, cooked text, normalized text, debug text, or semantic payload text. Original source text is not mixed into string data; it is stored in the dedicated `source text data` section only when `include_source_text = true`.
 
 The string offsets section and string data section are core sections and always exist, even with zero strings. In that case, string offsets can have `count = 0`, and string data can have `byte_len = 0`.
 
@@ -536,13 +570,13 @@ Decoders materialize UTF-8 strings lazily, only when a consumer reads them.
 
 ![ox-mf2 source text data section](./assets/003-ox-mf2-source-text-data-section.svg)
 
-The source text data section is an optional raw byte section. When `include_source_text = true`, each input's original MF2 source text is stored in this section as UTF-8 bytes. When `include_source_text = false`, this section is absent or empty.
+The source text data section is an optional raw byte section. When `include_source_text = true`, each emitted SourceRecord's original MF2 source text is stored in this section as UTF-8 bytes. When `include_source_text = false`, this section is absent or empty.
 
 v0.1 snapshot source text data covers only UTF-8-valid source text. If an input with unpaired surrogates must be handled for ECMAScript String compatibility, the source/language boundary keeps it as external source text and combines it with a snapshot using `include_source_text = false`. If storing WTF-8 or UTF-16 source text in snapshots becomes necessary, it should be designed as a future optional section or format change.
 
 When `include_source_text = true`, source text bytes are stored as one concatenated byte buffer.
 
-- each SourceRecord stores `SourceTextRef { source_id, offset, len }`
+- each SourceRecord stores `SourceTextRef { source_id, offset, len }` using the snapshot-local SourceId
 - `offset` is relative to the start of the source text data section
 - source text entries do not have NUL terminators
 - source text entries do not have per-entry padding
@@ -563,9 +597,9 @@ SourceTextRef {
 }
 ```
 
-`offset` and `len` are byte ranges inside the source text data section. `SourceTextRef.source_id = 0xFFFF_FFFF` is the none sentinel and means source text bytes are not included in the snapshot. In the sentinel case, decoders must not use `offset` or `len`.
+`offset` and `len` are byte ranges inside the source text data section. `SourceTextRef.source_id = 0xFFFF_FFFF` is the none sentinel and means source text bytes are not included in the snapshot. In the sentinel case, SnapshotWriter writes `offset = 0` and `len = 0`, and v0.1 decoders reject non-zero offset or length so the none representation stays canonical.
 
-Normal SourceId has no none sentinel, but SourceTextRef is an optional field and therefore has one. Source text data is separated from the string table so metadata string deduplication, diagnostic strings, normalized strings, and original source text lifetime / transfer policy can evolve independently.
+Normal SourceId has no none sentinel, but SourceTextRef is an optional field and therefore has one. Source text data is separated from the string table so metadata string deduplication, diagnostic strings, future derived text payloads, and original source text lifetime / transfer policy can evolve independently.
 
 ### Source Section
 
@@ -573,13 +607,13 @@ Normal SourceId has no none sentinel, but SourceTextRef is an optional field and
 
 The source section is a core section. Source records contain source identity and metadata, but not source text bytes.
 
-SourceRecord array order is not fixed to `parse_batch` input order. The sources section may deduplicate by source identity. Multiple RootRecords may point to the same `source_id`. Root-to-source mapping is always resolved through `RootRecord.source_id`.
+SourceRecord array order is not fixed to `parse_batch` input order. The sources section may deduplicate by source identity. Multiple RootRecords may point to the same snapshot-local `source_id`. Root-to-source mapping is always resolved through `RootRecord.source_id`.
 
-v0.1 snapshot format does not define a source dedup key. Identity rules such as `path + base_offset + source text` are not baked into the wire format. SourceId assigned by SourceStore or a higher-level source owner is the canonical source identity, and the snapshot encodes that mapping.
+v0.1 snapshot format does not define a source dedup key. Identity rules such as `path + base_offset + source text` are not baked into the wire format. Phase 1 SourceId assigned by SourceStore or a higher-level source owner is the input-side source identity. SnapshotWriter encodes a compact snapshot-local SourceId mapping into SourceRecord and RootRecord fields.
 
 The v0.1 writer does not deduplicate SourceRecord entries.
 
-For v0.1 output, each input root gets a corresponding SourceRecord, and RootRecord points to that SourceRecord. The wire format and decoder still allow multiple roots to reference the same SourceRecord, but the default writer avoids source deduplication until a precise dedup key and benchmark motivation exist. This keeps diagnostics, source slices, and root-to-input mapping straightforward.
+For v0.1 output, each input root gets a corresponding SourceRecord, and RootRecord points to that SourceRecord using the snapshot-local SourceId. The wire format and decoder still allow multiple roots to reference the same SourceRecord, but the default writer avoids source deduplication until a precise dedup key and benchmark motivation exist. This keeps diagnostics, source slices, and root-to-input mapping straightforward.
 
 ```text
 SourceRecord {
@@ -592,7 +626,7 @@ SourceRecord {
 }
 ```
 
-SourceId is a required index into the sources section. `SourceRecord.source_id` must match its own index in the sources section. RootRecord, TokenRecord, TriviaRecord, and DiagnosticRecord `source_id` fields have no none sentinel and must satisfy `source_id < sources.count`. `SourceId = 0` is valid.
+Snapshot SourceId is a required index into the sources section. `SourceRecord.source_id` must match its own index in the sources section. RootRecord, TokenRecord, TriviaRecord, and DiagnosticRecord `source_id` fields have no none sentinel and must satisfy `source_id < sources.count`. `SourceId = 0` is valid.
 
 `path`, `locale`, and `message_id` are optional metadata. They always exist as `StringRef` fields in SourceRecord, and use `StringId = 0xFFFF_FFFF` as the none sentinel when absent. SourceRecord layout does not vary by metadata presence.
 
@@ -691,6 +725,7 @@ TokenRecord {
   leading_trivia_count: u32,
   trailing_trivia_start: u32,
   trailing_trivia_count: u32,
+  reserved_tail: u32,
 }
 
 TriviaRecord {
@@ -704,7 +739,7 @@ TriviaRecord {
 
 TokenRecord.kind and TriviaRecord.kind also store the Phase 1 `SyntaxKind` numeric value directly. Nodes, tokens, and trivia share the same `SyntaxKind` family, while decoders/accessors interpret node kind, token kind, and trivia kind using section context and helper predicates. Decoders reject unknown `SyntaxKind` numeric values for TokenRecord.kind and TriviaRecord.kind too. This keeps kind identity identical across parser tables, snapshot records, and accessors, and removes the need for a kind conversion table during snapshot encoding.
 
-TokenRecord.flags and TriviaRecord.flags are reserved in v0.1. SnapshotWriter writes `0`, and decoders reject non-zero flags.
+TokenRecord.flags, TokenRecord.reserved_tail, and TriviaRecord.flags are reserved in v0.1. SnapshotWriter writes `0`, and decoders reject non-zero values.
 
 The internal Phase 1 `TokenRecord` may use a compact layout with `first_trivia` and leading/trailing counts to reduce record size. SnapshotWriter expands it linearly into snapshot `leading_trivia_start` / `leading_trivia_count` / `trailing_trivia_start` / `trailing_trivia_count`. The snapshot format does not need to be byte-identical to construction-time layout, but the conversion should require only per-token arithmetic.
 
@@ -718,7 +753,7 @@ v0.1 TokenRecord / TriviaRecord has no `text_ref`. Original token / trivia text 
 
 ![ox-mf2 diagnostics section](./assets/003-ox-mf2-diagnostics-section.svg)
 
-When `include_diagnostics = true`, the snapshot includes a diagnostics section. This allows snapshots to be inspected or transported with parse diagnostics attached.
+When `include_diagnostics = true`, SnapshotWriter encodes parser diagnostics and diagnostic labels when they are present. The diagnostics and diagnostic labels sections are optional and may still be omitted when empty. This allows snapshots to be inspected or transported with parse diagnostics attached without forcing empty optional sections into every snapshot.
 
 ```text
 DiagnosticRecord {
@@ -726,6 +761,7 @@ DiagnosticRecord {
   span_start: u32,
   span_end: u32,
   severity: u8,
+  reserved: u8,
   code: u16,
   message: StringRef,
   label_start: u32,
@@ -754,7 +790,11 @@ Diagnostics without labels use `label_count = 0`. Decoders verify `label_start +
 
 Public APIs may return diagnostics separately for convenience, but the snapshot format must be able to keep diagnostics as part of the encoded result. A flat diagnostics array in a binding result is a view over snapshot diagnostic records in root order, not a separate diagnostic table.
 
-## Decoder Error Boundary
+## Decoder and Accessor API
+
+This section defines how validated snapshot bytes become read-only Rust views. It covers decode errors, buffer ownership, handle identity, raw-id accessors, and traversal APIs.
+
+### Decoder Error Boundary
 
 Snapshot decode fails with typed errors, not panics.
 
@@ -848,7 +888,7 @@ Decoder validation order:
 
 String table validation happens before SourceRecord and DiagnosticRecord validation because those records contain StringRef fields. A decoder must know that string offsets and string data are valid before validating StringRef references from other records.
 
-## Snapshot Buffer Ownership
+### Snapshot Buffer Ownership
 
 The Rust decoder provides both borrowed and owned views.
 
@@ -893,7 +933,7 @@ Once eager validation succeeds, accessors read records from `bytes + SectionInde
 
 Accessors do not expand snapshot bytes into a recursive object tree. They slice the snapshot buffer and return values only when consumers read nodes, tokens, strings, or diagnostics.
 
-## Handle Model
+### Handle Model
 
 Public Root / Node / Token / Trivia handles are pairs of snapshot owner and section-local id, not object pointers.
 
@@ -906,7 +946,7 @@ TriviaHandle { snapshot: SnapshotRef, id: TriviaId }
 
 In Rust, `SnapshotRef` is a reference to `SnapshotView` / `SnapshotViewOwned` or an owned view. In bindings, the equivalent reference is a language-specific accessor object that owns or shares the snapshot buffer. The handle itself does not copy snapshot bytes.
 
-RootId, NodeId, TokenId, and TriviaId are snapshot-local identities. Equal id values from different snapshots do not mean the same node/token/trivia. Handle equality is based on both snapshot identity and id.
+RootId, NodeId, TokenId, TriviaId, and SourceId are snapshot-local identities. Equal id values from different snapshots do not mean the same root/node/token/trivia/source. Handle equality is based on both snapshot identity and id.
 
 Handle construction validates `id < section.count`. Children traversal, root lookup, and token trivia lookup return lightweight handles with the same `SnapshotRef`. This lets lazy accessors avoid materializing object trees and avoids dangling pointers in GC-managed languages.
 
@@ -952,7 +992,7 @@ SnapshotViewOwned::as_bytes() -> &[u8]
 
 This is useful for hashing, fixture generation, debug dumps, and persistence. Rust can expose borrowed bytes safely through lifetimes. Language bindings may still use copy semantics for raw byte export, as defined in the binding design.
 
-## Accessor Traversal API
+### Accessor Traversal API
 
 The snapshot accessor model uses array-like views as the primary representation, not recursive materialized trees.
 
@@ -988,7 +1028,7 @@ Rust `node.child_at(index)` returns `Option<ChildView<'a>>`; out-of-range indexe
 
 Language bindings may expose ergonomic array-returning helpers such as `children(): ChildHandle[]`, as defined in the binding design. Those helpers are not the Rust snapshot accessor baseline.
 
-If an out-of-range index is passed to an indexed accessor, the accessor returns an explicit error instead of silently returning an empty value. Invalid accessor usage fails loudly so formatter/linter traversal bugs are found early.
+Indexed accessors must distinguish out-of-range access from an empty child list. Rust snapshot accessors use `Option` for this boundary. Language bindings may convert the same condition into an explicit error so formatter/linter traversal bugs fail loudly.
 
 Language-specific iterator helpers may be added as convenience APIs, but they are not the snapshot compatibility surface. The snapshot traversal contract is defined by array-like methods and indexed accessors.
 
