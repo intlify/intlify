@@ -10,16 +10,26 @@
 //!
 //! # Quick start
 //!
-//! ```
-//! use ox_mf2_parser::{parse_message, snapshot::{
-//!     parse_result_to_snapshot, decode_snapshot, SnapshotOptions,
-//! }, SourceFileInput, SourceStore};
+//! Use [`parse_message_to_snapshot`] for a one-shot, standalone
+//! encode that does not require building a [`crate::SourceStore`].
+//! Use [`parse_source_to_snapshot`] / [`parse_result_to_snapshot`] /
+//! [`parse_session_to_snapshot`] when the caller already owns a
+//! `SourceStore` (e.g. a batch parse pipeline). Mixing
+//! [`crate::parse_message`]'s `ParseResult` with an unrelated
+//! `SourceStore` is **not safe** — see
+//! [`parse_result_to_snapshot`]'s documentation for the contract.
 //!
-//! let result = parse_message("Hello");
-//! let mut sources = SourceStore::new();
-//! let _ = sources.add(SourceFileInput { source: "Hello", ..Default::default() });
-//! let snap =
-//!     parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
+//! ```
+//! use ox_mf2_parser::{snapshot::{
+//!     decode_snapshot, parse_message_to_snapshot, SnapshotOptions,
+//! }, ParseOptions};
+//!
+//! let snap = parse_message_to_snapshot(
+//!     "Hello",
+//!     None,
+//!     ParseOptions::default(),
+//!     SnapshotOptions::default(),
+//! ).unwrap();
 //! let view = decode_snapshot(&snap.bytes).unwrap();
 //! assert_eq!(view.root_count(), 1);
 //! ```
@@ -55,7 +65,7 @@ pub use view::{
     TokenView, TriviaIter, TriviaView,
 };
 pub use writer::{
-    parse_batch_result_to_snapshot, parse_batch_to_snapshot, parse_result_to_snapshot,
-    parse_session_to_snapshot, parse_source_to_snapshot, BatchSnapshotResult, SnapshotOptions,
-    SnapshotResult,
+    parse_batch_result_to_snapshot, parse_batch_to_snapshot, parse_message_to_snapshot,
+    parse_result_to_snapshot, parse_session_to_snapshot, parse_source_to_snapshot,
+    BatchSnapshotResult, SnapshotOptions, SnapshotResult,
 };

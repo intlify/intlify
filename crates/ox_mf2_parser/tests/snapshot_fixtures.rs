@@ -142,8 +142,7 @@ fn render_dump(view: &SnapshotView<'_>) -> String {
             .expect("source view");
         let text_display = source
             .text()
-            .map(|t| format!("{t:?}"))
-            .unwrap_or_else(|| "-".to_owned());
+            .map_or_else(|| "-".to_owned(), |t| format!("{t:?}"));
         let _ = writeln!(
             out,
             "  [{i}] path={} locale={} message_id={} base_offset={} text={text_display}",

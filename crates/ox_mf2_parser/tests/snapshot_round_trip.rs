@@ -13,9 +13,8 @@ use ox_mf2_parser::snapshot::{
     SNAPSHOT_MAGIC,
 };
 use ox_mf2_parser::{
-    parse_batch_to_snapshot, parse_message, parse_result_to_snapshot, parse_source,
-    parse_source_to_snapshot, BatchParseOptions, ParseInput, ParseOptions, SourceFileInput,
-    SourceStore,
+    parse_batch_to_snapshot, parse_result_to_snapshot, parse_source, parse_source_to_snapshot,
+    BatchParseOptions, ParseInput, ParseOptions, SourceFileInput, SourceStore,
 };
 
 #[test]
@@ -59,26 +58,81 @@ fn snapshot_preserves_token_text_via_source_id_plus_span() {
     // Walk to find a text token in any descendant of the root.
     let root = view.root(snap.root).unwrap();
     let root_node = view.node(root.root_node()).unwrap();
-    let token_span = find_first_token_span(&view, root_node).expect("at least one token");
+    let token_span = find_first_token_span(root_node).expect("at least one token");
     let text = sources.slice_in(id, token_span);
     assert!(!text.is_empty(), "token covers non-empty source text");
 }
 
 fn find_first_token_span(
-    view: &ox_mf2_parser::SnapshotView<'_>,
     node: ox_mf2_parser::snapshot::view::NodeView<'_>,
 ) -> Option<ox_mf2_parser::Span> {
     for child in node.children() {
         match child {
             ChildView::Token(token) => return Some(token.span()),
             ChildView::Node(child_node) => {
-                if let Some(span) = find_first_token_span(view, child_node) {
+                if let Some(span) = find_first_token_span(child_node) {
                     return Some(span);
                 }
             }
         }
     }
     None
+}
+
+#[test]
+fn include_diagnostics_false_drops_diagnostic_sections_and_bytes() {
+    // `{$unclosed` is malformed: the parser emits at least one
+    // diagnostic. With include_diagnostics = true the snapshot must
+    // contain the diagnostics section; with include_diagnostics =
+    // false the writer must skip emitting diagnostic bytes entirely,
+    // which produces a strictly smaller snapshot.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "{$unclosed",
+        ..Default::default()
+    });
+    let with_diag = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let without_diag = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_diagnostics: false,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+
+    let with_view = decode_snapshot(&with_diag.bytes).unwrap();
+    let without_view = decode_snapshot(&without_diag.bytes).unwrap();
+
+    assert!(with_view.diagnostic_count() > 0);
+    assert!(with_view.section(SectionKind::Diagnostics).is_some());
+
+    assert_eq!(without_view.diagnostic_count(), 0);
+    assert!(without_view.section(SectionKind::Diagnostics).is_none());
+    assert!(without_view
+        .section(SectionKind::DiagnosticLabels)
+        .is_none());
+
+    assert!(
+        without_diag.bytes.len() < with_diag.bytes.len(),
+        "include_diagnostics = false must not include diagnostic bytes \
+         (with={} bytes, without={} bytes)",
+        with_diag.bytes.len(),
+        without_diag.bytes.len()
+    );
+
+    // Caller convenience: `diagnostics` is always populated so the
+    // caller can still inspect them.
+    assert!(!without_diag.diagnostics.is_empty());
+    assert_eq!(without_diag.diagnostics.len(), with_diag.diagnostics.len());
 }
 
 #[test]
@@ -177,14 +231,48 @@ fn snapshot_with_source_text_resolves_text_through_view() {
 }
 
 #[test]
+fn parse_message_to_snapshot_carries_metadata() {
+    // The standalone convenience encodes through its own one-entry
+    // SourceStore, so SnapshotResult.root is always 0 and any
+    // caller-supplied metadata round-trips into the source record.
+    let snap = ox_mf2_parser::parse_message_to_snapshot(
+        "Hi",
+        Some(SourceFileInput {
+            source: "",
+            path: Some("greeting.mf2"),
+            locale: Some("en"),
+            message_id: Some("hello"),
+            base_offset: Some(7),
+        }),
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(source.path(), Some("greeting.mf2"));
+    assert_eq!(source.locale(), Some("en"));
+    assert_eq!(source.message_id(), Some("hello"));
+    assert_eq!(source.base_offset(), 7);
+    // `metadata.source` is intentionally ignored; the snapshot must
+    // carry the actual parsed text.
+    assert_eq!(source.text(), Some("Hi"));
+}
+
+#[test]
 fn decode_snapshot_owned_shares_buffer() {
-    let result = parse_message("Hello");
-    let mut sources = SourceStore::new();
-    let _ = sources.add(SourceFileInput {
-        source: "Hello",
-        ..Default::default()
-    });
-    let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
+    let snap = ox_mf2_parser::parse_message_to_snapshot(
+        "Hello",
+        None,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
     let owned: std::sync::Arc<[u8]> = snap.bytes.into();
     let view = decode_snapshot_owned(owned.clone()).unwrap();
     // Same bytes are visible through both .as_bytes() and the cloned arc.

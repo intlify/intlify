@@ -198,18 +198,21 @@ impl DecodeError {
     }
 
     /// Attach the section the failure was found in.
+    #[must_use]
     pub const fn with_section(mut self, section: SectionKind) -> Self {
         self.section = Some(section);
         self
     }
 
     /// Attach the byte offset the failure was found at.
+    #[must_use]
     pub const fn with_offset(mut self, offset: u32) -> Self {
         self.offset = Some(offset);
         self
     }
 
     /// Attach the record index the failure was found at.
+    #[must_use]
     pub const fn with_index(mut self, index: u32) -> Self {
         self.index = Some(index);
         self

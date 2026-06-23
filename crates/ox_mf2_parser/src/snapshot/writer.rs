@@ -21,7 +21,7 @@ use crate::snapshot::format::{
 use crate::snapshot::sections::{EmittedSection, SnapshotAssembler};
 use crate::snapshot::source_map::SourceMap;
 use crate::snapshot::string_table::StringTableBuilder;
-use crate::source::{SourceFile, SourceStore};
+use crate::source::{SourceFile, SourceFileInput, SourceStore};
 use crate::span::SourceId as PhaseOneSourceId;
 use crate::tables::CstTables;
 
@@ -84,9 +84,22 @@ pub struct BatchSnapshotResult {
 /// Encode an already-produced [`ParseResult`] into a Binary AST
 /// snapshot.
 ///
-/// The `sources` store must contain the Phase 1 SourceId carried by
-/// `result.source`. `parse_result_to_snapshot` does not reparse the
-/// source.
+/// `sources` must be the same [`SourceStore`] the result was parsed
+/// against — i.e. `result` must have been produced by
+/// [`parse_source`](crate::parse_source) or [`parse_batch`](crate::parse_batch)
+/// using this very store. The encoder reads `SourceRecord` metadata
+/// (path / locale / `message_id` / `base_offset` / optional source
+/// text) from `sources.get(result.source)` and trusts the caller to
+/// have kept them in sync.
+///
+/// **Do not pass a [`ParseResult`] from
+/// [`parse_message`](crate::parse_message) here**:
+/// `parse_message` does not register the source in any store and
+/// always returns `SourceId::new(0)`, so pairing it with an
+/// unrelated store silently encodes the wrong source metadata. Use
+/// [`parse_message_to_snapshot`] for the standalone case.
+///
+/// `parse_result_to_snapshot` does not reparse the source.
 pub fn parse_result_to_snapshot(
     sources: &SourceStore,
     result: &ParseResult,
@@ -101,6 +114,44 @@ pub fn parse_result_to_snapshot(
     )
 }
 
+/// Parse `source` standalone and encode the result into a Binary
+/// AST snapshot. Builds a private one-entry [`SourceStore`] so
+/// callers never have to construct one to pair with
+/// [`parse_message`](crate::parse_message)'s
+/// `SourceId::new(0)` return value.
+///
+/// `metadata` lets callers attach path / locale / `message_id` /
+/// `base_offset` to the resulting `SourceRecord`. When `None`, the
+/// snapshot's `SourceRecord` carries no metadata strings and
+/// `base_offset = 0`.
+pub fn parse_message_to_snapshot(
+    source: &str,
+    metadata: Option<SourceFileInput<'_>>,
+    parse_options: ParseOptions,
+    snapshot_options: SnapshotOptions,
+) -> Result<SnapshotResult, SnapshotWriteError> {
+    let mut sources = SourceStore::with_capacity(1);
+    // Caller-supplied metadata is merged with the actual source text;
+    // any `source` field on `metadata` is ignored to keep the parser
+    // and the snapshot pointing at the same bytes.
+    let input = match metadata {
+        Some(m) => SourceFileInput {
+            source,
+            path: m.path,
+            locale: m.locale,
+            message_id: m.message_id,
+            base_offset: m.base_offset,
+        },
+        None => SourceFileInput {
+            source,
+            ..SourceFileInput::default()
+        },
+    };
+    let id = sources.add(input);
+    let result = run_parse_source(&sources, id, parse_options);
+    parse_result_to_snapshot(&sources, &result, snapshot_options)
+}
+
 /// Parse `source_id` from `sources` and encode the result into a
 /// Binary AST snapshot in a single call.
 pub fn parse_source_to_snapshot(
@@ -113,10 +164,11 @@ pub fn parse_source_to_snapshot(
     parse_result_to_snapshot(sources, &result, snapshot_options)
 }
 
-/// Encode a borrowed [`ParseSessionResult`] into a Binary AST snapshot.
+/// Encode a borrowed [`ParseSessionResult`] into a Binary AST
+/// snapshot.
 ///
-/// The session's CstView, diagnostics, and source identity are read
-/// in place without copying the underlying tables.
+/// The session's [`crate::CstView`], diagnostics, and source identity
+/// are read in place without copying the underlying tables.
 pub fn parse_session_to_snapshot(
     session: &ParseSessionResult<'_>,
     options: SnapshotOptions,
@@ -162,7 +214,11 @@ pub fn parse_batch_result_to_snapshot(
         )?;
     }
     let bytes = writer.finish(&result.sources)?;
-    let roots = (0..result.items.len() as u32).map(RootId::new).collect();
+    let roots_count = checked_u32(result.items.len()).ok_or(SnapshotWriteError::TooManyRoots)?;
+    let roots = (0..roots_count).map(RootId::new).collect();
+    // `SnapshotResult.diagnostics` is returned for caller
+    // convenience regardless of `SnapshotOptions.include_diagnostics`,
+    // so callers can still inspect parser output without re-parsing.
     let diagnostics = result
         .items
         .iter()
@@ -222,7 +278,7 @@ struct SnapshotWriter {
     diagnostic_labels_count: u32,
     roots: Vec<PendingRoot>,
     /// Cached snapshot-local source ids of input roots, in input
-    /// order. Used when emitting RootRecord wire bytes.
+    /// order. Used when emitting `RootRecord` wire bytes.
     root_source_locals: Vec<u32>,
 }
 
@@ -279,14 +335,27 @@ impl SnapshotWriter {
             None => return Err(SnapshotWriteError::MissingRoot),
         };
 
-        let diag_start = self.diagnostics_count;
-        for diag in diagnostics {
-            self.emit_diagnostic(diag)?;
-        }
-        let diag_count = self
-            .diagnostics_count
-            .checked_sub(diag_start)
-            .expect("diagnostics_count only grows");
+        // Diagnostic encoding is the writer's, not the caller's,
+        // choice. `SnapshotResult.diagnostics` is always returned to
+        // the caller from `encode_single` / batch encoders (so they
+        // can still see what the parser produced), but when
+        // `include_diagnostics = false` the writer must skip building
+        // any diagnostic section bytes, must not advance the
+        // diagnostic / label counters, and must not pollute the
+        // `SourceMap` with diagnostic-only sources.
+        let (diag_start, diag_count) = if self.options.include_diagnostics {
+            let start = self.diagnostics_count;
+            for diag in diagnostics {
+                self.emit_diagnostic(diag)?;
+            }
+            let count = self
+                .diagnostics_count
+                .checked_sub(start)
+                .expect("diagnostics_count only grows");
+            (start, count)
+        } else {
+            (0, 0)
+        };
 
         // `node_remap` / `token_remap` / `trivia_remap` are consumed
         // entirely inside this call: tokens and trivia are emitted

@@ -20,7 +20,7 @@ use ox_mf2_parser::snapshot::format::{
     STRING_OFFSET_RECORD_SIZE, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
 use ox_mf2_parser::snapshot::{decode_snapshot, DecodeErrorCode, SnapshotOptions};
-use ox_mf2_parser::{parse_message, parse_result_to_snapshot, SourceFileInput, SourceStore};
+use ox_mf2_parser::{parse_message_to_snapshot, ParseOptions};
 
 #[test]
 fn snapshot_default_options_match_design() {
@@ -157,14 +157,16 @@ fn changelog_documents_v01() {
 fn round_trip_helper_test_remains_stable() {
     // Tiny round-trip to exercise the encode → decode boundary so
     // any unrelated regression that breaks decoding shows up in the
-    // compatibility guard as well.
-    let result = parse_message("Hi");
-    let mut sources = SourceStore::new();
-    let _ = sources.add(SourceFileInput {
-        source: "Hi",
-        ..Default::default()
-    });
-    let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
+    // compatibility guard as well. Uses `parse_message_to_snapshot`
+    // so the test never relies on the `parse_message` + manual
+    // `SourceStore` pattern that the API contract forbids.
+    let snap = parse_message_to_snapshot(
+        "Hi",
+        None,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
     let view = decode_snapshot(&snap.bytes).expect("decode succeeds");
     assert_eq!(view.root_count(), 1);
 }

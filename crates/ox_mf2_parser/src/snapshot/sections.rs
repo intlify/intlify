@@ -89,7 +89,7 @@ impl SnapshotAssembler {
         debug_assert_eq!(buf.len() as u32, HEADER_SIZE);
 
         for (section, slot) in self.sections.iter().zip(plan.iter()) {
-            write_section_record(&mut buf, section.kind, section.count, slot);
+            write_section_record(&mut buf, section.kind, section.count, *slot);
         }
         debug_assert_eq!(buf.len() as u32, HEADER_SIZE + section_table_byte_len);
 
@@ -131,7 +131,7 @@ fn write_header(buf: &mut Vec<u8>, section_count: u32) {
     write_u32_le(buf, 0); // reserved_tail
 }
 
-fn write_section_record(buf: &mut Vec<u8>, kind: SectionKind, count: u32, plan: &SectionPlan) {
+fn write_section_record(buf: &mut Vec<u8>, kind: SectionKind, count: u32, plan: SectionPlan) {
     write_u16_le(buf, kind.as_u16());
     let flags = if kind.is_core() {
         SECTION_FLAG_REQUIRED

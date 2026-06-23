@@ -300,7 +300,7 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
         roots,
         nodes.count,
         sources.count,
-        diagnostics.map(|s| s.count).unwrap_or(0),
+        diagnostics.map_or(0, |s| s.count),
     )?;
 
     // ── Node records (kind, span, child range, data_ref) ───────────
@@ -310,12 +310,7 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
     validate_edge_records(bytes, edges, nodes.count, tokens.count)?;
 
     // ── Token records ──────────────────────────────────────────────
-    validate_token_records(
-        bytes,
-        tokens,
-        sources.count,
-        trivia.map(|s| s.count).unwrap_or(0),
-    )?;
+    validate_token_records(bytes, tokens, sources.count, trivia.map_or(0, |s| s.count))?;
 
     // ── Trivia records ─────────────────────────────────────────────
     if let Some(t) = trivia {
@@ -329,7 +324,7 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
             d,
             sources.count,
             string_offsets.count,
-            diagnostic_labels.map(|s| s.count).unwrap_or(0),
+            diagnostic_labels.map_or(0, |s| s.count),
         )?;
     }
     if let Some(l) = diagnostic_labels {
@@ -891,24 +886,43 @@ fn diagnostic_code_is_unknown(value: u16) -> bool {
 /// Strict variant of the Phase 1 diagnostic-code lookup: returns `None`
 /// for values that have not been assigned to a known v0.1 diagnostic.
 pub(crate) fn diagnostic_code_from_u16_strict(value: u16) -> Option<DiagnosticCode> {
-    use DiagnosticCode::*;
     Some(match value {
-        v if v == Unspecified.as_u16() => Unspecified,
-        v if v == UnexpectedEndOfInput.as_u16() => UnexpectedEndOfInput,
-        v if v == UnclosedExpression.as_u16() => UnclosedExpression,
-        v if v == UnclosedQuotedLiteral.as_u16() => UnclosedQuotedLiteral,
-        v if v == UnclosedQuotedPattern.as_u16() => UnclosedQuotedPattern,
-        v if v == InvalidDeclarationStart.as_u16() => InvalidDeclarationStart,
-        v if v == InvalidMatcherSyntax.as_u16() => InvalidMatcherSyntax,
-        v if v == InvalidVariantBoundary.as_u16() => InvalidVariantBoundary,
-        v if v == InvalidMarkupBoundary.as_u16() => InvalidMarkupBoundary,
-        v if v == MissingComplexBody.as_u16() => MissingComplexBody,
-        v if v == UnexpectedToken.as_u16() => UnexpectedToken,
-        v if v == SpanOverflow.as_u16() => SpanOverflow,
-        v if v == InvalidEscape.as_u16() => InvalidEscape,
-        v if v == AmbiguousMessageMode.as_u16() => AmbiguousMessageMode,
-        v if v == MissingRequiredWhitespace.as_u16() => MissingRequiredWhitespace,
-        v if v == MissingIdentifierName.as_u16() => MissingIdentifierName,
+        v if v == DiagnosticCode::Unspecified.as_u16() => DiagnosticCode::Unspecified,
+        v if v == DiagnosticCode::UnexpectedEndOfInput.as_u16() => {
+            DiagnosticCode::UnexpectedEndOfInput
+        }
+        v if v == DiagnosticCode::UnclosedExpression.as_u16() => DiagnosticCode::UnclosedExpression,
+        v if v == DiagnosticCode::UnclosedQuotedLiteral.as_u16() => {
+            DiagnosticCode::UnclosedQuotedLiteral
+        }
+        v if v == DiagnosticCode::UnclosedQuotedPattern.as_u16() => {
+            DiagnosticCode::UnclosedQuotedPattern
+        }
+        v if v == DiagnosticCode::InvalidDeclarationStart.as_u16() => {
+            DiagnosticCode::InvalidDeclarationStart
+        }
+        v if v == DiagnosticCode::InvalidMatcherSyntax.as_u16() => {
+            DiagnosticCode::InvalidMatcherSyntax
+        }
+        v if v == DiagnosticCode::InvalidVariantBoundary.as_u16() => {
+            DiagnosticCode::InvalidVariantBoundary
+        }
+        v if v == DiagnosticCode::InvalidMarkupBoundary.as_u16() => {
+            DiagnosticCode::InvalidMarkupBoundary
+        }
+        v if v == DiagnosticCode::MissingComplexBody.as_u16() => DiagnosticCode::MissingComplexBody,
+        v if v == DiagnosticCode::UnexpectedToken.as_u16() => DiagnosticCode::UnexpectedToken,
+        v if v == DiagnosticCode::SpanOverflow.as_u16() => DiagnosticCode::SpanOverflow,
+        v if v == DiagnosticCode::InvalidEscape.as_u16() => DiagnosticCode::InvalidEscape,
+        v if v == DiagnosticCode::AmbiguousMessageMode.as_u16() => {
+            DiagnosticCode::AmbiguousMessageMode
+        }
+        v if v == DiagnosticCode::MissingRequiredWhitespace.as_u16() => {
+            DiagnosticCode::MissingRequiredWhitespace
+        }
+        v if v == DiagnosticCode::MissingIdentifierName.as_u16() => {
+            DiagnosticCode::MissingIdentifierName
+        }
         _ => return None,
     })
 }

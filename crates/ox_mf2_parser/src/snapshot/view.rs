@@ -273,7 +273,7 @@ pub struct RootView<'a> {
     id: RootId,
 }
 
-impl<'a> RootView<'a> {
+impl RootView<'_> {
     pub fn id(&self) -> RootId {
         self.id
     }
@@ -406,7 +406,7 @@ pub enum ChildView<'a> {
     Token(TokenView<'a>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ChildIter<'a> {
     bytes: &'a [u8],
     sections: SectionIndex,
@@ -508,7 +508,7 @@ pub struct TriviaView<'a> {
     id: TriviaId,
 }
 
-impl<'a> TriviaView<'a> {
+impl TriviaView<'_> {
     pub fn id(&self) -> TriviaId {
         self.id
     }
@@ -534,7 +534,7 @@ impl<'a> TriviaView<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TriviaIter<'a> {
     bytes: &'a [u8],
     sections: SectionIndex,
@@ -657,7 +657,7 @@ impl<'a> DiagnosticLabelView<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct DiagnosticLabelIter<'a> {
     bytes: &'a [u8],
     sections: SectionIndex,

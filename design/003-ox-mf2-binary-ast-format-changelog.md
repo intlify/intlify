@@ -47,6 +47,8 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - v0.1 decoder normalises section-table read order so an empty section that shares an aligned offset with a non-empty section is never falsely rejected as overlapping.
 - `DecodeErrorCode` uses `#[repr(u16)]` with explicit discriminants; the numeric values are stable across the v0.1 surface for tests, fixture validators, and language bindings.
 - v0.1 writer emits the (possibly empty) `SourceTextData` section whenever `SnapshotOptions.include_source_text = true`, so empty source text round-trips back as `Some("")` instead of being lost.
+- v0.1 writer skips diagnostic / diagnostic-label record encoding entirely when `SnapshotOptions.include_diagnostics = false`. `SnapshotResult.diagnostics` is still populated for caller convenience, but the snapshot bytes no longer carry diagnostic data and the source map is not polluted with diagnostic-only sources.
+- v0.1 adds `parse_message_to_snapshot(source, metadata, parse_options, snapshot_options)` for the standalone (no caller `SourceStore`) path; `parse_result_to_snapshot` requires the caller to supply the same `SourceStore` the `ParseResult` was parsed against, so pairing it with a `parse_message`-derived result is no longer the documented pattern.
 
 ## Changelog Update Rule
 

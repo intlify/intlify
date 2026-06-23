@@ -58,7 +58,7 @@ impl StringTableBuilder {
         Ok(id)
     }
 
-    /// Borrowed view of the offset records, in StringId order.
+    /// Borrowed view of the offset records, in [`StringId`] order.
     #[inline]
     pub fn offsets(&self) -> &[StringOffsetEntry] {
         &self.offsets
