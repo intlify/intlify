@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use crate::diagnostic::{DiagnosticCode, DiagnosticSeverity};
+use crate::error::{OxMf2ErrorCode, SourceTextErrorCode};
 use crate::snapshot::decoder::{diagnostic_code_from_u16_strict, syntax_kind_from_u16};
 use crate::snapshot::format::{
     read_u16_le, read_u32_le, RootId, SectionKind, StringId, DIAGNOSTIC_LABEL_RECORD_SIZE,
@@ -50,6 +51,21 @@ impl core::fmt::Display for SourceTextUnavailable {
 }
 
 impl std::error::Error for SourceTextUnavailable {}
+
+impl SourceTextUnavailable {
+    #[inline]
+    pub const fn code(self) -> SourceTextErrorCode {
+        match self {
+            Self::NotIncluded => SourceTextErrorCode::SourceTextNotIncluded,
+            Self::SpanOutOfBounds => SourceTextErrorCode::SourceTextSpanOutOfBounds,
+        }
+    }
+
+    #[inline]
+    pub const fn as_ox_mf2_error_code(self) -> OxMf2ErrorCode {
+        self.code().as_ox_mf2_error_code()
+    }
+}
 
 /// Section payload range. Validated by the decoder so accessors can
 /// slice the underlying snapshot buffer without re-checking bounds.

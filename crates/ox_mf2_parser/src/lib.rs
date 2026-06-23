@@ -13,12 +13,17 @@
 //! `design/002-ox-mf2-phase-1-rust-parser-design.md` and the implementation
 //! plan in `.plans/002-ox-mf2-phase-1-rust-parser-implementation.md`.
 //!
+//! API error code ranges are defined in
+//! `design/appendix-ox-mf2-error-code.md`. Parser diagnostics use the
+//! separate [`DiagnosticCode`] namespace.
+//!
 //! [message-format-wg]: https://github.com/unicode-org/message-format-wg
 
 #![doc(html_root_url = "https://docs.rs/ox_mf2_parser/0.0.0")]
 
 pub mod api;
 pub mod diagnostic;
+pub mod error;
 pub mod parser;
 pub mod scanner;
 pub mod semantic;
@@ -38,6 +43,14 @@ pub use diagnostic::{
     Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef, DiagnosticSeverity,
     DiagnosticView,
 };
+pub use error::{
+    ox_mf2_error_code_name, ox_mf2_error_domain, BindingValidationErrorCode,
+    InitializationErrorCode, OxMf2ErrorCode, OxMf2ErrorDomain, SourceTextErrorCode,
+    OX_MF2_API_ERROR_MIN, OX_MF2_BINDING_VALIDATION_ERROR_MAX, OX_MF2_BINDING_VALIDATION_ERROR_MIN,
+    OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN, OX_MF2_INITIALIZATION_ERROR_MAX,
+    OX_MF2_INITIALIZATION_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX,
+    OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
+};
 pub use scanner::ScannerState;
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
 pub use snapshot::{
@@ -45,9 +58,10 @@ pub use snapshot::{
     parse_batch_to_snapshot, parse_message_to_snapshot, parse_result_to_snapshot,
     parse_session_to_snapshot, parse_source_to_snapshot, BatchSnapshotResult, DecodeError,
     DecodeErrorCode, RootId, SectionKind, SnapshotOptions, SnapshotResult, SnapshotSourceMetadata,
-    SnapshotView, SnapshotViewOwned, SnapshotWriteError, SourceTextUnavailable,
+    SnapshotView, SnapshotViewOwned, SnapshotWriteError, SnapshotWriteErrorCode,
+    SourceTextUnavailable,
 };
-pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore};
+pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore, SourceStoreError};
 pub use span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
 pub use syntax_kind::SyntaxKind;
 pub use tables::{CstCapacity, CstTables};

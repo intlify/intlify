@@ -14,6 +14,7 @@
 
 use std::sync::OnceLock;
 
+use crate::error::{OxMf2ErrorCode, SourceTextErrorCode};
 use crate::span::{SourceId, Span};
 
 /// Public input used to register a source file with [`SourceStore`].
@@ -110,6 +111,20 @@ impl core::fmt::Display for SourceStoreError {
 }
 
 impl std::error::Error for SourceStoreError {}
+
+impl SourceStoreError {
+    #[inline]
+    pub const fn code(self) -> SourceTextErrorCode {
+        match self {
+            Self::SourceTooLarge => SourceTextErrorCode::SourceTextTooLarge,
+        }
+    }
+
+    #[inline]
+    pub const fn as_ox_mf2_error_code(self) -> OxMf2ErrorCode {
+        self.code().as_ox_mf2_error_code()
+    }
+}
 
 /// Source ownership for single parse, batch parse, diagnostics, and Phase 2
 /// snapshot roots.

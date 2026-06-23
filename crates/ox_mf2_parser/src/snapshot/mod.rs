@@ -53,7 +53,7 @@ pub mod view;
 pub mod writer;
 
 pub use decoder::{decode_snapshot, decode_snapshot_owned};
-pub use error::{DecodeError, DecodeErrorCode, SnapshotWriteError};
+pub use error::{DecodeError, DecodeErrorCode, SnapshotWriteError, SnapshotWriteErrorCode};
 pub use format::{
     RootId, SectionKind, StringId, HEADER_SIZE, NONE_REF, ROOT_RECORD_SIZE, SECTION_ALIGNMENT,
     SECTION_RECORD_SIZE, SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION,

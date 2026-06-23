@@ -7,9 +7,27 @@
 //! just lock in the API shape, lifetime contracts, and batch ordering.
 
 use ox_mf2_parser::{
-    parse_batch, parse_message, parse_source, parse_source_session, BatchParseOptions,
-    ParseCapacity, ParseInput, ParseOptions, ParseWorkspace, SourceFileInput, SourceStore,
+    ox_mf2_error_code_name, parse_batch, parse_message, parse_source, parse_source_session,
+    BatchParseOptions, DecodeError, DecodeErrorCode, OxMf2ErrorCode, ParseCapacity, ParseInput,
+    ParseOptions, ParseWorkspace, SnapshotWriteError, SourceFileInput, SourceStore,
+    SourceTextUnavailable,
 };
+
+#[test]
+fn error_code_exports_are_available_from_crate_root() {
+    let decode: OxMf2ErrorCode =
+        DecodeError::new(DecodeErrorCode::InvalidMagic).as_ox_mf2_error_code();
+    assert_eq!(decode, 1001);
+    assert_eq!(ox_mf2_error_code_name(decode), "DecodeInvalidMagic");
+
+    let write: OxMf2ErrorCode = SnapshotWriteError::MissingRoot.as_ox_mf2_error_code();
+    assert_eq!(write, 2011);
+    assert_eq!(ox_mf2_error_code_name(write), "SnapshotWriteMissingRoot");
+
+    let source: OxMf2ErrorCode = SourceTextUnavailable::NotIncluded.as_ox_mf2_error_code();
+    assert_eq!(source, 3000);
+    assert_eq!(ox_mf2_error_code_name(source), "SourceTextNotIncluded");
+}
 
 #[test]
 fn parse_message_returns_owned_result() {
