@@ -246,9 +246,7 @@ fn print_help() {
         "  traverse_diagnostics         decode once, iterate diagnostics N times (malformed input)"
     );
     println!("  parse_batch_to_snapshot      parse + shared batch snapshot over --corpus");
-    println!(
-        "  parse_batch_result_to_snapshot batch parse once, snapshot N times over --corpus"
-    );
+    println!("  parse_batch_result_to_snapshot batch parse once, snapshot N times over --corpus");
     println!("  snapshot_to_bytes_copy       encode once, copy bytes into Arc<[u8]> N times");
     println!();
     println!("Phases (allocator inspection — requires `--features bench-alloc` build):");
@@ -823,8 +821,7 @@ fn run_decode_snapshot_owned(args: &Args) -> Result<PhaseSummary, String> {
     let iters = args.iterations.max(1);
     let mut sections = 0usize;
     for _ in 0..iters {
-        let view =
-            decode_snapshot_owned(arc.clone()).map_err(|e| format!("decode failed: {e}"))?;
+        let view = decode_snapshot_owned(arc.clone()).map_err(|e| format!("decode failed: {e}"))?;
         sections += view.view().section_count_for_bench();
     }
     Ok(PhaseSummary {
@@ -871,8 +868,9 @@ fn run_traverse_tokens(args: &Args) -> Result<PhaseSummary, String> {
             let token = view
                 .token(ox_mf2_parser::TokenId::new(i))
                 .expect("valid token");
-            units +=
-                token.span().len() as usize + token.leading_trivia().count() + token.trailing_trivia().count();
+            units += token.span().len() as usize
+                + token.leading_trivia().count()
+                + token.trailing_trivia().count();
         }
     }
     Ok(PhaseSummary {

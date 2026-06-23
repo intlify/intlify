@@ -42,3 +42,35 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - v0.1 decoder validates SyntaxKind numeric values in node, token, and trivia records.
 - Diagnostic code numeric values are snapshot-visible draft data and require fixture/changelog updates when changed.
 - v0.1 decoder validates diagnostic severity and diagnostic code numeric values.
+
+## Changelog Update Rule
+
+Any change to the following surface MUST add or amend a section in this changelog **in the same commit** that introduces the change.
+
+- snapshot magic, `major_version`, `minor_version`, or `feature_flags`
+- header layout or initial header values
+- `SectionKind` numeric values
+- section required / optional status
+- section alignment or padding rules
+- record field layout or `record_size`
+- `SyntaxKind` numeric values that the parser emits into snapshot records
+- `DiagnosticCode` numeric values that the parser emits into diagnostic records
+- decoder validation rules
+- canonical writer output rules
+- source text data layout
+- string table interning or deduplication policy
+- SourceRecord deduplication policy
+- extended data payload policy
+
+The compatibility guard tests under `crates/ox_mf2_parser/tests/snapshot_compat.rs` lock the v0.1 record sizes, section kind numeric order, default `SnapshotOptions`, edge kind numeric values, and assert that this changelog still documents the v0.1 magic, major, and minor version. A failure in those tests is the signal to update this file.
+
+## Version Bump Checklist
+
+Use this checklist when intentionally changing the snapshot wire format:
+
+1. Decide whether the change is a minor (additive) or major (incompatible) bump. While `major_version = 0`, every change is treated as draft and decoders use exact version matching, so any change inside v0.x is effectively a draft bump that requires updating both the writer and the v0.x decoder.
+2. Update the v0.1 section above (or open a new `v0.N` / `vM.0` heading) with one bullet per intentional change.
+3. Update `design/003-ox-mf2-phase-2-binary-ast-snapshot-design.md` to describe the new format.
+4. Update the Rust constants in `crates/ox_mf2_parser/src/snapshot/format.rs` and any matching decoder validation in `crates/ox_mf2_parser/src/snapshot/decoder.rs`.
+5. Regenerate the binary golden fixtures with `UPDATE_SNAPSHOTS=1 cargo test -p ox_mf2_parser --test snapshot_fixtures`.
+6. Re-run `vpr check` and `vpr test` to confirm the compatibility guard, fixture round-trips, and invalid fixture coverage all match the new format.

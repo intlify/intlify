@@ -3,10 +3,36 @@
 
 //! Binary AST snapshot writer, decoder, and accessor.
 //!
-//! This module implements the v0.1 versioned snapshot format defined
-//! in `design/003-ox-mf2-phase-2-binary-ast-snapshot-design.md`. The
+//! Implements the v0.1 versioned snapshot format defined in
+//! `design/003-ox-mf2-phase-2-binary-ast-snapshot-design.md`. The
 //! snapshot is the cross-process / cross-language / persistence
 //! boundary; it is not the primary parser representation.
+//!
+//! # Quick start
+//!
+//! ```
+//! use ox_mf2_parser::{parse_message, snapshot::{
+//!     parse_result_to_snapshot, decode_snapshot, SnapshotOptions,
+//! }, SourceFileInput, SourceStore};
+//!
+//! let result = parse_message("Hello");
+//! let mut sources = SourceStore::new();
+//! let _ = sources.add(SourceFileInput { source: "Hello", ..Default::default() });
+//! let snap =
+//!     parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
+//! let view = decode_snapshot(&snap.bytes).unwrap();
+//! assert_eq!(view.root_count(), 1);
+//! ```
+//!
+//! # Format stability
+//!
+//! While `major_version = 0`, the wire format is draft and decoders
+//! use exact version matching. Any intentional change to the wire
+//! format MUST update
+//! `design/003-ox-mf2-binary-ast-format-changelog.md` in the same
+//! commit; the compatibility guard tests under
+//! `crates/ox_mf2_parser/tests/snapshot_compat.rs` enforce that the
+//! changelog still documents the live magic, major, and minor version.
 
 pub mod decoder;
 pub mod error;
