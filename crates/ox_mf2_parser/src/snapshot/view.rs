@@ -384,6 +384,18 @@ impl<'a> SourceView<'a> {
     /// callers can distinguish "source text not encoded" from
     /// "span out of bounds" — see `design/003` §"Source Section".
     ///
+    /// `span` is interpreted as a zero-based byte offset into the
+    /// snapshot-embedded text, matching the spans returned by
+    /// [`NodeView::span`] / [`TokenView::span`] /
+    /// [`TriviaView::span`] / [`DiagnosticRecordView::span`] /
+    /// [`DiagnosticLabelView::span`]. `SourceView::base_offset` is
+    /// metadata (the file offset where the embedded substring starts
+    /// in the original source) and is intentionally NOT subtracted
+    /// here. Absolute file positions are `base_offset + span_start`
+    /// / `base_offset + span_end`; callers that already hold an
+    /// absolute span must subtract `base_offset` themselves before
+    /// calling `source_slice`.
+    ///
     /// Returns `Err(SourceTextUnavailable::NotIncluded)` when the
     /// snapshot was produced with `include_source_text = false`
     /// (text source ref is the canonical `NONE_REF` sentinel).

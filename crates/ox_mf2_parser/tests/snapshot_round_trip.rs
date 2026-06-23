@@ -234,6 +234,47 @@ fn source_slice_distinguishes_not_included_from_out_of_bounds() {
 }
 
 #[test]
+fn source_slice_uses_relative_spans_even_with_nonzero_base_offset() {
+    // design/003 §"Source Section": stored spans are relative to
+    // the encoded source text; absolute byte positions are
+    // computed as `base_offset + span_*`. `source_slice` must
+    // therefore treat its `span` argument as zero-based into the
+    // embedded text, matching `TokenView::span()` and friends.
+    // This test pins that contract so a future "subtract
+    // base_offset" change cannot quietly break callers that pass
+    // accessor-returned spans.
+    let snap = ox_mf2_parser::parse_message_to_snapshot(
+        "Hi",
+        Some(ox_mf2_parser::SnapshotSourceMetadata {
+            base_offset: Some(7),
+            ..Default::default()
+        }),
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(source.base_offset(), 7);
+    // Zero-based, relative spans resolve directly against the
+    // embedded text.
+    assert_eq!(source.source_slice(Span::new(0, 2)).unwrap(), "Hi");
+    assert_eq!(source.source_slice(Span::new(1, 2)).unwrap(), "i");
+    // Spans that already include `base_offset` (absolute file
+    // positions) must NOT be silently accepted — they would land
+    // out of bounds against the 2-byte embedded text.
+    assert_eq!(
+        source.source_slice(Span::new(7, 9)).unwrap_err(),
+        SourceTextUnavailable::SpanOutOfBounds
+    );
+}
+
+#[test]
 fn source_slice_rejects_span_splitting_multibyte_scalar() {
     // "あ" is 3 UTF-8 bytes (0xE3 0x81 0x84). A span that ends at
     // offset 1 splits the scalar — `source_slice` must surface

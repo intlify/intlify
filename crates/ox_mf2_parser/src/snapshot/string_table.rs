@@ -78,9 +78,19 @@ impl StringTableBuilder {
                 return Ok(StringId::new(i as u32));
             }
         }
-        // Miss: append data, offset record, and hash key.
-        let offset = checked_u32(self.data.len()).ok_or(SnapshotWriteError::SectionTooLarge)?;
-        let len = checked_u32(value.len()).ok_or(SnapshotWriteError::SectionTooLarge)?;
+        // Miss: append data, offset record, and hash key. The
+        // string data section's `byte_len` must fit in `u32`, so
+        // reject the append when the post-append cumulative length
+        // would overflow — checking `offset` and `len` in isolation
+        // is not enough because each can fit while their sum
+        // crosses `u32::MAX`.
+        let start_len = self.data.len();
+        let end_len = start_len
+            .checked_add(bytes.len())
+            .ok_or(SnapshotWriteError::SectionTooLarge)?;
+        let offset = checked_u32(start_len).ok_or(SnapshotWriteError::SectionTooLarge)?;
+        let len = checked_u32(bytes.len()).ok_or(SnapshotWriteError::SectionTooLarge)?;
+        let _ = checked_u32(end_len).ok_or(SnapshotWriteError::SectionTooLarge)?;
         let id_raw = checked_u32(self.offsets.len()).ok_or(SnapshotWriteError::TooManyStrings)?;
         if id_raw == NONE_REF {
             return Err(SnapshotWriteError::TooManyStrings);
