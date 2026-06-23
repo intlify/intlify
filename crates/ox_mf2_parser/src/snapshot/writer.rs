@@ -105,13 +105,33 @@ pub fn parse_result_to_snapshot(
     result: &ParseResult,
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
-    encode_single(
-        sources,
-        result.source,
-        &result.cst,
-        &result.diagnostics,
-        options,
-    )
+    // The owned-result path clones once, here, so the encoder body
+    // can move the `Vec` straight into `SnapshotResult.diagnostics`
+    // instead of doing a second `.to_vec()` inside `encode_single`.
+    let diagnostics = result.diagnostics.clone();
+    encode_single(sources, result.source, &result.cst, diagnostics, options)
+}
+
+/// Snapshot source metadata that pairs with
+/// [`parse_message_to_snapshot`]'s `source` parameter.
+///
+/// Deliberately omits the `source` field that
+/// [`SourceFileInput`] carries: the snapshot writer must point at
+/// the same bytes the parser saw, and a metadata struct that owned
+/// its own `source` would invite the caller to set two different
+/// strings. Bindings and language wrappers should follow the same
+/// shape.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SnapshotSourceMetadata<'a> {
+    /// Optional filesystem path, used for diagnostics.
+    pub path: Option<&'a str>,
+    /// Optional BCP-47 locale tag, used for project-aware tooling.
+    pub locale: Option<&'a str>,
+    /// Optional logical message id (e.g. translation key).
+    pub message_id: Option<&'a str>,
+    /// Optional base offset, used when the source is a substring of a
+    /// larger file (e.g. a single entry inside a locale resource).
+    pub base_offset: Option<u32>,
 }
 
 /// Parse `source` standalone and encode the result into a Binary
@@ -126,26 +146,18 @@ pub fn parse_result_to_snapshot(
 /// `base_offset = 0`.
 pub fn parse_message_to_snapshot(
     source: &str,
-    metadata: Option<SourceFileInput<'_>>,
+    metadata: Option<SnapshotSourceMetadata<'_>>,
     parse_options: ParseOptions,
     snapshot_options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
     let mut sources = SourceStore::with_capacity(1);
-    // Caller-supplied metadata is merged with the actual source text;
-    // any `source` field on `metadata` is ignored to keep the parser
-    // and the snapshot pointing at the same bytes.
-    let input = match metadata {
-        Some(m) => SourceFileInput {
-            source,
-            path: m.path,
-            locale: m.locale,
-            message_id: m.message_id,
-            base_offset: m.base_offset,
-        },
-        None => SourceFileInput {
-            source,
-            ..SourceFileInput::default()
-        },
+    let metadata = metadata.unwrap_or_default();
+    let input = SourceFileInput {
+        source,
+        path: metadata.path,
+        locale: metadata.locale,
+        message_id: metadata.message_id,
+        base_offset: metadata.base_offset,
     };
     let id = sources.add(input);
     let result = run_parse_source(&sources, id, parse_options);
@@ -173,16 +185,16 @@ pub fn parse_session_to_snapshot(
     session: &ParseSessionResult<'_>,
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
-    // Materialise diagnostics into owned values so the encoder shape
-    // is identical to the parse_result path. The records themselves
-    // stay borrowed; this only copies the catalog static `&str`s and
-    // resolved line/column. Cheap relative to encoding.
+    // Materialise diagnostics into owned values exactly once. The
+    // owned `Vec` is moved into both the writer (as a borrow) and the
+    // returned `SnapshotResult.diagnostics`, so workspace-reuse / LSP
+    // callers do not pay for a second `.to_vec()`.
     let diagnostics: Vec<Diagnostic> = session.diagnostics.iter().collect();
     encode_single(
         session.cst.sources(),
         session.source,
         session.cst.tables(),
-        &diagnostics,
+        diagnostics,
         options,
     )
 }
@@ -237,16 +249,16 @@ fn encode_single(
     sources: &SourceStore,
     source: PhaseOneSourceId,
     cst: &CstTables,
-    diagnostics: &[Diagnostic],
+    diagnostics: Vec<Diagnostic>,
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
     let mut writer = SnapshotWriter::new(options);
-    writer.add_root(sources, source, cst, diagnostics)?;
+    writer.add_root(sources, source, cst, &diagnostics)?;
     let bytes = writer.finish(sources)?;
     Ok(SnapshotResult {
         bytes,
         root: RootId::new(0),
-        diagnostics: diagnostics.to_vec(),
+        diagnostics,
     })
 }
 

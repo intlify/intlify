@@ -44,8 +44,8 @@ pub use snapshot::{
     decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
     parse_batch_to_snapshot, parse_message_to_snapshot, parse_result_to_snapshot,
     parse_session_to_snapshot, parse_source_to_snapshot, BatchSnapshotResult, DecodeError,
-    DecodeErrorCode, RootId, SectionKind, SnapshotOptions, SnapshotResult, SnapshotView,
-    SnapshotViewOwned, SnapshotWriteError,
+    DecodeErrorCode, RootId, SectionKind, SnapshotOptions, SnapshotResult, SnapshotSourceMetadata,
+    SnapshotView, SnapshotViewOwned, SnapshotWriteError,
 };
 pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore};
 pub use span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};

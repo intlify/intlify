@@ -71,6 +71,13 @@ parse_source_to_snapshot(
   snapshot_options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError>
 
+parse_message_to_snapshot(
+  source: &str,
+  metadata: Option<SnapshotSourceMetadata<'_>>,
+  parse_options: ParseOptions,
+  snapshot_options: SnapshotOptions,
+) -> Result<SnapshotResult, SnapshotWriteError>
+
 parse_result_to_snapshot(
   sources: &SourceStore,
   result: &ParseResult,
@@ -94,13 +101,15 @@ parse_batch_result_to_snapshot(
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
 `parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
 
-`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources` using `result.source`. The `sources` store must contain the Phase 1 SourceId carried by the result. SnapshotWriter then maps that Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+`parse_message_to_snapshot` is the standalone counterpart for callers that do not own a `SourceStore`. It builds a private one-entry `SourceStore` from `source` plus the optional `SnapshotSourceMetadata`, then runs the same `parse_source` + `parse_result_to_snapshot` pipeline. This is the API to use when porting code that used `parse_message(source)` directly — pairing a `parse_message` `ParseResult` with an unrelated `SourceStore` is unsafe (see below).
 
-If a `ParseResult` was produced by the `parse_message(source)` convenience API without SourceStore registration, callers that need a snapshot must either parse through `parse_source` / `SourceStore` or register equivalent source metadata before calling `parse_result_to_snapshot`. SnapshotWriter must not invent path, locale, message_id, base_offset, or source text ownership that is not present in SourceStore metadata.
+`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources.get(result.source)`. The contract is that `sources` is the same `SourceStore` the result was parsed against — i.e. the result came from `parse_source(sources, ...)` or `parse_batch(...).items[i].result`. SnapshotWriter then maps the Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+
+`parse_result_to_snapshot` MUST NOT be paired with a `ParseResult` produced by `parse_message(source)`: that path returns a hard-coded `SourceId::new(0)` without registering the source in any store, so a `sources.get(SourceId::new(0))` lookup against an unrelated store would silently encode the wrong source metadata or source text. Standalone callers should use `parse_message_to_snapshot` instead.
 
 `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / Phase 1 SourceId reachable from the session, then emits snapshot-local SourceIds.
 

@@ -67,5 +67,5 @@ pub use view::{
 pub use writer::{
     parse_batch_result_to_snapshot, parse_batch_to_snapshot, parse_message_to_snapshot,
     parse_result_to_snapshot, parse_session_to_snapshot, parse_source_to_snapshot,
-    BatchSnapshotResult, SnapshotOptions, SnapshotResult,
+    BatchSnapshotResult, SnapshotOptions, SnapshotResult, SnapshotSourceMetadata,
 };

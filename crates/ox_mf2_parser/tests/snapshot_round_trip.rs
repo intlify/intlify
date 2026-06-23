@@ -235,10 +235,12 @@ fn parse_message_to_snapshot_carries_metadata() {
     // The standalone convenience encodes through its own one-entry
     // SourceStore, so SnapshotResult.root is always 0 and any
     // caller-supplied metadata round-trips into the source record.
+    // `SnapshotSourceMetadata` omits the `source` field by
+    // construction so the parsed text and the snapshot's text can
+    // never diverge.
     let snap = ox_mf2_parser::parse_message_to_snapshot(
         "Hi",
-        Some(SourceFileInput {
-            source: "",
+        Some(ox_mf2_parser::SnapshotSourceMetadata {
             path: Some("greeting.mf2"),
             locale: Some("en"),
             message_id: Some("hello"),
@@ -259,8 +261,6 @@ fn parse_message_to_snapshot_carries_metadata() {
     assert_eq!(source.locale(), Some("en"));
     assert_eq!(source.message_id(), Some("hello"));
     assert_eq!(source.base_offset(), 7);
-    // `metadata.source` is intentionally ignored; the snapshot must
-    // carry the actual parsed text.
     assert_eq!(source.text(), Some("Hi"));
 }
 
