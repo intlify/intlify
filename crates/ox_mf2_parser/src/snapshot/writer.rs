@@ -20,7 +20,6 @@ use crate::snapshot::format::{
     EDGE_RECORD_SIZE, NODE_RECORD_SIZE, NONE_REF, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
 use crate::snapshot::sections::{EmittedSection, SnapshotAssembler};
-use crate::snapshot::source_map::SourceMap;
 use crate::snapshot::string_table::StringTableBuilder;
 use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId as PhaseOneSourceId;
@@ -322,11 +321,17 @@ struct SourceMetaIds {
 struct SnapshotWriter {
     options: SnapshotOptions,
     string_table: StringTableBuilder,
-    source_map: SourceMap,
-    /// Parallel to `source_map`: `source_meta[local_id]` is the
-    /// metadata `StringId` triple captured at intern time. Lets
-    /// `finish` skip the second pass through the string table for
-    /// already-known source metadata.
+    /// Phase 1 `SourceId` per snapshot-local `SourceId` (the
+    /// `Vec` index is the snapshot-local id). Parallel to
+    /// `source_meta`. v0.1 writer does NOT deduplicate
+    /// `SourceRecord`s — see `design/003` §"Source Section".
+    /// Each `add_root` call appends one entry, even when the
+    /// Phase 1 source matches an earlier root.
+    source_phase_one: Vec<PhaseOneSourceId>,
+    /// Parallel to `source_phase_one`: metadata `StringId` triple
+    /// captured by `allocate_root_source` so `finish` can copy
+    /// `path` / `locale` / `message_id` straight into the
+    /// `SourceRecord` without a second string-table lookup.
     source_meta: Vec<SourceMetaIds>,
     nodes_bytes: Vec<u8>,
     nodes_count: u32,
@@ -341,9 +346,6 @@ struct SnapshotWriter {
     diagnostic_labels_bytes: Vec<u8>,
     diagnostic_labels_count: u32,
     roots: Vec<PendingRoot>,
-    /// Cached snapshot-local source ids of input roots, in input
-    /// order. Used when emitting `RootRecord` wire bytes.
-    root_source_locals: Vec<u32>,
 }
 
 impl SnapshotWriter {
@@ -367,7 +369,7 @@ impl SnapshotWriter {
         Self {
             options,
             string_table: StringTableBuilder::with_capacity(string_hint, data_hint),
-            source_map: SourceMap::new(),
+            source_phase_one: Vec::with_capacity(root_hint),
             source_meta: Vec::with_capacity(root_hint),
             nodes_bytes: Vec::new(),
             nodes_count: 0,
@@ -382,56 +384,51 @@ impl SnapshotWriter {
             diagnostic_labels_bytes: Vec::new(),
             diagnostic_labels_count: 0,
             roots: Vec::with_capacity(root_hint),
-            root_source_locals: Vec::with_capacity(root_hint),
         }
     }
 
-    /// Intern a Phase 1 `SourceId` into the snapshot-local
-    /// `SourceMap`, interning the source's metadata strings
-    /// (`path` / `locale` / `message_id`) on first sight so the
-    /// `StringTable` first-seen order matches `design/003`'s
-    /// "source metadata strings before diagnostic messages"
-    /// contract.
-    ///
-    /// `pre_intern_root_sources` calls this in batch input order
-    /// before any `add_root`, so the typical case has every root
-    /// source registered (and its metadata interned) ahead of any
-    /// diagnostic messages.
-    fn intern_source(
+    /// Allocate a fresh snapshot-local `SourceId` for `root_source`
+    /// and cache its metadata `StringId` triple. v0.1 writer does
+    /// NOT deduplicate `SourceRecord`s by Phase 1 source id — see
+    /// `design/003` §"Source Section". Every `add_root` call gets
+    /// its own slot, even when the Phase 1 source matches an
+    /// earlier root, so root identity in the snapshot is 1:1 with
+    /// the input root order.
+    fn allocate_root_source(
         &mut self,
         sources: &SourceStore,
-        source: PhaseOneSourceId,
+        root_source: PhaseOneSourceId,
     ) -> Result<u32, SnapshotWriteError> {
         let file = sources
-            .get(source)
+            .get(root_source)
             .ok_or(SnapshotWriteError::InvalidSourceId)?;
-        let len_before = self.source_map.len();
-        let local = self.source_map.intern(source)?;
-        if self.source_map.len() > len_before {
-            // Capture the metadata `StringId`s alongside the
-            // first-seen intern so `finish` can copy them straight
-            // into the `SourceRecord` without a second linear scan
-            // through the FNV-pre-hashed string table.
-            let path = self.string_table.intern_optional(file.path.as_deref())?;
-            let locale = self.string_table.intern_optional(file.locale.as_deref())?;
-            let message_id = self
-                .string_table
-                .intern_optional(file.message_id.as_deref())?;
-            self.source_meta.push(SourceMetaIds {
-                path,
-                locale,
-                message_id,
-            });
-            debug_assert_eq!(self.source_meta.len(), self.source_map.len());
-        }
+        let local =
+            checked_u32(self.source_phase_one.len()).ok_or(SnapshotWriteError::TooManySources)?;
+        let path = self.string_table.intern_optional(file.path.as_deref())?;
+        let locale = self.string_table.intern_optional(file.locale.as_deref())?;
+        let message_id = self
+            .string_table
+            .intern_optional(file.message_id.as_deref())?;
+        self.source_phase_one.push(root_source);
+        self.source_meta.push(SourceMetaIds {
+            path,
+            locale,
+            message_id,
+        });
+        debug_assert_eq!(self.source_meta.len(), self.source_phase_one.len());
         Ok(local)
     }
 
-    /// Pre-intern source metadata for every root source ahead of
-    /// `add_root` so the string table emits `path` / `locale` /
-    /// `message_id` strings strictly before diagnostic messages —
-    /// matching the canonical writer order called out in
-    /// `design/003` §"String Table".
+    /// Pre-intern every root's source metadata strings into the
+    /// `StringTable` ahead of any `add_root` call. The string
+    /// table then emits source metadata strings strictly before
+    /// diagnostic messages — the canonical order called out in
+    /// `design/003` §"String Table" — even across batch items.
+    ///
+    /// Source slot allocation happens later inside `add_root` via
+    /// `allocate_root_source`; this method only touches the string
+    /// table, so repeated Phase 1 source ids are interned
+    /// idempotently and never cost extra string table entries.
     fn pre_intern_root_sources<I>(
         &mut self,
         sources: &SourceStore,
@@ -441,7 +438,11 @@ impl SnapshotWriter {
         I: IntoIterator<Item = PhaseOneSourceId>,
     {
         for id in source_ids {
-            self.intern_source(sources, id)?;
+            let file = sources.get(id).ok_or(SnapshotWriteError::InvalidSourceId)?;
+            self.string_table.intern_optional(file.path.as_deref())?;
+            self.string_table.intern_optional(file.locale.as_deref())?;
+            self.string_table
+                .intern_optional(file.message_id.as_deref())?;
         }
         Ok(())
     }
@@ -476,15 +477,20 @@ impl SnapshotWriter {
                 .reserve(label_total * DIAGNOSTIC_LABEL_RECORD_SIZE as usize);
         }
 
-        let source_local = self.intern_source(sources, source)?;
+        // Allocate a fresh SourceRecord slot for THIS root (no
+        // dedup by Phase 1 SourceId — see `design/003` §"Source
+        // Section"). `emit_*` below all reference this slot
+        // directly so every token / trivia / diagnostic in this
+        // root points at this root's snapshot-local SourceId.
+        let source_local = self.allocate_root_source(sources, source)?;
 
         // Trivia first so token records can reference snapshot-local
         // trivia ids without a second pass. With include_trivia=false
         // we still walk parser trivia to fill the remap with NONE_REF
         // so the per-token leading/trailing ranges encode as `0`.
-        let trivia_remap = self.emit_trivia(sources, cst)?;
+        let trivia_remap = self.emit_trivia(cst, source_local)?;
         // Tokens next: token records reference trivia ranges.
-        let token_remap = self.emit_tokens(sources, cst, &trivia_remap)?;
+        let token_remap = self.emit_tokens(cst, &trivia_remap, source_local)?;
         // Nodes / edges share a single post-order pass: every edge
         // refers to either a node id or token id, and node order
         // follows parser post-order so the parser root is the last
@@ -501,13 +507,12 @@ impl SnapshotWriter {
         // the caller from `encode_single` / batch encoders (so they
         // can still see what the parser produced), but when
         // `include_diagnostics = false` the writer must skip building
-        // any diagnostic section bytes, must not advance the
-        // diagnostic / label counters, and must not pollute the
-        // `SourceMap` with diagnostic-only sources.
+        // any diagnostic section bytes and must not advance the
+        // diagnostic / label counters.
         let (diag_start, diag_count) = if self.options.include_diagnostics {
             let start = self.diagnostics_count;
             for diag in diagnostics {
-                self.emit_diagnostic(sources, diag)?;
+                self.emit_diagnostic(diag, source_local)?;
             }
             let count = self
                 .diagnostics_count
@@ -532,14 +537,13 @@ impl SnapshotWriter {
             diag_start,
             diag_count,
         });
-        self.root_source_locals.push(source_local);
         Ok(())
     }
 
     fn emit_trivia(
         &mut self,
-        sources: &SourceStore,
         cst: &CstTables,
+        root_source_local: u32,
     ) -> Result<Vec<u32>, SnapshotWriteError> {
         let trivia_count = cst.trivia_count();
         let mut remap = Vec::with_capacity(trivia_count);
@@ -547,15 +551,18 @@ impl SnapshotWriter {
             remap.resize(trivia_count, NONE_REF);
             return Ok(remap);
         }
+        // Each trivia is recorded as belonging to the current
+        // root's snapshot-local `SourceRecord` — v0.1 keeps the
+        // writer to one SourceRecord per root and references each
+        // trivia / token / diagnostic span against that slot,
+        // matching the design/003 "no source dedup" contract.
         for trivia in &cst.trivia {
             let local = self.next_trivia_id()?;
-            let source = PhaseOneSourceId::new(trivia.source_id);
-            let source_local = self.intern_source(sources, source)?;
             write_u16_le(&mut self.trivia_bytes, trivia.kind);
             write_u16_le(&mut self.trivia_bytes, 0); // flags
             write_u32_le(&mut self.trivia_bytes, trivia.span_start);
             write_u32_le(&mut self.trivia_bytes, trivia.span_end);
-            write_u32_le(&mut self.trivia_bytes, source_local);
+            write_u32_le(&mut self.trivia_bytes, root_source_local);
             remap.push(local);
         }
         Ok(remap)
@@ -563,15 +570,14 @@ impl SnapshotWriter {
 
     fn emit_tokens(
         &mut self,
-        sources: &SourceStore,
         cst: &CstTables,
         trivia_remap: &[u32],
+        root_source_local: u32,
     ) -> Result<Vec<u32>, SnapshotWriteError> {
         let mut remap = Vec::with_capacity(cst.token_count());
         for token in &cst.tokens {
             let local = self.next_token_id()?;
-            let source = PhaseOneSourceId::new(token.source_id);
-            let source_local = self.intern_source(sources, source)?;
+            let source_local = root_source_local;
 
             let (leading_start, leading_count, trailing_start, trailing_count) =
                 if self.options.include_trivia
@@ -670,13 +676,18 @@ impl SnapshotWriter {
 
     fn emit_diagnostic(
         &mut self,
-        sources: &SourceStore,
         diagnostic: &Diagnostic,
+        root_source_local: u32,
     ) -> Result<(), SnapshotWriteError> {
-        let source_local = self.intern_source(sources, diagnostic.source)?;
+        // Diagnostics within a root all reference the root's
+        // snapshot-local `SourceRecord` (v0.1 has one SourceRecord
+        // per root). Multi-source diagnostics within a single root
+        // are not supported by the v0.1 writer.
+        let source_local = root_source_local;
         let label_start = self.diagnostic_labels_count;
         for label in &diagnostic.labels {
-            let label_source = self.intern_source(sources, label.source)?;
+            let label_source = root_source_local;
+            let _ = label.source; // intentional: v0.1 collapses to root source
             let msg_id = if self.options.include_diagnostics {
                 self.string_table.intern(label.message)?
             } else {
@@ -716,7 +727,7 @@ impl SnapshotWriter {
         let Self {
             options,
             string_table,
-            source_map,
+            source_phase_one,
             source_meta,
             nodes_bytes,
             nodes_count,
@@ -731,17 +742,16 @@ impl SnapshotWriter {
             diagnostic_labels_bytes,
             diagnostic_labels_count,
             roots,
-            root_source_locals,
         } = self;
 
         if roots.is_empty() {
             return Err(SnapshotWriteError::MissingRoot);
         }
 
-        debug_assert_eq!(source_meta.len(), source_map.len());
+        debug_assert_eq!(source_meta.len(), source_phase_one.len());
 
         // ── Sources section + optional source text data ──────────────
-        let mut sources_bytes = Vec::with_capacity(source_map.len() * 32);
+        let mut sources_bytes = Vec::with_capacity(source_phase_one.len() * 32);
         let mut sources_count: u32 = 0;
         let include_source_text = options.include_source_text;
         // Pre-size the source text data buffer from the actual
@@ -751,7 +761,7 @@ impl SnapshotWriter {
         // the total exceeds the `u32` byte-offset domain.
         let mut source_text_bytes: Vec<u8> = if include_source_text {
             let mut total: u32 = 0;
-            for (_, phase_one) in source_map.iter() {
+            for &phase_one in &source_phase_one {
                 let file = sources
                     .get(phase_one)
                     .ok_or(SnapshotWriteError::InvalidSourceId)?;
@@ -763,11 +773,14 @@ impl SnapshotWriter {
         } else {
             Vec::new()
         };
-        for (snapshot_local, phase_one) in source_map.iter() {
+        for (snapshot_local, (&phase_one, meta)) in
+            source_phase_one.iter().zip(source_meta.iter()).enumerate()
+        {
+            let snapshot_local =
+                checked_u32(snapshot_local).ok_or(SnapshotWriteError::TooManySources)?;
             let file = sources
                 .get(phase_one)
                 .ok_or(SnapshotWriteError::InvalidSourceId)?;
-            let meta = source_meta[snapshot_local as usize];
             let (text_source, text_offset, text_len) = if include_source_text {
                 let offset = checked_u32(source_text_bytes.len())
                     .ok_or(SnapshotWriteError::SectionTooLarge)?;
@@ -790,7 +803,6 @@ impl SnapshotWriter {
                 .checked_add(1)
                 .ok_or(SnapshotWriteError::TooManySources)?;
         }
-        let _ = root_source_locals; // (debug-only invariant; remap reused via roots.source_local)
 
         // ── Roots section ────────────────────────────────────────────
         let roots_count = checked_u32(roots.len()).ok_or(SnapshotWriteError::TooManyRoots)?;

@@ -54,6 +54,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - v0.1 adds `SourceView::source_slice(span) -> Result<&str, SourceTextUnavailable>` and the `SourceTextUnavailable { NotIncluded, SpanOutOfBounds }` error so accessors distinguish "snapshot encoded without source text" from "span is out of bounds / splits a UTF-8 scalar" — see the design's source slice accessor contract.
 - v0.1 writer pre-interns each batch root's source metadata before any `add_root`, so the string table emits `path` / `locale` / `message_id` strings strictly before diagnostic messages (matching the canonical writer order called out in `design/003` §"String Table").
 - v0.1 writer reserves the node / edge / token / trivia / diagnostic / diagnostic-label section byte buffers from the Phase 1 `CstTables` counts at the top of `add_root`, so the hot encode path does not grow the underlying `Vec`s mid-loop on large CSTs or recovery-heavy batches.
+- v0.1 writer emits exactly one `SourceRecord` per input root, even when two batch items share the same Phase 1 `SourceId`. The "no source dedup" rule from §"Source Section" is honoured at the writer boundary (previously `SourceMap::intern` deduplicated by Phase 1 id, causing multiple roots to share a single `SourceRecord`). Tokens / trivia / diagnostics inside one root continue to reference that root's snapshot-local `SourceRecord`.
 
 ## Changelog Update Rule
 

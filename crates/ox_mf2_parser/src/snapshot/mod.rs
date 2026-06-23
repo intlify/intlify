@@ -48,7 +48,6 @@ pub mod decoder;
 pub mod error;
 pub mod format;
 mod sections;
-mod source_map;
 mod string_table;
 pub mod view;
 pub mod writer;

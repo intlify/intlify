@@ -423,6 +423,60 @@ fn decode_snapshot_owned_shares_buffer() {
 }
 
 #[test]
+fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one_id_repeats() {
+    // `BatchParseResult` is a public struct, so a caller can craft
+    // one where two items share the same Phase 1 `SourceId`. The
+    // v0.1 writer must still emit one `SourceRecord` per root (see
+    // design/003 §"Source Section"), so root count == source count
+    // and each root's snapshot-local `source_id` is distinct.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "Hello",
+        path: Some("greeting.mf2"),
+        ..Default::default()
+    });
+    let first = parse_source(&sources, id, ParseOptions::default());
+    let second = parse_source(&sources, id, ParseOptions::default());
+    let batch = ox_mf2_parser::BatchParseResult {
+        sources,
+        items: vec![
+            ox_mf2_parser::BatchParseItem {
+                source: id,
+                result: first,
+            },
+            ox_mf2_parser::BatchParseItem {
+                source: id,
+                result: second,
+            },
+        ],
+        execution: ox_mf2_parser::BatchExecution::Sequential,
+        degraded: false,
+    };
+    let snap =
+        ox_mf2_parser::parse_batch_result_to_snapshot(&batch, SnapshotOptions::default()).unwrap();
+    assert_eq!(snap.roots.len(), 2);
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    assert_eq!(view.root_count(), 2);
+    assert_eq!(view.source_count(), 2, "one SourceRecord per root");
+
+    let root0 = view.root(snap.roots[0]).unwrap();
+    let root1 = view.root(snap.roots[1]).unwrap();
+    assert_ne!(
+        root0.source_id().raw(),
+        root1.source_id().raw(),
+        "each root must point at its own snapshot-local SourceRecord"
+    );
+    let source0 = view.source(root0.source_id()).unwrap();
+    let source1 = view.source(root1.source_id()).unwrap();
+    // Both records carry the same metadata because the underlying
+    // Phase 1 source is the same.
+    assert_eq!(source0.path(), Some("greeting.mf2"));
+    assert_eq!(source1.path(), Some("greeting.mf2"));
+    assert_eq!(source0.id().raw(), 0);
+    assert_eq!(source1.id().raw(), 1);
+}
+
+#[test]
 fn batch_snapshot_carries_one_root_per_input() {
     let inputs = [
         ParseInput {
