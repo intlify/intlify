@@ -233,11 +233,18 @@ pub fn parse_batch_result_to_snapshot(
     // `SnapshotResult.diagnostics` is returned for caller
     // convenience regardless of `SnapshotOptions.include_diagnostics`,
     // so callers can still inspect parser output without re-parsing.
-    let diagnostics = result
+    // Reserve once for the exact total and extend with per-diagnostic
+    // clones instead of `flat_map(|item| item.result.diagnostics.clone())`,
+    // which would allocate a temporary `Vec` per batch item.
+    let diagnostic_total: usize = result
         .items
         .iter()
-        .flat_map(|item| item.result.diagnostics.clone())
-        .collect();
+        .map(|item| item.result.diagnostics.len())
+        .sum();
+    let mut diagnostics = Vec::with_capacity(diagnostic_total);
+    for item in &result.items {
+        diagnostics.extend(item.result.diagnostics.iter().cloned());
+    }
     Ok(BatchSnapshotResult {
         bytes,
         roots,
