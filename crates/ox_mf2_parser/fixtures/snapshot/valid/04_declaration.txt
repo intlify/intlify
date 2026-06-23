@@ -1,0 +1,87 @@
+SNAPSHOT v0.1
+bytes: 1440
+section_count: 8
+
+roots:
+  [0] root=node#16 source=source#0 diags=[0,0) (count=0)
+
+sources:
+  [0] path=- locale=- message_id=- base_offset=0 text=-
+
+nodes:
+  [0] Name @ 9..10 children=1
+  [1] Variable @ 8..10 children=2
+  [2] Identifier @ 12..19 children=1
+  [3] Function @ 11..19 children=2
+  [4] VariableExpression @ 7..20 children=4
+  [5] Placeholder @ 7..20 children=1
+  [6] InputDeclaration @ 0..20 children=2
+  [7] Text @ 23..30 children=1
+  [8] Name @ 32..33 children=1
+  [9] Variable @ 31..33 children=2
+  [10] VariableExpression @ 30..34 children=3
+  [11] Placeholder @ 30..34 children=1
+  [12] Pattern @ 23..34 children=2
+  [13] QuotedPattern @ 21..36 children=3
+  [14] ComplexBody @ 21..36 children=1
+  [15] ComplexMessage @ 0..36 children=2
+  [16] Root @ 0..36 children=1
+
+edges:
+  [0] -> token#3
+  [1] -> token#2
+  [2] -> node#0
+  [3] -> token#5
+  [4] -> token#4
+  [5] -> node#2
+  [6] -> token#1
+  [7] -> node#1
+  [8] -> node#3
+  [9] -> token#6
+  [10] -> node#4
+  [11] -> token#0
+  [12] -> node#5
+  [13] -> token#8
+  [14] -> token#11
+  [15] -> token#10
+  [16] -> node#8
+  [17] -> token#9
+  [18] -> node#9
+  [19] -> token#12
+  [20] -> node#10
+  [21] -> node#7
+  [22] -> node#11
+  [23] -> token#7
+  [24] -> node#12
+  [25] -> token#13
+  [26] -> node#13
+  [27] -> node#6
+  [28] -> node#14
+  [29] -> node#15
+
+tokens:
+  [0] InputKeyword @ 0..6 source=source#0 leading=0 trailing=0
+  [1] LeftBraceToken @ 7..8 source=source#0 leading=1 trailing=0
+  [2] DollarToken @ 8..9 source=source#0 leading=0 trailing=0
+  [3] NameToken @ 9..10 source=source#0 leading=0 trailing=0
+  [4] ColonToken @ 11..12 source=source#0 leading=1 trailing=0
+  [5] NameToken @ 12..19 source=source#0 leading=0 trailing=0
+  [6] RightBraceToken @ 19..20 source=source#0 leading=0 trailing=0
+  [7] LeftDoubleBraceToken @ 21..23 source=source#0 leading=1 trailing=0
+  [8] TextToken @ 23..30 source=source#0 leading=0 trailing=0
+  [9] LeftBraceToken @ 30..31 source=source#0 leading=0 trailing=0
+  [10] DollarToken @ 31..32 source=source#0 leading=0 trailing=0
+  [11] NameToken @ 32..33 source=source#0 leading=0 trailing=0
+  [12] RightBraceToken @ 33..34 source=source#0 leading=0 trailing=0
+  [13] RightDoubleBraceToken @ 34..36 source=source#0 leading=0 trailing=0
+
+trivia:
+  [0] WhitespaceTrivia @ 6..7 source=source#0
+  [1] WhitespaceTrivia @ 10..11 source=source#0
+  [2] WhitespaceTrivia @ 20..21 source=source#0
+
+diagnostics:
+  (none)
+
+strings:
+  (none)

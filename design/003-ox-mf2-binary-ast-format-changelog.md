@@ -9,6 +9,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 ## v0.1 Draft
 
 - Initial Binary AST snapshot format.
+- Snapshot magic prefix is the ASCII byte sequence `OXMF2AST`.
 - Fixed-size header and section table.
 - SnapshotHeader is explicitly 32 bytes, including reserved fields.
 - TokenRecord is explicitly 36 bytes, including reserved tail bytes.

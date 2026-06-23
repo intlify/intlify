@@ -1,0 +1,45 @@
+SNAPSHOT v0.1
+bytes: 695
+section_count: 8
+
+roots:
+  [0] root=node#7 source=source#0 diags=[0,1) (count=1)
+
+sources:
+  [0] path=- locale=- message_id=- base_offset=0 text=-
+
+nodes:
+  [0] Name @ 2..10 children=1
+  [1] Variable @ 1..10 children=2
+  [2] Missing @ 10..10 children=0
+  [3] VariableExpression @ 0..10 children=3
+  [4] Placeholder @ 0..10 children=1
+  [5] Pattern @ 0..10 children=1
+  [6] SimpleMessage @ 0..10 children=1
+  [7] Root @ 0..10 children=1
+
+edges:
+  [0] -> token#2
+  [1] -> token#1
+  [2] -> node#0
+  [3] -> token#0
+  [4] -> node#1
+  [5] -> node#2
+  [6] -> node#3
+  [7] -> node#4
+  [8] -> node#5
+  [9] -> node#6
+
+tokens:
+  [0] LeftBraceToken @ 0..1 source=source#0 leading=0 trailing=0
+  [1] DollarToken @ 1..2 source=source#0 leading=0 trailing=0
+  [2] NameToken @ 2..10 source=source#0 leading=0 trailing=0
+
+trivia:
+  (none)
+
+diagnostics:
+  [0] Error UnclosedExpression @ 0..10 source=source#0 labels=[0,0) msg="unclosed placeholder expression"
+
+strings:
+  [0] "unclosed placeholder expression"

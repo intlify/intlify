@@ -1,0 +1,53 @@
+SNAPSHOT v0.1
+bytes: 768
+section_count: 7
+
+roots:
+  [0] root=node#8 source=source#0 diags=[0,0) (count=0)
+
+sources:
+  [0] path=- locale=- message_id=- base_offset=0 text=-
+
+nodes:
+  [0] Text @ 0..6 children=1
+  [1] Name @ 8..12 children=1
+  [2] Variable @ 7..12 children=2
+  [3] VariableExpression @ 6..13 children=3
+  [4] Placeholder @ 6..13 children=1
+  [5] Text @ 13..14 children=1
+  [6] Pattern @ 0..14 children=3
+  [7] SimpleMessage @ 0..14 children=1
+  [8] Root @ 0..14 children=1
+
+edges:
+  [0] -> token#0
+  [1] -> token#3
+  [2] -> token#2
+  [3] -> node#1
+  [4] -> token#1
+  [5] -> node#2
+  [6] -> token#4
+  [7] -> node#3
+  [8] -> token#5
+  [9] -> node#0
+  [10] -> node#4
+  [11] -> node#5
+  [12] -> node#6
+  [13] -> node#7
+
+tokens:
+  [0] TextToken @ 0..6 source=source#0 leading=0 trailing=0
+  [1] LeftBraceToken @ 6..7 source=source#0 leading=0 trailing=0
+  [2] DollarToken @ 7..8 source=source#0 leading=0 trailing=0
+  [3] NameToken @ 8..12 source=source#0 leading=0 trailing=0
+  [4] RightBraceToken @ 12..13 source=source#0 leading=0 trailing=0
+  [5] TextToken @ 13..14 source=source#0 leading=0 trailing=0
+
+trivia:
+  (none)
+
+diagnostics:
+  (none)
+
+strings:
+  (none)
