@@ -679,15 +679,24 @@ impl SnapshotWriter {
         diagnostic: &Diagnostic,
         root_source_local: u32,
     ) -> Result<(), SnapshotWriteError> {
-        // Diagnostics within a root all reference the root's
-        // snapshot-local `SourceRecord` (v0.1 has one SourceRecord
-        // per root). Multi-source diagnostics within a single root
-        // are not supported by the v0.1 writer.
+        // v0.1 writer policy: diagnostics and diagnostic labels
+        // belong to the root's snapshot-local `SourceRecord` (see
+        // `design/003` §"Diagnostics Section"). The wire format
+        // keeps an explicit `source_id` field on every
+        // `DiagnosticRecord` / `DiagnosticLabelRecord` so a future
+        // writer can opt into multi-source diagnostics within a
+        // single root, but v0.1 always emits the root's snapshot-
+        // local source. Phase 1 only generates diagnostics against
+        // the parsed source anyway; a caller-supplied
+        // `Diagnostic.source` or `DiagnosticLabel.source` that
+        // names a different Phase 1 source is intentionally
+        // collapsed here — the snapshot is single-source per root.
         let source_local = root_source_local;
+        let _ = diagnostic.source; // intentional: collapsed (see policy above)
         let label_start = self.diagnostic_labels_count;
         for label in &diagnostic.labels {
             let label_source = root_source_local;
-            let _ = label.source; // intentional: v0.1 collapses to root source
+            let _ = label.source; // intentional: collapsed (see policy above)
             let msg_id = if self.options.include_diagnostics {
                 self.string_table.intern(label.message)?
             } else {

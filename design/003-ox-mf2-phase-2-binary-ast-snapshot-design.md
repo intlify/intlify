@@ -782,7 +782,7 @@ DiagnosticRecord {
 
 In v0.1, `code` stores the parser diagnostic code numeric value. This mapping is snapshot-visible draft data, so changing numeric diagnostic code values requires fixture updates and a format changelog entry. The parser implementation must not silently rely on Rust enum declaration order if that would make diagnostic code numbers accidental.
 
-Diagnostic records are grouped by root order so RootRecord `diagnostic_start` / `diagnostic_count` can reference them. Each DiagnosticRecord has SourceId and Span, so it can still represent diagnostics from multiple sources associated with the same root. The RootRecord range is the source of truth for root-local diagnostics in the snapshot.
+Diagnostic records are grouped by root order so RootRecord `diagnostic_start` / `diagnostic_count` can reference them. In v0.1 writer output, diagnostics belong to the root's SourceRecord. `DiagnosticRecord.source_id` is still stored explicitly so the record layout stays uniform and future writer policies can evolve, but the v0.1 writer does not emit multi-source diagnostics within one root. The RootRecord range is the source of truth for root-local diagnostics in the snapshot.
 
 Diagnostic labels live in a separate diagnostic labels section. DiagnosticRecord `label_start` / `label_count` points to a contiguous range in the DiagnosticLabelRecord array.
 
@@ -795,7 +795,7 @@ DiagnosticLabelRecord {
 }
 ```
 
-Diagnostics without labels use `label_count = 0`. Decoders verify `label_start + label_count <= diagnostic_labels.count`. Help text is not included in the v0.1 snapshot record; add it later as an optional diagnostic-help section when needed.
+Diagnostics without labels use `label_count = 0`. Decoders verify `label_start + label_count <= diagnostic_labels.count`. In v0.1 writer output, DiagnosticLabelRecord `source_id` also points to the same root SourceRecord as the parent diagnostic. Help text is not included in the v0.1 snapshot record; add it later as an optional diagnostic-help section when needed.
 
 Public APIs may return diagnostics separately for convenience, but the snapshot format must be able to keep diagnostics as part of the encoded result. A flat diagnostics array in a binding result is a view over snapshot diagnostic records in root order, not a separate diagnostic table.
 

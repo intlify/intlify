@@ -423,6 +423,66 @@ fn decode_snapshot_owned_shares_buffer() {
 }
 
 #[test]
+fn diagnostic_source_is_collapsed_to_root_source_per_v01_policy() {
+    // design/003 §"Diagnostics Section" + format changelog: v0.1
+    // writer emits diagnostics and labels using the root's
+    // snapshot-local `SourceRecord`. Even when a caller-supplied
+    // `ParseResult` carries a `Diagnostic` (or its label) whose
+    // `source` names a different Phase 1 `SourceId`, the encoded
+    // record references the root source. This lock-in test
+    // documents the policy so a regression would fail loudly.
+    let mut sources = SourceStore::new();
+    let source_a = sources.add(SourceFileInput {
+        source: "Hello",
+        path: Some("a.mf2"),
+        ..Default::default()
+    });
+    let source_b = sources.add(SourceFileInput {
+        source: "world",
+        path: Some("b.mf2"),
+        ..Default::default()
+    });
+    let mut result = parse_source(&sources, source_a, ParseOptions::default());
+    // Inject a hand-crafted diagnostic whose source + label source
+    // both reference source B (not the root's source A).
+    result.diagnostics.push(ox_mf2_parser::Diagnostic {
+        source: source_b,
+        span: Span::new(0, 3),
+        location: ox_mf2_parser::SourceLocation { line: 1, column: 1 },
+        severity: ox_mf2_parser::DiagnosticSeverity::Error,
+        code: ox_mf2_parser::DiagnosticCode::Unspecified,
+        message: "synthetic for collapse policy test",
+        labels: vec![ox_mf2_parser::DiagnosticLabel {
+            source: source_b,
+            span: Span::new(1, 2),
+            message: "synthetic label",
+        }],
+    });
+
+    let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    assert_eq!(view.source_count(), 1, "v0.1: one SourceRecord per root");
+    let root = view.root(snap.root).unwrap();
+    let root_source_id = root.source_id().raw();
+    assert!(view.diagnostic_count() >= 1);
+    for i in 0..view.diagnostic_count() {
+        let diag = view.diagnostic(i).unwrap();
+        assert_eq!(
+            diag.source_id().raw(),
+            root_source_id,
+            "diag[{i}] source_id must be collapsed to the root's snapshot-local source"
+        );
+        for label in diag.labels() {
+            assert_eq!(
+                label.source_id().raw(),
+                root_source_id,
+                "diag[{i}] label source_id must be collapsed to the root's snapshot-local source"
+            );
+        }
+    }
+}
+
+#[test]
 fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one_id_repeats() {
     // `BatchParseResult` is a public struct, so a caller can craft
     // one where two items share the same Phase 1 `SourceId`. The
