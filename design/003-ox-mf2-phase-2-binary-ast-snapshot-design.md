@@ -117,6 +117,8 @@ parse_batch_result_to_snapshot(
 
 `parse_batch_result_to_snapshot` encodes an already produced `BatchParseResult` without reparsing. It uses `BatchParseResult.sources` for SourceRecord metadata and encodes `BatchParseResult.items` in input order as RootRecord entries. This preserves the original batch `execution` / `degraded` values and keeps parse cost separate from snapshot encode cost.
 
+`parse_batch_result_to_snapshot` requires `BatchParseItem.source == BatchParseItem.result.source` for every item. The Phase 1 `parse_batch` API preserves this invariant, but `BatchParseResult` / `BatchParseItem` are public, `Clone`, and constructible with struct literals, so a hand-crafted batch can break it. Encoding a mismatched item would attach the `BatchParseItem.source` metadata (path / locale / message_id / optional source text) to a CST whose spans were produced against `BatchParseItem.result.source`, silently emitting an incoherent snapshot. The writer rejects such inputs with `SnapshotWriteError::InconsistentSourceId` before any string interning or section emission runs.
+
 `parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
 
 `parse_session_to_snapshot` uses the `SourceStore` and Phase 1 SourceId reachable from `ParseSessionResult` / `CstView` as the only source metadata. It does not accept a second metadata argument. Passing independent metadata would create two sources of truth for path, locale, message_id, base_offset, and source text availability.
