@@ -239,6 +239,82 @@ fn source_slice_distinguishes_not_included_from_out_of_bounds() {
 }
 
 #[test]
+fn source_slice_can_use_external_text_when_snapshot_omits_source_text() {
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "Hello",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: false,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+
+    assert_eq!(
+        source.source_slice(Span::new(0, 5)).unwrap_err(),
+        SourceTextUnavailable::NotIncluded
+    );
+    assert_eq!(
+        source
+            .source_slice_with_external_text(Span::new(0, 5), "Hello")
+            .unwrap(),
+        "Hello"
+    );
+    assert_eq!(
+        source
+            .source_slice_with_external_text(Span::new(1, 4), "Hello")
+            .unwrap(),
+        "ell"
+    );
+    assert_eq!(
+        source
+            .source_slice_with_external_text(Span::new(0, 99), "Hello")
+            .unwrap_err(),
+        SourceTextUnavailable::SpanOutOfBounds
+    );
+}
+
+#[test]
+fn source_slice_with_external_text_prefers_embedded_text_when_available() {
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "Hello",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+
+    assert_eq!(
+        source
+            .source_slice_with_external_text(Span::new(0, 5), "World")
+            .unwrap(),
+        "Hello"
+    );
+}
+
+#[test]
 fn source_slice_uses_relative_spans_even_with_nonzero_base_offset() {
     // design/003 §"Source Section": stored spans are relative to
     // the encoded source text; absolute byte positions are

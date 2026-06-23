@@ -431,18 +431,40 @@ impl<'a> SourceView<'a> {
     /// UTF-8 scalar.
     pub fn source_slice(&self, span: Span) -> Result<&'a str, SourceTextUnavailable> {
         let text = self.text().ok_or(SourceTextUnavailable::NotIncluded)?;
-        if span.start > span.end {
-            return Err(SourceTextUnavailable::SpanOutOfBounds);
-        }
-        let len_u32 = text.len() as u32;
-        if span.end > len_u32 {
-            return Err(SourceTextUnavailable::SpanOutOfBounds);
-        }
-        let start = span.start as usize;
-        let end = span.end as usize;
-        text.get(start..end)
-            .ok_or(SourceTextUnavailable::SpanOutOfBounds)
+        slice_source_text(text, span)
     }
+
+    /// Slice source text by `span`, falling back to caller-provided
+    /// external text when the snapshot was encoded with
+    /// `include_source_text = false`.
+    ///
+    /// The external text is explicit rather than looked up through a
+    /// `SourceStore`: snapshot `SourceId`s are local to the emitted
+    /// snapshot and do not have to match Phase 1 `SourceStore` ids.
+    /// When snapshot-embedded text exists, it is preferred so this
+    /// method has the same behaviour as [`Self::source_slice`].
+    pub fn source_slice_with_external_text(
+        &self,
+        span: Span,
+        external_source_text: &'a str,
+    ) -> Result<&'a str, SourceTextUnavailable> {
+        let text = self.text().unwrap_or(external_source_text);
+        slice_source_text(text, span)
+    }
+}
+
+fn slice_source_text(text: &str, span: Span) -> Result<&str, SourceTextUnavailable> {
+    if span.start > span.end {
+        return Err(SourceTextUnavailable::SpanOutOfBounds);
+    }
+    let len_u32 = text.len() as u32;
+    if span.end > len_u32 {
+        return Err(SourceTextUnavailable::SpanOutOfBounds);
+    }
+    let start = span.start as usize;
+    let end = span.end as usize;
+    text.get(start..end)
+        .ok_or(SourceTextUnavailable::SpanOutOfBounds)
 }
 
 #[derive(Debug, Clone, Copy)]

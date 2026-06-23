@@ -231,6 +231,7 @@ pub enum SnapshotWriteError {
   SectionTooLarge,
   MissingRoot,
   InvalidSourceId,
+  InconsistentSourceId,
 }
 ```
 
@@ -647,12 +648,16 @@ When `include_source_text = false`, `text.source_id = 0xFFFF_FFFF`. SourceRecord
 
 When `include_source_text = true`, the snapshot stores source text in the dedicated source text data section. `SourceRecord.text.source_id` must equal the same record's `source_id`. In large batches, each SourceRecord has its own text range, and the roots section links source metadata to root nodes.
 
-Source slices are resolved with SourceId plus Span. `source_slice(span)` refers to APIs with source context, such as `SourceView::source_slice(span)` or convenience accessors on node/token handles. It succeeds only when source text can be resolved from snapshot source text data or from external source text retained by the source owner. If neither is available, the decoder/accessor returns a source text unavailable error instead of silently returning an empty value.
+Source slices are resolved with SourceId plus Span. `SourceView::source_slice(span)` resolves only snapshot-embedded source text. `SourceView::source_slice_with_external_text(span, external_source_text)` first uses snapshot-embedded source text when present, then falls back to caller-provided external source text. The external text is supplied explicitly by the source owner because snapshot-local SourceId values are not necessarily the same as Phase 1 SourceStore SourceId values, especially for batch snapshots that intentionally emit one SourceRecord per root. If neither embedded nor external source text is available, the decoder/accessor returns a source text unavailable error instead of silently returning an empty value.
 
 Rust source slice accessors return an explicit error when source text is unavailable.
 
 ```rust
 SourceView::source_slice(span: Span) -> Result<&str, SourceTextUnavailable>
+SourceView::source_slice_with_external_text(
+  span: Span,
+  external_source_text: &str,
+) -> Result<&str, SourceTextUnavailable>
 ```
 
 Higher-level APIs convert the same condition into their language boundary, such as a thrown error or explicit error result. Accessors must not use `None` / `undefined` for this case because an empty slice and unavailable source text are different states.
