@@ -40,5 +40,4 @@ jobs:
           inputs: .
           online-audits: true
           persona: regular
-          advanced-security: false # NOTE(kazupon): disable, because this repository is private
           version: latest
