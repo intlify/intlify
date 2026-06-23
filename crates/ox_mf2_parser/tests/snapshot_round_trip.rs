@@ -204,10 +204,9 @@ fn source_slice_distinguishes_not_included_from_out_of_bounds() {
     let source = view
         .source(view.root(snap.root).unwrap().source_id())
         .unwrap();
-    assert_eq!(
-        source.source_slice(Span::new(0, 5)).unwrap_err(),
-        SourceTextUnavailable::NotIncluded
-    );
+    let not_included = source.source_slice(Span::new(0, 5)).unwrap_err();
+    assert_eq!(not_included, SourceTextUnavailable::NotIncluded);
+    assert_eq!(not_included.as_ox_mf2_error_code(), 3000);
 
     // `include_source_text = true` → in-range span resolves, span
     // past the end / inverted span both surface `SpanOutOfBounds`.
@@ -228,10 +227,9 @@ fn source_slice_distinguishes_not_included_from_out_of_bounds() {
     assert_eq!(source.source_slice(Span::new(0, 5)).unwrap(), "Hello");
     assert_eq!(source.source_slice(Span::new(1, 4)).unwrap(), "ell");
     assert_eq!(source.source_slice(Span::new(0, 0)).unwrap(), "");
-    assert_eq!(
-        source.source_slice(Span::new(0, 99)).unwrap_err(),
-        SourceTextUnavailable::SpanOutOfBounds
-    );
+    let out_of_bounds = source.source_slice(Span::new(0, 99)).unwrap_err();
+    assert_eq!(out_of_bounds, SourceTextUnavailable::SpanOutOfBounds);
+    assert_eq!(out_of_bounds.as_ox_mf2_error_code(), 3001);
     assert_eq!(
         source.source_slice(Span::new(4, 2)).unwrap_err(),
         SourceTextUnavailable::SpanOutOfBounds
@@ -640,6 +638,7 @@ fn batch_result_to_snapshot_rejects_item_source_result_source_mismatch() {
     let err = ox_mf2_parser::parse_batch_result_to_snapshot(&batch, SnapshotOptions::default())
         .expect_err("snapshot encode must reject item/result source mismatch");
     assert_eq!(err, ox_mf2_parser::SnapshotWriteError::InconsistentSourceId);
+    assert_eq!(err.as_ox_mf2_error_code(), 2013);
 }
 
 #[test]

@@ -12,6 +12,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use ox_mf2_parser::error::{
+    SourceTextErrorCode, OX_MF2_API_ERROR_MIN, OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN,
+    OX_MF2_SNAPSHOT_WRITE_ERROR_MAX, OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX,
+    OX_MF2_SOURCE_TEXT_ERROR_MIN,
+};
 use ox_mf2_parser::snapshot::format::{
     SectionKind, DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE, EDGE_KIND_NODE,
     EDGE_KIND_TOKEN, EDGE_RECORD_SIZE, EXTENDED_DATA_HEADER_SIZE, HEADER_SIZE, NODE_RECORD_SIZE,
@@ -19,7 +24,9 @@ use ox_mf2_parser::snapshot::format::{
     SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION, SOURCE_RECORD_SIZE,
     STRING_OFFSET_RECORD_SIZE, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
-use ox_mf2_parser::snapshot::{decode_snapshot, DecodeErrorCode, SnapshotOptions};
+use ox_mf2_parser::snapshot::{
+    decode_snapshot, DecodeErrorCode, SnapshotOptions, SnapshotWriteError, SnapshotWriteErrorCode,
+};
 use ox_mf2_parser::{parse_message_to_snapshot, ParseOptions};
 
 #[test]
@@ -77,57 +84,191 @@ fn edge_kind_numeric_values_are_locked() {
 }
 
 #[test]
-fn decode_error_code_numeric_values_are_locked() {
+fn decode_error_code_numeric_values_are_locked_with_evidence() {
     // The numeric values of `DecodeErrorCode` are part of the v0.1
     // surface so language bindings and fixture validators can match
     // on them without parsing display messages. Reordering or
     // inserting a variant must keep existing numbers stable; add a
     // new variant at the next unused number and extend this list.
-    let expected: &[(DecodeErrorCode, u16)] = &[
-        (DecodeErrorCode::BufferTooShort, 1),
-        (DecodeErrorCode::InvalidMagic, 2),
-        (DecodeErrorCode::UnsupportedMajorVersion, 3),
-        (DecodeErrorCode::UnsupportedMinorVersion, 4),
-        (DecodeErrorCode::InvalidHeaderLength, 5),
-        (DecodeErrorCode::InvalidFeatureFlags, 6),
-        (DecodeErrorCode::InvalidReservedField, 7),
-        (DecodeErrorCode::SectionTableOutOfBounds, 8),
-        (DecodeErrorCode::DuplicateSection, 9),
-        (DecodeErrorCode::MissingRequiredSection, 10),
-        (DecodeErrorCode::UnknownSection, 11),
-        (DecodeErrorCode::UnknownRequiredSection, 12),
-        (DecodeErrorCode::InvalidSectionFlags, 13),
-        (DecodeErrorCode::InvalidSectionAlignment, 14),
-        (DecodeErrorCode::InvalidSectionBounds, 15),
-        (DecodeErrorCode::InvalidRecordSize, 16),
-        (DecodeErrorCode::InvalidSectionCount, 17),
-        (DecodeErrorCode::OverlappingSection, 18),
-        (DecodeErrorCode::InvalidPadding, 19),
-        (DecodeErrorCode::TrailingPadding, 20),
-        (DecodeErrorCode::InvalidStringOffset, 21),
-        (DecodeErrorCode::InvalidUtf8, 22),
-        (DecodeErrorCode::InvalidStringRef, 23),
-        (DecodeErrorCode::InvalidSourceRef, 24),
-        (DecodeErrorCode::InvalidRootRef, 25),
-        (DecodeErrorCode::InvalidNodeRef, 26),
-        (DecodeErrorCode::InvalidTokenRef, 27),
-        (DecodeErrorCode::InvalidTriviaRef, 28),
-        (DecodeErrorCode::UnknownSyntaxKind, 29),
-        (DecodeErrorCode::InvalidDiagnosticSeverity, 30),
-        (DecodeErrorCode::UnknownDiagnosticCode, 31),
-        (DecodeErrorCode::InvalidDiagnosticRange, 32),
-        (DecodeErrorCode::InvalidSourceTextRange, 33),
-        (DecodeErrorCode::InvalidExtendedData, 34),
-        (DecodeErrorCode::InvalidEdgeKind, 35),
-        (DecodeErrorCode::InvalidSpan, 36),
+    let expected: &[(DecodeErrorCode, u32)] = &[
+        (DecodeErrorCode::BufferTooShort, 1000),
+        (DecodeErrorCode::InvalidMagic, 1001),
+        (DecodeErrorCode::UnsupportedMajorVersion, 1002),
+        (DecodeErrorCode::UnsupportedMinorVersion, 1003),
+        (DecodeErrorCode::InvalidHeaderLength, 1004),
+        (DecodeErrorCode::InvalidFeatureFlags, 1005),
+        (DecodeErrorCode::InvalidReservedField, 1006),
+        (DecodeErrorCode::SectionTableOutOfBounds, 1007),
+        (DecodeErrorCode::DuplicateSection, 1008),
+        (DecodeErrorCode::MissingRequiredSection, 1009),
+        (DecodeErrorCode::UnknownSection, 1010),
+        (DecodeErrorCode::UnknownRequiredSection, 1011),
+        (DecodeErrorCode::InvalidSectionFlags, 1012),
+        (DecodeErrorCode::InvalidSectionAlignment, 1013),
+        (DecodeErrorCode::InvalidSectionBounds, 1014),
+        (DecodeErrorCode::InvalidRecordSize, 1015),
+        (DecodeErrorCode::InvalidSectionCount, 1016),
+        (DecodeErrorCode::OverlappingSection, 1017),
+        (DecodeErrorCode::InvalidPadding, 1018),
+        (DecodeErrorCode::TrailingPadding, 1019),
+        (DecodeErrorCode::InvalidStringOffset, 1020),
+        (DecodeErrorCode::InvalidUtf8, 1021),
+        (DecodeErrorCode::InvalidStringRef, 1022),
+        (DecodeErrorCode::InvalidSourceRef, 1023),
+        (DecodeErrorCode::InvalidRootRef, 1024),
+        (DecodeErrorCode::InvalidNodeRef, 1025),
+        (DecodeErrorCode::InvalidTokenRef, 1026),
+        (DecodeErrorCode::InvalidTriviaRef, 1027),
+        (DecodeErrorCode::UnknownSyntaxKind, 1028),
+        (DecodeErrorCode::InvalidDiagnosticSeverity, 1029),
+        (DecodeErrorCode::UnknownDiagnosticCode, 1030),
+        (DecodeErrorCode::InvalidDiagnosticRange, 1031),
+        (DecodeErrorCode::InvalidSourceTextRange, 1032),
+        (DecodeErrorCode::InvalidExtendedData, 1033),
+        (DecodeErrorCode::InvalidEdgeKind, 1034),
+        (DecodeErrorCode::InvalidSpan, 1035),
     ];
+    eprintln!("EVIDENCE compat decode_error_code_numeric_values_are_locked begin");
     for (code, expected_value) in expected {
+        eprintln!("EVIDENCE compat DecodeErrorCode::{code:?}={expected_value}");
         assert_eq!(
-            code.as_u16(),
+            code.as_u32(),
             *expected_value,
             "DecodeErrorCode::{code:?} discriminant changed"
         );
+        assert!(
+            (*expected_value >= OX_MF2_DECODE_ERROR_MIN
+                && *expected_value <= OX_MF2_DECODE_ERROR_MAX),
+            "DecodeErrorCode::{code:?} outside decode range"
+        );
+        assert!(
+            *expected_value >= OX_MF2_API_ERROR_MIN,
+            "DecodeErrorCode::{code:?} uses reserved low range"
+        );
     }
+    eprintln!("EVIDENCE compat InvalidMagic=1001 InvalidSpan=1035");
+    eprintln!("EVIDENCE compat decode_error_code_numeric_values_are_locked end");
+}
+
+#[test]
+fn snapshot_write_error_code_numeric_values_are_locked() {
+    let expected: &[(SnapshotWriteError, SnapshotWriteErrorCode, u32)] = &[
+        (
+            SnapshotWriteError::SourceTooLarge,
+            SnapshotWriteErrorCode::SourceTooLarge,
+            2000,
+        ),
+        (
+            SnapshotWriteError::TooManyRoots,
+            SnapshotWriteErrorCode::TooManyRoots,
+            2001,
+        ),
+        (
+            SnapshotWriteError::TooManySources,
+            SnapshotWriteErrorCode::TooManySources,
+            2002,
+        ),
+        (
+            SnapshotWriteError::TooManyStrings,
+            SnapshotWriteErrorCode::TooManyStrings,
+            2003,
+        ),
+        (
+            SnapshotWriteError::TooManyNodes,
+            SnapshotWriteErrorCode::TooManyNodes,
+            2004,
+        ),
+        (
+            SnapshotWriteError::TooManyEdges,
+            SnapshotWriteErrorCode::TooManyEdges,
+            2005,
+        ),
+        (
+            SnapshotWriteError::TooManyTokens,
+            SnapshotWriteErrorCode::TooManyTokens,
+            2006,
+        ),
+        (
+            SnapshotWriteError::TooManyTrivia,
+            SnapshotWriteErrorCode::TooManyTrivia,
+            2007,
+        ),
+        (
+            SnapshotWriteError::TooManyDiagnostics,
+            SnapshotWriteErrorCode::TooManyDiagnostics,
+            2008,
+        ),
+        (
+            SnapshotWriteError::TooManyDiagnosticLabels,
+            SnapshotWriteErrorCode::TooManyDiagnosticLabels,
+            2009,
+        ),
+        (
+            SnapshotWriteError::SectionTooLarge,
+            SnapshotWriteErrorCode::SectionTooLarge,
+            2010,
+        ),
+        (
+            SnapshotWriteError::MissingRoot,
+            SnapshotWriteErrorCode::MissingRoot,
+            2011,
+        ),
+        (
+            SnapshotWriteError::InvalidSourceId,
+            SnapshotWriteErrorCode::InvalidSourceId,
+            2012,
+        ),
+        (
+            SnapshotWriteError::InconsistentSourceId,
+            SnapshotWriteErrorCode::InconsistentSourceId,
+            2013,
+        ),
+    ];
+    for (err, code, expected_value) in expected {
+        assert_eq!(err.code(), *code);
+        assert_eq!(code.as_u32(), *expected_value);
+        assert_eq!(err.as_ox_mf2_error_code(), *expected_value);
+        assert!(
+            (*expected_value >= OX_MF2_SNAPSHOT_WRITE_ERROR_MIN
+                && *expected_value <= OX_MF2_SNAPSHOT_WRITE_ERROR_MAX),
+            "SnapshotWriteErrorCode::{code:?} outside write range"
+        );
+    }
+}
+
+#[test]
+fn source_text_error_code_numeric_values_are_locked() {
+    use ox_mf2_parser::snapshot::SourceTextUnavailable;
+    use ox_mf2_parser::SourceStoreError;
+
+    let cases: &[(u32, SourceTextErrorCode)] = &[
+        (3000, SourceTextErrorCode::SourceTextNotIncluded),
+        (3001, SourceTextErrorCode::SourceTextSpanOutOfBounds),
+        (3002, SourceTextErrorCode::SourceTextTooLarge),
+        (3003, SourceTextErrorCode::SourceTextCountMismatch),
+        (3004, SourceTextErrorCode::SourceTextUnpairedSurrogate),
+    ];
+    for (expected_value, code) in cases {
+        assert_eq!(code.as_u32(), *expected_value);
+        assert!(
+            (*expected_value >= OX_MF2_SOURCE_TEXT_ERROR_MIN
+                && *expected_value <= OX_MF2_SOURCE_TEXT_ERROR_MAX),
+            "SourceTextErrorCode::{code:?} outside source text range"
+        );
+    }
+
+    assert_eq!(
+        SourceTextUnavailable::NotIncluded.as_ox_mf2_error_code(),
+        3000
+    );
+    assert_eq!(
+        SourceTextUnavailable::SpanOutOfBounds.as_ox_mf2_error_code(),
+        3001
+    );
+    assert_eq!(
+        SourceStoreError::SourceTooLarge.as_ox_mf2_error_code(),
+        3002
+    );
 }
 
 #[test]
