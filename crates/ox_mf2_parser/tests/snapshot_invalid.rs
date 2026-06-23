@@ -45,6 +45,11 @@ fn section_payload_offset(bytes: &[u8], kind: SectionKind) -> usize {
     u32::from_le_bytes(bytes[rec + 4..rec + 8].try_into().unwrap()) as usize
 }
 
+fn section_count_for(bytes: &[u8], kind: SectionKind) -> u32 {
+    let rec = section_record_offset(bytes, kind).expect("section present");
+    u32::from_le_bytes(bytes[rec + 12..rec + 16].try_into().unwrap())
+}
+
 #[test]
 fn bad_magic_is_rejected() {
     let mut bytes = baseline();
@@ -272,11 +277,23 @@ fn nonzero_token_reserved_tail_is_rejected() {
 fn out_of_range_edge_token_ref_is_rejected() {
     let mut bytes = baseline();
     let edges_off = section_payload_offset(&bytes, SectionKind::Edges);
-    // First edge for "Hi" is a token edge. Set its ref_id huge.
-    // EdgeRecord: kind u16, flags u16, ref_id u32. ref_id at offset 4.
-    bytes[edges_off + 4..edges_off + 8].copy_from_slice(&u32::MAX.to_le_bytes());
+    let edge_count = section_count_for(&bytes, SectionKind::Edges);
+    // EdgeRecord: kind u16, flags u16, ref_id u32 (record size 8).
+    // Locate the first token edge (kind == EDGE_KIND_TOKEN == 1)
+    // dynamically so the test stays decoder-focused even if the
+    // parser reshapes edge order.
+    let mut token_edge_off = None;
+    for i in 0..edge_count {
+        let off = edges_off + i as usize * 8;
+        let kind = u16::from_le_bytes(bytes[off..off + 2].try_into().unwrap());
+        if kind == 1 {
+            token_edge_off = Some(off);
+            break;
+        }
+    }
+    let off = token_edge_off.expect("baseline must contain at least one token edge");
+    bytes[off + 4..off + 8].copy_from_slice(&u32::MAX.to_le_bytes());
     let err = decode_snapshot(&bytes).unwrap_err();
-    // The first edge is a token edge — invalid token ref expected.
     assert_eq!(err.code, DecodeErrorCode::InvalidTokenRef);
 }
 

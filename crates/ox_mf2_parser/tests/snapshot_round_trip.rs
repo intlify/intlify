@@ -55,23 +55,32 @@ fn snapshot_preserves_token_text_via_source_id_plus_span() {
     let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
     let view = decode_snapshot(&snap.bytes).unwrap();
 
-    // Walk to find a text token in any descendant of the root.
+    // For a single-input snapshot the writer remaps Phase 1 `id` to
+    // snapshot-local source 0 — assert that explicitly so a future
+    // source-remapping regression cannot quietly pass this test on
+    // span-based recovery alone.
     let root = view.root(snap.root).unwrap();
+    assert_eq!(root.source_id().raw(), 0);
     let root_node = view.node(root.root_node()).unwrap();
-    let token_span = find_first_token_span(root_node).expect("at least one token");
-    let text = sources.slice_in(id, token_span);
+    let token = find_first_token(root_node).expect("at least one token");
+    assert_eq!(
+        token.source_id().raw(),
+        root.source_id().raw(),
+        "token source identity must match the root's source identity"
+    );
+    let text = sources.slice_in(id, token.span());
     assert!(!text.is_empty(), "token covers non-empty source text");
 }
 
-fn find_first_token_span(
+fn find_first_token(
     node: ox_mf2_parser::snapshot::view::NodeView<'_>,
-) -> Option<ox_mf2_parser::Span> {
+) -> Option<ox_mf2_parser::snapshot::view::TokenView<'_>> {
     for child in node.children() {
         match child {
-            ChildView::Token(token) => return Some(token.span()),
+            ChildView::Token(token) => return Some(token),
             ChildView::Node(child_node) => {
-                if let Some(span) = find_first_token_span(child_node) {
-                    return Some(span);
+                if let Some(token) = find_first_token(child_node) {
+                    return Some(token);
                 }
             }
         }

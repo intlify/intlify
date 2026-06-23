@@ -903,6 +903,16 @@ fn run_traverse_diagnostics(args: &Args) -> Result<PhaseSummary, String> {
     })
 }
 
+fn batch_options_for(args: &Args) -> BatchParseOptions {
+    // Honour the same `--collect-trivia` / `--parse-semantic` flags
+    // the single-source bench phases use so comparisons across
+    // phases stay apples-to-apples.
+    BatchParseOptions {
+        parse: options_for(args, true, false),
+        ..BatchParseOptions::default()
+    }
+}
+
 fn run_parse_batch_to_snapshot(args: &Args) -> Result<PhaseSummary, String> {
     let dir = args
         .corpus_dir
@@ -910,6 +920,7 @@ fn run_parse_batch_to_snapshot(args: &Args) -> Result<PhaseSummary, String> {
         .ok_or("parse_batch_to_snapshot requires --corpus <dir>")?;
     let corpus = read_corpus(dir)?;
     let snap_opts = snapshot_options(args);
+    let batch_opts = batch_options_for(args);
     let inputs: Vec<_> = corpus
         .iter()
         .map(|(path, text)| ParseInput {
@@ -921,12 +932,8 @@ fn run_parse_batch_to_snapshot(args: &Args) -> Result<PhaseSummary, String> {
     let iters = args.iterations.max(1);
     let mut bytes_total = 0usize;
     for _ in 0..iters {
-        let snap = ox_mf2_parser::snapshot::parse_batch_to_snapshot(
-            &inputs,
-            BatchParseOptions::default(),
-            snap_opts,
-        )
-        .map_err(|e| format!("batch snapshot failed: {e}"))?;
+        let snap = ox_mf2_parser::snapshot::parse_batch_to_snapshot(&inputs, batch_opts, snap_opts)
+            .map_err(|e| format!("batch snapshot failed: {e}"))?;
         bytes_total += snap.bytes.len();
     }
     Ok(PhaseSummary {
@@ -942,6 +949,7 @@ fn run_parse_batch_result_to_snapshot(args: &Args) -> Result<PhaseSummary, Strin
         .ok_or("parse_batch_result_to_snapshot requires --corpus <dir>")?;
     let corpus = read_corpus(dir)?;
     let snap_opts = snapshot_options(args);
+    let batch_opts = batch_options_for(args);
     let inputs: Vec<_> = corpus
         .iter()
         .map(|(path, text)| ParseInput {
@@ -950,7 +958,7 @@ fn run_parse_batch_result_to_snapshot(args: &Args) -> Result<PhaseSummary, Strin
             ..Default::default()
         })
         .collect();
-    let batch = parse_batch(&inputs, BatchParseOptions::default());
+    let batch = parse_batch(&inputs, batch_opts);
     let iters = args.iterations.max(1);
     let mut bytes_total = 0usize;
     for _ in 0..iters {
