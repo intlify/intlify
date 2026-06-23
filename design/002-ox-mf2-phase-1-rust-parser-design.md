@@ -4,7 +4,7 @@
 
 This document defines the Phase 1 implementation design for the Rust MF2 parser. It covers not only parser performance, but also lossless CST, SemanticModel, SyntaxKind, token/trivia, accessors, diagnostics, recovery, tests, and benchmarks.
 
-The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). Binary AST snapshot details live in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md), and language binding details live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md). This document focuses on the parser implementation path before Binary AST snapshot encoding becomes the Phase 2 product boundary.
+The foundation document is [001-ox-mf2-toolchain-foundation.md](./001-ox-mf2-toolchain-foundation.md). Binary AST snapshot details live in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md), language binding details live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md), and API error code ranges live in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). This document focuses on the parser implementation path before Binary AST snapshot encoding becomes the Phase 2 product boundary.
 
 This design takes several ideas from the ox-jsdoc performance design: parser/semantic separation, clear source lifetime, allocation discipline, scanner/parser boundaries, and measurement-driven optimization.
 
@@ -1079,6 +1079,8 @@ DiagnosticLabelRecord {
 ```
 
 `DiagnosticRecord` and `DiagnosticLabelRecord` are parser-internal compact representations. Public `Diagnostic` may be exposed as a view / owned facade resolved through SourceStore and the diagnostic catalog.
+
+`DiagnosticCode` is a parser diagnostic classification enum, not an API error code. It is intentionally outside the `OxMf2ErrorCode` range policy defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md).
 
 Diagnostics must be cheap on the success path.
 

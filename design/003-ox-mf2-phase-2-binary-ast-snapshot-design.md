@@ -10,6 +10,8 @@ Language binding design is defined separately in [004-ox-mf2-phase-2-language-bi
 
 Intentional Binary AST format changes are tracked in [003-ox-mf2-binary-ast-format-changelog.md](./003-ox-mf2-binary-ast-format-changelog.md).
 
+API error code ranges are defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). The range policy applies to API failure codes such as `DecodeErrorCode` and `SnapshotWriteErrorCode`; it does not apply to snapshot classification enums such as `SyntaxKind`, `DiagnosticCode`, `DiagnosticSeverity`, or `SectionKind`.
+
 ## Document Structure
 
 This document is organized in implementation order.
@@ -236,6 +238,8 @@ pub enum SnapshotWriteError {
 ```
 
 `SnapshotWriteError` is separate from `DecodeError`. `DecodeError` is for validating untrusted snapshot bytes. `SnapshotWriteError` is for cases where trusted parser output, source metadata, or snapshot options cannot be encoded into the v0.1 format.
+
+The public numeric range for `SnapshotWriteErrorCode` is defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). `SnapshotWriteErrorCode` is an API failure code namespace; it is separate from parser diagnostics and from snapshot classification enums.
 
 v0.1 writer uses checked conversion and checked arithmetic for all `u32` fields.
 
@@ -874,6 +878,8 @@ pub enum DecodeErrorCode {
 ```
 
 Human-readable messages are generated through `Display`. They are not stored in snapshot bytes and are not part of the wire format. Programmatic handling uses `DecodeErrorCode` and optional context fields.
+
+The public numeric range for `DecodeErrorCode` is defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). `DecodeErrorCode` is an API failure code namespace; it is separate from `DiagnosticCode`, which represents recoverable parser diagnostics stored in diagnostic records.
 
 Rust APIs return invalid snapshots as `Result::Err(DecodeError)`. Decoder/accessors may handle untrusted bytes, so validation failures must not panic. Internal invariant violations may use debug assertions, but public decode boundaries return recoverable errors.
 
