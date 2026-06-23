@@ -216,7 +216,9 @@ pub fn parse_batch_result_to_snapshot(
     result: &BatchParseResult,
     options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError> {
-    let mut writer = SnapshotWriter::new(options);
+    // Pre-size the writer for the batch so the string table /
+    // roots vectors don't grow during encoding.
+    let mut writer = SnapshotWriter::with_root_hint(options, result.items.len());
     for item in &result.items {
         writer.add_root(
             &result.sources,
@@ -296,9 +298,25 @@ struct SnapshotWriter {
 
 impl SnapshotWriter {
     fn new(options: SnapshotOptions) -> Self {
+        Self::with_root_hint(options, 1)
+    }
+
+    /// Build a writer with capacity hints derived from the expected
+    /// root count. Each root contributes up to one source and three
+    /// metadata strings (`path` / `locale` / `message_id`), so a
+    /// batch caller can hand the writer a tight reservation up
+    /// front.
+    fn with_root_hint(options: SnapshotOptions, root_hint: usize) -> Self {
+        // 3 metadata strings per source plus a per-root fixed
+        // overhead for diagnostic catalog strings (~15 entries
+        // across the catalog) — being generous on string_hint
+        // costs only a small amount of capacity in the lookup
+        // vectors and avoids growth during intern.
+        let string_hint = root_hint.saturating_mul(3).saturating_add(16);
+        let data_hint = root_hint.saturating_mul(64);
         Self {
             options,
-            string_table: StringTableBuilder::new(),
+            string_table: StringTableBuilder::with_capacity(string_hint, data_hint),
             source_map: SourceMap::new(),
             nodes_bytes: Vec::new(),
             nodes_count: 0,
@@ -312,8 +330,8 @@ impl SnapshotWriter {
             diagnostics_count: 0,
             diagnostic_labels_bytes: Vec::new(),
             diagnostic_labels_count: 0,
-            roots: Vec::new(),
-            root_source_locals: Vec::new(),
+            roots: Vec::with_capacity(root_hint),
+            root_source_locals: Vec::with_capacity(root_hint),
         }
     }
 
