@@ -1,4 +1,9 @@
 /**
+ * @license MIT
+ * @author kazuya kawaguchi (a.k.a. kazupon)
+ */
+
+/**
  * Unified ox-mf2 API error codes for language bindings.
  *
  * Numeric values MUST stay in sync with `crates/ox_mf2_parser` guard tests
@@ -6,7 +11,6 @@
  *
  * @see design/appendix-ox-mf2-error-code.md
  */
-
 export const OxMf2ErrorCode = {
   // Decode (1000..1999)
   DecodeBufferTooShort: 1000,

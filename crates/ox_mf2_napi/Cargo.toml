@@ -1,0 +1,25 @@
+[package]
+name = "ox_mf2_napi"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3", default-features = false }
+napi-derive = "3"
+ox_mf2_parser = { path = "../ox_mf2_parser" }
+
+[build-dependencies]
+napi-build = "2"
+
+# `napi-derive` expands to N-API glue that contains unsafe internally.
+# The parser core keeps the workspace `unsafe_code = forbid` policy; the
+# binding crate isolates the host ABI boundary where that policy cannot apply.
+[lints.rust]
+unsafe_code = "allow"

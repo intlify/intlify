@@ -1,0 +1,38 @@
+{
+  "name": "@intlify/ox-mf2-wasm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "WASM runtime package for ox-mf2.",
+  "license": "MIT",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp run build:wasm && vp run build:pack",
+    "prebuild:wasm": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:wasm": "wasm-pack build ../../crates/ox_mf2_wasm --target web --no-pack --out-dir ../../packages/ox-mf2-wasm/dist --out-name ox_mf2_wasm",
+    "postbuild:wasm": "node -e \"require('node:fs').rmSync('dist/.gitignore',{force:true})\"",
+    "build:pack": "vp pack",
+    "test": "vp test"
+  },
+  "devDependencies": {
+    "@intlify/ox-mf2-shared": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

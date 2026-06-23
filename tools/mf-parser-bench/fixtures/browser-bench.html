@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ox-mf2 WASM browser benchmark</title>
+  </head>
+  <body>
+    <script type="module">
+      import init, {
+        decodeSnapshotBytes,
+        parseBatchToSnapshot,
+        parseMessageToSnapshot
+      } from '/wasm/ox_mf2_wasm.js'
+
+      const message = 'Hello {$name}'
+      const batch = [
+        { source: 'Hello {$name}', messageId: 'hello' },
+        { source: 'Welcome {$name}', messageId: 'welcome' }
+      ]
+      const options = {
+        collectTrivia: true,
+        includeTrivia: true,
+        includeDiagnostics: true,
+        includeSourceText: false
+      }
+
+      window.__OX_MF2_BROWSER_BENCH__ = {
+        ready: (async () => {
+          await init({ module_or_path: '/wasm/ox_mf2_wasm_bg.wasm' })
+        })(),
+        run(target, iterations) {
+          const bytes = parseMessageToSnapshot({ source: message }, options)
+          const start = performance.now()
+          for (let i = 0; i < iterations; i++) {
+            switch (target) {
+              case 'parse-message':
+                parseMessageToSnapshot({ source: message }, options)
+                break
+              case 'parse-batch':
+                parseBatchToSnapshot(batch, { ...options, batchExecution: 'sequential' })
+                break
+              case 'decode-snapshot':
+                decodeSnapshotBytes(bytes)
+                break
+              default:
+                throw new Error(`unknown benchmark target: ${target}`)
+            }
+          }
+          return {
+            target,
+            iterations,
+            elapsedMs: performance.now() - start
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

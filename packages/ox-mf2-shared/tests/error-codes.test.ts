@@ -1,5 +1,5 @@
 import { expect, test } from 'vite-plus/test'
-import { OxMf2ErrorCode, oxMf2ErrorCodeName } from '../src/error-codes.ts'
+import { OxMf2ErrorCode, oxMf2ErrorCodeName } from '../src/index.ts'
 
 test('oxMf2ErrorCodeName resolves every exported constant', () => {
   for (const [name, code] of Object.entries(OxMf2ErrorCode)) {

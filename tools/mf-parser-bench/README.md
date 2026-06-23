@@ -65,11 +65,67 @@ The result is written to `tools/mf-parser-bench/.tmp/calibration.json`.
 
 ## Benchmark
 
-Run measurements with `hyperfine`.
+Run the full benchmark suite (parser corpora, Node.js bindings, and browser WASM) from the repository root:
+
+```sh
+vp run bench
+```
+
+Short smoke run:
+
+```sh
+vp run bench:smoke
+```
+
+Parser-only measurements with `hyperfine`:
 
 ```sh
 vp run bench:mf-parser
 ```
+
+## Binding benchmarks
+
+Node.js N-API and WASM binding throughput is measured separately from parser corpora so binding cost stays visible.
+
+Operations:
+
+- `parse-message`
+- `parse-batch`
+- `decode-snapshot`
+- `snapshot-to-bytes-copy`
+
+Runtimes:
+
+- `ox-mf2-napi`
+- `ox-mf2-wasm`
+
+Setup builds `@intlify/ox-mf2-napi` and `@intlify/ox-mf2-wasm` when `dist/` artifacts are missing.
+
+Binding benchmarks reuse the parser calibration policy: each runtime / operation pair picks an iteration count so one invocation spends about `MF_PARSER_BENCH_CALIBRATE_MS` (default `200` ms). Results are stored in `tools/mf-parser-bench/.tmp/calibration.json` under `bindings`.
+
+```sh
+vp run bench:bindings
+```
+
+Node.js binding throughput only (after setup):
+
+```sh
+vp run mf-parser-bench#bench:bindings:run
+```
+
+Short smoke run from the repository root (Node.js bindings plus browser WASM):
+
+```sh
+vp run bench:bindings:smoke
+```
+
+Browser WASM benchmarks run through Playwright and share the same binding setup step.
+
+```sh
+vp run bench:bindings:browser
+```
+
+Browser WASM benchmarks use the calibrated `wasm / <operation>` iteration counts by default. Override all browser targets with `OX_MF2_BROWSER_BENCH_ITERATIONS` when needed.
 
 `WARMUP` and `RUNS` can be overridden with environment variables.
 
