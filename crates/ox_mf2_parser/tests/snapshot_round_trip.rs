@@ -524,6 +524,44 @@ fn diagnostic_source_is_collapsed_to_root_source_per_v01_policy() {
 }
 
 #[test]
+fn batch_result_to_snapshot_rejects_item_source_result_source_mismatch() {
+    // Phase 1 `parse_batch` always sets `item.source ==
+    // item.result.source`, but `BatchParseResult` / `BatchParseItem`
+    // are public, `Clone`, and constructible with struct literals.
+    // A hand-crafted item that swaps the two would otherwise
+    // produce a snapshot whose `SourceRecord` (path / locale /
+    // message_id / optional source text) describes `item.source`
+    // while spans were emitted from `item.result.source`'s CST —
+    // silent incoherence. The writer must reject the encode with
+    // `SnapshotWriteError::InconsistentSourceId`.
+    let mut sources = SourceStore::new();
+    let source_a = sources.add(SourceFileInput {
+        source: "Hello",
+        path: Some("a.mf2"),
+        ..Default::default()
+    });
+    let source_b = sources.add(SourceFileInput {
+        source: "world",
+        path: Some("b.mf2"),
+        ..Default::default()
+    });
+    // Parse against source A but tag the batch item with source B.
+    let result_for_a = parse_source(&sources, source_a, ParseOptions::default());
+    let batch = ox_mf2_parser::BatchParseResult {
+        sources,
+        items: vec![ox_mf2_parser::BatchParseItem {
+            source: source_b, // <- mismatch: result was parsed from source_a
+            result: result_for_a,
+        }],
+        execution: ox_mf2_parser::BatchExecution::Sequential,
+        degraded: false,
+    };
+    let err = ox_mf2_parser::parse_batch_result_to_snapshot(&batch, SnapshotOptions::default())
+        .expect_err("snapshot encode must reject item/result source mismatch");
+    assert_eq!(err, ox_mf2_parser::SnapshotWriteError::InconsistentSourceId);
+}
+
+#[test]
 fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one_id_repeats() {
     // `BatchParseResult` is a public struct, so a caller can craft
     // one where two items share the same Phase 1 `SourceId`. The

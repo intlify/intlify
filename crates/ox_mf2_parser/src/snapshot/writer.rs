@@ -233,6 +233,19 @@ pub fn parse_batch_result_to_snapshot(
     result: &BatchParseResult,
     options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError> {
+    // Phase 1 `parse_batch` guarantees `item.source ==
+    // item.result.source`, but `BatchParseResult` / `BatchParseItem`
+    // are public + `Clone` + struct-literal-constructible, so a
+    // hand-crafted batch can mismatch the two. Encoding such an
+    // item would attach the source metadata named by `item.source`
+    // (path / locale / message_id / source text) to a CST whose
+    // spans were produced against a different source — silently
+    // producing an incoherent snapshot. Reject up front.
+    for item in &result.items {
+        if item.source != item.result.source {
+            return Err(SnapshotWriteError::InconsistentSourceId);
+        }
+    }
     // Pre-size the writer for the batch so the string table /
     // roots vectors don't grow during encoding.
     let mut writer = SnapshotWriter::with_root_hint(options, result.items.len());

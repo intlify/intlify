@@ -41,6 +41,14 @@ pub enum SnapshotWriteError {
     /// A record referenced a Phase 1 `SourceId` that does not exist in
     /// the supplied `SourceStore`.
     InvalidSourceId,
+    /// A batch item exposed `item.source != item.result.source`. The
+    /// Phase 1 `parse_batch` contract is that the two agree; a
+    /// mismatch can only come from a caller hand-crafting a
+    /// `BatchParseResult`, and encoding it would attach the
+    /// item's `source` metadata to a CST parsed against a
+    /// different source (the spans would no longer match the
+    /// `SourceRecord`'s source text or metadata).
+    InconsistentSourceId,
 }
 
 impl core::fmt::Display for SnapshotWriteError {
@@ -59,6 +67,7 @@ impl core::fmt::Display for SnapshotWriteError {
             Self::SectionTooLarge => "snapshot section byte length exceeds u32::MAX",
             Self::MissingRoot => "parse result has no root node",
             Self::InvalidSourceId => "record references a SourceId that is not in SourceStore",
+            Self::InconsistentSourceId => "batch item source does not match item.result.source",
         })
     }
 }
@@ -270,6 +279,7 @@ mod tests {
             SectionTooLarge,
             MissingRoot,
             InvalidSourceId,
+            InconsistentSourceId,
         ];
         let mut seen = std::collections::HashSet::new();
         for code in codes {
