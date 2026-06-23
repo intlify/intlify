@@ -611,7 +611,7 @@ let root = session.cst.root();
 let result = parse_message("Hello, {$name}!");
 
 assert!(result.diagnostics.is_empty());
-let root = result.cst.root();
+let root = result.cst.root_id();
 ```
 
 `parse_batch` example:

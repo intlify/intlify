@@ -816,7 +816,7 @@ decode_snapshot(bytes: &[u8]) -> Result<SnapshotView<'_>, DecodeError>
 decode_snapshot_owned(bytes: Arc<[u8]>) -> Result<SnapshotViewOwned, DecodeError>
 ```
 
-`DecodeError` covers invalid snapshot, unsupported version, missing required section, invalid section layout, invalid index, unknown section, unknown required section, unknown `SyntaxKind`, invalid UTF-8 string, out-of-range source text, invalid extended data, diagnostic range mismatch, and similar failures.
+`DecodeError` covers invalid snapshot, unsupported version, missing required section, invalid section layout, invalid index, unknown section, unknown required section, unknown `SyntaxKind`, invalid UTF-8 string, invalid edge kind, inverted spans, out-of-range source text, invalid extended data, diagnostic range mismatch, and similar failures.
 
 Rust `DecodeError` uses a compact error code plus optional context fields.
 
@@ -863,6 +863,8 @@ pub enum DecodeErrorCode {
   InvalidDiagnosticRange,
   InvalidSourceTextRange,
   InvalidExtendedData,
+  InvalidEdgeKind,
+  InvalidSpan,
 }
 ```
 
@@ -972,7 +974,7 @@ SnapshotView::token(id: TokenId) -> Option<TokenView>
 SnapshotView::trivia(id: TriviaId) -> Option<TriviaView>
 
 // internal or unsafe hot path after decoder validation
-SnapshotView::node_unchecked(id: NodeId) -> NodeView
+SnapshotView::node_unchecked(id: NodeId) -> NodeView // pub(crate)
 ```
 
 Public raw-id accessors return `Option` for out-of-range ids. Traversal from already validated records may use internal unchecked helpers to avoid repeated range checks. Unchecked helpers are not the cross-language compatibility surface.
@@ -1108,10 +1110,15 @@ Relevant benchmark phases:
 - parse_batch_session
 - parse_batch_sequential
 - encode_snapshot
+- parse_cst_and_encode_snapshot
 - decode_snapshot
-- snapshot_accessor_traversal
+- decode_snapshot_owned
+- traverse_nodes
+- traverse_tokens
+- traverse_diagnostics
 - snapshot_to_bytes_copy
 - parse_batch_to_snapshot
+- parse_batch_result_to_snapshot
 
 Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and snapshot accessor cost separately.
 
@@ -1121,11 +1128,16 @@ Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot
 - `lower_semantic`: parser-core cost plus `SemanticModel` lowering.
 - `owned_materialize`: cost to create an owned `ParseResult` from borrowed session / table output.
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
+- `parse_cst_and_encode_snapshot`: combined parse + snapshot encode cost for one message. This is a product-path measurement and must not be used as the parser-core baseline.
 - `decode_snapshot`: cost to validate snapshot bytes and build lazy SnapshotView / section index. It does not include node/token/string traversal.
-- `snapshot_accessor_traversal`: cost to read roots, nodes, tokens, trivia, and diagnostics lazily from a decoded SnapshotView.
+- `decode_snapshot_owned`: cost to validate snapshot bytes and build an owned Arc-backed SnapshotViewOwned.
+- `traverse_nodes`: cost to read node handles lazily from a decoded SnapshotView.
+- `traverse_tokens`: cost to read token and trivia handles lazily from a decoded SnapshotView.
+- `traverse_diagnostics`: cost to read diagnostics lazily from a decoded SnapshotView.
 - `snapshot_to_bytes_copy`: cost to copy snapshot bytes from an owned snapshot buffer into a caller-owned byte buffer.
 - `parse_batch_session`: cost to parse a corpus with one `SourceStore` and one reused `ParseWorkspace` through borrowed session results.
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `parse_batch_to_snapshot`: combined product path for batch parse plus shared snapshot encoding. Do not mix it with the single-message parser baseline.
+- `parse_batch_result_to_snapshot`: batch parse once, then measure shared snapshot encoding over the already produced BatchParseResult.
 
-Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst + encode_snapshot`, `decode_snapshot`, `snapshot_accessor_traversal`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot numbers are reported separately as ox-mf2 product-boundary cost.
+Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst_and_encode_snapshot`, `decode_snapshot`, `traverse_nodes`, `traverse_tokens`, `traverse_diagnostics`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot numbers are reported separately as ox-mf2 product-boundary cost.

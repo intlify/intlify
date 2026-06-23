@@ -33,7 +33,8 @@ fn simple_message_round_trips_through_snapshot() {
     let view = decode_snapshot(&snap.bytes).expect("decode succeeds");
     assert_eq!(view.root_count(), 1);
     let root = view.root(snap.root).expect("root view");
-    let root_node = view.node(root.root_node()).expect("root node view");
+    let root_node = root.node();
+    assert_eq!(root_node.id(), root.root_node());
     // Same kind that the parser produced for the root.
     let parser_root = result
         .cst
@@ -123,6 +124,10 @@ fn include_diagnostics_false_drops_diagnostic_sections_and_bytes() {
 
     assert!(with_view.diagnostic_count() > 0);
     assert!(with_view.section(SectionKind::Diagnostics).is_some());
+    let with_root = with_view.root(with_diag.root).unwrap();
+    let (_, root_diag_count) = with_root.diagnostic_range();
+    assert_eq!(root_diag_count, with_root.diagnostics().count() as u32);
+    assert_eq!(root_diag_count, with_view.diagnostic_count());
 
     assert_eq!(without_view.diagnostic_count(), 0);
     assert!(without_view.section(SectionKind::Diagnostics).is_none());

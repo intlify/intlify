@@ -59,9 +59,10 @@ pub use format::{
     SECTION_RECORD_SIZE, SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION,
 };
 pub use view::{
-    ChildIter, ChildView, DiagnosticLabelIter, DiagnosticLabelView, DiagnosticRecordView, NodeView,
-    RootView, SectionIndex, SectionSlice, SectionView, SnapshotView, SnapshotViewOwned,
-    SourceTextUnavailable, SourceView, TokenView, TriviaIter, TriviaView,
+    ChildIter, ChildView, DiagnosticIter, DiagnosticLabelIter, DiagnosticLabelView,
+    DiagnosticRecordView, NodeView, RootView, SectionIndex, SectionSlice, SectionView,
+    SnapshotView, SnapshotViewOwned, SourceTextUnavailable, SourceView, TokenView, TriviaIter,
+    TriviaView,
 };
 pub use writer::{
     parse_batch_result_to_snapshot, parse_batch_to_snapshot, parse_message_to_snapshot,

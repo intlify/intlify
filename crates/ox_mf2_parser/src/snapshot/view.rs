@@ -179,11 +179,19 @@ impl<'a> SnapshotView<'a> {
         if id.is_none() || id.raw() >= self.sections.nodes.count {
             return None;
         }
-        Some(NodeView {
+        Some(self.node_unchecked(id))
+    }
+
+    /// Borrowed node view by id after the caller has already ensured
+    /// that `id < nodes.count`.
+    pub(crate) fn node_unchecked(&self, id: NodeId) -> NodeView<'a> {
+        debug_assert!(!id.is_none());
+        debug_assert!(id.raw() < self.sections.nodes.count);
+        NodeView {
             bytes: self.bytes,
             sections: self.sections,
             id,
-        })
+        }
     }
 
     /// Borrowed token view by id.
@@ -304,7 +312,7 @@ pub struct RootView<'a> {
     id: RootId,
 }
 
-impl RootView<'_> {
+impl<'a> RootView<'a> {
     pub fn id(&self) -> RootId {
         self.id
     }
@@ -325,6 +333,24 @@ impl RootView<'_> {
             read_u32_le(self.bytes, off + 8),
             read_u32_le(self.bytes, off + 12),
         )
+    }
+
+    pub fn node(&self) -> NodeView<'a> {
+        NodeView {
+            bytes: self.bytes,
+            sections: self.sections,
+            id: self.root_node(),
+        }
+    }
+
+    pub fn diagnostics(&self) -> DiagnosticIter<'a> {
+        let (start, count) = self.diagnostic_range();
+        DiagnosticIter {
+            bytes: self.bytes,
+            sections: self.sections,
+            cursor: start,
+            remaining: count,
+        }
     }
 }
 
@@ -635,6 +661,32 @@ pub struct DiagnosticRecordView<'a> {
     bytes: &'a [u8],
     sections: SectionIndex,
     index: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiagnosticIter<'a> {
+    bytes: &'a [u8],
+    sections: SectionIndex,
+    cursor: u32,
+    remaining: u32,
+}
+
+impl<'a> Iterator for DiagnosticIter<'a> {
+    type Item = DiagnosticRecordView<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+        let item = DiagnosticRecordView {
+            bytes: self.bytes,
+            sections: self.sections,
+            index: self.cursor,
+        };
+        self.cursor += 1;
+        self.remaining -= 1;
+        Some(item)
+    }
 }
 
 impl<'a> DiagnosticRecordView<'a> {
