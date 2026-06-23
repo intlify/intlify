@@ -22,7 +22,7 @@ use crate::snapshot::format::{
 use crate::snapshot::sections::{EmittedSection, SnapshotAssembler};
 use crate::snapshot::source_map::SourceMap;
 use crate::snapshot::string_table::StringTableBuilder;
-use crate::source::{SourceFile, SourceFileInput, SourceStore};
+use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId as PhaseOneSourceId;
 use crate::tables::CstTables;
 
@@ -308,10 +308,26 @@ struct PendingRoot {
     diag_count: u32,
 }
 
+/// Per-snapshot-local-source metadata `StringId`s, captured by
+/// `intern_source` the first time a Phase 1 source is registered
+/// so `finish` can emit `SourceRecord` wire bytes without a second
+/// `StringTableBuilder::intern_optional` lookup per field.
+#[derive(Debug, Clone, Copy)]
+struct SourceMetaIds {
+    path: StringId,
+    locale: StringId,
+    message_id: StringId,
+}
+
 struct SnapshotWriter {
     options: SnapshotOptions,
     string_table: StringTableBuilder,
     source_map: SourceMap,
+    /// Parallel to `source_map`: `source_meta[local_id]` is the
+    /// metadata `StringId` triple captured at intern time. Lets
+    /// `finish` skip the second pass through the string table for
+    /// already-known source metadata.
+    source_meta: Vec<SourceMetaIds>,
     nodes_bytes: Vec<u8>,
     nodes_count: u32,
     edges_bytes: Vec<u8>,
@@ -352,6 +368,7 @@ impl SnapshotWriter {
             options,
             string_table: StringTableBuilder::with_capacity(string_hint, data_hint),
             source_map: SourceMap::new(),
+            source_meta: Vec::with_capacity(root_hint),
             nodes_bytes: Vec::new(),
             nodes_count: 0,
             edges_bytes: Vec::new(),
@@ -391,10 +408,21 @@ impl SnapshotWriter {
         let len_before = self.source_map.len();
         let local = self.source_map.intern(source)?;
         if self.source_map.len() > len_before {
-            self.string_table.intern_optional(file.path.as_deref())?;
-            self.string_table.intern_optional(file.locale.as_deref())?;
-            self.string_table
+            // Capture the metadata `StringId`s alongside the
+            // first-seen intern so `finish` can copy them straight
+            // into the `SourceRecord` without a second linear scan
+            // through the FNV-pre-hashed string table.
+            let path = self.string_table.intern_optional(file.path.as_deref())?;
+            let locale = self.string_table.intern_optional(file.locale.as_deref())?;
+            let message_id = self
+                .string_table
                 .intern_optional(file.message_id.as_deref())?;
+            self.source_meta.push(SourceMetaIds {
+                path,
+                locale,
+                message_id,
+            });
+            debug_assert_eq!(self.source_meta.len(), self.source_map.len());
         }
         Ok(local)
     }
@@ -687,8 +715,9 @@ impl SnapshotWriter {
     fn finish(self, sources: &SourceStore) -> Result<Vec<u8>, SnapshotWriteError> {
         let Self {
             options,
-            mut string_table,
+            string_table,
             source_map,
+            source_meta,
             nodes_bytes,
             nodes_count,
             edges_bytes,
@@ -709,18 +738,36 @@ impl SnapshotWriter {
             return Err(SnapshotWriteError::MissingRoot);
         }
 
+        debug_assert_eq!(source_meta.len(), source_map.len());
+
         // ── Sources section + optional source text data ──────────────
         let mut sources_bytes = Vec::with_capacity(source_map.len() * 32);
         let mut sources_count: u32 = 0;
-        let mut source_text_bytes: Vec<u8> = Vec::new();
         let include_source_text = options.include_source_text;
+        // Pre-size the source text data buffer from the actual
+        // per-source text lengths so `extend_from_slice` below does
+        // not grow the underlying `Vec`. Sum with checked arithmetic
+        // so callers see `SectionTooLarge` instead of a panic when
+        // the total exceeds the `u32` byte-offset domain.
+        let mut source_text_bytes: Vec<u8> = if include_source_text {
+            let mut total: u32 = 0;
+            for (_, phase_one) in source_map.iter() {
+                let file = sources
+                    .get(phase_one)
+                    .ok_or(SnapshotWriteError::InvalidSourceId)?;
+                total = total
+                    .checked_add(file.len())
+                    .ok_or(SnapshotWriteError::SectionTooLarge)?;
+            }
+            Vec::with_capacity(total as usize)
+        } else {
+            Vec::new()
+        };
         for (snapshot_local, phase_one) in source_map.iter() {
             let file = sources
                 .get(phase_one)
                 .ok_or(SnapshotWriteError::InvalidSourceId)?;
-            let path_id = string_table.intern_optional(file.path.as_deref())?;
-            let locale_id = string_table.intern_optional(file.locale.as_deref())?;
-            let message_id = string_table.intern_optional(file.message_id.as_deref())?;
+            let meta = source_meta[snapshot_local as usize];
             let (text_source, text_offset, text_len) = if include_source_text {
                 let offset = checked_u32(source_text_bytes.len())
                     .ok_or(SnapshotWriteError::SectionTooLarge)?;
@@ -731,18 +778,14 @@ impl SnapshotWriter {
                 (NONE_REF, 0, 0)
             };
             write_u32_le(&mut sources_bytes, snapshot_local);
-            write_u32_le(&mut sources_bytes, path_id.raw());
-            write_u32_le(&mut sources_bytes, locale_id.raw());
-            write_u32_le(&mut sources_bytes, message_id.raw());
+            write_u32_le(&mut sources_bytes, meta.path.raw());
+            write_u32_le(&mut sources_bytes, meta.locale.raw());
+            write_u32_le(&mut sources_bytes, meta.message_id.raw());
             write_u32_le(&mut sources_bytes, file.base_offset);
             // SourceTextRef { source_id, offset, len }
             write_u32_le(&mut sources_bytes, text_source);
             write_u32_le(&mut sources_bytes, text_offset);
             write_u32_le(&mut sources_bytes, text_len);
-            // Force the file binding to stay live; quiets clippy when
-            // SnapshotOptions doesn't include source text.
-            let _ = file;
-            let _: SourceFile;
             sources_count = sources_count
                 .checked_add(1)
                 .ok_or(SnapshotWriteError::TooManySources)?;
