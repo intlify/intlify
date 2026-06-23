@@ -10,11 +10,11 @@
 
 use ox_mf2_parser::snapshot::{
     decode_snapshot, decode_snapshot_owned, view::ChildView, SectionKind, SnapshotOptions,
-    SNAPSHOT_MAGIC,
+    SourceTextUnavailable, SNAPSHOT_MAGIC,
 };
 use ox_mf2_parser::{
     parse_batch_to_snapshot, parse_result_to_snapshot, parse_source, parse_source_to_snapshot,
-    BatchParseOptions, ParseInput, ParseOptions, SourceFileInput, SourceStore,
+    BatchParseOptions, ParseInput, ParseOptions, SourceFileInput, SourceStore, Span,
 };
 
 #[test]
@@ -178,6 +178,140 @@ fn snapshot_omits_optional_sections_when_disabled() {
     assert!(view.section(SectionKind::Tokens).is_some());
     assert!(view.section(SectionKind::StringOffsets).is_some());
     assert!(view.section(SectionKind::StringData).is_some());
+}
+
+#[test]
+fn source_slice_distinguishes_not_included_from_out_of_bounds() {
+    // `include_source_text = false` (the default) → NotIncluded.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "Hello",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(
+        source.source_slice(Span::new(0, 5)).unwrap_err(),
+        SourceTextUnavailable::NotIncluded
+    );
+
+    // `include_source_text = true` → in-range span resolves, span
+    // past the end / inverted span both surface `SpanOutOfBounds`.
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(source.source_slice(Span::new(0, 5)).unwrap(), "Hello");
+    assert_eq!(source.source_slice(Span::new(1, 4)).unwrap(), "ell");
+    assert_eq!(source.source_slice(Span::new(0, 0)).unwrap(), "");
+    assert_eq!(
+        source.source_slice(Span::new(0, 99)).unwrap_err(),
+        SourceTextUnavailable::SpanOutOfBounds
+    );
+    assert_eq!(
+        source.source_slice(Span::new(4, 2)).unwrap_err(),
+        SourceTextUnavailable::SpanOutOfBounds
+    );
+}
+
+#[test]
+fn source_slice_rejects_span_splitting_multibyte_scalar() {
+    // "あ" is 3 UTF-8 bytes (0xE3 0x81 0x84). A span that ends at
+    // offset 1 splits the scalar — `source_slice` must surface
+    // `SpanOutOfBounds`, not return invalid bytes.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "あ",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(source.source_slice(Span::new(0, 3)).unwrap(), "あ");
+    assert_eq!(
+        source.source_slice(Span::new(0, 1)).unwrap_err(),
+        SourceTextUnavailable::SpanOutOfBounds
+    );
+}
+
+#[test]
+fn source_metadata_interns_before_diagnostic_messages() {
+    // design/003 §"String Table" requires the first-seen string
+    // order to be: 1) source metadata, 2) diagnostic messages.
+    // Use a malformed input with non-default metadata so both
+    // categories land in the string table, then assert metadata
+    // StringIds come before the diagnostic message StringId.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "{$unclosed",
+        path: Some("greeting.mf2"),
+        locale: Some("en"),
+        message_id: Some("hello"),
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+    // The string table must hold "greeting.mf2", "en", "hello",
+    // and the diagnostic catalog message — in that order.
+    assert_eq!(
+        view.string(ox_mf2_parser::snapshot::StringId::new(0)),
+        Some("greeting.mf2")
+    );
+    assert_eq!(
+        view.string(ox_mf2_parser::snapshot::StringId::new(1)),
+        Some("en")
+    );
+    assert_eq!(
+        view.string(ox_mf2_parser::snapshot::StringId::new(2)),
+        Some("hello")
+    );
+    // The diagnostic message StringId must reference an entry
+    // strictly after the source metadata block.
+    let diag = view.diagnostic(0).expect("malformed input has diagnostics");
+    let label_range = diag.label_range();
+    assert_eq!(label_range, (0, 0));
+    let message = diag.message().expect("diagnostic message interned");
+    // Static catalog message for UnclosedExpression.
+    assert!(message.starts_with("unclosed"));
+    // Lookup via section count: the message StringId must be >= 3.
+    let so = view.section(SectionKind::StringOffsets).unwrap();
+    assert!(so.count >= 4, "expected at least 4 interned strings");
 }
 
 #[test]

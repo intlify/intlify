@@ -16,7 +16,8 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode, MESSAGE_REF_CATALOG};
 use crate::snapshot::error::SnapshotWriteError;
 use crate::snapshot::format::{
     checked_u32, write_u16_le, write_u32_le, write_u8, RootId, SectionKind, StringId,
-    EDGE_KIND_NODE, EDGE_KIND_TOKEN, NONE_REF,
+    DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE, EDGE_KIND_NODE, EDGE_KIND_TOKEN,
+    EDGE_RECORD_SIZE, NODE_RECORD_SIZE, NONE_REF, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
 use crate::snapshot::sections::{EmittedSection, SnapshotAssembler};
 use crate::snapshot::source_map::SourceMap;
@@ -159,7 +160,14 @@ pub fn parse_message_to_snapshot(
         message_id: metadata.message_id,
         base_offset: metadata.base_offset,
     };
-    let id = sources.add(input);
+    // The public `parse_message_to_snapshot` signature returns
+    // `Result<_, SnapshotWriteError>`, so route oversized sources
+    // through `try_add` and convert the `SourceStoreError` into a
+    // `SnapshotWriteError::SourceTooLarge` instead of letting
+    // `SourceStore::add`'s panic escape the API boundary.
+    let id = sources
+        .try_add(input)
+        .map_err(|_| SnapshotWriteError::SourceTooLarge)?;
     let result = run_parse_source(&sources, id, parse_options);
     parse_result_to_snapshot(&sources, &result, snapshot_options)
 }
@@ -206,6 +214,16 @@ pub fn parse_batch_to_snapshot(
     batch_options: BatchParseOptions,
     snapshot_options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError> {
+    // Phase 1's `parse_batch` registers each input through
+    // `SourceStore::add`, which panics on `source.len() > u32::MAX`.
+    // The public snapshot API returns `Result<_, SnapshotWriteError>`,
+    // so pre-validate every input here and convert oversized inputs
+    // to `SnapshotWriteError::SourceTooLarge` before parse runs.
+    for input in inputs {
+        if u32::try_from(input.source.len()).is_err() {
+            return Err(SnapshotWriteError::SourceTooLarge);
+        }
+    }
     let batch = run_parse_batch(inputs, batch_options);
     parse_batch_result_to_snapshot(&batch, snapshot_options)
 }
@@ -219,6 +237,11 @@ pub fn parse_batch_result_to_snapshot(
     // Pre-size the writer for the batch so the string table /
     // roots vectors don't grow during encoding.
     let mut writer = SnapshotWriter::with_root_hint(options, result.items.len());
+    // Pre-intern every batch root's source metadata before any
+    // `add_root` runs so the string table emits source metadata
+    // strings ahead of diagnostic messages — the canonical writer
+    // order required by `design/003` §"String Table".
+    writer.pre_intern_root_sources(&result.sources, result.items.iter().map(|item| item.source))?;
     for item in &result.items {
         writer.add_root(
             &result.sources,
@@ -262,6 +285,10 @@ fn encode_single(
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
     let mut writer = SnapshotWriter::new(options);
+    // Match `parse_batch_result_to_snapshot`: register the root
+    // source metadata up front so it lands in the string table
+    // ahead of any diagnostic messages emitted during `add_root`.
+    writer.pre_intern_root_sources(sources, [source])?;
     writer.add_root(sources, source, cst, &diagnostics)?;
     let bytes = writer.finish(sources)?;
     Ok(SnapshotResult {
@@ -342,6 +369,55 @@ impl SnapshotWriter {
         }
     }
 
+    /// Intern a Phase 1 `SourceId` into the snapshot-local
+    /// `SourceMap`, interning the source's metadata strings
+    /// (`path` / `locale` / `message_id`) on first sight so the
+    /// `StringTable` first-seen order matches `design/003`'s
+    /// "source metadata strings before diagnostic messages"
+    /// contract.
+    ///
+    /// `pre_intern_root_sources` calls this in batch input order
+    /// before any `add_root`, so the typical case has every root
+    /// source registered (and its metadata interned) ahead of any
+    /// diagnostic messages.
+    fn intern_source(
+        &mut self,
+        sources: &SourceStore,
+        source: PhaseOneSourceId,
+    ) -> Result<u32, SnapshotWriteError> {
+        let file = sources
+            .get(source)
+            .ok_or(SnapshotWriteError::InvalidSourceId)?;
+        let len_before = self.source_map.len();
+        let local = self.source_map.intern(source)?;
+        if self.source_map.len() > len_before {
+            self.string_table.intern_optional(file.path.as_deref())?;
+            self.string_table.intern_optional(file.locale.as_deref())?;
+            self.string_table
+                .intern_optional(file.message_id.as_deref())?;
+        }
+        Ok(local)
+    }
+
+    /// Pre-intern source metadata for every root source ahead of
+    /// `add_root` so the string table emits `path` / `locale` /
+    /// `message_id` strings strictly before diagnostic messages —
+    /// matching the canonical writer order called out in
+    /// `design/003` §"String Table".
+    fn pre_intern_root_sources<I>(
+        &mut self,
+        sources: &SourceStore,
+        source_ids: I,
+    ) -> Result<(), SnapshotWriteError>
+    where
+        I: IntoIterator<Item = PhaseOneSourceId>,
+    {
+        for id in source_ids {
+            self.intern_source(sources, id)?;
+        }
+        Ok(())
+    }
+
     fn add_root(
         &mut self,
         sources: &SourceStore,
@@ -349,10 +425,30 @@ impl SnapshotWriter {
         cst: &CstTables,
         diagnostics: &[Diagnostic],
     ) -> Result<(), SnapshotWriteError> {
-        if sources.get(source).is_none() {
-            return Err(SnapshotWriteError::InvalidSourceId);
+        // Reserve section byte buffers from the Phase 1 CST counts
+        // so the per-record `write_*` calls below don't grow the
+        // underlying `Vec`s mid-loop. Diagnostics / labels are
+        // skipped when `include_diagnostics = false` so the writer
+        // doesn't speculate on encode work it won't perform.
+        self.nodes_bytes
+            .reserve(cst.node_count() * NODE_RECORD_SIZE as usize);
+        self.edges_bytes
+            .reserve(cst.edge_count() * EDGE_RECORD_SIZE as usize);
+        self.tokens_bytes
+            .reserve(cst.token_count() * TOKEN_RECORD_SIZE as usize);
+        if self.options.include_trivia {
+            self.trivia_bytes
+                .reserve(cst.trivia_count() * TRIVIA_RECORD_SIZE as usize);
         }
-        let source_local = self.source_map.intern(source)?;
+        if self.options.include_diagnostics {
+            self.diagnostics_bytes
+                .reserve(diagnostics.len() * DIAGNOSTIC_RECORD_SIZE as usize);
+            let label_total: usize = diagnostics.iter().map(|d| d.labels.len()).sum();
+            self.diagnostic_labels_bytes
+                .reserve(label_total * DIAGNOSTIC_LABEL_RECORD_SIZE as usize);
+        }
+
+        let source_local = self.intern_source(sources, source)?;
 
         // Trivia first so token records can reference snapshot-local
         // trivia ids without a second pass. With include_trivia=false
@@ -383,7 +479,7 @@ impl SnapshotWriter {
         let (diag_start, diag_count) = if self.options.include_diagnostics {
             let start = self.diagnostics_count;
             for diag in diagnostics {
-                self.emit_diagnostic(diag)?;
+                self.emit_diagnostic(sources, diag)?;
             }
             let count = self
                 .diagnostics_count
@@ -426,10 +522,7 @@ impl SnapshotWriter {
         for trivia in &cst.trivia {
             let local = self.next_trivia_id()?;
             let source = PhaseOneSourceId::new(trivia.source_id);
-            if sources.get(source).is_none() {
-                return Err(SnapshotWriteError::InvalidSourceId);
-            }
-            let source_local = self.source_map.intern(source)?;
+            let source_local = self.intern_source(sources, source)?;
             write_u16_le(&mut self.trivia_bytes, trivia.kind);
             write_u16_le(&mut self.trivia_bytes, 0); // flags
             write_u32_le(&mut self.trivia_bytes, trivia.span_start);
@@ -450,10 +543,7 @@ impl SnapshotWriter {
         for token in &cst.tokens {
             let local = self.next_token_id()?;
             let source = PhaseOneSourceId::new(token.source_id);
-            if sources.get(source).is_none() {
-                return Err(SnapshotWriteError::InvalidSourceId);
-            }
-            let source_local = self.source_map.intern(source)?;
+            let source_local = self.intern_source(sources, source)?;
 
             let (leading_start, leading_count, trailing_start, trailing_count) =
                 if self.options.include_trivia
@@ -550,11 +640,15 @@ impl SnapshotWriter {
         Ok(remap)
     }
 
-    fn emit_diagnostic(&mut self, diagnostic: &Diagnostic) -> Result<(), SnapshotWriteError> {
-        let source_local = self.source_map.intern(diagnostic.source)?;
+    fn emit_diagnostic(
+        &mut self,
+        sources: &SourceStore,
+        diagnostic: &Diagnostic,
+    ) -> Result<(), SnapshotWriteError> {
+        let source_local = self.intern_source(sources, diagnostic.source)?;
         let label_start = self.diagnostic_labels_count;
         for label in &diagnostic.labels {
-            let label_source = self.source_map.intern(label.source)?;
+            let label_source = self.intern_source(sources, label.source)?;
             let msg_id = if self.options.include_diagnostics {
                 self.string_table.intern(label.message)?
             } else {

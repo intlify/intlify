@@ -61,8 +61,8 @@ pub use format::{
 };
 pub use view::{
     ChildIter, ChildView, DiagnosticLabelIter, DiagnosticLabelView, DiagnosticRecordView, NodeView,
-    RootView, SectionIndex, SectionSlice, SectionView, SnapshotView, SnapshotViewOwned, SourceView,
-    TokenView, TriviaIter, TriviaView,
+    RootView, SectionIndex, SectionSlice, SectionView, SnapshotView, SnapshotViewOwned,
+    SourceTextUnavailable, SourceView, TokenView, TriviaIter, TriviaView,
 };
 pub use writer::{
     parse_batch_result_to_snapshot, parse_batch_to_snapshot, parse_message_to_snapshot,

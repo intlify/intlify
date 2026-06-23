@@ -20,6 +20,37 @@ use crate::snapshot::format::{
 use crate::span::{NodeId, SourceId, Span, TokenId, TriviaId};
 use crate::syntax_kind::SyntaxKind;
 
+/// Error returned when a snapshot accessor cannot resolve source
+/// bytes through [`SourceView::source_slice`].
+///
+/// `NotIncluded` means the snapshot was produced with
+/// `SnapshotOptions.include_source_text = false`, so the writer
+/// did not embed any source bytes. `SpanOutOfBounds` means the
+/// span extends past the encoded text or lands inside a multibyte
+/// UTF-8 scalar. The distinction matters because the former is
+/// recoverable by the caller (use external source text) while the
+/// latter signals a logic bug or stale span.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SourceTextUnavailable {
+    NotIncluded,
+    SpanOutOfBounds,
+}
+
+impl core::fmt::Display for SourceTextUnavailable {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            Self::NotIncluded => {
+                "snapshot was encoded without source text (include_source_text = false)"
+            }
+            Self::SpanOutOfBounds => {
+                "span extends past the encoded source text or splits a UTF-8 scalar"
+            }
+        })
+    }
+}
+
+impl std::error::Error for SourceTextUnavailable {}
+
 /// Section payload range. Validated by the decoder so accessors can
 /// slice the underlying snapshot buffer without re-checking bounds.
 #[derive(Debug, Clone, Copy)]
@@ -346,6 +377,33 @@ impl<'a> SourceView<'a> {
         let start = ed.offset as usize + offset as usize;
         let end = start + len as usize;
         core::str::from_utf8(&self.bytes[start..end]).ok()
+    }
+
+    /// Slice the snapshot-embedded source text by `span`, returning
+    /// an explicit `SourceTextUnavailable` rather than `None` so
+    /// callers can distinguish "source text not encoded" from
+    /// "span out of bounds" — see `design/003` §"Source Section".
+    ///
+    /// Returns `Err(SourceTextUnavailable::NotIncluded)` when the
+    /// snapshot was produced with `include_source_text = false`
+    /// (text source ref is the canonical `NONE_REF` sentinel).
+    /// Returns `Err(SourceTextUnavailable::SpanOutOfBounds)` when
+    /// `span` extends past the encoded text, when `span.start >
+    /// span.end`, or when either endpoint lands inside a multibyte
+    /// UTF-8 scalar.
+    pub fn source_slice(&self, span: Span) -> Result<&'a str, SourceTextUnavailable> {
+        let text = self.text().ok_or(SourceTextUnavailable::NotIncluded)?;
+        if span.start > span.end {
+            return Err(SourceTextUnavailable::SpanOutOfBounds);
+        }
+        let len_u32 = text.len() as u32;
+        if span.end > len_u32 {
+            return Err(SourceTextUnavailable::SpanOutOfBounds);
+        }
+        let start = span.start as usize;
+        let end = span.end as usize;
+        text.get(start..end)
+            .ok_or(SourceTextUnavailable::SpanOutOfBounds)
     }
 }
 
