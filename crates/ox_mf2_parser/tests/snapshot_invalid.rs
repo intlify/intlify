@@ -443,65 +443,6 @@ fn equal_offset_empty_section_listed_after_non_empty_decodes() {
 }
 
 #[test]
-fn zz_temp_real_bug_repro() {
-    // Construct the ACTUAL bug scenario: an empty section sharing an
-    // offset with a NON-empty section, with the non-empty one listed
-    // first in the table. Take the baseline and move StringOffsets
-    // (empty, byte_len=0) to share Tokens' offset (352). Tokens is
-    // non-empty (byte_len=36) and listed BEFORE StringOffsets.
-    //
-    // Layout target around the Tokens region:
-    //   Tokens       offset=352 byte_len=36  (non-empty, rec_idx=4)
-    //   StringOffsets offset=352 byte_len=0  (empty, rec_idx=5) -> shares offset
-    //   StringData   offset=388 byte_len=0   (empty)
-    // total must become 388.
-    let mut bytes = baseline();
-    let so_rec = section_record_offset(&bytes, SectionKind::StringOffsets).unwrap();
-    let sd_rec = section_record_offset(&bytes, SectionKind::StringData).unwrap();
-    // StringOffsets: offset = 352 (same as Tokens), byte_len = 0.
-    bytes[so_rec + 4..so_rec + 8].copy_from_slice(&352u32.to_le_bytes());
-    bytes[so_rec + 8..so_rec + 12].copy_from_slice(&0u32.to_le_bytes());
-    // StringData: offset = 400 (next 16-aligned after Tokens end 388),
-    // byte_len = 0. Pad 388..400 with zeros, end buffer at 400.
-    bytes[sd_rec + 4..sd_rec + 8].copy_from_slice(&400u32.to_le_bytes());
-    bytes[sd_rec + 8..sd_rec + 12].copy_from_slice(&0u32.to_le_bytes());
-    bytes.resize(400, 0);
-    match decode_snapshot(&bytes) {
-        Ok(_) => println!("TEMP_REPRO decode OK"),
-        Err(e) => println!("TEMP_REPRO decode ERR code={:?} section={:?}", e.code, e.section),
-    }
-}
-
-#[test]
-fn zz_temp_inspect_layout() {
-    let bytes = baseline();
-    for kind in [
-        SectionKind::Roots,
-        SectionKind::Sources,
-        SectionKind::Nodes,
-        SectionKind::Edges,
-        SectionKind::Tokens,
-        SectionKind::StringOffsets,
-        SectionKind::StringData,
-    ] {
-        if let Some(rec) = section_record_offset(&bytes, kind) {
-            let offset = u32::from_le_bytes(bytes[rec + 4..rec + 8].try_into().unwrap());
-            let byte_len = u32::from_le_bytes(bytes[rec + 8..rec + 12].try_into().unwrap());
-            let count = u32::from_le_bytes(bytes[rec + 12..rec + 16].try_into().unwrap());
-            println!(
-                "TEMP kind={:?} rec_idx={} offset={} byte_len={} count={}",
-                kind,
-                (rec - HEADER_SIZE as usize) / SECTION_RECORD_SIZE as usize,
-                offset,
-                byte_len,
-                count
-            );
-        }
-    }
-    println!("TEMP total_len={}", bytes.len());
-}
-
-#[test]
 fn decoder_does_not_panic_on_random_garbage() {
     // 4 KB of garbage shouldn't crash the decoder.
     let bytes: Vec<u8> = (0..4096).map(|i| (i & 0xFF) as u8).collect();
