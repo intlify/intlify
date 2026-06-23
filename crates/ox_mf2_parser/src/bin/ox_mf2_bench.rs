@@ -76,9 +76,14 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
+use ox_mf2_parser::snapshot::view::ChildView;
+use ox_mf2_parser::snapshot::{
+    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
+    parse_result_to_snapshot, SnapshotOptions,
+};
 use ox_mf2_parser::{
     parse_batch, parse_message, parse_source, parse_source_session, BatchParseOptions, CstChild,
-    CstNodeView, CstView, DiagnosticView, ParseInput, ParseOptions, ParseWorkspace,
+    CstNodeView, CstView, DiagnosticView, NodeId, ParseInput, ParseOptions, ParseWorkspace,
     SourceFileInput, SourceStore,
 };
 
@@ -108,6 +113,16 @@ enum Phase {
     ParseBatchSession,
     ParseBatchSequential,
     Allocations,
+    EncodeSnapshot,
+    ParseCstAndEncodeSnapshot,
+    DecodeSnapshot,
+    DecodeSnapshotOwned,
+    TraverseNodes,
+    TraverseTokens,
+    TraverseDiagnostics,
+    ParseBatchToSnapshot,
+    ParseBatchResultToSnapshot,
+    SnapshotToBytesCopy,
 }
 
 #[derive(Debug, Default)]
@@ -176,6 +191,16 @@ fn parse_phase(name: &str) -> Result<Phase, String> {
         "parse_batch_session" => Phase::ParseBatchSession,
         "parse_batch_sequential" => Phase::ParseBatchSequential,
         "allocations" => Phase::Allocations,
+        "encode_snapshot" => Phase::EncodeSnapshot,
+        "parse_cst_and_encode_snapshot" => Phase::ParseCstAndEncodeSnapshot,
+        "decode_snapshot" => Phase::DecodeSnapshot,
+        "decode_snapshot_owned" => Phase::DecodeSnapshotOwned,
+        "traverse_nodes" => Phase::TraverseNodes,
+        "traverse_tokens" => Phase::TraverseTokens,
+        "traverse_diagnostics" => Phase::TraverseDiagnostics,
+        "parse_batch_to_snapshot" => Phase::ParseBatchToSnapshot,
+        "parse_batch_result_to_snapshot" => Phase::ParseBatchResultToSnapshot,
+        "snapshot_to_bytes_copy" => Phase::SnapshotToBytesCopy,
         other => return Err(format!("unknown phase: {other}")),
     })
 }
@@ -209,6 +234,22 @@ fn print_help() {
     println!(
         "  parse_batch_sequential       owned parse_batch over --corpus (clone + materialise)"
     );
+    println!();
+    println!("Phases (Phase 2 Binary AST snapshot):");
+    println!("  encode_snapshot              parse once, encode snapshot N times");
+    println!("  parse_cst_and_encode_snapshot parse + encode each iteration (combined)");
+    println!("  decode_snapshot              encode once, borrowed decode N times");
+    println!("  decode_snapshot_owned        encode once, owned (Arc) decode N times");
+    println!("  traverse_nodes               decode once, walk every node N times");
+    println!("  traverse_tokens              decode once, walk every token N times");
+    println!(
+        "  traverse_diagnostics         decode once, iterate diagnostics N times (malformed input)"
+    );
+    println!("  parse_batch_to_snapshot      parse + shared batch snapshot over --corpus");
+    println!(
+        "  parse_batch_result_to_snapshot batch parse once, snapshot N times over --corpus"
+    );
+    println!("  snapshot_to_bytes_copy       encode once, copy bytes into Arc<[u8]> N times");
     println!();
     println!("Phases (allocator inspection — requires `--features bench-alloc` build):");
     println!("  allocations                  report alloc count + bytes per parse iteration");
@@ -284,6 +325,16 @@ fn main() -> ExitCode {
         Phase::ParseBatchSession => run_parse_batch_session(&args),
         Phase::ParseBatchSequential => run_parse_batch_sequential(&args),
         Phase::Allocations => run_allocations(&args),
+        Phase::EncodeSnapshot => run_encode_snapshot(&args),
+        Phase::ParseCstAndEncodeSnapshot => run_parse_cst_and_encode_snapshot(&args),
+        Phase::DecodeSnapshot => run_decode_snapshot(&args),
+        Phase::DecodeSnapshotOwned => run_decode_snapshot_owned(&args),
+        Phase::TraverseNodes => run_traverse_nodes(&args),
+        Phase::TraverseTokens => run_traverse_tokens(&args),
+        Phase::TraverseDiagnostics => run_traverse_diagnostics(&args),
+        Phase::ParseBatchToSnapshot => run_parse_batch_to_snapshot(&args),
+        Phase::ParseBatchResultToSnapshot => run_parse_batch_result_to_snapshot(&args),
+        Phase::SnapshotToBytesCopy => run_snapshot_to_bytes_copy(&args),
     };
     match result {
         Ok(summary) => {
@@ -687,4 +738,269 @@ fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
         iterations: iters,
         work_units: units,
     })
+}
+
+// ── Phase 2 Binary AST snapshot phases ───────────────────────────────
+
+fn snapshot_options(args: &Args) -> SnapshotOptions {
+    let mut opts = SnapshotOptions::default();
+    opts.include_trivia = args.collect_trivia.unwrap_or(true);
+    opts
+}
+
+fn parse_for_snapshot(args: &Args) -> Result<(SourceStore, ox_mf2_parser::ParseResult), String> {
+    let input = read_input(args)?;
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: &input,
+        ..Default::default()
+    });
+    let options = options_for(args, true, false);
+    let result = parse_source(&sources, id, options);
+    Ok((sources, result))
+}
+
+fn run_encode_snapshot(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap_opts = snapshot_options(args);
+    let iters = args.iterations.max(1);
+    let mut bytes_total = 0usize;
+    for _ in 0..iters {
+        let snap = parse_result_to_snapshot(&sources, &result, snap_opts)
+            .map_err(|e| format!("snapshot encode failed: {e}"))?;
+        bytes_total += snap.bytes.len();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: bytes_total,
+    })
+}
+
+fn run_parse_cst_and_encode_snapshot(args: &Args) -> Result<PhaseSummary, String> {
+    let input = read_input(args)?;
+    let snap_opts = snapshot_options(args);
+    let parse_opts = options_for(args, true, false);
+    let iters = args.iterations.max(1);
+    let mut bytes_total = 0usize;
+    for _ in 0..iters {
+        let mut sources = SourceStore::new();
+        let id = sources.add(SourceFileInput {
+            source: &input,
+            ..Default::default()
+        });
+        let result = parse_source(&sources, id, parse_opts);
+        let snap = parse_result_to_snapshot(&sources, &result, snap_opts)
+            .map_err(|e| format!("snapshot encode failed: {e}"))?;
+        bytes_total += snap.bytes.len();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: bytes_total,
+    })
+}
+
+fn run_decode_snapshot(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let iters = args.iterations.max(1);
+    let mut sections = 0usize;
+    for _ in 0..iters {
+        let view = decode_snapshot(&snap.bytes).map_err(|e| format!("decode failed: {e}"))?;
+        sections += view.section_count_for_bench();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: sections,
+    })
+}
+
+fn run_decode_snapshot_owned(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let arc: std::sync::Arc<[u8]> = snap.bytes.into();
+    let iters = args.iterations.max(1);
+    let mut sections = 0usize;
+    for _ in 0..iters {
+        let view =
+            decode_snapshot_owned(arc.clone()).map_err(|e| format!("decode failed: {e}"))?;
+        sections += view.view().section_count_for_bench();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: sections,
+    })
+}
+
+fn run_traverse_nodes(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let view = decode_snapshot(&snap.bytes).map_err(|e| format!("decode failed: {e}"))?;
+    let iters = args.iterations.max(1);
+    let mut units = 0usize;
+    for _ in 0..iters {
+        for i in 0..view.node_count() {
+            let node = view.node(NodeId::new(i)).expect("valid node");
+            // Touch span + kind so the loop is not eliminated.
+            units += node.span().len() as usize + node.kind() as u16 as usize;
+            for child in node.children() {
+                match child {
+                    ChildView::Node(n) => units += n.id().raw() as usize,
+                    ChildView::Token(t) => units += t.id().raw() as usize,
+                }
+            }
+        }
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: units,
+    })
+}
+
+fn run_traverse_tokens(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let view = decode_snapshot(&snap.bytes).map_err(|e| format!("decode failed: {e}"))?;
+    let iters = args.iterations.max(1);
+    let mut units = 0usize;
+    for _ in 0..iters {
+        for i in 0..view.token_count() {
+            let token = view
+                .token(ox_mf2_parser::TokenId::new(i))
+                .expect("valid token");
+            units +=
+                token.span().len() as usize + token.leading_trivia().count() + token.trailing_trivia().count();
+        }
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: units,
+    })
+}
+
+fn run_traverse_diagnostics(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let view = decode_snapshot(&snap.bytes).map_err(|e| format!("decode failed: {e}"))?;
+    let iters = args.iterations.max(1);
+    if view.diagnostic_count() == 0 {
+        eprintln!(
+            "ox-mf2-bench: traverse_diagnostics measured 0 diagnostics — supply a malformed --input"
+        );
+    }
+    let mut units = 0usize;
+    for _ in 0..iters {
+        for i in 0..view.diagnostic_count() {
+            let d = view.diagnostic(i).expect("valid diag");
+            units += d.span().len() as usize + d.labels().count();
+        }
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: units,
+    })
+}
+
+fn run_parse_batch_to_snapshot(args: &Args) -> Result<PhaseSummary, String> {
+    let dir = args
+        .corpus_dir
+        .as_ref()
+        .ok_or("parse_batch_to_snapshot requires --corpus <dir>")?;
+    let corpus = read_corpus(dir)?;
+    let snap_opts = snapshot_options(args);
+    let inputs: Vec<_> = corpus
+        .iter()
+        .map(|(path, text)| ParseInput {
+            source: text,
+            path: Some(path),
+            ..Default::default()
+        })
+        .collect();
+    let iters = args.iterations.max(1);
+    let mut bytes_total = 0usize;
+    for _ in 0..iters {
+        let snap = ox_mf2_parser::snapshot::parse_batch_to_snapshot(
+            &inputs,
+            BatchParseOptions::default(),
+            snap_opts,
+        )
+        .map_err(|e| format!("batch snapshot failed: {e}"))?;
+        bytes_total += snap.bytes.len();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: bytes_total,
+    })
+}
+
+fn run_parse_batch_result_to_snapshot(args: &Args) -> Result<PhaseSummary, String> {
+    let dir = args
+        .corpus_dir
+        .as_ref()
+        .ok_or("parse_batch_result_to_snapshot requires --corpus <dir>")?;
+    let corpus = read_corpus(dir)?;
+    let snap_opts = snapshot_options(args);
+    let inputs: Vec<_> = corpus
+        .iter()
+        .map(|(path, text)| ParseInput {
+            source: text,
+            path: Some(path),
+            ..Default::default()
+        })
+        .collect();
+    let batch = parse_batch(&inputs, BatchParseOptions::default());
+    let iters = args.iterations.max(1);
+    let mut bytes_total = 0usize;
+    for _ in 0..iters {
+        let snap = parse_batch_result_to_snapshot(&batch, snap_opts)
+            .map_err(|e| format!("batch snapshot failed: {e}"))?;
+        bytes_total += snap.bytes.len();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: bytes_total,
+    })
+}
+
+fn run_snapshot_to_bytes_copy(args: &Args) -> Result<PhaseSummary, String> {
+    let (sources, result) = parse_for_snapshot(args)?;
+    let snap = parse_result_to_snapshot(&sources, &result, snapshot_options(args))
+        .map_err(|e| format!("snapshot encode failed: {e}"))?;
+    let arc: std::sync::Arc<[u8]> = snap.bytes.into();
+    let iters = args.iterations.max(1);
+    let mut bytes_total = 0usize;
+    for _ in 0..iters {
+        // Realistic transfer / persistence path: deep copy the snapshot
+        // bytes into a fresh `Arc<[u8]>` so the inner Vec is freed.
+        let copy: std::sync::Arc<[u8]> = (*arc).to_vec().into();
+        bytes_total += copy.len();
+    }
+    Ok(PhaseSummary {
+        iterations: iters,
+        work_units: bytes_total,
+    })
+}
+
+// Tiny helper so the bench can report a section count without
+// exposing it as a stable public API on `SnapshotView` (the field
+// list lives on `SectionIndex`).
+trait BenchSectionExt {
+    fn section_count_for_bench(&self) -> usize;
+}
+
+impl BenchSectionExt for ox_mf2_parser::SnapshotView<'_> {
+    fn section_count_for_bench(&self) -> usize {
+        let s = self.sections();
+        let mut n = 7;
+        n += usize::from(s.trivia.is_some());
+        n += usize::from(s.diagnostics.is_some());
+        n += usize::from(s.diagnostic_labels.is_some());
+        n += usize::from(s.source_text_data.is_some());
+        n += usize::from(s.extended_data.is_some());
+        n
+    }
 }
