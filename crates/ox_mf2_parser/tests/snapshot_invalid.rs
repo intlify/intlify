@@ -312,6 +312,196 @@ fn nonzero_node_data_ref_is_rejected() {
 }
 
 #[test]
+fn inverted_node_span_is_rejected() {
+    let mut bytes = baseline();
+    let nodes_off = section_payload_offset(&bytes, SectionKind::Nodes);
+    // NodeRecord: kind u16, flags u16, span_start u32, span_end u32, ...
+    // Set span_end < span_start (start stays at original value).
+    let span_start = u32::from_le_bytes(bytes[nodes_off + 4..nodes_off + 8].try_into().unwrap());
+    let span_end = span_start.saturating_sub(1);
+    bytes[nodes_off + 8..nodes_off + 12].copy_from_slice(&span_end.to_le_bytes());
+    if span_start == span_end {
+        // Synthetic guard: pick a non-zero start so the test is meaningful.
+        bytes[nodes_off + 4..nodes_off + 8].copy_from_slice(&1u32.to_le_bytes());
+        bytes[nodes_off + 8..nodes_off + 12].copy_from_slice(&0u32.to_le_bytes());
+    }
+    let err = decode_snapshot(&bytes).unwrap_err();
+    assert_eq!(err.code, DecodeErrorCode::InvalidSpan);
+    assert_eq!(err.section, Some(SectionKind::Nodes));
+}
+
+#[test]
+fn inverted_token_span_is_rejected() {
+    let mut bytes = baseline();
+    let tokens_off = section_payload_offset(&bytes, SectionKind::Tokens);
+    // TokenRecord: kind u16, flags u16, span_start u32, span_end u32, ...
+    bytes[tokens_off + 4..tokens_off + 8].copy_from_slice(&5u32.to_le_bytes());
+    bytes[tokens_off + 8..tokens_off + 12].copy_from_slice(&2u32.to_le_bytes());
+    let err = decode_snapshot(&bytes).unwrap_err();
+    assert_eq!(err.code, DecodeErrorCode::InvalidSpan);
+    assert_eq!(err.section, Some(SectionKind::Tokens));
+}
+
+#[test]
+fn inverted_trivia_span_is_rejected() {
+    // A complex declaration produces real `ws` trivia between the
+    // keyword and the variable expression — the simple text-only
+    // pattern path keeps whitespace inside the `Text` token.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: ".input {$n :integer} {{count: {$n}}}",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let mut bytes = snap.bytes;
+    let trivia_off = section_payload_offset(&bytes, SectionKind::Trivia);
+    bytes[trivia_off + 4..trivia_off + 8].copy_from_slice(&9u32.to_le_bytes());
+    bytes[trivia_off + 8..trivia_off + 12].copy_from_slice(&0u32.to_le_bytes());
+    let err = decode_snapshot(&bytes).unwrap_err();
+    assert_eq!(err.code, DecodeErrorCode::InvalidSpan);
+    assert_eq!(err.section, Some(SectionKind::Trivia));
+}
+
+#[test]
+fn inverted_diagnostic_span_is_rejected() {
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "{$unclosed",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let mut bytes = snap.bytes;
+    let diags_off = section_payload_offset(&bytes, SectionKind::Diagnostics);
+    // DiagnosticRecord: source_id u32 (0), span_start u32 (4), span_end u32 (8).
+    bytes[diags_off + 4..diags_off + 8].copy_from_slice(&10u32.to_le_bytes());
+    bytes[diags_off + 8..diags_off + 12].copy_from_slice(&3u32.to_le_bytes());
+    let err = decode_snapshot(&bytes).unwrap_err();
+    assert_eq!(err.code, DecodeErrorCode::InvalidSpan);
+    assert_eq!(err.section, Some(SectionKind::Diagnostics));
+}
+
+#[test]
+fn string_offset_inside_multibyte_utf8_scalar_is_rejected() {
+    // SourceFileInput.path "あ" interns as a 3-byte UTF-8 string.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "x",
+        path: Some("あ"),
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let mut bytes = snap.bytes;
+    // First StringOffsetRecord: offset u32 (0), len u32 (4). Move offset
+    // forward by 1 so the slice splits the multibyte scalar. The full
+    // StringData buffer remains valid UTF-8, so this test only passes when
+    // per-slice validation is in place.
+    let so_off = section_payload_offset(&bytes, SectionKind::StringOffsets);
+    bytes[so_off..so_off + 4].copy_from_slice(&1u32.to_le_bytes());
+    bytes[so_off + 4..so_off + 8].copy_from_slice(&2u32.to_le_bytes());
+    let err = decode_snapshot(&bytes).unwrap_err();
+    assert_eq!(err.code, DecodeErrorCode::InvalidUtf8);
+    assert_eq!(err.section, Some(SectionKind::StringOffsets));
+}
+
+#[test]
+fn equal_offset_empty_section_listed_after_non_empty_decodes() {
+    // Construct a baseline where StringOffsets (empty) and StringData
+    // (empty) share an offset, then swap the two section records so
+    // the table lists StringData before StringOffsets. With the
+    // table-order-independent sort, decode must still succeed.
+    let mut bytes = baseline();
+    let so_off = section_record_offset(&bytes, SectionKind::StringOffsets).unwrap();
+    let sd_off = section_record_offset(&bytes, SectionKind::StringData).unwrap();
+    let rec_size = SECTION_RECORD_SIZE as usize;
+    let mut so_rec = [0u8; SECTION_RECORD_SIZE as usize];
+    let mut sd_rec = [0u8; SECTION_RECORD_SIZE as usize];
+    so_rec.copy_from_slice(&bytes[so_off..so_off + rec_size]);
+    sd_rec.copy_from_slice(&bytes[sd_off..sd_off + rec_size]);
+    bytes[so_off..so_off + rec_size].copy_from_slice(&sd_rec);
+    bytes[sd_off..sd_off + rec_size].copy_from_slice(&so_rec);
+    let view = decode_snapshot(&bytes).expect("decode succeeds after table swap");
+    assert!(view.section(SectionKind::StringOffsets).is_some());
+    assert!(view.section(SectionKind::StringData).is_some());
+}
+
+#[test]
+fn zz_temp_real_bug_repro() {
+    // Construct the ACTUAL bug scenario: an empty section sharing an
+    // offset with a NON-empty section, with the non-empty one listed
+    // first in the table. Take the baseline and move StringOffsets
+    // (empty, byte_len=0) to share Tokens' offset (352). Tokens is
+    // non-empty (byte_len=36) and listed BEFORE StringOffsets.
+    //
+    // Layout target around the Tokens region:
+    //   Tokens       offset=352 byte_len=36  (non-empty, rec_idx=4)
+    //   StringOffsets offset=352 byte_len=0  (empty, rec_idx=5) -> shares offset
+    //   StringData   offset=388 byte_len=0   (empty)
+    // total must become 388.
+    let mut bytes = baseline();
+    let so_rec = section_record_offset(&bytes, SectionKind::StringOffsets).unwrap();
+    let sd_rec = section_record_offset(&bytes, SectionKind::StringData).unwrap();
+    // StringOffsets: offset = 352 (same as Tokens), byte_len = 0.
+    bytes[so_rec + 4..so_rec + 8].copy_from_slice(&352u32.to_le_bytes());
+    bytes[so_rec + 8..so_rec + 12].copy_from_slice(&0u32.to_le_bytes());
+    // StringData: offset = 400 (next 16-aligned after Tokens end 388),
+    // byte_len = 0. Pad 388..400 with zeros, end buffer at 400.
+    bytes[sd_rec + 4..sd_rec + 8].copy_from_slice(&400u32.to_le_bytes());
+    bytes[sd_rec + 8..sd_rec + 12].copy_from_slice(&0u32.to_le_bytes());
+    bytes.resize(400, 0);
+    match decode_snapshot(&bytes) {
+        Ok(_) => println!("TEMP_REPRO decode OK"),
+        Err(e) => println!("TEMP_REPRO decode ERR code={:?} section={:?}", e.code, e.section),
+    }
+}
+
+#[test]
+fn zz_temp_inspect_layout() {
+    let bytes = baseline();
+    for kind in [
+        SectionKind::Roots,
+        SectionKind::Sources,
+        SectionKind::Nodes,
+        SectionKind::Edges,
+        SectionKind::Tokens,
+        SectionKind::StringOffsets,
+        SectionKind::StringData,
+    ] {
+        if let Some(rec) = section_record_offset(&bytes, kind) {
+            let offset = u32::from_le_bytes(bytes[rec + 4..rec + 8].try_into().unwrap());
+            let byte_len = u32::from_le_bytes(bytes[rec + 8..rec + 12].try_into().unwrap());
+            let count = u32::from_le_bytes(bytes[rec + 12..rec + 16].try_into().unwrap());
+            println!(
+                "TEMP kind={:?} rec_idx={} offset={} byte_len={} count={}",
+                kind,
+                (rec - HEADER_SIZE as usize) / SECTION_RECORD_SIZE as usize,
+                offset,
+                byte_len,
+                count
+            );
+        }
+    }
+    println!("TEMP total_len={}", bytes.len());
+}
+
+#[test]
 fn decoder_does_not_panic_on_random_garbage() {
     // 4 KB of garbage shouldn't crash the decoder.
     let bytes: Vec<u8> = (0..4096).map(|i| (i & 0xFF) as u8).collect();

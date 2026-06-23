@@ -19,7 +19,7 @@ use ox_mf2_parser::snapshot::format::{
     SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION, SOURCE_RECORD_SIZE,
     STRING_OFFSET_RECORD_SIZE, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
-use ox_mf2_parser::snapshot::{decode_snapshot, SnapshotOptions};
+use ox_mf2_parser::snapshot::{decode_snapshot, DecodeErrorCode, SnapshotOptions};
 use ox_mf2_parser::{parse_message, parse_result_to_snapshot, SourceFileInput, SourceStore};
 
 #[test]
@@ -74,6 +74,60 @@ fn section_kind_numeric_order_is_locked() {
 fn edge_kind_numeric_values_are_locked() {
     assert_eq!(EDGE_KIND_NODE, 0);
     assert_eq!(EDGE_KIND_TOKEN, 1);
+}
+
+#[test]
+fn decode_error_code_numeric_values_are_locked() {
+    // The numeric values of `DecodeErrorCode` are part of the v0.1
+    // surface so language bindings and fixture validators can match
+    // on them without parsing display messages. Reordering or
+    // inserting a variant must keep existing numbers stable; add a
+    // new variant at the next unused number and extend this list.
+    let expected: &[(DecodeErrorCode, u16)] = &[
+        (DecodeErrorCode::BufferTooShort, 1),
+        (DecodeErrorCode::InvalidMagic, 2),
+        (DecodeErrorCode::UnsupportedMajorVersion, 3),
+        (DecodeErrorCode::UnsupportedMinorVersion, 4),
+        (DecodeErrorCode::InvalidHeaderLength, 5),
+        (DecodeErrorCode::InvalidFeatureFlags, 6),
+        (DecodeErrorCode::InvalidReservedField, 7),
+        (DecodeErrorCode::SectionTableOutOfBounds, 8),
+        (DecodeErrorCode::DuplicateSection, 9),
+        (DecodeErrorCode::MissingRequiredSection, 10),
+        (DecodeErrorCode::UnknownSection, 11),
+        (DecodeErrorCode::UnknownRequiredSection, 12),
+        (DecodeErrorCode::InvalidSectionFlags, 13),
+        (DecodeErrorCode::InvalidSectionAlignment, 14),
+        (DecodeErrorCode::InvalidSectionBounds, 15),
+        (DecodeErrorCode::InvalidRecordSize, 16),
+        (DecodeErrorCode::InvalidSectionCount, 17),
+        (DecodeErrorCode::OverlappingSection, 18),
+        (DecodeErrorCode::InvalidPadding, 19),
+        (DecodeErrorCode::TrailingPadding, 20),
+        (DecodeErrorCode::InvalidStringOffset, 21),
+        (DecodeErrorCode::InvalidUtf8, 22),
+        (DecodeErrorCode::InvalidStringRef, 23),
+        (DecodeErrorCode::InvalidSourceRef, 24),
+        (DecodeErrorCode::InvalidRootRef, 25),
+        (DecodeErrorCode::InvalidNodeRef, 26),
+        (DecodeErrorCode::InvalidTokenRef, 27),
+        (DecodeErrorCode::InvalidTriviaRef, 28),
+        (DecodeErrorCode::UnknownSyntaxKind, 29),
+        (DecodeErrorCode::InvalidDiagnosticSeverity, 30),
+        (DecodeErrorCode::UnknownDiagnosticCode, 31),
+        (DecodeErrorCode::InvalidDiagnosticRange, 32),
+        (DecodeErrorCode::InvalidSourceTextRange, 33),
+        (DecodeErrorCode::InvalidExtendedData, 34),
+        (DecodeErrorCode::InvalidEdgeKind, 35),
+        (DecodeErrorCode::InvalidSpan, 36),
+    ];
+    for (code, expected_value) in expected {
+        assert_eq!(
+            code.as_u16(),
+            *expected_value,
+            "DecodeErrorCode::{code:?} discriminant changed"
+        );
+    }
 }
 
 #[test]

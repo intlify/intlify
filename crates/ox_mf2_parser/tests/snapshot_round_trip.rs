@@ -118,6 +118,37 @@ fn snapshot_omits_optional_sections_when_disabled() {
 }
 
 #[test]
+fn empty_source_text_round_trips_when_include_source_text_is_true() {
+    // Empty source text with `include_source_text = true` is the
+    // boundary case where the writer must emit an (empty) source
+    // text data section: the SourceRecord text refs are non-sentinel
+    // so the decoder needs the section to resolve them.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).expect("decode succeeds");
+    let source = view
+        .source(view.root(snap.root).unwrap().source_id())
+        .unwrap();
+    assert_eq!(source.text(), Some(""));
+    // Section exists with an empty payload.
+    let section = view.section(SectionKind::SourceTextData).unwrap();
+    assert_eq!(section.byte_len, 0);
+}
+
+#[test]
 fn snapshot_with_source_text_resolves_text_through_view() {
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {

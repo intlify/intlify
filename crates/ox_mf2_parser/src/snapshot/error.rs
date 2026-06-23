@@ -68,45 +68,62 @@ impl std::error::Error for SnapshotWriteError {}
 /// Programmatic decode failure code.
 ///
 /// Code values are stable across the v0.1 surface so tests, fixture
-/// validators, and language bindings can match on them without parsing
-/// human-readable messages.
+/// validators, and language bindings can match on them without
+/// parsing human-readable messages. The `#[repr(u16)]` with explicit
+/// discriminants is the enforcement mechanism: reordering or
+/// inserting a variant in the wrong place would change a stable
+/// numeric value, and the `snapshot_compat.rs` guard test catches
+/// it. When adding a new variant, append it at the end with the next
+/// unused number and update the guard test in the same commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u16)]
 pub enum DecodeErrorCode {
-    BufferTooShort,
-    InvalidMagic,
-    UnsupportedMajorVersion,
-    UnsupportedMinorVersion,
-    InvalidHeaderLength,
-    InvalidFeatureFlags,
-    InvalidReservedField,
-    SectionTableOutOfBounds,
-    DuplicateSection,
-    MissingRequiredSection,
-    UnknownSection,
-    UnknownRequiredSection,
-    InvalidSectionFlags,
-    InvalidSectionAlignment,
-    InvalidSectionBounds,
-    InvalidRecordSize,
-    InvalidSectionCount,
-    OverlappingSection,
-    InvalidPadding,
-    TrailingPadding,
-    InvalidStringOffset,
-    InvalidUtf8,
-    InvalidStringRef,
-    InvalidSourceRef,
-    InvalidRootRef,
-    InvalidNodeRef,
-    InvalidTokenRef,
-    InvalidTriviaRef,
-    UnknownSyntaxKind,
-    InvalidDiagnosticSeverity,
-    UnknownDiagnosticCode,
-    InvalidDiagnosticRange,
-    InvalidSourceTextRange,
-    InvalidExtendedData,
-    InvalidEdgeKind,
+    BufferTooShort = 1,
+    InvalidMagic = 2,
+    UnsupportedMajorVersion = 3,
+    UnsupportedMinorVersion = 4,
+    InvalidHeaderLength = 5,
+    InvalidFeatureFlags = 6,
+    InvalidReservedField = 7,
+    SectionTableOutOfBounds = 8,
+    DuplicateSection = 9,
+    MissingRequiredSection = 10,
+    UnknownSection = 11,
+    UnknownRequiredSection = 12,
+    InvalidSectionFlags = 13,
+    InvalidSectionAlignment = 14,
+    InvalidSectionBounds = 15,
+    InvalidRecordSize = 16,
+    InvalidSectionCount = 17,
+    OverlappingSection = 18,
+    InvalidPadding = 19,
+    TrailingPadding = 20,
+    InvalidStringOffset = 21,
+    InvalidUtf8 = 22,
+    InvalidStringRef = 23,
+    InvalidSourceRef = 24,
+    InvalidRootRef = 25,
+    InvalidNodeRef = 26,
+    InvalidTokenRef = 27,
+    InvalidTriviaRef = 28,
+    UnknownSyntaxKind = 29,
+    InvalidDiagnosticSeverity = 30,
+    UnknownDiagnosticCode = 31,
+    InvalidDiagnosticRange = 32,
+    InvalidSourceTextRange = 33,
+    InvalidExtendedData = 34,
+    InvalidEdgeKind = 35,
+    InvalidSpan = 36,
+}
+
+impl DecodeErrorCode {
+    /// Stable numeric wire value used by tests, fixture validators,
+    /// and language bindings. The mapping is locked by the
+    /// compatibility guard in `tests/snapshot_compat.rs`.
+    #[inline]
+    pub const fn as_u16(self) -> u16 {
+        self as u16
+    }
 }
 
 impl core::fmt::Display for DecodeErrorCode {
@@ -151,6 +168,7 @@ impl core::fmt::Display for DecodeErrorCode {
             }
             Self::InvalidExtendedData => "extended data section is malformed",
             Self::InvalidEdgeKind => "edge kind is not 0 (node) or 1 (token)",
+            Self::InvalidSpan => "record span has span_start > span_end",
         })
     }
 }

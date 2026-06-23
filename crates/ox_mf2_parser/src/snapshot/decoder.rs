@@ -186,9 +186,19 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
         }
     }
 
-    // Sort by offset and validate non-overlap + padding.
+    // Sort by offset; break ties by placing empty payloads before
+    // non-empty ones at the same aligned offset. Without the tie
+    // breaker, a section table that lists a non-empty section before
+    // an empty section that shares its offset would advance `cursor`
+    // past the empty section's offset and then reject the empty
+    // section as overlapping. The format contract permits the section
+    // table to enumerate sections in any order, so this normalisation
+    // keeps decode independent of physical table order.
     let mut sorted_indexes: Vec<usize> = (0..records.len()).collect();
-    sorted_indexes.sort_by_key(|i| records[*i].offset);
+    sorted_indexes.sort_by_key(|i| {
+        let rec = records[*i];
+        (rec.offset, rec.byte_len != 0)
+    });
     let mut cursor = HEADER_SIZE + (section_count as u32) * SECTION_RECORD_SIZE;
     for (sorted_pos, src_index) in sorted_indexes.iter().enumerate() {
         let rec = records[*src_index];
@@ -372,6 +382,16 @@ fn validate_string_offsets(
     offsets: SectionSlice,
     data: SectionSlice,
 ) -> Result<(), DecodeError> {
+    // Validate the concatenated buffer first so per-slice checks
+    // below are guaranteed to land on a UTF-8 boundary check (not a
+    // bytes-not-in-bounds check).
+    let data_start = data.offset as usize;
+    let data_end = data_start + data.byte_len as usize;
+    if core::str::from_utf8(&bytes[data_start..data_end]).is_err() {
+        return Err(
+            DecodeError::new(DecodeErrorCode::InvalidUtf8).with_section(SectionKind::StringData)
+        );
+    }
     let mut prev_end: u32 = 0;
     for i in 0..offsets.count {
         let rec_offset =
@@ -391,15 +411,35 @@ fn validate_string_offsets(
                 .with_section(SectionKind::StringOffsets)
                 .with_index(i));
         }
+        // Per-slice UTF-8 boundary check: the full StringData buffer
+        // can be valid UTF-8 even when an offset record splits a
+        // multibyte scalar. Catching that here means
+        // `SnapshotView::string` never silently returns `None` for an
+        // in-range reference.
+        let abs_start = data_start + off as usize;
+        let abs_end = data_start + end as usize;
+        if core::str::from_utf8(&bytes[abs_start..abs_end]).is_err() {
+            return Err(DecodeError::new(DecodeErrorCode::InvalidUtf8)
+                .with_section(SectionKind::StringOffsets)
+                .with_index(i));
+        }
         prev_end = end;
     }
-    // UTF-8 validation over string data.
-    let data_start = data.offset as usize;
-    let data_end = data_start + data.byte_len as usize;
-    if core::str::from_utf8(&bytes[data_start..data_end]).is_err() {
-        return Err(
-            DecodeError::new(DecodeErrorCode::InvalidUtf8).with_section(SectionKind::StringData)
-        );
+    Ok(())
+}
+
+/// Reject inverted snapshot spans (`span_start > span_end`).
+///
+/// All snapshot record spans use UTF-8 byte offsets and the half-
+/// open interval `[start, end)`. `start == end` is the canonical
+/// empty span, but `start > end` is not representable and would
+/// surface as a nonsensical `Span` through view accessors.
+#[inline]
+fn check_span(start: u32, end: u32, section: SectionKind, index: u32) -> Result<(), DecodeError> {
+    if start > end {
+        return Err(DecodeError::new(DecodeErrorCode::InvalidSpan)
+            .with_section(section)
+            .with_index(index));
     }
     Ok(())
 }
@@ -534,8 +574,9 @@ fn validate_node_records(
         let rec_offset = nodes.offset as usize + (i as usize) * NODE_RECORD_SIZE as usize;
         let kind = read_u16_le(bytes, rec_offset);
         let flags = read_u16_le(bytes, rec_offset + 2);
-        let _start = read_u32_le(bytes, rec_offset + 4);
-        let _end = read_u32_le(bytes, rec_offset + 8);
+        let span_start = read_u32_le(bytes, rec_offset + 4);
+        let span_end = read_u32_le(bytes, rec_offset + 8);
+        check_span(span_start, span_end, SectionKind::Nodes, i)?;
         let first_child = read_u32_le(bytes, rec_offset + 12);
         let child_count = read_u32_le(bytes, rec_offset + 16);
         let data_ref = read_u32_le(bytes, rec_offset + 20);
@@ -621,8 +662,9 @@ fn validate_token_records(
         let rec_offset = tokens.offset as usize + (i as usize) * TOKEN_RECORD_SIZE as usize;
         let kind = read_u16_le(bytes, rec_offset);
         let flags = read_u16_le(bytes, rec_offset + 2);
-        let _start = read_u32_le(bytes, rec_offset + 4);
-        let _end = read_u32_le(bytes, rec_offset + 8);
+        let span_start = read_u32_le(bytes, rec_offset + 4);
+        let span_end = read_u32_le(bytes, rec_offset + 8);
+        check_span(span_start, span_end, SectionKind::Tokens, i)?;
         let source_id = read_u32_le(bytes, rec_offset + 12);
         let lead_start = read_u32_le(bytes, rec_offset + 16);
         let lead_count = read_u32_le(bytes, rec_offset + 20);
@@ -674,8 +716,9 @@ fn validate_trivia_records(
         let rec_offset = trivia.offset as usize + (i as usize) * TRIVIA_RECORD_SIZE as usize;
         let kind = read_u16_le(bytes, rec_offset);
         let flags = read_u16_le(bytes, rec_offset + 2);
-        let _start = read_u32_le(bytes, rec_offset + 4);
-        let _end = read_u32_le(bytes, rec_offset + 8);
+        let span_start = read_u32_le(bytes, rec_offset + 4);
+        let span_end = read_u32_le(bytes, rec_offset + 8);
+        check_span(span_start, span_end, SectionKind::Trivia, i)?;
         let source_id = read_u32_le(bytes, rec_offset + 12);
         if flags != 0 {
             return Err(DecodeError::new(DecodeErrorCode::InvalidReservedField)
@@ -706,8 +749,9 @@ fn validate_diagnostic_records(
     for i in 0..diags.count {
         let rec_offset = diags.offset as usize + (i as usize) * DIAGNOSTIC_RECORD_SIZE as usize;
         let source_id = read_u32_le(bytes, rec_offset);
-        let _start = read_u32_le(bytes, rec_offset + 4);
-        let _end = read_u32_le(bytes, rec_offset + 8);
+        let span_start = read_u32_le(bytes, rec_offset + 4);
+        let span_end = read_u32_le(bytes, rec_offset + 8);
+        check_span(span_start, span_end, SectionKind::Diagnostics, i)?;
         let severity = bytes[rec_offset + 12];
         let reserved = bytes[rec_offset + 13];
         let code = read_u16_le(bytes, rec_offset + 14);
@@ -759,8 +803,9 @@ fn validate_diagnostic_label_records(
         let rec_offset =
             labels.offset as usize + (i as usize) * DIAGNOSTIC_LABEL_RECORD_SIZE as usize;
         let source_id = read_u32_le(bytes, rec_offset);
-        let _start = read_u32_le(bytes, rec_offset + 4);
-        let _end = read_u32_le(bytes, rec_offset + 8);
+        let span_start = read_u32_le(bytes, rec_offset + 4);
+        let span_end = read_u32_le(bytes, rec_offset + 8);
+        check_span(span_start, span_end, SectionKind::DiagnosticLabels, i)?;
         let message = read_u32_le(bytes, rec_offset + 12);
         if source_id >= source_count {
             return Err(DecodeError::new(DecodeErrorCode::InvalidSourceRef)
@@ -866,4 +911,53 @@ pub(crate) fn diagnostic_code_from_u16_strict(value: u16) -> Option<DiagnosticCo
         v if v == MissingIdentifierName.as_u16() => MissingIdentifierName,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test for the equal-offset section sort: an empty
+    /// section that shares an aligned offset with a non-empty
+    /// section must sort first so the overlap check accepts both,
+    /// regardless of the section-table listing order.
+    #[test]
+    fn equal_offset_sort_places_empty_before_non_empty() {
+        let records = [
+            DecodedSection {
+                kind: SectionKind::StringData,
+                offset: 32,
+                byte_len: 16,
+                count: 0,
+            },
+            DecodedSection {
+                kind: SectionKind::StringOffsets,
+                offset: 32,
+                byte_len: 0,
+                count: 0,
+            },
+        ];
+        let mut sorted: Vec<usize> = (0..records.len()).collect();
+        sorted.sort_by_key(|i| {
+            let rec = records[*i];
+            (rec.offset, rec.byte_len != 0)
+        });
+        assert_eq!(records[sorted[0]].kind, SectionKind::StringOffsets);
+        assert_eq!(records[sorted[1]].kind, SectionKind::StringData);
+    }
+
+    #[test]
+    fn check_span_accepts_zero_and_equal_endpoints() {
+        assert!(check_span(0, 0, SectionKind::Nodes, 0).is_ok());
+        assert!(check_span(5, 5, SectionKind::Nodes, 0).is_ok());
+        assert!(check_span(2, 7, SectionKind::Nodes, 0).is_ok());
+    }
+
+    #[test]
+    fn check_span_rejects_inverted_spans() {
+        let err = check_span(5, 4, SectionKind::Tokens, 3).unwrap_err();
+        assert_eq!(err.code, DecodeErrorCode::InvalidSpan);
+        assert_eq!(err.section, Some(SectionKind::Tokens));
+        assert_eq!(err.index, Some(3));
+    }
 }

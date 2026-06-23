@@ -633,7 +633,13 @@ impl SnapshotWriter {
             bytes: string_data,
             count: 0,
         });
-        if include_source_text && !source_text_bytes.is_empty() {
+        // When `include_source_text = true`, every SourceRecord
+        // writes a non-`NONE_REF` text_source above, even for empty
+        // source text. The section must therefore be emitted (even
+        // empty) so the decoder's `text_source != NONE_REF` branch
+        // can resolve an in-range `offset + len` and `SourceView::text`
+        // can round-trip `Some("")` back instead of returning `None`.
+        if include_source_text {
             assembler.push(EmittedSection {
                 kind: SectionKind::SourceTextData,
                 bytes: source_text_bytes,

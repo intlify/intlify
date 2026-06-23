@@ -42,6 +42,11 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - v0.1 decoder validates SyntaxKind numeric values in node, token, and trivia records.
 - Diagnostic code numeric values are snapshot-visible draft data and require fixture/changelog updates when changed.
 - v0.1 decoder validates diagnostic severity and diagnostic code numeric values.
+- v0.1 decoder rejects inverted spans (`span_start > span_end`) in node, token, trivia, diagnostic, and diagnostic-label records as `DecodeErrorCode::InvalidSpan` (36).
+- v0.1 decoder validates each interned string slice against UTF-8 boundaries (catches offsets that split a multibyte scalar even when the concatenated string-data buffer is valid UTF-8).
+- v0.1 decoder normalises section-table read order so an empty section that shares an aligned offset with a non-empty section is never falsely rejected as overlapping.
+- `DecodeErrorCode` uses `#[repr(u16)]` with explicit discriminants; the numeric values are stable across the v0.1 surface for tests, fixture validators, and language bindings.
+- v0.1 writer emits the (possibly empty) `SourceTextData` section whenever `SnapshotOptions.include_source_text = true`, so empty source text round-trips back as `Some("")` instead of being lost.
 
 ## Changelog Update Rule
 
