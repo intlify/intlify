@@ -71,6 +71,13 @@ parse_source_to_snapshot(
   snapshot_options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError>
 
+parse_message_to_snapshot(
+  source: &str,
+  metadata: Option<SnapshotSourceMetadata<'_>>,
+  parse_options: ParseOptions,
+  snapshot_options: SnapshotOptions,
+) -> Result<SnapshotResult, SnapshotWriteError>
+
 parse_result_to_snapshot(
   sources: &SourceStore,
   result: &ParseResult,
@@ -94,19 +101,23 @@ parse_batch_result_to_snapshot(
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
 `parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
 
-`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources` using `result.source`. The `sources` store must contain the Phase 1 SourceId carried by the result. SnapshotWriter then maps that Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+`parse_message_to_snapshot` is the standalone counterpart for callers that do not own a `SourceStore`. It builds a private one-entry `SourceStore` from `source` plus the optional `SnapshotSourceMetadata`, then runs the same `parse_source` + `parse_result_to_snapshot` pipeline. This is the API to use when porting code that used `parse_message(source)` directly — pairing a `parse_message` `ParseResult` with an unrelated `SourceStore` is unsafe (see below).
 
-If a `ParseResult` was produced by the `parse_message(source)` convenience API without SourceStore registration, callers that need a snapshot must either parse through `parse_source` / `SourceStore` or register equivalent source metadata before calling `parse_result_to_snapshot`. SnapshotWriter must not invent path, locale, message_id, base_offset, or source text ownership that is not present in SourceStore metadata.
+`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources.get(result.source)`. The contract is that `sources` is the same `SourceStore` the result was parsed against — i.e. the result came from `parse_source(sources, ...)` or `parse_batch(...).items[i].result`. SnapshotWriter then maps the Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+
+`parse_result_to_snapshot` MUST NOT be paired with a `ParseResult` produced by `parse_message(source)`: that path returns a hard-coded `SourceId::new(0)` without registering the source in any store, so a `sources.get(SourceId::new(0))` lookup against an unrelated store would silently encode the wrong source metadata or source text. Standalone callers should use `parse_message_to_snapshot` instead.
 
 `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / Phase 1 SourceId reachable from the session, then emits snapshot-local SourceIds.
 
 `parse_batch_to_snapshot` is a convenience API equivalent to `parse_batch` followed by `parse_batch_result_to_snapshot`.
 
 `parse_batch_result_to_snapshot` encodes an already produced `BatchParseResult` without reparsing. It uses `BatchParseResult.sources` for SourceRecord metadata and encodes `BatchParseResult.items` in input order as RootRecord entries. This preserves the original batch `execution` / `degraded` values and keeps parse cost separate from snapshot encode cost.
+
+`parse_batch_result_to_snapshot` requires `BatchParseItem.source == BatchParseItem.result.source` for every item. The Phase 1 `parse_batch` API preserves this invariant, but `BatchParseResult` / `BatchParseItem` are public, `Clone`, and constructible with struct literals, so a hand-crafted batch can break it. Encoding a mismatched item would attach the `BatchParseItem.source` metadata (path / locale / message_id / optional source text) to a CST whose spans were produced against `BatchParseItem.result.source`, silently emitting an incoherent snapshot. The writer rejects such inputs with `SnapshotWriteError::InconsistentSourceId` before any string interning or section emission runs.
 
 `parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
 
@@ -773,7 +784,7 @@ DiagnosticRecord {
 
 In v0.1, `code` stores the parser diagnostic code numeric value. This mapping is snapshot-visible draft data, so changing numeric diagnostic code values requires fixture updates and a format changelog entry. The parser implementation must not silently rely on Rust enum declaration order if that would make diagnostic code numbers accidental.
 
-Diagnostic records are grouped by root order so RootRecord `diagnostic_start` / `diagnostic_count` can reference them. Each DiagnosticRecord has SourceId and Span, so it can still represent diagnostics from multiple sources associated with the same root. The RootRecord range is the source of truth for root-local diagnostics in the snapshot.
+Diagnostic records are grouped by root order so RootRecord `diagnostic_start` / `diagnostic_count` can reference them. In v0.1 writer output, diagnostics belong to the root's SourceRecord. `DiagnosticRecord.source_id` is still stored explicitly so the record layout stays uniform and future writer policies can evolve, but the v0.1 writer does not emit multi-source diagnostics within one root. The RootRecord range is the source of truth for root-local diagnostics in the snapshot.
 
 Diagnostic labels live in a separate diagnostic labels section. DiagnosticRecord `label_start` / `label_count` points to a contiguous range in the DiagnosticLabelRecord array.
 
@@ -786,7 +797,7 @@ DiagnosticLabelRecord {
 }
 ```
 
-Diagnostics without labels use `label_count = 0`. Decoders verify `label_start + label_count <= diagnostic_labels.count`. Help text is not included in the v0.1 snapshot record; add it later as an optional diagnostic-help section when needed.
+Diagnostics without labels use `label_count = 0`. Decoders verify `label_start + label_count <= diagnostic_labels.count`. In v0.1 writer output, DiagnosticLabelRecord `source_id` also points to the same root SourceRecord as the parent diagnostic. Help text is not included in the v0.1 snapshot record; add it later as an optional diagnostic-help section when needed.
 
 Public APIs may return diagnostics separately for convenience, but the snapshot format must be able to keep diagnostics as part of the encoded result. A flat diagnostics array in a binding result is a view over snapshot diagnostic records in root order, not a separate diagnostic table.
 

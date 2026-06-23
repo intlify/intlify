@@ -1,0 +1,18 @@
+# typos spell-checker configuration.
+#
+# https://github.com/crate-ci/typos
+#
+# typos runs over the whole repository in CI. The directories below
+# contain MessageFormat sample data — ICU MF1 cases, MF2 fixtures,
+# benchmark inputs, generated bench reports, and the v0.1 Binary AST
+# snapshot golden files. They are message content under test, not
+# source or documentation, and intentionally contain placeholders
+# like the ICU ordinal suffix `{#nd}` (as in "2nd") that the spell
+# checker would otherwise flag as `nd` → `and`.
+
+[files]
+extend-exclude = [
+  "tools/mf-parser-bench/cases/**",
+  "tools/mf-parser-bench/results/**",
+  "crates/ox_mf2_parser/fixtures/**"
+]

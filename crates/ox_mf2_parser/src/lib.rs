@@ -22,6 +22,7 @@ pub mod diagnostic;
 pub mod parser;
 pub mod scanner;
 pub mod semantic;
+pub mod snapshot;
 pub mod source;
 pub mod span;
 pub mod syntax_kind;
@@ -39,6 +40,13 @@ pub use diagnostic::{
 };
 pub use scanner::ScannerState;
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
+pub use snapshot::{
+    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
+    parse_batch_to_snapshot, parse_message_to_snapshot, parse_result_to_snapshot,
+    parse_session_to_snapshot, parse_source_to_snapshot, BatchSnapshotResult, DecodeError,
+    DecodeErrorCode, RootId, SectionKind, SnapshotOptions, SnapshotResult, SnapshotSourceMetadata,
+    SnapshotView, SnapshotViewOwned, SnapshotWriteError, SourceTextUnavailable,
+};
 pub use source::{SourceFile, SourceFileInput, SourceLocation, SourceStore};
 pub use span::{EdgeId, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
 pub use syntax_kind::SyntaxKind;

@@ -1,0 +1,2 @@
+.input {$n :integer}
+{{count: {$n}}}
