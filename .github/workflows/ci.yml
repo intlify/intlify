@@ -96,7 +96,7 @@ jobs:
       - name: Testing
         env:
           VITE_LOG: vite_task=trace
-        run: vpr -v test
+        run: vpr --no-cache -v test
 
   binding-package-smoke:
     runs-on: ubuntu-latest
