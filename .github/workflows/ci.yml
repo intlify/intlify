@@ -110,7 +110,28 @@ jobs:
         run: vp run -r build
 
       - name: Testing
+        if: matrix.os != 'windows-latest'
         run: vp run -r test
+
+      - name: Test Rust
+        if: matrix.os == 'windows-latest'
+        run: cargo test --all-targets --color always
+
+      - name: Test root Vitest
+        if: matrix.os == 'windows-latest'
+        run: vp test
+
+      - name: Test shared package
+        if: matrix.os == 'windows-latest'
+        run: vp run @intlify/ox-mf2-shared#test
+
+      - name: Test N-API package
+        if: matrix.os == 'windows-latest'
+        run: vp run @intlify/ox-mf2-napi#test
+
+      - name: Test WASM package
+        if: matrix.os == 'windows-latest'
+        run: vp run @intlify/ox-mf2-wasm#test
 
   binding-package-smoke:
     runs-on: ubuntu-latest
