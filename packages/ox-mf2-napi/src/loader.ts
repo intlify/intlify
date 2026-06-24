@@ -102,13 +102,20 @@ function tryLoadNativeBinding(): NativeLoadResult {
 }
 
 function candidateSpecifiers(): string[] {
-  return [
+  const specifiers = [
     optionalPackageName(),
     join(bindingDir(), localBinaryName()),
-    join(bindingDir(), 'ox_mf2_napi.node'),
-    join(packageDir(), '..', '..', 'target', 'debug', 'ox_mf2_napi.node'),
-    join(packageDir(), '..', '..', 'target', 'release', 'ox_mf2_napi.node')
+    join(bindingDir(), 'ox_mf2_napi.node')
   ]
+
+  if (process.env.OX_MF2_NAPI_ALLOW_LOCAL_TARGET === '1') {
+    specifiers.push(
+      join(packageDir(), '..', '..', 'target', 'debug', 'ox_mf2_napi.node'),
+      join(packageDir(), '..', '..', 'target', 'release', 'ox_mf2_napi.node')
+    )
+  }
+
+  return specifiers
 }
 
 function bindingDir(): string {

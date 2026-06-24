@@ -17,7 +17,8 @@ export const BINDING_CALIBRATION_CANDIDATES = [1, 10, 100, 1000, 5000, 10000, 25
  * @returns Calibration target in milliseconds.
  */
 export function bindingCalibrationTargetMs() {
-  return Number(process.env.MF_PARSER_BENCH_CALIBRATE_MS ?? '200')
+  const value = Number(process.env.MF_PARSER_BENCH_CALIBRATE_MS ?? '200')
+  return Number.isFinite(value) && value > 0 ? value : 200
 }
 
 /**
@@ -84,7 +85,10 @@ export async function writeBindingCalibration(rootDir, bindings) {
 
   try {
     calibration = JSON.parse(await readFile(calibrationPath, 'utf8'))
-  } catch {
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error
+    }
     // Keep defaults when parser calibration has not run yet.
   }
 
@@ -154,7 +158,11 @@ async function runBinding({ rootDir, calibrationRunDir, runtime, operation, iter
       '--summary-json',
       summaryJson
     ],
-    { cwd: rootDir }
+    {
+      cwd: rootDir,
+      timeout: 120_000,
+      killSignal: 'SIGKILL'
+    }
   )
 
   const summary = JSON.parse(await readFile(summaryJson, 'utf8'))

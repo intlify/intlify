@@ -67,6 +67,12 @@ test('parseBatch input accepts objects only and must not be empty', () => {
   expect(normalizeParseBatchInput([{ source: 'Hello' }])).toHaveLength(1)
 })
 
+test('parseBatch input rejects sparse arrays', () => {
+  const sparse: Array<{ source: string } | undefined> = [{ source: 'Hello' }]
+  sparse[2] = { source: 'World' }
+  expect(() => normalizeParseBatchInput(sparse as never)).toThrow(TypeError)
+})
+
 test('decodeSnapshot accepts only Uint8Array', () => {
   const bytes = new Uint8Array([1, 2, 3])
   expect(validateDecodeSnapshotInput(bytes)).toBe(bytes)
@@ -77,4 +83,10 @@ test('withSources validates source strings', () => {
   expect(validateWithSourcesInput(['a', 'b'])).toEqual(['a', 'b'])
   expect(() => validateWithSourcesInput([1] as never)).toThrow(TypeError)
   expect(() => validateWithSourcesInput(['\ud800'])).toThrow(TypeError)
+})
+
+test('withSources rejects sparse arrays', () => {
+  const sparse: Array<string | undefined> = ['a']
+  sparse[2] = 'b'
+  expect(() => validateWithSourcesInput(sparse as never)).toThrow(TypeError)
 })

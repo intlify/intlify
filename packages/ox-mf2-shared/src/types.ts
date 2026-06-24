@@ -467,4 +467,4 @@ export type DecodedSnapshotResult = {
 }
 
 /** Input accepted by the WASM package initializer. */
-export type WasmInitInput = URL | RequestInfo | WebAssembly.Module | ArrayBuffer | Uint8Array
+export type WasmInitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module

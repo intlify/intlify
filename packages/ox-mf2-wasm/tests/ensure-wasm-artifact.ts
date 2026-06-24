@@ -81,7 +81,9 @@ async function runWasmPackBuild(): Promise<void> {
       ],
       {
         cwd: packageDir,
-        maxBuffer: 10 * 1024 * 1024
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: waitTimeoutMs,
+        killSignal: 'SIGKILL'
       }
     )
   } catch (error) {

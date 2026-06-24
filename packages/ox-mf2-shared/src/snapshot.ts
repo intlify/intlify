@@ -617,7 +617,10 @@ export class BinarySnapshotAccessor implements SnapshotAccessor {
         return rootId
       }
     }
-    return 0
+    throw snapshotError(
+      OxMf2ErrorCode.DecodeInvalidSectionCount,
+      'diagnostic index is not mapped to any root'
+    )
   }
 
   #sourceString(sourceId: number, fieldOffset: number): string | null {
@@ -641,6 +644,12 @@ export class BinarySnapshotAccessor implements SnapshotAccessor {
     }
     const offset = this.#readU32(sourceOffset + 24)
     const byteLength = this.#readU32(sourceOffset + 28)
+    if (offset + byteLength > section.byteLength) {
+      throw snapshotError(
+        OxMf2ErrorCode.DecodeInvalidSectionBounds,
+        'source text range exceeds source text section payload'
+      )
+    }
     const start = section.offset + offset
     return this.#bytes.subarray(start, start + byteLength)
   }
@@ -655,8 +664,16 @@ export class BinarySnapshotAccessor implements SnapshotAccessor {
       return null
     }
     const offset = offsets.offset + id * 8
-    const start = data.offset + this.#readU32(offset)
-    const end = start + this.#readU32(offset + 4)
+    const relativeStart = this.#readU32(offset)
+    const byteLength = this.#readU32(offset + 4)
+    if (relativeStart + byteLength > data.byteLength) {
+      throw snapshotError(
+        OxMf2ErrorCode.DecodeInvalidSectionBounds,
+        'string range exceeds string data section payload'
+      )
+    }
+    const start = data.offset + relativeStart
+    const end = start + byteLength
     return TEXT_DECODER.decode(this.#bytes.subarray(start, end))
   }
 

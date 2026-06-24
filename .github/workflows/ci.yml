@@ -94,11 +94,12 @@ jobs:
   binding-package-smoke:
     runs-on: ubuntu-latest
     name: Binding package smoke
+    timeout-minutes: 15
     steps:
       - name: Checkout codes
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Setup Vite Plus
@@ -128,11 +129,12 @@ jobs:
   binding-benchmark-smoke:
     runs-on: ubuntu-latest
     name: Binding benchmark smoke
+    timeout-minutes: 20
     steps:
       - name: Checkout codes
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Setup Vite Plus
@@ -167,11 +169,12 @@ jobs:
   binding-benchmark-e2e-smoke:
     runs-on: ubuntu-latest
     name: Binding benchmark E2E smoke
+    timeout-minutes: 20
     steps:
       - name: Checkout codes
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Setup Vite Plus
@@ -193,7 +196,7 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
       - name: Install browser
-        run: npx --package @playwright/cli playwright-cli install-browser chromium
+        run: npx --yes playwright install --with-deps chromium
 
       - name: Build packages
         run: vpr build

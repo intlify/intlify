@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { createReadStream, existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { extname, resolve } from 'node:path'
+import { extname, resolve, sep } from 'node:path'
 import { BROWSER_BINDING_OPERATIONS } from '../binding-targets.mjs'
 import { readBindingIterations } from './binding-calibration.mjs'
 
@@ -48,7 +48,13 @@ try {
 
 async function resolveBrowserIterations(operation) {
   if (process.env.OX_MF2_BROWSER_BENCH_ITERATIONS) {
-    return Number(process.env.OX_MF2_BROWSER_BENCH_ITERATIONS)
+    const override = Number(process.env.OX_MF2_BROWSER_BENCH_ITERATIONS)
+    if (!Number.isInteger(override) || override <= 0) {
+      throw new Error(
+        `OX_MF2_BROWSER_BENCH_ITERATIONS must be a positive integer: ${process.env.OX_MF2_BROWSER_BENCH_ITERATIONS}`
+      )
+    }
+    return override
   }
 
   return readBindingIterations(benchDir, 'wasm', operation)
@@ -106,23 +112,28 @@ function createStaticServer({ fixturesDir, wasmDistDir }) {
 }
 
 async function serveFile(filePath, root, response) {
-  if (!filePath.startsWith(root)) {
+  const normalizedRoot = resolve(root)
+  const normalizedFilePath = resolve(filePath)
+  if (
+    normalizedFilePath !== normalizedRoot &&
+    !normalizedFilePath.startsWith(`${normalizedRoot}${sep}`)
+  ) {
     response.writeHead(403)
     response.end('forbidden')
     return
   }
 
   try {
-    const info = await stat(filePath)
+    const info = await stat(normalizedFilePath)
     if (!info.isFile()) {
       response.writeHead(404)
       response.end('not found')
       return
     }
     response.writeHead(200, {
-      'content-type': contentType(filePath)
+      'content-type': contentType(normalizedFilePath)
     })
-    createReadStream(filePath).pipe(response)
+    createReadStream(normalizedFilePath).pipe(response)
   } catch {
     response.writeHead(404)
     response.end('not found')

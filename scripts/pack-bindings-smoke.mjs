@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -47,6 +48,7 @@ try {
 }
 
 function packPackage(packagePath) {
+  const before = new Set(readdirSync(packDir))
   const result = spawnSync('pnpm', ['--dir', packagePath, 'pack', '--pack-destination', packDir], {
     cwd: workspaceDir,
     encoding: 'utf8',
@@ -55,11 +57,11 @@ function packPackage(packagePath) {
   if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || `failed to pack ${packagePath}`)
   }
-  const match = result.stdout.match(/(\/.*\.tgz)$/m)
-  if (!match) {
+  const created = readdirSync(packDir).find(name => name.endsWith('.tgz') && !before.has(name))
+  if (!created) {
     throw new Error(`failed to locate tarball path for ${packagePath}`)
   }
-  return match[1]
+  return join(packDir, created)
 }
 
 function listPackage(packageFile) {

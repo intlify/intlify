@@ -16,7 +16,7 @@ mod source_text;
 use wasm_bindgen::prelude::*;
 
 use ox_mf2_parser::{
-    decode_snapshot_owned, parse_batch_to_snapshot, parse_message_to_snapshot, BatchExecution,
+    decode_snapshot, parse_batch_to_snapshot, parse_message_to_snapshot, BatchExecution,
     BatchParseOptions, ParseInput, ParseOptions, SnapshotOptions, SnapshotSourceMetadata,
 };
 
@@ -67,7 +67,12 @@ pub fn parse_batch_to_snapshot_js(items: JsValue, options: JsValue) -> Result<Ve
         BatchParseOptions {
             execution: match options.batch_execution.as_str() {
                 "parallel" => BatchExecution::Parallel,
-                _ => BatchExecution::Sequential,
+                "sequential" => BatchExecution::Sequential,
+                other => {
+                    return Err(js_error(format!(
+                        "Invalid batchExecution '{other}'. Expected 'sequential' or 'parallel'."
+                    )))
+                }
             },
             max_threads: None,
             preserve_order: true,
@@ -88,9 +93,8 @@ pub fn parse_batch_to_snapshot_js(items: JsValue, options: JsValue) -> Result<Ve
 }
 
 #[wasm_bindgen(js_name = decodeSnapshotBytes)]
-pub fn decode_snapshot_bytes(bytes: &[u8]) -> Result<Vec<u8>, JsValue> {
-    let bytes = bytes.to_vec();
-    decode_snapshot_owned(bytes.clone()).map_err(|error| js_error(error.to_string()))?;
+pub fn decode_snapshot_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    decode_snapshot(&bytes).map_err(|error| js_error(error.to_string()))?;
     Ok(bytes)
 }
 

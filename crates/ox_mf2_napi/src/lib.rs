@@ -21,7 +21,7 @@ use ox_mf2_parser::{
     SnapshotSourceMetadata,
 };
 
-use crate::error::{decode, not_implemented, snapshot_write};
+use crate::error::{decode, snapshot_write};
 use crate::input::{JsParseBatchInput, JsParseMessageInput};
 use crate::options::{JsDecodeSnapshotOptions, JsParseBatchOptions, JsParseMessageOptions};
 use crate::snapshot::{JsNativeSnapshotResult, JsSnapshotHandle};
@@ -101,7 +101,6 @@ pub fn decode_snapshot(
 }
 
 #[napi]
-pub fn snapshot_to_bytes(_snapshot: &JsSnapshotHandle) -> napi::Result<Uint8Array> {
-    let _ = _snapshot.bytes();
-    Err(not_implemented("snapshot_to_bytes"))
+pub fn snapshot_to_bytes(snapshot: &JsSnapshotHandle) -> napi::Result<Uint8Array> {
+    Ok(Uint8Array::from(snapshot.bytes().to_vec()))
 }

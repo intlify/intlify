@@ -113,7 +113,7 @@ export function normalizeParseBatchInput(
   if (items.length === 0) {
     throw new RangeError('parseBatch input must not be empty')
   }
-  return items.map((item, index) => {
+  return Array.from(items, (item, index) => {
     const object = normalizeInputObject(item, `parseBatch input item ${index}`)
     return normalizeParseInputObject(object, `parseBatch input item ${index}`)
   })
@@ -142,7 +142,7 @@ export function validateWithSourcesInput(sources: readonly string[]): string[] {
   if (!Array.isArray(sources)) {
     throw new TypeError('withSources input must be a string array')
   }
-  return sources.map((source, index) => {
+  return Array.from(sources, (source, index) => {
     if (typeof source !== 'string') {
       throw new TypeError(`withSources input item ${index} must be a string`)
     }
