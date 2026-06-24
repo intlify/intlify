@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile
 
+      - name: Print Vite+ version
+        run: vp --version
+
       - name: Setup cargo cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
@@ -90,11 +93,10 @@ jobs:
       - name: Build packages
         run: vpr build
 
-      - name: Test Rust
-        run: cargo test -p ox_mf2_parser --all-targets --color always
-
-      - name: Test packages
-        run: vp test
+      - name: Testing
+        env:
+          VITE_LOG: vite_task=trace
+        run: vpr -v test
 
   binding-package-smoke:
     runs-on: ubuntu-latest
