@@ -90,8 +90,11 @@ jobs:
       - name: Build packages
         run: vpr build
 
-      - name: Testing
-        run: vpr test
+      - name: Test Rust
+        run: cargo test -p ox_mf2_parser --all-targets --color always
+
+      - name: Test packages
+        run: vp test
 
   binding-package-smoke:
     runs-on: ubuntu-latest
