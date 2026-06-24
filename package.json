@@ -23,7 +23,7 @@
     "ready": "vpr check && vpr test && vpr build",
     "dev": "vp run website#dev",
     "check": "vp run check:rust && vp check",
-    "test": "cargo test --all-targets --color always && vp test",
+    "test": "cargo test -p ox_mf2_parser --all-targets --color always && vp test",
     "prepare": "vp config"
   },
   "devDependencies": {
