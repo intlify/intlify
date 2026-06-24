@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 
+import { calibrateBindings } from './binding-calibration.mjs'
 import { TARGETS, benchmarkCorporaForTarget } from '../targets.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -28,9 +29,11 @@ for (const target of TARGETS) {
   }
 }
 
+const bindings = await calibrateBindings({ rootDir, targetMs })
+
 await writeFile(
   resolve(outputDir, 'calibration.json'),
-  `${JSON.stringify({ targetMs, results }, null, 2)}\n`
+  `${JSON.stringify({ targetMs, results, bindings }, null, 2)}\n`
 )
 
 async function calibrate(target, corpus) {

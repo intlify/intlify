@@ -1,0 +1,22 @@
+[package]
+name = "ox_mf2_wasm"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ox_mf2_parser = { path = "../ox_mf2_parser" }
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2.125"
+
+# `wasm-bindgen` expands host boundary glue that can contain unsafe internally.
+# The parser core keeps the workspace `unsafe_code = forbid` policy.
+[lints.rust]
+unsafe_code = "allow"

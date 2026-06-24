@@ -6,11 +6,18 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    "./error-codes": "./src/error-codes.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./error-codes": {
+      "types": "./dist/error-codes.d.ts",
+      "import": "./dist/error-codes.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "vp pack",
     "test": "vp test"
   },
   "devDependencies": {

@@ -31,7 +31,7 @@ dist-ssr
 !.vscode/extensions.json
 
 # playwright-cli
-.playwright-cli
+**/.playwright-cli
 
 # Rust build artefacts (workspace and crate-local target dirs)
 target
@@ -44,6 +44,11 @@ target
 tools/mf-parser-bench/.tmp
 tools/mf-parser-bench/results
 tools/mf-parser-bench/rs/target
+packages/ox-mf2-napi/*.node
+packages/ox-mf2-napi/native-binding.js
+packages/ox-mf2-napi/native-binding.d.ts
+packages/ox-mf2-wasm/dist
+packages/ox-mf2-wasm/.wasm-build.lock
 
 # others
 .plans

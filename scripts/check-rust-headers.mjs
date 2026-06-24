@@ -1,9 +1,3 @@
-#!/usr/bin/env node
-/**
- * @license MIT
- * @author kazuya kawaguchi (a.k.a. kazupon)
- */
-
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

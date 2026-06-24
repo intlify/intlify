@@ -19,6 +19,7 @@ jobs:
   lint:
     runs-on: ${{ matrix.os }}
     name: Lint (${{ matrix.os }})
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -45,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile
 
+      - name: Print Vite+ version
+        run: vp --version
+
       - name: Setup cargo cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
@@ -52,11 +56,12 @@ jobs:
         run: vp run -r build
 
       - name: Check
-        run: vp run check
+        run: vpr check
 
   test:
     runs-on: ${{ matrix.os }}
     name: Test (${{ matrix.os }})
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -86,7 +91,122 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
       - name: Build packages
-        run: vp run -r build
+        run: vpr build
 
       - name: Testing
-        run: vp run -r test
+        env:
+          VITE_LOG: vite_task=trace
+        run: vpr --no-cache -v test
+
+  binding-package-smoke:
+    runs-on: ubuntu-latest
+    name: Binding package smoke
+    timeout-minutes: 15
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 22.13
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Setup cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+
+      - name: Build packages
+        run: vpr build
+
+      - name: Run binding package smoke
+        run: vp run pack:bindings:smoke
+
+  binding-benchmark-smoke:
+    runs-on: ubuntu-latest
+    name: Binding benchmark smoke
+    timeout-minutes: 20
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 22.13
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Setup cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+
+      - name: Install benchmark tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y hyperfine
+
+      - name: Build packages
+        run: vpr build
+
+      - name: Run binding benchmark smoke
+        run: vp run bench:bindings:smoke
+
+  binding-benchmark-e2e-smoke:
+    runs-on: ubuntu-latest
+    name: Binding benchmark E2E smoke
+    timeout-minutes: 20
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 22.13
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Setup cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+
+      - name: Install browser
+        run: npx --yes playwright install --with-deps chromium
+
+      - name: Build packages
+        run: vpr build
+
+      - name: Run binding benchmark E2E smoke
+        run: vp run bench:bindings:e2e:smoke

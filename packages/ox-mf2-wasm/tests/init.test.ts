@@ -1,0 +1,21 @@
+import { beforeAll, expect, test } from 'vite-plus/test'
+import { OxMf2InitializationError, init, parseMessage } from '../src/index.ts'
+import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
+
+beforeAll(async () => {
+  await ensureWasmArtifacts()
+})
+
+test('module import succeeds before WASM init', () => {
+  expect(typeof init).toBe('function')
+})
+
+test('API before init reports initialization error', () => {
+  expect(() => parseMessage('Hello {$name}')).toThrow(OxMf2InitializationError)
+})
+
+test('init initializes the generated WASM artifact', async () => {
+  await expect(init()).resolves.toBeUndefined()
+  await expect(init()).resolves.toBeUndefined()
+  await expect(init(new Uint8Array())).rejects.toBeInstanceOf(OxMf2InitializationError)
+})

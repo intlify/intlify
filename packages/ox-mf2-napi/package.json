@@ -1,0 +1,50 @@
+{
+  "name": "@intlify/ox-mf2-napi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "N-API runtime package for ox-mf2.",
+  "license": "MIT",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp run build:napi && vp run build:pack",
+    "build:napi": "napi build --manifest-path ../../crates/ox_mf2_napi/Cargo.toml --output-dir dist --platform --esm --no-dts-header --js native-binding.js --dts native-binding.d.ts",
+    "build:pack": "vp pack",
+    "test": "vp test"
+  },
+  "devDependencies": {
+    "@intlify/ox-mf2-shared": "workspace:*",
+    "@napi-rs/cli": "^3.7.2",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "napi": {
+    "binaryName": "ox_mf2_napi",
+    "packageName": "@intlify/ox-mf2-napi",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
