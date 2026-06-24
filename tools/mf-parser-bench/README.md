@@ -113,7 +113,7 @@ Node.js binding throughput only (after setup):
 vp run mf-parser-bench#bench:bindings:run
 ```
 
-Short smoke run from the repository root (Node.js bindings plus browser WASM):
+Short Node.js binding smoke run from the repository root:
 
 ```sh
 vp run bench:bindings:smoke
@@ -123,6 +123,12 @@ Browser WASM benchmarks run through Playwright and share the same binding setup 
 
 ```sh
 vp run bench:bindings:browser
+```
+
+Short browser WASM smoke run from the repository root:
+
+```sh
+vp run bench:bindings:e2e:smoke
 ```
 
 Browser WASM benchmarks use the calibrated `wasm / <operation>` iteration counts by default. Override all browser targets with `OX_MF2_BROWSER_BENCH_ITERATIONS` when needed.

@@ -16,6 +16,7 @@
     "bench:bindings": "vp run mf-parser-bench#bench:bindings",
     "bench:bindings:browser": "vp run mf-parser-bench#bench:bindings:browser",
     "bench:bindings:smoke": "vp run mf-parser-bench#bench:bindings:smoke",
+    "bench:bindings:e2e:smoke": "vp run mf-parser-bench#bench:bindings:e2e:smoke",
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",
     "build": "vp run -r build",
     "fmt": "cargo fmt --all && vp fmt",
