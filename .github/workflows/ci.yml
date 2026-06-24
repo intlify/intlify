@@ -5,6 +5,7 @@ env:
   CARGO_TERM_COLOR: always
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ permissions:
 
 jobs:
   lint:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     name: Lint (${{ matrix.os }})
     timeout-minutes: 20
@@ -96,9 +98,10 @@ jobs:
       - name: Testing
         env:
           VITE_LOG: vite_task=trace
-        run: vpr --no-cache -v test
+        run: vpr -v test
 
   binding-package-smoke:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Binding package smoke
     timeout-minutes: 15
@@ -134,6 +137,7 @@ jobs:
         run: vp run pack:bindings:smoke
 
   binding-benchmark-smoke:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Binding benchmark smoke
     timeout-minutes: 20
@@ -174,6 +178,7 @@ jobs:
         run: vp run bench:bindings:smoke
 
   binding-benchmark-e2e-smoke:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Binding benchmark E2E smoke
     timeout-minutes: 20
