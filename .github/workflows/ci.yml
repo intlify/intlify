@@ -52,28 +52,7 @@ jobs:
         run: vp run -r build
 
       - name: Check
-        if: matrix.os != 'windows-latest'
-        run: vp run check
-
-      - name: Check Rust headers
-        if: matrix.os == 'windows-latest'
-        run: node scripts/check-rust-headers.mjs
-
-      - name: Check Rust format
-        if: matrix.os == 'windows-latest'
-        run: cargo fmt --all -- --check
-
-      - name: Check Rust clippy
-        if: matrix.os == 'windows-latest'
-        run: cargo clippy --all-targets --color always
-
-      - name: Check Rust compile
-        if: matrix.os == 'windows-latest'
-        run: cargo check --all-targets --color always
-
-      - name: Check Vite Plus
-        if: matrix.os == 'windows-latest'
-        run: vp check
+        run: vpr check
 
   test:
     runs-on: ${{ matrix.os }}
@@ -110,28 +89,7 @@ jobs:
         run: vp run -r build
 
       - name: Testing
-        if: matrix.os != 'windows-latest'
-        run: vp run -r test
-
-      - name: Test Rust
-        if: matrix.os == 'windows-latest'
-        run: cargo test --all-targets --color always
-
-      - name: Test root Vitest
-        if: matrix.os == 'windows-latest'
-        run: vp test
-
-      - name: Test shared package
-        if: matrix.os == 'windows-latest'
-        run: vp run @intlify/ox-mf2-shared#test
-
-      - name: Test N-API package
-        if: matrix.os == 'windows-latest'
-        run: vp run @intlify/ox-mf2-napi#test
-
-      - name: Test WASM package
-        if: matrix.os == 'windows-latest'
-        run: vp run @intlify/ox-mf2-wasm#test
+        run: vpr test
 
   binding-package-smoke:
     runs-on: ubuntu-latest
