@@ -20,7 +20,7 @@
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",
     "build": "vp run -r build",
     "fmt": "cargo fmt --all && vp fmt",
-    "ready": "vpr check && vp run -r test && vp run -r build",
+    "ready": "vpr check && vpr test && vpr build",
     "dev": "vp run website#dev",
     "check": "vp run check:rust && vp check",
     "test": "cargo test --all-targets --color always && vp test",

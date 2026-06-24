@@ -86,7 +86,7 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
       - name: Build packages
-        run: vp run -r build
+        run: vpr build
 
       - name: Testing
         run: vpr test
@@ -120,7 +120,7 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
 
       - name: Build packages
-        run: vp run -r build
+        run: vpr build
 
       - name: Run binding package smoke
         run: vp run pack:bindings:smoke
@@ -159,7 +159,7 @@ jobs:
           sudo apt-get install -y hyperfine
 
       - name: Build packages
-        run: vp run -r build
+        run: vpr build
 
       - name: Run binding benchmark smoke
         run: vp run bench:bindings:smoke
@@ -196,7 +196,7 @@ jobs:
         run: npx --package @playwright/cli playwright-cli install-browser chromium
 
       - name: Build packages
-        run: vp run -r build
+        run: vpr build
 
       - name: Run binding benchmark E2E smoke
         run: vp run bench:bindings:e2e:smoke
