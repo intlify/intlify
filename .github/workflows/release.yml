@@ -86,7 +86,7 @@ jobs:
         run: node scripts/inspect-binding-packages.mjs
 
   build-napi:
-    name: Build @intlify/ox-mf2-napi (${{ matrix.target }})
+    name: Build @intlify/ox-mf2-napi (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     needs:
@@ -101,21 +101,27 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            label: darwin-arm64
             target: aarch64-apple-darwin
             extra_args: ''
           - os: macos-latest
+            label: darwin-x64
             target: x86_64-apple-darwin
             extra_args: ''
           - os: ubuntu-latest
+            label: linux-x64-gnu
             target: x86_64-unknown-linux-gnu
             extra_args: '--use-napi-cross'
           - os: ubuntu-latest
+            label: linux-x64-musl
             target: x86_64-unknown-linux-musl
             extra_args: '--use-napi-cross'
           - os: ubuntu-latest
+            label: linux-arm64-gnu
             target: aarch64-unknown-linux-gnu
             extra_args: '--use-napi-cross'
           - os: windows-latest
+            label: win32-x64-msvc
             target: x86_64-pc-windows-msvc
             extra_args: ''
     defaults:
