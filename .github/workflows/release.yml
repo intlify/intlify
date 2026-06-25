@@ -71,16 +71,16 @@ jobs:
       - name: Verify release version
         run: node scripts/check-release-version.mjs "$TAG"
 
+      - name: Build packages
+        run: vpr build
+
       - name: Check
-        run: vpr check
+        run: vpr --no-cache -v check
 
       - name: Test
         env:
           VITE_LOG: vite_task=trace
         run: vpr --no-cache -v test
-
-      - name: Build packages
-        run: vpr build
 
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
