@@ -57,7 +57,7 @@ jobs:
         run: vp run -r build
 
       - name: Check
-        run: vpr check
+        run: vpr --no-cache -v check
 
   test:
     runs-on: ${{ matrix.os }}
