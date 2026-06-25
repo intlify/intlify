@@ -20,6 +20,8 @@
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",
     "build": "vp run -r build",
     "fmt": "cargo fmt --all && vp fmt",
+    "release": "bumpp \"package.json\" \"packages/ox-mf2-napi/package.json\" \"packages/ox-mf2-wasm/package.json\" \"packages/ox-mf2-shared/package.json\" --commit \"release: v%s\" --all --push --tag --execute \"node scripts/bump-cargo-version.mjs\"",
+    "changelog": "gh-changelogen --repo=intlify/intlify",
     "ready": "vpr check && vpr test && vpr build",
     "dev": "vp run website#dev",
     "check": "vp run check:rust && vp check",
@@ -28,6 +30,8 @@
   },
   "devDependencies": {
     "@kazupon/vp-config": "catalog:",
+    "bumpp": "catalog:",
+    "gh-changelogen": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {
