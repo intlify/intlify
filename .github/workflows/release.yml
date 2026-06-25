@@ -162,6 +162,7 @@ jobs:
           TARGET: ${{ matrix.target }}
           EXTRA_ARGS: ${{ matrix.extra_args }}
         run: |
+          # shellcheck disable=SC2086
           npm exec -- napi build \
             --manifest-path ../../crates/ox_mf2_napi/Cargo.toml \
             --output-dir dist \
@@ -270,7 +271,21 @@ jobs:
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
 
+      - name: Configure bootstrap npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_BOOTSTRAP }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN_BOOTSTRAP is not configured; npm publish will use Trusted Publishing/OIDC."
+            exit 0
+          fi
+
+          printf "%s\n" "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" >> "$HOME/.npmrc"
+          npm whoami
+
       - name: Publish packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_BOOTSTRAP }}
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi
 
   published-smoke:
