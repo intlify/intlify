@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AstTree from './AstTree.vue'
-import type { AstSelection, ParseView } from '../types/playground'
+import type { AstSelection, ParseView } from '../types/playground.ts'
 
 defineProps<{
   parseView: ParseView

@@ -4,10 +4,11 @@ import AstPane from './components/AstPane.vue'
 import ParserOptionsToolbar from './components/ParserOptionsToolbar.vue'
 import PlaygroundHeader from './components/PlaygroundHeader.vue'
 import SourcePane from './components/SourcePane.vue'
-import { useMf2Parser } from './composables/useMf2Parser'
-import { useMonacoSourceEditor } from './composables/useMonacoSourceEditor'
-import { usePlaygroundSettings } from './composables/usePlaygroundSettings'
-import type { AstSelection, SourceRange } from './types/playground'
+import { useMf2Parser } from './composables/useMf2Parser.ts'
+import { useMonacoSourceEditor } from './composables/useMonacoSourceEditor.ts'
+import { usePlaygroundSettings } from './composables/usePlaygroundSettings.ts'
+
+import type { AstSelection, SourceRange } from './types/playground.ts'
 
 const sample = `.input {$count :number}
 .local $label = {$count :number}

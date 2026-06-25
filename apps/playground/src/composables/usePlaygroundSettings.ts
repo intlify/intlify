@@ -1,5 +1,6 @@
 import { reactive, ref, watch } from 'vue'
-import type { ParserOptions, PlaygroundSettings, PlaygroundTheme } from '../types/playground'
+
+import type { ParserOptions, PlaygroundSettings, PlaygroundTheme } from '../types/playground.ts'
 
 const settingsKey = 'ox-mf2.playground.settings'
 

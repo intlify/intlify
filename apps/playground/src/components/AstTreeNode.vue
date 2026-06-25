@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AstSelection, SourceRange } from '../types/playground'
+
+import type { AstSelection, SourceRange } from '../types/playground.ts'
 
 defineOptions({
   name: 'AstTreeNode'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PlaygroundTheme } from '../types/playground'
+import type { PlaygroundTheme } from '../types/playground.ts'
 
 defineProps<{
   duration: number | null

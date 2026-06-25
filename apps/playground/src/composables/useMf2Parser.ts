@@ -8,6 +8,7 @@ import {
   syntaxKindName
 } from '@intlify/ox-mf2-wasm'
 import { computed, onMounted, ref } from 'vue'
+
 import type {
   ChildHandle,
   DiagnosticLabelView,
