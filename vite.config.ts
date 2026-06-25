@@ -46,8 +46,8 @@ export default defineConfig({
   },
   test: {
     exclude: ['**/node_modules/**', '**/.git/**', 'refers/**']
-  },
-  run: {
-    cache: true
   }
+  // run: {
+  //   cache: true
+  // }
 })
