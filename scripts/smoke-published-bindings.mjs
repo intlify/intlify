@@ -10,6 +10,8 @@ if (!tag?.startsWith('v')) {
 
 const version = tag.slice(1)
 const packages = ['@intlify/ox-mf2-napi', '@intlify/ox-mf2-wasm']
+const npmAvailabilityMaxAttempts = readPositiveIntegerEnv('NPM_SMOKE_MAX_ATTEMPTS', 60)
+const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_000)
 
 for (const packageName of packages) {
   await waitForPackage(packageName, version)
@@ -60,7 +62,7 @@ try {
 }
 
 async function waitForPackage(packageName, packageVersion) {
-  for (let attempt = 1; attempt <= 18; attempt++) {
+  for (let attempt = 1; attempt <= npmAvailabilityMaxAttempts; attempt++) {
     const result = spawnSync('npm', ['view', `${packageName}@${packageVersion}`, 'version'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
@@ -69,8 +71,10 @@ async function waitForPackage(packageName, packageVersion) {
       console.log(`${packageName}@${packageVersion} is available on npm`)
       return
     }
-    console.log(`Waiting for ${packageName}@${packageVersion} on npm (${attempt}/18)`)
-    await new Promise(resolve => setTimeout(resolve, 10_000))
+    console.log(
+      `Waiting for ${packageName}@${packageVersion} on npm (${attempt}/${npmAvailabilityMaxAttempts})`
+    )
+    await new Promise(resolve => setTimeout(resolve, npmAvailabilityDelayMs))
   }
   throw new Error(`${packageName}@${packageVersion} is not available on npm`)
 }
@@ -84,4 +88,17 @@ function run(commandName, commandArgs, options) {
   if (result.status !== 0) {
     throw new Error(`${commandName} ${commandArgs.join(' ')} failed`)
   }
+}
+
+function readPositiveIntegerEnv(name, fallback) {
+  const rawValue = process.env[name]
+  if (rawValue == null || rawValue === '') {
+    return fallback
+  }
+
+  const value = Number(rawValue)
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`)
+  }
+  return value
 }

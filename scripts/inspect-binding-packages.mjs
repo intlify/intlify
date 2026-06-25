@@ -65,6 +65,7 @@ async function inspectPackage({ packagePath, requiredFiles, extraChecks }) {
       throw new Error(`${pkg.name} package is missing ${file}`)
     }
   }
+  await assertNoPackedSharedRuntimeImport(packagePath, files, pkg.name)
 
   extraChecks?.({ files, pkg })
   console.log(`${pkg.name} package contents ok`)
@@ -100,6 +101,19 @@ function assertNoSharedRuntimeDependency(pkg) {
   for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
     if (pkg[field]?.['@intlify/ox-mf2-shared']) {
       throw new Error(`${pkg.name} must not publish a runtime dependency on @intlify/ox-mf2-shared`)
+    }
+  }
+}
+
+async function assertNoPackedSharedRuntimeImport(packagePath, files, packageName) {
+  for (const file of files) {
+    if (!file.startsWith('dist/') || !file.endsWith('.js')) {
+      continue
+    }
+
+    const content = await readFile(new URL(`${packagePath}/${file}`, `file://${rootDir}/`), 'utf8')
+    if (content.includes('@intlify/ox-mf2-shared')) {
+      throw new Error(`${packageName} package must bundle @intlify/ox-mf2-shared in ${file}`)
     }
   }
 }

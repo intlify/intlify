@@ -242,6 +242,9 @@ jobs:
         with:
           path: artifacts
 
+      - name: Build shared package
+        run: vp run --no-cache @intlify/ox-mf2-shared#build
+
       - name: Build WASM package
         run: vp run --no-cache @intlify/ox-mf2-wasm#build
 
