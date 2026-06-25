@@ -10,7 +10,6 @@ const optionalNapiPackages = [
   '@intlify/ox-mf2-napi-linux-x64-gnu',
   '@intlify/ox-mf2-napi-linux-x64-musl',
   '@intlify/ox-mf2-napi-linux-arm64-gnu',
-  '@intlify/ox-mf2-napi-linux-arm64-musl',
   '@intlify/ox-mf2-napi-win32-x64-msvc'
 ]
 

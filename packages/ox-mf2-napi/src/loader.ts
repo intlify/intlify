@@ -140,9 +140,7 @@ function optionalPackageName(): string {
     return isMusl() ? '@intlify/ox-mf2-napi-linux-x64-musl' : '@intlify/ox-mf2-napi-linux-x64-gnu'
   }
   if (platform === 'linux' && arch === 'arm64') {
-    return isMusl()
-      ? '@intlify/ox-mf2-napi-linux-arm64-musl'
-      : '@intlify/ox-mf2-napi-linux-arm64-gnu'
+    return isMusl() ? '@intlify/ox-mf2-napi-unsupported' : '@intlify/ox-mf2-napi-linux-arm64-gnu'
   }
   if (platform === 'win32' && arch === 'x64') {
     return '@intlify/ox-mf2-napi-win32-x64-msvc'
