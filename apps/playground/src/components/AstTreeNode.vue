@@ -83,8 +83,8 @@ function selectNode(): void {
   })
 }
 
-function handleChildSelect(selection: AstSelection): void {
-  emit('select', selection)
+function handleChildSelect(selection: unknown): void {
+  emit('select', selection as AstSelection)
 }
 
 function toggleOpen(): void {

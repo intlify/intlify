@@ -25,7 +25,7 @@
     "ready": "vpr check && vpr test && vpr build",
     "dev": "vp run website#dev",
     "dev:playground": "vp run playground#dev",
-    "check": "vp run check:rust && vp check",
+    "check": "vp run check:rust && vp check && vp run playground#vize:check",
     "test": "cargo test -p ox_mf2_parser --all-targets --color always && vp test",
     "prepare": "vp config"
   },

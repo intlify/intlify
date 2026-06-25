@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
 import { basename, join } from 'node:path'
 import { defineConfig } from 'vite-plus'
+import { voidPlugin } from 'void'
 
 const require = createRequire(import.meta.url)
 const oxMf2WasmPackage = require('../../packages/ox-mf2-wasm/package.json') as {
@@ -50,11 +51,13 @@ function oxMf2WasmAssets() {
       })
     },
     closeBundle() {
-      const targetDir = join(process.cwd(), 'dist', 'dist')
-
-      mkdirSync(targetDir, { recursive: true })
       for (const filename of oxMf2WasmAssetNames) {
-        copyFileSync(join(assetDir, filename), join(targetDir, filename))
+        for (const outputDirectory of ['client', 'ssr']) {
+          const targetDir = join(process.cwd(), 'dist', outputDirectory, 'dist')
+
+          mkdirSync(targetDir, { recursive: true })
+          copyFileSync(join(assetDir, filename), join(targetDir, filename))
+        }
       }
     }
   }
@@ -70,5 +73,5 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 4000
   },
-  plugins: [oxMf2WasmAssets(), vue()]
+  plugins: [oxMf2WasmAssets(), voidPlugin(), vue()]
 })

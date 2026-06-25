@@ -1,7 +1,12 @@
 {
-  "extends": "../../apps/website/tsconfig.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "jsx": "preserve",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "declaration": false,
+    "emitDeclarationOnly": false,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node", "vite-plus/client"]
   },
