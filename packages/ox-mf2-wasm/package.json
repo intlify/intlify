@@ -1,9 +1,24 @@
 {
   "name": "@intlify/ox-mf2-wasm",
   "version": "0.0.0",
-  "private": true,
   "description": "WASM runtime package for ox-mf2.",
+  "keywords": [
+    "intlify",
+    "messageformat",
+    "mf2",
+    "parser",
+    "wasm"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/ox-mf2-wasm"
+  },
   "files": [
     "README.md",
     "dist"
@@ -17,6 +32,9 @@
       "import": "./dist/index.js"
     },
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "vp run build:wasm && vp run build:pack",
