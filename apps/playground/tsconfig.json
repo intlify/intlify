@@ -1,0 +1,9 @@
+{
+  "extends": "../../apps/website/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite-plus/client"]
+  },
+  "include": ["vite.config.ts", "src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"]
+}
