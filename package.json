@@ -32,6 +32,7 @@
     "@kazupon/vp-config": "catalog:",
     "bumpp": "catalog:",
     "gh-changelogen": "catalog:",
+    "pkg-pr-new": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {
