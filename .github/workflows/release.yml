@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       job:
-        description: 'Which job(s) to run. `all` runs the full pipeline.'
+        description: 'Which job(s) to run. `all` publishes npm and crates.io packages.'
         type: choice
         required: true
         default: all
@@ -28,6 +28,10 @@ env:
   CI: true
   CARGO_TERM_COLOR: always
   TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -288,11 +292,17 @@ jobs:
     needs:
       - validate
     if: >-
-      always() && github.event_name == 'workflow_dispatch' &&
-        inputs.job == 'crate-publish' &&
-        needs.validate.result == 'success'
+      always() && (
+        (github.event_name == 'push' &&
+          needs.validate.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' &&
+          (inputs.job == 'all' || inputs.job == 'crate-publish') &&
+          needs.validate.result == 'success')
+      )
 
 
+    # crates.io Trusted Publisher is configured for this workflow file and
+    # the `crates-release` environment.
     environment: crates-release
     permissions:
       contents: read
@@ -386,13 +396,17 @@ jobs:
     timeout-minutes: 15
     needs:
       - published-smoke
+      - crate-publish
     if: >-
       always() && (
         (github.event_name == 'push' &&
-          needs.published-smoke.result == 'success') ||
+          needs.published-smoke.result == 'success' &&
+          needs.crate-publish.result == 'success') ||
         (github.event_name == 'workflow_dispatch' &&
           (inputs.job == 'release-notes' ||
-            (inputs.job == 'all' && needs.published-smoke.result == 'success')))
+            (inputs.job == 'all' &&
+              needs.published-smoke.result == 'success' &&
+              needs.crate-publish.result == 'success')))
       )
 
 
