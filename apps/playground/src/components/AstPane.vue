@@ -21,7 +21,7 @@ function handleSelect(selection: AstSelection): void {
 <template>
   <section class="pane ast-pane">
     <div class="pane-title">
-      <span>Snapshot</span>
+      <span>AST (Snapshot)</span>
       <strong>
         {{ parseView.counts.nodes }} nodes / {{ parseView.counts.tokens }} tokens /
         {{ parseView.snapshotBytes }} bytes

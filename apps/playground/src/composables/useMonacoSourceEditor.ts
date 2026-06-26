@@ -187,23 +187,23 @@ function defineEditorThemes(): void {
     base: 'vs',
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: '126b72', fontStyle: 'bold' },
+      { token: 'keyword', foreground: '6e4b20', fontStyle: 'bold' },
       { token: 'delimiter.bracket', foreground: '7f5539' },
-      { token: 'variable', foreground: '1f5f99', fontStyle: 'bold' },
+      { token: 'variable', foreground: '315a95', fontStyle: 'bold' },
       { token: 'type.identifier', foreground: '8a4f0a' },
       { token: 'annotation', foreground: '8463a9' },
-      { token: 'operator', foreground: 'a34b2a' },
+      { token: 'operator', foreground: 'b85d22' },
       { token: 'number', foreground: '2f6f4e' },
       { token: 'string', foreground: '2f3f46' }
     ],
     colors: {
-      'editor.background': '#fbfaf7',
-      'editor.foreground': '#182022',
-      'editor.lineHighlightBackground': '#eef1ee',
-      'editorLineNumber.activeForeground': '#126b72',
-      'editorLineNumber.foreground': '#8b9699',
-      'editor.selectionBackground': '#c9ebe7',
-      'editorCursor.foreground': '#126b72'
+      'editor.background': '#fffaf2',
+      'editor.foreground': '#1d1710',
+      'editor.lineHighlightBackground': '#f3eadc',
+      'editorLineNumber.activeForeground': '#7a4a18',
+      'editorLineNumber.foreground': '#9b8d80',
+      'editor.selectionBackground': '#f7d8a8',
+      'editorCursor.foreground': '#7a4a18'
     }
   })
 
@@ -223,11 +223,11 @@ function defineEditorThemes(): void {
     colors: {
       'editor.background': '#121719',
       'editor.foreground': '#e9eef0',
-      'editor.lineHighlightBackground': '#1a2224',
-      'editorLineNumber.activeForeground': '#67d5cb',
+      'editor.lineHighlightBackground': '#201b15',
+      'editorLineNumber.activeForeground': '#ffad33',
       'editorLineNumber.foreground': '#6c797d',
-      'editor.selectionBackground': '#264c5a',
-      'editorCursor.foreground': '#67d5cb'
+      'editor.selectionBackground': '#5a3a1a',
+      'editorCursor.foreground': '#ffad33'
     }
   })
 }
