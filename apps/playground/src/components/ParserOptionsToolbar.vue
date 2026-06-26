@@ -94,7 +94,7 @@ function readChecked(event: Event): boolean {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 18px;
 }
 
 .check-control {
@@ -102,10 +102,7 @@ function readChecked(event: Event): boolean {
   align-items: center;
   gap: 8px;
   min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-strong);
+  padding: 4px 0;
   color: var(--ink);
   font: 700 12px/1 var(--sans);
   letter-spacing: 0.12em;

@@ -142,9 +142,8 @@ h1 {
   display: inline-flex;
   align-items: center;
   min-height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel-strong);
+  border: 0;
+  background: none;
   color: var(--ink);
   font: 700 12px/1 var(--sans);
   letter-spacing: 0.12em;
@@ -154,14 +153,25 @@ h1 {
 .icon-link {
   gap: 8px;
   justify-content: center;
-  padding: 10px 14px;
-  text-decoration: none;
+  padding: 10px 4px;
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
 }
 
 .icon-link:hover,
-.theme-toggle:hover {
-  border-color: var(--accent);
+.icon-link:focus-visible,
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
   color: var(--accent);
+}
+
+.icon-link:focus-visible,
+.theme-toggle:focus-visible {
+  border-radius: 999px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .icon-link svg {
@@ -173,7 +183,7 @@ h1 {
   gap: 12px;
   justify-content: center;
   min-width: 142px;
-  padding: 10px 16px;
+  padding: 10px 4px;
 }
 
 .toggle-track {
