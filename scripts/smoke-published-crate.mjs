@@ -16,6 +16,7 @@ if (!version) {
 
 const attempts = Number(process.env.CRATE_SMOKE_ATTEMPTS ?? 10)
 const delayMs = Number(process.env.CRATE_SMOKE_DELAY_MS ?? 10_000)
+let passed = false
 
 for (let attempt = 1; attempt <= attempts; attempt++) {
   const workspace = await mkdtemp(join(tmpdir(), 'ox-mf2-parser-crate-smoke-'))
@@ -27,7 +28,8 @@ for (let attempt = 1; attempt <= attempts; attempt++) {
     })
     if (result.status === 0) {
       console.log(`ox_mf2_parser@${version} smoke test passed`)
-      process.exit(0)
+      passed = true
+      break
     }
     console.error(`ox_mf2_parser@${version} smoke test failed on attempt ${attempt}/${attempts}`)
   } finally {
@@ -39,7 +41,9 @@ for (let attempt = 1; attempt <= attempts; attempt++) {
   }
 }
 
-throw new Error(`ox_mf2_parser@${version} did not pass smoke test`)
+if (!passed) {
+  throw new Error(`ox_mf2_parser@${version} did not pass smoke test`)
+}
 
 async function prepareProject(workspace, version) {
   await mkdir(join(workspace, 'src'), { recursive: true })
