@@ -18,6 +18,7 @@ on:
           - npm-publish
           - crate-publish
           - published-smoke
+          - published-crate-smoke
           - release-notes
       tag:
         description: 'Existing tag to release, e.g. v0.1.0.'
@@ -353,11 +354,8 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
         run: cargo publish -p ox_mf2_parser --locked
 
-      - name: Smoke test published crate
-        run: node scripts/smoke-published-crate.mjs "$TAG"
-
   published-smoke:
-    name: Smoke test published packages
+    name: Smoke test published npm packages
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
@@ -390,23 +388,62 @@ jobs:
       - name: Smoke test published packages
         run: node scripts/smoke-published-bindings.mjs "$TAG"
 
+  published-crate-smoke:
+    name: Smoke test published crates.io package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - crate-publish
+    if: >-
+      always() && (
+        (github.event_name == 'push' &&
+          needs.crate-publish.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' &&
+          (inputs.job == 'published-crate-smoke' ||
+            (inputs.job == 'all' && needs.crate-publish.result == 'success')))
+      )
+
+
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 24
+          cache: false
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Smoke test published crate
+        run: node scripts/smoke-published-crate.mjs "$TAG"
+
   release-notes:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
       - published-smoke
-      - crate-publish
+      - published-crate-smoke
     if: >-
       always() && (
         (github.event_name == 'push' &&
           needs.published-smoke.result == 'success' &&
-          needs.crate-publish.result == 'success') ||
+          needs.published-crate-smoke.result == 'success') ||
         (github.event_name == 'workflow_dispatch' &&
           (inputs.job == 'release-notes' ||
             (inputs.job == 'all' &&
               needs.published-smoke.result == 'success' &&
-              needs.crate-publish.result == 'success')))
+              needs.published-crate-smoke.result == 'success')))
       )
 
 
