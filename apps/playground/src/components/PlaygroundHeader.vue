@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import logoDarkUrl from '../assets/logo-dark.svg'
+import logoLightUrl from '../assets/logo-light.svg'
+
 import type { PlaygroundTheme } from '../types/playground.ts'
 
-defineProps<{
+const props = defineProps<{
   duration: number | null
   statusLabel: string
   statusTone: Record<string, boolean>
   theme: PlaygroundTheme
   version: string
 }>()
+
+const logoUrl = computed(() => (props.theme === 'dark' ? logoDarkUrl : logoLightUrl))
 
 const emit = defineEmits<{
   toggleTheme: []
@@ -21,7 +27,7 @@ function handleToggleTheme(): void {
 <template>
   <section class="topbar" aria-labelledby="title">
     <div class="brand">
-      <img class="brand-logo" src="../assets/logo.svg" alt="" width="96" height="96" />
+      <img class="brand-logo" :src="logoUrl" alt="" width="640" height="640" />
       <div class="brand-copy">
         <p class="eyebrow">@intlify/ox-mf2-wasm v{{ version }}</p>
         <h1 id="title">ox-mf2 Playground</h1>
