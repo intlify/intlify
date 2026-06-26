@@ -33,6 +33,8 @@ const emptyCounts = {
   trivia: 0
 } as const
 
+type NormalizedParseResult = ReturnType<typeof normalizeResult>
+
 type UseMf2ParserOptions = {
   options: ParserOptions
   source: Ref<string>
@@ -98,13 +100,14 @@ export function useMf2Parser({ options, source }: UseMf2ParserOptions) {
       )
       const summary = normalizeResult(result)
       const diagnostics = result.diagnostics.map(formatDiagnostic)
+      const snapshotBytes = result.snapshot.toBytes().byteLength
 
       return {
         status: diagnostics.length === 0 ? 'ok' : 'invalid',
-        ast: serializeParseResult(result),
+        ast: serializeParseResult(result, summary, snapshotBytes),
         diagnostics,
         duration: performance.now() - start,
-        snapshotBytes: result.snapshot.toBytes().byteLength,
+        snapshotBytes,
         counts: summary.counts
       }
     } catch (error) {
@@ -131,12 +134,14 @@ function createErrorAst(message: string): unknown {
   }
 }
 
-function serializeParseResult(result: ParseMessageResult): unknown {
-  const summary = normalizeResult(result)
-
+function serializeParseResult(
+  result: ParseMessageResult,
+  summary: NormalizedParseResult,
+  snapshotBytes: number
+): unknown {
   return {
     type: 'OxMf2ParseResult',
-    snapshotBytes: result.snapshot.toBytes().byteLength,
+    snapshotBytes,
     counts: summary.counts,
     roots: result.roots.map(root => serializeRoot(root, result.source)),
     sources: result.sources.map(serializeSource),

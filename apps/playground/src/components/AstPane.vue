@@ -29,7 +29,7 @@ function handleSelect(selection: AstSelection): void {
     </div>
 
     <div v-if="parseView.diagnostics.length > 0" class="diagnostics">
-      <p v-for="diagnostic in parseView.diagnostics" :key="diagnostic">
+      <p v-for="(diagnostic, index) in parseView.diagnostics" :key="`${index}:${diagnostic}`">
         {{ diagnostic }}
       </p>
     </div>

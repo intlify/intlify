@@ -47,7 +47,17 @@ function oxMf2WasmAssets() {
         }
 
         response.setHeader('Content-Type', getContentType(filename))
-        createReadStream(file).pipe(response)
+        const stream = createReadStream(file)
+        stream.on('error', () => {
+          if (response.headersSent) {
+            response.destroy()
+            return
+          }
+
+          response.removeHeader('Content-Type')
+          next()
+        })
+        stream.pipe(response)
       })
     },
     closeBundle() {
