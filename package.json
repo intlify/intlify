@@ -23,7 +23,7 @@
     "release": "bumpp \"package.json\" \"packages/ox-mf2-napi/package.json\" \"packages/ox-mf2-wasm/package.json\" \"packages/ox-mf2-shared/package.json\" --commit \"release: v%s\" --all --push --tag --execute \"node scripts/bump-cargo-version.mjs\"",
     "changelog": "gh-changelogen --repo=intlify/intlify",
     "ready": "vpr check && vpr test && vpr build",
-    "dev": "vp run website#dev",
+    "dev": "vp run playground#dev",
     "dev:playground": "vp run playground#dev",
     "check": "vp run check:rust && vp check && vp run playground#vize:check",
     "test": "cargo test -p ox_mf2_parser --all-targets --color always && vp test",
