@@ -6,7 +6,7 @@
 //! Each section is built into its own `Vec<u8>` first. After every
 //! section is collected, the assembler computes aligned offsets and
 //! writes the snapshot header, the section table, padding, and section
-//! payloads in [`crate::snapshot::format::SectionKind::ALL_IN_ORDER`].
+//! payloads in [`crate::snapshot::SectionKind::ALL_IN_ORDER`].
 
 use crate::snapshot::error::SnapshotWriteError;
 use crate::snapshot::format::{

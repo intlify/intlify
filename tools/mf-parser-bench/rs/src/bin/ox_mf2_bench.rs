@@ -76,9 +76,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use ox_mf2_parser::snapshot::view::ChildView;
 use ox_mf2_parser::snapshot::{
-    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
+    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot, ChildView,
     parse_result_to_snapshot, SnapshotOptions,
 };
 use ox_mf2_parser::{
@@ -655,7 +654,8 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
 fn run_allocations(_args: &Args) -> Result<PhaseSummary, String> {
     Err(
         "allocations phase requires `--features bench-alloc`; rebuild with \
-         `cargo build --release -p ox_mf2_parser --bin ox-mf2-bench --features bench-alloc`"
+         `cargo build --release --manifest-path tools/mf-parser-bench/rs/Cargo.toml \
+         --bin ox-mf2-bench --features bench-alloc`"
             .to_string(),
     )
 }

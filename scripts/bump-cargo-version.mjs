@@ -18,6 +18,7 @@ for (const relativePath of cargoTomlFiles) {
   await replacePackageVersion(relativePath, version)
 }
 
+await replaceHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', version)
 await replaceCargoLockVersions('Cargo.lock', cargoLockPackages, version)
 
 async function replacePackageVersion(relativePath, nextVersion) {
@@ -55,6 +56,24 @@ async function replaceCargoLockVersions(relativePath, packageNames, nextVersion)
   const missing = packageNames.filter(packageName => !seen.has(packageName))
   if (missing.length > 0) {
     throw new Error(`failed to update ${missing.join(', ')} in ${relativePath}`)
+  }
+  await writeFile(file, updated)
+}
+
+async function replaceHtmlRootUrl(relativePath, crateName, nextVersion) {
+  const file = new URL(relativePath, `file://${rootDir}/`)
+  const source = await readFile(file, 'utf8')
+  const expected = `https://docs.rs/${crateName}/${nextVersion}`
+  let matched = false
+  const updated = source.replace(
+    /(#!\[doc\(html_root_url\s*=\s*")([^"]+)("\)\])/,
+    (_, prefix, _currentUrl, suffix) => {
+      matched = true
+      return `${prefix}${expected}${suffix}`
+    }
+  )
+  if (!matched) {
+    throw new Error(`failed to update html_root_url in ${relativePath}`)
   }
   await writeFile(file, updated)
 }

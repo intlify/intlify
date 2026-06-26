@@ -1,39 +1,61 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! ox-mf2 Phase 1 MF2 parser core.
+//! High performance `MessageFormat` 2 parser core.
 //!
 //! This crate provides the Rust core for parsing
-//! [Unicode MessageFormat 2.0][message-format-wg] messages. The Phase 1 scope
-//! is intentionally narrow: build a fast, recovering, lossless CST and an
-//! optional `SemanticModel` that later phases (Binary AST snapshot, formatter,
-//! linter, compiler, language bindings) can consume.
+//! [Unicode MessageFormat 2.0][message-format-wg] messages. It builds a
+//! recovering, lossless concrete syntax tree (CST), materialises diagnostics,
+//! optionally lowers semantic records, and can encode parse results into the
+//! crate's Binary AST snapshot format.
 //!
-//! The Phase 1 public surface is described in
-//! `design/002-ox-mf2-phase-1-rust-parser-design.md` and the implementation
-//! plan in `.plans/002-ox-mf2-phase-1-rust-parser-implementation.md`.
+//! # Entry points
 //!
-//! API error code ranges are defined in
-//! `design/appendix-ox-mf2-error-code.md`. Parser diagnostics use the
-//! separate [`DiagnosticCode`] namespace.
+//! Use [`parse_message`] for a one-shot parse of an in-memory message. Use
+//! [`parse_source`] when the caller owns a [`SourceStore`], and
+//! [`parse_source_session`] with [`ParseWorkspace`] when repeated parsing
+//! should reuse allocations.
+//!
+//! # API layers
+//!
+//! The crate root re-exports the supported parser, CST, diagnostic, semantic,
+//! source, and workspace types. The [`snapshot`] module is the public namespace
+//! for Binary AST snapshot encoding, decoding, and zero-copy views.
+//!
+//! # Stability
+//!
+//! This crate is pre-1.0. Public APIs are intended to be useful and documented,
+//! but minor releases may still refine names, shape, and snapshot details while
+//! `MessageFormat` 2 integration work continues. Error code values are exposed so
+//! language bindings can map failures without parsing display strings.
+//!
+//! # Example
+//!
+//! ```
+//! use ox_mf2_parser::parse_message;
+//!
+//! let result = parse_message("Hello, {$name}!");
+//! assert!(result.diagnostics.is_empty());
+//! assert!(result.cst.node_count() > 0);
+//! ```
 //!
 //! [message-format-wg]: https://github.com/unicode-org/message-format-wg
 
-#![doc(html_root_url = "https://docs.rs/ox_mf2_parser/0.0.0")]
+#![doc(html_root_url = "https://docs.rs/ox_mf2_parser/0.1.3")]
 
-pub mod api;
-pub mod diagnostic;
-pub mod error;
-pub mod parser;
-pub mod scanner;
-pub mod semantic;
+mod api;
+mod diagnostic;
+mod error;
+mod parser;
+mod scanner;
+mod semantic;
 pub mod snapshot;
-pub mod source;
-pub mod span;
-pub mod syntax_kind;
-pub mod tables;
-pub mod view;
-pub mod workspace;
+mod source;
+mod span;
+mod syntax_kind;
+mod tables;
+mod view;
+mod workspace;
 
 pub use api::{
     parse_batch, parse_message, parse_source, parse_source_session, BatchExecution, BatchParseItem,
@@ -51,7 +73,6 @@ pub use error::{
     OX_MF2_INITIALIZATION_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX,
     OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
 };
-pub use scanner::ScannerState;
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
 pub use snapshot::{
     decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,

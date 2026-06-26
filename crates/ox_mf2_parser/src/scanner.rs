@@ -213,8 +213,9 @@ pub(crate) fn is_escape_target(b: u8) -> bool {
 
 /// ASCII-only fast check for `name-start`. Returns `Some(true)` / `Some(false)`
 /// for ASCII bytes, `None` for bytes that need the Unicode slow path.
+#[allow(dead_code)]
 #[inline]
-pub fn ascii_is_name_start(b: u8) -> Option<bool> {
+pub(crate) fn ascii_is_name_start(b: u8) -> Option<bool> {
     if b >= 0x80 {
         return None;
     }

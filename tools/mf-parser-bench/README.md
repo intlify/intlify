@@ -83,6 +83,55 @@ Parser-only measurements with `hyperfine`:
 vp run bench:mf-parser
 ```
 
+## Ox MF2 parser phase benchmarks
+
+`ox-mf2-bench` is a secondary Rust binary in `tools/mf-parser-bench/rs`. It measures low-level `ox_mf2_parser` phases such as CST parsing, semantic lowering, owned materialisation, and one-shot convenience parsing. These measurements are separate from the parser comparison benchmark above.
+
+Run the default phase sweep from the repository root:
+
+```sh
+vp run bench:mf-parser:phase
+```
+
+Short smoke run:
+
+```sh
+vp run bench:mf-parser:phase:smoke
+```
+
+Run the wrapper directly with a custom input:
+
+```sh
+bash tools/mf-parser-bench/scripts/ox-mf2-phase-hyperfine.sh \
+  --input path/to/input.mf2
+```
+
+Inline input, iteration count, and hyperfine settings can be overridden:
+
+```sh
+bash tools/mf-parser-bench/scripts/ox-mf2-phase-hyperfine.sh \
+  --input-text 'Hello, {$name}!' \
+  --iterations 10000 \
+  --warmup 3 \
+  --runs 20
+```
+
+The wrapper intentionally excludes the allocator inspection phase from the standard sweep. To inspect allocations, build the secondary binary with the tools-local `bench-alloc` feature and run the phase manually:
+
+```sh
+cargo build --release \
+  --manifest-path tools/mf-parser-bench/rs/Cargo.toml \
+  --bin ox-mf2-bench \
+  --features bench-alloc
+
+tools/mf-parser-bench/rs/target/release/ox-mf2-bench \
+  --phase allocations \
+  --iterations 1000 \
+  --input-text 'Hello, {$name}!'
+```
+
+The old positional input form from `crates/ox_mf2_parser/benches/hyperfine.sh` has been replaced with explicit options such as `--input` and `--input-text`.
+
 ## Binding benchmarks
 
 Node.js N-API and WASM binding throughput is measured separately from parser corpora so binding cost stays visible.

@@ -9,7 +9,7 @@
 //! cover the API contract and that decoded views match parser output.
 
 use ox_mf2_parser::snapshot::{
-    decode_snapshot, decode_snapshot_owned, view::ChildView, SectionKind, SnapshotOptions,
+    decode_snapshot, decode_snapshot_owned, ChildView, SectionKind, SnapshotOptions,
     SourceTextUnavailable, SNAPSHOT_MAGIC,
 };
 use ox_mf2_parser::{
@@ -74,8 +74,8 @@ fn snapshot_preserves_token_text_via_source_id_plus_span() {
 }
 
 fn find_first_token(
-    node: ox_mf2_parser::snapshot::view::NodeView<'_>,
-) -> Option<ox_mf2_parser::snapshot::view::TokenView<'_>> {
+    node: ox_mf2_parser::snapshot::NodeView<'_>,
+) -> Option<ox_mf2_parser::snapshot::TokenView<'_>> {
     for child in node.children() {
         match child {
             ChildView::Token(token) => return Some(token),

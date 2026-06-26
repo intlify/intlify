@@ -13,6 +13,8 @@
     "bench:smoke": "vp run mf-parser-bench#bench:smoke",
     "bench:mf-parser": "vp run mf-parser-bench#bench:parser",
     "bench:mf-parser:smoke": "vp run mf-parser-bench#bench:parser:smoke",
+    "bench:mf-parser:phase": "vp run mf-parser-bench#bench:parser:phase",
+    "bench:mf-parser:phase:smoke": "vp run mf-parser-bench#bench:parser:phase:smoke",
     "bench:bindings": "vp run mf-parser-bench#bench:bindings",
     "bench:bindings:browser": "vp run mf-parser-bench#bench:bindings:browser",
     "bench:bindings:smoke": "vp run mf-parser-bench#bench:bindings:smoke",

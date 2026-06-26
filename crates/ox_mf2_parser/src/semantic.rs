@@ -202,6 +202,7 @@ impl<'a> SemanticView<'a> {
 /// around [`lower_into`] that allocates a new model — prefer the latter
 /// when you already own a model whose capacity can be reused (LSP, batch
 /// loops, the borrowed-session workspace).
+#[allow(dead_code)]
 pub fn lower(sources: &SourceStore, source_id: SourceId, tables: &CstTables) -> SemanticModel {
     let mut model = SemanticModel::default();
     lower_into(sources, source_id, tables, &mut model);
