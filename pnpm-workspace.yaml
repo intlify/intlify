@@ -3,6 +3,14 @@ packages:
   - packages/*
   - tools/*
 
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  wasm-pack: true
+  workerd: true
+
 catalogMode: prefer
 
 catalog:
@@ -31,13 +39,6 @@ peerDependencyRules:
   allowedVersions:
     vite: '*'
     vitest: '*'
-allowBuilds:
-  better-sqlite3: true
-  esbuild: true
-  sharp: true
-  unrs-resolver: true
-  wasm-pack: true
-  workerd: true
 minimumReleaseAgeExclude:
   - vize
   - '@vizejs/**'
