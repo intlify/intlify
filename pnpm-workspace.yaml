@@ -3,6 +3,14 @@ packages:
   - packages/*
   - tools/*
 
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  wasm-pack: true
+  workerd: true
+
 catalogMode: prefer
 
 catalog:
@@ -10,6 +18,11 @@ catalog:
   typescript: ^6.0.0
   vite: npm:@voidzero-dev/vite-plus-core@0.2.1
   vitest: npm:@voidzero-dev/vite-plus-test@0.1.24
+  vue: ^3.5.39
+  '@vitejs/plugin-vue': ^6.0.7
+  monaco-editor: ^0.55.1
+  vize: ^0.225.0
+  void: ^0.9.3
   vite-plus: 0.1.24
   '@kazupon/vp-config': ^0.5.0
   wasm-pack: 0.15.0
@@ -26,5 +39,16 @@ peerDependencyRules:
   allowedVersions:
     vite: '*'
     vitest: '*'
-allowBuilds:
-  wasm-pack: true
+minimumReleaseAgeExclude:
+  - vize
+  - '@vizejs/**'
+  - '@vue/compiler-core@3.5.39'
+  - '@vue/compiler-dom@3.5.39'
+  - '@vue/compiler-sfc@3.5.39'
+  - '@vue/compiler-ssr@3.5.39'
+  - '@vue/reactivity@3.5.39'
+  - '@vue/runtime-core@3.5.39'
+  - '@vue/runtime-dom@3.5.39'
+  - '@vue/server-renderer@3.5.39'
+  - '@vue/shared@3.5.39'
+  - vue@3.5.39

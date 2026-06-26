@@ -1,0 +1,35 @@
+{
+  "name": "playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "init": "void init",
+    "lint": "vp exec vize lint --preset happy-path src",
+    "build:bindings": "vp run @intlify/ox-mf2-shared#build && vp run @intlify/ox-mf2-wasm#build",
+    "dev": "vp run build:bindings && vp dev --configLoader runner",
+    "build": "vp run build:bindings && vp build --configLoader runner",
+    "preview": "vp preview",
+    "deploy": "void deploy",
+    "vize:check": "vp run vize:lint && vp run vize:_check",
+    "vize:_check": "vp exec vize check --tsconfig tsconfig.json src",
+    "vize:lint": "vp run vize:lint:opinionated && vp run vize:lint:strict-reactivity",
+    "vize:lint:opinionated": "vp exec vize lint --preset opinionated --help-level short src",
+    "vize:lint:strict-reactivity": "vp exec vize lint --strict-reactivity src",
+    "vize:lint:ci": "vp exec vize lint --preset essential --max-warnings 0 src"
+  },
+  "dependencies": {
+    "@intlify/ox-mf2-wasm": "workspace:*",
+    "monaco-editor": "catalog:",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vize": "catalog:",
+    "void": "catalog:"
+  }
+}
