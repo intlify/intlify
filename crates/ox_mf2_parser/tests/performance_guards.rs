@@ -4,7 +4,8 @@
 //! Performance regression guards for Phase 1.
 //!
 //! These tests do not measure wall-clock time — they sit alongside the
-//! benchmark harness (`benches/hyperfine.sh`) and instead guard the
+//! benchmark harness (`tools/mf-parser-bench/scripts/ox-mf2-phase-hyperfine.sh`)
+//! and instead guard the
 //! invariants that the benchmark numbers depend on:
 //!
 //! 1. Record layout sizes stay within the design's budget (so cache

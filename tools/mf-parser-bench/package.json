@@ -12,6 +12,8 @@
     "bench:smoke": "node scripts/setup.mjs && node scripts/preflight.mjs && node scripts/setup-bindings.mjs && node scripts/calibrate.mjs && bash scripts/mf-parser-hyperfine.sh --warmup 1 --runs 2 && bash scripts/binding-hyperfine.sh --warmup 1 --runs 2 && node scripts/bench-browser.mjs",
     "bench:parser": "node scripts/setup.mjs && node scripts/preflight.mjs && node scripts/calibrate.mjs && bash scripts/mf-parser-hyperfine.sh && node report.mjs",
     "bench:parser:smoke": "bash scripts/mf-parser-hyperfine.sh --warmup 1 --runs 2",
+    "bench:parser:phase": "bash scripts/ox-mf2-phase-hyperfine.sh",
+    "bench:parser:phase:smoke": "bash scripts/ox-mf2-phase-hyperfine.sh --warmup 1 --runs 2",
     "bench:run": "bash scripts/mf-parser-hyperfine.sh",
     "setup:bindings": "node scripts/setup-bindings.mjs",
     "bench:bindings": "node scripts/setup-bindings.mjs && node scripts/calibrate-bindings.mjs && bash scripts/binding-hyperfine.sh",

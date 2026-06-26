@@ -16,6 +16,7 @@ on:
         options:
           - all
           - npm-publish
+          - crate-publish
           - published-smoke
           - release-notes
       tag:
@@ -38,7 +39,7 @@ jobs:
     timeout-minutes: 30
     if: >-
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
-        (inputs.job == 'all' || inputs.job == 'npm-publish'))
+        (inputs.job == 'all' || inputs.job == 'npm-publish' || inputs.job == 'crate-publish'))
 
 
     steps:
@@ -279,6 +280,68 @@ jobs:
 
       - name: Publish packages
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi
+
+  crate-publish:
+    name: Publish crates.io package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - validate
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' &&
+        inputs.job == 'crate-publish' &&
+        needs.validate.result == 'success'
+
+
+    environment: crates-release
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Verify release version
+        run: node scripts/check-release-version.mjs "$TAG"
+
+      - name: Print publish tool versions
+        run: |
+          node --version
+          cargo --version
+
+      - name: Inspect crate package contents
+        run: cargo package -p ox_mf2_parser --list --locked
+
+      - name: Dry-run publish crate
+        run: cargo publish -p ox_mf2_parser --dry-run --locked
+
+      # The initial crates.io publication must use a token because trusted
+      # publishing is configured after the crate exists.
+      - name: Publish crate
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ox_mf2_parser --locked # zizmor: ignore[use-trusted-publishing]
+
+      - name: Smoke test published crate
+        run: node scripts/smoke-published-crate.mjs "$TAG"
 
   published-smoke:
     name: Smoke test published packages

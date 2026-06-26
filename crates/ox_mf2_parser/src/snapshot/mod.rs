@@ -3,10 +3,10 @@
 
 //! Binary AST snapshot writer, decoder, and accessor.
 //!
-//! Implements the v0.1 versioned snapshot format defined in
-//! `design/003-ox-mf2-phase-2-binary-ast-snapshot-design.md`. The
-//! snapshot is the cross-process / cross-language / persistence
-//! boundary; it is not the primary parser representation.
+//! The snapshot is the cross-process, cross-language, and persistence boundary
+//! for parser output. It is not the primary in-process parser representation;
+//! use [`crate::ParseResult`] and [`crate::CstView`] when a Rust caller only
+//! needs to inspect a fresh parse.
 //!
 //! # Quick start
 //!
@@ -37,26 +37,25 @@
 //! # Format stability
 //!
 //! While `major_version = 0`, the wire format is draft and decoders
-//! use exact version matching. Any intentional change to the wire
-//! format MUST update
-//! `design/003-ox-mf2-binary-ast-format-changelog.md` in the same
-//! commit; the compatibility guard tests under
-//! `crates/ox_mf2_parser/tests/snapshot_compat.rs` enforce that the
-//! changelog still documents the live magic, major, and minor version.
+//! use exact version matching.
 
-pub mod decoder;
-pub mod error;
-pub mod format;
+mod decoder;
+mod error;
+mod format;
 mod sections;
 mod string_table;
-pub mod view;
-pub mod writer;
+mod view;
+mod writer;
 
 pub use decoder::{decode_snapshot, decode_snapshot_owned};
 pub use error::{DecodeError, DecodeErrorCode, SnapshotWriteError, SnapshotWriteErrorCode};
 pub use format::{
-    RootId, SectionKind, StringId, HEADER_SIZE, NONE_REF, ROOT_RECORD_SIZE, SECTION_ALIGNMENT,
-    SECTION_RECORD_SIZE, SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION,
+    RootId, SectionKind, StringId, DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE,
+    EDGE_KIND_NODE, EDGE_KIND_TOKEN, EDGE_RECORD_SIZE, EXTENDED_DATA_HEADER_SIZE, HEADER_SIZE,
+    NODE_RECORD_SIZE, NONE_REF, ROOT_RECORD_SIZE, SECTION_ALIGNMENT, SECTION_FLAG_REQUIRED,
+    SECTION_RECORD_SIZE, SNAPSHOT_FEATURE_FLAGS, SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION,
+    SNAPSHOT_MINOR_VERSION, SOURCE_RECORD_SIZE, STRING_OFFSET_RECORD_SIZE, TOKEN_RECORD_SIZE,
+    TRIVIA_RECORD_SIZE,
 };
 pub use view::{
     ChildIter, ChildView, DiagnosticIter, DiagnosticLabelIter, DiagnosticLabelView,

@@ -40,6 +40,7 @@ for (const relativePath of cargoTomlFiles) {
   assertEqual(`${relativePath} version`, version, expectedVersion)
 }
 
+await assertHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', expectedVersion)
 await assertCargoLockVersions(['ox_mf2_parser', 'ox_mf2_napi', 'ox_mf2_wasm'], expectedVersion)
 await assertPublicPackageMetadata('packages/ox-mf2-napi/package.json')
 await assertPublicPackageMetadata('packages/ox-mf2-wasm/package.json')
@@ -71,6 +72,12 @@ async function assertCargoLockVersions(packageNames, expected) {
     )
     assertEqual(`Cargo.lock ${packageName} version`, block?.[1], expected)
   }
+}
+
+async function assertHtmlRootUrl(relativePath, crateName, expected) {
+  const source = await readText(relativePath)
+  const actual = source.match(/#!\[doc\(html_root_url\s*=\s*"([^"]+)"\)\]/)?.[1]
+  assertEqual(`${relativePath} html_root_url`, actual, `https://docs.rs/${crateName}/${expected}`)
 }
 
 async function readJson(relativePath) {

@@ -12,22 +12,19 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ox_mf2_parser::error::{
-    SourceTextErrorCode, OX_MF2_API_ERROR_MIN, OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN,
-    OX_MF2_SNAPSHOT_WRITE_ERROR_MAX, OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX,
-    OX_MF2_SOURCE_TEXT_ERROR_MIN,
-};
-use ox_mf2_parser::snapshot::format::{
-    SectionKind, DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE, EDGE_KIND_NODE,
+use ox_mf2_parser::snapshot::{
+    decode_snapshot, DecodeErrorCode, SectionKind, SnapshotOptions, SnapshotWriteError,
+    SnapshotWriteErrorCode, DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE, EDGE_KIND_NODE,
     EDGE_KIND_TOKEN, EDGE_RECORD_SIZE, EXTENDED_DATA_HEADER_SIZE, HEADER_SIZE, NODE_RECORD_SIZE,
     ROOT_RECORD_SIZE, SECTION_ALIGNMENT, SECTION_RECORD_SIZE, SNAPSHOT_FEATURE_FLAGS,
     SNAPSHOT_MAGIC, SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION, SOURCE_RECORD_SIZE,
     STRING_OFFSET_RECORD_SIZE, TOKEN_RECORD_SIZE, TRIVIA_RECORD_SIZE,
 };
-use ox_mf2_parser::snapshot::{
-    decode_snapshot, DecodeErrorCode, SnapshotOptions, SnapshotWriteError, SnapshotWriteErrorCode,
+use ox_mf2_parser::{
+    parse_message_to_snapshot, ParseOptions, SourceTextErrorCode, OX_MF2_API_ERROR_MIN,
+    OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX,
+    OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
 };
-use ox_mf2_parser::{parse_message_to_snapshot, ParseOptions};
 
 #[test]
 fn snapshot_default_options_match_design() {

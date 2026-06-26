@@ -4,9 +4,9 @@
 //! Snapshot decoder.
 //!
 //! Eagerly validates header, section table, every section payload, and
-//! cross-section references so that [`crate::snapshot::view::SnapshotView`]
+//! cross-section references so that [`crate::snapshot::SnapshotView`]
 //! accessors can stay allocation-free. Malformed bytes return a
-//! [`crate::snapshot::error::DecodeError`] rather than panicking.
+//! [`crate::snapshot::DecodeError`] rather than panicking.
 
 use std::sync::Arc;
 

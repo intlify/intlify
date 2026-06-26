@@ -174,8 +174,8 @@ fn render_dump(view: &SnapshotView<'_>) -> String {
         let kind = u16::from_le_bytes(view.as_bytes()[off..off + 2].try_into().unwrap());
         let ref_id = u32::from_le_bytes(view.as_bytes()[off + 4..off + 8].try_into().unwrap());
         let label = match kind {
-            ox_mf2_parser::snapshot::format::EDGE_KIND_NODE => format!("node#{ref_id}"),
-            ox_mf2_parser::snapshot::format::EDGE_KIND_TOKEN => format!("token#{ref_id}"),
+            ox_mf2_parser::snapshot::EDGE_KIND_NODE => format!("node#{ref_id}"),
+            ox_mf2_parser::snapshot::EDGE_KIND_TOKEN => format!("token#{ref_id}"),
             other => format!("?#{ref_id}(kind={other})"),
         };
         let _ = writeln!(out, "  [{i}] -> {label}");
