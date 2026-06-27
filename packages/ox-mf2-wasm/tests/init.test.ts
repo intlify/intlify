@@ -3,6 +3,7 @@ import {
   OxMf2InitializationError,
   init,
   parseMessage,
+  utf16OffsetToUtf8ByteOffset,
   utf8ByteOffsetToUtf16Offset
 } from '../src/index.ts'
 import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
@@ -16,6 +17,7 @@ test('module import succeeds before WASM init', () => {
 })
 
 test('module re-exports source offset helpers', () => {
+  expect(utf16OffsetToUtf8ByteOffset('aあ', 2)).toBe(4)
   expect(utf8ByteOffsetToUtf16Offset('aあ', 4)).toBe(2)
 })
 

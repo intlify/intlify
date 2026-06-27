@@ -2,6 +2,7 @@
 import editorWorkerUrl from 'monaco-editor/esm/vs/editor/editor.worker?url'
 import { utf16OffsetToUtf8ByteOffset, utf8ByteOffsetToUtf16Offset } from '@intlify/ox-mf2-wasm'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
+import { logger } from 'void/log'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import type { PlaygroundTheme, SourceRange } from '../types/playground'
@@ -59,8 +60,16 @@ export function useMonacoSourceEditor({
       return
     }
 
-    const startOffset = utf8ByteOffsetToUtf16Offset(source.value, range.start)
-    const endOffset = utf8ByteOffsetToUtf16Offset(source.value, range.end)
+    let startOffset: number
+    let endOffset: number
+    try {
+      startOffset = utf8ByteOffsetToUtf16Offset(source.value, range.start)
+      endOffset = utf8ByteOffsetToUtf16Offset(source.value, range.end)
+    } catch (error) {
+      logOffsetConversionError('highlight', error)
+      return
+    }
+
     const start = model.getPositionAt(startOffset)
     const end = model.getPositionAt(endOffset)
 
@@ -118,7 +127,15 @@ export function useMonacoSourceEditor({
       }
 
       const stringOffset = model.getOffsetAt(position)
-      onSourceOffsetClick(utf16OffsetToUtf8ByteOffset(source.value, stringOffset))
+      let byteOffset: number
+      try {
+        byteOffset = utf16OffsetToUtf8ByteOffset(source.value, stringOffset)
+      } catch (error) {
+        logOffsetConversionError('click', error)
+        return
+      }
+
+      onSourceOffsetClick(byteOffset)
     })
 
     resizeObserver = new ResizeObserver(() => {
@@ -150,6 +167,13 @@ export function useMonacoSourceEditor({
     highlightSourceRange,
     setEditorHost
   }
+}
+
+function logOffsetConversionError(action: string, error: unknown): void {
+  logger.warn('Failed to convert MessageFormat source offset', {
+    action,
+    error: error instanceof Error ? error.message : String(error)
+  })
 }
 
 function defineEditorLanguage(): void {

@@ -52,9 +52,11 @@ test('offset helpers floor offsets inside a scalar value', () => {
 
 test('offset helpers validate bounds and source text', () => {
   expect(() => utf16OffsetToUtf8ByteOffset('abc', -1)).toThrow(RangeError)
+  expect(() => utf16OffsetToUtf8ByteOffset('abc', 1.5)).toThrow(RangeError)
   expect(() => utf16OffsetToUtf8ByteOffset('abc', 4)).toThrow(RangeError)
   expect(() => utf16OffsetToUtf8ByteOffset('\ud800', 0)).toThrow(TypeError)
   expect(() => utf8ByteOffsetToUtf16Offset('abc', -1)).toThrow(RangeError)
+  expect(() => utf8ByteOffsetToUtf16Offset('abc', 1.5)).toThrow(RangeError)
   expect(() => utf8ByteOffsetToUtf16Offset('abc', 4)).toThrow(RangeError)
   expect(() => utf8ByteOffsetToUtf16Offset('\ud800', 0)).toThrow(TypeError)
 })
