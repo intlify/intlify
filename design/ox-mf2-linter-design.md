@@ -470,3 +470,12 @@ The following items are detailed linter design questions, not Phase 3 boundary d
 - CLI exclude flags and their interaction with config
 - exact JSON output source path normalization
 - default concurrency and deterministic output ordering with parallel linting
+- rule registry and introspection surface, including whether the CLI exposes rule listing, resolved metadata, or documentation links
+- rule metadata generation workflow for docs, JSON Schema, rule option schemas, and implementation-time rule tables
+- suppression model beyond the first implementation, including inline disable directives, unused directive diagnostics, and baseline suppression files
+- fix model boundaries, including safe fixes, suggestions, dangerous fixes, and how non-style fixes interact with formatter-owned style changes
+- machine reporter roadmap beyond initial `text` and `json`, including whether CI-oriented formats such as GitHub annotations or SARIF need stable compatibility targets
+- CLI inspection and debug modes, such as resolved config printing, file discovery debugging, rule timing output, and their exit code behavior
+- exact API result schema parity across Rust, N-API, WASM, CLI JSON, and future editor integrations
+- rule test harness shape, fixture conventions, snapshot expectations, and validation for rules that claim fix capability
+- benchmark scope for linting, including parse/semantic/rule execution split, per-rule timing, file discovery overhead, and output serialization overhead
