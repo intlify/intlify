@@ -310,12 +310,24 @@ The following items are detailed formatter design questions, not Phase 3 boundar
 - exact `FormatResult`, `FormatCheckResult`, and error envelope shape for Rust, N-API, and WASM
 - exact config file name, JSON Schema path, option names, and default values
 - exact CLI flag precedence over config and `.editorconfig`
+- whether the CLI supports an explicit `--config <path>` in addition to root-only discovery
+- CLI exit code classification for format mismatch, formatter errors, config errors, and no matched files
+- stdout/stderr behavior for write, check, list-different, stdin, and error-reporting modes
+- whether the CLI exposes runtime controls such as `--threads`
+- whether the CLI supports `--no-error-on-unmatched-pattern`
 - supported file extensions for direct message files
 - file discovery behavior for paths, globs, directories, duplicate matches, and deterministic ordering
 - ignore file support, CLI exclude flags, and interaction with config `ignorePatterns`
+- whether ignore files include `.gitignore`, a formatter-specific ignore file, explicit `--ignore-path`, or only config `ignorePatterns`
 - unmatched pattern behavior
 - symlink traversal, hidden files, VCS directories, and dependency directories such as `node_modules`
 - whether `ox-mf2 init` should generate config and schema comments/examples
 - exact formatter ignore directive syntax, target range rules, and trivia handling
 - exact matcher layout and line wrapping rules
+- LSP/editor configuration shape, including whether an explicit formatter config path is supported
+- LSP/editor behavior when config loading fails, including whether it falls back to defaults or reports an operational error
+- generated JSON Schema and generated TypeScript type distribution in npm packages
+- fixture harness structure, including `options.json` matrices, snapshot format, and idempotency checks
+- source text, token, trivia, and comment cursor responsibilities needed by preserve mode and ignore directives
+- whether `formatMessage` returns `code + errors`, a Rust-style result envelope, or separate success/error variants
 - native package lazy-loading and config helper behavior
