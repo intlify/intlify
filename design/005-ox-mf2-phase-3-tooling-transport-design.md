@@ -351,12 +351,6 @@ Out-of-scope linter features:
 - JavaScript custom rules
 - linter plugin system
 
-## Parse Artifact Cache
-
-Dictionary-shaped tooling frequently revisits the same `(locale, message_id, source_text)` entries. The parser core should not learn about dictionaries, but higher layers may cache owned parse artifacts.
-
-The parse artifact cache design note is [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md). It is intentionally unnumbered because it is a bridge note, not a numbered phase design document.
-
 ## LSP and Editor Workflow
 
 Long-lived language-service workflows should avoid re-parsing and re-encoding on every request. They can combine:
