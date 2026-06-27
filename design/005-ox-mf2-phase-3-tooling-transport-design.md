@@ -119,6 +119,14 @@ The CLI accepts file path and glob inputs so users can format MF2 files directly
 
 `ox-mf2 format` should default to write mode and modify files in place. It should also support check workflows such as `--check` and `--list-different` for CI and pre-commit usage. Stdin formatting should be supported through a file-aware option such as `--stdin-filepath`, allowing editors and scripts to pipe source while still giving the formatter enough context for extension checks and configuration.
 
+### Formatter Parallelism
+
+The CLI may format multiple files in parallel, but observable behavior must remain deterministic. File discovery should normalize and de-duplicate paths before formatting so write mode never races on the same file when overlapping globs or repeated paths are provided.
+
+Text output, `--check`, and `--list-different` results should be reported in stable normalized path order, independent of worker scheduling. Programmatic APIs such as `formatMessage(source, options?)` remain single-message operations; resource/catalog adapters and CLI workflows decide whether to parallelize multiple message entries.
+
+Benchmarks should report formatter concurrency settings separately from parser, syntax traversal, layout construction, rendering, binding, and file I/O costs.
+
 ### Configuration
 
 The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the repository root config is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
