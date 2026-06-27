@@ -1,8 +1,17 @@
 import { expect, test } from 'vite-plus/test'
-import { OxMf2InitializationError, parseMessage, syntaxKindName } from '../src/index.ts'
+import {
+  OxMf2InitializationError,
+  parseMessage,
+  syntaxKindName,
+  utf8ByteOffsetToUtf16Offset
+} from '../src/index.ts'
 
 test('module import succeeds without a native binary', () => {
   expect(syntaxKindName(1)).toBe('Root')
+})
+
+test('module re-exports source offset helpers', () => {
+  expect(utf8ByteOffsetToUtf16Offset('aあ', 4)).toBe(2)
 })
 
 test('first API call reports native binding unavailability', () => {

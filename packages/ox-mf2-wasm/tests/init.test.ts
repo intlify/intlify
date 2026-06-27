@@ -1,5 +1,10 @@
 import { beforeAll, expect, test } from 'vite-plus/test'
-import { OxMf2InitializationError, init, parseMessage } from '../src/index.ts'
+import {
+  OxMf2InitializationError,
+  init,
+  parseMessage,
+  utf8ByteOffsetToUtf16Offset
+} from '../src/index.ts'
 import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
 
 beforeAll(async () => {
@@ -8,6 +13,10 @@ beforeAll(async () => {
 
 test('module import succeeds before WASM init', () => {
   expect(typeof init).toBe('function')
+})
+
+test('module re-exports source offset helpers', () => {
+  expect(utf8ByteOffsetToUtf16Offset('aあ', 4)).toBe(2)
 })
 
 test('API before init reports initialization error', () => {
