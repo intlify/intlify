@@ -16,6 +16,8 @@ const bytes = result.snapshot.toBytes()
 
 Spans and `SourceLocation.column` use UTF-8 byte offsets. JavaScript strings with unpaired surrogates are rejected. Recoverable parser diagnostics are returned on the result and are not thrown.
 
+Editor integrations can convert between parser UTF-8 byte offsets and JavaScript UTF-16 code unit offsets with `utf8ByteOffsetToUtf16Offset()` and `utf16OffsetToUtf8ByteOffset()`.
+
 Native binary load failures do not throw during module import. The first API call throws `OxMf2InitializationError` if no native artifact is available.
 
-Phase 2 does not provide an `@intlify/ox-mf2` wrapper package, automatic WASM fallback, UTF-16 location helpers, formatter API, linter API, or semantic snapshot exposure.
+Phase 2 does not provide an `@intlify/ox-mf2` wrapper package, automatic WASM fallback, formatter API, linter API, or semantic snapshot exposure.

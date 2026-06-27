@@ -50,6 +50,8 @@ export {
   encodeUtf8Source,
   hasUnpairedSurrogate,
   isUtf8Boundary,
+  utf16OffsetToUtf8ByteOffset,
+  utf8ByteOffsetToUtf16Offset,
   utf8ByteLength
 } from './source-text.ts'
 export {

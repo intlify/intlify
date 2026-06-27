@@ -1,6 +1,8 @@
 // oxlint-disable-next-line import/default -- Vite ?url imports expose a default URL string.
 import editorWorkerUrl from 'monaco-editor/esm/vs/editor/editor.worker?url'
+import { utf16OffsetToUtf8ByteOffset, utf8ByteOffsetToUtf16Offset } from '@intlify/ox-mf2-wasm'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
+import { logger } from 'void/log'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import type { PlaygroundTheme, SourceRange } from '../types/playground'
@@ -11,8 +13,6 @@ const globalSelf = globalThis as typeof globalThis & {
     getWorker(): Worker
   }
 }
-const utf8Encoder = new TextEncoder()
-
 globalSelf.MonacoEnvironment = {
   getWorker() {
     return new Worker(editorWorkerUrl, { type: 'module' })
@@ -60,8 +60,16 @@ export function useMonacoSourceEditor({
       return
     }
 
-    const startOffset = byteOffsetToStringOffset(source.value, range.start)
-    const endOffset = byteOffsetToStringOffset(source.value, range.end)
+    let startOffset: number
+    let endOffset: number
+    try {
+      startOffset = utf8ByteOffsetToUtf16Offset(source.value, range.start)
+      endOffset = utf8ByteOffsetToUtf16Offset(source.value, range.end)
+    } catch (error) {
+      logOffsetConversionError('highlight', error)
+      return
+    }
+
     const start = model.getPositionAt(startOffset)
     const end = model.getPositionAt(endOffset)
 
@@ -119,7 +127,15 @@ export function useMonacoSourceEditor({
       }
 
       const stringOffset = model.getOffsetAt(position)
-      onSourceOffsetClick(stringOffsetToByteOffset(source.value, stringOffset))
+      let byteOffset: number
+      try {
+        byteOffset = utf16OffsetToUtf8ByteOffset(source.value, stringOffset)
+      } catch (error) {
+        logOffsetConversionError('click', error)
+        return
+      }
+
+      onSourceOffsetClick(byteOffset)
     })
 
     resizeObserver = new ResizeObserver(() => {
@@ -151,6 +167,13 @@ export function useMonacoSourceEditor({
     highlightSourceRange,
     setEditorHost
   }
+}
+
+function logOffsetConversionError(action: string, error: unknown): void {
+  logger.warn('Failed to convert MessageFormat source offset', {
+    action,
+    error: error instanceof Error ? error.message : String(error)
+  })
 }
 
 function defineEditorLanguage(): void {
@@ -230,33 +253,4 @@ function defineEditorThemes(): void {
       'editorCursor.foreground': '#ffad33'
     }
   })
-}
-
-function stringOffsetToByteOffset(source: string, offset: number): number {
-  return utf8Encoder.encode(source.slice(0, offset)).length
-}
-
-function byteOffsetToStringOffset(source: string, byteOffset: number): number {
-  let currentBytes = 0
-  let currentOffset = 0
-
-  while (currentOffset < source.length && currentBytes < byteOffset) {
-    const codePoint = source.codePointAt(currentOffset)
-
-    if (codePoint === undefined) {
-      break
-    }
-
-    const chunk = String.fromCodePoint(codePoint)
-    const nextBytes = currentBytes + utf8Encoder.encode(chunk).length
-
-    if (nextBytes > byteOffset) {
-      break
-    }
-
-    currentBytes = nextBytes
-    currentOffset += chunk.length
-  }
-
-  return currentOffset
 }

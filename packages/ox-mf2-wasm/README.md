@@ -17,6 +17,8 @@ The public API matches the N-API package where possible. `parseMessage()` and `p
 
 Decoded snapshots that do not embed source text can reattach it with `withSources()`. Spans and `SourceLocation.column` use UTF-8 byte offsets. JavaScript strings with unpaired surrogates are rejected. Recoverable parser diagnostics are returned on the result and are not thrown.
 
+Editor integrations can convert between parser UTF-8 byte offsets and JavaScript UTF-16 code unit offsets with `utf8ByteOffsetToUtf16Offset()` and `utf16OffsetToUtf8ByteOffset()`.
+
 WASM initialization is explicit. Calling parser APIs before `await init()` throws `OxMf2InitializationError`.
 
-Phase 2 does not provide an `@intlify/ox-mf2` wrapper package, automatic N-API fallback, UTF-16 location helpers, formatter API, linter API, or semantic snapshot exposure.
+Phase 2 does not provide an `@intlify/ox-mf2` wrapper package, automatic N-API fallback, formatter API, linter API, or semantic snapshot exposure.

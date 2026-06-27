@@ -68,6 +68,86 @@ export function utf8ByteLength(source: string, label = 'source'): number {
 }
 
 /**
+ * Convert a JavaScript UTF-16 code unit offset to a UTF-8 byte offset.
+ *
+ * @param source - Source text to inspect.
+ * @param offset - UTF-16 code unit offset, such as a Monaco or LSP character offset.
+ * @param label - Human-readable label used in error messages.
+ * @returns UTF-8 byte offset at the same source position, floored to the previous scalar boundary.
+ */
+export function utf16OffsetToUtf8ByteOffset(
+  source: string,
+  offset: number,
+  label = 'offset'
+): number {
+  assertNoUnpairedSurrogates(source)
+  assertOffsetInBounds(source.length, offset, label)
+
+  let currentBytes = 0
+  let currentOffset = 0
+
+  while (currentOffset < source.length && currentOffset < offset) {
+    const codePoint = source.codePointAt(currentOffset)
+
+    if (codePoint === undefined) {
+      break
+    }
+
+    const chunk = String.fromCodePoint(codePoint)
+    const nextOffset = currentOffset + chunk.length
+
+    if (nextOffset > offset) {
+      break
+    }
+
+    currentBytes += TEXT_ENCODER.encode(chunk).length
+    currentOffset = nextOffset
+  }
+
+  return currentBytes
+}
+
+/**
+ * Convert a UTF-8 byte offset to a JavaScript UTF-16 code unit offset.
+ *
+ * @param source - Source text to inspect.
+ * @param byteOffset - UTF-8 byte offset from a parser span or diagnostic.
+ * @param label - Human-readable label used in error messages.
+ * @returns UTF-16 code unit offset for editor APIs, floored to the previous scalar boundary.
+ */
+export function utf8ByteOffsetToUtf16Offset(
+  source: string,
+  byteOffset: number,
+  label = 'byteOffset'
+): number {
+  assertNoUnpairedSurrogates(source)
+  assertOffsetInBounds(TEXT_ENCODER.encode(source).byteLength, byteOffset, label)
+
+  let currentBytes = 0
+  let currentOffset = 0
+
+  while (currentOffset < source.length && currentBytes < byteOffset) {
+    const codePoint = source.codePointAt(currentOffset)
+
+    if (codePoint === undefined) {
+      break
+    }
+
+    const chunk = String.fromCodePoint(codePoint)
+    const nextBytes = currentBytes + TEXT_ENCODER.encode(chunk).length
+
+    if (nextBytes > byteOffset) {
+      break
+    }
+
+    currentBytes = nextBytes
+    currentOffset += chunk.length
+  }
+
+  return currentOffset
+}
+
+/**
  * Return whether an offset falls on a UTF-8 code point boundary.
  *
  * @param bytes - UTF-8 encoded source bytes.
@@ -120,4 +200,13 @@ function isHighSurrogate(unit: number): boolean {
 
 function isLowSurrogate(unit: number): boolean {
   return unit >= 0xdc00 && unit <= 0xdfff
+}
+
+function assertOffsetInBounds(length: number, offset: number, label: string): void {
+  if (!Number.isInteger(offset)) {
+    throw new RangeError(`${label} must be an integer`)
+  }
+  if (offset < 0 || offset > length) {
+    throw new RangeError(`${label} is outside source text bounds`)
+  }
 }
