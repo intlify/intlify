@@ -62,7 +62,7 @@ Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles s
 
 Linters, compilers, validators, and language-service features can combine Binary AST decoder/accessor traversal with SemanticView.
 
-SemanticView should remain derived from the Rust core semantic model. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
+SemanticView should remain derived from the Rust core semantic model. In the initial Phase 3 scope, it is a Rust core and linter-facing contract rather than a fixed N-API/WASM public API. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
 
 ## Formatter Input
 
@@ -131,7 +131,7 @@ Benchmarks should report formatter concurrency settings separately from parser, 
 
 The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the repository root config is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
 
-The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth.
+The project configuration surface should use one unified JSON Schema with `format` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
 
 Formatter configuration should support `ignorePatterns` but not file-specific `overrides` in the initial design. The initial formatter target is a narrow MF2 message file/resource workflow, so file-kind-specific overrides are unnecessary. If future resource/catalog or multi-file-kind workflows need per-file options, overrides can be reconsidered then.
 
@@ -214,6 +214,8 @@ While the linter remains in 0.x, the `recommended` preset may evolve by adding b
 ### CLI Output and Exit Behavior
 
 The initial CLI output formats should include human-readable `text` output and machine-readable `json` output. Additional formats can be added later, but `json` should use the same diagnostic schema exposed by Rust, N-API, and WASM entry points.
+
+Machine-readable output schemas are distinct from the unified project config schema. `lint`, `format --check`, and a future combined `check` command may use command-specific JSON result schemas, while sharing common grouping and summary conventions where practical.
 
 The CLI exits with a failure status when any `error` diagnostic is reported. `warning` diagnostics do not fail the process by default. A `--max-warnings <n>` option should allow CI users to fail when the warning count exceeds the configured threshold.
 
@@ -471,7 +473,7 @@ The transport or binding layer is selected by the integration environment. The c
 
 Agent coding tools such as Codex, Claude Code, Grok Build, and similar systems are separate consumers from LSP/editor integrations. They may expose plugins, skills, commands, hooks, MCP servers, ACP clients, headless execution, or other agent-specific extension points, but those extension systems should wrap the same formatter, linter, parser, and snapshot contracts rather than defining new core behavior.
 
-The initial Phase 3 agent-facing surface should be the `ox-mf2` CLI and stable machine-readable output. Agents can call `ox-mf2 format`, `ox-mf2 lint`, and future check commands in repo workflows, CI-style verification, pre-commit automation, and code review tasks.
+The initial Phase 3 agent-facing surface should be the `ox-mf2` CLI and stable machine-readable output. Agents can call `ox-mf2 format`, `ox-mf2 lint`, and future check commands in repo workflows, CI-style verification, pre-commit automation, and code review tasks. Agent, CI, and editor-adapter integrations should prefer JSON output over human-readable text output when they need to inspect diagnostics or formatting status.
 
 Agent integrations may later provide MCP servers, agent plugins, skills, or commands, but those should remain distribution and workflow wrappers. They should not become the source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, or semantic analysis.
 
@@ -495,21 +497,33 @@ Linter results should be transportable over JSON-RPC or a future MessagePack ses
 
 Tooling and transport benchmarks must be phase-separated.
 
-Relevant Phase 3 benchmark phases:
+Initial Phase 3 benchmark phases:
 
 - format_preserve
 - format_standard
+- format_check_cli_e2e
+- format_check_json
 - lint_message_core
 - lint_snapshot_core
 - lint_cli_e2e
+- lint_json
 - lint_binding_napi
 - lint_binding_wasm
 - lint_lsp_diagnostics
+- check_cli_e2e
+- check_json
+- agent_cli_json
 - semantic_query
-- lsp_jsonrpc
-- lsp_msgpack
-- cache_hit_query
 - cache_miss_parse
 - e2e_format
 
-Reports should separate parser, semantic lowering, snapshot encode/decode, binding calls, MessagePack transport, JSON-RPC transport, cache hit/miss behavior, and actual rule/formatter work.
+Future transport benchmark phases:
+
+- jsonrpc_baseline
+- messagepack_transport
+- lsp_jsonrpc
+- lsp_msgpack
+- cache_hit_query
+- long_lived_session_query
+
+Reports should separate parser, semantic lowering, snapshot encode/decode, binding calls, CLI JSON serialization, JSON-RPC transport, MessagePack transport, cache hit/miss behavior, and actual rule/formatter work.
