@@ -379,6 +379,8 @@ For `.mf2` files, the adapter may treat the whole document as one message or res
 
 Parser, formatter, and linter core APIs operate on the extracted message text. Adapters map message-local results back to the containing document.
 
+Host document parsing, string escaping, decoded-to-raw offset mapping, and outer document edit ownership are adapter concerns. Their exact contracts should be specified in a dedicated LSP/editor or resource adapter design.
+
 ### Span and Position Conversion
 
 Core parser, snapshot, semantic, formatter, and linter APIs use message-local UTF-8 byte spans as their canonical location model.
@@ -406,6 +408,8 @@ Cached artifacts must be invalidated when the document version changes. Cache ow
 
 Editor diagnostics are produced by combining parser, semantic, and linter diagnostics through the shared diagnostic result contract.
 
+When an adapter uses `lintMessage` or `lintSnapshot`, that result should be treated as the preferred diagnostic source because it already contains parser, semantic, and lint diagnostics. Adapters must avoid publishing parser diagnostics twice when they also keep parser results in a separate cache.
+
 The initial workflow is strict:
 
 - parser diagnostics are always reported
@@ -432,11 +436,13 @@ For standalone `.mf2` documents, the resulting edit may replace the whole docume
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 
+Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the mapping is stale or the containing message range can no longer be identified, the adapter should no-op. Exact version checks and edit conflict behavior belong in the dedicated LSP/editor design.
+
 ### Configuration
 
-Editor adapters should use the same resolved formatter and linter configuration as CLI workflows. Configuration is discovered from the workspace or repository root; nested config discovery is not required.
+Editor adapters should normalize their settings into the same resolved formatter and linter configuration models used by CLI workflows. They may combine project configuration with editor-specific settings such as workspace settings, user settings, or LSP initialization options before passing options to core APIs.
 
-Configuration loading failures are operational editor errors, not parser, semantic, formatter, or linter diagnostics. Exact config file names, fallback behavior, and editor error presentation belong in dedicated formatter, linter, or LSP/editor design documents.
+Configuration loading failures are operational editor errors, not parser, semantic, formatter, or linter diagnostics. Exact config sources, precedence, reload behavior, fallback behavior, and editor error presentation belong in dedicated formatter, linter, or LSP/editor design documents.
 
 ### Out-of-Scope Editor Features
 
