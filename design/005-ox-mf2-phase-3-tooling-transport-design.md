@@ -353,19 +353,113 @@ Out-of-scope linter features:
 
 ## LSP and Editor Workflow
 
-Long-lived language-service workflows should avoid re-parsing and re-encoding on every request. They can combine:
+### Product Boundary
 
-- SourceStore / SourceView for source identity and location conversion
-- parse artifact cache for repeated dictionary entries
-- Binary AST snapshot or decoded SnapshotView for syntax traversal
-- SemanticView for semantic queries
-- diagnostics store for parser and linter diagnostics
+Phase 3 does not require a dedicated LSP server or editor extension as a direct product. Instead, LSP and editor integrations are treated as adapter workflows built on top of the parser, formatter, linter, `SnapshotView`, `SemanticView`, and binding packages.
 
-LSP-facing UTF-16 positions are converted at the editor boundary. Core parser and snapshot spans remain UTF-8 byte offsets.
+The parser, formatter, and linter cores remain LSP-agnostic. They should not return LSP protocol types such as `Diagnostic`, `TextEdit`, `CodeAction`, or UTF-16 positions directly.
 
-LSP and editor integrations should reuse the linter engine directly or through the N-API/WASM entry points. Parser, semantic, and lint diagnostics are converted into LSP diagnostics by mapping the shared diagnostic result contract to editor ranges and severity. The linter core does not emit `info` or `hint` diagnostics initially, but editor layers may add advice-style diagnostics on top of the shared `error` and `warning` results.
+### Initial Scope
 
-Recovery-aware partial linting for incomplete editor buffers is a future editor-mode concern. The initial linter core keeps the strict `parser -> semantic -> rules` pipeline used by CLI and bindings.
+The initial editor workflow focuses on diagnostics and formatting.
+
+Code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, and minimal-diff formatting are not required in the initial workflow. `SemanticView` should still preserve enough stable semantic relationships to support those future editor features.
+
+### Document and Message Mapping
+
+Editor adapters should support both standalone `.mf2` documents and MF2 messages embedded in JSON/YAML resource or catalog files.
+
+For `.mf2` files, the adapter may treat the whole document as one message or resource unit. For JSON/YAML resources, the adapter extracts each MF2 message from the relevant key/value entry and tracks the relationship between:
+
+- document URI and version
+- resource or catalog key
+- document-level value range
+- extracted message text
+- message-local byte offsets
+
+Parser, formatter, and linter core APIs operate on the extracted message text. Adapters map message-local results back to the containing document.
+
+### Span and Position Conversion
+
+Core parser, snapshot, semantic, formatter, and linter APIs use message-local UTF-8 byte spans as their canonical location model.
+
+LSP and editor adapters are responsible for:
+
+- mapping message-local UTF-8 spans to document-level UTF-8 spans
+- converting document-level UTF-8 spans to editor-facing UTF-16 positions
+- preserving source identity through `SourceStore` / `SourceView` or equivalent adapter state
+
+This keeps JSON/YAML parsing, document URI handling, and LSP position encoding outside of the core crates and bindings.
+
+### Artifact Reuse
+
+Long-lived language-service workflows may reuse parse artifacts per document version to avoid re-parsing and re-encoding on every request. They can combine:
+
+- `SourceStore` / `SourceView` for source identity and location conversion
+- binary AST snapshot or decoded `SnapshotView` for syntax traversal
+- `SemanticView` for semantic queries
+- diagnostics store for parser, semantic, and linter diagnostics
+
+Cached artifacts must be invalidated when the document version changes. Cache ownership and eviction are adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
+
+### Diagnostics Workflow
+
+Editor diagnostics are produced by combining parser, semantic, and linter diagnostics through the shared diagnostic result contract.
+
+The initial workflow is strict:
+
+- parser diagnostics are always reported
+- semantic diagnostics are reported when parse recovery provides enough structure for semantic lowering
+- linter diagnostics are reported only when parsing and semantic lowering succeed
+- parse failure prevents the linter from running
+
+Shared `error` and `warning` severities map to editor/LSP diagnostic severity at the adapter boundary. The core linter does not emit `info` or `hint` diagnostics initially, but editor layers may add advice-style diagnostics on top of the shared results.
+
+Recovery-aware partial linting for incomplete editor buffers is a future editor-mode concern. The initial editor workflow keeps the same strict `parser -> semantic -> rules` pipeline used by CLI and bindings.
+
+### Formatting Workflow
+
+Formatter core APIs format whole MF2 messages and return formatted message text. They do not return LSP `TextEdit` values directly.
+
+Editor adapters should:
+
+1. find the containing MF2 message or resource entry
+2. call whole-message formatting
+3. compare the original and formatted message text
+4. create editor `TextEdit` values at the adapter boundary
+
+For standalone `.mf2` documents, the resulting edit may replace the whole document. For JSON/YAML resources, the edit should replace only the containing message value range.
+
+If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
+
+### Configuration
+
+Editor adapters should use the same resolved formatter and linter configuration as CLI workflows. Configuration is discovered from the workspace or repository root; nested config discovery is not required.
+
+Configuration loading failures are operational editor errors, not parser, semantic, formatter, or linter diagnostics. Exact config file names, fallback behavior, and editor error presentation belong in dedicated formatter, linter, or LSP/editor design documents.
+
+### Out-of-Scope Editor Features
+
+The following features are deferred from the initial Phase 3 editor workflow:
+
+- code actions and quick fixes
+- hover, completion, go-to-definition, and rename
+- true range-only formatting
+- minimal-diff formatting
+- recovery-aware partial linting for incomplete buffers
+- dedicated LSP server CLI, protocol handlers, and extension packaging
+
+Future editor adapters may map stable linter rule ids and formatter output into quick fixes. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
+
+### Implementation Targets
+
+Different integration environments can use the same conceptual workflow through different implementation targets:
+
+- Rust LSP servers can call parser, formatter, and linter crates directly
+- Node-based language servers or editor extensions can use N-API packages
+- browser-based editors and playgrounds can use WASM packages
+
+The transport or binding layer is selected by the integration environment. The core workflow remains the same across these targets.
 
 ## MessagePack Transport
 
