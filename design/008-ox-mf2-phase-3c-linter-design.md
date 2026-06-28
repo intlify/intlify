@@ -62,7 +62,7 @@ parser -> semantic -> rules
 
 Parser diagnostics are always included in lint results. If any parser diagnostic is produced, semantic lowering and configurable lint rules do not run.
 
-Semantic diagnostics are always included after successful parsing. If semantic lowering produces any semantic diagnostic, configurable lint rules do not run.
+Semantic diagnostics, when produced by semantic lowering, are included after successful parsing. If semantic lowering produces any semantic diagnostic, configurable lint rules do not run.
 
 Rules only run when parsing and semantic lowering complete without diagnostics.
 
@@ -250,7 +250,7 @@ This detailed linter design owns the classification between core semantic diagno
 
 Each candidate should be classified into one of these groups:
 
-- core semantic diagnostic: always emitted after successful parsing, independent from rule configuration, and initially reported as `error`
+- core semantic diagnostic: always enabled after successful parsing, independent from rule configuration, and initially reported as `error` when the semantic condition is present
 - configurable lint rule: runs only after parser and semantic diagnostics are clean, and is controlled by `off`, `warn`, or `error`
 - deferred: requires more MF2 selection semantics, resource/catalog context, or editor-specific behavior before implementation
 
@@ -274,8 +274,8 @@ Example:
 Open decisions:
 
 - Whether simple messages allow implicit variables by default.
-- Whether strict mode is required for this diagnostic.
-- Whether references inside `.local` right-hand sides use the same visibility rules as message body references.
+- Whether this diagnostic requires strict mode.
+- Whether `.local` right-hand sides share visibility rules with message body references.
 
 ### duplicate-declaration
 
@@ -304,7 +304,7 @@ Open decisions:
 
 ### invalid-local-dependency
 
-Reports invalid `.local` dependency graphs, including self references and cycles.
+Reports invalid `.local` dependency graphs, including self-references and cycles.
 
 Example:
 
@@ -431,7 +431,7 @@ Initial configurable lint rules should avoid style concerns. Style checks and fo
 
 Candidate categories:
 
-- `semantic`: correctness checks that can be configured after core diagnostics
+- `correctness`: correctness checks that can be configured after core diagnostics and run in the configurable rules phase
 - `best-practice`: maintainability or translation workflow checks
 - `resource`: future resource/catalog-level checks
 

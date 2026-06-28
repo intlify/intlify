@@ -149,6 +149,8 @@ FormatOptions {
 }
 ```
 
+With only `mode` in the minimum option set, `.editorconfig` has no active formatter effect yet because common `.editorconfig` fields map to later options such as line width, indent width, line ending, and final newline. `.editorconfig` fallback becomes active only for formatter options that are explicitly supported.
+
 Options to decide later:
 
 - line width
@@ -168,7 +170,7 @@ If parsing produces any parser diagnostic:
 
 - the formatter does not produce public formatted output
 - CLI write mode does not modify the file
-- API consumers receive the original source with diagnostics or an error result
+- API consumers receive diagnostics or an error result without formatted output
 - LSP/editor adapters treat the request as a no-op
 
 Recovery-aware formatting is future editor-specific scope.
@@ -331,3 +333,6 @@ The following items are detailed formatter design questions, not Phase 3 boundar
 - source text, token, trivia, and comment cursor responsibilities needed by preserve mode and ignore directives
 - whether `formatMessage` returns `code + errors`, a Rust-style result envelope, or separate success/error variants
 - native package lazy-loading and config helper behavior
+- WASM bundle-size constraints and tree-shaking expectations
+- whether the WASM API should expose synchronous formatting after initialization or use an asynchronous API shape
+- how preserve mode should apply surrounding layout heuristics around syntax units emitted from original source slices by formatter ignore directives

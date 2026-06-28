@@ -120,7 +120,7 @@ Formatter and linter semantic correctness tests belong to later product phases.
 - What is the exact config file name?
 - Should the CLI support an explicit `--config <path>` option in Phase 3A?
 - What global option selects JSON output: `--format json`, `--output json`, or another spelling?
-- Should `ox-mf2 check` be introduced in Phase 3A as a reserved command, or only after formatter and linter products both exist?
+- Should `ox-mf2 check` appear in user-facing help as a reserved command in Phase 3A, or remain hidden/internal scaffolding until formatter and linter products both exist?
 - What top-level fields are required in every JSON output envelope?
 - How should operational errors be represented in JSON output without mixing them with parser, formatter, or linter diagnostics?
 - What exit-code contract should apply to operational errors versus check failures?

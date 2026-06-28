@@ -185,7 +185,7 @@ The formatter should read `.editorconfig` as formatter-only fallback input for u
 
 ### Invalid Syntax
 
-Formatter behavior for invalid syntax is strict in the initial design. If parsing produces any parser diagnostic, the formatter does not produce public formatted output. CLI write mode must not modify the file. API consumers should receive the original source with diagnostics or an error result. LSP/editor adapters should treat incomplete or invalid editing buffers as no-op formatting requests. Recovery-aware formatting is future editor-specific scope.
+Formatter behavior for invalid syntax is strict in the initial design. If parsing produces any parser diagnostic, the formatter does not produce public formatted output. CLI write mode must not modify the file. API consumers should receive diagnostics or an error result without formatted output. LSP/editor adapters should treat incomplete or invalid editing buffers as no-op formatting requests. Recovery-aware formatting is future editor-specific scope.
 
 ### Formatter Results
 
@@ -320,7 +320,7 @@ Diagnostics should identify their source category and rule id when applicable. P
 
 If parsing produces any parser diagnostics, the initial linter stops before semantic lowering and rule execution. This keeps rule implementations from depending on incomplete recovery AST shapes. A future recovery-aware editor mode may run selected rules on partial syntax, but that is outside the initial linter core.
 
-Semantic diagnostics are also always included in `lintMessage(source)` after successful parsing. They use `category: "semantic"` and no rule id, or a reserved semantic rule id if an output format requires one. These diagnostics represent MF2 meaning errors rather than configurable lint rules. Initial semantic diagnostics are emitted as `error`; `warning` is reserved for future best-practice or ambiguous-but-valid semantic diagnostics.
+Semantic diagnostics, when produced by semantic lowering, are included in `lintMessage(source)` after successful parsing. They use `category: "semantic"` and no rule id, or a reserved semantic rule id if an output format requires one. These diagnostics represent MF2 meaning errors rather than configurable lint rules. Initial semantic diagnostics are emitted as `error`; `warning` is reserved for future best-practice or ambiguous-but-valid semantic diagnostics.
 
 If semantic lowering produces any semantic diagnostics, configurable lint rules do not run. The initial linter pipeline is strictly `parser -> semantic -> rules`, and each stage must complete without diagnostics before the next stage runs.
 
@@ -415,7 +415,7 @@ Code actions, quick fixes, hover, completion, go-to-definition, rename, true ran
 
 Editor adapters should support both standalone `.mf2` documents and MF2 messages embedded in JSON/YAML resource or catalog files.
 
-For `.mf2` files, the adapter may treat the whole document as one message or resource unit. For JSON/YAML resources, the adapter extracts each MF2 message from the relevant key/value entry and tracks the relationship between:
+For `.mf2` files, the adapter may treat the whole document as one MF2 message. For JSON/YAML resources, the adapter extracts each embedded MF2 message from the relevant resource or catalog key/value entry and tracks the relationship between:
 
 - document URI and version
 - resource or catalog key
@@ -437,7 +437,7 @@ LSP and editor adapters are responsible for:
 - converting document-level UTF-8 spans to editor-facing UTF-16 positions
 - preserving source identity through `SourceStore` / `SourceView` or equivalent adapter state
 
-This keeps JSON/YAML parsing, document URI handling, and LSP position encoding outside of the core crates and bindings.
+This keeps JSON/YAML parsing, document URI handling, and LSP position encoding outside the core crates and bindings.
 
 ### Artifact Reuse
 

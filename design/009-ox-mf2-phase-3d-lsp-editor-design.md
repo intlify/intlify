@@ -30,7 +30,7 @@ Adapters extract MF2 message text from the host document, call core APIs, and ma
 
 Editor adapters should treat standalone `.mf2` files and JSON/YAML resource files as different host document shapes over the same message-level core.
 
-For standalone `.mf2` files, the document can be mapped directly to one MF2 message or resource unit. For JSON/YAML resource files, the adapter extracts MF2 message text from the relevant resource entry and keeps enough mapping data to translate message-local results back to the host document.
+For standalone `.mf2` files, the document maps directly to one MF2 message. For JSON/YAML resource files, the adapter extracts embedded MF2 message text from the relevant resource or catalog entry and keeps enough mapping data to translate message-local results back to the host document.
 
 Host document parsing, string escaping, decoded-to-raw offset mapping, and outer document edits remain adapter responsibilities. The parser, formatter, and linter cores receive extracted message text and return message-local results.
 
