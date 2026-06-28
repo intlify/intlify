@@ -16,6 +16,50 @@ Semantic information is exposed separately as SemanticView or a later compact se
 
 MessagePack is not the CST/AST representation of ox-mf2. It is reserved as a future transport for long-lived language-service workflows.
 
+## Implementation Phasing
+
+This document defines the broader tooling and consumer boundary for Phase 3 and later work. It does not require formatter, linter, LSP/editor, agent integration, and long-lived transport features to be implemented in one release or one milestone.
+
+Implementation should be split by consumer-facing product surface:
+
+1. **Phase 3A: Tooling Foundation**
+   - `ox-mf2` CLI crate and command structure
+   - unified `format` / `lint` project config model and JSON Schema
+   - shared machine-readable output conventions
+   - package and distribution boundaries for CLI, N-API, and WASM tooling
+
+2. **Phase 3B: Formatter Product**
+   - `crates/ox_mf2_format`
+   - `ox-mf2 format`
+   - `format --check` and formatter check result contract
+   - standard and preserve formatting modes
+   - formatter-specific N-API and WASM packages
+
+3. **Phase 3C: Linter Product**
+   - `crates/ox_mf2_lint`
+   - `ox-mf2 lint`
+   - parser, semantic, and lint diagnostic result contract
+   - recommended preset and initial semantic diagnostics
+   - linter-specific N-API and WASM packages
+
+4. **Phase 3D: LSP/Editor Integration**
+   - adapter workflows for diagnostics and formatting
+   - `.mf2` and JSON/YAML resource message mapping
+   - UTF-8 byte span to editor position conversion
+   - editor-specific configuration source handling
+
+5. **Phase 3E: Agent Coding Integration**
+   - agent workflows over stable CLI JSON output
+   - repo instructions, skills, plugins, hooks, or MCP wrappers as needed
+   - no vendor-specific agent protocol as the core contract
+
+6. **Phase 3F or Later: Long-lived Transport**
+   - JSON-RPC baseline measurement
+   - MessagePack transport evaluation
+   - daemon/session/cache optimization for repeated language-service queries
+
+Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts.
+
 ## SnapshotView
 
 Phase 3 does not introduce a second public AST view. The existing Binary AST `SnapshotView` / binding-side snapshot accessor remains the common syntax input for formatter, linter, LSP/editor, and transport consumers.
