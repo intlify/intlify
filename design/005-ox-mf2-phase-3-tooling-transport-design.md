@@ -483,6 +483,8 @@ MessagePack is not the CST/AST representation of ox-mf2.
 
 It is a future transport candidate for long-lived language-service workflows such as LSP, editor integration, daemon mode, and repeated semantic queries. The standard CST/AST product boundary remains the versioned Binary AST snapshot.
 
+MessagePack transport is not an initial Phase 3 deliverable. The initial transport baseline is JSON-based CLI/API output and JSON-RPC-style language-service communication. MessagePack remains a future optimization candidate for long-lived sessions after JSON payload costs are measured.
+
 If MessagePack transport is added later, its overhead must be measured separately from parser, semantic lowering, snapshot encoding, snapshot decoding, binding cost, and LSP request handling.
 
 MessagePack payloads should transport query/response data or language-service session messages. They should not become a second AST format that competes with the Binary AST snapshot.
