@@ -6,7 +6,7 @@ This document defines the Phase 3 design boundary for tooling and transport work
 
 Phase 1 parser design is defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Phase 2 Binary AST snapshot design is defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). Phase 2 language binding design is defined in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 
-This document focuses on formatter/linter input, SemanticView exposure, LSP/editor workflows, transport choices, and long-lived language-service scenarios.
+This document focuses on formatter/linter input, SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
 
 ## Basic Policy
 
@@ -466,6 +466,16 @@ Different integration environments can use the same conceptual workflow through 
 - browser-based editors and playgrounds can use WASM packages
 
 The transport or binding layer is selected by the integration environment. The core workflow remains the same across these targets.
+
+## Agent Coding Workflow
+
+Agent coding tools such as Codex, Claude Code, Grok Build, and similar systems are separate consumers from LSP/editor integrations. They may expose plugins, skills, commands, hooks, MCP servers, ACP clients, headless execution, or other agent-specific extension points, but those extension systems should wrap the same formatter, linter, parser, and snapshot contracts rather than defining new core behavior.
+
+The initial Phase 3 agent-facing surface should be the `ox-mf2` CLI and stable machine-readable output. Agents can call `ox-mf2 format`, `ox-mf2 lint`, and future check commands in repo workflows, CI-style verification, pre-commit automation, and code review tasks.
+
+Agent integrations may later provide MCP servers, agent plugins, skills, or commands, but those should remain distribution and workflow wrappers. They should not become the source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, or semantic analysis.
+
+Detailed agent integration choices are tracked in [ox-mf2-agent-integration-design.md](./ox-mf2-agent-integration-design.md).
 
 ## MessagePack Transport
 
