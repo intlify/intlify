@@ -1,4 +1,4 @@
-# ox-mf2 Agent Integration Design
+# ox-mf2 Phase 3E Agent Integration Design
 
 This document tracks detailed integration design for agent coding tools that consume ox-mf2.
 

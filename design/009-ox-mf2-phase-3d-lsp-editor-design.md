@@ -1,4 +1,4 @@
-# ox-mf2 LSP and Editor Design
+# ox-mf2 Phase 3D LSP and Editor Design
 
 This document tracks the detailed LSP and editor integration design for ox-mf2.
 

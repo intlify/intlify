@@ -1,4 +1,4 @@
-# ox-mf2 Formatter Design
+# ox-mf2 Phase 3B Formatter Design
 
 ## Purpose
 

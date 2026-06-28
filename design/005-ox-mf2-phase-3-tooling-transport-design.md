@@ -138,7 +138,7 @@ The primary public API is `formatMessage(source, options?)`, which parses one MF
 
 ### Formatting Modes
 
-The formatter should support at least two modes. Detailed formatter rules, API shape, fixtures, and implementation requirements are tracked separately in [ox-mf2-formatter-design.md](./ox-mf2-formatter-design.md). This document only fixes the Phase 3 boundary and high-level formatter direction.
+The formatter should support at least two modes. Detailed formatter rules, API shape, fixtures, and implementation requirements are tracked separately in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md). This document only fixes the Phase 3 boundary and high-level formatter direction.
 
 - standard mode: format to the standard ox-mf2 style without using the original layout as a primary decision input
 - preserve mode: preserve source shape where it is meaningful while still applying standard local formatting rules
@@ -355,7 +355,7 @@ The initial semantic diagnostic candidates are:
 
 ### Detailed Linter Design Reference
 
-Detailed rule semantics, examples, and implementation contracts should be specified in [ox-mf2-linter-design.md](./ox-mf2-linter-design.md). This phase document only fixes the consumer-facing pipeline and initial scope.
+Detailed rule semantics, examples, and implementation contracts should be specified in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). This phase document only fixes the consumer-facing pipeline and initial scope.
 
 ### Suppression
 
@@ -521,7 +521,7 @@ The initial Phase 3 agent-facing surface should be the `ox-mf2` CLI and stable m
 
 Agent integrations may later provide MCP servers, agent plugins, skills, or commands, but those should remain distribution and workflow wrappers. They should not become the source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, or semantic analysis.
 
-Detailed agent integration choices are tracked in [ox-mf2-agent-integration-design.md](./ox-mf2-agent-integration-design.md).
+Detailed agent integration choices are tracked in [010-ox-mf2-phase-3e-agent-integration-design.md](./010-ox-mf2-phase-3e-agent-integration-design.md).
 
 ## MessagePack Transport
 

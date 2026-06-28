@@ -1,4 +1,4 @@
-# ox-mf2 Linter Design
+# ox-mf2 Phase 3C Linter Design
 
 This document captures the detailed design for the ox-mf2 linter. The Phase 3 tooling and transport design fixes the high-level consumer contract; this file tracks the rule-level behavior, examples, and implementation decisions that need more detail before implementation.
 
