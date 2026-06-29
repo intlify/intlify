@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Phase 3A CLI foundation architecture</title>
+<desc id="desc">The intlify CLI binary calls the Rust CLI crate, which owns config loading, schema generation, command routing, reporters, exit codes, and future formatter and linter product integration points.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .small { fill:#334155; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .package { fill:#334155; }
+    .cli { fill:#0f766e; }
+    .config { fill:#475569; }
+    .schema { fill:#475569; }
+    .reporter { fill:#0f766e; }
+    .future { fill:#64748b; }
+    .parser { fill:#1f2937; }
+    .arrow { stroke:#64748b; }
+    .dashed { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .small { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1240" height="760" fill="none"/>
+
+<text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Phase 3A CLI foundation architecture</text>
+<text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">The CLI foundation owns command routing, configuration, JSON reporting, package distribution, and future product integration points.</text>
+
+<rect x="50" y="112" width="250" height="126" rx="12" class="panel" stroke-width="2"/>
+<text x="175" y="150" font-size="16" font-weight="700" text-anchor="middle" class="label">Consumers</text>
+<rect x="82" y="172" width="186" height="42" rx="7" class="package"/>
+<text x="175" y="198" font-size="12" font-weight="700" text-anchor="middle" class="white">User / CI / Editor / Agent</text>
+
+<rect x="374" y="108" width="492" height="572" rx="14" class="group" stroke-width="2"/>
+<text x="620" y="146" font-size="16" font-weight="700" text-anchor="middle" class="label">Phase 3A foundation</text>
+<text x="620" y="170" font-size="12" text-anchor="middle" class="muted">No formatter or linter engine behavior is implemented in this phase.</text>
+
+<rect x="442" y="204" width="356" height="74" rx="9" class="package"/>
+<text x="620" y="232" font-size="14" font-weight="700" text-anchor="middle" class="white">@intlify/cli npm package</text>
+<text x="620" y="254" font-size="11.5" text-anchor="middle" class="soft-white">distributes the native intlify binary and bundled schema</text>
+
+<path d="M 620 282 L 620 322" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="442" y="322" width="356" height="74" rx="9" class="cli"/>
+<text x="620" y="350" font-size="14" font-weight="700" text-anchor="middle" class="white">crates/ox_mf2_cli</text>
+<text x="620" y="372" font-size="11.5" text-anchor="middle" class="soft-white">command routing, config loading, reporters, exit codes</text>
+
+<path d="M 540 396 L 540 472 L 488 472 L 488 500" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+<path d="M 700 396 L 700 472 L 728 472 L 728 500" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="128" y="500" width="212" height="78" rx="9" class="schema"/>
+<text x="234" y="528" font-size="13" font-weight="700" text-anchor="middle" class="white">Unified config schema</text>
+<text x="234" y="550" font-size="10.8" text-anchor="middle" class="soft-white">./schema/config.schema.json</text>
+
+<path d="M 340 539 L 400 539" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="400" y="500" width="176" height="78" rx="9" class="config"/>
+<text x="488" y="528" font-size="13" font-weight="700" text-anchor="middle" class="white">Config loader</text>
+<text x="488" y="550" font-size="10.8" text-anchor="middle" class="soft-white">intlify.config.json</text>
+<text x="488" y="568" font-size="10.8" text-anchor="middle" class="soft-white">or --config path</text>
+
+<rect x="640" y="500" width="176" height="78" rx="9" class="reporter"/>
+<text x="728" y="528" font-size="13" font-weight="700" text-anchor="middle" class="white">Reporter layer</text>
+<text x="728" y="550" font-size="10.8" text-anchor="middle" class="soft-white">human output</text>
+<text x="728" y="568" font-size="10.8" text-anchor="middle" class="soft-white">or --reporter json</text>
+
+<rect x="942" y="112" width="248" height="190" rx="12" class="panel" stroke-width="2"/>
+<text x="1066" y="150" font-size="16" font-weight="700" text-anchor="middle" class="label">Output contract</text>
+<rect x="974" y="174" width="184" height="52" rx="7" class="reporter"/>
+<text x="1066" y="198" font-size="12" font-weight="700" text-anchor="middle" class="white">JSON envelope</text>
+<text x="1066" y="215" font-size="10.5" text-anchor="middle" class="soft-white">summary / results / errors</text>
+<rect x="974" y="244" width="184" height="34" rx="7" class="config"/>
+<text x="1066" y="266" font-size="11.5" font-weight="700" text-anchor="middle" class="white">exit codes: 0 / 1 / 2</text>
+
+<path d="M 798 359 L 914 359 L 914 200 L 974 200" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="942" y="362" width="248" height="220" rx="12" class="panel" stroke-width="2"/>
+<text x="1066" y="400" font-size="16" font-weight="700" text-anchor="middle" class="label">Future products</text>
+<text x="1066" y="424" font-size="12" text-anchor="middle" class="muted">Added behind the same CLI shell.</text>
+<rect x="974" y="452" width="184" height="46" rx="7" class="future"/>
+<text x="1066" y="480" font-size="12" font-weight="700" text-anchor="middle" class="white">ox_mf2_format</text>
+<rect x="974" y="518" width="184" height="46" rx="7" class="future"/>
+<text x="1066" y="546" font-size="12" font-weight="700" text-anchor="middle" class="white">ox_mf2_lint</text>
+
+<path d="M 798 376 L 870 376 L 870 475 L 974 475" fill="none" class="dashed" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 798 394 L 846 394 L 846 541 L 974 541" fill="none" class="dashed" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="942" y="626" width="248" height="72" rx="9" class="parser"/>
+<text x="1066" y="650" font-size="12" font-weight="700" text-anchor="middle" class="white">ox_mf2_parser</text>
+<text x="1066" y="669" font-size="10.5" text-anchor="middle" class="soft-white">parser, diagnostics, snapshots</text>
+<text x="1066" y="687" font-size="10.5" text-anchor="middle" class="soft-white">and semantic lowering owner</text>
+
+<path d="M 1066 582 L 1066 626" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<path d="M 300 175 L 364 175 L 364 241 L 442 241" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+</svg>

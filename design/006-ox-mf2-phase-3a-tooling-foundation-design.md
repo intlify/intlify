@@ -12,7 +12,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 - Define the shared CLI package and native binary distribution boundary.
 - Define the unified project configuration model with `format` and `lint` sections.
 - Publish a unified JSON Schema for editor completion and config validation.
-- Define shared machine-readable output conventions for future `format --check`, `lint`, and combined `check` workflows.
+- Define shared machine-readable output conventions for future `fmt --check`, `lint`, and combined `check` workflows.
 - Keep formatter and linter resolved config models separate internally while exposing one project-level config file to users.
 - Keep CLI output schemas separate from the project config schema.
 - Provide enough package and API boundaries for Phase 3B formatter and Phase 3C linter work to proceed independently.
@@ -51,12 +51,22 @@ Formatter and linter crates own their resolved config models once Phase 3B and P
 
 Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, and semantic lowering. Phase 3A should not move parser behavior into the CLI crate.
 
+## Architecture
+
+Phase 3A introduces the CLI shell and distribution layer without moving parser behavior or implementing formatter/linter engines. The architecture separates the user-facing `intlify` binary from product-specific engines so later phases can add formatter and linter behavior behind the same command and reporting contracts.
+
+![Phase 3A CLI foundation architecture](./assets/006-ox-mf2-phase-3a-cli-architecture.svg)
+
+The native npm package owns binary distribution, the bundled config schema, and install-time smoke-test coverage. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
+
+Formatter and linter crates remain product-specific extension points. Both future engines consume parser-owned parse artifacts instead of owning parsing themselves. Phase 3A only defines how their future config sections, results, and operational errors flow through the CLI foundation.
+
 ## CLI Surface
 
 The initial CLI should reserve the user-facing command shape without requiring all product implementations to exist immediately:
 
 ```text
-intlify format
+intlify fmt
 intlify lint
 intlify check
 ```
@@ -85,12 +95,12 @@ Open product-specific config details remain in the formatter and linter design d
 
 Machine-readable CLI output should use JSON and should be stable enough for CI, editor adapters, and agent coding workflows to consume.
 
-The config schema and output schemas are separate surfaces. `lint`, `format --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
+The config schema and output schemas are separate surfaces. `lint`, `fmt --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
 
 The shared top-level JSON envelope contains:
 
 - `schemaVersion`: output contract version
-- `command`: command that produced the result, such as `format`, `lint`, or future `check`
+- `command`: command that produced the result, such as `fmt`, `lint`, or future `check`
 - `version`: CLI/package version
 - `cwd`: path resolution base
 - `summary`: command-level aggregate status and counts
