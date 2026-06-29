@@ -162,6 +162,8 @@ For `lint`, `details.requiredPhase` is `"3C"`. For `check`, `details.requiredPha
 
 Operational errors are represented only in the top-level `errors` array. They are CLI execution failures rather than parser, formatter, or linter diagnostics.
 
+CLI operational error codes are stable string identifiers scoped to the CLI JSON output contract. They are intentionally separate from the numeric `OxMf2ErrorCode` API namespace defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). CLI operational failures may wrap lower-level API errors later, but the top-level CLI `errors[].code` field remains a string.
+
 Each operational error contains:
 
 - `kind`: broad error group, such as `config`, `input`, `io`, `reporter`, `unsupported`, or `internal`
