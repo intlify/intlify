@@ -57,7 +57,7 @@ Phase 3A introduces the CLI shell and distribution layer without moving parser b
 
 ![Phase 3A CLI foundation architecture](./assets/006-ox-mf2-phase-3a-cli-architecture.svg)
 
-The native npm package owns binary distribution, the bundled config schema, and install-time smoke-test coverage. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
+The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and install-time smoke-test coverage. Platform-specific native npm packages own only the compiled native `intlify` binary for their target. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
 
 Formatter and linter crates remain product-specific extension points. Both future engines consume parser-owned parse artifacts instead of owning parsing themselves. Phase 3A only defines how their future config sections, results, and operational errors flow through the CLI foundation.
 
@@ -86,6 +86,25 @@ The default reporter is `text`. Machine-readable JSON output is selected with `-
 
 `intlify --version` reports the public `@intlify/cli` package version. The JSON envelope `version` field uses the same value. The wrapper package, native packages, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
 
+Top-level help and version behavior:
+
+- `intlify`, `intlify --help`, and `intlify -h` write top-level help to stdout and exit with `0`.
+- `intlify --version` and `intlify -V` write the public `@intlify/cli` version to stdout and exit with `0`.
+- Top-level help does not list reserved `fmt`, `lint`, or `check` commands as normal available commands in Phase 3A.
+- `intlify fmt --help`, `intlify lint --help`, and `intlify check --help` write reserved-command placeholder help to stdout and exit with `0`.
+- Reserved-command placeholder help states that the command is reserved but not available in the current release.
+
+Global options can appear before or after the subcommand. For example, `intlify --reporter json fmt` and `intlify fmt --reporter json` are equivalent. Duplicate global options are operational input errors with `kind: "input"`, `code: "duplicate_cli_option"`, and exit code `2`.
+
+Operational error precedence:
+
+1. Help and version flags return help/version output and exit with `0`.
+2. CLI argument shape errors are reported next, including unknown options, missing option values, duplicate options, and unsupported reporters.
+3. Command routing errors are reported next, including unknown commands and reserved commands that return `command_not_ready`.
+4. Config discovery, loading, and validation errors are reported only after the command is known to require config.
+
+For example, `intlify fmt --config missing.json --reporter json` returns `command_not_ready` in Phase 3A rather than `config_not_found`, because the reserved formatter command does not execute far enough to require config loading.
+
 ## Configuration Contract
 
 Project configuration is one JSON config with separate `fmt` and `lint` sections. The config file name is `intlify.config.json`.
@@ -107,7 +126,7 @@ When `--config <path>` is provided and that file does not exist, the CLI returns
 
 The unified config JSON Schema is the schema that users and editors should reference. Formatter and linter config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
 
-The unified config JSON Schema is published with the native CLI npm package. The schema is exported at `./schema/config.schema.json` and can internally separate formatter and linter configuration under definitions such as `$defs.fmt` and `$defs.lint`. Formatter and linter detail schemas remain separately owned, but users reference one schema for `intlify.config.json`.
+The unified config JSON Schema is published with the public `@intlify/cli` wrapper package. The schema is exported at `./schema/config.schema.json` from that package and can internally separate formatter and linter configuration under definitions such as `$defs.fmt` and `$defs.lint`. Formatter and linter detail schemas remain separately owned, but users reference one schema for `intlify.config.json`. Native packages may contain internal implementation artifacts, but they do not define a public config schema path.
 
 Schema generation uses Rust config types as the source of truth. Phase 3A should generate the unified schema from the project-level Rust config model, using schema annotations for editor-facing descriptions and examples where needed. A dedicated schema generation crate is not required in Phase 3A.
 
@@ -164,6 +183,10 @@ The shared `summary.status` values are:
 - `error`: operational error, corresponding to exit code `2`
 
 The `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
+
+If a path cannot be represented relative to `projectRoot`, such as an explicit `--config` path outside the project root, machine-readable output may use an absolute slash-normalized path for that field. No extra boolean is added to distinguish relative and absolute paths; consumers can determine that from the path string.
+
+The envelope `command` field is the resolved command name when a subcommand is known: `fmt`, `lint`, or `check`. If no subcommand is resolved, if an invalid top-level argument prevents command resolution, or if a wrapper-level native resolution error occurs before the Rust CLI starts, `command` is `"intlify"`. Unknown command tokens are reported in `errors[].details` while keeping `command: "intlify"`. The envelope does not use `null` or `"unknown"` for the command field.
 
 Reserved command placeholder JSON output uses the same envelope. For example, `intlify fmt --reporter json` returns:
 
