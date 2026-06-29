@@ -372,6 +372,7 @@ For wrapper-level native resolution failures, the wrapper does not perform git-r
 - `bin`: `{ "intlify": "./bin/intlify.mjs" }`
 - `files`: `["bin", "schema", "README.md", "package.json"]`
 - `optionalDependencies`: all initial native packages, pinned to the same exact version as `@intlify/cli`
+- `publishConfig`: `{ "access": "public" }`
 - `engines.node`: `>=22.12.0`
 
 Native package `package.json` contract:
@@ -382,31 +383,42 @@ Native package `package.json` contract:
 - `files` on Windows targets: `["intlify.exe", "README.md", "package.json"]`
 - no `engines` field is required
 - no `bin` entry; the public command is exposed only by `@intlify/cli`
+- `publishConfig`: `{ "access": "public" }`
 
-Linux libc selection is represented by package name and wrapper resolution logic rather than npm package metadata.
+Linux libc selection is represented by package name, npm `libc` metadata, and wrapper resolution logic.
 
-Native package `os` and `cpu` matrix:
+Native package platform metadata and Rust target matrix:
 
-| Native package                 | `os`         | `cpu`       |
-| ------------------------------ | ------------ | ----------- |
-| `@intlify/cli-darwin-x64`      | `["darwin"]` | `["x64"]`   |
-| `@intlify/cli-darwin-arm64`    | `["darwin"]` | `["arm64"]` |
-| `@intlify/cli-linux-x64-gnu`   | `["linux"]`  | `["x64"]`   |
-| `@intlify/cli-linux-arm64-gnu` | `["linux"]`  | `["arm64"]` |
-| `@intlify/cli-linux-x64-musl`  | `["linux"]`  | `["x64"]`   |
-| `@intlify/cli-win32-x64-msvc`  | `["win32"]`  | `["x64"]`   |
+| Native package | `os` | `cpu` | `libc` | Rust target |
+| --- | --- | --- | --- | --- |
+| `@intlify/cli-darwin-x64` | `["darwin"]` | `["x64"]` | n/a | `x86_64-apple-darwin` |
+| `@intlify/cli-darwin-arm64` | `["darwin"]` | `["arm64"]` | n/a | `aarch64-apple-darwin` |
+| `@intlify/cli-linux-x64-gnu` | `["linux"]` | `["x64"]` | `["glibc"]` | `x86_64-unknown-linux-gnu` |
+| `@intlify/cli-linux-arm64-gnu` | `["linux"]` | `["arm64"]` | `["glibc"]` | `aarch64-unknown-linux-gnu` |
+| `@intlify/cli-linux-x64-musl` | `["linux"]` | `["x64"]` | `["musl"]` | `x86_64-unknown-linux-musl` |
+| `@intlify/cli-win32-x64-msvc` | `["win32"]` | `["x64"]` | n/a | `x86_64-pc-windows-msvc` |
+
+Future native target mapping:
+
+| Native package | `os` | `cpu` | `libc` | Rust target |
+| --- | --- | --- | --- | --- |
+| `@intlify/cli-win32-arm64-msvc` | `["win32"]` | `["arm64"]` | n/a | `aarch64-pc-windows-msvc` |
+| `@intlify/cli-linux-arm64-musl` | `["linux"]` | `["arm64"]` | `["musl"]` | `aarch64-unknown-linux-musl` |
 
 Build and package assembly pipeline:
 
 - Build the Rust CLI with `cargo build --release -p ox_mf2_cli --bin intlify`.
 - Run cross-target binary builds in the GitHub Actions release matrix.
 - Copy the built binary into the matching native package root as `intlify` or `intlify.exe`.
+- Preserve or set executable permissions for Unix native package binaries with `chmod +x`.
+- Ensure `packages/cli/bin/intlify.mjs` has a `#!/usr/bin/env node` shebang and executable permissions.
 - Generate `config.schema.json` from Rust config types and write it to the committed `packages/cli/schema/config.schema.json` artifact.
 - Expose schema generation as `vp run cli#schema`.
 - Expose schema verification as `vp run cli#schema:check`, comparing regenerated schema output with the committed schema artifact.
 - Expose root scripts `schema:cli` and `schema:cli:check` as wrappers around those Vite Task commands.
 - Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/ox_mf2_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
+- Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix native package binaries during pack or release validation.
 - Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution, and schema file presence. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
 
 Parser binding packages remain focused on parsing, snapshots, and parser-level APIs. Formatter and linter APIs should not be folded into parser packages.
