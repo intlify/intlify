@@ -84,6 +84,8 @@ The CLI should provide consistent global behavior for help output, version outpu
 
 The default reporter is `text`. Machine-readable JSON output is selected with `--reporter json`. Phase 3A does not support `--cwd` or `--root`; project root discovery is fixed by the config discovery contract below.
 
+`intlify --version` reports the public `@intlify/cli` package version. The JSON envelope `version` field uses the same value. The wrapper package, native packages, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
+
 ## Configuration Contract
 
 Project configuration is one JSON config with separate `fmt` and `lint` sections. The config file name is `intlify.config.json`.
@@ -111,7 +113,21 @@ Schema generation uses Rust config types as the source of truth. Phase 3A should
 
 The root-level `$schema` field is allowed as metadata for editor completion and validation. It is accepted by validation but is not passed into the resolved config model.
 
+The recommended `$schema` value for a root `intlify.config.json` is:
+
+```json
+{
+  "$schema": "./node_modules/@intlify/cli/schema/config.schema.json",
+  "fmt": {},
+  "lint": {}
+}
+```
+
+The `$schema` field is optional. The CLI does not use the `$schema` value to locate its validation schema at runtime; it is editor-facing metadata only.
+
 Unknown fields are validation errors at the root level, except for `$schema`, and inside `fmt` and `lint` sections. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
+
+In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
 Phase 3A config error codes:
 
@@ -191,6 +207,8 @@ Each operational error contains:
 
 If an unsupported reporter is requested, the CLI returns an operational reporter error with `kind: "reporter"`, `code: "reporter_not_supported"`, and exit code `2`. Its `details` object contains the requested `reporter` value and `supportedReporters: ["text", "json"]`.
 
+If the Rust CLI can parse `--reporter json` before rejecting invalid command-line arguments, invalid arguments are reported as a JSON envelope with `kind: "input"`, `code: "invalid_cli_argument"`, and exit code `2`. If argument parsing fails before reporter selection can be determined, the CLI falls back to a human-readable stderr error and exits with code `2`.
+
 Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. Phase 3A supports only `text` and `json` reporter names. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
 
 Output streams:
@@ -199,7 +217,7 @@ Output streams:
 - With the human-readable reporter, normal results and summaries are written to stdout.
 - Human-readable operational errors are written to stderr.
 - `--version` and `--help` write to stdout.
-- Invalid CLI arguments write to stderr and exit with code `2`.
+- Invalid CLI arguments write to stderr and exit with code `2` unless `--reporter json` can be parsed before the argument error is reported.
 - Wrapper-level native resolution failures may fall back to a minimal human-readable stderr message when the Rust CLI cannot be started and a JSON envelope cannot be produced.
 
 Exit codes:
@@ -244,7 +262,7 @@ Wrapper-level native resolution error codes:
 - `native_binary_not_found`: the native package resolves but the expected binary path does not exist
 - `native_binary_failed`: the native binary exists but fails to start or exits before delegating to the Rust CLI contract
 
-These are operational errors and use exit code `2`. When the wrapper can construct the standard JSON envelope, it should report them in `errors`. When it cannot start the Rust CLI or construct the envelope safely, it should print a minimal human-readable stderr fallback.
+These are operational errors and use exit code `2`. The wrapper should parse only the minimum command-line surface needed to detect `--reporter json` for native resolution failures. When `--reporter json` is detected and the wrapper can construct the standard JSON envelope safely, it should write the native resolution error to stdout in `errors`. Otherwise, it should print a minimal human-readable stderr fallback.
 
 `@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release must not publish a version lower than `0.13.1`.
 
