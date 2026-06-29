@@ -498,11 +498,12 @@ Build and package assembly pipeline:
 - Preserve or set executable permissions for Unix native package binaries with `chmod +x`.
 - Ensure `packages/cli/bin/intlify.mjs` has a `#!/usr/bin/env node` shebang and executable permissions.
 - Generate `config.schema.json` from Rust config types and write it to the committed `packages/cli/schema/config.schema.json` artifact.
+- Expose host CLI build assembly as `vp run cli#build`, covering the Rust CLI release build, copying the host binary into the matching native package root as `intlify` or `intlify.exe`, and applying Unix executable permissions where needed.
 - Expose schema generation as `vp run cli#schema`.
 - Expose schema verification as `vp run cli#schema:check`, comparing regenerated schema output with the committed schema artifact.
 - Expose package validation as `vp run cli#pack:check`, covering wrapper/native package contents, package metadata, included files, and executable permissions.
-- Expose local CLI smoke validation as `vp run cli#smoke`, covering built-artifact `intlify --version`, reserved-command placeholder behavior, schema presence, wrapper native resolution, and direct native binary execution for the host platform.
-- Expose root scripts as wrappers around those Vite Task commands: `schema:cli`, `schema:cli:check`, `check:cli-pack`, and `test:cli-smoke`.
+- Expose local CLI smoke validation as `vp run cli#smoke`, covering `cli#build` artifacts with `intlify --version`, reserved-command placeholder behavior, schema presence, wrapper native resolution, and direct native binary execution for the host platform.
+- Expose root scripts as wrappers around those Vite Task commands: `build:cli`, `schema:cli`, `schema:cli:check`, `check:cli-pack`, and `test:cli-smoke`.
 - Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/ox_mf2_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
 - Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix native package binaries during pack or release validation.
@@ -510,6 +511,16 @@ Build and package assembly pipeline:
 - Publish CLI native packages before publishing the public `@intlify/cli` wrapper package, because the wrapper lists native packages in `optionalDependencies`.
 - Use npm trusted publishing for normal CLI package releases through `.github/workflows/release.yml`. The public `@intlify/cli` package already exists on npm, so it can use trusted publishing once its trusted publisher settings are configured. The new `@intlify/cli-<target>` native packages do not exist on npm before their first release, so their first publication may require a token-based bootstrap release. After the native packages exist and their trusted publisher settings are configured on npm, subsequent releases should use trusted publishing without an npm token fallback in the normal release path.
 - Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution through the `@intlify/cli` wrapper, direct execution of each native package binary with `--version`, and schema file presence. Wrapper install smoke should install `@intlify/cli@<version>` from the published registry and verify that the current platform's optional native package is resolved. Native direct smoke should install `@intlify/cli-<target>@<version>` on a compatible host runner and execute that package's `intlify` or `intlify.exe` binary directly. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
+
+The release workflow should order publish, smoke, and release-note steps as:
+
+1. Validate the release tag and version consistency.
+2. Build ox-mf2 npm packages, ox-mf2 native packages, and CLI native binaries.
+3. Publish crates.io artifacts.
+4. Publish CLI native packages.
+5. Publish the public `@intlify/cli` wrapper package.
+6. Run published artifact smoke tests for ox-mf2 npm packages, crates.io artifacts, and CLI wrapper/native packages.
+7. Create GitHub Release notes only after all publish and smoke steps pass.
 
 Normal CI should validate the CLI foundation before publishing by running schema verification, Rust tests, `check:cli-pack`, and local `test:cli-smoke`. Local smoke tests directly execute the host platform native binary. Release workflow validation owns cross-target native builds, package publishing, and smoke tests against installed published packages. Target build jobs should directly execute the built target binary when the runner can execute that target; targets that cannot be executed on the runner are covered by package content checks, executable permission checks where applicable, and installed-package smoke tests on supported host runners.
 
