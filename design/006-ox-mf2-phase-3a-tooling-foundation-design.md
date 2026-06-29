@@ -273,6 +273,21 @@ Phase 3A validation should focus on foundation behavior:
 
 Formatter and linter semantic correctness tests belong to later product phases.
 
+## Deferred Follow-Up Notes
+
+The following items are intentionally not delivered in Phase 3A, but should remain visible for later implementation phases:
+
+- Formatter and linter engines remain follow-up products. Phase 3A only reserves `intlify fmt`, `intlify lint`, and `intlify check` and returns placeholder operational errors for those commands.
+- User-visible `intlify check` behavior is deferred until both Phase 3B formatter and Phase 3C linter products exist.
+- Formatter-specific option names, defaults, layout rules, ignore directive behavior, and formatter result schemas belong to [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
+- Linter-specific rule semantics, presets, include/exclude behavior, ignore behavior, severity policy details, and diagnostic result schemas belong to [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
+- Command-specific JSON result schemas for `fmt --check`, `lint`, and combined `check` are deferred to the product phases. Phase 3A owns only the shared envelope and operational error shape.
+- Formatter and linter N-API/WASM packages are deferred to their product phases. Phase 3A only records package boundaries and keeps parser binding packages focused on parser-level APIs.
+- Resource/catalog parsing, host-file escaping, outer document edits, and resource-level linting or formatting remain layered workflows outside the Phase 3A CLI foundation.
+- LSP/editor adapters, agent integrations, and MessagePack or daemon transport remain later consumers of this foundation.
+- Nested config discovery, nearest-config-wins behavior, file-specific config overrides, `--cwd`, and `--root` remain out of scope until a concrete multi-workspace or adapter requirement appears.
+- Additional native package targets such as `@intlify/cli-win32-arm64-msvc` and `@intlify/cli-linux-arm64-musl` are future candidates, not initial Phase 3A requirements.
+
 ## Open Questions
 
 No unresolved Phase 3A foundation questions remain in this document. Product-specific formatter, linter, LSP/editor, and agent questions are tracked in their dedicated design documents.
