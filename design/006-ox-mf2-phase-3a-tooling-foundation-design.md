@@ -94,6 +94,8 @@ Top-level help and version behavior:
 - `intlify fmt --help`, `intlify lint --help`, and `intlify check --help` write reserved-command placeholder help to stdout and exit with `0`.
 - Reserved-command placeholder help states that the command is reserved but not available in the current release.
 
+`intlify --reporter json` without a subcommand follows the same behavior as `intlify`: it writes human-readable top-level help to stdout and exits with `0`. The JSON reporter affects command result output and operational errors, but it does not JSON-encode help output for no-subcommand execution.
+
 Global options can appear before or after the subcommand. For example, `intlify --reporter json fmt` and `intlify fmt --reporter json` are equivalent. Duplicate global options are operational input errors with `kind: "input"`, `code: "duplicate_cli_option"`, and exit code `2`.
 
 Operational error precedence:
@@ -163,6 +165,8 @@ Open product-specific config details remain in the formatter and linter design d
 Machine-readable CLI output should use JSON and should be stable enough for CI, editor adapters, and agent coding workflows to consume.
 
 The config schema and output schemas are separate surfaces. `lint`, `fmt --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
+
+Phase 3A publishes only the config JSON Schema. The output envelope remains documented and fixture-tested, but no public output JSON Schema is published while `schemaVersion` is `"0"`. Publishing output schemas should be reconsidered in Phase 3B or Phase 3C after command-specific result shapes become clearer.
 
 The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the output contract remains pre-stable. It contains:
 
@@ -262,7 +266,40 @@ Expected package groups:
 - Formatter packages: future formatter-specific N-API and WASM APIs.
 - Linter packages: future linter-specific N-API and WASM APIs.
 
+Initial package directories:
+
+- `packages/cli`: `@intlify/cli`
+- `packages/cli-darwin-x64`: `@intlify/cli-darwin-x64`
+- `packages/cli-darwin-arm64`: `@intlify/cli-darwin-arm64`
+- `packages/cli-linux-x64-gnu`: `@intlify/cli-linux-x64-gnu`
+- `packages/cli-linux-arm64-gnu`: `@intlify/cli-linux-arm64-gnu`
+- `packages/cli-linux-x64-musl`: `@intlify/cli-linux-x64-musl`
+- `packages/cli-win32-x64-msvc`: `@intlify/cli-win32-x64-msvc`
+
 `@intlify/cli` should resolve the current platform's optional native package and execute that package's binary. This keeps the public npm entry point stable while avoiding a single package that ships every platform binary. The platform package model should follow the same general direction as the existing native ox-mf2 package publishing flow.
+
+Wrapper execution contract:
+
+- Native binary file names are `intlify` on Unix platforms and `intlify.exe` on Windows.
+- The native binary is stored at the root of each native package.
+- The wrapper passes `process.argv.slice(2)` through unchanged.
+- The wrapper forwards stdin, stdout, stderr, and `process.env` to the native process.
+- The wrapper exits with the native process exit code.
+- The wrapper forwards process termination signals to the native process where the host platform allows it.
+- The wrapper owns output only for wrapper-level native resolution failures.
+
+Platform resolution table:
+
+| Runtime platform | Runtime arch | Runtime libc | Native package                 |
+| ---------------- | ------------ | ------------ | ------------------------------ |
+| `darwin`         | `x64`        | n/a          | `@intlify/cli-darwin-x64`      |
+| `darwin`         | `arm64`      | n/a          | `@intlify/cli-darwin-arm64`    |
+| `linux`          | `x64`        | `glibc`      | `@intlify/cli-linux-x64-gnu`   |
+| `linux`          | `arm64`      | `glibc`      | `@intlify/cli-linux-arm64-gnu` |
+| `linux`          | `x64`        | `musl`       | `@intlify/cli-linux-x64-musl`  |
+| `win32`          | `x64`        | n/a          | `@intlify/cli-win32-x64-msvc`  |
+
+Unsupported platform, architecture, or libc combinations return `native_platform_unsupported`. Linux libc detection is performed by the wrapper. If libc detection fails, the wrapper reports `native_platform_unsupported` rather than guessing.
 
 Initial CLI native package names:
 
@@ -295,13 +332,13 @@ Parser binding packages remain focused on parsing, snapshots, and parser-level A
 
 Phase 3A validation should focus on foundation behavior:
 
-- config discovery and parsing
-- default config behavior when no root config exists
-- explicit `--config` missing-file errors
-- config error code fixtures
-- unknown-field validation
-- config schema generation
-- config validation fixtures
+- config discovery and parsing through crate-level unit/integration tests
+- default config behavior when no root config exists through crate-level unit/integration tests
+- explicit `--config` missing-file errors through crate-level unit/integration tests
+- config error code fixtures through crate-level unit/integration tests
+- unknown-field validation through crate-level unit/integration tests
+- config schema generation through crate-level unit/integration tests
+- config validation fixtures through crate-level unit/integration tests
 - CLI help/version behavior
 - reserved command placeholder behavior
 - native CLI package install and binary execution smoke tests
@@ -313,6 +350,8 @@ Phase 3A validation should focus on foundation behavior:
 - operational error shape
 
 Formatter and linter semantic correctness tests belong to later product phases.
+
+Phase 3A does not add hidden internal CLI commands just to exercise config loading. Reserved `fmt`, `lint`, and `check` commands stop at `command_not_ready`, so config loader behavior is verified directly at the crate level rather than through public CLI execution.
 
 ## Deferred Follow-Up Notes
 
