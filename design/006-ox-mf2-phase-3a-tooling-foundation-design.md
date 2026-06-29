@@ -67,7 +67,7 @@ Phase 3A introduces the CLI shell and distribution layer without moving parser b
 
 ![Phase 3A CLI foundation architecture](./assets/006-ox-mf2-phase-3a-cli-architecture.svg)
 
-The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and install-time smoke-test coverage. Platform-specific native npm packages own only the compiled native `intlify` binary for their target. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
+The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and release-time installed-package smoke-test coverage. Platform-specific native npm packages own only the compiled native `intlify` binary for their target. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
 
 Formatter and linter crates remain product-specific extension points. Both future engines consume parser-owned parse artifacts instead of owning parsing themselves. Phase 3A only defines how their future config sections, results, and operational errors flow through the CLI foundation.
 
@@ -97,6 +97,8 @@ The default reporter is `text`. Machine-readable JSON output is selected with `-
 Value-taking long options accept both separated and equals forms. `--reporter json` and `--reporter=json` are equivalent. `--config path` and `--config=path` are equivalent. Phase 3A does not define `-r` or `-c`; the only short options are `-h` and `-V`.
 
 `intlify --version` reports the public `@intlify/cli` package version. The JSON envelope `version` field uses the same value. The wrapper package, native packages, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
+
+The first monorepo-managed `@intlify/cli` release is `0.14.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, native CLI packages, and the Rust CLI crate should all release as `0.14.0` for that release. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
 
 Top-level help and version behavior:
 
@@ -154,6 +156,8 @@ The unified config JSON Schema is published with the public `@intlify/cli` wrapp
 
 Schema generation uses Rust config types as the source of truth. Phase 3A should generate the unified schema from the project-level Rust config model, using schema annotations for editor-facing descriptions and examples where needed. A dedicated schema generation crate is not required in Phase 3A.
 
+The generated `packages/cli/schema/config.schema.json` file is committed to the repository because it is a public artifact. Schema generation tests or CI checks should verify that regenerating the schema from Rust config types produces the committed file. Any Rust config-model change that affects the public schema must update the committed schema in the same change.
+
 The root-level `$schema` field is allowed as metadata for editor completion and validation. It is accepted by validation but is not passed into the resolved config model.
 
 The recommended `$schema` value for a root `intlify.config.json` is:
@@ -196,7 +200,7 @@ The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the o
 - `command`: command that produced the result, such as `fmt`, `lint`, or future `check`
 - `version`: CLI/package version
 - `projectRoot`: discovered project root
-- `summary`: command-level aggregate status and counts
+- `summary`: command-level aggregate status and optional command-specific counts
 - `results`: command-specific file, message, diagnostic, or formatting results
 - `errors`: operational errors separated from parser, formatter, and linter diagnostics
 
@@ -207,6 +211,8 @@ The shared `summary.status` values are:
 - `success`: successful execution, corresponding to exit code `0`
 - `failure`: command executed successfully but reported a check, lint, or formatting failure, corresponding to exit code `1`
 - `error`: operational error, corresponding to exit code `2`
+
+In Phase 3A, only `summary.status` is required in the shared envelope. Command-specific count fields are not defined until formatter, linter, or combined check result schemas are defined in Phase 3B or Phase 3C.
 
 The `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
 
@@ -220,7 +226,7 @@ Reserved command placeholder JSON output uses the same envelope. For example, `i
 {
   "schemaVersion": "0",
   "command": "fmt",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "projectRoot": "/repo",
   "summary": {
     "status": "error"
@@ -342,30 +348,36 @@ Wrapper-level native resolution error codes:
 - `native_platform_unsupported`: the current platform is not in the supported platform table
 - `native_package_not_found`: the platform is supported but the optional native package cannot be resolved
 - `native_binary_not_found`: the native package resolves but the expected binary path does not exist
-- `native_binary_failed`: the native binary exists but fails to start or exits before delegating to the Rust CLI contract
+- `native_binary_failed`: the native binary exists but cannot be spawned or executed
 
 These are operational errors and use exit code `2`. The wrapper should parse only the minimum command-line surface needed to detect `--reporter json` for native resolution failures. When `--reporter json` is detected and the wrapper can construct the standard JSON envelope safely, it should write the native resolution error to stdout in `errors`. Otherwise, it should print a minimal human-readable stderr fallback.
 
+The wrapper's minimal reporter parser detects only `--reporter json` and `--reporter=json`. If either JSON reporter form appears anywhere in argv, wrapper-level native resolution failures use the JSON envelope. The wrapper does not validate duplicate reporter options, missing reporter values, unknown options, or unsupported reporter values. If the Rust CLI cannot be started and no JSON reporter form is present, wrapper-level native resolution failures use the human-readable stderr fallback.
+
+Once the native binary is spawned successfully, wrapper-level native resolution is complete. The wrapper forwards the Rust CLI process exit code unchanged, including operational error exits and unexpected non-zero exits. Those exits are not reported as `native_binary_failed`.
+
 For wrapper-level native resolution failures, the wrapper does not perform git-root discovery. If it emits a JSON envelope, `projectRoot` is the absolute slash-normalized `process.cwd()` value and the native resolution error includes `details.projectRootSource: "cwd-fallback"`. Normal Rust CLI execution uses the standard git-root discovery contract.
 
-`@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release must not publish a version lower than `0.13.1`.
+`@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release is `0.14.0`.
 
 `packages/cli/package.json` contract:
 
 - `name`: `@intlify/cli`
-- `version`: monorepo release version, not lower than `0.13.1` for the first monorepo-managed release
+- `version`: monorepo release version; `0.14.0` for the first monorepo-managed release
 - `type`: `module`
 - `bin`: `{ "intlify": "./bin/intlify.mjs" }`
 - `files`: `["bin", "schema", "README.md", "package.json"]`
 - `optionalDependencies`: all initial native packages, pinned to the same exact version as `@intlify/cli`
-- `engines.node`: follows the repository's existing Node.js support policy
+- `engines.node`: `>=22.12.0`
 
 Native package `package.json` contract:
 
 - `name`: `@intlify/cli-<target>`
 - `version`: same exact version as `@intlify/cli`
-- `files`: `["intlify", "intlify.exe", "README.md", "package.json"]`
+- `files` on Unix targets: `["intlify", "README.md", "package.json"]`
+- `files` on Windows targets: `["intlify.exe", "README.md", "package.json"]`
 - `os` and `cpu`: set for each target package
+- no `engines` field is required
 - no `bin` entry; the public command is exposed only by `@intlify/cli`
 
 Linux libc selection is represented by package name and wrapper resolution logic rather than npm package metadata.
@@ -375,10 +387,13 @@ Build and package assembly pipeline:
 - Build the Rust CLI with `cargo build --release -p ox_mf2_cli --bin intlify`.
 - Run cross-target binary builds in the GitHub Actions release matrix.
 - Copy the built binary into the matching native package root as `intlify` or `intlify.exe`.
-- Generate `config.schema.json` from Rust config types and write it to `packages/cli/schema/config.schema.json`.
+- Generate `config.schema.json` from Rust config types and write it to the committed `packages/cli/schema/config.schema.json` artifact.
+- Expose schema generation as `vp run cli#schema`.
+- Expose schema verification as `vp run cli#schema:check`, comparing regenerated schema output with the committed schema artifact.
+- Optionally expose root scripts `schema:cli` and `schema:cli:check` as wrappers around those Vite Task commands.
 - Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/ox_mf2_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
-- Run installed-package smoke tests for `intlify --version` and reserved command placeholder behavior.
+- Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution, and schema file presence. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
 
 Parser binding packages remain focused on parsing, snapshots, and parser-level APIs. Formatter and linter APIs should not be folded into parser packages.
 
