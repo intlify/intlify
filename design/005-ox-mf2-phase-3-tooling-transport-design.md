@@ -23,21 +23,21 @@ This document defines the broader tooling and consumer boundary for Phase 3 and 
 Implementation should be split by consumer-facing product surface:
 
 1. **Phase 3A: Tooling Foundation**
-   - `ox-mf2` CLI crate and command structure
-   - unified `format` / `lint` project config model and JSON Schema
+   - `crates/ox_mf2_cli` and the `intlify` command structure
+   - unified `fmt` / `lint` project config model and JSON Schema
    - shared machine-readable output conventions
    - package and distribution boundaries for CLI, N-API, and WASM tooling
 
 2. **Phase 3B: Formatter Product**
    - `crates/ox_mf2_format`
-   - `ox-mf2 format`
-   - `format --check` and formatter check result contract
+   - `intlify fmt`
+   - `fmt --check` and formatter check result contract
    - standard and preserve formatting modes
    - formatter-specific N-API and WASM packages
 
 3. **Phase 3C: Linter Product**
    - `crates/ox_mf2_lint`
-   - `ox-mf2 lint`
+   - `intlify lint`
    - parser, semantic, and lint diagnostic result contract
    - recommended preset and initial semantic diagnostics
    - linter-specific N-API and WASM packages
@@ -120,7 +120,7 @@ The Rust formatter engine should live in a separate `crates/ox_mf2_format` crate
 
 ### CLI and Package Distribution
 
-The CLI binary should live in `crates/ox_mf2_cli` and expose `ox-mf2 format` alongside `ox-mf2 lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in `crates/ox_mf2_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
 N-API and WASM formatter bindings should be published as formatter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while formatter packages expose formatter-specific APIs backed by `crates/ox_mf2_format`.
 
@@ -157,11 +157,11 @@ The formatter should separate syntax traversal from rendering. Internally, it sh
 
 ### CLI Input Model
 
-The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `ox-mf2 format "locales/**/*.mf2"` or `ox-mf2 format messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Resource files containing multiple messages, framework-specific i18n files, and multi-locale catalogs are layered consumers that extract message entries and reuse the message-level formatter; their host-file parsing, string escaping, and outer document edits are not fixed by the Phase 3 core formatter contract.
+The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `intlify fmt "locales/**/*.mf2"` or `intlify fmt messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Resource files containing multiple messages, framework-specific i18n files, and multi-locale catalogs are layered consumers that extract message entries and reuse the message-level formatter; their host-file parsing, string escaping, and outer document edits are not fixed by the Phase 3 core formatter contract.
 
 ### CLI Write and Check Workflows
 
-`ox-mf2 format` should default to write mode and modify files in place. It should also support check workflows such as `--check` and `--list-different` for CI and pre-commit usage. Stdin formatting should be supported through a file-aware option such as `--stdin-filepath`, allowing editors and scripts to pipe source while still giving the formatter enough context for extension checks and configuration.
+`intlify fmt` should default to write mode and modify files in place. It should also support check workflows such as `--check` and `--list-different` for CI and pre-commit usage. Stdin formatting should be supported through a file-aware option such as `--stdin-filepath`, allowing editors and scripts to pipe source while still giving the formatter enough context for extension checks and configuration.
 
 ### Formatter Parallelism
 
@@ -173,9 +173,9 @@ Benchmarks should report formatter concurrency settings separately from parser, 
 
 ### Configuration
 
-The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the repository root config is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
+The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
 
-The project configuration surface should use one unified JSON Schema with `format` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
+The project configuration surface should use one unified JSON Schema with `fmt` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
 
 Formatter configuration should support `ignorePatterns` but not file-specific `overrides` in the initial design. The initial formatter target is a narrow MF2 message file/resource workflow, so file-kind-specific overrides are unnecessary. If future resource/catalog or multi-file-kind workflows need per-file options, overrides can be reconsidered then.
 
@@ -197,7 +197,7 @@ Formatter ignore directives are in scope for the initial formatter. A formatter 
 
 ### Formatter and Linter Boundary
 
-The Phase 3 responsibility boundary is style in the formatter and correctness in the linter. Formatting checks should use `ox-mf2 format --check` or formatter check APIs. If a future linter workflow needs style diagnostics or style fixes, it should delegate to formatter APIs rather than reimplement formatter layout rules in lint rules.
+The Phase 3 responsibility boundary is style in the formatter and correctness in the linter. Formatting checks should use `intlify fmt --check` or formatter check APIs. If a future linter workflow needs style diagnostics or style fixes, it should delegate to formatter APIs rather than reimplement formatter layout rules in lint rules.
 
 ### Dedicated Formatter Design Notes
 
@@ -205,7 +205,7 @@ Formatter detail notes to resolve in the dedicated formatter design:
 
 - exact Rust, N-API, and WASM result types
 - formatter options and defaults
-- formatter config file name and schema shape
+- formatter config section schema shape
 - formatter ignore directive syntax and target range rules
 - line wrapping rules
 - matcher layout rules
@@ -229,7 +229,7 @@ The Rust linter engine should live in a separate `crates/ox_mf2_lint` crate that
 
 ### CLI and Package Distribution
 
-The CLI binary should live in a separate `crates/ox_mf2_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `ox-mf2 lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in a separate `crates/ox_mf2_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
 N-API and WASM linter bindings should be published as linter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while linter packages expose lint-specific APIs backed by `crates/ox_mf2_lint`.
 
@@ -239,13 +239,13 @@ The Phase 3 linter deliverables are the Rust linter engine, CLI, N-API linter pa
 
 ### CLI Input Model
 
-The CLI accepts file path and glob inputs so users can lint MF2 files directly, for example `ox-mf2 lint "locales/**/*.mf2"` or `ox-mf2 lint messages/en.mf2 messages/ja.mf2`.
+The CLI accepts file path and glob inputs so users can lint MF2 files directly, for example `intlify lint "locales/**/*.mf2"` or `intlify lint messages/en.mf2 messages/ja.mf2`.
 
 The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and linted directly. Resource files containing multiple messages, framework-specific i18n files, and multi-locale catalogs are layered consumers that extract message entries and reuse the message-level linter; their concrete file formats are not fixed by the Phase 3 core linter contract.
 
 ### Configuration
 
-The CLI should load JSON project configuration for rule severity, presets, and file include/exclude patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the repository root config is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/ox_mf2_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
+The CLI should load JSON project configuration for rule severity, presets, and file include/exclude patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/ox_mf2_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
 
 The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to include/exclude and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
 
@@ -259,11 +259,11 @@ While the linter remains in 0.x, the `recommended` preset may evolve by adding b
 
 The initial CLI output formats should include human-readable `text` output and machine-readable `json` output. Additional formats can be added later, but `json` should use the same diagnostic schema exposed by Rust, N-API, and WASM entry points.
 
-Machine-readable output schemas are distinct from the unified project config schema. `lint`, `format --check`, and a future combined `check` command may use command-specific JSON result schemas, while sharing common grouping and summary conventions where practical.
+Machine-readable output schemas are distinct from the unified project config schema. `lint`, `fmt --check`, and a future combined `check` command may use command-specific JSON result schemas, while sharing common grouping and summary conventions where practical.
 
 The CLI exits with a failure status when any `error` diagnostic is reported. `warning` diagnostics do not fail the process by default. A `--max-warnings <n>` option should allow CI users to fail when the warning count exceeds the configured threshold.
 
-Detailed CLI option semantics, including quiet mode, fix mode, config file name/schema details, ignore/include behavior, unmatched-pattern behavior, and additional output formats, belong to the linter-specific design document rather than this Phase 3 consumer contract.
+Detailed CLI option semantics, including quiet mode, fix mode, linter config section schema details, ignore/include behavior, unmatched-pattern behavior, and additional output formats, belong to the linter-specific design document rather than this Phase 3 consumer contract.
 
 ### Public Syntax and Semantic Input
 
@@ -517,7 +517,7 @@ The transport or binding layer is selected by the integration environment. The c
 
 Agent coding tools such as Codex, Claude Code, Grok Build, and similar systems are separate consumers from LSP/editor integrations. They may expose plugins, skills, commands, hooks, MCP servers, ACP clients, headless execution, or other agent-specific extension points, but those extension systems should wrap the same formatter, linter, parser, and snapshot contracts rather than defining new core behavior.
 
-The initial Phase 3 agent-facing surface should be the `ox-mf2` CLI and stable machine-readable output. Agents can call `ox-mf2 format`, `ox-mf2 lint`, and future check commands in repo workflows, CI-style verification, pre-commit automation, and code review tasks. Agent, CI, and editor-adapter integrations should prefer JSON output over human-readable text output when they need to inspect diagnostics or formatting status.
+The initial Phase 3 agent-facing surface should be the `intlify` CLI and stable machine-readable output. Agents can call `intlify fmt`, `intlify lint`, and future check commands in repo workflows, CI-style verification, pre-commit automation, and code review tasks. Agent, CI, and editor-adapter integrations should prefer JSON output over human-readable text output when they need to inspect diagnostics or formatting status.
 
 Agent integrations may later provide MCP servers, agent plugins, skills, or commands, but those should remain distribution and workflow wrappers. They should not become the source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, or semantic analysis.
 

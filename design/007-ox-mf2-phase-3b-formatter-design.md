@@ -13,7 +13,7 @@ The formatter should provide a deterministic ox-mf2 style while keeping the publ
 Primary goals:
 
 - format MF2 messages through a Rust core implementation
-- expose a dedicated `ox-mf2 format` CLI backed by the same core
+- expose a dedicated `intlify fmt` CLI backed by the same core
 - expose the formatter through Rust, N-API, and WASM without duplicating formatting logic
 - use Binary AST `SnapshotView` / binding-side snapshot accessors as the stable public syntax view
 - support both standard and preserve formatting modes
@@ -107,7 +107,7 @@ Open decisions for the detailed result contract:
 
 ## CLI Workflow
 
-The CLI command is `ox-mf2 format`.
+The CLI command is `intlify fmt`.
 
 Initial CLI behavior:
 
@@ -122,9 +122,9 @@ Resource files and catalogs that contain multiple messages are layered workflows
 
 ## Configuration
 
-Formatter configuration lives in the `format` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON, and the Rust config model is the source of truth for generated JSON Schema.
+Formatter configuration lives in the `fmt` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON, and the Rust config model is the source of truth for generated JSON Schema.
 
-Initial config discovery is root-only. The CLI loads only the repository root config. Nearest-config-wins and nested config discovery are not part of the initial design.
+Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design.
 
 Initial formatter config supports `ignorePatterns` but not file-specific `overrides`. The first formatter target is a narrow MF2 message/resource workflow, so per-file option overrides are unnecessary until resource/catalog requirements prove otherwise.
 
@@ -132,9 +132,8 @@ The formatter reads `.editorconfig` as fallback input for unset formatting optio
 
 Open decisions for detailed configuration:
 
-- exact config file name
-- exact JSON Schema package path
-- exact option names, defaults, and validation errors
+- exact formatter option names, defaults, and validation errors
+- formatter-specific schema definitions under the unified config schema
 - how CLI flags override config and `.editorconfig`
 
 ## Options
@@ -310,9 +309,9 @@ Phase 3 benchmark names:
 The following items are detailed formatter design questions, not Phase 3 boundary decisions:
 
 - exact `FormatResult`, `FormatCheckResult`, and error envelope shape for Rust, N-API, and WASM
-- exact config file name, JSON Schema path, option names, and default values
+- exact formatter option names and default values
+- formatter-specific schema definitions under the unified config schema
 - exact CLI flag precedence over config and `.editorconfig`
-- whether the CLI supports an explicit `--config <path>` in addition to root-only discovery
 - CLI exit code classification for format mismatch, formatter errors, config errors, and no matched files
 - stdout/stderr behavior for write, check, list-different, stdin, and error-reporting modes
 - whether the CLI exposes runtime controls such as `--threads`
@@ -323,7 +322,7 @@ The following items are detailed formatter design questions, not Phase 3 boundar
 - whether ignore files include `.gitignore`, a formatter-specific ignore file, explicit `--ignore-path`, or only config `ignorePatterns`
 - unmatched pattern behavior
 - symlink traversal, hidden files, VCS directories, and dependency directories such as `node_modules`
-- whether `ox-mf2 init` should generate config and schema comments/examples
+- whether `intlify init` should generate config and schema comments/examples
 - exact formatter ignore directive syntax, target range rules, and trivia handling
 - exact matcher layout and line wrapping rules
 - LSP/editor configuration shape, including whether an explicit formatter config path is supported

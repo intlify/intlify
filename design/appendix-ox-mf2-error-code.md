@@ -6,7 +6,7 @@ This appendix defines the numeric range policy for ox-mf2 API error codes.
 
 The range policy applies only to errors that represent API failure boundaries, such as snapshot decode failures, snapshot write failures, source text failures, initialization failures, and binding validation failures.
 
-The range policy does not apply to parser or snapshot classification enums.
+The range policy does not apply to parser or snapshot classification enums, or to CLI JSON operational error string codes.
 
 ## Namespace Separation
 
@@ -24,6 +24,8 @@ These enums are compact parser / snapshot values. They are allowed to use small 
 `DiagnosticCode` is intentionally not an API error code. It identifies a recoverable parser diagnostic emitted into a parse result or diagnostic snapshot section. Parser diagnostics do not throw and do not represent API call failure.
 
 `OxMf2ErrorCode` is the API error code namespace. Only values in this namespace use the range policy below.
+
+CLI JSON operational error codes, such as `config_not_found` or `command_not_ready`, are stable string identifiers in the CLI output contract. They are not numeric `OxMf2ErrorCode` values and are not allocated from the ranges in this appendix. A CLI operational error may include lower-level API error information in structured details when needed, but the CLI `errors[].code` field remains a string namespace.
 
 ## Range Allocation
 

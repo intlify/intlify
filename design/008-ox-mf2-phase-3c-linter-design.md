@@ -27,7 +27,7 @@ LSP/editor integration and playground usage are consumers of these deliverables,
 
 The Rust linter engine lives in `crates/ox_mf2_lint` and depends on `ox_mf2_parser`. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The lint crate owns rule execution, presets, lint configuration, and lint result shaping.
 
-The user-facing CLI binary lives in `crates/ox_mf2_cli`. It composes the parser, formatter, and linter crates into commands such as `ox-mf2 lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
+The user-facing CLI binary lives in `crates/ox_mf2_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
 
 N-API and WASM linter bindings are distributed as linter-specific packages backed by `crates/ox_mf2_lint`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs.
 
@@ -174,7 +174,7 @@ Open decisions:
 
 Project configuration is JSON, not JavaScript or TypeScript. Lint settings live in the `lint` section of one ox-mf2 tooling config shared with formatter settings. The Rust linter engine is the source of truth for the resolved config model.
 
-Initial config discovery is root-only. The CLI loads only the repository root config. Nearest-config-wins and nested config discovery are not part of the initial design.
+Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design.
 
 Initial linter config does not support file-specific `overrides`. File selection belongs to include/exclude and ignore patterns. Resource/catalog linting can revisit per-resource configuration later if a concrete need appears.
 
@@ -192,11 +192,8 @@ The JSON configuration surface should have a generated JSON Schema published wit
 
 Open decisions:
 
-- exact config file name
-- JSON schema shape
-- package-level JSON schema publication
+- linter-specific JSON schema shape under the unified config schema
 - include/exclude pattern semantics
-- root detection rule for locating the single project config
 
 ## File Discovery
 
@@ -231,10 +228,9 @@ This document owns the detailed CLI option semantics.
 
 Open decisions:
 
-- exact command name and package/bin ownership
 - rule listing/introspection command
 - resolved config printing command
-- config file name and JSON schema details
+- linter-specific config schema details
 - include/exclude and ignore behavior
 - quiet mode behavior
 - whether fix mode exists in the first CLI version
@@ -459,8 +455,7 @@ Directive syntax is not fixed yet. The linter result model should be able to rep
 
 The following items are detailed linter design questions, not Phase 3 boundary decisions:
 
-- exact config file name and JSON Schema publication path
-- exact root detection rule for loading the single project config
+- linter-specific config schema details under the unified config schema
 - include/exclude glob syntax and precedence
 - ignore file support and interaction with config ignore patterns
 - supported file extensions for direct message files
