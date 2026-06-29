@@ -216,7 +216,7 @@ The same `$schema` value is recommended for `intlify.config.jsonc`:
 
 The `$schema` field is optional. The CLI does not use the `$schema` value to locate its validation schema at runtime; it is editor-facing metadata only. JSONC editor schema support is expected in VS Code-compatible JSONC tooling.
 
-Unknown fields are validation errors at the root level, except for `$schema`, and inside `fmt` and `lint` sections. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
+Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt` and `lint` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
 
 In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
@@ -337,9 +337,9 @@ Output streams:
 - With `--reporter json`, the JSON envelope is written to stdout and no human-readable log is emitted.
 - With the human-readable reporter, normal results and summaries are written to stdout.
 - Human-readable operational errors are written to stderr.
-- `--version` and `--help` write to stdout.
+- After the Rust CLI starts, `--version` and `--help` write to stdout and exit with `0`.
 - Invalid CLI arguments write to stderr and exit with code `2` unless `--reporter json` can be parsed before the argument error is reported.
-- Wrapper-level native resolution failures may fall back to a minimal human-readable stderr message when the Rust CLI cannot be started and a JSON envelope cannot be produced.
+- Wrapper-level native resolution failures happen before Rust CLI stream rules apply and may fall back to a minimal human-readable stderr message when the Rust CLI cannot be started and a JSON envelope cannot be produced.
 
 Exit codes:
 
