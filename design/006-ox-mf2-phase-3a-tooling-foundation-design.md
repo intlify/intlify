@@ -47,11 +47,14 @@ The Rust CLI crate is defined as:
 
 - crate directory: `crates/ox_mf2_cli`
 - Cargo package name: `ox_mf2_cli`
+- crates.io publishing: disabled with `publish = false`
 - binary target name: `intlify`
 - binary entry point: `src/main.rs`
 - library target: `src/lib.rs`
 
 The native binary copied into npm packages is `intlify` on Unix platforms and `intlify.exe` on Windows.
+
+`ox_mf2_cli` is a workspace-internal Rust package used to build the native CLI binary for npm distribution. It is not a public crates.io package and does not support `cargo install ox_mf2_cli` in Phase 3A. Public CLI distribution is handled by `@intlify/cli` and the platform-specific `@intlify/cli-<target>` native npm packages.
 
 The binary entry point should stay thin. CLI core behavior, including command routing, config discovery, config loading, config validation, reporter selection, and output shaping, should live in library modules under `src/lib.rs`. This is required so Phase 3A can test config loader behavior directly without adding hidden public CLI commands.
 
@@ -334,7 +337,7 @@ The Phase 3A text reporter should stay minimal. Top-level help, reserved command
 
 Output streams:
 
-- With `--reporter json`, the JSON envelope is written to stdout and no human-readable log is emitted.
+- For command results and operational errors with `--reporter json`, the JSON envelope is written to stdout and no human-readable log is emitted.
 - With the human-readable reporter, normal results and summaries are written to stdout.
 - Human-readable operational errors are written to stderr.
 - After the Rust CLI starts, `--version` and `--help` write to stdout and exit with `0`.
@@ -494,7 +497,7 @@ Future native target mapping:
 Build and package assembly pipeline:
 
 - Build the Rust CLI with `cargo build --release -p ox_mf2_cli --bin intlify`.
-- Integrate CLI package publishing into the existing `.github/workflows/release.yml` release-tag workflow, alongside npm package and crates.io publishing.
+- Integrate CLI package publishing into the existing `.github/workflows/release.yml` release-tag workflow, alongside npm package publishing and crates.io publishing for public library crates such as `ox_mf2_parser`.
 - Run cross-target binary builds in the GitHub Actions release matrix.
 - Copy the built binary into the matching native package root as `intlify` or `intlify.exe`.
 - Preserve or set executable permissions for Unix native package binaries with `chmod +x`.
@@ -518,10 +521,10 @@ The release workflow should order publish, smoke, and release-note steps as:
 
 1. Validate the release tag and version consistency.
 2. Build ox-mf2 npm packages, ox-mf2 native packages, and CLI native binaries.
-3. Publish crates.io artifacts.
+3. Publish crates.io artifacts for public library crates such as `ox_mf2_parser`; `ox_mf2_cli` remains `publish = false`.
 4. Publish CLI native packages.
 5. Publish the public `@intlify/cli` wrapper package.
-6. Run published artifact smoke tests for ox-mf2 npm packages, crates.io artifacts, and CLI wrapper/native packages.
+6. Run published artifact smoke tests for ox-mf2 npm packages, crates.io public library artifacts, and CLI wrapper/native packages.
 7. Create GitHub Release notes only after all publish and smoke steps pass.
 
 Normal CI should validate the CLI foundation before publishing by running schema verification, Rust tests, `check:cli-pack`, and local `test:cli-smoke`. The `check:cli-pack` and `test:cli-smoke` root scripts are standalone entry points because their underlying tasks depend on `cli#build`; CI may still split `build:cli` into an earlier visible step for log clarity, but correctness must not depend on callers remembering that order. Local smoke tests directly execute the host platform native binary. Release workflow validation owns cross-target native builds, package publishing, and smoke tests against installed published packages. Target build jobs should directly execute the built target binary when the runner can execute that target; targets that cannot be executed on the runner are covered by package content checks, executable permission checks where applicable, and installed-package smoke tests on supported host runners.
