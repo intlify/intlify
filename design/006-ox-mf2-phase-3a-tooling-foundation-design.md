@@ -49,9 +49,11 @@ The Rust CLI crate is defined as:
 - Cargo package name: `ox_mf2_cli`
 - binary target name: `intlify`
 - binary entry point: `src/main.rs`
-- optional library target: `src/lib.rs`, if shared testable CLI modules need one
+- library target: `src/lib.rs`
 
 The native binary copied into npm packages is `intlify` on Unix platforms and `intlify.exe` on Windows.
+
+The binary entry point should stay thin. CLI core behavior, including command routing, config discovery, config loading, config validation, reporter selection, and output shaping, should live in library modules under `src/lib.rs`. This is required so Phase 3A can test config loader behavior directly without adding hidden public CLI commands.
 
 ## Ownership
 
@@ -130,6 +132,8 @@ Phase 3A input and routing error codes:
 - `reporter_not_supported`: unsupported reporter value, with `kind: "reporter"`
 - `unknown_command`: unknown subcommand, with `kind: "unsupported"`
 - `command_not_ready`: reserved command without an implementation in the current phase, with `kind: "unsupported"`
+
+For `unknown_command`, the top-level envelope `command` remains `"intlify"` and the unknown subcommand is reported in `errors[].details.command`. For example, `intlify foo --reporter json` reports `details: { "command": "foo" }`.
 
 ## Configuration Contract
 
@@ -376,11 +380,21 @@ Native package `package.json` contract:
 - `version`: same exact version as `@intlify/cli`
 - `files` on Unix targets: `["intlify", "README.md", "package.json"]`
 - `files` on Windows targets: `["intlify.exe", "README.md", "package.json"]`
-- `os` and `cpu`: set for each target package
 - no `engines` field is required
 - no `bin` entry; the public command is exposed only by `@intlify/cli`
 
 Linux libc selection is represented by package name and wrapper resolution logic rather than npm package metadata.
+
+Native package `os` and `cpu` matrix:
+
+| Native package                 | `os`         | `cpu`       |
+| ------------------------------ | ------------ | ----------- |
+| `@intlify/cli-darwin-x64`      | `["darwin"]` | `["x64"]`   |
+| `@intlify/cli-darwin-arm64`    | `["darwin"]` | `["arm64"]` |
+| `@intlify/cli-linux-x64-gnu`   | `["linux"]`  | `["x64"]`   |
+| `@intlify/cli-linux-arm64-gnu` | `["linux"]`  | `["arm64"]` |
+| `@intlify/cli-linux-x64-musl`  | `["linux"]`  | `["x64"]`   |
+| `@intlify/cli-win32-x64-msvc`  | `["win32"]`  | `["x64"]`   |
 
 Build and package assembly pipeline:
 
@@ -390,7 +404,7 @@ Build and package assembly pipeline:
 - Generate `config.schema.json` from Rust config types and write it to the committed `packages/cli/schema/config.schema.json` artifact.
 - Expose schema generation as `vp run cli#schema`.
 - Expose schema verification as `vp run cli#schema:check`, comparing regenerated schema output with the committed schema artifact.
-- Optionally expose root scripts `schema:cli` and `schema:cli:check` as wrappers around those Vite Task commands.
+- Expose root scripts `schema:cli` and `schema:cli:check` as wrappers around those Vite Task commands.
 - Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/ox_mf2_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
 - Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution, and schema file presence. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
@@ -410,7 +424,7 @@ Phase 3A validation should focus on foundation behavior:
 - config validation fixtures through crate-level unit/integration tests
 - CLI help/version behavior
 - reserved command placeholder behavior
-- native CLI package install and binary execution smoke tests
+- release-time installed-package smoke tests for CLI wrapper/native resolution
 - native package resolution error handling
 - output envelope fixtures
 - slash-normalized `projectRoot` and result paths
