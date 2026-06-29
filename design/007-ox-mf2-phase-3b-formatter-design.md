@@ -122,7 +122,7 @@ Resource files and catalogs that contain multiple messages are layered workflows
 
 ## Configuration
 
-Formatter configuration lives in the `format` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON, and the Rust config model is the source of truth for generated JSON Schema.
+Formatter configuration lives in the `fmt` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON, and the Rust config model is the source of truth for generated JSON Schema.
 
 Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design.
 

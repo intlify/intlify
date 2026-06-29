@@ -10,7 +10,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 
 - Establish the Phase 3A CLI crate and the `intlify` command structure.
 - Define the shared CLI package and native binary distribution boundary.
-- Define the unified project configuration model with `format` and `lint` sections.
+- Define the unified project configuration model with `fmt` and `lint` sections.
 - Publish a unified JSON Schema for editor completion and config validation.
 - Define shared machine-readable output conventions for future `fmt --check`, `lint`, and combined `check` workflows.
 - Keep formatter and linter resolved config models separate internally while exposing one project-level config file to users.
@@ -47,7 +47,7 @@ Phase 3A deliverables:
 
 The CLI crate owns command routing, config discovery, config loading, output formatting, exit-code behavior, and package-level CLI composition.
 
-Formatter and linter crates own their resolved config models once Phase 3B and Phase 3C begin. Phase 3A owns only the project-level config envelope, schema generation boundary, and normalization path that lets the CLI pass `format` and `lint` sections to product-specific crates later.
+Formatter and linter crates own their resolved config models once Phase 3B and Phase 3C begin. Phase 3A owns only the project-level config envelope, schema generation boundary, and normalization path that lets the CLI pass `fmt` and `lint` sections to product-specific crates later.
 
 Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, and semantic lowering. Phase 3A should not move parser behavior into the CLI crate.
 
@@ -71,25 +71,44 @@ intlify lint
 intlify check
 ```
 
-Phase 3A reserves the `fmt` and `lint` command names but keeps them out of normal `intlify --help` output until the formatter and linter engines are ready. If either reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. `intlify check` remains hidden/internal scaffolding until formatter and linter products both exist.
+Phase 3A reserves the `fmt`, `lint`, and `check` command names but keeps them out of normal `intlify --help` output until the required product engines are ready. If any reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. `intlify check` requires both formatter and linter products, so its placeholder error uses `details.requiredPhase: "3B+3C"`.
 
 The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Machine-readable JSON output is selected with `--reporter json`.
 
 ## Configuration Contract
 
-Project configuration is one JSON config with separate `format` and `lint` sections. The config file name is `intlify.config.json`.
+Project configuration is one JSON config with separate `fmt` and `lint` sections. The config file name is `intlify.config.json`.
 
 The initial config discovery model is root-only. Root means the git repository root found by walking up from `cwd`; when no git repository root exists, root falls back to `cwd`. The discovered config path is `<root>/intlify.config.json`. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
 
 The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root `intlify.config.json`.
 
-When root discovery does not find `intlify.config.json`, the CLI continues with the default project config without emitting a warning or error. When `--config <path>` is provided and that file does not exist, the CLI returns an operational config error with `code: "config_not_found"` and exits with code `2`.
+When root discovery does not find `intlify.config.json`, the CLI continues with the default project config without emitting a warning or error. The default normalized project config is:
+
+```json
+{
+  "fmt": {},
+  "lint": {}
+}
+```
+
+When `--config <path>` is provided and that file does not exist, the CLI returns an operational config error with `code: "config_not_found"` and exits with code `2`.
 
 The unified config JSON Schema is the schema that users and editors should reference. Formatter and linter config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
 
-The unified config JSON Schema is published with the native CLI npm package. The schema is exported at `./schema/config.schema.json` and can internally separate formatter and linter configuration under definitions such as `$defs.format` and `$defs.lint`. Formatter and linter detail schemas remain separately owned, but users reference one schema for `intlify.config.json`.
+The unified config JSON Schema is published with the native CLI npm package. The schema is exported at `./schema/config.schema.json` and can internally separate formatter and linter configuration under definitions such as `$defs.fmt` and `$defs.lint`. Formatter and linter detail schemas remain separately owned, but users reference one schema for `intlify.config.json`.
 
 Schema generation uses Rust config types as the source of truth. Phase 3A should generate the unified schema from the project-level Rust config model, using schema annotations for editor-facing descriptions and examples where needed. A dedicated schema generation crate is not required in Phase 3A.
+
+Unknown fields are validation errors at the root level and inside `fmt` and `lint` sections. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
+
+Phase 3A config error codes:
+
+- `config_not_found`: explicit `--config <path>` does not exist
+- `config_read_failed`: config exists but cannot be read because of permissions or IO failures
+- `config_parse_failed`: config cannot be parsed as JSON
+- `config_validation_failed`: config parses as JSON but fails schema or config-model validation
+- `config_schema_generation_failed`: config schema generation fails in a build or validation workflow
 
 Open product-specific config details remain in the formatter and linter design documents.
 
@@ -104,14 +123,42 @@ The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the o
 - `schemaVersion`: output contract version
 - `command`: command that produced the result, such as `fmt`, `lint`, or future `check`
 - `version`: CLI/package version
-- `cwd`: path resolution base
+- `projectRoot`: discovered project root
 - `summary`: command-level aggregate status and counts
 - `results`: command-specific file, message, diagnostic, or formatting results
 - `errors`: operational errors separated from parser, formatter, and linter diagnostics
 
 Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope.
 
-The `cwd` field is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `cwd` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
+The `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
+
+Reserved command placeholder JSON output uses the same envelope. For example, `intlify fmt --reporter json` returns:
+
+```json
+{
+  "schemaVersion": "0",
+  "command": "fmt",
+  "version": "0.13.1",
+  "projectRoot": "/repo",
+  "summary": {
+    "status": "error"
+  },
+  "results": [],
+  "errors": [
+    {
+      "kind": "unsupported",
+      "code": "command_not_ready",
+      "message": "The fmt command is reserved but not available in this release.",
+      "details": {
+        "phase": "3A",
+        "requiredPhase": "3B"
+      }
+    }
+  ]
+}
+```
+
+For `lint`, `details.requiredPhase` is `"3C"`. For `check`, `details.requiredPhase` is `"3B+3C"`.
 
 Operational errors are represented only in the top-level `errors` array. They are CLI execution failures rather than parser, formatter, or linter diagnostics.
 
@@ -124,6 +171,15 @@ Each operational error contains:
 - `details`: optional structured data for integrations
 
 Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
+
+Output streams:
+
+- With `--reporter json`, the JSON envelope is written to stdout and no human-readable log is emitted.
+- With the human-readable reporter, normal results and summaries are written to stdout.
+- Human-readable operational errors are written to stderr.
+- `--version` and `--help` write to stdout.
+- Invalid CLI arguments write to stderr and exit with code `2`.
+- Wrapper-level native resolution failures may fall back to a minimal human-readable stderr message when the Rust CLI cannot be started and a JSON envelope cannot be produced.
 
 Exit codes:
 
@@ -146,6 +202,29 @@ Expected package groups:
 
 `@intlify/cli` should resolve the current platform's optional native package and execute that package's binary. This keeps the public npm entry point stable while avoiding a single package that ships every platform binary. The platform package model should follow the same general direction as the existing native ox-mf2 package publishing flow.
 
+Initial CLI native package names:
+
+- `@intlify/cli-darwin-x64`
+- `@intlify/cli-darwin-arm64`
+- `@intlify/cli-linux-x64-gnu`
+- `@intlify/cli-linux-arm64-gnu`
+- `@intlify/cli-linux-x64-musl`
+- `@intlify/cli-win32-x64-msvc`
+
+Future native package candidates:
+
+- `@intlify/cli-win32-arm64-msvc`
+- `@intlify/cli-linux-arm64-musl`
+
+Wrapper-level native resolution error codes:
+
+- `native_platform_unsupported`: the current platform is not in the supported platform table
+- `native_package_not_found`: the platform is supported but the optional native package cannot be resolved
+- `native_binary_not_found`: the native package resolves but the expected binary path does not exist
+- `native_binary_failed`: the native binary exists but fails to start or exits before delegating to the Rust CLI contract
+
+These are operational errors and use exit code `2`. When the wrapper can construct the standard JSON envelope, it should report them in `errors`. When it cannot start the Rust CLI or construct the envelope safely, it should print a minimal human-readable stderr fallback.
+
 `@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release must not publish a version lower than `0.13.1`.
 
 Parser binding packages remain focused on parsing, snapshots, and parser-level APIs. Formatter and linter APIs should not be folded into parser packages.
@@ -157,13 +236,17 @@ Phase 3A validation should focus on foundation behavior:
 - config discovery and parsing
 - default config behavior when no root config exists
 - explicit `--config` missing-file errors
+- config error code fixtures
+- unknown-field validation
 - config schema generation
 - config validation fixtures
 - CLI help/version behavior
 - reserved command placeholder behavior
 - native CLI package install and binary execution smoke tests
+- native package resolution error handling
 - output envelope fixtures
-- slash-normalized `cwd` and result paths
+- slash-normalized `projectRoot` and result paths
+- stdout/stderr behavior
 - deterministic JSON ordering
 - operational error shape
 

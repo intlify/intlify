@@ -24,7 +24,7 @@ Implementation should be split by consumer-facing product surface:
 
 1. **Phase 3A: Tooling Foundation**
    - `crates/ox_mf2_cli` and the `intlify` command structure
-   - unified `format` / `lint` project config model and JSON Schema
+   - unified `fmt` / `lint` project config model and JSON Schema
    - shared machine-readable output conventions
    - package and distribution boundaries for CLI, N-API, and WASM tooling
 
@@ -173,9 +173,9 @@ Benchmarks should report formatter concurrency settings separately from parser, 
 
 ### Configuration
 
-The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
+The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
 
-The project configuration surface should use one unified JSON Schema with `format` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
+The project configuration surface should use one unified JSON Schema with `fmt` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
 
 Formatter configuration should support `ignorePatterns` but not file-specific `overrides` in the initial design. The initial formatter target is a narrow MF2 message file/resource workflow, so file-kind-specific overrides are unnecessary. If future resource/catalog or multi-file-kind workflows need per-file options, overrides can be reconsidered then.
 
@@ -245,7 +245,7 @@ The primary CLI input unit is a single MF2 message file: one file contains one M
 
 ### Configuration
 
-The CLI should load JSON project configuration for rule severity, presets, and file include/exclude patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `format` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/ox_mf2_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
+The CLI should load JSON project configuration for rule severity, presets, and file include/exclude patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/ox_mf2_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
 
 The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to include/exclude and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
 
