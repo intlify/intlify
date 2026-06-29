@@ -26,10 +26,10 @@ The initial agent workflow should use the same CLI and JSON contracts designed f
 
 Agents can run:
 
-- `ox-mf2 lint` to collect parser, semantic, and lint diagnostics
-- `ox-mf2 format --check` to detect formatting drift
-- `ox-mf2 format` to apply formatting when the task explicitly allows edits
-- future `ox-mf2` check commands when formatter and linter workflows are composed
+- `intlify lint` to collect parser, semantic, and lint diagnostics
+- `intlify fmt --check` to detect formatting drift
+- `intlify fmt` to apply formatting when the task explicitly allows edits
+- future `intlify` check commands when formatter and linter workflows are composed
 
 Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic categories, rule ids, severities, and suggested follow-up actions.
 

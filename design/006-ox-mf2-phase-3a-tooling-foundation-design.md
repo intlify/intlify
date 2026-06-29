@@ -71,7 +71,7 @@ intlify lint
 intlify check
 ```
 
-Phase 3A may implement placeholders or hidden/internal command scaffolding as needed, but user-visible incomplete commands should not appear as stable behavior until their product phase is ready. `intlify check` remains hidden/internal scaffolding until formatter and linter products both exist.
+Phase 3A reserves the `fmt` and `lint` command names but keeps them out of normal `intlify --help` output until the formatter and linter engines are ready. If either reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. `intlify check` remains hidden/internal scaffolding until formatter and linter products both exist.
 
 The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Machine-readable JSON output is selected with `--reporter json`.
 
@@ -79,9 +79,11 @@ The CLI should provide consistent global behavior for help output, version outpu
 
 Project configuration is one JSON config with separate `format` and `lint` sections. The config file name is `intlify.config.json`.
 
-The initial config discovery model is root-only. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
+The initial config discovery model is root-only. Root means the git repository root found by walking up from `cwd`; when no git repository root exists, root falls back to `cwd`. The discovered config path is `<root>/intlify.config.json`. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
 
 The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root `intlify.config.json`.
+
+When root discovery does not find `intlify.config.json`, the CLI continues with the default project config without emitting a warning or error. When `--config <path>` is provided and that file does not exist, the CLI returns an operational config error with `code: "config_not_found"` and exits with code `2`.
 
 The unified config JSON Schema is the schema that users and editors should reference. Formatter and linter config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
 
@@ -97,7 +99,7 @@ Machine-readable CLI output should use JSON and should be stable enough for CI, 
 
 The config schema and output schemas are separate surfaces. `lint`, `fmt --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
 
-The shared top-level JSON envelope contains:
+The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the output contract remains pre-stable. It contains:
 
 - `schemaVersion`: output contract version
 - `command`: command that produced the result, such as `fmt`, `lint`, or future `check`
@@ -109,11 +111,13 @@ The shared top-level JSON envelope contains:
 
 Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope.
 
+The `cwd` field is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `cwd` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
+
 Operational errors are represented only in the top-level `errors` array. They are CLI execution failures rather than parser, formatter, or linter diagnostics.
 
 Each operational error contains:
 
-- `kind`: broad error group, such as `config`, `input`, `io`, `reporter`, or `internal`
+- `kind`: broad error group, such as `config`, `input`, `io`, `reporter`, `unsupported`, or `internal`
 - `code`: stable machine-readable error code
 - `message`: human-readable message
 - `path`: optional related file path
@@ -135,9 +139,12 @@ Phase 3A should define package boundaries without forcing all packages to exist 
 
 Expected package groups:
 
-- CLI package: `@intlify/cli`, distributing the compiled native `intlify` binary.
+- CLI package: `@intlify/cli`, distributing the `intlify` command as a wrapper package.
+- CLI native packages: platform-specific optional packages that contain the compiled native `intlify` binary.
 - Formatter packages: future formatter-specific N-API and WASM APIs.
 - Linter packages: future linter-specific N-API and WASM APIs.
+
+`@intlify/cli` should resolve the current platform's optional native package and execute that package's binary. This keeps the public npm entry point stable while avoiding a single package that ships every platform binary. The platform package model should follow the same general direction as the existing native ox-mf2 package publishing flow.
 
 `@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release must not publish a version lower than `0.13.1`.
 
@@ -148,11 +155,15 @@ Parser binding packages remain focused on parsing, snapshots, and parser-level A
 Phase 3A validation should focus on foundation behavior:
 
 - config discovery and parsing
+- default config behavior when no root config exists
+- explicit `--config` missing-file errors
 - config schema generation
 - config validation fixtures
 - CLI help/version behavior
+- reserved command placeholder behavior
 - native CLI package install and binary execution smoke tests
 - output envelope fixtures
+- slash-normalized `cwd` and result paths
 - deterministic JSON ordering
 - operational error shape
 
