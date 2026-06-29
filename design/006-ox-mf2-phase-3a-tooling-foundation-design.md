@@ -73,7 +73,16 @@ intlify check
 
 Phase 3A reserves the `fmt`, `lint`, and `check` command names but keeps them out of normal `intlify --help` output until the required product engines are ready. If any reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. `intlify check` requires both formatter and linter products, so its placeholder error uses `details.requiredPhase: "3B+3C"`.
 
-The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Machine-readable JSON output is selected with `--reporter json`.
+The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Phase 3A global options are:
+
+- `--help`
+- `-h`
+- `--version`
+- `-V`
+- `--config <path>`
+- `--reporter <text|json>`
+
+The default reporter is `text`. Machine-readable JSON output is selected with `--reporter json`. Phase 3A does not support `--cwd` or `--root`; project root discovery is fixed by the config discovery contract below.
 
 ## Configuration Contract
 
@@ -81,7 +90,7 @@ Project configuration is one JSON config with separate `fmt` and `lint` sections
 
 The initial config discovery model is root-only. Root means the git repository root found by walking up from `cwd`; when no git repository root exists, root falls back to `cwd`. The discovered config path is `<root>/intlify.config.json`. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
 
-The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root `intlify.config.json`.
+The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root `intlify.config.json`. Relative `--config` paths are resolved from the process `cwd`; absolute paths are used as-is. `--config` replaces config discovery, but it does not change `projectRoot`.
 
 When root discovery does not find `intlify.config.json`, the CLI continues with the default project config without emitting a warning or error. The default normalized project config is:
 
@@ -100,7 +109,9 @@ The unified config JSON Schema is published with the native CLI npm package. The
 
 Schema generation uses Rust config types as the source of truth. Phase 3A should generate the unified schema from the project-level Rust config model, using schema annotations for editor-facing descriptions and examples where needed. A dedicated schema generation crate is not required in Phase 3A.
 
-Unknown fields are validation errors at the root level and inside `fmt` and `lint` sections. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
+The root-level `$schema` field is allowed as metadata for editor completion and validation. It is accepted by validation but is not passed into the resolved config model.
+
+Unknown fields are validation errors at the root level, except for `$schema`, and inside `fmt` and `lint` sections. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
 
 Phase 3A config error codes:
 
@@ -129,6 +140,12 @@ The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the o
 - `errors`: operational errors separated from parser, formatter, and linter diagnostics
 
 Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope.
+
+The shared `summary.status` values are:
+
+- `success`: successful execution, corresponding to exit code `0`
+- `failure`: command executed successfully but reported a check, lint, or formatting failure, corresponding to exit code `1`
+- `error`: operational error, corresponding to exit code `2`
 
 The `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
 
@@ -172,7 +189,9 @@ Each operational error contains:
 - `path`: optional related file path
 - `details`: optional structured data for integrations
 
-Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
+If an unsupported reporter is requested, the CLI returns an operational reporter error with `kind: "reporter"`, `code: "reporter_not_supported"`, and exit code `2`. Its `details` object contains the requested `reporter` value and `supportedReporters: ["text", "json"]`.
+
+Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. Phase 3A supports only `text` and `json` reporter names. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
 
 Output streams:
 
