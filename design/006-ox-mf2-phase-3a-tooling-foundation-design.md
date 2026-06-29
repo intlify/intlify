@@ -8,7 +8,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 
 ## Goals
 
-- Establish the `ox-mf2` CLI crate and command structure.
+- Establish the Phase 3A CLI crate and the `intlify` command structure.
 - Define the shared CLI package and native binary distribution boundary.
 - Define the unified project configuration model with `format` and `lint` sections.
 - Publish a unified JSON Schema for editor completion and config validation.
@@ -35,8 +35,8 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 Phase 3A deliverables:
 
 - `crates/ox_mf2_cli` crate skeleton
-- `ox-mf2` CLI command structure
-- native CLI npm package boundary
+- `intlify` CLI command structure
+- native `intlify` CLI npm package boundary
 - unified project config model
 - generated unified project config JSON Schema
 - shared machine-readable output envelope conventions
@@ -56,22 +56,28 @@ Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots,
 The initial CLI should reserve the user-facing command shape without requiring all product implementations to exist immediately:
 
 ```text
-ox-mf2 format
-ox-mf2 lint
-ox-mf2 check
+intlify format
+intlify lint
+intlify check
 ```
 
-Phase 3A may implement placeholders or hidden/internal command scaffolding as needed, but user-visible incomplete commands should not appear as stable behavior until their product phase is ready.
+Phase 3A may implement placeholders or hidden/internal command scaffolding as needed, but user-visible incomplete commands should not appear as stable behavior until their product phase is ready. `intlify check` remains hidden/internal scaffolding until formatter and linter products both exist.
 
-The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors.
+The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Machine-readable JSON output is selected with `--reporter json`.
 
 ## Configuration Contract
 
-Project configuration is one JSON config with separate `format` and `lint` sections.
+Project configuration is one JSON config with separate `format` and `lint` sections. The config file name is `intlify.config.json`.
 
 The initial config discovery model is root-only. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
 
+The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root `intlify.config.json`.
+
 The unified config JSON Schema is the schema that users and editors should reference. Formatter and linter config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
+
+The unified config JSON Schema is published with the native CLI npm package. The schema is exported at `./schema/config.schema.json` and can internally separate formatter and linter configuration under definitions such as `$defs.format` and `$defs.lint`. Formatter and linter detail schemas remain separately owned, but users reference one schema for `intlify.config.json`.
+
+Schema generation uses Rust config types as the source of truth. Phase 3A should generate the unified schema from the project-level Rust config model, using schema annotations for editor-facing descriptions and examples where needed. A dedicated schema generation crate is not required in Phase 3A.
 
 Open product-specific config details remain in the formatter and linter design documents.
 
@@ -79,15 +85,39 @@ Open product-specific config details remain in the formatter and linter design d
 
 Machine-readable CLI output should use JSON and should be stable enough for CI, editor adapters, and agent coding workflows to consume.
 
-The config schema and output schemas are separate surfaces. `lint`, `format --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical:
+The config schema and output schemas are separate surfaces. `lint`, `format --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
 
-- top-level summary
-- file or message grouping
-- operational error separation
-- deterministic ordering
-- stable command and version metadata
+The shared top-level JSON envelope contains:
 
-Human-readable text output can optimize for users, but integrations should use JSON output when they need to inspect diagnostics or formatting status.
+- `schemaVersion`: output contract version
+- `command`: command that produced the result, such as `format`, `lint`, or future `check`
+- `version`: CLI/package version
+- `cwd`: path resolution base
+- `summary`: command-level aggregate status and counts
+- `results`: command-specific file, message, diagnostic, or formatting results
+- `errors`: operational errors separated from parser, formatter, and linter diagnostics
+
+Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope.
+
+Operational errors are represented only in the top-level `errors` array. They are CLI execution failures rather than parser, formatter, or linter diagnostics.
+
+Each operational error contains:
+
+- `kind`: broad error group, such as `config`, `input`, `io`, `reporter`, or `internal`
+- `code`: stable machine-readable error code
+- `message`: human-readable message
+- `path`: optional related file path
+- `details`: optional structured data for integrations
+
+Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
+
+Exit codes:
+
+- `0`: success, including passing check-style commands
+- `1`: check failure, such as lint diagnostics, format mismatch, or future combined `check` failure
+- `2`: operational error, such as config errors, IO errors, invalid CLI arguments, or unsupported reporters
+
+If check failures and operational errors both occur, the CLI exits with `2`.
 
 ## Package Boundaries
 
@@ -95,9 +125,11 @@ Phase 3A should define package boundaries without forcing all packages to exist 
 
 Expected package groups:
 
-- CLI package: distributes the compiled native `ox-mf2` binary.
+- CLI package: `@intlify/cli`, distributing the compiled native `intlify` binary.
 - Formatter packages: future formatter-specific N-API and WASM APIs.
 - Linter packages: future linter-specific N-API and WASM APIs.
+
+`@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release must not publish a version lower than `0.13.1`.
 
 Parser binding packages remain focused on parsing, snapshots, and parser-level APIs. Formatter and linter APIs should not be folded into parser packages.
 
@@ -109,6 +141,7 @@ Phase 3A validation should focus on foundation behavior:
 - config schema generation
 - config validation fixtures
 - CLI help/version behavior
+- native CLI package install and binary execution smoke tests
 - output envelope fixtures
 - deterministic JSON ordering
 - operational error shape
@@ -117,14 +150,4 @@ Formatter and linter semantic correctness tests belong to later product phases.
 
 ## Open Questions
 
-- What is the exact config file name?
-- Should the CLI support an explicit `--config <path>` option in Phase 3A?
-- What global option selects JSON output: `--format json`, `--output json`, or another spelling?
-- Should `ox-mf2 check` appear in user-facing help as a reserved command in Phase 3A, or remain hidden/internal scaffolding until formatter and linter products both exist?
-- What top-level fields are required in every JSON output envelope?
-- How should operational errors be represented in JSON output without mixing them with parser, formatter, or linter diagnostics?
-- What exit-code contract should apply to operational errors versus check failures?
-- How should the unified config JSON Schema be generated and published with npm packages?
-- Should schema generation happen from Rust types, hand-authored schema files, or a dedicated schema generation crate?
-- What package name should distribute the native CLI binary?
-- Should Phase 3A include smoke tests for package install and binary execution before formatter/linter commands exist?
+No unresolved Phase 3A foundation questions remain in this document. Product-specific formatter, linter, LSP/editor, and agent questions are tracked in their dedicated design documents.
