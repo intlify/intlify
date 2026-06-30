@@ -106,7 +106,7 @@ importers:
   packages/cli:
     dependencies:
       '@intlify/cli-native':
-        specifier: workspace:0.14.0
+        specifier: workspace:*
         version: link:../cli-native
     devDependencies:
       '@types/node':

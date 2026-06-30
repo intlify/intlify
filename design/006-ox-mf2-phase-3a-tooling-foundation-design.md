@@ -437,7 +437,7 @@ If the wrapper emits a JSON envelope before the Rust CLI starts, the envelope `v
 - `bin`: `{ "intlify": "./bin/intlify.mjs" }`
 - `exports`: expose only `./package.json` and `./schema/config.schema.json`
 - `files`: `["bin", "schema", "README.md", "package.json"]`
-- `dependencies`: `@intlify/cli-native`, using `workspace:<version>` in source and rewritten by the package manager to the same exact version as `@intlify/cli` in published package metadata
+- `dependencies`: `@intlify/cli-native`, using `workspace:*` in source so the monorepo-managed workspace version is applied and rewritten by the package manager to the resolved exact version in published package metadata
 - `publishConfig`: `{ "access": "public" }`
 - `engines.node`: `>=22.12.0`
 

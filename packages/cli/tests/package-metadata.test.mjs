@@ -60,7 +60,7 @@ test('wrapper package metadata matches the public package contract', async () =>
     },
     files: ['bin', 'schema', 'README.md', 'package.json'],
     dependencies: {
-      [NATIVE_PACKAGE_NAME]: `workspace:${packageVersion}`
+      [NATIVE_PACKAGE_NAME]: 'workspace:*'
     },
     publishConfig: {
       access: 'public'
@@ -79,7 +79,7 @@ test('wrapper package metadata matches the public package contract', async () =>
     './schema/config.schema.json': './schema/config.schema.json'
   })
   expect(pkg.optionalDependencies).toBeUndefined()
-  expect(pkg.dependencies[NATIVE_PACKAGE_NAME]).toBe(`workspace:${pkg.version}`)
+  expect(pkg.dependencies[NATIVE_PACKAGE_NAME]).toBe('workspace:*')
   expect(pkg.keywords).toEqual(expect.arrayContaining(['intlify', 'messageformat', 'mf2', 'cli']))
 })
 

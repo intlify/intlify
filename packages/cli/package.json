@@ -39,7 +39,7 @@
     "test": "vp test"
   },
   "dependencies": {
-    "@intlify/cli-native": "workspace:0.14.0"
+    "@intlify/cli-native": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
