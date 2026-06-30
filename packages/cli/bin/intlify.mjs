@@ -11,8 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const require = createRequire(import.meta.url)
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 const workspacePackagesRoot = dirname(packageRoot)
-export const NATIVE_PACKAGE_NAME = '@intlify/cli-napi'
-export const NATIVE_PACKAGE_DIRECTORY = 'cli-napi'
+export const NATIVE_PACKAGE_NAME = '@intlify/cli-native'
+export const NATIVE_PACKAGE_DIRECTORY = 'cli-native'
 export const NATIVE_PACKAGE_BINARY_DIRECTORY = 'bin'
 const PACKAGE_VERSION = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')

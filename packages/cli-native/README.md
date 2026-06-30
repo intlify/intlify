@@ -1,4 +1,4 @@
-# @intlify/cli-napi
+# @intlify/cli-native
 
 This package is the source package for the native `intlify` CLI binary consumed by `@intlify/cli`.
 

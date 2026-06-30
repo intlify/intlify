@@ -76,7 +76,7 @@ test('wrapper forwards args env stdio and native exit code', () => {
   expect(calls[0].options).toEqual({ env, stdio: 'inherit' })
   expect(
     calls[0].binaryPath.endsWith(
-      join('@intlify-cli-napi', 'bin', 'aarch64-apple-darwin', 'intlify')
+      join('@intlify-cli-native', 'bin', 'aarch64-apple-darwin', 'intlify')
     )
   ).toBe(true)
   expect(exitCode).toBe(7)
@@ -121,7 +121,7 @@ test('wrapper reports non-json reporter failures as human-readable stderr', () =
 
   expect(output.exitCode).toBe(2)
   expect(output.stdout).toBe('')
-  expect(output.stderr).toContain('error: Native package @intlify/cli-napi')
+  expect(output.stderr).toContain('error: Native package @intlify/cli-native')
 })
 
 test('wrapper does not implement help or version shortcuts', () => {
@@ -172,7 +172,7 @@ test('wrapper distinguishes missing package missing binary and spawn failures', 
   expect(json.errors[0].details.cause).toBe('permission denied')
 })
 
-test('wrapper can resolve source-tree cli-napi package', () => {
+test('wrapper can resolve source-tree cli-native package', () => {
   const resolution = resolveNativeBinary({
     platform: 'darwin',
     arch: 'arm64',
@@ -182,7 +182,7 @@ test('wrapper can resolve source-tree cli-napi package', () => {
   expect(resolution.error.code).toBe('native_binary_not_found')
   expect(resolution.error.details.packageName).toBe(NATIVE_PACKAGE_NAME)
   expect(resolution.error.details.binaryPath).toContain(
-    'packages/cli-napi/bin/aarch64-apple-darwin/intlify'
+    'packages/cli-native/bin/aarch64-apple-darwin/intlify'
   )
 })
 

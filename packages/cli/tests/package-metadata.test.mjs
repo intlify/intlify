@@ -83,8 +83,8 @@ test('wrapper package metadata matches the public package contract', async () =>
   expect(pkg.keywords).toEqual(expect.arrayContaining(['intlify', 'messageformat', 'mf2', 'cli']))
 })
 
-test('cli-napi package metadata matches the native package source contract', async () => {
-  const pkg = await readJson('../../cli-napi/package.json')
+test('cli-native package metadata matches the native package source contract', async () => {
+  const pkg = await readJson('../../cli-native/package.json')
 
   expect(pkg).toMatchObject({
     name: NATIVE_PACKAGE_NAME,
@@ -98,7 +98,7 @@ test('cli-napi package metadata matches the native package source contract', asy
     repository: {
       type: 'git',
       url: repositoryUrl,
-      directory: 'packages/cli-napi'
+      directory: 'packages/cli-native'
     },
     files: ['bin', 'README.md', 'package.json'],
     publishConfig: {

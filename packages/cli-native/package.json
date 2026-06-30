@@ -1,5 +1,5 @@
 {
-  "name": "@intlify/cli-napi",
+  "name": "@intlify/cli-native",
   "version": "0.14.0",
   "description": "Native intlify CLI binary package source.",
   "keywords": [
@@ -16,7 +16,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/intlify/intlify.git",
-    "directory": "packages/cli-napi"
+    "directory": "packages/cli-native"
   },
   "files": [
     "bin",

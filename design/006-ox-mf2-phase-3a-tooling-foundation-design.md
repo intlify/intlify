@@ -54,7 +54,7 @@ The Rust CLI crate is defined as:
 
 The native binary copied into npm packages is `intlify` on Unix platforms and `intlify.exe` on Windows.
 
-`intlify_cli` is a workspace-internal Rust package used to build the native CLI binary for npm distribution. It is not a public crates.io package and does not support `cargo install intlify_cli` in Phase 3A. Public CLI distribution is handled by `@intlify/cli` and the `@intlify/cli-napi` native npm package source.
+`intlify_cli` is a workspace-internal Rust package used to build the native CLI binary for npm distribution. It is not a public crates.io package and does not support `cargo install intlify_cli` in Phase 3A. Public CLI distribution is handled by `@intlify/cli` and the `@intlify/cli-native` native npm package source.
 
 The binary entry point should stay thin. CLI core behavior, including command routing, config discovery, config loading, config validation, reporter selection, and output shaping, should live in library modules under `src/lib.rs`. This is required so Phase 3A can test config loader behavior directly without adding hidden public CLI commands.
 
@@ -72,7 +72,7 @@ Phase 3A introduces the CLI shell and distribution layer without moving parser b
 
 ![Phase 3A CLI foundation architecture](./assets/006-ox-mf2-phase-3a-cli-architecture.svg)
 
-The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and release-time installed-package smoke-test coverage. The `@intlify/cli-napi` package source owns the compiled native `intlify` binary artifacts prepared by release automation. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
+The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and release-time installed-package smoke-test coverage. The `@intlify/cli-native` package source owns the compiled native `intlify` binary artifacts prepared by release automation. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
 
 Formatter and linter crates remain product-specific extension points. Both future engines consume parser-owned parse artifacts instead of owning parsing themselves. Phase 3A only defines how their future config sections, results, and operational errors flow through the CLI foundation.
 
@@ -104,9 +104,9 @@ The default reporter is `text`. Machine-readable JSON output is selected with `-
 
 Value-taking long options accept both separated and equals forms. `--reporter json` and `--reporter=json` are equivalent. `--config path` and `--config=path` are equivalent. Phase 3A does not define `-r` or `-c`; the only short options are `-h` and `-V`. Clustered short options such as `-hV` are not supported and are treated as invalid or unknown options rather than as multiple short flags. The `--` end-of-options marker is not special in Phase 3A and is treated as invalid or unknown input; file operand handling should be reconsidered in formatter and linter product phases.
 
-`intlify --version` reports the public `@intlify/cli` package version as the version number only, for example `0.14.0`. The JSON envelope `version` field uses the same value. The wrapper package, `@intlify/cli-napi` native package source, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
+`intlify --version` reports the public `@intlify/cli` package version as the version number only, for example `0.14.0`. The JSON envelope `version` field uses the same value. The wrapper package, `@intlify/cli-native` native package source, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
 
-The first monorepo-managed `@intlify/cli` release is `0.14.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, `@intlify/cli-napi`, and the Rust CLI crate should all release as `0.14.0` for that release. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
+The first monorepo-managed `@intlify/cli` release is `0.14.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, `@intlify/cli-native`, and the Rust CLI crate should all release as `0.14.0` for that release. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
 
 Top-level help and version behavior:
 
@@ -359,21 +359,21 @@ Phase 3A should define package boundaries without forcing all packages to exist 
 Expected package groups:
 
 - CLI package: `@intlify/cli`, distributing the `intlify` command as a wrapper package.
-- CLI native package source: `@intlify/cli-napi`, the single package source used by release automation to build target-specific native `intlify` binary artifacts.
+- CLI native package source: `@intlify/cli-native`, the single package source used by release automation to build target-specific native `intlify` binary artifacts.
 - Formatter packages: future formatter-specific N-API and WASM APIs.
 - Linter packages: future linter-specific N-API and WASM APIs.
 
 Initial package directories:
 
 - `packages/cli`: `@intlify/cli`
-- `packages/cli-napi`: `@intlify/cli-napi`
+- `packages/cli-native`: `@intlify/cli-native`
 
-`@intlify/cli` should resolve `@intlify/cli-napi` and execute the binary prepared for the current platform. This keeps the public npm entry point stable while avoiding checked-in per-architecture package skeletons under `packages/`. The native package assembly and publish model should follow the same single-source package direction as the existing `@intlify/ox-mf2-napi` publishing flow, while packaging CLI binaries under target-specific directories inside one `@intlify/cli-napi` artifact.
+`@intlify/cli` should resolve `@intlify/cli-native` and execute the binary prepared for the current platform. This keeps the public npm entry point stable while avoiding checked-in per-architecture package skeletons under `packages/`. The native package assembly and publish model should follow the same single-source package direction as the existing `@intlify/ox-mf2-napi` publishing flow, while packaging CLI binaries under target-specific directories inside one `@intlify/cli-native` artifact.
 
 Wrapper execution contract:
 
 - Native binary file names are `intlify` on Unix platforms and `intlify.exe` on Windows.
-- The native binary is stored at `bin/<rust-target>/intlify` or `bin/<rust-target>/intlify.exe` inside `@intlify/cli-napi`.
+- The native binary is stored at `bin/<rust-target>/intlify` or `bin/<rust-target>/intlify.exe` inside `@intlify/cli-native`.
 - The wrapper passes `process.argv.slice(2)` through unchanged.
 - The wrapper forwards stdin, stdout, stderr, and `process.env` to the native process.
 - The wrapper exits with the native process exit code.
@@ -395,7 +395,7 @@ Unsupported platform, architecture, or libc combinations return `native_platform
 
 Initial CLI native package source:
 
-- `@intlify/cli-napi`
+- `@intlify/cli-native`
 
 Future native target candidates:
 
@@ -405,8 +405,8 @@ Future native target candidates:
 Wrapper-level native resolution error codes:
 
 - `native_platform_unsupported`: the current platform is not in the supported platform table
-- `native_package_not_found`: the platform is supported but `@intlify/cli-napi` cannot be resolved
-- `native_binary_not_found`: `@intlify/cli-napi` resolves but the expected binary path does not exist
+- `native_package_not_found`: the platform is supported but `@intlify/cli-native` cannot be resolved
+- `native_binary_not_found`: `@intlify/cli-native` resolves but the expected binary path does not exist
 - `native_binary_failed`: the native binary exists but cannot be spawned or executed
 
 These are operational errors and use exit code `2`. The wrapper should parse only the minimum command-line surface needed to detect `--reporter json` for native resolution failures. When `--reporter json` is detected and the wrapper can construct the standard JSON envelope safely, it should write the native resolution error to stdout in `errors`. Otherwise, it should print a minimal human-readable stderr fallback.
@@ -437,29 +437,29 @@ If the wrapper emits a JSON envelope before the Rust CLI starts, the envelope `v
 - `bin`: `{ "intlify": "./bin/intlify.mjs" }`
 - `exports`: expose only `./package.json` and `./schema/config.schema.json`
 - `files`: `["bin", "schema", "README.md", "package.json"]`
-- `dependencies`: `@intlify/cli-napi`, using `workspace:<version>` in source and rewritten by the package manager to the same exact version as `@intlify/cli` in published package metadata
+- `dependencies`: `@intlify/cli-native`, using `workspace:<version>` in source and rewritten by the package manager to the same exact version as `@intlify/cli` in published package metadata
 - `publishConfig`: `{ "access": "public" }`
 - `engines.node`: `>=22.12.0`
 
 `packages/cli/README.md` is the public CLI README. It should document the `intlify` command, the Phase 3A reserved-command status, config schema location, and installation expectations. Its primary config example should use `intlify.config.json`; JSONC can be shown as a secondary option.
 
-`packages/cli-napi/package.json` contract:
+`packages/cli-native/package.json` contract:
 
-- `name`: `@intlify/cli-napi`
+- `name`: `@intlify/cli-native`
 - `version`: same exact version as `@intlify/cli`
 - `description`: public package summary for the native `intlify` binary package source
 - `keywords`: include at least `intlify`, `messageformat`, `mf2`, and `cli`
 - `homepage`: `https://github.com/intlify/intlify#readme`
 - `bugs.url`: `https://github.com/intlify/intlify/issues`
 - `license`: `MIT`
-- `repository`: git repository metadata with `directory: "packages/cli-napi"`
+- `repository`: git repository metadata with `directory: "packages/cli-native"`
 - `files`: `["bin", "README.md", "package.json"]`
 - no `engines` field is required
 - no `bin` entry; the public command is exposed only by `@intlify/cli`
 - no JavaScript import API is exposed
 - `publishConfig`: `{ "access": "public" }`
 
-The `@intlify/cli-napi` README should stay minimal. It should state that the package is the native binary package source for `@intlify/cli`, that release automation prepares target-specific binaries under `bin/<rust-target>/`, and that users normally install or invoke `@intlify/cli` rather than this package directly.
+The `@intlify/cli-native` README should stay minimal. It should state that the package is the native binary package source for `@intlify/cli`, that release automation prepares target-specific binaries under `bin/<rust-target>/`, and that users normally install or invoke `@intlify/cli` rather than this package directly.
 
 Linux libc selection is represented by the wrapper platform table and release build target selection.
 
@@ -488,23 +488,23 @@ Build and package assembly pipeline:
 - Build the Rust CLI with `cargo build --release -p intlify_cli --bin intlify`.
 - Integrate CLI package publishing into the existing `.github/workflows/release.yml` release-tag workflow, alongside npm package publishing and crates.io publishing for public library crates such as `ox_mf2_parser`.
 - Run cross-target binary builds in the GitHub Actions release matrix.
-- Copy the built host binary into `packages/cli-napi/bin/<rust-target>/intlify` or `packages/cli-napi/bin/<rust-target>/intlify.exe`.
+- Copy the built host binary into `packages/cli-native/bin/<rust-target>/intlify` or `packages/cli-native/bin/<rust-target>/intlify.exe`.
 - Preserve or set executable permissions for Unix native package binaries with `chmod +x`.
 - Ensure `packages/cli/bin/intlify.mjs` has a `#!/usr/bin/env node` shebang and executable permissions.
 - Generate `config.schema.json` from Rust config types and write it to the committed `packages/cli/schema/config.schema.json` artifact.
-- Expose host CLI build assembly as `vp run cli#build`, covering the Rust CLI release build, copying the host binary into `packages/cli-napi/bin/<rust-target>` as `intlify` or `intlify.exe`, and applying Unix executable permissions where needed.
+- Expose host CLI build assembly as `vp run cli#build`, covering the Rust CLI release build, copying the host binary into `packages/cli-native/bin/<rust-target>` as `intlify` or `intlify.exe`, and applying Unix executable permissions where needed.
 - Expose schema generation as `vp run cli#schema`.
 - Expose schema verification as `vp run cli#schema:check`, comparing regenerated schema output with the committed schema artifact.
-- Expose package validation as `vp run cli#pack:check`, depending on `cli#build` so the task is safe to run directly, and covering wrapper and `@intlify/cli-napi` package contents, package metadata, included files, and executable permissions.
+- Expose package validation as `vp run cli#pack:check`, depending on `cli#build` so the task is safe to run directly, and covering wrapper and `@intlify/cli-native` package contents, package metadata, included files, and executable permissions.
 - Expose local CLI smoke validation as `vp run cli#smoke`, depending on `cli#build` so the task is safe to run directly, and covering `cli#build` artifacts with `intlify --version`, reserved-command placeholder behavior, schema presence, wrapper native resolution, and direct native binary execution for the host platform.
 - Expose root scripts as wrappers around those Vite Task commands: `build:cli`, `schema:cli`, `schema:cli:check`, `check:cli-pack`, and `test:cli-smoke`.
-- Validate version consistency across `packages/cli/package.json`, `packages/cli-napi/package.json`, `crates/intlify_cli/Cargo.toml`, and the monorepo release version.
+- Validate version consistency across `packages/cli/package.json`, `packages/cli-native/package.json`, `crates/intlify_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
-- Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix `@intlify/cli-napi` binaries during pack or release validation.
+- Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix `@intlify/cli-native` binaries during pack or release validation.
 - Validate that each published CLI package includes its expected `README.md`.
-- Publish `@intlify/cli-napi` before publishing the public `@intlify/cli` wrapper package, because the wrapper depends on it.
-- Use npm trusted publishing for normal CLI package releases through `.github/workflows/release.yml`. The public `@intlify/cli` package already exists on npm, so it can use trusted publishing once its trusted publisher settings are configured. The new `@intlify/cli-napi` package does not exist on npm before its first release, so its first publication may require a token-based bootstrap release. After it exists and trusted publisher settings are configured on npm, subsequent releases should use trusted publishing without an npm token fallback in the normal release path.
-- Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution through the `@intlify/cli` wrapper, direct execution of the `@intlify/cli-napi` binary with `--version`, and schema file presence. Wrapper install smoke should install `@intlify/cli@<version>` from the published registry and verify that the compatible `@intlify/cli-napi` package is resolved. Native direct smoke should install `@intlify/cli-napi@<version>` on a compatible host runner and execute that package's `intlify` or `intlify.exe` binary directly. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
+- Publish `@intlify/cli-native` before publishing the public `@intlify/cli` wrapper package, because the wrapper depends on it.
+- Use npm trusted publishing for normal CLI package releases through `.github/workflows/release.yml`. The public `@intlify/cli` package already exists on npm, so it can use trusted publishing once its trusted publisher settings are configured. The new `@intlify/cli-native` package does not exist on npm before its first release, so its first publication may require a token-based bootstrap release. After it exists and trusted publisher settings are configured on npm, subsequent releases should use trusted publishing without an npm token fallback in the normal release path.
+- Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution through the `@intlify/cli` wrapper, direct execution of the `@intlify/cli-native` binary with `--version`, and schema file presence. Wrapper install smoke should install `@intlify/cli@<version>` from the published registry and verify that the compatible `@intlify/cli-native` package is resolved. Native direct smoke should install `@intlify/cli-native@<version>` on a compatible host runner and execute that package's `intlify` or `intlify.exe` binary directly. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
 
 The release workflow should order publish, smoke, and release-note steps as:
 
@@ -540,9 +540,9 @@ The primary benchmark command is `--version`. It is intentionally chosen because
 
 Benchmark commands:
 
-- `cli_startup_native`: execute the host native package binary copied by `cli#build`, such as `packages/cli-napi/bin/aarch64-apple-darwin/intlify --version`, or `packages/cli-napi/bin/x86_64-pc-windows-msvc/intlify.exe --version` on Windows.
+- `cli_startup_native`: execute the host native package binary copied by `cli#build`, such as `packages/cli-native/bin/aarch64-apple-darwin/intlify --version`, or `packages/cli-native/bin/x86_64-pc-windows-msvc/intlify.exe --version` on Windows.
 - `cli_startup_wrapper`: execute `node packages/cli/bin/intlify.mjs --version` after `cli#build`, using the source-tree wrapper and host native package.
-- `cli_startup_installed`: create a temporary install fixture, install the locally packed or published `@intlify/cli` package plus the compatible `@intlify/cli-napi` package, and execute `node_modules/.bin/intlify --version`.
+- `cli_startup_installed`: create a temporary install fixture, install the locally packed or published `@intlify/cli` package plus the compatible `@intlify/cli-native` package, and execute `node_modules/.bin/intlify --version`.
 
 The startup benchmark entry point should be exposed separately from validation tasks, for example as `vp run cli#bench:startup` and a root script such as `bench:cli-startup`. It may depend on `cli#build` and package assembly, but it must not be part of `vpr check`, `vpr test`, normal CI success gates, or release publish gates.
 
