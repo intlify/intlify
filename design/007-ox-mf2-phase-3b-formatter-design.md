@@ -161,6 +161,126 @@ function formatSnapshot(
 
 `formatSnapshot` follows the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, it returns `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. A mismatch returns `ok: false` with an operational error.
 
+## Operational Error Codes
+
+Formatter operational errors use the shared Phase 3A error code namespace. Formatter APIs, CLI JSON output, N-API, and WASM should use the same code strings.
+
+Parser diagnostics are not represented as operational errors. If parsing produces diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and `errors` empty unless an independent operational error also occurred.
+
+Formatter-specific codes:
+
+| Code | Exit | When |
+| --- | --- | --- |
+| `source_snapshot_mismatch` | `2` | `formatSnapshot` receives source text that does not match the snapshot where consistency can be verified. |
+| `unsupported_input_file` | `2` | CLI explicit file input or `--stdin-filepath` uses an unsupported extension or unsupported direct file form. |
+| `invalid_ignore_pattern` | `2` | `fmt.ignorePatterns` or `--ignore-path` contains a pattern outside the formatter gitignore-compatible subset. |
+| `ignore_file_read_failed` | `2` | A `--ignore-path` file cannot be read. |
+| `unmatched_input` | `2` | A CLI input path or glob resolves to no target. |
+| `invalid_options` | `2` | Rust, N-API, or WASM formatter APIs receive invalid options. |
+| `invalid_snapshot` | `2` | Snapshot input is corrupt, unsupported, or missing required formatter capabilities, excluding source/snapshot mismatch. |
+| `input_read_failed` | `2` | An input file or discovered directory entry cannot be read. |
+| `output_write_failed` | `2` | Write mode cannot write formatted output. |
+| `internal_error` | `2` | The formatter hits an implementation invariant or unexpected internal failure. |
+
+Formatter also reuses Phase 3A common codes:
+
+| Code | Exit | When |
+| --- | --- | --- |
+| `invalid_cli_argument` | `2` | Invalid CLI values or combinations, such as `--mode compact` or `--list-different --reporter json`. |
+| `config_read_failed` | `2` | The shared tooling config file cannot be read. |
+| `config_parse_failed` | `2` | The shared tooling config file is not valid JSON or JSONC. |
+| `config_validation_failed` | `2` | The shared tooling config fails schema validation, including invalid `fmt.mode` or invalid `fmt.ignorePatterns` entries. |
+
+Standardized `details` fields:
+
+- `source_snapshot_mismatch`: implementation-defined. The code is stable; the exact details schema is not fixed in Phase 3B.
+- `unsupported_input_file`:
+
+  ```json
+  {
+    "extension": ".json",
+    "supportedExtensions": [".mf2"]
+  }
+  ```
+
+  `path` is carried by the top-level error. Files without an extension use `""`.
+
+- `invalid_ignore_pattern`:
+
+  ```json
+  {
+    "pattern": "[",
+    "source": "fmt.ignorePatterns",
+    "index": 0,
+    "reason": "unterminated_character_class"
+  }
+  ```
+
+  For `--ignore-path`, `source` is `"ignore-path"` and the top-level `path` is the ignore file path.
+
+- `ignore_file_read_failed`:
+
+  ```json
+  {
+    "reason": "not_found"
+  }
+  ```
+
+  The top-level `path` is the ignore file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, and `unknown`.
+
+- `unmatched_input`:
+
+  ```json
+  {
+    "input": "missing/**/*.mf2",
+    "kind": "glob"
+  }
+  ```
+
+  `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file.
+
+- `invalid_options`:
+
+  ```json
+  {
+    "pointer": "/mode",
+    "value": "compact",
+    "allowedValues": ["standard", "preserve"]
+  }
+  ```
+
+- `invalid_snapshot`:
+
+  ```json
+  {
+    "reason": "unsupported_version",
+    "version": 3,
+    "supportedVersions": [1, 2]
+  }
+  ```
+
+  Initial reason values are `corrupt`, `unsupported_version`, `missing_capability`, and `unknown`.
+
+- `input_read_failed` and `output_write_failed`:
+
+  ```json
+  {
+    "reason": "permission_denied"
+  }
+  ```
+
+  The top-level `path` is the input or output file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, and `unknown`.
+
+- `internal_error`:
+
+  ```json
+  {
+    "reason": "layout_invariant_violation"
+  }
+  ```
+
+  The `reason` value is an implementation-defined string.
+
 ## CLI Workflow
 
 The CLI command is `intlify fmt`.
@@ -596,7 +716,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact operational error codes for formatter-specific failures, such as source/snapshot mismatch and unsupported explicit input files
 - exact JSON reporter `summary` fields for write, check, list-different-equivalent failures, stdin, and no selected files
 - exact text reporter wording beyond stdout/stderr and path-list behavior
 - exact internal layout IR/document representation
