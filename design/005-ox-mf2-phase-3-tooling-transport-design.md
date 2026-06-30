@@ -29,11 +29,11 @@ Implementation should be split by consumer-facing product surface:
    - package and distribution boundaries for CLI, N-API, and WASM tooling
 
 2. **Phase 3B: Formatter Product**
-   - `crates/ox_mf2_format`
+   - workspace-internal `crates/intlify_format`
    - `intlify fmt`
    - `fmt --check` and formatter check result contract
    - standard and preserve formatting modes
-   - formatter-specific N-API and WASM packages
+   - `@intlify/format-napi` and `@intlify/format-wasm`
 
 3. **Phase 3C: Linter Product**
    - `crates/ox_mf2_lint`
@@ -112,19 +112,19 @@ SemanticView should remain derived from the Rust core semantic model. In the ini
 
 ### Product Surface
 
-Phase 3 should provide a dedicated formatter engine and reusable formatter entry points for Rust, N-API, and WASM consumers. The CLI is the primary user-facing workflow, while N-API and WASM bindings allow the same formatter engine to power playgrounds, editor integrations, workers, and Node-based tools.
+Phase 3 should provide a dedicated formatter engine and reusable formatter entry points for workspace Rust, N-API, and WASM consumers. The CLI is the primary user-facing workflow, while N-API and WASM bindings allow the same formatter engine to power playgrounds, editor integrations, workers, and Node-based tools.
 
 ### Crate Ownership
 
-The Rust formatter engine should live in a separate `crates/ox_mf2_format` crate that depends on `ox_mf2_parser`. The parser crate remains responsible for CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The formatter crate owns formatting modes, formatter configuration, layout construction, rendering, formatter result shaping, and formatter-specific suppression behavior.
+The Rust formatter engine should live in a separate workspace-internal `crates/intlify_format` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3B; public formatter distribution happens through the `intlify fmt` CLI and formatter N-API/WASM packages. The parser crate remains responsible for CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The formatter crate owns formatting modes, formatter configuration, layout construction, rendering, and formatter result shaping.
 
 ### CLI and Package Distribution
 
 The CLI binary should live in `crates/ox_mf2_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
-N-API and WASM formatter bindings should be published as formatter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while formatter packages expose formatter-specific APIs backed by `crates/ox_mf2_format`.
+N-API and WASM formatter bindings should be published as formatter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while `@intlify/format-napi` and `@intlify/format-wasm` expose formatter-specific APIs backed by `crates/intlify_format`.
 
-The npm distribution surface should separate the CLI package from formatter API packages. A CLI package owns native binary distribution for command-line use, a formatter N-API package exposes Node APIs, and a formatter WASM package supports browser, worker, and playground use cases. Exact package names are formatter-specific design details.
+The npm distribution surface should separate the CLI package from formatter API packages. `@intlify/cli` owns native binary distribution for command-line use, `@intlify/format-napi` exposes Node APIs, and `@intlify/format-wasm` supports browser, worker, and playground use cases.
 
 The Phase 3 formatter deliverables are the Rust formatter engine, CLI command, N-API formatter package, WASM formatter package, JSON configuration contract, generated JSON Schema, and formatter result contract. LSP/editor integration, playground usage, and resource/catalog formatting are consumers or layered workflows rather than separate direct products in this phase.
 
@@ -193,7 +193,7 @@ Formatter results are distinct from linter diagnostic results, but parser diagno
 
 ### Formatter Ignore Directives
 
-Formatter ignore directives are in scope for the initial formatter. A formatter directive such as an `ox-mf2-ignore`-style comment should suppress formatting for a syntax unit and cause that unit's source slice to be emitted verbatim. Exact directive syntax, target range rules, and comment/trivia interactions belong to the formatter-specific design.
+Formatter ignore directives are not in scope for the initial formatter. MF2 does not define line or block comments, and `#` is a markup sigil, so a comment-like formatter directive would be a syntax extension. Initial formatter ignoring is file-level only, through formatter config, root `.gitignore`, and explicit ignore paths. A future syntax-unit suppression mechanism must be spec-compatible and belongs to the formatter-specific design.
 
 ### Formatter and Linter Boundary
 
@@ -206,7 +206,7 @@ Formatter detail notes to resolve in the dedicated formatter design:
 - exact Rust, N-API, and WASM result types
 - formatter options and defaults
 - formatter config section schema shape
-- formatter ignore directive syntax and target range rules
+- future spec-compatible formatter suppression mechanism
 - line wrapping rules
 - matcher layout rules
 - formatter fixture and idempotency requirements
