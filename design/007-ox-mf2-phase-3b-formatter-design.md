@@ -375,7 +375,39 @@ Parser diagnostics never cause write mode to modify the affected file.
 
 ### Human and JSON Output
 
-Human-readable write mode prints only files that changed. Human-readable `--check` prints files that differ and files with parser diagnostics. `--list-different` prints path-only output for files that differ or have parser diagnostics.
+Human-readable output keeps stdout machine-friendly and sends problems to stderr.
+
+All human path-only stdout entries use project-root-relative slash-normalized paths in stable slash-normalized path order. On Windows, stdout paths still use `/`.
+
+Write mode:
+
+- changed files are printed to stdout, one path per line
+- already formatted files produce no stdout
+- parser diagnostics and operational errors are rendered to stderr
+- files with parser diagnostics are not modified
+- if valid targets are changed before or alongside diagnostics/errors, those changed paths are still printed to stdout
+
+Check mode:
+
+- files that would be formatted are printed to stdout, one path per line
+- already formatted files produce no stdout
+- parser diagnostics and operational errors are rendered to stderr
+- files with parser diagnostics are not included in stdout because stdout means "would-format targets"
+
+`--list-different` is allowed together with `--check` and uses the same path-only human output. In Phase 3B, it is a path-only output guarantee rather than a separate result model.
+
+Stdin human output:
+
+- normal stdin formatting writes formatted code to stdout, writes nothing to stderr on success, and exits with `0`
+- stdin `--check` with a difference prints `--stdin-filepath` when provided, otherwise `"<stdin>"`, writes nothing to stderr, and exits with `1`
+- stdin `--check` without a difference writes nothing to stdout or stderr and exits with `0`
+- stdin parser diagnostics write no formatted code to stdout, render diagnostics to stderr, and exit with `1`
+
+When the final selected target set is empty, human output writes nothing to stdout or stderr and exits with `0`.
+
+For invalid or mixed input, valid selected `.mf2` targets are processed where possible. Write mode prints changed valid targets to stdout, check/list-different prints would-format valid targets to stdout, and operational errors are rendered to stderr. The final exit code still follows `2 > 1 > 0`.
+
+Formatter-specific human stderr wording is not fixed in this document. Parser diagnostics and operational errors use the Phase 3A diagnostic/error renderer contract.
 
 JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON output has this top-level shape:
 
@@ -792,7 +824,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact text reporter wording beyond stdout/stderr and path-list behavior
 - exact internal layout IR/document representation
 - exact SnapshotView accessors or binary format extensions needed by the formatter implementation
 - exact fixture harness runner format for `options.json` matrices and diagnostics snapshots
