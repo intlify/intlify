@@ -1,0 +1,35 @@
+{
+  "name": "@intlify/cli-darwin-arm64",
+  "version": "0.14.0",
+  "description": "Target-specific native intlify CLI binary for macOS arm64.",
+  "keywords": [
+    "cli",
+    "intlify",
+    "messageformat",
+    "mf2"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/cli-darwin-arm64"
+  },
+  "files": [
+    "intlify",
+    "README.md",
+    "package.json"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

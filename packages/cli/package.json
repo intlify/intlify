@@ -1,0 +1,56 @@
+{
+  "name": "@intlify/cli",
+  "version": "0.14.0",
+  "description": "Command line interface for Intlify MessageFormat 2 tooling.",
+  "keywords": [
+    "cli",
+    "intlify",
+    "messageformat",
+    "mf2"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "intlify": "./bin/intlify.mjs"
+  },
+  "files": [
+    "bin",
+    "schema",
+    "README.md",
+    "package.json"
+  ],
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./schema/config.schema.json": "./schema/config.schema.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vp test"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "optionalDependencies": {
+    "@intlify/cli-darwin-arm64": "0.14.0",
+    "@intlify/cli-darwin-x64": "0.14.0",
+    "@intlify/cli-linux-arm64-gnu": "0.14.0",
+    "@intlify/cli-linux-x64-gnu": "0.14.0",
+    "@intlify/cli-linux-x64-musl": "0.14.0",
+    "@intlify/cli-win32-x64-msvc": "0.14.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

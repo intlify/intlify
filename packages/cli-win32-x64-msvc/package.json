@@ -1,0 +1,35 @@
+{
+  "name": "@intlify/cli-win32-x64-msvc",
+  "version": "0.14.0",
+  "description": "Target-specific native intlify CLI binary for Windows x64 MSVC.",
+  "keywords": [
+    "cli",
+    "intlify",
+    "messageformat",
+    "mf2"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/cli-win32-x64-msvc"
+  },
+  "files": [
+    "intlify.exe",
+    "README.md",
+    "package.json"
+  ],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
