@@ -5,6 +5,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { constants as osConstants } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -19,6 +20,9 @@ const PACKAGE_VERSION = JSON.parse(
 ).version
 const OUTPUT_SCHEMA_VERSION = '0'
 const SIGNAL_EXIT_CODES = {
+  ...Object.fromEntries(
+    Object.entries(osConstants.signals).map(([signal, value]) => [signal, 128 + value])
+  ),
   SIGHUP: 129,
   SIGINT: 130,
   SIGTERM: 143

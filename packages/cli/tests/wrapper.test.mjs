@@ -16,10 +16,10 @@ import {
   usesJsonReporter
 } from '../bin/intlify.mjs'
 
-test('wrapper resolves a supported host native package', () => {
-  const platform = process.platform
-  const arch = process.arch
-  const libc = platform === 'linux' ? 'glibc' : undefined
+test('wrapper resolves a supported native package', () => {
+  const platform = 'darwin'
+  const arch = 'arm64'
+  const libc = undefined
   const target = resolveNativeTarget({ platform, arch, libc })
 
   expect(target).toBeTruthy()
@@ -80,6 +80,30 @@ test('wrapper forwards args env stdio and native exit code', () => {
     )
   ).toBe(true)
   expect(exitCode).toBe(7)
+})
+
+test('wrapper maps native signal exits to shell-compatible status codes', () => {
+  const child = new EventEmitter()
+  child.kill = () => true
+  let exitCode
+
+  runWrapper({
+    platform: 'darwin',
+    arch: 'arm64',
+    resolvePackageJson: packageName => fixturePackageJsonPath(packageName),
+    existsSync: path => path.endsWith('intlify'),
+    spawn() {
+      return child
+    },
+    exit(code) {
+      exitCode = code
+    },
+    forwardSignals: false
+  })
+
+  child.emit('exit', null, 'SIGKILL')
+
+  expect(exitCode).toBe(137)
 })
 
 test('wrapper reports unsupported platform as JSON envelope when requested', () => {
