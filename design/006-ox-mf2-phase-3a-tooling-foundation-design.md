@@ -34,7 +34,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 
 Phase 3A deliverables:
 
-- `crates/ox_mf2_cli` crate skeleton
+- `crates/intlify_cli` crate skeleton
 - `intlify` CLI command structure
 - native `intlify` CLI npm package boundary
 - unified project config model
@@ -45,8 +45,8 @@ Phase 3A deliverables:
 
 The Rust CLI crate is defined as:
 
-- crate directory: `crates/ox_mf2_cli`
-- Cargo package name: `ox_mf2_cli`
+- crate directory: `crates/intlify_cli`
+- Cargo package name: `intlify_cli`
 - crates.io publishing: disabled with `publish = false`
 - binary target name: `intlify`
 - binary entry point: `src/main.rs`
@@ -54,7 +54,7 @@ The Rust CLI crate is defined as:
 
 The native binary copied into npm packages is `intlify` on Unix platforms and `intlify.exe` on Windows.
 
-`ox_mf2_cli` is a workspace-internal Rust package used to build the native CLI binary for npm distribution. It is not a public crates.io package and does not support `cargo install ox_mf2_cli` in Phase 3A. Public CLI distribution is handled by `@intlify/cli` and the platform-specific `@intlify/cli-<target>` native npm packages.
+`intlify_cli` is a workspace-internal Rust package used to build the native CLI binary for npm distribution. It is not a public crates.io package and does not support `cargo install intlify_cli` in Phase 3A. Public CLI distribution is handled by `@intlify/cli` and the platform-specific `@intlify/cli-<target>` native npm packages.
 
 The binary entry point should stay thin. CLI core behavior, including command routing, config discovery, config loading, config validation, reporter selection, and output shaping, should live in library modules under `src/lib.rs`. This is required so Phase 3A can test config loader behavior directly without adding hidden public CLI commands.
 
@@ -496,7 +496,7 @@ Future native target mapping:
 
 Build and package assembly pipeline:
 
-- Build the Rust CLI with `cargo build --release -p ox_mf2_cli --bin intlify`.
+- Build the Rust CLI with `cargo build --release -p intlify_cli --bin intlify`.
 - Integrate CLI package publishing into the existing `.github/workflows/release.yml` release-tag workflow, alongside npm package publishing and crates.io publishing for public library crates such as `ox_mf2_parser`.
 - Run cross-target binary builds in the GitHub Actions release matrix.
 - Copy the built binary into the matching native package root as `intlify` or `intlify.exe`.
@@ -509,7 +509,7 @@ Build and package assembly pipeline:
 - Expose package validation as `vp run cli#pack:check`, depending on `cli#build` so the task is safe to run directly, and covering wrapper/native package contents, package metadata, included files, and executable permissions.
 - Expose local CLI smoke validation as `vp run cli#smoke`, depending on `cli#build` so the task is safe to run directly, and covering `cli#build` artifacts with `intlify --version`, reserved-command placeholder behavior, schema presence, wrapper native resolution, and direct native binary execution for the host platform.
 - Expose root scripts as wrappers around those Vite Task commands: `build:cli`, `schema:cli`, `schema:cli:check`, `check:cli-pack`, and `test:cli-smoke`.
-- Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/ox_mf2_cli/Cargo.toml`, and the monorepo release version.
+- Validate version consistency across `packages/cli/package.json`, every `packages/cli-<target>/package.json`, `crates/intlify_cli/Cargo.toml`, and the monorepo release version.
 - Validate package contents with `npm pack --dry-run` or the equivalent release-pack step.
 - Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix native package binaries during pack or release validation.
 - Validate that each published CLI package includes its expected `README.md`.
@@ -521,7 +521,7 @@ The release workflow should order publish, smoke, and release-note steps as:
 
 1. Validate the release tag and version consistency.
 2. Build ox-mf2 npm packages, ox-mf2 native packages, and CLI native binaries.
-3. Publish crates.io artifacts for public library crates such as `ox_mf2_parser`; `ox_mf2_cli` remains `publish = false`.
+3. Publish crates.io artifacts for public library crates such as `ox_mf2_parser`; `intlify_cli` remains `publish = false`.
 4. Publish CLI native packages.
 5. Publish the public `@intlify/cli` wrapper package.
 6. Run published artifact smoke tests for ox-mf2 npm packages, crates.io public library artifacts, and CLI wrapper/native packages.

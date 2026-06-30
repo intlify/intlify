@@ -251,7 +251,7 @@ Future candidates:
 ox_mf2_linter
 ox_mf2_formatter
 ox_mf2_codegen
-ox_mf2_cli
+intlify_cli
 ox_mf2_napi
 ox_mf2_wasm
 ```
