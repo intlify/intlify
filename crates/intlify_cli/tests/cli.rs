@@ -1,18 +1,37 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
 const CLI_VERSION: &str = intlify_cli::version::VERSION;
 
 fn run(args: &[&str]) -> intlify_cli::CliRunResult {
-    intlify_cli::run(args.iter().copied(), Path::new("."))
+    run_in(args, Path::new("."))
+}
+
+fn run_in(args: &[&str], cwd: &Path) -> intlify_cli::CliRunResult {
+    intlify_cli::run(args.iter().copied(), cwd)
 }
 
 fn json_stdout(result: &intlify_cli::CliRunResult) -> Value {
     serde_json::from_str(result.stdout.trim_end()).expect("stdout should be JSON")
+}
+
+fn temp_project_root(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock should be after unix epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "intlify-cli-{name}-{}-{unique}",
+        std::process::id()
+    ));
+    fs::create_dir_all(root.join(".git")).expect("temp project git marker should be created");
+    root
 }
 
 #[test]
@@ -20,6 +39,7 @@ fn manifest_declares_cli_crate_contract() {
     let manifest = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
 
     assert!(manifest.contains("name = \"intlify_cli\""));
+    assert!(manifest.contains("version = \"0.14.0\""));
     assert!(manifest.contains("publish = false"));
     assert!(manifest.contains("[[bin]]"));
     assert!(manifest.contains("name = \"intlify\""));
@@ -111,6 +131,15 @@ fn reserved_command_text_reporter_writes_stderr() {
 }
 
 #[test]
+fn explicit_text_reporter_writes_operational_errors_to_stderr() {
+    let result = run(&["fmt", "--reporter=text"]);
+
+    assert_eq!(result.exit_code, 2);
+    assert!(result.stdout.is_empty());
+    assert!(result.stderr.contains("reserved"));
+}
+
+#[test]
 fn reserved_command_help_prints_placeholder_help() {
     for command in ["fmt", "lint", "check", "init"] {
         let result = run(&[command, "--help"]);
@@ -122,6 +151,15 @@ fn reserved_command_help_prints_placeholder_help() {
         assert!(result.stdout.contains("reserved but not available"));
         assert!(result.stderr.is_empty());
     }
+}
+
+#[test]
+fn init_help_mentions_future_config_scaffolding() {
+    let result = run(&["init", "--help"]);
+
+    assert_eq!(result.exit_code, 0);
+    assert!(result.stdout.contains("future config scaffolding"));
+    assert!(result.stderr.is_empty());
 }
 
 #[test]
@@ -166,6 +204,52 @@ fn reserved_command_accepts_global_options_before_and_after_command() {
 }
 
 #[test]
+fn reporter_json_is_equivalent_before_or_after_reserved_command() {
+    let before = json_stdout(&run(&["--reporter", "json", "fmt"]));
+    let after = json_stdout(&run(&["fmt", "--reporter=json"]));
+
+    assert_eq!(before["command"], "fmt");
+    assert_eq!(after["command"], "fmt");
+    assert_eq!(before["errors"][0]["code"], "command_not_ready");
+    assert_eq!(after["errors"][0]["code"], "command_not_ready");
+}
+
+#[test]
+fn reserved_command_help_skips_config_loading() {
+    let result = run(&["fmt", "--help", "--config", "missing.json"]);
+
+    assert_eq!(result.exit_code, 0);
+    assert!(result.stdout.starts_with("Usage: intlify fmt"));
+    assert!(result.stderr.is_empty());
+}
+
+#[test]
+fn reserved_command_does_not_load_missing_explicit_config() {
+    let result = run(&["fmt", "--config", "missing.json", "--reporter=json"]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["errors"][0]["code"], "command_not_ready");
+    assert!(json["errors"][0].get("path").is_none());
+}
+
+#[test]
+fn reserved_command_does_not_check_discovered_config_conflicts() {
+    let root = temp_project_root("config-conflict");
+    fs::write(root.join("intlify.config.json"), "{}").expect("json config should be written");
+    fs::write(root.join("intlify.config.jsonc"), "{}").expect("jsonc config should be written");
+
+    let result = run_in(&["fmt", "--reporter=json"], &root);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["errors"][0]["code"], "command_not_ready");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn input_errors_use_json_when_reporter_json_is_present() {
     let result = run(&["--unknown", "--reporter", "json"]);
     let json = json_stdout(&result);
@@ -179,6 +263,15 @@ fn input_errors_use_json_when_reporter_json_is_present() {
 }
 
 #[test]
+fn input_errors_use_stderr_with_text_reporter() {
+    let result = run(&["--unknown"]);
+
+    assert_eq!(result.exit_code, 2);
+    assert!(result.stdout.is_empty());
+    assert!(result.stderr.contains("Unknown CLI option"));
+}
+
+#[test]
 fn unsupported_short_option_is_an_input_error() {
     let result = run(&["-x", "--reporter=json"]);
     let json = json_stdout(&result);
@@ -186,6 +279,19 @@ fn unsupported_short_option_is_an_input_error() {
     assert_eq!(result.exit_code, 2);
     assert_eq!(json["errors"][0]["code"], "unknown_cli_option");
     assert_eq!(json["errors"][0]["details"]["option"], "-x");
+}
+
+#[test]
+fn cwd_root_and_short_aliases_are_not_supported() {
+    for option in ["--cwd", "--root", "-c", "-r"] {
+        let result = run(&[option, "--reporter=json"]);
+        let json = json_stdout(&result);
+
+        assert_eq!(result.exit_code, 2);
+        assert_eq!(json["errors"][0]["kind"], "input");
+        assert_eq!(json["errors"][0]["code"], "unknown_cli_option");
+        assert_eq!(json["errors"][0]["details"]["option"], option);
+    }
 }
 
 #[test]
@@ -197,6 +303,17 @@ fn end_of_options_marker_is_not_special_cased() {
     assert_eq!(json["errors"][0]["kind"], "input");
     assert_eq!(json["errors"][0]["code"], "unknown_cli_option");
     assert_eq!(json["errors"][0]["details"]["option"], "--");
+}
+
+#[test]
+fn duplicate_reporter_is_an_input_error() {
+    let result = run(&["--reporter", "json", "--reporter=json"]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["errors"][0]["kind"], "input");
+    assert_eq!(json["errors"][0]["code"], "duplicate_cli_option");
+    assert_eq!(json["errors"][0]["details"]["option"], "--reporter");
 }
 
 #[test]
@@ -267,6 +384,17 @@ fn unknown_command_is_reported_in_details() {
     assert_eq!(json["errors"][0]["kind"], "unsupported");
     assert_eq!(json["errors"][0]["code"], "unknown_command");
     assert_eq!(json["errors"][0]["details"]["command"], "foo");
+}
+
+#[test]
+fn unknown_positional_uses_first_token_as_command() {
+    let result = run(&["file.mf2", "extra", "--reporter=json"]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["command"], "intlify");
+    assert_eq!(json["errors"][0]["code"], "unknown_command");
+    assert_eq!(json["errors"][0]["details"]["command"], "file.mf2");
 }
 
 #[test]
