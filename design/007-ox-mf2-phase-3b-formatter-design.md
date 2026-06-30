@@ -206,15 +206,40 @@ File symlinks are followed. Directory symlinks are not followed.
 
 Phase 3B supports file-level ignore through:
 
-- `fmt.ignorePatterns`
 - root `.gitignore`
 - one or more `--ignore-path <path>` files
+- `fmt.ignorePatterns`
 
-Ignore sources are additive. If any source matches a file, the file is excluded. Ignore always wins, even for explicit file input.
+Ignore sources are evaluated as one ordered pattern list, not as independent additive filters. The source order is:
+
+1. root `.gitignore`
+2. `--ignore-path <path>` files in CLI argument order
+3. `fmt.ignorePatterns`
+
+Later patterns override earlier patterns. This means negated patterns can re-include files ignored by earlier patterns, and `fmt.ignorePatterns` is the final project-level formatter override.
+
+The ignore grammar is a gitignore-compatible subset:
+
+- `!pattern` negation is supported
+- project-root-relative slash-normalized paths are used for matching
+- `/pattern` is anchored to the project root
+- unanchored patterns match at any depth
+- `pattern/` is directory-only
+- `**` globstar is supported
+- escaped leading `\!` and `\#` are supported
+- blank lines and unescaped leading `#` comments are ignored
+
+The same blank-line and unescaped leading `#` behavior applies to `fmt.ignorePatterns` entries.
+
+Ignore rules apply to all target files, including explicit file input. For example, `intlify fmt ignored/file.mf2` skips the file when the ordered ignore list resolves that path as ignored. If all requested inputs are ignored and the final selected target set is empty, the command exits with `0`.
 
 The initial `.gitignore` behavior reads only the project root `.gitignore`, matching the root-only config discovery model. Nested `.gitignore` files are deferred.
 
-All ignore patterns are evaluated relative to the project root, including patterns loaded from `--ignore-path`. Missing `--ignore-path` files are operational errors and exit with `2`.
+All ignore patterns are evaluated relative to the project root, including patterns loaded from `--ignore-path`.
+
+Invalid `fmt.ignorePatterns` entries are config validation errors and exit with `2` using `config_validation_failed`. Invalid patterns in `--ignore-path` files are operational errors and exit with `2`. Unsupported or unrecognized patterns in root `.gitignore` are ignored as non-fatal compatibility behavior.
+
+Missing `--ignore-path` files are operational errors and exit with `2`.
 
 ### Exit Codes
 
@@ -277,6 +302,8 @@ Configuration precedence for formatting mode is:
 Formatter-specific schema definitions live under the unified config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
 
 Config validation errors use the Phase 3A `config_validation_failed` operational error, with JSON pointers such as `/fmt/mode` or `/fmt/ignorePatterns`. Invalid CLI values such as `--mode compact` use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
+
+`fmt.ignorePatterns` uses the same gitignore-compatible subset described in [Ignore Sources](#ignore-sources). Invalid entries are rejected during config validation.
 
 ## Options
 
@@ -569,7 +596,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact ignore pattern grammar, including negation support and path separator normalization
 - exact operational error codes for formatter-specific failures, such as source/snapshot mismatch and unsupported explicit input files
 - exact JSON reporter `summary` fields for write, check, list-different-equivalent failures, stdin, and no selected files
 - exact text reporter wording beyond stdout/stderr and path-list behavior
