@@ -10,7 +10,7 @@ Phase 3A reserves `fmt`, `lint`, `check`, and `init` so integrations can target 
 npm install --save-dev @intlify/cli
 ```
 
-The package resolves a target-specific optional native package for the current platform and forwards all command line behavior to the native Rust CLI binary.
+The package resolves the `@intlify/cli-napi` native package for the current platform and forwards all command line behavior to the native Rust CLI binary.
 
 ## Config Schema
 

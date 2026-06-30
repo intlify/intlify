@@ -11,6 +11,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const require = createRequire(import.meta.url)
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 const workspacePackagesRoot = dirname(packageRoot)
+export const NATIVE_PACKAGE_NAME = '@intlify/cli-napi'
+export const NATIVE_PACKAGE_DIRECTORY = 'cli-napi'
+export const NATIVE_PACKAGE_BINARY_DIRECTORY = 'bin'
 const PACKAGE_VERSION = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 ).version
@@ -25,46 +28,40 @@ export const NATIVE_TARGETS = [
   {
     platform: 'darwin',
     arch: 'x64',
-    packageName: '@intlify/cli-darwin-x64',
-    packageDirectory: 'cli-darwin-x64',
+    rustTarget: 'x86_64-apple-darwin',
     binaryName: 'intlify'
   },
   {
     platform: 'darwin',
     arch: 'arm64',
-    packageName: '@intlify/cli-darwin-arm64',
-    packageDirectory: 'cli-darwin-arm64',
+    rustTarget: 'aarch64-apple-darwin',
     binaryName: 'intlify'
   },
   {
     platform: 'linux',
     arch: 'x64',
     libc: 'glibc',
-    packageName: '@intlify/cli-linux-x64-gnu',
-    packageDirectory: 'cli-linux-x64-gnu',
+    rustTarget: 'x86_64-unknown-linux-gnu',
     binaryName: 'intlify'
   },
   {
     platform: 'linux',
     arch: 'arm64',
     libc: 'glibc',
-    packageName: '@intlify/cli-linux-arm64-gnu',
-    packageDirectory: 'cli-linux-arm64-gnu',
+    rustTarget: 'aarch64-unknown-linux-gnu',
     binaryName: 'intlify'
   },
   {
     platform: 'linux',
     arch: 'x64',
     libc: 'musl',
-    packageName: '@intlify/cli-linux-x64-musl',
-    packageDirectory: 'cli-linux-x64-musl',
+    rustTarget: 'x86_64-unknown-linux-musl',
     binaryName: 'intlify'
   },
   {
     platform: 'win32',
     arch: 'x64',
-    packageName: '@intlify/cli-win32-x64-msvc',
-    packageDirectory: 'cli-win32-x64-msvc',
+    rustTarget: 'x86_64-pc-windows-msvc',
     binaryName: 'intlify.exe'
   }
 ]
@@ -164,25 +161,30 @@ export function resolveNativeBinary(options = {}) {
   const exists = options.existsSync ?? existsSync
   try {
     packageJsonPath = options.resolvePackageJson
-      ? options.resolvePackageJson(target.packageName)
-      : resolvePackageJson(target, exists)
+      ? options.resolvePackageJson(NATIVE_PACKAGE_NAME)
+      : resolvePackageJson(exists)
   } catch {
     return {
       ok: false,
       error: wrapperError({
         code: 'native_package_not_found',
-        message: `Native package ${target.packageName} could not be resolved.`,
+        message: `Native package ${NATIVE_PACKAGE_NAME} could not be resolved.`,
         details: platformDetails({
           platform,
           arch,
           libc,
-          packageName: target.packageName
+          packageName: NATIVE_PACKAGE_NAME
         })
       })
     }
   }
 
-  const binaryPath = join(dirname(packageJsonPath), target.binaryName)
+  const binaryPath = join(
+    dirname(packageJsonPath),
+    NATIVE_PACKAGE_BINARY_DIRECTORY,
+    target.rustTarget,
+    target.binaryName
+  )
   if (!exists(binaryPath)) {
     return {
       ok: false,
@@ -193,7 +195,7 @@ export function resolveNativeBinary(options = {}) {
           platform,
           arch,
           libc,
-          packageName: target.packageName,
+          packageName: NATIVE_PACKAGE_NAME,
           binaryPath
         })
       })
@@ -207,17 +209,17 @@ export function resolveNativeBinary(options = {}) {
   }
 }
 
-function resolvePackageJson(target, exists) {
+function resolvePackageJson(exists) {
   try {
-    return require.resolve(`${target.packageName}/package.json`)
+    return require.resolve(`${NATIVE_PACKAGE_NAME}/package.json`)
   } catch {
-    // Source-tree wrapper runs before native packages are installed from npm;
-    // PR4 build tasks copy the binary into this sibling package directory.
-    const sourceTreePath = join(workspacePackagesRoot, target.packageDirectory, 'package.json')
+    // Source-tree wrapper runs before the native package is installed from npm;
+    // PR4 build tasks copy host binaries into this sibling package directory.
+    const sourceTreePath = join(workspacePackagesRoot, NATIVE_PACKAGE_DIRECTORY, 'package.json')
     if (exists(sourceTreePath)) {
       return sourceTreePath
     }
-    throw new Error(`native package ${target.packageName} was not found`)
+    throw new Error(`native package ${NATIVE_PACKAGE_NAME} was not found`)
   }
 }
 
@@ -328,7 +330,7 @@ function nativeBinaryFailedError({ target, binaryPath, cause }) {
       platform: target.platform,
       arch: target.arch,
       libc: target.libc,
-      packageName: target.packageName,
+      packageName: NATIVE_PACKAGE_NAME,
       binaryPath,
       cause: cause?.message
     })

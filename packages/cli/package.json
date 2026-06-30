@@ -38,17 +38,12 @@
   "scripts": {
     "test": "vp test"
   },
+  "dependencies": {
+    "@intlify/cli-napi": "workspace:0.14.0"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "vite-plus": "catalog:"
-  },
-  "optionalDependencies": {
-    "@intlify/cli-darwin-arm64": "0.14.0",
-    "@intlify/cli-darwin-x64": "0.14.0",
-    "@intlify/cli-linux-arm64-gnu": "0.14.0",
-    "@intlify/cli-linux-x64-gnu": "0.14.0",
-    "@intlify/cli-linux-x64-musl": "0.14.0",
-    "@intlify/cli-win32-x64-msvc": "0.14.0"
   },
   "engines": {
     "node": ">=22.12.0"

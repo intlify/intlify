@@ -1,7 +1,7 @@
 {
-  "name": "@intlify/cli-linux-x64-musl",
+  "name": "@intlify/cli-napi",
   "version": "0.14.0",
-  "description": "Target-specific native intlify CLI binary for Linux x64 musl.",
+  "description": "Native intlify CLI binary package source.",
   "keywords": [
     "cli",
     "intlify",
@@ -16,21 +16,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/intlify/intlify.git",
-    "directory": "packages/cli-linux-x64-musl"
+    "directory": "packages/cli-napi"
   },
   "files": [
-    "intlify",
+    "bin",
     "README.md",
     "package.json"
-  ],
-  "os": [
-    "linux"
-  ],
-  "cpu": [
-    "x64"
-  ],
-  "libc": [
-    "musl"
   ],
   "publishConfig": {
     "access": "public"

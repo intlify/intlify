@@ -1,77 +1,50 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 
 import { expect, test } from 'vite-plus/test'
 
-import { NATIVE_TARGETS } from '../bin/intlify.mjs'
+import { NATIVE_PACKAGE_NAME, NATIVE_TARGETS } from '../bin/intlify.mjs'
 
 const packageVersion = '0.14.0'
 const repositoryUrl = 'git+https://github.com/intlify/intlify.git'
-const nativePackageMetadata = [
+const nativeTargetMatrix = [
   {
-    directory: 'packages/cli-darwin-x64',
-    name: '@intlify/cli-darwin-x64',
-    packageDirectory: 'cli-darwin-x64',
     platform: 'darwin',
     arch: 'x64',
-    os: ['darwin'],
-    cpu: ['x64'],
-    files: ['intlify', 'README.md', 'package.json']
+    rustTarget: 'x86_64-apple-darwin',
+    binaryName: 'intlify'
   },
   {
-    directory: 'packages/cli-darwin-arm64',
-    name: '@intlify/cli-darwin-arm64',
-    packageDirectory: 'cli-darwin-arm64',
     platform: 'darwin',
     arch: 'arm64',
-    os: ['darwin'],
-    cpu: ['arm64'],
-    files: ['intlify', 'README.md', 'package.json']
+    rustTarget: 'aarch64-apple-darwin',
+    binaryName: 'intlify'
   },
   {
-    directory: 'packages/cli-linux-x64-gnu',
-    name: '@intlify/cli-linux-x64-gnu',
-    packageDirectory: 'cli-linux-x64-gnu',
     platform: 'linux',
     arch: 'x64',
     libc: 'glibc',
-    os: ['linux'],
-    cpu: ['x64'],
-    packageLibc: ['glibc'],
-    files: ['intlify', 'README.md', 'package.json']
+    rustTarget: 'x86_64-unknown-linux-gnu',
+    binaryName: 'intlify'
   },
   {
-    directory: 'packages/cli-linux-arm64-gnu',
-    name: '@intlify/cli-linux-arm64-gnu',
-    packageDirectory: 'cli-linux-arm64-gnu',
     platform: 'linux',
     arch: 'arm64',
     libc: 'glibc',
-    os: ['linux'],
-    cpu: ['arm64'],
-    packageLibc: ['glibc'],
-    files: ['intlify', 'README.md', 'package.json']
+    rustTarget: 'aarch64-unknown-linux-gnu',
+    binaryName: 'intlify'
   },
   {
-    directory: 'packages/cli-linux-x64-musl',
-    name: '@intlify/cli-linux-x64-musl',
-    packageDirectory: 'cli-linux-x64-musl',
     platform: 'linux',
     arch: 'x64',
     libc: 'musl',
-    os: ['linux'],
-    cpu: ['x64'],
-    packageLibc: ['musl'],
-    files: ['intlify', 'README.md', 'package.json']
+    rustTarget: 'x86_64-unknown-linux-musl',
+    binaryName: 'intlify'
   },
   {
-    directory: 'packages/cli-win32-x64-msvc',
-    name: '@intlify/cli-win32-x64-msvc',
-    packageDirectory: 'cli-win32-x64-msvc',
     platform: 'win32',
     arch: 'x64',
-    os: ['win32'],
-    cpu: ['x64'],
-    files: ['intlify.exe', 'README.md', 'package.json']
+    rustTarget: 'x86_64-pc-windows-msvc',
+    binaryName: 'intlify.exe'
   }
 ]
 
@@ -86,6 +59,9 @@ test('wrapper package metadata matches the public package contract', async () =>
       intlify: './bin/intlify.mjs'
     },
     files: ['bin', 'schema', 'README.md', 'package.json'],
+    dependencies: {
+      [NATIVE_PACKAGE_NAME]: `workspace:${packageVersion}`
+    },
     publishConfig: {
       access: 'public'
     },
@@ -102,66 +78,52 @@ test('wrapper package metadata matches the public package contract', async () =>
     './package.json': './package.json',
     './schema/config.schema.json': './schema/config.schema.json'
   })
+  expect(pkg.optionalDependencies).toBeUndefined()
+  expect(pkg.dependencies[NATIVE_PACKAGE_NAME]).toBe(`workspace:${pkg.version}`)
   expect(pkg.keywords).toEqual(expect.arrayContaining(['intlify', 'messageformat', 'mf2', 'cli']))
-
-  for (const metadata of nativePackageMetadata) {
-    expect(pkg.optionalDependencies[metadata.name]).toBe(packageVersion)
-  }
-  expect(Object.keys(pkg.optionalDependencies).sort()).toEqual(
-    nativePackageMetadata.map(metadata => metadata.name).sort()
-  )
 })
 
-test('native package metadata matches wrapper resolution table', async () => {
-  expect(
-    NATIVE_TARGETS.map(target => ({
-      name: target.packageName,
-      platform: target.platform,
-      arch: target.arch,
-      libc: target.libc,
-      packageDirectory: target.packageDirectory,
-      binaryName: target.binaryName
-    }))
-  ).toEqual(
-    nativePackageMetadata.map(metadata => ({
-      name: metadata.name,
-      platform: metadata.platform,
-      arch: metadata.arch,
-      libc: metadata.libc,
-      packageDirectory: metadata.packageDirectory,
-      binaryName: metadata.files[0]
-    }))
-  )
+test('cli-napi package metadata matches the native package source contract', async () => {
+  const pkg = await readJson('../../cli-napi/package.json')
 
-  for (const metadata of nativePackageMetadata) {
-    const pkg = await readJson(`../../../${metadata.directory}/package.json`)
+  expect(pkg).toMatchObject({
+    name: NATIVE_PACKAGE_NAME,
+    version: packageVersion,
+    keywords: expect.arrayContaining(['intlify', 'messageformat', 'mf2', 'cli']),
+    homepage: 'https://github.com/intlify/intlify#readme',
+    bugs: {
+      url: 'https://github.com/intlify/intlify/issues'
+    },
+    license: 'MIT',
+    repository: {
+      type: 'git',
+      url: repositoryUrl,
+      directory: 'packages/cli-napi'
+    },
+    files: ['bin', 'README.md', 'package.json'],
+    publishConfig: {
+      access: 'public'
+    }
+  })
+  expect(pkg.bin).toBeUndefined()
+  expect(pkg.engines).toBeUndefined()
+  expect(pkg.exports).toBeUndefined()
+})
 
-    expect(pkg).toMatchObject({
-      name: metadata.name,
-      version: packageVersion,
-      keywords: expect.arrayContaining(['intlify', 'messageformat', 'mf2', 'cli']),
-      homepage: 'https://github.com/intlify/intlify#readme',
-      bugs: {
-        url: 'https://github.com/intlify/intlify/issues'
-      },
-      license: 'MIT',
-      repository: {
-        type: 'git',
-        url: repositoryUrl,
-        directory: metadata.directory
-      },
-      files: metadata.files,
-      os: metadata.os,
-      cpu: metadata.cpu,
-      publishConfig: {
-        access: 'public'
-      }
-    })
-    expect(pkg.libc).toEqual(metadata.packageLibc)
-    expect(pkg.bin).toBeUndefined()
-    expect(pkg.engines).toBeUndefined()
-    expect(pkg.exports).toBeUndefined()
-  }
+test('legacy per-target native package skeletons are not checked in', async () => {
+  const packageEntries = await readdir(new URL('../../', import.meta.url), {
+    withFileTypes: true
+  })
+  const legacyCliPackageDirectories = packageEntries
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .filter(name => /^cli-(?:darwin|linux|win32)/.test(name))
+
+  expect(legacyCliPackageDirectories).toEqual([])
+})
+
+test('wrapper platform table matches the CLI native build matrix', () => {
+  expect(NATIVE_TARGETS).toEqual(nativeTargetMatrix)
 })
 
 async function readJson(relativePath) {
