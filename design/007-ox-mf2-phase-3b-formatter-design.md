@@ -583,9 +583,9 @@ The formatter separates syntax traversal from rendering.
 
 The message-level core lives in a workspace-internal Rust crate named `intlify_format`. This crate is not published to crates.io in Phase 3B. It should still expose a clear workspace API for the CLI, N-API binding, WASM binding, and tests.
 
-The message-level core should build an internal layout representation before rendering text. The layout model should support delayed line, group, and indent decisions so standard mode, preserve mode, future line width support, and future resource/catalog adapters can reuse one formatter core.
+The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build an internal layout/document representation before rendering text. The layout model should support delayed line, group, and indent decisions so standard mode, preserve mode, future line width support, and future resource/catalog adapters can reuse one formatter core.
 
-The exact IR/document implementation is intentionally left to implementation design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
+The exact IR node shape, printing algorithm, and line-breaking strategy are intentionally left to implementation design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
 
 `@intlify/cli` owns the `intlify fmt` command and links the `intlify_format` crate through the native CLI binary. Programmatic formatter APIs are distributed separately:
 
@@ -709,20 +709,26 @@ one  {{One item}}
 
 ## SnapshotView Requirements
 
-The formatter first consumes the existing Binary AST `SnapshotView` / binding-side accessor model.
+The formatter first consumes the existing Binary AST `SnapshotView` / binding-side accessor model. Rust, N-API, and WASM SnapshotView surfaces should provide the same logical accessor contract even if their concrete implementations differ.
 
-Initial required helpers are the minimum needed by the formatter:
+Initial required helper semantics:
 
-- node and token kind traversal
-- node and token span access
-- source slicing for node and token spans
-- leading/trailing trivia span access where already represented
+- node children are traversed in source order
+- token traversal is available in source order
+- public node and token kind accessors expose stable symbolic names; numeric discriminants are internal
+- node and token spans are UTF-8 byte spans using half-open ranges `[start, end)`
+- source slicing is available through a `slice(span)`-style helper after source/snapshot consistency has been established
+- delimiter spans are exposed through delimiter token kind and span access; dedicated delimiter-specific accessors are not required
+- token raw text is not duplicated in the snapshot; consumers use token spans with `slice(span)`
+- token-level leading and trailing whitespace trivia spans are available for preserve mode
+- derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans and source slices
 - parser diagnostic access
-- source/snapshot consistency checks where the snapshot format supports them
+- recovered or missing node/token flags are not formatter requirements because snapshots with parser diagnostics do not produce formatted output
+- source/snapshot consistency checks are required when the snapshot carries a source hash or equivalent source identity; otherwise checks are best-effort
 
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
-If the formatter requires a Binary AST snapshot format change, the formatter PR may include it, but it must also update snapshot versioning, compatibility policy, parser snapshot round-trip tests, parser snapshot compatibility tests, N-API/WASM exposure, and any affected fixtures. Snapshot format changes should remain narrowly scoped to formatter requirements.
+If the formatter requires a Binary AST snapshot format change, the formatter PR may include it, but it must also update snapshot versioning, compatibility policy, parser snapshot round-trip tests, parser snapshot compatibility tests, N-API/WASM exposure, and any affected fixtures. Snapshot format changes should remain narrowly scoped to formatter requirements. If the required snapshot change becomes large enough to obscure the formatter review, split it into a separate prerequisite PR.
 
 ## Fixture Strategy
 
@@ -810,6 +816,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 - Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, decoded-to-raw mapping, and outer document edits.
 - Formatter ignore or suppression mechanisms that are compatible with MF2 syntax.
+- Formatter internal layout IR / document model details, including node shapes, printing algorithm, line-breaking strategy, and implementation tests.
 - `.editorconfig` loading once formatter options exist that can consume it.
 - Line wrapping and style options such as `lineWidth`, `indentWidth`, `lineEnding`, `finalNewline`, and quote/literal spelling policy.
 - Generated TypeScript config type distribution.
@@ -824,8 +831,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact internal layout IR/document representation
-- exact SnapshotView accessors or binary format extensions needed by the formatter implementation
 - exact fixture harness runner format for `options.json` matrices and diagnostics snapshots
 - LSP/editor configuration shape, including whether an explicit formatter config path is supported
 - LSP/editor behavior when config loading fails, including whether it falls back to defaults or reports an operational error
