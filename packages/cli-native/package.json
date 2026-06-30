@@ -1,0 +1,29 @@
+{
+  "name": "@intlify/cli-native",
+  "version": "0.14.0",
+  "description": "Native intlify CLI binary package source.",
+  "keywords": [
+    "cli",
+    "intlify",
+    "messageformat",
+    "mf2"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/cli-native"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
