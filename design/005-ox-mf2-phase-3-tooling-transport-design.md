@@ -23,7 +23,7 @@ This document defines the broader tooling and consumer boundary for Phase 3 and 
 Implementation should be split by consumer-facing product surface:
 
 1. **Phase 3A: Tooling Foundation**
-   - `crates/ox_mf2_cli` and the `intlify` command structure
+   - `crates/intlify_cli` and the `intlify` command structure
    - unified `fmt` / `lint` project config model and JSON Schema
    - shared machine-readable output conventions
    - package and distribution boundaries for CLI, N-API, and WASM tooling
@@ -120,7 +120,7 @@ The Rust formatter engine should live in a separate `crates/ox_mf2_format` crate
 
 ### CLI and Package Distribution
 
-The CLI binary should live in `crates/ox_mf2_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in `crates/intlify_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
 N-API and WASM formatter bindings should be published as formatter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while formatter packages expose formatter-specific APIs backed by `crates/ox_mf2_format`.
 
@@ -229,7 +229,7 @@ The Rust linter engine should live in a separate `crates/ox_mf2_lint` crate that
 
 ### CLI and Package Distribution
 
-The CLI binary should live in a separate `crates/ox_mf2_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in a separate `crates/intlify_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
 N-API and WASM linter bindings should be published as linter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while linter packages expose lint-specific APIs backed by `crates/ox_mf2_lint`.
 
@@ -366,7 +366,7 @@ Suppression and directive comments are diagnostic-layer concerns. This document 
 Phase 3 linter core scope:
 
 - Rust linter engine in `crates/ox_mf2_lint`
-- CLI in `crates/ox_mf2_cli`
+- CLI in `crates/intlify_cli`
 - npm-distributed native CLI package
 - linter-specific N-API package
 - linter-specific WASM package

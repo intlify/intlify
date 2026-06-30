@@ -61,7 +61,7 @@
 <path d="M 620 282 L 620 322" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
 
 <rect x="442" y="322" width="356" height="74" rx="9" class="cli"/>
-<text x="620" y="350" font-size="14" font-weight="700" text-anchor="middle" class="white">crates/ox_mf2_cli</text>
+<text x="620" y="350" font-size="14" font-weight="700" text-anchor="middle" class="white">crates/intlify_cli</text>
 <text x="620" y="372" font-size="11.5" text-anchor="middle" class="soft-white">command routing, config loading, reporters, exit codes</text>
 
 <path d="M 540 396 L 540 472 L 488 472 L 488 500" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>

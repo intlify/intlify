@@ -27,7 +27,7 @@ LSP/editor integration and playground usage are consumers of these deliverables,
 
 The Rust linter engine lives in `crates/ox_mf2_lint` and depends on `ox_mf2_parser`. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The lint crate owns rule execution, presets, lint configuration, and lint result shaping.
 
-The user-facing CLI binary lives in `crates/ox_mf2_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
+The user-facing CLI binary lives in `crates/intlify_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
 
 N-API and WASM linter bindings are distributed as linter-specific packages backed by `crates/ox_mf2_lint`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs.
 
