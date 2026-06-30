@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "EmptyConfig": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "properties": {
+    "$schema": {
+      "description": "Editor-facing schema metadata. Ignored by the CLI at runtime.",
+      "type": "string"
+    },
+    "fmt": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/EmptyConfig"
+        }
+      ],
+      "description": "Formatter configuration. Phase 3A accepts only an empty object."
+    },
+    "lint": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/EmptyConfig"
+        }
+      ],
+      "description": "Linter configuration. Phase 3A accepts only an empty object."
+    }
+  },
+  "required": ["fmt", "lint"],
+  "title": "ProjectConfigFile",
+  "type": "object"
+}
