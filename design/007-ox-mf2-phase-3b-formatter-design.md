@@ -12,15 +12,15 @@ The formatter should provide a deterministic ox-mf2 style while keeping the publ
 
 Primary goals:
 
-- format MF2 messages through a Rust core implementation
+- format MF2 messages through a workspace-internal Rust core crate named `intlify_format`
 - expose a dedicated `intlify fmt` CLI backed by the same core
-- expose the formatter through Rust, N-API, and WASM without duplicating formatting logic
+- expose the formatter through `@intlify/format-napi` and `@intlify/format-wasm` without duplicating formatting logic
 - use Binary AST `SnapshotView` / binding-side snapshot accessors as the stable public syntax view
 - support both standard and preserve formatting modes
-- provide a JSON configuration contract and generated JSON Schema
-- support formatter ignore directives for selected syntax units
-- keep parser, snapshot decode/access, formatting, and binding costs measurable separately
+- provide a JSON configuration contract through the unified `@intlify/cli` config schema
+- keep parser, snapshot decode/access, formatting, binding, and CLI costs measurable separately
 - preserve parse semantics and produce stable output when formatting succeeds
+- provide local-first formatter benchmark tooling under `tools/`
 
 Non-goals for the first formatter design:
 
@@ -31,6 +31,11 @@ Non-goals for the first formatter design:
 - file-specific config overrides
 - resource/catalog host-file parsing, escaping, and outer edit ownership
 - semantic rewriting, variable renaming, variant reordering, or fallback normalization
+- formatter ignore directives or MF2 syntax extensions
+- line wrapping and style options beyond `mode`
+- `.editorconfig` loading before formatter options exist that can consume it
+- generated TypeScript config type distribution
+- crates.io publishing for `intlify_format`
 
 Range-only and minimal-diff formatting remain LSP/editor workflow concerns until editor requirements are defined.
 
@@ -40,16 +45,17 @@ Range-only and minimal-diff formatting remain LSP/editor workflow concerns until
 
 Standard mode is a deterministic pretty-printer over the public syntax view. It formats to the standard ox-mf2 style without using the original source layout as a primary decision input.
 
-Standard mode should normalize:
+Standard mode normalizes:
 
 - declaration spacing
 - expression spacing
 - function, markup, option, and attribute spacing
-- indentation
-- matcher layout
-- final newline behavior
+- indentation to 2 spaces
+- matcher table layout
+- line endings to LF
+- final newline behavior to exactly one final LF
 
-Style decisions that are independent of original source layout belong to standard mode. For example, matcher selectors and variant keys may use a table-like layout when that improves readability for multi-selector messages. Such decisions should be specified as ox-mf2 style rules, not as preservation behavior.
+Standard mode does not rewrite translatable pattern text, quoted literal spelling, unquoted literal spelling, or escape spelling. Those choices can change runtime content or require heavier validity rules, so quote/literal spelling policy remains future scope.
 
 ### Preserve Mode
 
@@ -59,88 +65,222 @@ Preserve mode may preserve:
 
 - single-line / multi-line choices
 - blank-line grouping
-- quote or literal spelling
-- comment/trivia placement
 - delimiter-driven source shape when recoverable
 
-Preserve mode should still normalize:
+Preserve mode still normalizes:
 
 - local spacing around declarations and operators
-- indentation
-- required spaces between syntax elements
-- final newline behavior, unless a later option explicitly controls it
+- expression, function, option, and attribute spacing
+- indentation to 2 spaces
+- matcher table layout
+- line endings to LF
+- final newline behavior to exactly one final LF
 
 Preserve mode is not a minimal-diff formatter. It may rewrite larger regions when the formatted shape follows ox-mf2 style rules.
 
 ## Public API Shape
 
-The primary public API parses and formats one MF2 message:
+The primary Rust API parses and formats one MF2 message:
 
 ```rust
 format_message(source: &str, options: FormatOptions) -> FormatResult
 check_format(source: &str, options: FormatOptions) -> FormatCheckResult
 ```
 
-Bindings should expose the same shape with host naming conventions:
+The conceptual Rust result shape is a success/failure split:
+
+```rust
+enum FormatResult {
+    Ok(FormatSuccess),
+    Err(FormatFailure),
+}
+
+struct FormatSuccess {
+    code: String,
+    changed: bool,
+}
+
+enum FormatCheckResult {
+    Ok(FormatCheckSuccess),
+    Err(FormatFailure),
+}
+
+struct FormatCheckSuccess {
+    changed: bool,
+}
+
+struct FormatFailure {
+    diagnostics: Vec<ParserDiagnostic>,
+    errors: Vec<OperationalError>,
+}
+```
+
+N-API and WASM expose the same contract as a discriminated union:
 
 ```ts
-formatMessage(source: string, options?: FormatOptions): FormatResult
-checkFormat(source: string, options?: FormatOptions): FormatCheckResult
+type FormatResult =
+  | { ok: true; code: string; changed: boolean }
+  | { ok: false; diagnostics: ParserDiagnostic[]; errors: OperationalError[] }
+
+type FormatCheckResult =
+  | { ok: true; changed: boolean }
+  | { ok: false; diagnostics: ParserDiagnostic[]; errors: OperationalError[] }
+
+function formatMessage(source: string, options?: FormatOptions): FormatResult
+function checkFormat(source: string, options?: FormatOptions): FormatCheckResult
 ```
+
+`checkFormat` does not return formatted output. It only reports whether the source would change. Callers that need formatted code should use `formatMessage`.
+
+Parser diagnostics and operational errors are separated:
+
+- `diagnostics` contains parser diagnostics only.
+- `errors` uses the Phase 3A operational error shape: `{ kind, code, message, path?, details? }`.
+- Formatter-specific diagnostics are not emitted in the initial design.
+- Formatter execution failures, invalid options, source/snapshot mismatches, unsupported inputs, and internal errors use `errors`.
+
+If parsing produces any parser diagnostic, all formatter APIs return `ok: false` and no formatted output. Invalid N-API/WASM options also return `ok: false` with `errors`; the public formatter APIs should not throw for normal validation failures.
 
 The advanced API accepts an already-created Binary AST snapshot. This is for playgrounds, workers, and language-service caches that already hold parse artifacts:
 
 ```rust
-format_snapshot(snapshot: SnapshotView<'_>, source: Option<&str>, options: FormatOptions) -> FormatResult
+format_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions) -> FormatResult
 ```
 
-`source` is still needed for preserve mode, source slicing, parser diagnostics, and editor position conversion. Snapshot-backed formatting should therefore be treated as parse-artifact reuse, not as a source-free formatting mode.
+Bindings expose this as:
 
-Formatter results are separate from linter diagnostics. Parser diagnostic locations use the shared SourceId plus UTF-8 byte Span model, but formatter result objects should not contain lint severities or lint rule ids.
+```ts
+function formatSnapshot(
+  snapshot: SnapshotView,
+  source: string,
+  options?: FormatOptions
+): FormatResult
+```
 
-Open decisions for the detailed result contract:
+`source` is required for snapshot-backed formatting because preserve mode, source slicing, parser diagnostics, and editor position conversion depend on source text. Snapshot-backed formatting is parse-artifact reuse, not a source-free formatting mode.
 
-- exact Rust result types
-- exact N-API and WASM result object shape
-- whether `checkFormat` returns a boolean only or also normalized formatted output
-- whether formatter-specific diagnostics need a separate category in the first implementation
+`formatSnapshot` follows the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, it returns `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. A mismatch returns `ok: false` with an operational error.
 
 ## CLI Workflow
 
 The CLI command is `intlify fmt`.
 
-Initial CLI behavior:
+Initial CLI flags:
 
-- write mode is the default
-- `--check` reports whether files differ without writing
-- `--list-different` prints paths that would change
-- stdin is supported with a file-aware option such as `--stdin-filepath`
-- path and glob inputs are accepted
-- the primary input unit is `1 file = 1 MF2 message`
+- `--mode standard|preserve`
+- `--check`
+- `--list-different`
+- `--stdin-filepath <path>`
+- `--ignore-path <path>`; may be provided multiple times
+
+Write mode is the default. `--check` reports whether files differ without writing. `--list-different` is a no-write check mode that prints path-only output for files that do not pass formatting. `--check` and `--list-different` may be used together, in which case `--list-different` controls the human-readable output.
+
+`--list-different` is a text-only mode. Combining it with `--reporter json` is an invalid CLI argument. Combining it with stdin is also invalid.
+
+Stdin formatting is supported. Stdin always writes formatted code to stdout and never writes to `--stdin-filepath`. `--stdin-filepath` is optional and only provides path context for extension checks, result paths, and future adapters. Without `--stdin-filepath`, stdin is treated as a direct MF2 message input named `<stdin>`.
+
+Stdin with `--check` is allowed. It exits with `1` when the stdin source would change. If stdin has parser diagnostics, human-readable mode writes no formatted code to stdout, writes diagnostics to stderr, and exits with `1`. JSON reporter mode writes the JSON envelope to stdout.
+
+### Input Discovery
+
+The primary input unit is `1 file = 1 MF2 message`. Phase 3B initially supports only direct `.mf2` message files.
+
+Input rules:
+
+- explicit `.mf2` file paths are accepted
+- explicit non-`.mf2` file paths are unsupported input errors and exit with `2`
+- directory inputs are searched recursively for `.mf2` files
+- glob inputs may be broad, but only matched `.mf2` files are selected
+- unmatched paths or globs are input errors and exit with `2`
+- if the final selected target set is empty, the command exits with `0`
+- duplicate matches are de-duplicated by absolute path
+- processing and output use stable slash-normalized path order
+
+Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules.
+
+Directory and glob discovery also excludes common VCS, dependency, and output directories by default, including `.git`, `.hg`, `.svn`, `node_modules`, `vendor`, `target`, `dist`, and `coverage`. Explicit file paths can still target files under those directories, subject to ignore rules.
+
+File symlinks are followed. Directory symlinks are not followed.
+
+### Ignore Sources
+
+Phase 3B supports file-level ignore through:
+
+- `fmt.ignorePatterns`
+- root `.gitignore`
+- one or more `--ignore-path <path>` files
+
+Ignore sources are additive. If any source matches a file, the file is excluded. Ignore always wins, even for explicit file input.
+
+The initial `.gitignore` behavior reads only the project root `.gitignore`, matching the root-only config discovery model. Nested `.gitignore` files are deferred.
+
+All ignore patterns are evaluated relative to the project root, including patterns loaded from `--ignore-path`. Missing `--ignore-path` files are operational errors and exit with `2`.
+
+### Exit Codes
+
+Exit code classification:
+
+- `0`: all selected files are formatted, or no files are selected after filtering
+- `1`: format mismatch, parser diagnostics in selected inputs, or another formatting failure caused by input content
+- `2`: operational error, including config errors, IO errors, invalid CLI arguments, unsupported explicit input files, unmatched input patterns, unsupported reporters, or internal errors
+
+When multiple outcomes occur, final exit code priority is `2 > 1 > 0`.
+
+Parser diagnostics never cause write mode to modify the affected file.
+
+### Human and JSON Output
+
+Human-readable write mode prints only files that changed. Human-readable `--check` prints files that differ and files with parser diagnostics. `--list-different` prints path-only output for files that differ or have parser diagnostics.
+
+JSON reporter output for write and check mode uses the shared Phase 3A envelope and adds command-specific `summary` fields and `results[]` entries. Each result should include:
+
+- `path`
+- `changed`
+- `diagnostics`
+- `errors`
+
+When no files are selected after filtering, JSON output uses `summary.status: "success"`, `summary.matchedFiles: 0`, and `results: []`.
 
 Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
 
 ## Configuration
 
-Formatter configuration lives in the `fmt` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON, and the Rust config model is the source of truth for generated JSON Schema.
+Formatter configuration lives in the `fmt` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON or JSONC as defined by the Phase 3A CLI foundation, and the Rust config model remains the source of truth for generated JSON Schema.
 
 Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design.
 
-Initial formatter config supports `ignorePatterns` but not file-specific `overrides`. The first formatter target is a narrow MF2 message/resource workflow, so per-file option overrides are unnecessary until resource/catalog requirements prove otherwise.
+Initial formatter config supports:
 
-The formatter reads `.editorconfig` as fallback input for unset formatting options. The linter does not read `.editorconfig`.
+```json
+{
+  "fmt": {
+    "mode": "standard",
+    "ignorePatterns": []
+  }
+}
+```
 
-Open decisions for detailed configuration:
+`fmt.mode` is an enum with `"standard"` and `"preserve"`. The default is `"standard"`.
 
-- exact formatter option names, defaults, and validation errors
-- formatter-specific schema definitions under the unified config schema
-- how CLI flags override config and `.editorconfig`
+`fmt.ignorePatterns` participates in CLI file discovery only. It is not part of `FormatOptions`, and message-level APIs do not perform file selection.
+
+Formatter configuration does not support file-specific `overrides` in the initial design. The first formatter target is a narrow direct `.mf2` message-file workflow, so per-file option overrides are unnecessary until resource/catalog requirements prove otherwise.
+
+The formatter does not read `.editorconfig` in the initial implementation because `mode` is the only supported formatting option. `.editorconfig` fallback becomes active only when formatter options such as line width, indent width, line ending, or final newline are explicitly supported.
+
+Configuration precedence for formatting mode is:
+
+1. CLI `--mode`
+2. `fmt.mode`
+3. default `"standard"`
+
+Formatter-specific schema definitions live under the unified config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
+
+Config validation errors use the Phase 3A `config_validation_failed` operational error, with JSON pointers such as `/fmt/mode` or `/fmt/ignorePatterns`. Invalid CLI values such as `--mode compact` use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
 
 ## Options
 
-Initial options should stay small.
-
-Candidate minimum:
+Initial options stay intentionally small:
 
 ```text
 FormatOptions {
@@ -148,9 +288,9 @@ FormatOptions {
 }
 ```
 
-With only `mode` in the minimum option set, `.editorconfig` has no active formatter effect yet because common `.editorconfig` fields map to later options such as line width, indent width, line ending, and final newline. `.editorconfig` fallback becomes active only for formatter options that are explicitly supported.
+Default `mode` is `standard`.
 
-Options to decide later:
+Options deferred until fixtures prove a need:
 
 - line width
 - indent width
@@ -168,8 +308,9 @@ Formatter behavior for invalid or partially recovered syntax is strict in the in
 If parsing produces any parser diagnostic:
 
 - the formatter does not produce public formatted output
+- API consumers receive `ok: false` with parser diagnostics and no formatted output
 - CLI write mode does not modify the file
-- API consumers receive diagnostics or an error result without formatted output
+- CLI check/list-different modes treat the file as a formatting failure and exit with `1`
 - LSP/editor adapters treat the request as a no-op
 
 Recovery-aware formatting is future editor-specific scope.
@@ -185,15 +326,41 @@ Formatter fixtures must cover:
 
 The formatter separates syntax traversal from rendering.
 
-The message-level core should build an internal layout representation before rendering text. The layout model should support delayed line, group, and indent decisions so standard mode, preserve mode, line width, and future resource/catalog adapters can reuse one formatter core.
+The message-level core lives in a workspace-internal Rust crate named `intlify_format`. This crate is not published to crates.io in Phase 3B. It should still expose a clear workspace API for the CLI, N-API binding, WASM binding, and tests.
 
-The exact IR/document implementation is intentionally left to implementation design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics.
+The message-level core should build an internal layout representation before rendering text. The layout model should support delayed line, group, and indent decisions so standard mode, preserve mode, future line width support, and future resource/catalog adapters can reuse one formatter core.
+
+The exact IR/document implementation is intentionally left to implementation design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
+
+`@intlify/cli` owns the `intlify fmt` command and links the `intlify_format` crate through the native CLI binary. Programmatic formatter APIs are distributed separately:
+
+- `@intlify/format-napi`
+- `@intlify/format-wasm`
+
+`@intlify/format-napi` is a wrapper package with platform-specific native packages, using the existing label style:
+
+- `@intlify/format-napi-darwin-arm64`
+- `@intlify/format-napi-darwin-x64`
+- `@intlify/format-napi-linux-x64-gnu`
+- `@intlify/format-napi-linux-x64-musl`
+- `@intlify/format-napi-linux-arm64-gnu`
+- `@intlify/format-napi-win32-x64-msvc`
+
+The N-API package uses lazy native loading. Importing the package should not eagerly load the native binary; API calls load the binding as needed.
+
+`@intlify/format-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/format-napi`. After `await init()`, the WASM package exposes synchronous `formatMessage`, `checkFormat`, and `formatSnapshot` APIs.
+
+New `@intlify/format-*` npm packages may require token-based bootstrap publishing for the first release. After the packages exist on npm and trusted publisher settings are configured, normal releases should use npm trusted publishing.
+
+Parser binding packages remain focused on parser-level APIs. Formatter APIs are not added to existing `@intlify/ox-mf2-napi` or `@intlify/ox-mf2-wasm` packages.
 
 ## Resource and Catalog Formatting
 
 The formatter core formats one MF2 message. Resource/catalog formatting is layered above it.
 
-A resource/catalog adapter is responsible for:
+Phase 3B does not implement JSON, YAML, framework-specific resource files, multi-message catalogs, host-file parsing, host-file escaping, or outer document edits.
+
+A future resource/catalog adapter is responsible for:
 
 - parsing JSON, YAML, or framework-specific resource files
 - locating message entries
@@ -218,74 +385,133 @@ This keeps minimal edit calculation out of the formatter core and lets editors h
 
 ## Formatter Ignore Directives
 
-The formatter should support an `ox-mf2-ignore`-style directive in the first implementation.
+Formatter ignore directives are not included in Phase 3B.
 
-The directive suppresses formatting for a syntax unit and emits the original source slice for that unit. Exact directive syntax, target range selection, and comment/trivia interactions are open detailed-design items.
+The MF2 grammar does not define line comments or block comments, and `#` is a markup sigil for `{#tag}`. Introducing a comment-like formatter directive would require a non-standard syntax extension. Phase 3B therefore uses only file-level ignore sources: `fmt.ignorePatterns`, root `.gitignore`, and `--ignore-path`.
+
+A future formatter suppression mechanism must be spec-compatible. Possible directions include an attribute-based mechanism for expression/markup units or a future resource/container-level convention, but no syntax-unit formatter directive is part of the initial formatter product.
 
 ## Matcher Layout
 
-Matcher layout needs a dedicated rule set because it affects readability and introduces alignment behavior.
+Matcher layout uses a table-like layout in both standard and preserve mode.
 
-Open decisions:
+Rules:
 
-- whether multi-selector matchers always use a table-like layout
-- whether single-selector matchers use one-line or multi-line variants
-- whether variant keys align by column width
-- whether selector names align with variant key columns
-- how preserve mode handles existing matcher table shape
-- how line wrapping interacts with long keys and long patterns
+- multi-selector matchers use table-like variant rows
+- single-selector matchers also align variant rows
+- variant keys align by each key column's maximum width
+- `.match` selector expressions are not aligned to variant key columns
+- key columns have at least 2 spaces between them
+- the final key column and quoted pattern have at least 2 spaces between them
+- preserve mode may preserve existing single-line/multi-line shape and blank-line grouping, but still normalizes matcher rows to the table-like spacing rules
+
+Example:
+
+```mf2
+.match $count $gender
+one  masculine  {{He has one item}}
+one  feminine   {{She has one item}}
+*    *          {{They have items}}
+```
 
 ## Line Wrapping
 
-Line wrapping is not yet specified.
+Line wrapping is not implemented in Phase 3B.
 
-Open decisions:
+The initial formatter does not support `lineWidth`, and it does not wrap long expressions, long quoted patterns, or long matcher variants. Long syntax units are emitted as whole units. Wrapping behavior remains future scope because pattern text and quoted literal whitespace are semantically significant.
 
-- default line width
-- wrapping behavior for long expressions
-- wrapping behavior for long quoted patterns
-- wrapping behavior for long matcher variants
-- whether preserve mode keeps original line breaks if all lines fit
-- how to avoid changing semantic text in quoted patterns while wrapping
+## Core Style Rules
+
+Initial core style rules:
+
+- output line endings are LF
+- output ends with exactly one final LF
+- indentation is 2 spaces
+- complex messages put each declaration on its own line and the body on the following line
+- simple message pattern text is emitted as-is; the formatter does not insert line breaks around placeholders
+- translatable pattern text whitespace is preserved
+- quoted pattern text whitespace is preserved
+- single-line quoted patterns remain `{{text}}`; delimiters are not split onto separate lines just for formatting
+- expression braces have no inner padding
+- operand/function/options/attributes are separated by 1 space
+- option `=` and attribute `=` have no surrounding spaces
+- declaration `=` has 1 space on both sides
+- quoted literal spelling, unquoted literal spelling, and escape spelling are preserved
+
+Examples:
+
+```mf2
+.input {$count :number}
+.local $label = {$count :number}
+.match $count
+one  {{One item}}
+*    {{$label items}}
+```
+
+```mf2
+{$value :number minimumFractionDigits=2 maximumFractionDigits=4 @foo=|bar|}
+```
 
 ## SnapshotView Requirements
 
-The formatter should first consume the existing Binary AST `SnapshotView` / binding-side accessor model.
+The formatter first consumes the existing Binary AST `SnapshotView` / binding-side accessor model.
 
-Likely required helpers:
+Initial required helpers are the minimum needed by the formatter:
 
-- raw token text
-- raw trivia text
-- root/source-aware token stream traversal
-- delimiter and keyword token lookup
-- single-line / multi-line checks
-- blank-line and line-break checks between adjacent syntax records
-- source slicing for node, token, and trivia spans
+- node and token kind traversal
+- node and token span access
+- source slicing for node and token spans
+- leading/trailing trivia span access where already represented
+- parser diagnostic access
+- source/snapshot consistency checks where the snapshot format supports them
 
-These helpers should be derived from snapshot records and source text when possible. If a formatter rule needs information that cannot be derived, the implementation should either use a Rust-internal fast path temporarily or propose an explicit snapshot format extension.
+If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
+
+If the formatter requires a Binary AST snapshot format change, the formatter PR may include it, but it must also update snapshot versioning, compatibility policy, parser snapshot round-trip tests, parser snapshot compatibility tests, N-API/WASM exposure, and any affected fixtures. Snapshot format changes should remain narrowly scoped to formatter requirements.
 
 ## Fixture Strategy
 
 Formatter fixtures should be reviewable and stable.
 
-Each fixture should include:
+Valid fixtures use directory fixtures:
 
-- input
-- formatted standard output
-- formatted preserve output when different
-- parser diagnostics before formatting
-- parser diagnostics after formatting
-- idempotency assertion
+```text
+crates/intlify_format/fixtures/
+  matcher_table/
+    input.mf2
+    standard.mf2
+    preserve.mf2
+    options.json
+```
+
+`preserve.mf2` is optional. When it is absent, preserve mode is expected to match `standard.mf2`.
+
+Invalid fixtures do not include formatted output:
+
+```text
+crates/intlify_format/fixtures/
+  invalid_unclosed/
+    input.mf2
+    diagnostics.json
+```
 
 Required assertions:
 
-- formatting output is stable after a second format pass
-- formatting preserves the parse tree shape for valid input
+- `format(input, standard)` matches `standard.mf2`
+- `format(input, preserve)` matches `preserve.mf2` when present, otherwise `standard.mf2`
+- formatting standard output again in standard mode is idempotent
+- formatting preserve output again in preserve mode is idempotent
+- valid input has no parser diagnostics
+- invalid input produces no public formatted output
+- formatted output reparses without diagnostics
+- CLI write mode does not modify invalid syntax
 - formatting preserves semantic facts once SemanticView participates in formatter tests
-- parser diagnostics do not produce public formatted output
-- invalid syntax is not modified by CLI write mode
+
+Formatter benchmarks may reuse parser fixtures for syntax coverage and add formatter-specific fixtures for spacing, layout, matcher, preserve mode, and direct `.mf2` workflows.
 
 ## Benchmarks
+
+Formatter benchmarks are local-first tooling under `tools/`, following the parser benchmark pattern.
 
 Formatter benchmarks should separate:
 
@@ -295,43 +521,61 @@ Formatter benchmarks should separate:
 - syntax traversal cost
 - layout construction cost
 - rendering cost
-- binding call cost
+- N-API binding call cost
+- WASM binding call cost
 - CLI end-to-end format cost
+- CLI JSON reporter cost
 
 Phase 3 benchmark names:
 
 - `format_standard`
 - `format_preserve`
+- `format_check_cli_e2e`
+- `format_check_json`
 - `e2e_format`
+
+Benchmark commands and result schemas must be executable and testable, but timing thresholds are not CI pass/fail gates in Phase 3B. A benchmark command that cannot build, cannot execute, cannot read fixtures, or emits malformed results is an implementation failure. A slow timing value is an observation, not a failing threshold.
+
+GitHub Actions benchmark jobs and issue-comment reporting are deferred follow-up work. The Phase 3B implementation should not add benchmark runtime to normal `vpr check`, `vpr test`, or default CI gates.
+
+## Implementation Phasing
+
+Phase 3B formatter implementation should be split into reviewable PRs:
+
+1. `intlify_format` crate scaffold, result/options/config model, and fixture harness
+2. standard/preserve core formatter rules for direct `.mf2` messages
+3. `intlify fmt` CLI integration, file discovery, check/write mode, and JSON reporter
+4. `@intlify/format-napi` wrapper and platform native packages
+5. `@intlify/format-wasm`
+6. local-first formatter benchmarks under `tools/`
+
+Each PR should be cut from `main`, keep formatter work separated from Phase 3C linter work, and maintain the existing Phase 3A CLI contract unless the PR explicitly extends it for `intlify fmt`.
+
+## Deferred Follow-Up Notes
+
+- Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, decoded-to-raw mapping, and outer document edits.
+- Formatter ignore or suppression mechanisms that are compatible with MF2 syntax.
+- `.editorconfig` loading once formatter options exist that can consume it.
+- Line wrapping and style options such as `lineWidth`, `indentWidth`, `lineEnding`, `finalNewline`, and quote/literal spelling policy.
+- Generated TypeScript config type distribution.
+- Nested config discovery, nearest-config-wins behavior, file-specific overrides, `--cwd`, and `--root`.
+- `--no-error-on-unmatched-pattern` if users need a relaxed unmatched-input mode.
+- Runtime controls such as `--threads`.
+- `intlify init` config scaffolding once formatter and linter config fields are stable enough to write.
+- GitHub Actions benchmark jobs and issue-comment benchmark reporting for parser and formatter trends.
+- Publishing public command-specific output JSON Schemas after `schemaVersion` is stable enough.
 
 ## Open Questions
 
-The following items are detailed formatter design questions, not Phase 3 boundary decisions:
+The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact `FormatResult`, `FormatCheckResult`, and error envelope shape for Rust, N-API, and WASM
-- exact formatter option names and default values
-- formatter-specific schema definitions under the unified config schema
-- exact CLI flag precedence over config and `.editorconfig`
-- CLI exit code classification for format mismatch, formatter errors, config errors, and no matched files
-- stdout/stderr behavior for write, check, list-different, stdin, and error-reporting modes
-- whether the CLI exposes runtime controls such as `--threads`
-- whether the CLI supports `--no-error-on-unmatched-pattern`
-- supported file extensions for direct message files
-- file discovery behavior for paths, globs, directories, duplicate matches, and deterministic ordering
-- ignore file support, CLI exclude flags, and interaction with config `ignorePatterns`
-- whether ignore files include `.gitignore`, a formatter-specific ignore file, explicit `--ignore-path`, or only config `ignorePatterns`
-- unmatched pattern behavior
-- symlink traversal, hidden files, VCS directories, and dependency directories such as `node_modules`
-- whether `intlify init` should generate config and schema comments/examples
-- exact formatter ignore directive syntax, target range rules, and trivia handling
-- exact matcher layout and line wrapping rules
+- exact ignore pattern grammar, including negation support and path separator normalization
+- exact operational error codes for formatter-specific failures, such as source/snapshot mismatch and unsupported explicit input files
+- exact JSON reporter `summary` fields for write, check, list-different-equivalent failures, stdin, and no selected files
+- exact text reporter wording beyond stdout/stderr and path-list behavior
+- exact internal layout IR/document representation
+- exact SnapshotView accessors or binary format extensions needed by the formatter implementation
+- exact fixture harness runner format for `options.json` matrices and diagnostics snapshots
 - LSP/editor configuration shape, including whether an explicit formatter config path is supported
 - LSP/editor behavior when config loading fails, including whether it falls back to defaults or reports an operational error
-- generated JSON Schema and generated TypeScript type distribution in npm packages
-- fixture harness structure, including `options.json` matrices, snapshot format, and idempotency checks
-- source text, token, trivia, and comment cursor responsibilities needed by preserve mode and ignore directives
-- whether `formatMessage` returns `code + errors`, a Rust-style result envelope, or separate success/error variants
-- native package lazy-loading and config helper behavior
 - WASM bundle-size constraints and tree-shaking expectations
-- whether the WASM API should expose synchronous formatting after initialization or use an asynchronous API shape
-- how preserve mode should apply surrounding layout heuristics around syntax units emitted from original source slices by formatter ignore directives
