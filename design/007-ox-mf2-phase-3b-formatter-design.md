@@ -377,14 +377,90 @@ Parser diagnostics never cause write mode to modify the affected file.
 
 Human-readable write mode prints only files that changed. Human-readable `--check` prints files that differ and files with parser diagnostics. `--list-different` prints path-only output for files that differ or have parser diagnostics.
 
-JSON reporter output for write and check mode uses the shared Phase 3A envelope and adds command-specific `summary` fields and `results[]` entries. Each result should include:
+JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON output has this top-level shape:
 
-- `path`
-- `changed`
-- `diagnostics`
-- `errors`
+```json
+{
+  "schemaVersion": 1,
+  "command": "fmt",
+  "summary": {},
+  "results": [],
+  "errors": []
+}
+```
 
-When no files are selected after filtering, JSON output uses `summary.status: "success"`, `summary.matchedFiles: 0`, and `results: []`.
+`schemaVersion` follows the Phase 3A shared envelope contract. `command` is always `"fmt"`.
+
+The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field.
+
+`summary.status` is `"success"` or `"failure"` and follows the command outcome. Parser diagnostics, check differences, and operational errors all produce `"failure"`. Write mode that formats files successfully remains `"success"` even when files changed.
+
+Common `summary` fields:
+
+- `status`
+- `operation`
+- `mode`, omitted when the mode cannot be resolved because of invalid CLI or config input
+- `matchedFiles`, counting only final selected formatter targets
+- `unchangedFiles`
+- `diagnosticFiles`
+- `diagnosticCount`
+- `errorCount`, counting top-level `errors` plus all `results[].errors`
+
+`operation` is one of:
+
+- `"write"`
+- `"check"`
+- `"stdin"`
+- `"stdin-check"`
+
+Write mode adds `formattedFiles`, counting files actually written. Check mode adds `differentFiles`, counting targets that would change. Stdin operations do not add `formattedFiles`; changed state is represented by the single result entry.
+
+When no files are selected after filtering, JSON output uses a mode-independent zero-target summary:
+
+```json
+{
+  "status": "success",
+  "operation": "write",
+  "mode": "standard",
+  "matchedFiles": 0,
+  "unchangedFiles": 0,
+  "diagnosticFiles": 0,
+  "diagnosticCount": 0,
+  "errorCount": 0
+}
+```
+
+`operation` and `mode` are still emitted when they can be resolved. `formattedFiles` and `differentFiles` are omitted for zero-target output. `results` and `errors` are empty arrays.
+
+Each `results[]` entry uses this shape:
+
+```json
+{
+  "path": "messages/foo.mf2",
+  "status": "formatted",
+  "changed": true,
+  "diagnostics": [],
+  "errors": []
+}
+```
+
+`status` is one of:
+
+- `"formatted"`: write mode or stdin produced formatter output that differs from the input
+- `"unchanged"`: the target already matched formatter output
+- `"would_format"`: check mode or stdin check found a difference without writing formatted output
+- `"diagnostic"`: parser diagnostics prevented formatting for that target
+- `"error"`: a file-specific operational error occurred
+
+`changed` is always present. It is `true` for `"formatted"` and `"would_format"`, and `false` for `"unchanged"`, `"diagnostic"`, and `"error"`.
+
+Ignored files are not included in `results[]`; `results[]` represents only the final selected formatter target set. Invalid input and unmatched input errors, including `unsupported_input_file` and `unmatched_input`, are top-level operational errors and do not create result entries.
+
+Mixed outcomes continue processing valid selected `.mf2` targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"failure"`, and exits with `2`.
+
+For stdin JSON output, `matchedFiles` is `1`. If `--stdin-filepath` is provided, `results[0].path` is that path; otherwise it is `"<stdin>"`. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
+
+If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "failure"` and a top-level `invalid_cli_argument` error.
 
 Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
 
@@ -716,7 +792,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact JSON reporter `summary` fields for write, check, list-different-equivalent failures, stdin, and no selected files
 - exact text reporter wording beyond stdout/stderr and path-list behavior
 - exact internal layout IR/document representation
 - exact SnapshotView accessors or binary format extensions needed by the formatter implementation
