@@ -734,7 +734,11 @@ If the formatter requires a Binary AST snapshot format change, the formatter PR 
 
 Formatter fixtures should be reviewable and stable.
 
-Valid fixtures use directory fixtures:
+Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` API, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
+
+Core fixtures live under `crates/intlify_format/fixtures`.
+
+Valid core fixtures use directory fixtures:
 
 ```text
 crates/intlify_format/fixtures/
@@ -745,28 +749,124 @@ crates/intlify_format/fixtures/
     options.json
 ```
 
-`preserve.mf2` is optional. When it is absent, preserve mode is expected to match `standard.mf2`.
+`options.json` is required and uses a strict `cases[]` array. Unknown fields are fixture authoring errors.
 
-Invalid fixtures do not include formatted output:
+```json
+{
+  "cases": [
+    {
+      "name": "standard",
+      "options": { "mode": "standard" },
+      "expected": "standard.mf2"
+    },
+    {
+      "name": "preserve",
+      "options": { "mode": "preserve" },
+      "expected": "preserve.mf2"
+    }
+  ]
+}
+```
+
+Each valid case must provide `expected`. There is no implicit fallback from preserve mode to `standard.mf2`; expected output is always explicit.
+
+Invalid core fixtures do not include formatted output:
 
 ```text
 crates/intlify_format/fixtures/
   invalid_unclosed/
     input.mf2
     diagnostics.json
+    options.json
 ```
 
-Required assertions:
+Invalid `diagnostics.json` stores a diagnostics summary rather than full parser diagnostic text:
 
-- `format(input, standard)` matches `standard.mf2`
-- `format(input, preserve)` matches `preserve.mf2` when present, otherwise `standard.mf2`
-- formatting standard output again in standard mode is idempotent
-- formatting preserve output again in preserve mode is idempotent
+```json
+{
+  "diagnosticCount": 1
+}
+```
+
+Invalid cases use `expectedDiagnostics`:
+
+```json
+{
+  "cases": [
+    {
+      "name": "standard",
+      "options": { "mode": "standard" },
+      "expectedDiagnostics": "diagnostics.json"
+    }
+  ]
+}
+```
+
+A core fixture directory is either valid or invalid. Mixed `expected` and `expectedDiagnostics` cases in one fixture directory are fixture authoring errors.
+
+Core fixture assertions:
+
+- each valid case formats `input.mf2` to its `expected` file
+- each valid case is idempotent when formatting its own expected output with the same options
+- each valid expected output reparses with zero parser diagnostics
 - valid input has no parser diagnostics
-- invalid input produces no public formatted output
-- formatted output reparses without diagnostics
-- CLI write mode does not modify invalid syntax
-- formatting preserves semantic facts once SemanticView participates in formatter tests
+- each invalid case returns `ok: false`, produces no public formatted output, and matches its diagnostics summary
+- SemanticView preservation is checked for every valid case once SemanticView is available; until then this assertion is skipped
+
+Core fixture updates use:
+
+```sh
+INTLIFY_UPDATE_FORMAT_FIXTURES=1 cargo test -p intlify_format
+```
+
+The update mode updates expected `.mf2` files and invalid `diagnostics.json` summaries. It does not rewrite fixture `options.json`.
+
+CLI fixtures live under `packages/cli/fixtures/fmt` and use one directory per fixture case:
+
+```text
+packages/cli/fixtures/fmt/
+  write-changed/
+    input/
+    expected/
+      write/
+    write.stdout
+    options.json
+```
+
+For each CLI scenario, the runner copies the contents of `input/` into a temporary directory root and runs the intlify CLI with that temporary directory as cwd. Scenario `args` contain subcommand arguments only; the runner supplies the intlify binary path.
+
+CLI `options.json` uses a strict `scenarios[]` array:
+
+```json
+{
+  "scenarios": [
+    {
+      "name": "write",
+      "args": ["fmt", "."],
+      "exitCode": 0,
+      "stdout": "write.stdout",
+      "stderr": "write.stderr",
+      "expectedTree": "expected/write"
+    }
+  ]
+}
+```
+
+Scenario path fields are relative to the fixture case directory. These fields include `stdin`, `stdout`, `stderr`, `stdoutJson`, and `expectedTree`.
+
+CLI scenario rules:
+
+- `stdout` and `stderr` are optional; omitted fields mean empty expected output
+- `stdoutJson` parses stdout as JSON and compares it structurally against the expected JSON file
+- `stderrJson` is not supported
+- `stdin` points to a file used as process stdin
+- `expectedTree` is optional; when omitted, the runner asserts that the input tree remains unchanged
+- if `expectedTree` is omitted and the tree changes, the test fails even in update mode
+- scenario-level `env` is not supported initially
+
+CLI fixture updates use the same `INTLIFY_UPDATE_FORMAT_FIXTURES=1` environment variable. The update mode updates declared `stdout`, `stderr`, `stdoutJson`, and `expectedTree` artifacts. It does not add missing output fields or rewrite `options.json`; undeclared stdout/stderr output remains a test failure.
+
+Fixture authoring errors are hard test failures. Examples include malformed `options.json`, missing required files, mixed valid/invalid core cases, unknown fields, unsupported scenario fields, and expected files that do not exist.
 
 Formatter benchmarks may reuse parser fixtures for syntax coverage and add formatter-specific fixtures for spacing, layout, matcher, preserve mode, and direct `.mf2` workflows.
 
@@ -831,7 +931,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
 
-- exact fixture harness runner format for `options.json` matrices and diagnostics snapshots
 - LSP/editor configuration shape, including whether an explicit formatter config path is supported
 - LSP/editor behavior when config loading fails, including whether it falls back to defaults or reports an operational error
 - WASM bundle-size constraints and tree-shaking expectations
