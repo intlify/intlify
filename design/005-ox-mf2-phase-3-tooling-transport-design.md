@@ -543,6 +543,9 @@ Tooling and transport benchmarks must be phase-separated.
 
 Initial Phase 3 benchmark phases:
 
+- cli_startup_native
+- cli_startup_wrapper
+- cli_startup_installed
 - format_preserve
 - format_standard
 - format_check_cli_e2e
@@ -561,6 +564,8 @@ Initial Phase 3 benchmark phases:
 - cache_miss_parse
 - e2e_format
 
+The CLI startup benchmarks are Phase 3A foundation baselines. They should measure a direct native binary invocation, the npm wrapper invoking the native binary from the source tree, and an installed `node_modules/.bin/intlify` invocation separately. These measurements isolate Node.js wrapper startup, native package resolution, and native process spawn overhead from formatter, linter, parser, and transport work. They are baseline measurements rather than blocking performance gates.
+
 Future transport benchmark phases:
 
 - jsonrpc_baseline
@@ -570,4 +575,4 @@ Future transport benchmark phases:
 - cache_hit_query
 - long_lived_session_query
 
-Reports should separate parser, semantic lowering, snapshot encode/decode, binding calls, CLI JSON serialization, JSON-RPC transport, MessagePack transport, cache hit/miss behavior, and actual rule/formatter work.
+Reports should separate parser, semantic lowering, snapshot encode/decode, binding calls, CLI wrapper startup, native package resolution, native process spawn overhead, CLI JSON serialization, JSON-RPC transport, MessagePack transport, cache hit/miss behavior, and actual rule/formatter work.

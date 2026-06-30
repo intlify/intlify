@@ -531,6 +531,47 @@ Normal CI should validate the CLI foundation before publishing by running schema
 
 Parser binding packages remain focused on parsing, snapshots, and parser-level APIs. Formatter and linter APIs should not be folded into parser packages.
 
+## CLI Startup Benchmarks
+
+Phase 3A should provide a standalone benchmark entry point for measuring CLI startup overhead. This benchmark is a foundation baseline for the broader Phase 3 benchmark plan in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md), not a formatter, linter, parser, or transport benchmark.
+
+The purpose is to quantify the cost added by the npm wrapper before later `fmt`, `lint`, `check`, editor, or agent benchmarks start measuring product work. The benchmark must separate:
+
+- direct native binary startup
+- npm wrapper startup from the source tree
+- installed package startup through `node_modules/.bin/intlify`
+
+Initial Phase 3A startup benchmark phases:
+
+- `cli_startup_native`
+- `cli_startup_wrapper`
+- `cli_startup_installed`
+
+The primary benchmark command is `--version`. It is intentionally chosen because it exercises wrapper resolution, process startup, native binary startup, argument parsing, and version output without loading config or running formatter/linter behavior. This keeps the baseline focused on startup overhead.
+
+Benchmark commands:
+
+- `cli_startup_native`: execute the host native package binary copied by `cli#build`, such as `packages/cli-darwin-arm64/intlify --version`, or `packages/cli-win32-x64-msvc/intlify.exe --version` on Windows.
+- `cli_startup_wrapper`: execute `node packages/cli/bin/intlify.mjs --version` after `cli#build`, using the source-tree wrapper and host native package.
+- `cli_startup_installed`: create a temporary install fixture, install the locally packed or published `@intlify/cli` package plus the compatible host native package, and execute `node_modules/.bin/intlify --version`.
+
+The startup benchmark entry point should be exposed separately from validation tasks, for example as `vp run cli#bench:startup` and a root script such as `bench:cli-startup`. It may depend on `cli#build` and package assembly, but it must not be part of `vpr check`, `vpr test`, normal CI success gates, or release publish gates.
+
+Benchmark reporting should include:
+
+- benchmark phase name
+- command line
+- package version
+- git commit
+- operating system, architecture, and libc where applicable
+- Node.js and npm versions for wrapper and installed-package phases
+- native binary path
+- sample count and timing summary
+- derived wrapper overhead compared with direct native startup
+- derived installed-package overhead compared with direct native startup
+
+Timing results are environment-sensitive, so Phase 3A should not define pass/fail thresholds. Failures to execute the benchmark command itself are implementation errors for the benchmark entry point, but slow timings are observations rather than blocking failures. Benchmark results should be used to compare startup overhead over time and to subtract wrapper/native launch cost from later formatter, linter, and transport end-to-end measurements.
+
 ## Validation
 
 Phase 3A validation should focus on foundation behavior:
@@ -555,6 +596,7 @@ Phase 3A validation should focus on foundation behavior:
 - stdout/stderr behavior
 - deterministic JSON ordering
 - operational error shape
+- standalone CLI startup benchmark entry point
 
 Formatter and linter semantic correctness tests belong to later product phases.
 
