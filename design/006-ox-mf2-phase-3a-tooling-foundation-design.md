@@ -457,7 +457,7 @@ If the wrapper emits a JSON envelope before the Rust CLI starts, the envelope `v
 - no `engines` field is required
 - no `bin` entry; the public command is exposed only by `@intlify/cli`
 - no JavaScript import API is exposed
-- `publishConfig`: `{ "access": "public", "executableFiles": [...] }`, listing every native binary path so packed Unix binaries remain executable even though the package intentionally has no `bin` entry
+- `publishConfig`: `{ "access": "public", "executableFiles": [...] }`, listing every native binary path so packed Unix binaries remain executable even though the package intentionally has no `bin` entry. Release publishing should publish a pnpm-produced tarball for packages that use `executableFiles`, while keeping npm as the final publish command for Trusted Publishing.
 
 The `@intlify/cli-native` README should stay minimal. It should state that the package is the native binary package source for `@intlify/cli`, that release automation prepares target-specific binaries under `bin/<rust-target>/`, and that users normally install or invoke `@intlify/cli` rather than this package directly.
 

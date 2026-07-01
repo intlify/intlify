@@ -10,11 +10,7 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
-import {
-  detectLinuxLibc,
-  NATIVE_TARGETS,
-  resolveNativeTarget
-} from '../packages/cli/bin/intlify.mjs'
+import { detectLinuxLibc, resolveNativeTarget } from '../packages/cli/bin/intlify.mjs'
 
 const workspaceRoot = fileURLToPath(new URL('..', import.meta.url))
 const cliPackageRoot = join(workspaceRoot, 'packages', 'cli')
@@ -26,9 +22,8 @@ const wrapperBinPath = join(cliPackageRoot, 'bin', 'intlify.mjs')
 const schemaPath = join(cliPackageRoot, 'schema', 'config.schema.json')
 const unixExecutableMask = 0o111
 const executableMode = 0o755
-const supportedNativeBinaryPaths = new Map(
-  NATIVE_TARGETS.map(target => [`bin/${target.rustTarget}/${target.binaryName}`, target])
-)
+const defaultRunTimeoutMs = 300_000
+const timeoutKillGraceMs = 5_000
 
 const command = process.argv[2]
 
@@ -152,6 +147,10 @@ async function benchStartup() {
       nativeTarball,
       cliTarball
     })
+    const installedNativeBinaryPath = installedPackageNativeBinaryPath({
+      installDirectory,
+      target
+    })
 
     const version = await cliVersion()
     const phases = [
@@ -170,7 +169,7 @@ async function benchStartup() {
       {
         name: 'cli_startup_installed',
         command: [installedBinPath, '--version'],
-        nativeBinaryPath: nativeBinaryPath(target),
+        nativeBinaryPath: installedNativeBinaryPath,
         nodeVersion: process.version,
         npmVersion: await toolVersion('npm')
       }
@@ -263,17 +262,24 @@ async function assertInstalledPackagePermissions({ installDirectory, target }) {
   }
 
   await assertExecutable(
-    join(
+    installedPackageNativeBinaryPath({
       installDirectory,
-      'node_modules',
-      '@intlify',
-      'cli-native',
-      'bin',
-      target.rustTarget,
-      target.binaryName
-    )
+      target
+    })
   )
   await assertExecutable(join(installDirectory, 'node_modules', '.bin', 'intlify'))
+}
+
+function installedPackageNativeBinaryPath({ installDirectory, target }) {
+  return join(
+    installDirectory,
+    'node_modules',
+    '@intlify',
+    'cli-native',
+    'bin',
+    target.rustTarget,
+    target.binaryName
+  )
 }
 
 async function assertSchemaPresence() {
@@ -323,27 +329,19 @@ function assertNativePackFiles(pack, hostTarget) {
   assertEqual(pack.name, '@intlify/cli-native', '@intlify/cli-native pack name')
 
   const paths = pack.files.map(file => file.path).sort(compareStrings)
-  for (const requiredPath of [
+  const expectedPaths = [
     'README.md',
     'package.json',
     `bin/${hostTarget.rustTarget}/${hostTarget.binaryName}`
-  ]) {
-    if (!paths.includes(requiredPath)) {
-      throw new Error(`@intlify/cli-native pack is missing ${requiredPath}`)
-    }
-  }
+  ].sort(compareStrings)
+  assertJsonEqual(paths, expectedPaths, '@intlify/cli-native packed files')
 
-  for (const file of pack.files) {
-    if (file.path === 'README.md' || file.path === 'package.json') {
-      continue
-    }
-    const target = supportedNativeBinaryPaths.get(file.path)
-    if (!target) {
-      throw new Error(`unexpected @intlify/cli-native packed file ${file.path}`)
-    }
-    if (target.binaryName === 'intlify' && (file.mode & unixExecutableMask) === 0) {
-      throw new Error(`packed native binary ${file.path} must be executable`)
-    }
+  if (hostTarget.binaryName !== 'intlify.exe') {
+    assertPackMode(
+      pack,
+      `bin/${hostTarget.rustTarget}/${hostTarget.binaryName}`,
+      unixExecutableMask
+    )
   }
 }
 
@@ -456,8 +454,11 @@ async function run(commandName, args, options = {}) {
   const cwd = options.cwd ?? workspaceRoot
   const allowExitCodes = options.allowExitCodes ?? [0]
   const capture = options.capture ?? false
+  const timeoutMs = options.timeoutMs ?? defaultRunTimeoutMs
 
   return new Promise((resolve, reject) => {
+    let settled = false
+    let killTimer
     const child = spawn(commandName, args, {
       cwd,
       stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit'
@@ -474,19 +475,49 @@ async function run(commandName, args, options = {}) {
       })
     }
 
-    child.once('error', reject)
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM')
+      killTimer = setTimeout(() => {
+        child.kill('SIGKILL')
+      }, timeoutKillGraceMs)
+      settle(
+        reject,
+        new Error(
+          `${commandName} ${args.join(' ')} timed out after ${Math.round(timeoutMs / 1000)}s`
+        )
+      )
+    }, timeoutMs)
+
+    child.once('error', error => {
+      settle(reject, error, timeout, killTimer)
+    })
     child.once('close', code => {
       if (!allowExitCodes.includes(code)) {
-        reject(
+        settle(
+          reject,
           new Error(
             `${commandName} ${args.join(' ')} failed with exit code ${code}` +
               (capture && stderr ? `\n${stderr.trimEnd()}` : '')
-          )
+          ),
+          timeout,
+          killTimer
         )
         return
       }
-      resolve({ code, stdout, stderr })
+      settle(resolve, { code, stdout, stderr }, timeout, killTimer)
     })
+
+    function settle(callback, value, ...timers) {
+      for (const timer of timers) {
+        clearTimeout(timer)
+      }
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      callback(value)
+    }
   })
 }
 
