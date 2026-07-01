@@ -102,12 +102,28 @@ test('cli-native package metadata matches the native package source contract', a
     },
     files: ['bin', 'README.md', 'package.json'],
     publishConfig: {
-      access: 'public'
+      access: 'public',
+      executableFiles: nativeTargetMatrix.map(
+        target => `./bin/${target.rustTarget}/${target.binaryName}`
+      )
     }
   })
   expect(pkg.bin).toBeUndefined()
   expect(pkg.engines).toBeUndefined()
   expect(pkg.exports).toBeUndefined()
+})
+
+test('root package exposes CLI local validation entry points', async () => {
+  const pkg = await readJson('../../../package.json')
+
+  expect(pkg.scripts).toMatchObject({
+    'build:cli': 'vp run cli#build',
+    'schema:cli': 'vp run cli#schema',
+    'schema:cli:check': 'vp run cli#schema:check',
+    'check:cli-pack': 'vp run cli#pack:check',
+    'test:cli-smoke': 'vp run cli#smoke',
+    'bench:cli-startup': 'vp run cli#bench:startup'
+  })
 })
 
 test('legacy per-target native package skeletons are not checked in', async () => {

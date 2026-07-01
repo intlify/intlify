@@ -24,6 +24,14 @@
     "package.json"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "executableFiles": [
+      "./bin/x86_64-apple-darwin/intlify",
+      "./bin/aarch64-apple-darwin/intlify",
+      "./bin/x86_64-unknown-linux-gnu/intlify",
+      "./bin/aarch64-unknown-linux-gnu/intlify",
+      "./bin/x86_64-unknown-linux-musl/intlify",
+      "./bin/x86_64-pc-windows-msvc/intlify.exe"
+    ]
   }
 }
