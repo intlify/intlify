@@ -124,6 +124,9 @@ test('root package exposes CLI local validation entry points', async () => {
     'test:cli-smoke': 'vp run cli#smoke',
     'bench:cli-startup': 'vp run cli#bench:startup'
   })
+  expect(pkg.scripts.release).toContain('"packages/cli/package.json"')
+  expect(pkg.scripts.release).toContain('"packages/cli-native/package.json"')
+  expect(pkg.scripts.test).toContain('cargo test -p intlify_cli --all-targets')
 })
 
 test('legacy per-target native package skeletons are not checked in', async () => {
