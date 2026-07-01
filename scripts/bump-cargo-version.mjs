@@ -9,10 +9,11 @@ const version = JSON.parse(
 const cargoTomlFiles = [
   'crates/ox_mf2_parser/Cargo.toml',
   'crates/ox_mf2_napi/Cargo.toml',
-  'crates/ox_mf2_wasm/Cargo.toml'
+  'crates/ox_mf2_wasm/Cargo.toml',
+  'crates/intlify_cli/Cargo.toml'
 ]
 
-const cargoLockPackages = ['ox_mf2_parser', 'ox_mf2_napi', 'ox_mf2_wasm']
+const cargoLockPackages = ['ox_mf2_parser', 'ox_mf2_napi', 'ox_mf2_wasm', 'intlify_cli']
 
 for (const relativePath of cargoTomlFiles) {
   await replacePackageVersion(relativePath, version)

@@ -18,6 +18,7 @@ on:
           - npm-publish
           - crate-publish
           - published-smoke
+          - published-cli-smoke
           - published-crate-smoke
           - release-notes
       tag:
@@ -63,7 +64,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
           components: rustfmt, clippy
@@ -90,6 +91,18 @@ jobs:
 
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
+
+      - name: Verify CLI schema
+        run: vp run schema:cli:check
+
+      - name: Test CLI crate
+        run: cargo test -p intlify_cli --all-targets --color always
+
+      - name: Check CLI package contents
+        run: vp run check:cli-pack
+
+      - name: Smoke test CLI package
+        run: vp run test:cli-smoke
 
   build-napi:
     name: Build @intlify/ox-mf2-napi (${{ matrix.label }})
@@ -153,7 +166,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -194,6 +207,163 @@ jobs:
             packages/ox-mf2-napi/dist/native-binding.js
             packages/ox-mf2-napi/dist/native-binding.d.ts
 
+  build-cli-native:
+    name: Build @intlify/cli-native (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    needs:
+      - validate
+    if: >-
+      github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
+        (inputs.job == 'all' || inputs.job == 'npm-publish'))
+
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: darwin-arm64
+            target: aarch64-apple-darwin
+            binary: intlify
+          - os: macos-latest
+            label: darwin-x64
+            target: x86_64-apple-darwin
+            binary: intlify
+          - os: ubuntu-latest
+            label: linux-x64-gnu
+            target: x86_64-unknown-linux-gnu
+            binary: intlify
+          - os: ubuntu-latest
+            label: linux-x64-musl
+            target: x86_64-unknown-linux-musl
+            binary: intlify
+          - os: ubuntu-latest
+            label: linux-arm64-gnu
+            target: aarch64-unknown-linux-gnu
+            binary: intlify
+          - os: windows-latest
+            label: win32-x64-msvc
+            target: x86_64-pc-windows-msvc
+            binary: intlify.exe
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Enable long paths
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Add Rust target
+        env:
+          TARGET: ${{ matrix.target }}
+        run: rustup target add "$TARGET"
+
+      - name: Install Linux target tools
+        if: runner.os == 'Linux'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          sudo apt-get update
+          case "$TARGET" in
+            x86_64-unknown-linux-musl)
+              sudo apt-get install -y musl-tools
+              ;;
+            aarch64-unknown-linux-gnu)
+              sudo apt-get install -y gcc-aarch64-linux-gnu
+              ;;
+          esac
+
+      - name: Build CLI native binary
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          if [ "$TARGET" = "aarch64-unknown-linux-gnu" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          cargo build --release -p intlify_cli --bin intlify --target "$TARGET"
+
+      - name: Stage CLI native binary
+        env:
+          TARGET: ${{ matrix.target }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          source_binary="target/$TARGET/release/$BINARY"
+          staged_binary="cli-native-bin/$TARGET/$BINARY"
+          if [ ! -f "$source_binary" ]; then
+            echo "CLI binary is missing at $source_binary" >&2
+            exit 1
+          fi
+          mkdir -p "cli-native-bin/$TARGET"
+          cp "$source_binary" "$staged_binary"
+          if [ "$BINARY" != "intlify.exe" ]; then
+            chmod 755 "$staged_binary"
+          fi
+
+      - name: Smoke executable CLI target
+        env:
+          TARGET: ${{ matrix.target }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          runnable=$(node - <<'NODE'
+          const target = process.env.TARGET
+          const platform = process.platform
+          const arch = process.arch
+          const runnableTargets = new Map([
+            ['darwin-arm64', 'aarch64-apple-darwin'],
+            ['darwin-x64', 'x86_64-apple-darwin'],
+            ['linux-x64', 'x86_64-unknown-linux-gnu'],
+            ['linux-x64-musl', 'x86_64-unknown-linux-musl'],
+            ['linux-arm64', 'aarch64-unknown-linux-gnu'],
+            ['win32-x64', 'x86_64-pc-windows-msvc']
+          ])
+          const key = platform === 'linux' && target.endsWith('-musl')
+            ? `${platform}-${arch}-musl`
+            : `${platform}-${arch}`
+          process.stdout.write(String(runnableTargets.get(key) === target))
+          NODE
+          )
+          if [ "$runnable" = "true" ]; then
+            "cli-native-bin/$TARGET/$BINARY" --version
+          else
+            echo "Skipping direct execution for $TARGET on $(node -p \"process.platform + '/' + process.arch\")"
+          fi
+
+      - name: Prepare CLI native artifact
+        run: |
+          rm -rf cli-native-artifact
+          mkdir -p cli-native-artifact
+          cp -R cli-native-bin cli-native-artifact/
+
+      - name: Upload CLI native binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          if-no-files-found: error
+          name: cli-native-${{ matrix.target }}
+          path: cli-native-artifact
+
   npm-publish:
     name: Publish npm packages
     runs-on: ubuntu-latest
@@ -201,18 +371,25 @@ jobs:
     needs:
       - validate
       - build-napi
+      - build-cli-native
     if: >-
       always() && (
         (github.event_name == 'push' &&
           needs.validate.result == 'success' &&
-          needs.build-napi.result == 'success') ||
+          needs.build-napi.result == 'success' &&
+          needs.build-cli-native.result == 'success') ||
         (github.event_name == 'workflow_dispatch' &&
           (inputs.job == 'all' || inputs.job == 'npm-publish') &&
           needs.validate.result == 'success' &&
-          needs.build-napi.result == 'success')
+          needs.build-napi.result == 'success' &&
+          needs.build-cli-native.result == 'success')
       )
 
 
+    # npm Trusted Publishing is the normal path. NPM_TOKEN is an optional
+    # bootstrap fallback for first-time package publication before npm trusted
+    # publisher settings can exist, for example the first @intlify/cli-native
+    # release.
     environment: npm-release
     permissions:
       contents: read
@@ -233,7 +410,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -283,7 +460,48 @@ jobs:
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
 
+      - name: Prepare CLI release packages
+        run: |
+          rm -rf packages/cli-native/bin
+          mkdir -p packages/cli-native/bin
+
+          found=0
+          while IFS= read -r artifact_dir; do
+            cp -R "$artifact_dir"/. packages/cli-native/bin/
+            found=1
+          done < <(find artifacts -path '*/cli-native-bin' -type d | sort)
+
+          if [ "$found" -ne 1 ]; then
+            echo "CLI native binary artifacts are missing" >&2
+            exit 1
+          fi
+
+          find packages/cli-native/bin -type f ! -name '*.exe' -exec chmod 755 {} \;
+          find packages/cli-native/bin -type f | sort
+
+      - name: Validate CLI release packages
+        env:
+          CLI_NATIVE_PACK_TARGETS: all
+        run: |
+          vp run schema:cli:check
+          vp run check:cli-pack
+          vp run test:cli-smoke
+
+      - name: Configure npm token fallback
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "NPM_TOKEN is not configured; npm publish will use Trusted Publishing."
+            exit 0
+          fi
+
+          npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          echo "Configured npm token fallback for first-time package publication."
+
       - name: Publish packages
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi
 
   crate-publish:
@@ -324,7 +542,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -388,6 +606,44 @@ jobs:
       - name: Smoke test published packages
         run: node scripts/smoke-published-bindings.mjs "$TAG"
 
+  published-cli-smoke:
+    name: Smoke test published CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    needs:
+      - npm-publish
+    if: >-
+      always() && (
+        (github.event_name == 'push' &&
+          needs.npm-publish.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' &&
+          (inputs.job == 'published-cli-smoke' ||
+            (inputs.job == 'all' && needs.npm-publish.result == 'success')))
+      )
+
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 24
+          cache: false
+          run-install: false
+
+      - name: Smoke test published CLI
+        run: node scripts/smoke-published-cli.mjs "$TAG"
+
   published-crate-smoke:
     name: Smoke test published crates.io package
     runs-on: ubuntu-latest
@@ -420,7 +676,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -433,16 +689,19 @@ jobs:
     timeout-minutes: 15
     needs:
       - published-smoke
+      - published-cli-smoke
       - published-crate-smoke
     if: >-
       always() && (
         (github.event_name == 'push' &&
           needs.published-smoke.result == 'success' &&
+          needs.published-cli-smoke.result == 'success' &&
           needs.published-crate-smoke.result == 'success') ||
         (github.event_name == 'workflow_dispatch' &&
           (inputs.job == 'release-notes' ||
             (inputs.job == 'all' &&
               needs.published-smoke.result == 'success' &&
+              needs.published-cli-smoke.result == 'success' &&
               needs.published-crate-smoke.result == 'success')))
       )
 

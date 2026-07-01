@@ -12,7 +12,9 @@ const { dryRun, explicitTag, npmDir } = parseCliArgs(process.argv.slice(2))
 const packageDirs = [
   ...collectGeneratedPackageDirs(npmDir),
   join(rootDir, 'packages', 'ox-mf2-wasm'),
-  join(rootDir, 'packages', 'ox-mf2-napi')
+  join(rootDir, 'packages', 'ox-mf2-napi'),
+  join(rootDir, 'packages', 'cli-native'),
+  join(rootDir, 'packages', 'cli')
 ]
 
 for (const packageDir of packageDirs) {
@@ -97,9 +99,22 @@ async function preparePublishTarget(packageDir, pkg) {
 
 function requiresPnpmPackedTarball(pkg) {
   return (
-    Array.isArray(pkg.publishConfig?.executableFiles) &&
-    pkg.publishConfig.executableFiles.length > 0
+    Boolean(
+      Array.isArray(pkg.publishConfig?.executableFiles) &&
+      pkg.publishConfig.executableFiles.length > 0
+    ) || hasWorkspacePublishDependency(pkg)
   )
+}
+
+function hasWorkspacePublishDependency(pkg) {
+  for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+    for (const specifier of Object.values(pkg[field] ?? {})) {
+      if (typeof specifier === 'string' && specifier.startsWith('workspace:')) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 function packageTarballName(pkg) {
