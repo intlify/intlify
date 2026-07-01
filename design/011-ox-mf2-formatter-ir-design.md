@@ -465,6 +465,57 @@ UPDATE_FIXTURES=1 cargo test -p intlify_format
 
 Without `UPDATE_FIXTURES=1`, tests compare the generated output and any present layout dump pair against checked-in expected files.
 
+## Invariant and Error Boundaries
+
+Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for normal formatter execution. Runtime invariant violations in the formatter pipeline are converted into the shared formatter operational error code `internal_error`.
+
+`internal_error` is for internal formatter state that should have been impossible after validation. It is not used for user input validation, parser diagnostics, unsupported input files, or fixture authoring mistakes.
+
+Runtime invariant violations include:
+
+- an invalid `SourceSlice(SourceSpan)` inside the IR, such as `start > end`, `end > source.len()`, or non-UTF-8 character boundaries
+- formatter-computed source spans that were not derived from verified token/source ranges
+- matcher table normalization state where `column_widths` does not match selector/key columns, row key counts are inconsistent, or uncomputed columns reach lowering
+- Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
+- invalid comment source spans
+
+`formatSnapshot(snapshot, source, options)` has a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
+
+Parser diagnostics are not internal errors. If source text or a supplied snapshot contains parser diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and do not start IR construction. `errors` remains empty unless an independent operational error also occurred.
+
+Invalid options are rejected before IR construction:
+
+- CLI config/schema validation failures use `config_validation_failed`
+- Rust, N-API, and WASM formatter API option validation failures use `invalid_options`
+
+Unsupported CLI input files or unsupported `--stdin-filepath` extensions are rejected during CLI/input discovery with `unsupported_input_file`. They do not enter parser or formatter IR construction.
+
+Comment attachment should prefer preservation over failure. If a valid comment cannot be classified cleanly by the line-position rule, the formatter attaches it to the next major node as a leading comment. If no later major node exists, it attaches to the `LayoutMessage` trailing comments. The formatter must not drop comments to recover from an attachment ambiguity.
+
+Fixture authoring failures are test-only failures, not public formatter errors. They include:
+
+- only one of `.layout.before.txt` and `.layout.after.txt` exists
+- an expected layout dump file cannot be read
+- an expected layout dump header is malformed
+- a success formatter fixture input produces parser diagnostics
+- `UPDATE_FIXTURES=1` is used while only one file in a layout dump pair exists
+
+Generated output or layout dump differences are ordinary test assertion failures. They mean formatter behavior changed or the expected fixture is stale, and may be updated intentionally with `UPDATE_FIXTURES=1`.
+
+Test helpers and fixture loaders may use assertions, but fixture authoring failures should produce explicit messages that identify the bad fixture path and condition.
+
+`debug_assert!` may be used as an additional development aid inside IR construction, normalization, lowering, or rendering. It must not be the only correctness check. Release/public API execution still needs `Result`-based validation that can become `internal_error`.
+
+Public `internal_error.details` should be minimal and must not expose IR dumps, source text, node spans, or parser internals. It may include a stable pipeline phase:
+
+```text
+snapshot_traversal
+layout_ir_construction
+layout_ir_normalize
+document_ir_lowering
+document_ir_render
+```
+
 ## Benchmarks
 
 Formatter IR benchmark stages should align with the pipeline:
@@ -479,4 +530,4 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Open Questions
 
-- Which exact invariant checks should return `internal_error` versus fixture-authoring failures in tests?
+No formatter IR design open questions remain at this level. Later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
