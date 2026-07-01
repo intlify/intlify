@@ -108,7 +108,6 @@ enum LayoutDeclaration {
 
 struct LayoutInputDeclaration {
     meta: LayoutNodeMeta,
-    variable: LayoutVariable,
     value: LayoutExpression,
 }
 
@@ -119,24 +118,23 @@ struct LayoutLocalDeclaration {
 }
 ```
 
+`LayoutInputDeclaration` stores only the placeholder expression. The declared input variable is derived from the variable operand inside `value`, matching the parser and semantic model where `.input {$name}` owns one placeholder expression. Constructing a `LayoutInputDeclaration` whose `value` does not contain exactly one variable operand is an internal invariant error, not a recoverable formatter diagnostic, because formatter IR is built only after parser diagnostics have succeeded.
+
+`LayoutLocalDeclaration` keeps `variable` and `value` separately because `.local $name = {...}` has an explicit left-hand-side variable outside the expression value.
+
 Expressions are decomposed at the units where the formatter controls spacing:
 
 ```rust
 struct LayoutExpression {
     meta: LayoutNodeMeta,
     operand: Option<LayoutOperand>,
-    annotation: Option<LayoutAnnotation>,
+    function: Option<LayoutFunction>,
     attributes: Vec<LayoutAttribute>,
 }
 
 enum LayoutOperand {
     Variable(LayoutVariable),
     Literal(LayoutLiteral),
-}
-
-enum LayoutAnnotation {
-    Function(LayoutFunction),
-    PrivateUse(LayoutPrivateUse),
 }
 
 struct LayoutFunction {
@@ -159,6 +157,8 @@ enum LayoutLiteralOrVariable {
     Variable(LayoutVariable),
 }
 ```
+
+`LayoutExpression.function` represents the optional `:` function syntax from the current MF2 grammar. The IR does not model a separate private-use annotation form because the current grammar and parser do not expose such a syntax. `@` syntax is represented only as `LayoutAttribute`.
 
 Patterns preserve translatable text and literal spelling through source slices while still allowing embedded expressions and markup to be formatted:
 
@@ -294,8 +294,10 @@ After MF2 Layout IR construction, a normalize pass prepares data that needs whol
 
 Phase 3B normalize work includes:
 
-- matcher table column width calculation using Unicode display width
+- matcher table column width calculation using Unicode display width over emitted raw source spelling
 - `blank_lines_before` normalization to `0` or `1`
+
+Matcher column widths are computed from the same text the renderer emits. `LayoutVariantKey::Literal` therefore measures the `LayoutLiteral` source slice, including quoted-literal delimiters and escape spelling, instead of decoding the literal value first. `LayoutVariantKey::CatchAll` measures the generated `*` token.
 
 `Group(flat|break)` decisions are made during MF2 Layout IR construction from formatter mode and shape hints. The normalize pass should not become the place where all formatting decisions are delayed.
 

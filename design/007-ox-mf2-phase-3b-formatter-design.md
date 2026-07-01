@@ -374,15 +374,17 @@ Write mode is the default. `--check` reports whether files differ without writin
 
 The default reporter is `text`. Machine-readable output is selected with `--reporter json`, matching the Phase 3A reporter names.
 
-`--list-different` is a text-only mode. Combining it with `--reporter json` is an invalid CLI argument. Combining it with stdin is also invalid, including `--check --list-different` with stdin. `--check --reporter json` is allowed.
+`--list-different` is a text-only mode. Combining it with `--reporter json` is an invalid CLI argument. Combining it with stdin mode is also invalid, including `--check --list-different --stdin-filepath <path>`. `--check --reporter json` is allowed.
 
-Stdin formatting is supported. Stdin always writes formatted code to stdout and never writes to `--stdin-filepath`. `--stdin-filepath` is optional and only provides path context for extension checks, result paths, and future adapters. Without `--stdin-filepath`, stdin is treated as a direct MF2 message input named `<stdin>`.
+Stdin formatting is supported only through explicit stdin mode. `--stdin-filepath <path>` selects stdin mode, reads all source text from stdin, uses `<path>` as the virtual input path, writes formatted code to stdout, and never writes to `<path>`. This follows the oxfmt-style explicit stdin contract and avoids making `intlify fmt` change behavior based on whether stdin is piped.
+
+Stdin mode cannot be combined with file, directory, or glob operands. Any operand together with `--stdin-filepath` is an `invalid_cli_argument` error.
 
 Stdin with `--check` is allowed. It exits with `1` when the stdin source would change. If stdin has parser diagnostics, human-readable mode writes no formatted code to stdout, writes diagnostics to stderr, and exits with `1`. JSON reporter mode writes the JSON envelope to stdout.
 
-When no file, directory, or glob operands are provided, `intlify fmt` behaves as `intlify fmt .`. Help and version options keep the Phase 3A precedence and do not trigger config loading, input discovery, or formatting.
+When no file, directory, or glob operands are provided and stdin mode is not selected, `intlify fmt` behaves as `intlify fmt .`. Help and version options keep the Phase 3A precedence and do not trigger config loading, input discovery, or formatting.
 
-`intlify fmt` supports `--` as an end-of-options marker. Tokens after `--` are treated as input path or glob operands even if they start with `-` or `--`. If `--` is present with no operands after it, the command follows the no-operand rule and formats `.`. Global options such as `--reporter json` and formatter options such as `--mode preserve` are recognized only before `--`.
+`intlify fmt` supports `--` as an end-of-options marker. Tokens after `--` are treated as input path or glob operands even if they start with `-` or `--`. If `--` is present with no operands after it and stdin mode is not selected, the command follows the no-operand rule and formats `.`. Global options such as `--reporter json` and formatter options such as `--mode preserve` are recognized only before `--`.
 
 `--ignore-path` may be provided multiple times. `--mode`, `--stdin-filepath`, `--check`, `--list-different`, and `--reporter` are not repeatable; duplicates are `duplicate_cli_option` errors.
 
@@ -394,7 +396,7 @@ The primary input unit is `1 file = 1 MF2 message`. Phase 3B initially supports 
 
 Input rules:
 
-- no operands are equivalent to an explicit directory operand `.`
+- in file mode, no operands are equivalent to an explicit directory operand `.`
 - explicit `.mf2` file paths are accepted
 - explicit non-`.mf2` file paths are unsupported input errors and exit with `2`
 - directory inputs are searched recursively for `.mf2` files
@@ -448,15 +450,17 @@ The same blank-line and unescaped leading `#` behavior applies to `fmt.ignorePat
 
 Ignore rules apply to all target files, including explicit file input. For example, `intlify fmt ignored/file.mf2` skips the file when the ordered ignore list resolves that path as ignored. If all requested inputs are ignored and the final selected target set is empty, the command exits with `0`.
 
-The initial `.gitignore` behavior reads only the project root `.gitignore`, matching the root-only config discovery model. Nested `.gitignore` files are deferred.
+The initial `.gitignore` behavior reads only the resolved project root `.gitignore`, matching the root-only config discovery model. If `intlify.config` provides a project root override, formatter ignore behavior uses the final resolved project root rather than the process `cwd` or the pre-config discovered root. Nested `.gitignore` files are deferred.
 
-All ignore patterns are evaluated relative to the project root, including patterns loaded from `--ignore-path`.
+All ignore patterns are evaluated relative to the resolved project root, including patterns loaded from `--ignore-path`.
+
+`--ignore-path <path>` itself is resolved after config loading. Absolute ignore file paths are used as-is. Relative ignore file paths are resolved from the resolved project root, including a project root supplied by config. This differs from `--config <path>`, which is resolved from the process `cwd` because it must be loaded before the project root override can be known.
 
 Invalid `fmt.ignorePatterns` entries are config validation errors and exit with `2` using `config_validation_failed`. Invalid patterns in `--ignore-path` files are operational errors and exit with `2`. Unsupported or unrecognized patterns in root `.gitignore` are ignored as non-fatal compatibility behavior.
 
 Missing `--ignore-path` files are operational errors and exit with `2`.
 
-Stdin without `--stdin-filepath` does not apply ignore rules. Stdin with `--stdin-filepath path.mf2` applies ignore rules to that context path. If the stdin filepath is ignored, normal stdin formatting writes the original stdin source to stdout and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
+Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, normal stdin formatting writes the original stdin source to stdout and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
 
 ### Exit Codes
 
@@ -498,7 +502,7 @@ Check mode:
 Stdin human output:
 
 - normal stdin formatting writes formatted code to stdout, writes nothing to stderr on success, and exits with `0`
-- stdin `--check` with a difference prints `--stdin-filepath` when provided, otherwise `"<stdin>"`, writes nothing to stderr, and exits with `1`
+- stdin `--check` with a difference prints the `--stdin-filepath` virtual path, writes nothing to stderr, and exits with `1`
 - stdin `--check` without a difference writes nothing to stdout or stderr and exits with `0`
 - stdin parser diagnostics write no formatted code to stdout, render diagnostics to stderr, and exit with `1`
 
@@ -558,7 +562,7 @@ Write mode adds `formattedFiles`, counting files actually written. Check mode ad
 
 `--list-different` is not a JSON operation. It is a text-only output mode and conflicts with `--reporter json`. JSON users should use `--check --reporter json`.
 
-When no files are selected after filtering, JSON output uses a mode-independent zero-target summary:
+When no files are selected after filtering in file mode, JSON output uses a zero-target summary:
 
 ```json
 {
@@ -573,7 +577,24 @@ When no files are selected after filtering, JSON output uses a mode-independent 
 }
 ```
 
-`operation` and `mode` are still emitted when they can be resolved. `formattedFiles` and `differentFiles` are omitted for zero-target output. `results` and `errors` are empty arrays.
+`operation` and `mode` are still emitted when they can be resolved. `formattedFiles` and `differentFiles` are omitted for zero-target output. `results` and `errors` are empty arrays. Ignored stdin mode also uses zero-target output, but its `operation` remains `"stdin"` or `"stdin-check"` because stdin mode was selected explicitly.
+
+Ignored stdin JSON output in normal stdin mode uses:
+
+```json
+{
+  "status": "success",
+  "operation": "stdin",
+  "mode": "standard",
+  "matchedFiles": 0,
+  "unchangedFiles": 0,
+  "diagnosticFiles": 0,
+  "diagnosticCount": 0,
+  "errorCount": 0
+}
+```
+
+Ignored stdin JSON output in stdin check mode uses the same zero-target counters with `"operation": "stdin-check"`. It does not add `differentFiles`, because the ignored stdin source is not checked as a formatter target.
 
 Each `results[]` entry uses this shape:
 
@@ -601,7 +622,7 @@ Ignored files are not included in `results[]`; `results[]` represents only the f
 
 Mixed outcomes continue processing valid selected `.mf2` targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"error"`, and exits with `2`.
 
-For stdin JSON output, `matchedFiles` is `1` unless stdin is skipped by ignore rules through `--stdin-filepath`. If `--stdin-filepath` is provided, `results[0].path` is that path; otherwise it is `"<stdin>"`. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
+For stdin JSON output, `matchedFiles` is `1` unless stdin is skipped by ignore rules through `--stdin-filepath`. `results[0].path` is the `--stdin-filepath` virtual path. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
 
 If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "error"` and a top-level `invalid_cli_argument` error.
 
@@ -795,7 +816,7 @@ Rules:
 - the final key column and the variant value pattern start have at least 2 spaces between them
 - preserve mode may preserve existing single-line/multi-line shape and blank-line grouping, but still normalizes matcher rows to the table-like spacing rules
 
-Matcher column width is measured using Unicode display width, not UTF-8 byte length. Row alignment applies only to variant key columns and the value pattern start. The value pattern's internal formatting is handled by normal pattern formatting, regardless of whether the pattern starts with quoted text, an expression, or markup. Phase 3B does not wrap long value patterns.
+Matcher column width is measured using Unicode display width, not UTF-8 byte length. Literal key width is measured from the raw source spelling that the formatter will emit, not from a decoded literal value. For example, escaped characters and quoted-literal delimiters count according to the emitted source slice. Row alignment applies only to variant key columns and the value pattern start. The value pattern's internal formatting is handled by normal pattern formatting, regardless of whether the pattern starts with quoted text, an expression, or markup. Phase 3B does not wrap long value patterns.
 
 Example:
 
