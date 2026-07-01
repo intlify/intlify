@@ -78,6 +78,55 @@ Preserve mode still normalizes:
 
 Preserve mode is not a minimal-diff formatter. It may rewrite larger regions when the formatted shape follows ox-mf2 style rules.
 
+### Mode Examples
+
+The examples in this section are illustrative. Fixture expected files remain the exact source of truth for formatted output.
+
+Standard mode shows canonical spacing, indentation, LF line endings, exactly one final LF, and matcher table spacing:
+
+```mf2
+.input   {$count   :number}
+.local $label={$count:number}
+.match $count
+0 {{No items}}
+1 {{One item}}
+*   {{$label items}}
+```
+
+formats toward:
+
+```mf2
+.input {$count :number}
+.local $label = {$count :number}
+.match $count
+0  {{No items}}
+1  {{One item}}
+*  {{$label items}}
+```
+
+Preserve mode may use the original single-line or multi-line source shape where the shape is meaningful, while still normalizing local spacing:
+
+```mf2
+.input   {$name   :string} {{Hello {$name}}}
+```
+
+may remain a single-line message shape:
+
+```mf2
+.input {$name :string} {{Hello {$name}}}
+```
+
+Preserve mode may also keep blank-line grouping as a source-shape hint:
+
+```mf2
+.input {$count :number}
+
+.local $label = {$count :number}
+{{{$label} items}}
+```
+
+Standard mode may collapse that grouping when canonical layout does not require it, while preserve mode may keep the blank line.
+
 ## Public API Shape
 
 The primary Rust API parses and formats one MF2 message:
@@ -736,6 +785,44 @@ Formatter fixtures should be reviewable and stable.
 
 Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` API, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
 
+### Minimum Coverage Matrix
+
+Coverage is scoped by implementation PR. A row is `MUST` for the PR that implements the corresponding behavior; before that PR, the row is either not applicable or `SHOULD` only when it can be covered without pulling future work forward.
+
+Syntax coverage:
+
+| Coverage area | Required by | Requirement |
+| --- | --- | --- |
+| `.input` and `.local` declarations | Core formatter rules PR | `MUST` |
+| expressions with operands and functions | Core formatter rules PR | `MUST` |
+| options and attributes | Core formatter rules PR | `MUST` |
+| markup syntax | Core formatter rules PR | `MUST` |
+| matcher table layout | Core formatter rules PR | `MUST` |
+| quoted patterns and whitespace-sensitive pattern text | Core formatter rules PR | `MUST` |
+| quoted literal spelling, unquoted literal spelling, and escape spelling preservation | Core formatter rules PR | `MUST` |
+| parser diagnostics that produce no formatted output | Fixture harness / core formatter PRs | `MUST` |
+| preserve-mode single-line / multi-line source shape | Preserve formatter rules PR | `MUST` |
+| preserve-mode blank-line grouping and leading/trailing trivia | Preserve formatter rules PR | `MUST` |
+
+Behavior coverage:
+
+| Coverage area | Required by | Requirement |
+| --- | --- | --- |
+| `format_message` output and `check_format` changed/unchanged behavior | Core formatter PRs | `MUST` |
+| idempotency of formatted output | Core formatter PRs | `MUST` |
+| formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
+| parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
+| `intlify fmt` write mode | CLI formatter PR | `MUST` |
+| `intlify fmt --check` and `--list-different` | CLI formatter PR | `MUST` |
+| stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
+| JSON reporter success, difference, diagnostic, and operational-error output | CLI formatter PR | `MUST` |
+| explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
+| unsupported file, unmatched input, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
+| ignore source precedence across root `.gitignore`, `--ignore-path`, and `fmt.ignorePatterns` | CLI formatter PR | `MUST` |
+| N-API `formatMessage`, `checkFormat`, and `formatSnapshot` contract | N-API binding PR | `MUST` |
+| WASM `formatMessage`, `checkFormat`, and `formatSnapshot` contract | WASM binding PR | `MUST` |
+| local benchmark command execution and result schema validation | Benchmark PR | `MUST` |
+
 Core fixtures live under `crates/intlify_format/fixtures`.
 
 Valid core fixtures use directory fixtures:
@@ -897,6 +984,8 @@ Phase 3 benchmark names:
 
 Benchmark commands and result schemas must be executable and testable, but timing thresholds are not CI pass/fail gates in Phase 3B. A benchmark command that cannot build, cannot execute, cannot read fixtures, or emits malformed results is an implementation failure. A slow timing value is an observation, not a failing threshold.
 
+WASM bundle size is measured, not gated, in Phase 3B. The initial formatter design does not set a numeric size budget for `@intlify/format-wasm`, and size changes should not fail CI. The implementation should keep WASM artifact size and JavaScript glue size observable so later releases can compare browser-facing cost over time.
+
 GitHub Actions benchmark jobs and issue-comment reporting are deferred follow-up work. The Phase 3B implementation should not add benchmark runtime to normal `vpr check`, `vpr test`, or default CI gates.
 
 ## Implementation Phasing
@@ -925,12 +1014,10 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 - Runtime controls such as `--threads`.
 - `intlify init` config scaffolding once formatter and linter config fields are stable enough to write.
 - GitHub Actions benchmark jobs and issue-comment benchmark reporting for parser and formatter trends.
+- WASM artifact size and JavaScript glue size reporting for both `@intlify/format-wasm` and `@intlify/ox-mf2-wasm`; these measurements should remain observational until a future design sets an explicit budget.
 - Publishing public command-specific output JSON Schemas after `schemaVersion` is stable enough.
+- LSP/editor configuration behavior, including explicit formatter config paths and config-load failure fallback/error policy, in the LSP/editor detailed design.
 
 ## Open Questions
 
-The following items remain detailed formatter design questions, not Phase 3 boundary decisions:
-
-- LSP/editor configuration shape, including whether an explicit formatter config path is supported
-- LSP/editor behavior when config loading fails, including whether it falls back to defaults or reports an operational error
-- WASM bundle-size constraints and tree-shaking expectations
+No formatter-specific open questions remain at this design level. Deferred items are tracked in [Deferred Follow-Up Notes](#deferred-follow-up-notes) or in later product-specific design documents.
