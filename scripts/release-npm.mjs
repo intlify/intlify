@@ -4,17 +4,10 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
-const args = process.argv.slice(2)
-const command = args[0] ?? 'publish'
-const dryRun = args.includes('--dry-run') || command === 'dry-run'
-const npmDir = readOption('--npm-dir') ?? join(rootDir, 'release-dir', 'ox-mf2-napi')
-const explicitTag = readOption('--tag')
-
-if (!['publish', 'dry-run'].includes(command)) {
-  throw new Error(`unsupported command: ${command}`)
-}
+const { dryRun, explicitTag, npmDir } = parseCliArgs(process.argv.slice(2))
 
 const packageDirs = [
   ...collectGeneratedPackageDirs(npmDir),
@@ -107,13 +100,35 @@ function packageTarballName(pkg) {
   return `${pkg.name.replace(/^@/, '').replace('/', '-')}-${pkg.version}.tgz`
 }
 
-async function readJson(path) {
-  return JSON.parse(await readFile(path, 'utf8'))
+function parseCliArgs(args) {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      'dry-run': { type: 'boolean' },
+      'npm-dir': { type: 'string' },
+      tag: { type: 'string' }
+    },
+    allowPositionals: true
+  })
+
+  if (positionals.length > 1) {
+    throw new Error(`expected at most one command, received: ${positionals.join(' ')}`)
+  }
+
+  const command = positionals[0] ?? 'publish'
+  if (!['publish', 'dry-run'].includes(command)) {
+    throw new Error(`unsupported command: ${command}`)
+  }
+
+  return {
+    dryRun: Boolean(values['dry-run']) || command === 'dry-run',
+    explicitTag: values.tag,
+    npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi')
+  }
 }
 
-function readOption(name) {
-  const index = args.indexOf(name)
-  return index === -1 ? undefined : args[index + 1]
+async function readJson(path) {
+  return JSON.parse(await readFile(path, 'utf8'))
 }
 
 function run(commandName, commandArgs, options) {
