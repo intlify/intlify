@@ -337,6 +337,133 @@ Initial selective dump fixtures should focus on:
 - preserve-mode `shape_hint`
 - `blank_lines_before` normalization
 - `SourceSlice` construction
+- comment attachment and preservation
+
+Layout dump fixtures live next to formatter input/output fixtures and are selective. A formatter fixture only validates layout dumps when both files exist:
+
+```text
+fixtures/formatter/matcher/basic.input.mf2
+fixtures/formatter/matcher/basic.output.mf2
+fixtures/formatter/matcher/basic.layout.before.txt
+fixtures/formatter/matcher/basic.layout.after.txt
+```
+
+`basic.layout.before.txt` stores the MF2 Layout IR before normalization. `basic.layout.after.txt` stores the MF2 Layout IR after normalization. If only one of the two layout dump files exists, the test treats it as a fixture authoring error.
+
+The dump format is a dedicated two-space-indented text format. It is not Rust `Debug`, JSON, RON, or a public serialization contract.
+
+Each dump starts with a minimal key/value header:
+
+```text
+format=ox-mf2-layout-dump
+stage=before-normalize
+mode=preserve
+
+Message span=0..84 shape=Break blank=0
+```
+
+Header fields are fixed to:
+
+- `format=ox-mf2-layout-dump`
+- `stage=before-normalize | after-normalize`
+- `mode=standard | preserve`
+
+The dump does not include package versions, parser versions, fixture paths, or dump format versions. Fixture updates happen inside the same repository, so version churn should not affect expected files.
+
+Major node lines use this field order:
+
+```text
+Kind span=START..END shape=Flat|Break|Unknown blank=N [extra-fields]
+```
+
+`span` uses UTF-8 byte offsets and half-open ranges. `shape` and `blank` are always emitted for major nodes, even when `shape=Unknown` or `blank=0`. Node-specific fields follow the common metadata fields. Empty lists are omitted unless the empty value is meaningful, such as `columns=[]` before matcher table normalization.
+
+Before normalization, `blank=N` may contain the raw blank-line count. After normalization, `blank` is limited to `0` or `1`. `shape` is emitted in both before and after dumps and is not changed by normalization.
+
+Source-backed leaves use lower-case formatter-owned names and include both span and JSON-string-escaped source text:
+
+```text
+variable span=8..14 text="$count"
+identifier span=16..22 text="number"
+literal span=30..35 text="|foo|"
+pattern_text span=40..46 text="Hello "
+comment span=0..12 text="# note"
+```
+
+Generated keywords and punctuation, such as `.input`, `.local`, `.match`, `{`, `}`, `=`, `:`, and `@`, are not emitted in MF2 Layout IR dumps because they are not MF2 Layout IR nodes.
+
+Comments are emitted as child lines on their attached major node:
+
+```text
+Input span=12..30 shape=Flat blank=0
+  leading_comment span=0..10 text="# note"
+  Expression span=19..30 shape=Flat blank=0
+    variable span=20..26 text="$count"
+  trailing_comment span=31..40 text="# tail"
+```
+
+Expressions, patterns, markup, and matcher tables are dumped as trees instead of source-like formatted text:
+
+```text
+Expression span=8..23 shape=Flat blank=0
+  variable span=9..15 text="$count"
+  Function
+    identifier span=17..23 text="number"
+    option
+      identifier span=24..27 text="min"
+      literal span=28..29 text="1"
+  attribute
+    identifier span=31..35 text="unit"
+    literal span=36..40 text="meter"
+```
+
+Pattern chunks are emitted in source order:
+
+```text
+Pattern span=30..60 shape=Flat blank=0
+  pattern_text span=32..38 text="Hello "
+  Expression span=38..45 shape=Flat blank=0
+    variable span=39..44 text="$name"
+  MarkupOpen span=45..55 shape=Flat blank=0
+    identifier span=47..51 text="link"
+```
+
+Markup node names are `MarkupOpen`, `MarkupClose`, and `MarkupStandalone`.
+
+Matcher table dumps include selectors, rows, variant keys, and computed columns:
+
+```text
+MatcherTable span=24..96 shape=Break blank=0 columns=[]
+  selectors
+    Expression span=31..38 shape=Flat blank=0
+      variable span=32..38 text="$count"
+  Row span=39..58 shape=Flat blank=0
+    key literal span=39..40 text="0"
+    Pattern span=42..58 shape=Flat blank=0
+      pattern_text span=44..52 text="No items"
+  Row span=59..82 shape=Flat blank=0
+    key catch_all span=59..60 text="*"
+    Pattern span=62..82 shape=Flat blank=0
+      pattern_text span=64..75 text="Other items"
+```
+
+After normalization, the same matcher table emits computed column widths:
+
+```text
+format=ox-mf2-layout-dump
+stage=after-normalize
+mode=preserve
+
+MatcherTable span=24..96 shape=Break blank=0 columns=[1]
+```
+
+Fixture updates use the same explicit update flag as final formatter output fixtures:
+
+```sh
+UPDATE_FIXTURES=1 cargo test -p intlify_format
+```
+
+Without `UPDATE_FIXTURES=1`, tests compare the generated output and any present layout dump pair against checked-in expected files.
 
 ## Benchmarks
 
@@ -352,5 +479,4 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Open Questions
 
-- What stable dump syntax should be used for MF2 Layout IR fixture files?
 - Which exact invariant checks should return `internal_error` versus fixture-authoring failures in tests?
