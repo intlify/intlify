@@ -10,7 +10,11 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
-import { detectLinuxLibc, resolveNativeTarget } from '../packages/cli/bin/intlify.mjs'
+import {
+  detectLinuxLibc,
+  NATIVE_TARGETS,
+  resolveNativeTarget
+} from '../packages/cli/bin/intlify.mjs'
 
 const workspaceRoot = fileURLToPath(new URL('..', import.meta.url))
 const cliPackageRoot = join(workspaceRoot, 'packages', 'cli')
@@ -90,7 +94,7 @@ async function checkCliPackages() {
   assertPackMode(cliDryRun, 'bin/intlify.mjs', unixExecutableMask)
 
   const nativeDryRun = await npmPackDryRun(nativePackageRoot)
-  assertNativePackFiles(nativeDryRun, target)
+  assertNativePackFiles(nativeDryRun, expectedNativePackTargets(target))
 
   const packDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-pack-check-'))
   const installDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-pack-install-'))
@@ -325,23 +329,33 @@ function assertPackMode(pack, path, executableMask) {
   }
 }
 
-function assertNativePackFiles(pack, hostTarget) {
+function expectedNativePackTargets(hostTarget) {
+  const mode = process.env.CLI_NATIVE_PACK_TARGETS ?? 'host'
+  if (mode === 'host') {
+    return [hostTarget]
+  }
+  if (mode === 'all') {
+    return NATIVE_TARGETS
+  }
+  throw new Error('CLI_NATIVE_PACK_TARGETS must be "host" or "all"')
+}
+
+function assertNativePackFiles(pack, expectedTargets) {
   assertEqual(pack.name, '@intlify/cli-native', '@intlify/cli-native pack name')
 
   const paths = pack.files.map(file => file.path).sort(compareStrings)
   const expectedPaths = [
     'README.md',
     'package.json',
-    `bin/${hostTarget.rustTarget}/${hostTarget.binaryName}`
+    ...expectedTargets.map(target => `bin/${target.rustTarget}/${target.binaryName}`)
   ].sort(compareStrings)
   assertJsonEqual(paths, expectedPaths, '@intlify/cli-native packed files')
 
-  if (hostTarget.binaryName !== 'intlify.exe') {
-    assertPackMode(
-      pack,
-      `bin/${hostTarget.rustTarget}/${hostTarget.binaryName}`,
-      unixExecutableMask
-    )
+  for (const target of expectedTargets) {
+    if (target.binaryName === 'intlify.exe') {
+      continue
+    }
+    assertPackMode(pack, `bin/${target.rustTarget}/${target.binaryName}`, unixExecutableMask)
   }
 }
 
