@@ -351,12 +351,18 @@ jobs:
             echo "Skipping direct execution for $TARGET on $(node -p \"process.platform + '/' + process.arch\")"
           fi
 
+      - name: Prepare CLI native artifact
+        run: |
+          rm -rf cli-native-artifact
+          mkdir -p cli-native-artifact
+          cp -R cli-native-bin cli-native-artifact/
+
       - name: Upload CLI native binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           if-no-files-found: error
           name: cli-native-${{ matrix.target }}
-          path: cli-native-bin/${{ matrix.target }}/${{ matrix.binary }}
+          path: cli-native-artifact
 
   npm-publish:
     name: Publish npm packages

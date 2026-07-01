@@ -355,6 +355,12 @@ function assertNativePackFiles(pack, expectedTargets) {
   ].sort(compareStrings)
   assertJsonEqual(paths, expectedPaths, '@intlify/cli-native packed files')
 
+  // Windows npm pack metadata does not preserve Unix executable bits, including
+  // binaries staged for non-Windows targets in an all-target validation.
+  if (process.platform === 'win32') {
+    return
+  }
+
   for (const target of expectedTargets) {
     if (target.binaryName === 'intlify.exe') {
       continue

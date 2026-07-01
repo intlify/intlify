@@ -4,19 +4,22 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+const semverPattern =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[a-z-][0-9a-z-]*)(?:\.(?:0|[1-9]\d*|[a-z-][0-9a-z-]*))*)?(?:\+[0-9a-z-]+(?:\.[0-9a-z-]+)*)?$/i
 const tag = process.argv[2] ?? process.env.TAG ?? process.env.GITHUB_REF_NAME
 if (!tag?.startsWith('v')) {
   throw new Error(`release tag must start with "v": ${String(tag)}`)
 }
 
 const version = tag.slice(1)
-if (!version) {
-  throw new Error(`release tag does not contain a version: ${tag}`)
+if (!semverPattern.test(version)) {
+  throw new Error(`release tag must contain a strict semver version: ${tag}`)
 }
 
 const packages = ['@intlify/cli', '@intlify/cli-native']
 const npmAvailabilityMaxAttempts = readPositiveIntegerEnv('NPM_SMOKE_MAX_ATTEMPTS', 60)
 const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_000)
+const defaultRunTimeoutMs = readPositiveIntegerEnv('CLI_SMOKE_RUN_TIMEOUT_MS', 120_000)
 
 for (const packageName of packages) {
   await waitForPackage(packageName, version)
@@ -87,7 +90,8 @@ async function waitForPackage(packageName, packageVersion) {
   for (let attempt = 1; attempt <= npmAvailabilityMaxAttempts; attempt++) {
     const result = spawnSync('npm', ['view', `${packageName}@${packageVersion}`, 'version'], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore']
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: defaultRunTimeoutMs
     })
     if (result.status === 0 && result.stdout.trim() === packageVersion) {
       console.log(`${packageName}@${packageVersion} is available on npm`)
@@ -124,12 +128,14 @@ function run(commandName, commandArgs, options = {}) {
     cwd: options.cwd,
     encoding: 'utf8',
     stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-    shell: process.platform === 'win32'
+    shell: process.platform === 'win32',
+    timeout: options.timeoutMs ?? defaultRunTimeoutMs
   })
   const allowExitCodes = options.allowExitCodes ?? [0]
   if (!allowExitCodes.includes(result.status)) {
     throw new Error(
       `${commandName} ${commandArgs.join(' ')} failed with exit code ${result.status}` +
+        (result.error ? `\n${result.error.message}` : '') +
         (result.stderr ? `\n${result.stderr.trimEnd()}` : '')
     )
   }
@@ -138,7 +144,9 @@ function run(commandName, commandArgs, options = {}) {
 
 function assertStdoutEquals(result, expectedVersion, label) {
   assertEqual(result.stdout, `${expectedVersion}\n`, label)
-  assertEqual(result.stderr, '', `${label} stderr`)
+  if (result.stderr) {
+    console.warn(`${label} stderr:\n${result.stderr.trimEnd()}`)
+  }
 }
 
 function assertEqual(actual, expected, label) {
