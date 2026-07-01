@@ -628,6 +628,18 @@ Initial formatter config supports:
 }
 ```
 
+Schema-level formatter config rules:
+
+- `fmt` is optional
+- if present, `fmt` must be an object
+- `fmt: null` is invalid
+- unknown fields inside `fmt` are invalid
+- `fmt.mode` is optional and defaults to `"standard"`
+- `fmt.mode` accepts only `"standard"` or `"preserve"`
+- `fmt.ignorePatterns` is optional and defaults to `[]`
+- `fmt.ignorePatterns` must be an array of strings
+- each `fmt.ignorePatterns` entry is validated during config validation against the formatter ignore pattern subset
+
 `fmt.mode` is an enum with `"standard"` and `"preserve"`. The default is `"standard"`.
 
 `fmt.ignorePatterns` participates in CLI file discovery only. It is not part of `FormatOptions`, and message-level APIs do not perform file selection.
@@ -644,11 +656,13 @@ Configuration precedence for formatting mode is:
 
 Config files are validated as a whole before CLI overrides are applied. For example, an invalid `fmt.mode` in config still produces `config_validation_failed` even when `--mode standard` is provided. CLI argument shape and value validation happens before config loading when the invalid value can be detected from argv alone, so `--mode compact` is `invalid_cli_argument`.
 
-Formatter-specific schema definitions live under the unified config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
+Formatter-specific config schema definitions live under the unified project config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
 
 Config validation errors use the Phase 3A `config_validation_failed` operational error, with JSON pointers such as `/fmt/mode` or `/fmt/ignorePatterns`. Invalid CLI values such as `--mode compact` use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
 
 `fmt.ignorePatterns` uses the same gitignore-compatible subset described in [Ignore Sources](#ignore-sources). Invalid entries are rejected during config validation with pointers such as `/fmt/ignorePatterns/0`.
+
+The resolved message-level `FormatOptions` receives only `mode`. CLI-only file selection settings such as `fmt.ignorePatterns`, root `.gitignore`, and `--ignore-path` remain outside `FormatOptions`.
 
 ## Options
 
@@ -1062,9 +1076,11 @@ Phase 3 benchmark names:
 
 Benchmark commands and result schemas must be executable and testable, but timing thresholds are not CI pass/fail gates in Phase 3B. A benchmark command that cannot build, cannot execute, cannot read fixtures, or emits malformed results is an implementation failure. A slow timing value is an observation, not a failing threshold.
 
-WASM bundle size is measured, not gated, in Phase 3B. The initial formatter design does not set a numeric size budget for `@intlify/format-wasm`, and size changes should not fail CI. The implementation should keep WASM artifact size and JavaScript glue size observable so later releases can compare browser-facing cost over time.
+WASM bundle size reporting is not a Phase 3B core implementation gate. The initial formatter design does not set a numeric size budget for `@intlify/format-wasm`, and size changes should not fail CI. After `@intlify/format-wasm` exists, follow-up reporting should keep WASM artifact size and JavaScript glue size observable so later releases can compare browser-facing cost over time.
 
 GitHub Actions benchmark jobs and issue-comment reporting are deferred follow-up work. The Phase 3B implementation should not add benchmark runtime to normal `vpr check`, `vpr test`, or default CI gates.
+
+Phase 3B does not publish public command-specific output JSON Schemas while `schemaVersion` is `"0"`. It also does not create internal test-only output schemas. Formatter JSON reporter shape is verified through typed Rust structs and JSON fixtures.
 
 ## Implementation Phasing
 
@@ -1086,6 +1102,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 - Future formatter IR changes beyond the Phase 3B design in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md), such as width-aware wrapping or additional document primitives.
 - `.editorconfig` loading once formatter options exist that can consume it.
 - Line wrapping and style options such as `lineWidth`, `indentWidth`, `lineEnding`, `finalNewline`, and quote/literal spelling policy.
+- Future `fmt` config option expansion beyond `mode` and `ignorePatterns`, including whether line width, indentation, line endings, final newline, matcher layout, literal spelling, include/exclude, or formatter-specific check behavior should become user-configurable.
 - Generated TypeScript config type distribution.
 - Nested config discovery, nearest-config-wins behavior, file-specific overrides, `--cwd`, and `--root`.
 - `--no-error-on-unmatched-pattern` if users need a relaxed unmatched-input mode.
