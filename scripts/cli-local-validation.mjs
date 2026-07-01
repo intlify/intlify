@@ -91,7 +91,11 @@ async function checkCliPackages() {
     packageName: '@intlify/cli',
     exactFiles: ['README.md', 'bin/intlify.mjs', 'package.json', 'schema/config.schema.json']
   })
-  assertPackMode(cliDryRun, 'bin/intlify.mjs', unixExecutableMask)
+  // Windows npm pack metadata does not preserve Unix executable bits, so
+  // Unix runners own the wrapper executable permission assertion.
+  if (process.platform !== 'win32') {
+    assertPackMode(cliDryRun, 'bin/intlify.mjs', unixExecutableMask)
+  }
 
   const nativeDryRun = await npmPackDryRun(nativePackageRoot)
   assertNativePackFiles(nativeDryRun, expectedNativePackTargets(target))
