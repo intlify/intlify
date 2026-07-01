@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Formatter IR design boundary</title>
+<desc id="desc">The public formatter API accepts source text or SnapshotView input, builds internal MF2 Layout IR, normalizes it, lowers it to Document IR, renders formatted text, and returns formatted output or diagnostics and errors. The IR layers remain internal to intlify_format.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .internal { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .api { fill:#334155; }
+    .parse { fill:#1d4ed8; }
+    .layout { fill:#0f766e; }
+    .normalize { fill:#0d9488; }
+    .document { fill:#7c3aed; }
+    .render { fill:#be185d; }
+    .output { fill:#475569; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .internal { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1180" height="640" fill="none"/>
+
+<text x="590" y="44" font-size="24" font-weight="700" text-anchor="middle" class="title">Formatter IR design boundary</text>
+<text x="590" y="72" font-size="13" text-anchor="middle" class="subtitle">The formatter IR is internal to intlify_format; public callers only provide source or snapshots and receive output or failures.</text>
+
+<rect x="42" y="112" width="230" height="172" rx="12" class="panel" stroke-width="2"/>
+<text x="157" y="148" font-size="16" font-weight="700" text-anchor="middle" class="label">Public input</text>
+<rect x="72" y="174" width="170" height="44" rx="8" class="api"/>
+<text x="157" y="201" font-size="12.5" font-weight="700" text-anchor="middle" class="white">source text</text>
+<rect x="72" y="230" width="170" height="44" rx="8" class="api"/>
+<text x="157" y="257" font-size="12.5" font-weight="700" text-anchor="middle" class="white">SnapshotView</text>
+
+<rect x="322" y="104" width="536" height="434" rx="16" class="group" stroke-width="2"/>
+<text x="590" y="140" font-size="17" font-weight="700" text-anchor="middle" class="label">intlify_format internal pipeline</text>
+<text x="590" y="164" font-size="12" text-anchor="middle" class="muted">Syntax traversal and both IR layers stay inside the Rust formatter crate.</text>
+
+<rect x="356" y="230" width="468" height="236" rx="14" class="internal" stroke-width="2"/>
+<text x="590" y="250" font-size="13" font-weight="700" text-anchor="middle" class="muted">internal IR boundary</text>
+
+<rect x="388" y="278" width="154" height="70" rx="9" class="layout"/>
+<text x="465" y="304" font-size="13" font-weight="700" text-anchor="middle" class="white">MF2 Layout IR</text>
+<text x="465" y="325" font-size="10.6" text-anchor="middle" class="soft-white">message structure</text>
+<text x="465" y="341" font-size="10.6" text-anchor="middle" class="soft-white">formatter intent</text>
+
+<rect x="388" y="386" width="154" height="58" rx="9" class="normalize"/>
+<text x="465" y="410" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Normalize pass</text>
+<text x="465" y="431" font-size="10.6" text-anchor="middle" class="soft-white">columns / blank lines</text>
+
+<rect x="638" y="278" width="154" height="70" rx="9" class="document"/>
+<text x="715" y="304" font-size="13" font-weight="700" text-anchor="middle" class="white">Document IR</text>
+<text x="715" y="325" font-size="10.6" text-anchor="middle" class="soft-white">text / lines</text>
+<text x="715" y="341" font-size="10.6" text-anchor="middle" class="soft-white">groups / indent</text>
+
+<rect x="638" y="386" width="154" height="58" rx="9" class="render"/>
+<text x="715" y="410" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Renderer</text>
+<text x="715" y="431" font-size="10.6" text-anchor="middle" class="soft-white">deterministic text</text>
+
+<rect x="404" y="478" width="372" height="44" rx="8" class="note"/>
+<text x="590" y="505" font-size="11.6" font-weight="700" text-anchor="middle" class="note-text">Callers never construct, inspect, or depend on IR nodes.</text>
+
+<rect x="388" y="174" width="154" height="44" rx="8" class="parse"/>
+<text x="465" y="201" font-size="12.5" font-weight="700" text-anchor="middle" class="white">syntax traversal</text>
+
+<path d="M 242 196 L 388 196" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 242 252 L 302 252 L 302 214 L 388 214" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 465 218 L 465 278" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 465 348 L 465 386" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 542 415 L 600 415 L 600 313 L 638 313" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 715 348 L 715 386" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+<rect x="908" y="112" width="230" height="172" rx="12" class="panel" stroke-width="2"/>
+<text x="1023" y="148" font-size="16" font-weight="700" text-anchor="middle" class="label">Public output</text>
+<rect x="938" y="174" width="170" height="44" rx="8" class="output"/>
+<text x="1023" y="201" font-size="12.5" font-weight="700" text-anchor="middle" class="white">formatted text</text>
+<rect x="938" y="230" width="170" height="44" rx="8" class="output"/>
+<text x="1023" y="257" font-size="12.5" font-weight="700" text-anchor="middle" class="white">diagnostics / errors</text>
+
+<path d="M 792 406 L 876 406 L 876 196 L 938 196" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 792 424 L 894 424 L 894 252 L 938 252" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="94" y="358" width="178" height="86" rx="10" class="note"/>
+<text x="183" y="386" font-size="12" font-weight="700" text-anchor="middle" class="note-text">accepted APIs</text>
+<text x="183" y="410" font-size="10.8" text-anchor="middle" class="note-text">format_message</text>
+<text x="183" y="428" font-size="10.8" text-anchor="middle" class="note-text">format_snapshot</text>
+
+<rect x="908" y="358" width="230" height="86" rx="10" class="note"/>
+<text x="1023" y="386" font-size="12" font-weight="700" text-anchor="middle" class="note-text">outside this boundary</text>
+<text x="1023" y="410" font-size="10.8" text-anchor="middle" class="note-text">editor TextEdits</text>
+<text x="1023" y="428" font-size="10.8" text-anchor="middle" class="note-text">resource host-file edits</text>
+</svg>

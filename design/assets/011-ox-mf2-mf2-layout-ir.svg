@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">MF2 Layout IR structure</title>
+<desc id="desc">MF2 Layout IR is built from SnapshotView, source trivia, and formatter options. It combines syntax-oriented nodes with formatter-specific layout nodes and source-shape metadata before normalization and Document IR lowering.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .ir-boundary { fill:#ffffff; stroke:#64748b; stroke-dasharray:10 8; }
+    .input { fill:#334155; }
+    .syntax { fill:#1d4ed8; }
+    .layout { fill:#0f766e; }
+    .metadata { fill:#7c3aed; }
+    .normalize { fill:#0d9488; }
+    .document { fill:#be185d; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .dashed-arrow { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .ir-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed-arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1280" height="760" fill="none"/>
+
+<text x="640" y="48" font-size="24" font-weight="700" text-anchor="middle" class="title">MF2 Layout IR structure</text>
+<text x="640" y="78" font-size="13" text-anchor="middle" class="subtitle">The upper formatter IR combines MF2 syntax shape, formatter-only layout nodes, and preserve-mode metadata.</text>
+
+<rect x="50" y="138" width="232" height="312" rx="12" class="panel" stroke-width="2"/>
+<text x="166" y="176" font-size="16" font-weight="700" text-anchor="middle" class="label">Construction input</text>
+<rect x="82" y="206" width="168" height="44" rx="8" class="input"/>
+<text x="166" y="233" font-size="12.2" font-weight="700" text-anchor="middle" class="white">SnapshotView</text>
+<rect x="82" y="274" width="168" height="44" rx="8" class="input"/>
+<text x="166" y="301" font-size="12.2" font-weight="700" text-anchor="middle" class="white">source trivia</text>
+<rect x="82" y="342" width="168" height="44" rx="8" class="input"/>
+<text x="166" y="369" font-size="12.2" font-weight="700" text-anchor="middle" class="white">FormatOptions</text>
+<rect x="82" y="408" width="168" height="26" rx="6" class="note"/>
+<text x="166" y="426" font-size="10.2" font-weight="700" text-anchor="middle" class="note-text">mode: standard / preserve</text>
+
+<rect x="350" y="124" width="620" height="540" rx="16" class="group" stroke-width="2"/>
+<text x="660" y="164" font-size="17" font-weight="700" text-anchor="middle" class="label">MF2 Layout IR</text>
+<text x="660" y="190" font-size="12" text-anchor="middle" class="muted">Mixed model: syntax-oriented structure plus formatter-owned layout decisions.</text>
+
+<rect x="400" y="236" width="520" height="410" rx="14" class="ir-boundary" stroke-width="2"/>
+<text x="660" y="262" font-size="13" font-weight="700" text-anchor="middle" class="muted">layout model boundary</text>
+
+<rect x="440" y="300" width="190" height="200" rx="9" class="syntax"/>
+<text x="535" y="329" font-size="12.8" font-weight="700" text-anchor="middle" class="white">syntax-oriented nodes</text>
+<text x="535" y="356" font-size="10.6" text-anchor="middle" class="soft-white">Message</text>
+<text x="535" y="379" font-size="10.6" text-anchor="middle" class="soft-white">DeclarationBlock</text>
+<text x="535" y="402" font-size="10.6" text-anchor="middle" class="soft-white">Expression</text>
+<text x="535" y="425" font-size="10.6" text-anchor="middle" class="soft-white">Pattern / Markup</text>
+<text x="535" y="448" font-size="10.6" text-anchor="middle" class="soft-white">Options / Attributes</text>
+<text x="535" y="471" font-size="10.6" text-anchor="middle" class="soft-white">Literals</text>
+
+<rect x="710" y="300" width="190" height="200" rx="9" class="layout"/>
+<text x="805" y="329" font-size="12.8" font-weight="700" text-anchor="middle" class="white">layout-owned nodes</text>
+<text x="805" y="358" font-size="10.6" text-anchor="middle" class="soft-white">MatcherTable</text>
+<text x="805" y="382" font-size="10.6" text-anchor="middle" class="soft-white">matcher rows</text>
+<text x="805" y="406" font-size="10.6" text-anchor="middle" class="soft-white">computed columns</text>
+<text x="805" y="436" font-size="10.6" text-anchor="middle" class="soft-white">PatternChunk</text>
+<text x="805" y="460" font-size="10.6" text-anchor="middle" class="soft-white">PreserveGrouping</text>
+<text x="805" y="484" font-size="10.6" text-anchor="middle" class="soft-white">SourceSlice refs</text>
+
+<rect x="488" y="552" width="344" height="78" rx="9" class="metadata"/>
+<text x="660" y="580" font-size="12.8" font-weight="700" text-anchor="middle" class="white">preserve metadata on major nodes</text>
+<text x="660" y="604" font-size="10.6" text-anchor="middle" class="soft-white">ShapeHint = Flat | Break | Unknown</text>
+<text x="660" y="624" font-size="10.6" text-anchor="middle" class="soft-white">blank_lines_before = 0 | 1</text>
+
+<path d="M 250 228 L 330 228 L 330 400 L 434 400" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 250 296 L 318 296 L 318 590 L 482 590" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 250 364 L 306 364 L 306 620 L 482 620" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 630 400 L 704 400" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 805 500 L 805 546" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<rect x="1020" y="164" width="230" height="344" rx="12" class="panel" stroke-width="2"/>
+<text x="1135" y="202" font-size="16" font-weight="700" text-anchor="middle" class="label">Next stages</text>
+<rect x="1050" y="250" width="170" height="52" rx="8" class="normalize"/>
+<text x="1135" y="272" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Normalize pass</text>
+<text x="1135" y="290" font-size="10.2" text-anchor="middle" class="soft-white">widths / blank lines</text>
+<rect x="1050" y="350" width="170" height="52" rx="8" class="document"/>
+<text x="1135" y="372" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Document IR</text>
+<text x="1135" y="390" font-size="10.2" text-anchor="middle" class="soft-white">MF2-agnostic docs</text>
+<rect x="1050" y="450" width="170" height="44" rx="8" class="note"/>
+<text x="1135" y="469" font-size="10.4" font-weight="700" text-anchor="middle" class="note-text">renderer never knows</text>
+<text x="1135" y="486" font-size="10.4" font-weight="700" text-anchor="middle" class="note-text">matcher semantics</text>
+
+<path d="M 926 410 L 994 410 L 994 276 L 1044 276" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1135 302 L 1135 344" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 1135 402 L 1135 444" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+</svg>

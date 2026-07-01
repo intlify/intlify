@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Document IR structure</title>
+<desc id="desc">Document IR is lowered from normalized MF2 Layout IR into MF2-agnostic rendering primitives. It separates generated text, verified source slices, line primitives, structure primitives, and fixed group modes before deterministic rendering.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .doc-boundary { fill:#ffffff; stroke:#64748b; stroke-dasharray:10 8; }
+    .input { fill:#334155; }
+    .generated { fill:#1d4ed8; }
+    .slice { fill:#0f766e; }
+    .line { fill:#0d9488; }
+    .structure { fill:#7c3aed; }
+    .mode { fill:#475569; }
+    .render { fill:#be185d; }
+    .output { fill:#475569; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .dashed-arrow { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .doc-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed-arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1280" height="800" fill="none"/>
+
+<text x="640" y="48" font-size="24" font-weight="700" text-anchor="middle" class="title">Document IR structure</text>
+<text x="640" y="78" font-size="13" text-anchor="middle" class="subtitle">The lower formatter IR is MF2-agnostic and renders fixed layout primitives deterministically in Phase 3B.</text>
+
+<rect x="50" y="150" width="236" height="344" rx="12" class="panel" stroke-width="2"/>
+<text x="168" y="188" font-size="16" font-weight="700" text-anchor="middle" class="label">Lowering input</text>
+<rect x="82" y="220" width="172" height="48" rx="8" class="input"/>
+<text x="168" y="241" font-size="12.2" font-weight="700" text-anchor="middle" class="white">normalized</text>
+<text x="168" y="258" font-size="12.2" font-weight="700" text-anchor="middle" class="white">MF2 Layout IR</text>
+<rect x="82" y="300" width="172" height="48" rx="8" class="input"/>
+<text x="168" y="321" font-size="12.2" font-weight="700" text-anchor="middle" class="white">verified</text>
+<text x="168" y="338" font-size="12.2" font-weight="700" text-anchor="middle" class="white">source spans</text>
+<rect x="82" y="380" width="172" height="48" rx="8" class="input"/>
+<text x="168" y="401" font-size="12.2" font-weight="700" text-anchor="middle" class="white">fixed</text>
+<text x="168" y="418" font-size="12.2" font-weight="700" text-anchor="middle" class="white">GroupMode</text>
+<rect x="82" y="452" width="172" height="24" rx="6" class="note"/>
+<text x="168" y="469" font-size="10.2" font-weight="700" text-anchor="middle" class="note-text">Flat or Break</text>
+
+<rect x="340" y="124" width="650" height="600" rx="16" class="group" stroke-width="2"/>
+<text x="665" y="164" font-size="17" font-weight="700" text-anchor="middle" class="label">Document IR</text>
+<text x="665" y="190" font-size="12" text-anchor="middle" class="muted">Small rendering document model. It must not know MF2 matcher, declaration, or pattern semantics.</text>
+
+<rect x="390" y="238" width="560" height="450" rx="14" class="doc-boundary" stroke-width="2"/>
+<text x="670" y="264" font-size="13" font-weight="700" text-anchor="middle" class="muted">MF2-agnostic document boundary</text>
+
+<rect x="430" y="304" width="190" height="96" rx="9" class="generated"/>
+<text x="525" y="332" font-size="12.8" font-weight="700" text-anchor="middle" class="white">generated syntax</text>
+<text x="525" y="358" font-size="10.6" text-anchor="middle" class="soft-white">Text</text>
+<text x="525" y="380" font-size="10.6" text-anchor="middle" class="soft-white">Space / punctuation</text>
+
+<rect x="740" y="304" width="190" height="96" rx="9" class="slice"/>
+<text x="835" y="332" font-size="12.8" font-weight="700" text-anchor="middle" class="white">verified source</text>
+<text x="835" y="358" font-size="10.6" text-anchor="middle" class="soft-white">SourceSlice(span)</text>
+<text x="835" y="380" font-size="10.6" text-anchor="middle" class="soft-white">pattern / literals</text>
+
+<rect x="430" y="458" width="190" height="96" rx="9" class="line"/>
+<text x="525" y="486" font-size="12.8" font-weight="700" text-anchor="middle" class="white">line primitives</text>
+<text x="525" y="512" font-size="10.6" text-anchor="middle" class="soft-white">HardLine</text>
+<text x="525" y="534" font-size="10.6" text-anchor="middle" class="soft-white">SoftLine</text>
+
+<rect x="740" y="458" width="190" height="96" rx="9" class="structure"/>
+<text x="835" y="486" font-size="12.8" font-weight="700" text-anchor="middle" class="white">structure primitives</text>
+<text x="835" y="512" font-size="10.6" text-anchor="middle" class="soft-white">Concat / Indent</text>
+<text x="835" y="534" font-size="10.6" text-anchor="middle" class="soft-white">Group</text>
+
+<rect x="500" y="610" width="340" height="58" rx="8" class="mode"/>
+<text x="670" y="635" font-size="12.2" font-weight="700" text-anchor="middle" class="white">GroupMode is already fixed</text>
+<text x="670" y="655" font-size="10.6" text-anchor="middle" class="soft-white">SoftLine: Flat -> space, Break -> newline</text>
+
+<path d="M 254 244 L 326 244 L 326 352 L 424 352" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 254 324 L 312 324 L 312 506 L 424 506" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 254 404 L 298 404 L 298 639 L 494 639" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 620 352 L 734 352" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 620 506 L 734 506" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 835 554 L 835 604" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<rect x="1020" y="164" width="230" height="350" rx="12" class="panel" stroke-width="2"/>
+<text x="1135" y="202" font-size="16" font-weight="700" text-anchor="middle" class="label">Renderer result</text>
+<rect x="1050" y="248" width="170" height="52" rx="8" class="render"/>
+<text x="1135" y="270" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Document renderer</text>
+<text x="1135" y="288" font-size="10.2" text-anchor="middle" class="soft-white">deterministic render</text>
+<rect x="1050" y="348" width="170" height="48" rx="8" class="output"/>
+<text x="1135" y="369" font-size="12.2" font-weight="700" text-anchor="middle" class="white">formatted text</text>
+<text x="1135" y="386" font-size="10.2" text-anchor="middle" class="soft-white">exactly one final LF</text>
+<rect x="1050" y="444" width="170" height="48" rx="8" class="note"/>
+<text x="1135" y="465" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">render errors become</text>
+<text x="1135" y="482" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">internal_error</text>
+
+<path d="M 950 506 L 1000 506 L 1000 274 L 1044 274" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1135 300 L 1135 342" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 1135 396 L 1135 438" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+</svg>

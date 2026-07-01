@@ -38,6 +38,8 @@ Range-only and minimal-diff editing remain LSP/editor integration concerns. Reso
 
 ## Design Boundary
 
+![Formatter IR design boundary](./assets/011-ox-mf2-formatter-ir-boundary.svg)
+
 The IR is an internal implementation detail of `intlify_format`.
 
 The public formatter API accepts source text or a `SnapshotView`, then returns formatted text or diagnostics/errors. Callers do not construct or inspect formatter IR nodes.
@@ -65,6 +67,8 @@ The MF2 Layout IR carries enough structure for MF2-specific rendering decisions 
 The Document IR is independent of MF2 semantics. It should not know about matcher tables, declarations, selectors, or pattern semantics. Its job is to render an already-decided document layout deterministically.
 
 ## MF2 Layout IR
+
+![MF2 Layout IR structure](./assets/011-ox-mf2-mf2-layout-ir.svg)
 
 The MF2 Layout IR is a mixed model:
 
@@ -98,6 +102,8 @@ Phase 3B normalize work includes:
 `Group(flat|break)` decisions are made during MF2 Layout IR construction from formatter mode and shape hints. The normalize pass should not become the place where all formatting decisions are delayed.
 
 ## Document IR
+
+![Document IR structure](./assets/011-ox-mf2-document-ir.svg)
 
 The initial Document IR uses a minimal document model with dormant wrapping hooks:
 
