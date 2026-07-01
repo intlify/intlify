@@ -351,7 +351,7 @@ This keeps line-breaking intent explicit without implementing width-based wrappi
 
 Phase 3B generated `Text` is limited to fixed MF2 syntax tokens and whitespace: keywords such as `.input`, `.local`, and `.match`; punctuation such as `{`, `}`, `:`, `=`, and `@`; spaces; LF; indentation; and matcher padding. User-controlled identifiers, variables, literals, pattern text, and escape spelling are not generated as `Text`; they remain source-backed through `SourceSlice`. Future semantic rewriting or identifier normalization requires a separate escaping and validation design.
 
-`SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed spans must be derived from verified token/source ranges. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
+`SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed contiguous spans may cross multiple verified token boundaries, but they must be derived from verified token/source ranges and must remain valid UTF-8 byte boundaries. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
 
 The renderer returns errors. IR invariant violations, invalid unverified source slices, or source access failures are converted to formatter operational errors such as `internal_error`; they must not leak as public API panics.
 
@@ -507,7 +507,7 @@ Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for 
 Runtime invariant violations include:
 
 - an invalid `SourceSlice(SourceSpan)` inside the IR, such as `start > end`, `end > source.len()`, or non-UTF-8 character boundaries
-- formatter-computed source spans that were not derived from verified token/source ranges
+- formatter-computed source spans that were not derived from verified token/source ranges or that cross unverified source boundaries
 - matcher table normalization state where `column_widths` does not match selector/key columns, row key counts are inconsistent, or uncomputed columns reach lowering
 - Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
 

@@ -206,7 +206,7 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `source` is required for snapshot-backed formatting because preserve mode, source slicing, parser diagnostics, and editor position conversion depend on source text. Snapshot-backed formatting is parse-artifact reuse, not a source-free formatting mode.
 
-`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. A mismatch returns `ok: false` with an operational error.
+`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source identity validation best-effort and does not require snapshots to carry a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
 
 `changed` is computed by byte equality between the formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Inputs with CRLF line endings, missing final LF, or multiple final newlines therefore report `changed: true` when the formatter normalizes them to LF and exactly one final LF. Snapshot-backed APIs compare against the supplied `source`; if embedded source identity exists and differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
@@ -224,8 +224,8 @@ Formatter-specific codes:
 | `unsupported_input_file` | `input` | `2` | CLI explicit file input or `--stdin-filepath` uses an unsupported extension or unsupported direct file form. |
 | `invalid_ignore_pattern` | `input` | `2` | A `--ignore-path` file contains a pattern outside the formatter gitignore-compatible subset. Invalid `fmt.ignorePatterns` entries use `config_validation_failed`. |
 | `ignore_file_read_failed` | `io` | `2` | A `--ignore-path` file cannot be read. |
-| `unmatched_input` | `input` | `2` | A CLI input path or glob resolves to no target. |
-| `invalid_options` | `input` | `2` | Rust, N-API, or WASM formatter APIs receive invalid options. |
+| `unmatched_input` | `input` | `2` | A CLI input path does not exist or a glob matches no filesystem entries. |
+| `invalid_options` | `input` | `2` | N-API, WASM, or other raw external formatter option input fails validation before typed formatter options are constructed. |
 | `invalid_snapshot` | `input` | `2` | Snapshot input is corrupt, unsupported, or missing required formatter capabilities, excluding source/snapshot mismatch. |
 | `input_read_failed` | `io` | `2` | An input file or discovered directory entry cannot be read. |
 | `output_write_failed` | `io` | `2` | Write mode cannot write formatted output. |
@@ -289,7 +289,7 @@ Standardized `details` fields:
   }
   ```
 
-  `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file.
+  `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file or matched entry. A glob that matches filesystem entries but selects no `.mf2` formatter targets is not `unmatched_input`.
 
 - `invalid_options`:
 
@@ -301,7 +301,7 @@ Standardized `details` fields:
   }
   ```
 
-  JavaScript binding calls use `invalid_options` for invalid argument shape or option values, including `null` options, unknown option fields, non-string `source`, non-`Uint8Array` snapshot input, and invalid `mode`.
+  JavaScript binding calls use `invalid_options` for invalid argument shape or option values, including `null` options, unknown option fields, non-string `source`, non-`Uint8Array` snapshot input, and invalid `mode`. The typed Rust `FormatOptions` API should not allow invalid option states; raw external input is validated before constructing typed options.
 
 - `invalid_cli_argument` for `--list-different --reporter json`:
 
@@ -401,7 +401,8 @@ Input rules:
 - explicit non-`.mf2` file paths are unsupported input errors and exit with `2`
 - directory inputs are searched recursively for `.mf2` files
 - glob inputs may be broad, but only matched `.mf2` files are selected
-- unmatched paths or globs are input errors and exit with `2`
+- unmatched paths or globs that match no filesystem entries are input errors and exit with `2`
+- glob inputs that match filesystem entries but select no `.mf2` formatter targets are zero-target successes and exit with `0`
 - invalid glob syntax is an `invalid_cli_argument` error
 - if the final selected target set is empty, the command exits with `0`
 - duplicate matches are de-duplicated by absolute path
@@ -699,6 +700,8 @@ Default `mode` is `standard`.
 
 For N-API and WASM, omitted `options` uses the default options. `null` options are invalid. Unknown option fields are invalid to catch typos; `details.pointer` points at the unknown field, `details.reason` is `"unknown_field"`, and `details.allowedFields` may include `["mode"]`.
 
+The Rust API accepts typed `FormatOptions` and should not expose invalid runtime option states. Conversion from raw external inputs, such as N-API values, WASM values, CLI strings, or config data, validates before constructing typed formatter options. Invalid CLI and config input use their CLI/config error codes; invalid programmatic binding options use `invalid_options`.
+
 Options deferred until fixtures prove a need:
 
 - line width
@@ -886,7 +889,7 @@ Initial required helper semantics:
 
 `formatMessage(source)` parses the same source it formats, so a public source/snapshot mismatch cannot occur. Span and UTF-8 boundary validation still happens as internal formatter validation.
 
-`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source identity when the snapshot carries a source hash, source length, or equivalent source identity. A mismatch returns `source_snapshot_mismatch`. If the snapshot has no source identity, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
+`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source identity when the snapshot carries a source hash, source length, or equivalent source identity. A mismatch returns `source_snapshot_mismatch`. Phase 3B does not require snapshots to carry source identity data. If the snapshot has no source identity, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
 
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
