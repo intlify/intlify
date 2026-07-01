@@ -103,8 +103,8 @@ async function checkCliPackages() {
   const packDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-pack-check-'))
   const installDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-pack-install-'))
   try {
-    const nativeTarball = await pnpmPack(nativePackageRoot, packDirectory)
-    const cliTarball = await pnpmPack(cliPackageRoot, packDirectory)
+    const nativeTarball = await packageManagerPack(nativePackageRoot, packDirectory)
+    const cliTarball = await packageManagerPack(cliPackageRoot, packDirectory)
     await installPackedCli({ installDirectory, nativeTarball, cliTarball })
     await assertInstalledPackagePermissions({ installDirectory, target })
     console.log(`Created ${nativeTarball}`)
@@ -148,8 +148,8 @@ async function benchStartup() {
   const packDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-bench-pack-'))
   const installDirectory = await mkdtemp(join(tmpdir(), 'intlify-cli-bench-install-'))
   try {
-    const nativeTarball = await pnpmPack(nativePackageRoot, packDirectory)
-    const cliTarball = await pnpmPack(cliPackageRoot, packDirectory)
+    const nativeTarball = await packageManagerPack(nativePackageRoot, packDirectory)
+    const cliTarball = await packageManagerPack(cliPackageRoot, packDirectory)
     const installedBinPath = await installPackedCli({
       installDirectory,
       nativeTarball,
@@ -363,17 +363,18 @@ function assertNativePackFiles(pack, expectedTargets) {
   }
 }
 
-async function pnpmPack(packageRoot, destination) {
+async function packageManagerPack(packageRoot, destination) {
   const packageMetadata = await readJson(join(packageRoot, 'package.json'))
   const expectedTarball = join(
     destination,
     `${packageMetadata.name.replace(/^@/, '').replace('/', '-')}-${packageMetadata.version}.tgz`
   )
-  await run('pnpm', ['--dir', packageRoot, 'pack', '--pack-destination', destination], {
+  await run('vp', ['pm', 'pack', '--pack-destination', destination], {
+    cwd: packageRoot,
     capture: true
   })
   if (!existsSync(expectedTarball)) {
-    throw new Error(`pnpm pack did not create a tarball for ${packageRoot}`)
+    throw new Error(`package manager pack did not create a tarball for ${packageRoot}`)
   }
   return expectedTarball
 }
