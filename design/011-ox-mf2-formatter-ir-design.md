@@ -77,6 +77,150 @@ The MF2 Layout IR is a mixed model:
 
 The initial model should include a dedicated matcher table layout node. The matcher table node owns row data and computed column widths. Document IR and the renderer must not know MF2 matcher semantics.
 
+### Minimal Node Set
+
+Phase 3B uses a closed Rust enum/struct model for the MF2 Layout IR. It is an internal formatter implementation detail, not a public AST or plugin extension surface.
+
+The top-level message node is:
+
+```rust
+struct LayoutMessage {
+    meta: LayoutNodeMeta,
+    declarations: Vec<LayoutDeclaration>,
+    body: LayoutMessageBody,
+}
+
+enum LayoutMessageBody {
+    Pattern(LayoutPattern),
+    MatcherTable(LayoutMatcherTable),
+}
+```
+
+The formatter IR only represents valid messages. Parser recovery, missing-node, and error-node shapes are not part of the initial IR because formatter APIs return `ok: false` when parser diagnostics exist.
+
+Declarations are split by syntax shape:
+
+```rust
+enum LayoutDeclaration {
+    Input(LayoutInputDeclaration),
+    Local(LayoutLocalDeclaration),
+}
+```
+
+Expressions are decomposed at the units where the formatter controls spacing:
+
+```rust
+struct LayoutExpression {
+    meta: LayoutNodeMeta,
+    operand: Option<LayoutOperand>,
+    annotation: Option<LayoutAnnotation>,
+    attributes: Vec<LayoutAttribute>,
+}
+
+enum LayoutOperand {
+    Variable(LayoutVariable),
+    Literal(LayoutLiteral),
+}
+
+enum LayoutAnnotation {
+    Function(LayoutFunction),
+    PrivateUse(LayoutPrivateUse),
+}
+
+struct LayoutFunction {
+    name: LayoutIdentifier,
+    options: Vec<LayoutOption>,
+}
+
+struct LayoutOption {
+    name: LayoutIdentifier,
+    value: LayoutLiteralOrVariable,
+}
+
+struct LayoutAttribute {
+    name: LayoutIdentifier,
+    value: Option<LayoutLiteralOrVariable>,
+}
+```
+
+Patterns preserve translatable text and literal spelling through source slices while still allowing embedded expressions and markup to be formatted:
+
+```rust
+struct LayoutPattern {
+    meta: LayoutNodeMeta,
+    chunks: Vec<LayoutPatternChunk>,
+}
+
+enum LayoutPatternChunk {
+    Text(SourceSlice),
+    Expression(LayoutExpression),
+    Markup(LayoutMarkup),
+}
+```
+
+Markup is split by syntax shape:
+
+```rust
+enum LayoutMarkup {
+    Open(LayoutOpenMarkup),
+    Close(LayoutCloseMarkup),
+    Standalone(LayoutStandaloneMarkup),
+}
+```
+
+Matcher syntax uses a dedicated table node:
+
+```rust
+struct LayoutMatcherTable {
+    meta: LayoutNodeMeta,
+    selectors: Vec<LayoutExpression>,
+    rows: Vec<LayoutMatcherRow>,
+    column_widths: Vec<usize>,
+}
+
+struct LayoutMatcherRow {
+    meta: LayoutNodeMeta,
+    keys: Vec<LayoutVariantKey>,
+    value: LayoutPattern,
+}
+
+enum LayoutVariantKey {
+    Literal(LayoutLiteral),
+    CatchAll,
+}
+```
+
+Leaf tokens that must preserve source spelling are source-backed. `LayoutVariable` stores the full `$name` span. Keywords such as `.input`, `.local`, and `.match`, as well as delimiters and punctuation such as `{`, `}`, `=`, `:`, and `@`, are generated formatter text rather than source-backed leaves.
+
+```rust
+struct LayoutIdentifier {
+    source: SourceSlice,
+}
+
+struct LayoutVariable {
+    source: SourceSlice,
+}
+
+struct LayoutLiteral {
+    source: SourceSlice,
+}
+```
+
+`SourceSlice` is span-only. The source text itself is owned by the formatter construction/render context, and source slices are resolved against that context.
+
+```rust
+struct SourceSlice {
+    span: SourceSpan,
+}
+
+struct SourceSpan {
+    start: u32,
+    end: u32,
+}
+```
+
+`SourceSpan` uses UTF-8 byte offsets and half-open ranges. JavaScript UTF-16 conversion remains a binding/editor adapter concern.
+
 Preserve mode records source-shape metadata on major syntax/layout nodes:
 
 ```text
@@ -84,11 +228,41 @@ ShapeHint = Flat | Break | Unknown
 blank_lines_before = 0 | 1
 ```
 
-`ShapeHint` is stored on major nodes such as message, declaration block, expression, matcher table, pattern, and markup. Phase 3B does not store shape hints at every token pair or delimiter.
+`ShapeHint` is stored on major nodes such as message, input declaration, local declaration, expression, matcher table, matcher row, pattern, and markup. Phase 3B does not store shape hints at every token pair, option, attribute, leaf, or delimiter.
 
 `Flat` means the source shape should be treated as single-line where possible. `Break` means the source shape should be treated as multi-line. `Unknown` is used when standard mode is active, when source shape is not meaningful, or when shape cannot be recovered.
 
 `blank_lines_before` records whether a major node had a blank-line gap before it. Multiple blank lines are normalized to one blank line. This preserves grouping intent without letting arbitrary vertical spacing leak into formatter output.
+
+Major nodes carry shared metadata:
+
+```rust
+struct LayoutNodeMeta {
+    source_span: SourceSpan,
+    shape_hint: ShapeHint,
+    blank_lines_before: u8,
+    leading_comments: Vec<LayoutComment>,
+    trailing_comments: Vec<LayoutComment>,
+}
+```
+
+`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. `blank_lines_before` is computed from the major node's leading trivia and then normalized to `0` or `1`.
+
+MF2 `#` comments are preserved as formatter trivia:
+
+```rust
+struct LayoutComment {
+    source: SourceSlice,
+}
+```
+
+Comments attach to major nodes with a simple line-position rule:
+
+- a same-line comment after a node is trailing
+- a comment on a preceding line is leading
+- a blank line before a leading comment is represented by `blank_lines_before = 1`
+
+Standard mode still keeps comments while applying normal formatter spacing and layout rules. Preserve mode may use comment placement as part of source-shape-sensitive layout.
 
 ## Normalize Pass
 
@@ -107,14 +281,18 @@ Phase 3B normalize work includes:
 
 The initial Document IR uses a minimal document model with dormant wrapping hooks:
 
-- `Text`
-- `SourceSlice`
-- `Space`
-- `HardLine`
-- `SoftLine`
-- `Concat`
-- `Indent`
-- `Group`
+```rust
+enum Doc {
+    Text(Cow<'static, str>),
+    SourceSlice(SourceSpan),
+    Space,
+    HardLine,
+    SoftLine,
+    Concat(Vec<Doc>),
+    Indent(Box<Doc>),
+    Group { mode: GroupMode, doc: Box<Doc> },
+}
+```
 
 `Group` has a fixed mode in Phase 3B:
 
@@ -134,7 +312,9 @@ This keeps line-breaking intent explicit without implementing width-based wrappi
 - `Text` is generated formatter syntax, such as `.input`, spaces, braces, separators, and normalized punctuation.
 - `SourceSlice(span)` is verified source text copied from the original input, such as whitespace-sensitive pattern text, literal spelling, or escape spelling.
 
-`SourceSlice(span)` may use token spans or formatter-computed contiguous spans. Formatter-computed spans must be derived from verified token/source ranges. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
+`Text` uses `Cow<'static, str>` so static formatter tokens and computed generated text, such as matcher padding, can share one representation.
+
+`SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed spans must be derived from verified token/source ranges. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
 
 The renderer returns errors. IR invariant violations, invalid unverified source slices, or source access failures are converted to formatter operational errors such as `internal_error`; they must not leak as public API panics.
 
@@ -172,6 +352,5 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Open Questions
 
-- What is the minimal IR node set needed for Phase 3B standard and preserve formatting?
 - What stable dump syntax should be used for MF2 Layout IR fixture files?
 - Which exact invariant checks should return `internal_error` versus fixture-authoring failures in tests?
