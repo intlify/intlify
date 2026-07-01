@@ -3,11 +3,11 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { constants as osConstants } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -360,11 +360,26 @@ function exitCodeForNativeProcess(code, signal) {
   return SIGNAL_EXIT_CODES[signal] ?? 1
 }
 
-const isMain = process.argv[1]
-  ? import.meta.url === pathToFileURL(fileURLToPath(import.meta.url)).href &&
-    fileURLToPath(import.meta.url) === process.argv[1]
-  : false
+/**
+ * Check whether this module is the process entry point.
+ *
+ * @param entryPath - Process entry path from argv.
+ * @param moduleUrl - Current module URL.
+ * @returns Whether the entry path resolves to this module.
+ */
+export function isMainEntryPath(entryPath, moduleUrl = import.meta.url) {
+  if (!entryPath) {
+    return false
+  }
 
-if (isMain) {
+  const modulePath = fileURLToPath(moduleUrl)
+  try {
+    return realpathSync(modulePath) === realpathSync(entryPath)
+  } catch {
+    return modulePath === entryPath
+  }
+}
+
+if (isMainEntryPath(process.argv[1])) {
   runWrapper()
 }

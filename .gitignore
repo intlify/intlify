@@ -52,6 +52,7 @@ tools/mf-parser-bench/rs/target
 packages/ox-mf2-napi/*.node
 packages/ox-mf2-napi/native-binding.js
 packages/ox-mf2-napi/native-binding.d.ts
+packages/cli-native/bin
 packages/ox-mf2-wasm/dist
 packages/ox-mf2-wasm/.wasm-build.lock
 

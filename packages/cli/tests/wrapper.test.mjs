@@ -1,13 +1,15 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { expect, test } from 'vite-plus/test'
 
 import {
   buildErrorEnvelope,
   detectLinuxLibc,
+  isMainEntryPath,
   NATIVE_PACKAGE_NAME,
   resolveNativeBinary,
   resolveNativeTarget,
@@ -159,6 +161,20 @@ test('wrapper does not implement help or version shortcuts', () => {
   expect(output.stdout).toBe('')
   expect(output.stderr).toContain('No intlify native CLI package is available')
   expect(output.stderr).not.toBe('0.14.0\n')
+})
+
+test('wrapper main detection accepts symlinked entry paths', () => {
+  const root = mkdtempSync(join(tmpdir(), 'intlify-wrapper-main-'))
+  try {
+    const realPath = join(root, 'intlify.mjs')
+    const symlinkPath = join(root, 'intlify')
+    writeFileSync(realPath, '')
+    symlinkSync(realPath, symlinkPath)
+
+    expect(isMainEntryPath(symlinkPath, pathToFileURL(realPath).href)).toBe(true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('wrapper distinguishes missing package missing binary and spawn failures', () => {
