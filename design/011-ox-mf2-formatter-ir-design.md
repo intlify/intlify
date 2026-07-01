@@ -105,6 +105,18 @@ enum LayoutDeclaration {
     Input(LayoutInputDeclaration),
     Local(LayoutLocalDeclaration),
 }
+
+struct LayoutInputDeclaration {
+    meta: LayoutNodeMeta,
+    variable: LayoutVariable,
+    value: LayoutExpression,
+}
+
+struct LayoutLocalDeclaration {
+    meta: LayoutNodeMeta,
+    variable: LayoutVariable,
+    value: LayoutExpression,
+}
 ```
 
 Expressions are decomposed at the units where the formatter controls spacing:
@@ -141,6 +153,11 @@ struct LayoutAttribute {
     name: LayoutIdentifier,
     value: Option<LayoutLiteralOrVariable>,
 }
+
+enum LayoutLiteralOrVariable {
+    Literal(LayoutLiteral),
+    Variable(LayoutVariable),
+}
 ```
 
 Patterns preserve translatable text and literal spelling through source slices while still allowing embedded expressions and markup to be formatted:
@@ -165,6 +182,25 @@ enum LayoutMarkup {
     Open(LayoutOpenMarkup),
     Close(LayoutCloseMarkup),
     Standalone(LayoutStandaloneMarkup),
+}
+
+struct LayoutOpenMarkup {
+    meta: LayoutNodeMeta,
+    name: LayoutIdentifier,
+    options: Vec<LayoutOption>,
+    attributes: Vec<LayoutAttribute>,
+}
+
+struct LayoutCloseMarkup {
+    meta: LayoutNodeMeta,
+    name: LayoutIdentifier,
+}
+
+struct LayoutStandaloneMarkup {
+    meta: LayoutNodeMeta,
+    name: LayoutIdentifier,
+    options: Vec<LayoutOption>,
+    attributes: Vec<LayoutAttribute>,
 }
 ```
 
@@ -221,6 +257,8 @@ struct SourceSpan {
 
 `SourceSpan` uses UTF-8 byte offsets and half-open ranges. JavaScript UTF-16 conversion remains a binding/editor adapter concern.
 
+`LayoutNodeMeta.source_span` is the original syntax node's full source range, excluding leading and trailing trivia. Blank-line detection uses leading trivia or the gap from the previous token rather than expanding the node span. Generated punctuation may fall inside a node's source span, but it is still emitted as formatter-generated `Text` during rendering instead of being copied as source-backed leaves.
+
 Preserve mode records source-shape metadata on major syntax/layout nodes:
 
 ```text
@@ -244,7 +282,9 @@ struct LayoutNodeMeta {
 }
 ```
 
-`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. `blank_lines_before` is computed from the major node's leading trivia and then normalized to `0` or `1`.
+`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. In standard mode, shape hints are `Unknown`. In preserve mode, a major node whose span contains no line break is `Flat`; a major node whose span contains a line break is `Break`; nodes without meaningful or recoverable source shape are `Unknown`. Pattern text line breaks contribute to the parent pattern's shape hint, but the pattern text itself remains a source slice and is not rewritten.
+
+`blank_lines_before` is computed from the major node's leading trivia or previous-token gap and then normalized to `0` or `1`. Preserve mode uses blank-line grouping only at major syntax boundaries such as top-level declarations, message body, matcher rows, and major pattern or markup chunks. Standard mode treats `blank_lines_before` as `0`. Leading blank lines before the message are not emitted, final output still ends with exactly one LF, and blank lines inside pattern text are preserved as semantically significant source slices rather than normalized as grouping metadata.
 
 MF2 does not define line comments or block comments. The formatter IR does not model comments, and Phase 3B does not support syntax-local formatter ignore directives. Attribute syntax remains part of expressions and markup, but attributes are not treated as formatter comments or suppression directives.
 
@@ -254,7 +294,7 @@ After MF2 Layout IR construction, a normalize pass prepares data that needs whol
 
 Phase 3B normalize work includes:
 
-- matcher table column width calculation
+- matcher table column width calculation using Unicode display width
 - `blank_lines_before` normalization to `0` or `1`
 
 `Group(flat|break)` decisions are made during MF2 Layout IR construction from formatter mode and shape hints. The normalize pass should not become the place where all formatting decisions are delayed.
@@ -297,6 +337,8 @@ This keeps line-breaking intent explicit without implementing width-based wrappi
 - `SourceSlice(span)` is verified source text copied from the original input, such as whitespace-sensitive pattern text, literal spelling, or escape spelling.
 
 `Text` uses `Cow<'static, str>` so static formatter tokens and computed generated text, such as matcher padding, can share one representation.
+
+Phase 3B generated `Text` is limited to fixed MF2 syntax tokens and whitespace: keywords such as `.input`, `.local`, and `.match`; punctuation such as `{`, `}`, `:`, `=`, and `@`; spaces; LF; indentation; and matcher padding. User-controlled identifiers, variables, literals, pattern text, and escape spelling are not generated as `Text`; they remain source-backed through `SourceSlice`. Future semantic rewriting or identifier normalization requires a separate escaping and validation design.
 
 `SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed spans must be derived from verified token/source ranges. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
 
@@ -443,6 +485,8 @@ INTLIFY_UPDATE_FORMAT_FIXTURES=1 cargo test -p intlify_format
 
 Without `INTLIFY_UPDATE_FORMAT_FIXTURES=1`, tests compare the generated output and any present layout dump pair against checked-in expected files.
 
+Update mode may rewrite existing declared layout dump pairs, but it does not auto-create missing dump files. Because layout dumps are selective, fixture authors must opt in by adding both `*.layout.before.txt` and `*.layout.after.txt`; a single missing side of the pair remains a fixture authoring error even in update mode.
+
 ## Invariant and Error Boundaries
 
 Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for normal formatter execution. Runtime invariant violations in the formatter pipeline are converted into the shared formatter operational error code `internal_error`.
@@ -456,7 +500,7 @@ Runtime invariant violations include:
 - matcher table normalization state where `column_widths` does not match selector/key columns, row key counts are inconsistent, or uncomputed columns reach lowering
 - Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
 
-`formatSnapshot(snapshot, source, options)` has a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
+`formatSnapshot(snapshot, source, options)` and `checkSnapshot(snapshot, source, options)` have a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Invalid snapshot bytes, unsupported snapshot versions, or missing formatter-required snapshot capabilities detected before IR construction return `invalid_snapshot`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
 
 Parser diagnostics are not internal errors. If source text or a supplied snapshot contains parser diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and do not start IR construction. `errors` remains empty unless an independent operational error also occurred.
 

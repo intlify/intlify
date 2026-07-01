@@ -134,6 +134,8 @@ The primary Rust API parses and formats one MF2 message:
 ```rust
 format_message(source: &str, options: FormatOptions) -> FormatResult
 check_format(source: &str, options: FormatOptions) -> FormatCheckResult
+format_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions) -> FormatResult
+check_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions) -> FormatCheckResult
 ```
 
 The conceptual Rust result shape is a success/failure split:
@@ -177,6 +179,12 @@ type FormatCheckResult =
 
 function formatMessage(source: string, options?: FormatOptions): FormatResult
 function checkFormat(source: string, options?: FormatOptions): FormatCheckResult
+function formatSnapshot(snapshot: Uint8Array, source: string, options?: FormatOptions): FormatResult
+function checkSnapshot(
+  snapshot: Uint8Array,
+  source: string,
+  options?: FormatOptions
+): FormatCheckResult
 ```
 
 `checkFormat` does not return formatted output. It only reports whether the source would change. Callers that need formatted code should use `formatMessage`.
@@ -190,25 +198,17 @@ Parser diagnostics and operational errors are separated:
 
 If parsing produces any parser diagnostic, all formatter APIs return `ok: false` and no formatted output. Invalid N-API/WASM options also return `ok: false` with `errors`; the public formatter APIs should not throw for normal validation failures.
 
-The advanced API accepts an already-created Binary AST snapshot. This is for playgrounds, workers, and language-service caches that already hold parse artifacts:
+Programmatic formatter API results do not use the CLI JSON envelope. They do not include `schemaVersion`, `version`, `projectRoot`, `summary`, or `results`. N-API and WASM reuse the same parser diagnostic JavaScript shape as the parser packages, but they do not define a new diagnostic object format.
 
-```rust
-format_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions) -> FormatResult
-```
+The advanced snapshot APIs accept an already-created Binary AST snapshot. These APIs are for playgrounds, workers, and language-service caches that already hold parse artifacts.
 
-Bindings expose this as:
-
-```ts
-function formatSnapshot(
-  snapshot: SnapshotView,
-  source: string,
-  options?: FormatOptions
-): FormatResult
-```
+Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serialized snapshot bytes as `Uint8Array`; formatter binding packages do not exchange parser-package native objects or WASM objects across package boundaries.
 
 `source` is required for snapshot-backed formatting because preserve mode, source slicing, parser diagnostics, and editor position conversion depend on source text. Snapshot-backed formatting is parse-artifact reuse, not a source-free formatting mode.
 
-`formatSnapshot` follows the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, it returns `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. A mismatch returns `ok: false` with an operational error.
+`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. A mismatch returns `ok: false` with an operational error.
+
+`changed` is computed by byte equality between the formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Inputs with CRLF line endings, missing final LF, or multiple final newlines therefore report `changed: true` when the formatter normalizes them to LF and exactly one final LF. Snapshot-backed APIs compare against the supplied `source`; if embedded source identity exists and differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
 ## Operational Error Codes
 
@@ -218,27 +218,30 @@ Parser diagnostics are not represented as operational errors. If parsing produce
 
 Formatter-specific codes:
 
-| Code | Exit | When |
-| --- | --- | --- |
-| `source_snapshot_mismatch` | `2` | `formatSnapshot` receives source text that does not match the snapshot where consistency can be verified. |
-| `unsupported_input_file` | `2` | CLI explicit file input or `--stdin-filepath` uses an unsupported extension or unsupported direct file form. |
-| `invalid_ignore_pattern` | `2` | `fmt.ignorePatterns` or `--ignore-path` contains a pattern outside the formatter gitignore-compatible subset. |
-| `ignore_file_read_failed` | `2` | A `--ignore-path` file cannot be read. |
-| `unmatched_input` | `2` | A CLI input path or glob resolves to no target. |
-| `invalid_options` | `2` | Rust, N-API, or WASM formatter APIs receive invalid options. |
-| `invalid_snapshot` | `2` | Snapshot input is corrupt, unsupported, or missing required formatter capabilities, excluding source/snapshot mismatch. |
-| `input_read_failed` | `2` | An input file or discovered directory entry cannot be read. |
-| `output_write_failed` | `2` | Write mode cannot write formatted output. |
-| `internal_error` | `2` | The formatter hits an implementation invariant or unexpected internal failure. |
+| Code | Kind | Exit | When |
+| --- | --- | --- | --- |
+| `source_snapshot_mismatch` | `input` | `2` | `formatSnapshot` or `checkSnapshot` receives source text that does not match the snapshot where consistency can be verified. |
+| `unsupported_input_file` | `input` | `2` | CLI explicit file input or `--stdin-filepath` uses an unsupported extension or unsupported direct file form. |
+| `invalid_ignore_pattern` | `input` | `2` | A `--ignore-path` file contains a pattern outside the formatter gitignore-compatible subset. Invalid `fmt.ignorePatterns` entries use `config_validation_failed`. |
+| `ignore_file_read_failed` | `io` | `2` | A `--ignore-path` file cannot be read. |
+| `unmatched_input` | `input` | `2` | A CLI input path or glob resolves to no target. |
+| `invalid_options` | `input` | `2` | Rust, N-API, or WASM formatter APIs receive invalid options. |
+| `invalid_snapshot` | `input` | `2` | Snapshot input is corrupt, unsupported, or missing required formatter capabilities, excluding source/snapshot mismatch. |
+| `input_read_failed` | `io` | `2` | An input file or discovered directory entry cannot be read. |
+| `output_write_failed` | `io` | `2` | Write mode cannot write formatted output. |
+| `internal_error` | `internal` | `2` | The formatter hits an implementation invariant or unexpected internal failure. |
 
 Formatter also reuses Phase 3A common codes:
 
-| Code | Exit | When |
-| --- | --- | --- |
-| `invalid_cli_argument` | `2` | Invalid CLI values or combinations, such as `--mode compact` or `--list-different --reporter json`. |
-| `config_read_failed` | `2` | The shared tooling config file cannot be read. |
-| `config_parse_failed` | `2` | The shared tooling config file is not valid JSON or JSONC. |
-| `config_validation_failed` | `2` | The shared tooling config fails schema validation, including invalid `fmt.mode` or invalid `fmt.ignorePatterns` entries. |
+| Code | Kind | Exit | When |
+| --- | --- | --- | --- |
+| `invalid_cli_argument` | `input` | `2` | Invalid CLI values or combinations, such as `--mode compact`, `--list-different --reporter json`, or an invalid input glob. |
+| `missing_cli_option_value` | `input` | `2` | A value-taking CLI option such as `--mode`, `--stdin-filepath`, `--ignore-path`, or `--reporter` is missing its value. |
+| `duplicate_cli_option` | `input` | `2` | A non-repeatable CLI option is provided more than once. |
+| `reporter_not_supported` | `reporter` | `2` | `--reporter` is provided with a value outside `text` or `json`. |
+| `config_read_failed` | `config` | `2` | The shared tooling config file cannot be read. |
+| `config_parse_failed` | `config` | `2` | The shared tooling config file is not valid JSON or JSONC. |
+| `config_validation_failed` | `config` | `2` | The shared tooling config fails schema validation, including invalid `fmt.mode` or invalid `fmt.ignorePatterns` entries. |
 
 Standardized `details` fields:
 
@@ -259,13 +262,13 @@ Standardized `details` fields:
   ```json
   {
     "pattern": "[",
-    "source": "fmt.ignorePatterns",
+    "source": "ignore-path",
     "index": 0,
     "reason": "unterminated_character_class"
   }
   ```
 
-  For `--ignore-path`, `source` is `"ignore-path"` and the top-level `path` is the ignore file path.
+  `source` is `"ignore-path"` and the top-level `path` is the ignore file path. `index` is the zero-based pattern index after blank lines and unescaped leading `#` comments are skipped. Invalid `fmt.ignorePatterns` entries are config validation failures and use JSON pointers such as `/fmt/ignorePatterns/0`.
 
 - `ignore_file_read_failed`:
 
@@ -298,6 +301,28 @@ Standardized `details` fields:
   }
   ```
 
+  JavaScript binding calls use `invalid_options` for invalid argument shape or option values, including `null` options, unknown option fields, non-string `source`, non-`Uint8Array` snapshot input, and invalid `mode`.
+
+- `invalid_cli_argument` for `--list-different --reporter json`:
+
+  ```json
+  {
+    "option": "--list-different",
+    "reason": "text_only_mode",
+    "conflictsWith": ["--reporter json"]
+  }
+  ```
+
+- `invalid_cli_argument` for an invalid input glob:
+
+  ```json
+  {
+    "input": "[",
+    "kind": "glob",
+    "reason": "invalid_glob"
+  }
+  ```
+
 - `invalid_snapshot`:
 
   ```json
@@ -309,6 +334,8 @@ Standardized `details` fields:
   ```
 
   Initial reason values are `corrupt`, `unsupported_version`, `missing_capability`, and `unknown`.
+
+  `invalid_snapshot` is used after the public binding argument shape has been accepted as snapshot bytes. Non-`Uint8Array` snapshot arguments use `invalid_options`.
 
 - `input_read_failed` and `output_write_failed`:
 
@@ -341,14 +368,25 @@ Initial CLI flags:
 - `--list-different`
 - `--stdin-filepath <path>`
 - `--ignore-path <path>`; may be provided multiple times
+- `--reporter <text|json>`
 
 Write mode is the default. `--check` reports whether files differ without writing. `--list-different` is a no-write check mode that prints path-only output for files that do not pass formatting. `--check` and `--list-different` may be used together, in which case `--list-different` controls the human-readable output.
 
-`--list-different` is a text-only mode. Combining it with `--reporter json` is an invalid CLI argument. Combining it with stdin is also invalid.
+The default reporter is `text`. Machine-readable output is selected with `--reporter json`, matching the Phase 3A reporter names.
+
+`--list-different` is a text-only mode. Combining it with `--reporter json` is an invalid CLI argument. Combining it with stdin is also invalid, including `--check --list-different` with stdin. `--check --reporter json` is allowed.
 
 Stdin formatting is supported. Stdin always writes formatted code to stdout and never writes to `--stdin-filepath`. `--stdin-filepath` is optional and only provides path context for extension checks, result paths, and future adapters. Without `--stdin-filepath`, stdin is treated as a direct MF2 message input named `<stdin>`.
 
 Stdin with `--check` is allowed. It exits with `1` when the stdin source would change. If stdin has parser diagnostics, human-readable mode writes no formatted code to stdout, writes diagnostics to stderr, and exits with `1`. JSON reporter mode writes the JSON envelope to stdout.
+
+When no file, directory, or glob operands are provided, `intlify fmt` behaves as `intlify fmt .`. Help and version options keep the Phase 3A precedence and do not trigger config loading, input discovery, or formatting.
+
+`intlify fmt` supports `--` as an end-of-options marker. Tokens after `--` are treated as input path or glob operands even if they start with `-` or `--`. If `--` is present with no operands after it, the command follows the no-operand rule and formats `.`. Global options such as `--reporter json` and formatter options such as `--mode preserve` are recognized only before `--`.
+
+`--ignore-path` may be provided multiple times. `--mode`, `--stdin-filepath`, `--check`, `--list-different`, and `--reporter` are not repeatable; duplicates are `duplicate_cli_option` errors.
+
+After help/version precedence and command argument shape validation, `intlify fmt` loads and validates config before file discovery or formatting. If `--reporter json` can be parsed before a config error, the config error is emitted as a JSON envelope. Missing root config uses defaults.
 
 ### Input Discovery
 
@@ -356,20 +394,26 @@ The primary input unit is `1 file = 1 MF2 message`. Phase 3B initially supports 
 
 Input rules:
 
+- no operands are equivalent to an explicit directory operand `.`
 - explicit `.mf2` file paths are accepted
 - explicit non-`.mf2` file paths are unsupported input errors and exit with `2`
 - directory inputs are searched recursively for `.mf2` files
 - glob inputs may be broad, but only matched `.mf2` files are selected
 - unmatched paths or globs are input errors and exit with `2`
+- invalid glob syntax is an `invalid_cli_argument` error
 - if the final selected target set is empty, the command exits with `0`
 - duplicate matches are de-duplicated by absolute path
 - processing and output use stable slash-normalized path order
 
-Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules.
+Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an explicit hidden path with an unsupported extension is `unsupported_input_file`.
 
 Directory and glob discovery also excludes common VCS, dependency, and output directories by default, including `.git`, `.hg`, `.svn`, `node_modules`, `vendor`, `target`, `dist`, and `coverage`. Explicit file paths can still target files under those directories, subject to ignore rules.
 
-File symlinks are followed. Directory symlinks are not followed.
+File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
+
+Directory inputs such as `.` that contain no selected `.mf2` files after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
+
+Phase 3B initially processes selected files sequentially after discovery, de-duplication, and sorting. Future parallel execution may be added without changing observable stdout, JSON result ordering, or write target selection.
 
 ### Ignore Sources
 
@@ -400,6 +444,8 @@ The ignore grammar is a gitignore-compatible subset:
 
 The same blank-line and unescaped leading `#` behavior applies to `fmt.ignorePatterns` entries.
 
+`fmt.ignorePatterns` is a `string[]` config field. Non-string entries and invalid patterns are `config_validation_failed` errors. Empty strings are treated like blank ignore-file lines and ignored. Unsupported gitignore constructs in `fmt.ignorePatterns` are config validation errors, while unsupported or unrecognized constructs in the root `.gitignore` are ignored as non-fatal compatibility behavior.
+
 Ignore rules apply to all target files, including explicit file input. For example, `intlify fmt ignored/file.mf2` skips the file when the ordered ignore list resolves that path as ignored. If all requested inputs are ignored and the final selected target set is empty, the command exits with `0`.
 
 The initial `.gitignore` behavior reads only the project root `.gitignore`, matching the root-only config discovery model. Nested `.gitignore` files are deferred.
@@ -409,6 +455,8 @@ All ignore patterns are evaluated relative to the project root, including patter
 Invalid `fmt.ignorePatterns` entries are config validation errors and exit with `2` using `config_validation_failed`. Invalid patterns in `--ignore-path` files are operational errors and exit with `2`. Unsupported or unrecognized patterns in root `.gitignore` are ignored as non-fatal compatibility behavior.
 
 Missing `--ignore-path` files are operational errors and exit with `2`.
+
+Stdin without `--stdin-filepath` does not apply ignore rules. Stdin with `--stdin-filepath path.mf2` applies ignore rules to that context path. If the stdin filepath is ignored, normal stdin formatting writes the original stdin source to stdout and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
 
 ### Exit Codes
 
@@ -421,6 +469,8 @@ Exit code classification:
 When multiple outcomes occur, final exit code priority is `2 > 1 > 0`.
 
 Parser diagnostics never cause write mode to modify the affected file.
+
+In write mode, successfully written files are not failures. If files are formatted and no diagnostics or operational errors occur, the command exits with `0`. If parser diagnostics occur without operational errors, the command exits with `1`. If any operational error occurs, the command exits with `2`.
 
 ### Human and JSON Output
 
@@ -458,23 +508,33 @@ For invalid or mixed input, valid selected `.mf2` targets are processed where po
 
 Formatter-specific human stderr wording is not fixed in this document. Parser diagnostics and operational errors use the Phase 3A diagnostic/error renderer contract.
 
+Human stderr fixtures should avoid over-constraining full prose. CLI fixture tests should primarily lock stream selection, exit code, stable error code/path prefixes where needed, and JSON reporter shape. JSON reporter fixtures are the strict machine-readable contract.
+
 JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON output has this top-level shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": "0",
   "command": "fmt",
+  "version": "0.14.0",
+  "projectRoot": "/repo",
   "summary": {},
   "results": [],
   "errors": []
 }
 ```
 
-`schemaVersion` follows the Phase 3A shared envelope contract. `command` is always `"fmt"`.
+`schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
 
 The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field.
 
-`summary.status` is `"success"` or `"failure"` and follows the command outcome. Parser diagnostics, check differences, and operational errors all produce `"failure"`. Write mode that formats files successfully remains `"success"` even when files changed.
+`summary.status` follows the Phase 3A status contract:
+
+- `"success"` for exit `0`
+- `"failure"` for exit `1`, such as check differences or parser diagnostics without operational errors
+- `"error"` for exit `2`, including any operational error
+
+Write mode that formats files successfully remains `"success"` even when files changed. In mixed outcomes, any operational error makes the final status `"error"`; otherwise diagnostics or check differences make the final status `"failure"`.
 
 Common `summary` fields:
 
@@ -495,6 +555,8 @@ Common `summary` fields:
 - `"stdin-check"`
 
 Write mode adds `formattedFiles`, counting files actually written. Check mode adds `differentFiles`, counting targets that would change. Stdin operations do not add `formattedFiles`; changed state is represented by the single result entry.
+
+`--list-different` is not a JSON operation. It is a text-only output mode and conflicts with `--reporter json`. JSON users should use `--check --reporter json`.
 
 When no files are selected after filtering, JSON output uses a mode-independent zero-target summary:
 
@@ -537,11 +599,15 @@ Each `results[]` entry uses this shape:
 
 Ignored files are not included in `results[]`; `results[]` represents only the final selected formatter target set. Invalid input and unmatched input errors, including `unsupported_input_file` and `unmatched_input`, are top-level operational errors and do not create result entries.
 
-Mixed outcomes continue processing valid selected `.mf2` targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"failure"`, and exits with `2`.
+Mixed outcomes continue processing valid selected `.mf2` targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"error"`, and exits with `2`.
 
-For stdin JSON output, `matchedFiles` is `1`. If `--stdin-filepath` is provided, `results[0].path` is that path; otherwise it is `"<stdin>"`. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
+For stdin JSON output, `matchedFiles` is `1` unless stdin is skipped by ignore rules through `--stdin-filepath`. If `--stdin-filepath` is provided, `results[0].path` is that path; otherwise it is `"<stdin>"`. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
 
-If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "failure"` and a top-level `invalid_cli_argument` error.
+If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "error"` and a top-level `invalid_cli_argument` error.
+
+Per-file input read failures and output write failures create `results[]` entries with `status: "error"` and continue processing other selected targets where possible. The final exit code is `2` and `summary.status` is `"error"`. Human text output may still include changed or would-format paths for successful targets, while operational errors are rendered to stderr.
+
+Write mode generates the full formatted output in memory before writing. Phase 3B writes directly to the target file and does not guarantee rollback or atomic replacement if the filesystem write fails.
 
 Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
 
@@ -576,11 +642,13 @@ Configuration precedence for formatting mode is:
 2. `fmt.mode`
 3. default `"standard"`
 
+Config files are validated as a whole before CLI overrides are applied. For example, an invalid `fmt.mode` in config still produces `config_validation_failed` even when `--mode standard` is provided. CLI argument shape and value validation happens before config loading when the invalid value can be detected from argv alone, so `--mode compact` is `invalid_cli_argument`.
+
 Formatter-specific schema definitions live under the unified config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
 
 Config validation errors use the Phase 3A `config_validation_failed` operational error, with JSON pointers such as `/fmt/mode` or `/fmt/ignorePatterns`. Invalid CLI values such as `--mode compact` use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
 
-`fmt.ignorePatterns` uses the same gitignore-compatible subset described in [Ignore Sources](#ignore-sources). Invalid entries are rejected during config validation.
+`fmt.ignorePatterns` uses the same gitignore-compatible subset described in [Ignore Sources](#ignore-sources). Invalid entries are rejected during config validation with pointers such as `/fmt/ignorePatterns/0`.
 
 ## Options
 
@@ -593,6 +661,8 @@ FormatOptions {
 ```
 
 Default `mode` is `standard`.
+
+For N-API and WASM, omitted `options` uses the default options. `null` options are invalid. Unknown option fields are invalid to catch typos; `details.pointer` points at the unknown field, `details.reason` is `"unknown_field"`, and `details.allowedFields` may include `["mode"]`.
 
 Options deferred until fixtures prove a need:
 
@@ -652,11 +722,13 @@ The exact IR node shape, printing algorithm, and line-breaking strategy are inte
 
 The N-API package uses lazy native loading. Importing the package should not eagerly load the native binary; API calls load the binding as needed.
 
-`@intlify/format-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/format-napi`. After `await init()`, the WASM package exposes synchronous `formatMessage`, `checkFormat`, and `formatSnapshot` APIs.
+`@intlify/format-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/format-napi`. After `await init()`, the WASM package exposes synchronous `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` APIs. Calling these APIs before `init()` is a usage error and may throw. Repeated `init()` calls are idempotent. The exact `init(input?)` loading parameter shape is implementation-defined in Phase 3B.
 
 New `@intlify/format-*` npm packages may require token-based bootstrap publishing for the first release. After the packages exist on npm and trusted publisher settings are configured, normal releases should use npm trusted publishing.
 
 Parser binding packages remain focused on parser-level APIs. Formatter APIs are not added to existing `@intlify/ox-mf2-napi` or `@intlify/ox-mf2-wasm` packages.
+
+Formatter binding packages do not have runtime dependencies on parser binding packages. `@intlify/format-napi` does not depend on `@intlify/ox-mf2-napi`, and `@intlify/format-wasm` does not depend on `@intlify/ox-mf2-wasm`. Snapshot reuse crosses package boundaries through serialized Binary AST snapshot bytes (`Uint8Array`) plus source text. Formatter packages perform their own snapshot version and capability checks.
 
 ## Resource and Catalog Formatting
 
@@ -706,8 +778,10 @@ Rules:
 - variant keys align by each key column's maximum width
 - `.match` selector expressions are not aligned to variant key columns
 - key columns have at least 2 spaces between them
-- the final key column and quoted pattern have at least 2 spaces between them
+- the final key column and the variant value pattern start have at least 2 spaces between them
 - preserve mode may preserve existing single-line/multi-line shape and blank-line grouping, but still normalizes matcher rows to the table-like spacing rules
+
+Matcher column width is measured using Unicode display width, not UTF-8 byte length. Row alignment applies only to variant key columns and the value pattern start. The value pattern's internal formatting is handled by normal pattern formatting, regardless of whether the pattern starts with quoted text, an expression, or markup. Phase 3B does not wrap long value patterns.
 
 Example:
 
@@ -775,6 +849,10 @@ Initial required helper semantics:
 - recovered or missing node/token flags are not formatter requirements because snapshots with parser diagnostics do not produce formatted output
 - source/snapshot consistency checks are required when the snapshot carries a source hash or equivalent source identity; otherwise checks are best-effort
 
+`formatMessage(source)` parses the same source it formats, so a public source/snapshot mismatch cannot occur. Span and UTF-8 boundary validation still happens as internal formatter validation.
+
+`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source identity when the snapshot carries a source hash, source length, or equivalent source identity. A mismatch returns `source_snapshot_mismatch`. If the snapshot has no source identity, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
+
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
 If the formatter requires a Binary AST snapshot format change, the formatter PR may include it, but it must also update snapshot versioning, compatibility policy, parser snapshot round-trip tests, parser snapshot compatibility tests, N-API/WASM exposure, and any affected fixtures. Snapshot format changes should remain narrowly scoped to formatter requirements. If the required snapshot change becomes large enough to obscure the formatter review, split it into a separate prerequisite PR.
@@ -819,8 +897,8 @@ Behavior coverage:
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
 | unsupported file, unmatched input, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
 | ignore source precedence across root `.gitignore`, `--ignore-path`, and `fmt.ignorePatterns` | CLI formatter PR | `MUST` |
-| N-API `formatMessage`, `checkFormat`, and `formatSnapshot` contract | N-API binding PR | `MUST` |
-| WASM `formatMessage`, `checkFormat`, and `formatSnapshot` contract | WASM binding PR | `MUST` |
+| N-API `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | N-API binding PR | `MUST` |
+| WASM `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | WASM binding PR | `MUST` |
 | local benchmark command execution and result schema validation | Benchmark PR | `MUST` |
 
 Core fixtures live under `crates/intlify_format/fixtures`.
@@ -906,7 +984,7 @@ Core fixture updates use:
 INTLIFY_UPDATE_FORMAT_FIXTURES=1 cargo test -p intlify_format
 ```
 
-The update mode updates expected `.mf2` files and invalid `diagnostics.json` summaries. It does not rewrite fixture `options.json`.
+The update mode updates expected `.mf2` files, invalid `diagnostics.json` summaries, and declared layout dump pairs (`*.layout.before.txt` and `*.layout.after.txt`). It does not rewrite fixture `options.json`. Layout dump files are selective and are not auto-created; if only one file in a dump pair exists, update mode still treats the fixture as an authoring error.
 
 CLI fixtures live under `packages/cli/fixtures/fmt` and use one directory per fixture case:
 
