@@ -74,18 +74,24 @@ async function preparePublishTarget(packageDir, pkg) {
   }
 
   const packDirectory = await mkdtemp(join(tmpdir(), 'intlify-npm-publish-'))
-  run('pnpm', ['--dir', packageDir, 'pack', '--pack-destination', packDirectory], { cwd: rootDir })
-  const tarballPath = join(packDirectory, packageTarballName(pkg))
-  if (!existsSync(tarballPath)) {
-    await rm(packDirectory, { recursive: true, force: true })
-    throw new Error(`pnpm pack did not create ${tarballPath}`)
-  }
-
-  return {
-    args: [tarballPath],
-    cleanup: async () => {
-      await rm(packDirectory, { recursive: true, force: true })
+  try {
+    run('pnpm', ['--dir', packageDir, 'pack', '--pack-destination', packDirectory], {
+      cwd: rootDir
+    })
+    const tarballPath = join(packDirectory, packageTarballName(pkg))
+    if (!existsSync(tarballPath)) {
+      throw new Error(`pnpm pack did not create ${tarballPath}`)
     }
+
+    return {
+      args: [tarballPath],
+      cleanup: async () => {
+        await rm(packDirectory, { recursive: true, force: true })
+      }
+    }
+  } catch (error) {
+    await rm(packDirectory, { recursive: true, force: true })
+    throw error
   }
 }
 
