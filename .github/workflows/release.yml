@@ -386,9 +386,10 @@ jobs:
       )
 
 
-    # npm Trusted Publishing is the normal path. The first publication of new
-    # packages such as @intlify/cli-native may require a one-time npm-side
-    # bootstrap before this tokenless workflow can publish them.
+    # npm Trusted Publishing is the normal path. NPM_TOKEN is an optional
+    # bootstrap fallback for first-time package publication before npm trusted
+    # publisher settings can exist, for example the first @intlify/cli-native
+    # release.
     environment: npm-release
     permissions:
       contents: read
@@ -486,7 +487,21 @@ jobs:
           vp run check:cli-pack
           vp run test:cli-smoke
 
+      - name: Configure npm token fallback
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "NPM_TOKEN is not configured; npm publish will use Trusted Publishing."
+            exit 0
+          fi
+
+          npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          echo "Configured npm token fallback for first-time package publication."
+
       - name: Publish packages
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi
 
   crate-publish:
