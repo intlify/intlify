@@ -149,7 +149,7 @@ struct LayoutOption {
 
 struct LayoutAttribute {
     name: LayoutIdentifier,
-    value: Option<LayoutLiteralOrVariable>,
+    value: Option<LayoutLiteral>,
 }
 
 enum LayoutLiteralOrVariable {
@@ -159,6 +159,8 @@ enum LayoutLiteralOrVariable {
 ```
 
 `LayoutExpression.function` represents the optional `:` function syntax from the current MF2 grammar. The IR does not model a separate private-use annotation form because the current grammar and parser do not expose such a syntax. `@` syntax is represented only as `LayoutAttribute`.
+
+Option values may be either literals or variables, matching `option = identifier "=" (literal / variable)`. Attribute values are literal-only, matching `attribute = "@" identifier ["=" literal]`; variables are not valid attribute values in the formatter IR.
 
 Patterns preserve translatable text and literal spelling through source slices while still allowing embedded expressions and markup to be formatted:
 
@@ -194,6 +196,8 @@ struct LayoutOpenMarkup {
 struct LayoutCloseMarkup {
     meta: LayoutNodeMeta,
     name: LayoutIdentifier,
+    options: Vec<LayoutOption>,
+    attributes: Vec<LayoutAttribute>,
 }
 
 struct LayoutStandaloneMarkup {
@@ -209,9 +213,14 @@ Matcher syntax uses a dedicated table node:
 ```rust
 struct LayoutMatcherTable {
     meta: LayoutNodeMeta,
-    selectors: Vec<LayoutExpression>,
+    selectors: Vec<LayoutSelector>,
     rows: Vec<LayoutMatcherRow>,
     column_widths: Vec<usize>,
+}
+
+struct LayoutSelector {
+    meta: LayoutNodeMeta,
+    variable: LayoutVariable,
 }
 
 struct LayoutMatcherRow {
@@ -266,7 +275,7 @@ ShapeHint = Flat | Break | Unknown
 blank_lines_before = 0 | 1
 ```
 
-`ShapeHint` is stored on major nodes such as message, input declaration, local declaration, expression, matcher table, matcher row, pattern, and markup. Phase 3B does not store shape hints at every token pair, option, attribute, leaf, or delimiter.
+`ShapeHint` is stored on major nodes such as message, input declaration, local declaration, expression, matcher table, matcher selector, matcher row, pattern, and markup. Phase 3B does not store shape hints at every token pair, option, attribute, leaf, or delimiter.
 
 `Flat` means the source shape should be treated as single-line where possible. `Break` means the source shape should be treated as multi-line. `Unknown` is used when standard mode is active, when source shape is not meaningful, or when shape cannot be recovered.
 
@@ -457,7 +466,7 @@ Matcher table dumps include selectors, rows, variant keys, and computed columns:
 ```text
 MatcherTable span=24..96 shape=Break blank=0 columns=[]
   selectors
-    Expression span=31..38 shape=Flat blank=0
+    Selector span=31..38 shape=Flat blank=0
       variable span=32..38 text="$count"
   Row span=39..58 shape=Flat blank=0
     key literal span=39..40 text="0"

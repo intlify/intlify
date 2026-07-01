@@ -450,11 +450,11 @@ The same blank-line and unescaped leading `#` behavior applies to `fmt.ignorePat
 
 Ignore rules apply to all target files, including explicit file input. For example, `intlify fmt ignored/file.mf2` skips the file when the ordered ignore list resolves that path as ignored. If all requested inputs are ignored and the final selected target set is empty, the command exits with `0`.
 
-The initial `.gitignore` behavior reads only the resolved project root `.gitignore`, matching the root-only config discovery model. If `intlify.config` provides a project root override, formatter ignore behavior uses the final resolved project root rather than the process `cwd` or the pre-config discovered root. Nested `.gitignore` files are deferred.
+The initial `.gitignore` behavior reads only the Phase 3A discovered project root `.gitignore`, matching the root-only config discovery model. Nested `.gitignore` files are deferred.
 
-All ignore patterns are evaluated relative to the resolved project root, including patterns loaded from `--ignore-path`.
+All ignore patterns are evaluated relative to the Phase 3A discovered project root, including patterns loaded from `--ignore-path`.
 
-`--ignore-path <path>` itself is resolved after config loading. Absolute ignore file paths are used as-is. Relative ignore file paths are resolved from the resolved project root, including a project root supplied by config. This differs from `--config <path>`, which is resolved from the process `cwd` because it must be loaded before the project root override can be known.
+`--ignore-path <path>` itself is resolved after config loading. Absolute ignore file paths are used as-is. Relative ignore file paths are resolved from the Phase 3A discovered project root. This differs from `--config <path>`, which is resolved from the process `cwd` because it is part of the config loading boundary.
 
 Invalid `fmt.ignorePatterns` entries are config validation errors and exit with `2` using `config_validation_failed`. Invalid patterns in `--ignore-path` files are operational errors and exit with `2`. Unsupported or unrecognized patterns in root `.gitignore` are ignored as non-fatal compatibility behavior.
 
@@ -811,7 +811,7 @@ Rules:
 - multi-selector matchers use table-like variant rows
 - single-selector matchers also align variant rows
 - variant keys align by each key column's maximum width
-- `.match` selector expressions are not aligned to variant key columns
+- `.match` selector variables are not aligned to variant key columns
 - key columns have at least 2 spaces between them
 - the final key column and the variant value pattern start have at least 2 spaces between them
 - preserve mode may preserve existing single-line/multi-line shape and blank-line grouping, but still normalizes matcher rows to the table-like spacing rules
@@ -1124,6 +1124,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 - `.editorconfig` loading once formatter options exist that can consume it.
 - Line wrapping and style options such as `lineWidth`, `indentWidth`, `lineEnding`, `finalNewline`, and quote/literal spelling policy.
 - Future `fmt` config option expansion beyond `mode` and `ignorePatterns`, including whether line width, indentation, line endings, final newline, matcher layout, literal spelling, include/exclude, or formatter-specific check behavior should become user-configurable.
+- A root-level `projectRoot` config field should be reconsidered only when multi-workspace or resource/catalog requirements need a config-defined root. Phase 3B uses the Phase 3A discovered project root and does not define a project root override.
 - Generated TypeScript config type distribution.
 - Nested config discovery, nearest-config-wins behavior, file-specific overrides, `--cwd`, and `--root`.
 - `--no-error-on-unmatched-pattern` if users need a relaxed unmatched-input mode.
