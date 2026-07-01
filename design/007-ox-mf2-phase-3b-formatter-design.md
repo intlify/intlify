@@ -324,11 +324,11 @@ Standardized `details` fields:
 
   ```json
   {
-    "reason": "layout_invariant_violation"
+    "phase": "document_ir_render"
   }
   ```
 
-  The `reason` value is an implementation-defined string.
+  Initial phase values are `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, and `document_ir_render`. Formatter internals such as IR node kinds, source text, and source spans are not exposed in public `internal_error.details`.
 
 ## CLI Workflow
 
@@ -693,7 +693,7 @@ Formatter ignore directives are not included in Phase 3B.
 
 The MF2 grammar does not define line comments or block comments, and `#` is a markup sigil for `{#tag}`. Introducing a comment-like formatter directive would require a non-standard syntax extension. Phase 3B therefore uses only file-level ignore sources: `fmt.ignorePatterns`, root `.gitignore`, and `--ignore-path`.
 
-A future formatter suppression mechanism must be spec-compatible. Possible directions include an attribute-based mechanism for expression/markup units or a future resource/container-level convention, but no syntax-unit formatter directive is part of the initial formatter product.
+A future formatter suppression mechanism must be spec-compatible. Possible directions include an attribute-based mechanism for expression/markup units or a future resource/container-level convention such as namespaced resource metadata tags like `@intlify:*`, but no syntax-unit formatter directive is part of the initial formatter product.
 
 ## Matcher Layout
 
@@ -1005,7 +1005,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 - Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, decoded-to-raw mapping, and outer document edits.
 - Formatter ignore or suppression mechanisms that are compatible with MF2 syntax.
-- Formatter internal layout IR / document model details, including node shapes, printing algorithm, line-breaking strategy, and implementation tests.
+- Future formatter IR changes beyond the Phase 3B design in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md), such as width-aware wrapping or additional document primitives.
 - `.editorconfig` loading once formatter options exist that can consume it.
 - Line wrapping and style options such as `lineWidth`, `indentWidth`, `lineEnding`, `finalNewline`, and quote/literal spelling policy.
 - Generated TypeScript config type distribution.

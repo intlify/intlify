@@ -241,28 +241,12 @@ struct LayoutNodeMeta {
     source_span: SourceSpan,
     shape_hint: ShapeHint,
     blank_lines_before: u8,
-    leading_comments: Vec<LayoutComment>,
-    trailing_comments: Vec<LayoutComment>,
 }
 ```
 
 `ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. `blank_lines_before` is computed from the major node's leading trivia and then normalized to `0` or `1`.
 
-MF2 `#` comments are preserved as formatter trivia:
-
-```rust
-struct LayoutComment {
-    source: SourceSlice,
-}
-```
-
-Comments attach to major nodes with a simple line-position rule:
-
-- a same-line comment after a node is trailing
-- a comment on a preceding line is leading
-- a blank line before a leading comment is represented by `blank_lines_before = 1`
-
-Standard mode still keeps comments while applying normal formatter spacing and layout rules. Preserve mode may use comment placement as part of source-shape-sensitive layout.
+MF2 does not define line comments or block comments. The formatter IR does not model comments, and Phase 3B does not support syntax-local formatter ignore directives. Attribute syntax remains part of expressions and markup, but attributes are not treated as formatter comments or suppression directives.
 
 ## Normalize Pass
 
@@ -337,18 +321,23 @@ Initial selective dump fixtures should focus on:
 - preserve-mode `shape_hint`
 - `blank_lines_before` normalization
 - `SourceSlice` construction
-- comment attachment and preservation
 
 Layout dump fixtures live next to formatter input/output fixtures and are selective. A formatter fixture only validates layout dumps when both files exist:
 
 ```text
-fixtures/formatter/matcher/basic.input.mf2
-fixtures/formatter/matcher/basic.output.mf2
-fixtures/formatter/matcher/basic.layout.before.txt
-fixtures/formatter/matcher/basic.layout.after.txt
+crates/intlify_format/fixtures/
+  matcher_table/
+    input.mf2
+    standard.mf2
+    standard.layout.before.txt
+    standard.layout.after.txt
+    preserve.mf2
+    preserve.layout.before.txt
+    preserve.layout.after.txt
+    options.json
 ```
 
-`basic.layout.before.txt` stores the MF2 Layout IR before normalization. `basic.layout.after.txt` stores the MF2 Layout IR after normalization. If only one of the two layout dump files exists, the test treats it as a fixture authoring error.
+Layout dump filenames follow the case expected output basename. For example, `standard.layout.before.txt` stores the MF2 Layout IR before normalization for the case that expects `standard.mf2`, and `standard.layout.after.txt` stores the same case after normalization. If only one of the two layout dump files exists for a case, the test treats it as a fixture authoring error.
 
 The dump format is a dedicated two-space-indented text format. It is not Rust `Debug`, JSON, RON, or a public serialization contract.
 
@@ -387,20 +376,9 @@ variable span=8..14 text="$count"
 identifier span=16..22 text="number"
 literal span=30..35 text="|foo|"
 pattern_text span=40..46 text="Hello "
-comment span=0..12 text="# note"
 ```
 
 Generated keywords and punctuation, such as `.input`, `.local`, `.match`, `{`, `}`, `=`, `:`, and `@`, are not emitted in MF2 Layout IR dumps because they are not MF2 Layout IR nodes.
-
-Comments are emitted as child lines on their attached major node:
-
-```text
-Input span=12..30 shape=Flat blank=0
-  leading_comment span=0..10 text="# note"
-  Expression span=19..30 shape=Flat blank=0
-    variable span=20..26 text="$count"
-  trailing_comment span=31..40 text="# tail"
-```
 
 Expressions, patterns, markup, and matcher tables are dumped as trees instead of source-like formatted text:
 
@@ -460,10 +438,10 @@ MatcherTable span=24..96 shape=Break blank=0 columns=[1]
 Fixture updates use the same explicit update flag as final formatter output fixtures:
 
 ```sh
-UPDATE_FIXTURES=1 cargo test -p intlify_format
+INTLIFY_UPDATE_FORMAT_FIXTURES=1 cargo test -p intlify_format
 ```
 
-Without `UPDATE_FIXTURES=1`, tests compare the generated output and any present layout dump pair against checked-in expected files.
+Without `INTLIFY_UPDATE_FORMAT_FIXTURES=1`, tests compare the generated output and any present layout dump pair against checked-in expected files.
 
 ## Invariant and Error Boundaries
 
@@ -477,7 +455,6 @@ Runtime invariant violations include:
 - formatter-computed source spans that were not derived from verified token/source ranges
 - matcher table normalization state where `column_widths` does not match selector/key columns, row key counts are inconsistent, or uncomputed columns reach lowering
 - Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
-- invalid comment source spans
 
 `formatSnapshot(snapshot, source, options)` has a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
 
@@ -490,17 +467,15 @@ Invalid options are rejected before IR construction:
 
 Unsupported CLI input files or unsupported `--stdin-filepath` extensions are rejected during CLI/input discovery with `unsupported_input_file`. They do not enter parser or formatter IR construction.
 
-Comment attachment should prefer preservation over failure. If a valid comment cannot be classified cleanly by the line-position rule, the formatter attaches it to the next major node as a leading comment. If no later major node exists, it attaches to the `LayoutMessage` trailing comments. The formatter must not drop comments to recover from an attachment ambiguity.
-
 Fixture authoring failures are test-only failures, not public formatter errors. They include:
 
 - only one of `.layout.before.txt` and `.layout.after.txt` exists
 - an expected layout dump file cannot be read
 - an expected layout dump header is malformed
 - a success formatter fixture input produces parser diagnostics
-- `UPDATE_FIXTURES=1` is used while only one file in a layout dump pair exists
+- `INTLIFY_UPDATE_FORMAT_FIXTURES=1` is used while only one file in a layout dump pair exists
 
-Generated output or layout dump differences are ordinary test assertion failures. They mean formatter behavior changed or the expected fixture is stale, and may be updated intentionally with `UPDATE_FIXTURES=1`.
+Generated output or layout dump differences are ordinary test assertion failures. They mean formatter behavior changed or the expected fixture is stale, and may be updated intentionally with `INTLIFY_UPDATE_FORMAT_FIXTURES=1`.
 
 Test helpers and fixture loaders may use assertions, but fixture authoring failures should produce explicit messages that identify the bad fixture path and condition.
 
