@@ -133,7 +133,9 @@ Calling WASM APIs before `init()` throws `OxMf2InitializationError`. WASM does n
 
 Only the first WASM `init()` call may provide explicit input. Calling `init()` after successful initialization with no arguments is a no-op. Calling `init(input)` with any explicit input after successful initialization throws `OxMf2InitializationError`, even if the caller believes the input is equivalent. This avoids defining equality for `URL`, `RequestInfo`, `WebAssembly.Module`, `ArrayBuffer`, and `Uint8Array`.
 
-Concurrent `init()` calls share the same in-flight initialization promise when they are compatible with the first call. A no-argument `init()` call is compatible with any in-flight initialization. If initialization is in flight and another call provides a different explicit input, the later call throws `OxMf2InitializationError`; the runtime does not replace an already-started or already-initialized WASM module.
+Concurrent `init()` calls share the same in-flight initialization promise only when the later call has no explicit input. A no-argument `init()` call is compatible with any in-flight initialization. If initialization is in flight and another call provides explicit input, the later call throws `OxMf2InitializationError`, even when the in-flight initialization started with default input. The runtime does not replace an already-started or already-initialized WASM module.
+
+Callers that must guarantee a specific WASM artifact should call `init(input)` first, before any other code path can trigger default initialization.
 
 After initialization, the public parser and decoder APIs are synchronous in both packages:
 
@@ -553,7 +555,7 @@ Snapshot and diagnostic kinds are exposed as numeric const objects with string-n
 
 ```ts
 SyntaxKind.Message
-DiagnosticCode.UnclosedPlaceholder
+DiagnosticCode.UnclosedExpression
 DiagnosticSeverity.Error
 SectionKind.Nodes
 OxMf2ErrorCode.DecodeInvalidMagic

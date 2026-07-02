@@ -768,7 +768,7 @@ The `@intlify/format-wasm` initialization contract follows the existing `@intlif
 - Calling synchronous formatter APIs before initialization throws a WASM initialization error.
 - Repeated `init()` calls with no input after successful initialization are idempotent.
 - Reinitializing an already initialized runtime with an explicit input is an initialization error.
-- While initialization is in flight, `init()` with no input returns the in-flight promise. If the in-flight initialization started with default input, a later explicit input also returns the in-flight promise. If the in-flight initialization started with explicit input, a competing explicit input is an initialization error.
+- While initialization is in flight, `init()` with no input returns the in-flight promise. Any later `init(input)` call with explicit input is an initialization error, even when the in-flight initialization started with default input.
 
 New `@intlify/format-*` npm packages may require token-based bootstrap publishing for the first release. After the packages exist on npm and trusted publisher settings are configured, normal releases should use npm trusted publishing.
 
