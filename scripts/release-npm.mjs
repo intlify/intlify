@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -9,11 +9,15 @@ import { parseArgs } from 'node:util'
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
 
 if (isDirectRun()) {
-  const { dryRun, explicitTag, npmDir } = parseCliArgs(process.argv.slice(2))
-  await publishPackages({ dryRun, explicitTag, npmDir })
+  const { dryRun, explicitTag, npmDir, packageNames, tokenEnv } = parseCliArgs(
+    process.argv.slice(2)
+  )
+  await publishPackages({ dryRun, explicitTag, npmDir, packageNames, tokenEnv })
 }
 
-async function publishPackages({ dryRun, explicitTag, npmDir }) {
+async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, tokenEnv }) {
+  const selectedPackageNames = new Set(packageNames)
+  const seenPackageNames = new Set()
   const packageDirs = [
     ...collectGeneratedPackageDirs(npmDir),
     join(rootDir, 'packages', 'ox-mf2-wasm'),
@@ -23,12 +27,23 @@ async function publishPackages({ dryRun, explicitTag, npmDir }) {
   ]
 
   for (const packageDir of packageDirs) {
-    await publishPackage(packageDir, { dryRun, explicitTag })
+    const pkg = await readJson(join(packageDir, 'package.json'))
+    if (selectedPackageNames.size > 0 && !selectedPackageNames.has(pkg.name)) {
+      continue
+    }
+    seenPackageNames.add(pkg.name)
+    await publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv })
+  }
+
+  const missingPackageNames = [...selectedPackageNames].filter(
+    packageName => !seenPackageNames.has(packageName)
+  )
+  if (missingPackageNames.length > 0) {
+    throw new Error(`selected package(s) not found: ${missingPackageNames.join(', ')}`)
   }
 }
 
-async function publishPackage(packageDir, { dryRun, explicitTag }) {
-  const pkg = await readJson(join(packageDir, 'package.json'))
+async function publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv }) {
   const distTag = explicitTag ?? distTagForVersion(pkg.version)
 
   if (!dryRun && (await isPublished(pkg.name, pkg.version))) {
@@ -37,6 +52,7 @@ async function publishPackage(packageDir, { dryRun, explicitTag }) {
   }
 
   const publishTarget = await preparePublishTarget(packageDir, pkg)
+  const publishAuth = await preparePublishAuth(tokenEnv)
   try {
     const publishArgs = ['publish', ...publishTarget.args, '--access', 'public', '--tag', distTag]
     if (dryRun) {
@@ -44,8 +60,9 @@ async function publishPackage(packageDir, { dryRun, explicitTag }) {
     }
 
     console.log(`${dryRun ? 'Dry-run publishing' : 'Publishing'} ${pkg.name}@${pkg.version}`)
-    run('npm', publishArgs, { cwd: packageDir })
+    run('npm', publishArgs, { cwd: packageDir, env: publishAuth.env })
   } finally {
+    await publishAuth.cleanup()
     await publishTarget.cleanup()
   }
 }
@@ -115,6 +132,36 @@ async function preparePublishTarget(packageDir, pkg) {
   }
 }
 
+async function preparePublishAuth(tokenEnv) {
+  if (!tokenEnv) {
+    return {
+      env: process.env,
+      cleanup: async () => {}
+    }
+  }
+
+  const token = process.env[tokenEnv]
+  if (!token) {
+    throw new Error(`${tokenEnv} is required for token-authenticated npm publish`)
+  }
+
+  const authDirectory = await mkdtemp(join(tmpdir(), 'intlify-npm-auth-'))
+  const userConfigPath = join(authDirectory, '.npmrc')
+  await writeFile(userConfigPath, `//registry.npmjs.org/:_authToken=${token}\n`, {
+    mode: 0o600
+  })
+
+  return {
+    env: {
+      ...process.env,
+      NPM_CONFIG_USERCONFIG: userConfigPath
+    },
+    cleanup: async () => {
+      await rm(authDirectory, { recursive: true, force: true })
+    }
+  }
+}
+
 function requiresPnpmPackedTarball(pkg) {
   return (
     Boolean(
@@ -145,6 +192,8 @@ function parseCliArgs(args) {
     options: {
       'dry-run': { type: 'boolean' },
       'npm-dir': { type: 'string' },
+      package: { type: 'string', multiple: true },
+      'token-env': { type: 'string' },
       tag: { type: 'string' }
     },
     allowPositionals: true
@@ -162,7 +211,9 @@ function parseCliArgs(args) {
   return {
     dryRun: Boolean(values['dry-run']) || command === 'dry-run',
     explicitTag: values.tag,
-    npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi')
+    npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi'),
+    packageNames: values.package ?? [],
+    tokenEnv: values['token-env']
   }
 }
 
