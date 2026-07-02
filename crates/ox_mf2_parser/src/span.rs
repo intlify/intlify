@@ -10,6 +10,21 @@
 /// Sentinel value used for optional table references.
 pub const NONE_U32: u32 = u32::MAX;
 
+#[inline]
+pub(crate) fn usize_to_u32(value: usize, label: &str) -> u32 {
+    u32::try_from(value).unwrap_or_else(|_| panic!("{label} exceeds u32::MAX"))
+}
+
+#[inline]
+pub(crate) fn usize_to_id_u32(value: usize, label: &str) -> u32 {
+    let value = usize_to_u32(value, label);
+    assert!(
+        value != NONE_U32,
+        "{label} exceeds maximum allocatable id (u32::MAX - 1)"
+    );
+    value
+}
+
 macro_rules! define_id {
     ($(#[$doc:meta])* $name:ident) => {
         $(#[$doc])*
@@ -156,6 +171,17 @@ mod tests {
         assert!(EdgeId::NONE.is_none());
         assert!(SourceId::NONE.is_none());
         assert_eq!(NONE_U32, u32::MAX);
+    }
+
+    #[test]
+    fn id_conversion_reserves_none_sentinel() {
+        assert_eq!(usize_to_id_u32(0, "test id"), 0);
+        assert_eq!(usize_to_u32(u32::MAX as usize, "test count"), u32::MAX);
+
+        let panic = std::panic::catch_unwind(|| {
+            let _ = usize_to_id_u32(u32::MAX as usize, "test id");
+        });
+        assert!(panic.is_err());
     }
 
     #[test]

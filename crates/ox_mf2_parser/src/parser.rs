@@ -32,7 +32,7 @@ use crate::scanner::{
 };
 use crate::semantic::MessageMode;
 use crate::source::SourceStore;
-use crate::span::{NodeId, SourceId, Span, TokenId};
+use crate::span::{usize_to_u32, NodeId, SourceId, Span, TokenId};
 use crate::syntax_kind::SyntaxKind;
 use crate::tables::{CstBuilder, CstEdgeKind};
 use crate::workspace::ParseWorkspace;
@@ -210,6 +210,9 @@ impl Parser<'_, '_> {
         }
 
         if peek.try_eat_at_offset(b"{{") {
+            return MessageMode::Complex;
+        }
+        if peek.peek_byte() == Some(b'.') {
             return MessageMode::Complex;
         }
         if detect_keyword(&peek).is_some() {
@@ -520,6 +523,14 @@ impl Parser<'_, '_> {
                     Span::new(slash_start, self.cursor.offset()),
                 );
                 self.builder.push_token_edge(tok);
+                let boundary = peek_trivia(&self.cursor);
+                if boundary.next_byte == Some(b'}') && boundary.end_offset != self.cursor.offset() {
+                    self.diagnostics.push(
+                        self.source,
+                        Span::new(slash_start, boundary.end_offset),
+                        DiagnosticCode::InvalidMarkupBoundary,
+                    );
+                }
             }
         }
     }
@@ -538,6 +549,12 @@ impl Parser<'_, '_> {
                 Span::new(dollar_start, self.cursor.offset()),
             );
             self.builder.push_token_edge(tok);
+        } else {
+            self.diagnostics.push(
+                self.source,
+                Span::new(var_start, var_start),
+                DiagnosticCode::UnexpectedToken,
+            );
         }
         let name = self.parse_name();
         self.builder.push_node_edge(name);
@@ -869,14 +886,21 @@ impl Parser<'_, '_> {
         // Declarations *(declaration o). `.match` is part of complex-body,
         // not a declaration — break on it so parse_complex_body can route it.
         loop {
-            let Some(kw @ (crate::scanner::KeywordHit::Input | crate::scanner::KeywordHit::Local)) =
-                detect_keyword(&self.cursor)
-            else {
-                break;
-            };
-            let decl = self.parse_declaration(kw);
-            self.builder.push_node_edge(decl);
-            self.eat_trivia(TriviaMode::Optional);
+            match detect_keyword(&self.cursor) {
+                Some(
+                    kw @ (crate::scanner::KeywordHit::Input | crate::scanner::KeywordHit::Local),
+                ) => {
+                    let decl = self.parse_declaration(kw);
+                    self.builder.push_node_edge(decl);
+                    self.eat_trivia(TriviaMode::Optional);
+                }
+                None if self.cursor.peek_byte() == Some(b'.') => {
+                    let invalid = self.parse_invalid_declaration_start();
+                    self.builder.push_node_edge(invalid);
+                    self.eat_trivia(TriviaMode::Optional);
+                }
+                Some(crate::scanner::KeywordHit::Match) | None => break,
+            }
         }
 
         // Complex body
@@ -887,6 +911,24 @@ impl Parser<'_, '_> {
         self.eat_trivia(TriviaMode::Optional);
 
         let end = self.cursor.offset();
+        self.builder.finish_node(pending, end)
+    }
+
+    fn parse_invalid_declaration_start(&mut self) -> NodeId {
+        let start = self.cursor.offset();
+        let pending = self.builder.start_node(SyntaxKind::Error, start);
+
+        let _ = self.cursor.bump_byte(); // '.'
+        let _ = scan_name(&mut self.cursor);
+        let end = self.cursor.offset();
+        let tok = self.commit_token(SyntaxKind::TextToken, Span::new(start, end));
+        self.builder.push_token_edge(tok);
+        self.diagnostics.push(
+            self.source,
+            Span::new(start, end),
+            DiagnosticCode::InvalidDeclarationStart,
+        );
+
         self.builder.finish_node(pending, end)
     }
 
@@ -918,7 +960,7 @@ impl Parser<'_, '_> {
                 if self.cursor.peek_byte() == Some(b'{') {
                     let expr = self.parse_placeholder();
                     self.builder.push_node_edge(expr);
-                    // `input-declaration = input s variable-expression` —
+                    // `input-declaration = input o variable-expression` —
                     // a literal, function, or markup placeholder after
                     // `.input` is a syntax error. The placeholder subtree is
                     // kept so tooling can still inspect the offending value.
@@ -1031,8 +1073,27 @@ impl Parser<'_, '_> {
             selector_count += 1;
         }
 
-        // variant *(o variant) — `o` between variants is optional.
         let mut variant_count = 0usize;
+
+        // `s variant` — the first variant must be separated from the
+        // match-statement by required whitespace.
+        let peek = peek_trivia(&self.cursor);
+        if Self::is_variant_start_byte(peek.next_byte) {
+            if !peek.satisfies_required_s() {
+                let at = peek.end_offset;
+                self.diagnostics.push(
+                    self.source,
+                    Span::new(at, at),
+                    DiagnosticCode::MissingRequiredWhitespace,
+                );
+            }
+            self.commit_peeked_trivia(peek, TriviaMode::Required);
+            let variant = self.parse_variant();
+            self.builder.push_node_edge(variant);
+            variant_count += 1;
+        }
+
+        // *(o variant) — `o` between following variants is optional.
         loop {
             let peek = peek_trivia(&self.cursor);
             if !Self::is_variant_start_byte(peek.next_byte) {
@@ -1240,7 +1301,7 @@ impl Parser<'_, '_> {
 
         // Direct field read — the BuilderLengths struct path packed five
         // other fields we don't need on the hot trivia commit path.
-        let trivia_start = self.builder.tables.trivia.len() as u32;
+        let trivia_start = usize_to_u32(self.builder.tables.trivia.len(), "trivia table length");
         // Active run state: kind being collected and the byte offset where
         // the current run started. `None` means we haven't started a run.
         let mut run_kind: Option<SyntaxKind> = None;
@@ -1387,9 +1448,9 @@ impl Parser<'_, '_> {
         // Direct field read — commit_token runs per committed token, the
         // BuilderLengths struct path was packing five other fields each
         // call only to discard them.
-        let trivia_len_now = self.builder.tables.trivia.len() as u32;
+        let trivia_len_now = usize_to_u32(self.builder.tables.trivia.len(), "trivia table length");
         let first_trivia = self.pending_trivia_start;
-        let leading_count = trivia_len_now.saturating_sub(first_trivia) as u16;
+        let leading_count = trivia_len_now.saturating_sub(first_trivia);
         let id = self
             .builder
             .push_token(kind, self.source, span, first_trivia, leading_count, 0);

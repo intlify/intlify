@@ -255,6 +255,7 @@ name = "ox_mf2_parser"
 version = "0.1.6"
 dependencies = [
  "memchr",
+ "serde_json",
 ]
 
 [[package]]

@@ -269,9 +269,41 @@ fn speculative_branch_does_not_duplicate_trivia() {
     assert_eq!(result.cst.trivia_count(), 1, "expected one trivia record");
 }
 
+#[test]
+fn invalid_declaration_start_emits_diagnostic() {
+    let (_, result) = parse(".foo {{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidDeclarationStart]);
+}
+
+#[test]
+fn missing_s_before_first_variant_emits_diagnostic() {
+    let (_, result) = parse(".match $count* {{one}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&DiagnosticCode::MissingRequiredWhitespace),
+        "{:?}",
+        codes
+    );
+}
+
+#[test]
+fn standalone_markup_disallows_space_between_slash_and_brace() {
+    let (_, result) = parse("{#tag / }");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidMarkupBoundary]);
+}
+
+#[test]
+fn local_declaration_variable_requires_dollar_sigil() {
+    let (_, result) = parse(".local name = {$x}\n{{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::UnexpectedToken]);
+}
+
 // ─── `.input` requires a variable-expression ───────────────────────────────
 //
-// `input-declaration = input s variable-expression` — a literal, function,
+// `input-declaration = input o variable-expression` — a literal, function,
 // or markup placeholder after `.input` is a syntax error. The placeholder
 // subtree is still kept so tooling can inspect the offending value. This
 // backs the zero-diagnostic guarantee that the Phase 3B formatter strict

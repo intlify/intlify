@@ -40,3 +40,4 @@ default = []
 memchr = "2.7"
 
 [dev-dependencies]
+serde_json = "1"
