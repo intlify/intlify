@@ -52,10 +52,9 @@ Standard mode normalizes:
 - function, markup, option, and attribute spacing
 - indentation to 2 spaces
 - matcher table layout
-- line endings to LF
-- final newline behavior to exactly one final LF
+- formatter-generated line breaks to LF
 
-Standard mode does not rewrite translatable pattern text, quoted literal spelling, unquoted literal spelling, or escape spelling. Those choices can change runtime content or require heavier validity rules, so quote/literal spelling policy remains future scope.
+Standard mode does not rewrite translatable pattern text, quoted literal spelling, unquoted literal spelling, or escape spelling. Those choices can change runtime content or require heavier validity rules, so quote/literal spelling policy remains future scope. Line endings inside pattern text and the presence of a final newline are not message-level formatter concerns; final-newline and BOM handling belong to the CLI file boundary defined in [File Framing](#file-framing).
 
 ### Preserve Mode
 
@@ -73,8 +72,7 @@ Preserve mode still normalizes:
 - expression, function, option, and attribute spacing
 - indentation to 2 spaces
 - matcher table layout
-- line endings to LF
-- final newline behavior to exactly one final LF
+- formatter-generated line breaks to LF
 
 Preserve mode is not a minimal-diff formatter. It may rewrite larger regions when the formatted shape follows ox-mf2 style rules.
 
@@ -82,7 +80,7 @@ Preserve mode is not a minimal-diff formatter. It may rewrite larger regions whe
 
 The examples in this section are illustrative. Fixture expected files remain the exact source of truth for formatted output.
 
-Standard mode shows canonical spacing, indentation, LF line endings, exactly one final LF, and matcher table spacing:
+Standard mode shows canonical spacing, indentation, LF line breaks between declarations and variants, and matcher table spacing:
 
 ```mf2
 .input   {$count   :number}
@@ -208,7 +206,7 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. Snapshot-backed formatting requires verifiable diagnostic capability in all modes; if diagnostics may have been omitted from the supplied snapshot, the formatter cannot prove that the parse was diagnostic-free and returns `invalid_snapshot` with `details.reason: "missing_capability"`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source consistency validation best-effort and does not require snapshots to carry source identity data or consistency metadata, such as a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
 
-`changed` is computed by byte equality between the formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Inputs with CRLF line endings, missing final LF, or multiple final newlines therefore report `changed: true` when the formatter normalizes them to LF and exactly one final LF. Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
+`changed` is computed by byte equality between the message-level formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Message-level APIs treat the supplied source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
 ## Operational Error Codes
 
@@ -278,7 +276,7 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the ignore file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, and `unknown`.
+  The top-level `path` is the ignore file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `invalid_utf8`, and `unknown`.
 
 - `unmatched_input`:
 
@@ -345,7 +343,7 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the input or output file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, and `unknown`.
+  The top-level `path` is the input or output file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. `invalid_utf8` reports input bytes that are not valid UTF-8; the file is not parsed and the target is reported as a file-specific operational error.
 
 - `internal_error`:
 
@@ -389,6 +387,23 @@ When no file, directory, or glob operands are provided and stdin mode is not sel
 `--ignore-path` may be provided multiple times. `--mode`, `--stdin-filepath`, `--check`, `--list-different`, and `--reporter` are not repeatable; duplicates are `duplicate_cli_option` errors.
 
 After help/version precedence and command argument shape validation, `intlify fmt` loads and validates config before file discovery or formatting. If `--reporter json` can be parsed before a config error, the config error is emitted as a JSON envelope. Missing root config uses defaults.
+
+### File Framing
+
+In a simple message, all bytes including the trailing newline are pattern text. To keep formatting semantics-preserving while still producing conventional files, the CLI treats a small amount of file framing as outside the MF2 message:
+
+- Read framing: if the input starts with a UTF-8 BOM (`EF BB BF`), exactly one BOM is removed. If the remaining content then ends with one `LF` or one `CRLF`, exactly that one trailing newline sequence is removed. The result is the MF2 message text passed to the message-level formatter.
+- Write framing: the output file is the message-level formatter output followed by exactly one final `LF`. A BOM is never re-emitted.
+- Stdin framing: stdin mode applies the same read framing to stdin bytes, and stdout output is the formatted message followed by exactly one final `LF`.
+- Check modes compare the framed output bytes with the original input bytes, so a missing final newline, a `CRLF` final newline, or a leading BOM reports a difference even when the message text itself is already formatted.
+
+Framing consequences:
+
+- An empty file and a file containing only one `LF` both represent the empty message. Write mode produces a single `LF` for both; the former reports `changed: true` and the latter is already formatted.
+- Only one trailing newline sequence is framing. A simple-message file that ends with two newlines keeps the first newline as pattern text; the content round-trips unchanged.
+- Message-level APIs such as `formatMessage` receive and return unframed message text. They never strip or append newlines and never remove a BOM; callers that need file framing apply it themselves.
+- Resource/catalog adapters and LSP/editor adapters pass extracted message text to message-level APIs and never receive an injected final newline or lose message-leading content.
+- Parser diagnostics and spans are message-local, relative to the unframed message text. When read framing removed a BOM, file-level byte positions shift by the BOM length; the CLI accounts for that shift when rendering diagnostics against the original file.
 
 ### Input Discovery
 
@@ -848,13 +863,14 @@ The initial formatter does not support `lineWidth`, and it does not wrap long ex
 
 Initial core style rules:
 
-- output line endings are LF
-- output ends with exactly one final LF
+- formatter-generated line breaks are LF
+- message-level output has no file framing: no final newline is appended and no BOM is emitted; the CLI applies [File Framing](#file-framing) separately
 - indentation is 2 spaces
 - complex messages put each declaration on its own line and the body on the following line
 - simple message pattern text is emitted as-is; the formatter does not insert line breaks around placeholders
-- translatable pattern text whitespace is preserved
+- translatable pattern text whitespace is preserved; line endings inside pattern text are content and are preserved byte-exact, including CR and CRLF
 - quoted pattern text whitespace is preserved
+- bidi marks in whitespace trivia positions, such as LRM, RLM, ALM, and isolates, are not re-emitted by formatter-generated spacing in either mode; bidi marks inside name, identifier, variable, and literal token spans are preserved through source slices
 - single-line quoted patterns remain `{{text}}`; delimiters are not split onto separate lines just for formatting
 - expression braces have no inner padding
 - operand/function/options/attributes are separated by 1 space
@@ -890,13 +906,13 @@ Initial required helper semantics:
 - source slicing is available through a `slice(span)`-style helper after available source/snapshot consistency checks have passed
 - delimiter spans are exposed through delimiter token kind and span access; dedicated delimiter-specific accessors are not required
 - token raw text is not duplicated in the snapshot; consumers use token spans with `slice(span)`
-- token-level leading and trailing whitespace trivia spans are available for preserve mode, or equivalent trivia can be derived from verified source/token gaps
-- derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans or verified source/token gaps
+- token-level leading and trailing whitespace trivia spans are available for preserve mode
+- derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans and source slices
 - parser diagnostic access is required for all snapshot-backed formatter modes, including a verifiable indication that diagnostics were encoded even when the diagnostic count is zero
 - recovered or missing node/token flags are not formatter requirements because snapshots with parser diagnostics do not produce formatted output
 - source/snapshot consistency checks are required when the snapshot carries source identity data or consistency metadata, such as a source hash or source length; otherwise checks are best-effort
 
-Snapshot-backed preserve mode requires access to source-shape and blank-line grouping inputs through token-level leading/trailing trivia spans or equivalent verified source/token gaps. If a supplied snapshot lacks the data needed to derive preserve-mode trivia, `formatSnapshot` and `checkSnapshot` return `invalid_snapshot` with `details.reason: "missing_capability"`. Whether trivia-less snapshots are rejected for all modes or only for preserve mode remains an open question.
+Trivia-less snapshots are rejected only for preserve mode. Snapshot-backed preserve mode requires source-shape and blank-line grouping inputs through token-level leading/trailing trivia spans; in Phase 3B, a preserve-mode `formatSnapshot` or `checkSnapshot` call on a snapshot without trivia records returns `invalid_snapshot` with `details.reason: "missing_capability"`. Standard mode does not use trivia for layout decisions, so standard-mode calls accept trivia-less snapshots. Deriving equivalent whitespace information from verified source/token gaps could lift the preserve-mode restriction later as an implementation optimization; it is not part of the Phase 3B contract.
 
 Snapshot-backed formatting also requires verifiable diagnostic capability in all modes. A zero diagnostic count is not enough by itself when the snapshot format cannot prove whether diagnostics were encoded or intentionally omitted. Phase 3B may satisfy this requirement with a snapshot capability marker or with an explicit zero-count diagnostics section when diagnostics are enabled. If a supplied snapshot lacks verifiable diagnostic capability, `formatSnapshot` and `checkSnapshot` return `invalid_snapshot` with `details.reason: "missing_capability"` before formatting.
 
@@ -1024,6 +1040,8 @@ Invalid cases use `expectedDiagnostics`:
 ```
 
 A core fixture directory is either valid or invalid. Mixed `expected` and `expectedDiagnostics` cases in one fixture directory are fixture authoring errors.
+
+Core fixture files use the same file framing as the CLI: fixture `.mf2` files end with exactly one final LF on disk, and the fixture harness removes that one trailing newline sequence when loading file content as message text, both for `input.mf2` and for `expected` files. Fixtures that deliberately test framing behavior, such as BOM or final-newline handling, are CLI fixtures and compare raw bytes.
 
 Core fixture assertions:
 
@@ -1160,10 +1178,9 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 ## Open Questions
 
-1. **Final LF / line-ending normalization scope.** The "exactly one final LF" and "line endings to LF" rules can change simple-message content when a final newline, CR, or CRLF is part of pattern text. That conflicts with preserving parse semantics and future SemanticView preservation assertions. Before the core formatter rules PR, decide whether these rules belong to the CLI file boundary, such as treating one final file LF as outside the message, or whether they apply only to formatter-generated trivia while excluding pattern text. The decision must cover empty files, `Hello` vs `Hello\n`, CRLF inside pattern text, and resource/editor adapters that must not inject newlines into extracted message text. This must be resolved before Implementation Phasing PR 2.
+No formatter-specific open questions remain. The previously tracked questions were resolved as follows and folded into the sections above:
 
-2. **Bidi trivia policy.** Decide whether standard mode preserves or removes bidi marks that MF2 allows in `o` / `s` positions, such as LRM, RLM, ALM, and isolates, during spacing normalization.
-
-3. **Snapshot capability requirements per mode.** Decide how `formatSnapshot` handles snapshots without trivia, such as `collect_trivia=false` or `include_trivia=false`: always return `invalid_snapshot` with `details.reason: "missing_capability"`, or reject only preserve mode while allowing standard mode.
-
-4. **CLI input encoding.** Decide the error shape for non-UTF-8 `.mf2` input, such as adding `invalid_utf8` to `input_read_failed.details.reason`, and decide how UTF-8 BOM is handled.
+1. **Final LF / line-ending normalization scope**: resolved as a CLI file-framing rule. The CLI removes one leading BOM and one trailing newline sequence on read and appends exactly one final LF on write; message-level APIs never append a final newline and never rewrite pattern text line endings. See [File Framing](#file-framing) and [Core Style Rules](#core-style-rules).
+2. **Bidi trivia policy**: resolved as removal in both modes. Formatter-generated spacing does not re-emit whitespace-trivia bidi marks; bidi marks inside token spans are preserved through source slices. See [Core Style Rules](#core-style-rules).
+3. **Snapshot capability requirements per mode**: resolved as preserve-only rejection. Trivia-less snapshots are accepted in standard mode and rejected with `invalid_snapshot` / `missing_capability` in preserve mode; source/token gap derivation remains a future optimization. See [SnapshotView Requirements](#snapshotview-requirements).
+4. **CLI input encoding**: resolved. Non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`, and a single leading UTF-8 BOM is removed as file framing and never re-emitted. See [File Framing](#file-framing) and [Operational Error Codes](#operational-error-codes).
