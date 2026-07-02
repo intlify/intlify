@@ -96,9 +96,9 @@
 <text x="1066" y="400" font-size="16" font-weight="700" text-anchor="middle" class="label">Future products</text>
 <text x="1066" y="424" font-size="12" text-anchor="middle" class="muted">Added behind the same CLI shell.</text>
 <rect x="974" y="452" width="184" height="46" rx="7" class="future"/>
-<text x="1066" y="480" font-size="12" font-weight="700" text-anchor="middle" class="white">ox_mf2_format</text>
+<text x="1066" y="480" font-size="12" font-weight="700" text-anchor="middle" class="white">intlify_format</text>
 <rect x="974" y="518" width="184" height="46" rx="7" class="future"/>
-<text x="1066" y="546" font-size="12" font-weight="700" text-anchor="middle" class="white">ox_mf2_lint</text>
+<text x="1066" y="546" font-size="12" font-weight="700" text-anchor="middle" class="white">intlify_lint</text>
 
 <path d="M 798 376 L 870 376 L 870 475 L 974 475" fill="none" class="dashed" stroke-width="2.3" marker-end="url(#arrow)"/>
 <path d="M 798 394 L 846 394 L 846 541 L 974 541" fill="none" class="dashed" stroke-width="2.3" marker-end="url(#arrow)"/>

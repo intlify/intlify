@@ -248,8 +248,8 @@ crates/
 Future candidates:
 
 ```text
-ox_mf2_linter
-ox_mf2_formatter
+intlify_lint
+intlify_format
 ox_mf2_codegen
 intlify_cli
 ox_mf2_napi
