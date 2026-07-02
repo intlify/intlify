@@ -1,6 +1,6 @@
 [package]
 name = "ox_mf2_napi"
-version = "0.1.6"
+version = "0.14.0-alpha.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
