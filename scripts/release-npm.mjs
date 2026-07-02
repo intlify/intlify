@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -9,26 +9,16 @@ import { parseArgs } from 'node:util'
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
 
 if (isDirectRun()) {
-  const { bootstrapMissingPackage, dryRun, explicitTag, npmDir, packageNames, tokenEnv } =
-    parseCliArgs(process.argv.slice(2))
+  const { dryRun, explicitTag, npmDir, packageNames } = parseCliArgs(process.argv.slice(2))
   await publishPackages({
-    bootstrapMissingPackage,
     dryRun,
     explicitTag,
     npmDir,
-    packageNames,
-    tokenEnv
+    packageNames
   })
 }
 
-async function publishPackages({
-  bootstrapMissingPackage,
-  dryRun,
-  explicitTag,
-  npmDir,
-  packageNames,
-  tokenEnv
-}) {
+async function publishPackages({ dryRun, explicitTag, npmDir, packageNames }) {
   const selectedPackageNames = new Set(packageNames)
   const seenPackageNames = new Set()
   const publishTargets = []
@@ -58,32 +48,15 @@ async function publishPackages({
 
   for (const { packageDir, pkg } of publishTargets) {
     await publishPackage(packageDir, {
-      bootstrapMissingPackage,
       dryRun,
       explicitTag,
-      pkg,
-      tokenEnv
+      pkg
     })
   }
 }
 
-async function publishPackage(
-  packageDir,
-  { bootstrapMissingPackage, dryRun, explicitTag, pkg, tokenEnv }
-) {
+async function publishPackage(packageDir, { dryRun, explicitTag, pkg }) {
   const distTag = explicitTag ?? distTagForVersion(pkg.version)
-
-  if (bootstrapMissingPackage && !dryRun) {
-    if (await packageExists(pkg.name)) {
-      console.log(`${pkg.name} already exists on npm; skipping initial package bootstrap`)
-      return
-    }
-    if (!tokenEnv) {
-      throw new Error(
-        `${pkg.name} does not exist on npm; initial package bootstrap requires --token-env`
-      )
-    }
-  }
 
   if (!dryRun && (await isPublished(pkg.name, pkg.version))) {
     console.log(`${pkg.name}@${pkg.version} is already published; skipping`)
@@ -91,7 +64,6 @@ async function publishPackage(
   }
 
   const publishTarget = await preparePublishTarget(packageDir, pkg)
-  const publishAuth = await preparePublishAuth(tokenEnv)
   try {
     const publishArgs = ['publish', ...publishTarget.args, '--access', 'public', '--tag', distTag]
     if (dryRun) {
@@ -99,9 +71,8 @@ async function publishPackage(
     }
 
     console.log(`${dryRun ? 'Dry-run publishing' : 'Publishing'} ${pkg.name}@${pkg.version}`)
-    run('npm', publishArgs, { cwd: packageDir, env: publishAuth.env })
+    run('npm', publishArgs, { cwd: packageDir })
   } finally {
-    await publishAuth.cleanup()
     await publishTarget.cleanup()
   }
 }
@@ -123,15 +94,6 @@ async function isPublished(packageName, version) {
     stdio: ['ignore', 'pipe', 'ignore']
   })
   return result.status === 0 && result.stdout.trim() === version
-}
-
-async function packageExists(packageName) {
-  const result = spawnSync('npm', ['view', packageName, 'name'], {
-    cwd: rootDir,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore']
-  })
-  return result.status === 0 && result.stdout.trim() === packageName
 }
 
 /**
@@ -180,36 +142,6 @@ async function preparePublishTarget(packageDir, pkg) {
   }
 }
 
-async function preparePublishAuth(tokenEnv) {
-  if (!tokenEnv) {
-    return {
-      env: process.env,
-      cleanup: async () => {}
-    }
-  }
-
-  const token = process.env[tokenEnv]
-  if (!token) {
-    throw new Error(`${tokenEnv} is required for token-authenticated npm publish`)
-  }
-
-  const authDirectory = await mkdtemp(join(tmpdir(), 'intlify-npm-auth-'))
-  const userConfigPath = join(authDirectory, '.npmrc')
-  await writeFile(userConfigPath, `//registry.npmjs.org/:_authToken=${token}\n`, {
-    mode: 0o600
-  })
-
-  return {
-    env: {
-      ...process.env,
-      NPM_CONFIG_USERCONFIG: userConfigPath
-    },
-    cleanup: async () => {
-      await rm(authDirectory, { recursive: true, force: true })
-    }
-  }
-}
-
 function requiresPackedTarball(pkg) {
   return (
     Boolean(
@@ -238,11 +170,9 @@ function parseCliArgs(args) {
   const { values, positionals } = parseArgs({
     args,
     options: {
-      'bootstrap-missing-package': { type: 'boolean' },
       'dry-run': { type: 'boolean' },
       'npm-dir': { type: 'string' },
       package: { type: 'string', multiple: true },
-      'token-env': { type: 'string' },
       tag: { type: 'string' }
     },
     allowPositionals: true
@@ -258,12 +188,10 @@ function parseCliArgs(args) {
   }
 
   return {
-    bootstrapMissingPackage: Boolean(values['bootstrap-missing-package']),
     dryRun: Boolean(values['dry-run']) || command === 'dry-run',
     explicitTag: values.tag,
     npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi'),
-    packageNames: values.package ?? [],
-    tokenEnv: values['token-env']
+    packageNames: values.package ?? []
   }
 }
 
