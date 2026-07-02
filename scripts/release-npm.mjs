@@ -108,7 +108,7 @@ export function distTagForVersion(version) {
 }
 
 async function preparePublishTarget(packageDir, pkg) {
-  if (!requiresPnpmPackedTarball(pkg)) {
+  if (!requiresPackedTarball(pkg)) {
     return {
       args: [],
       cleanup: async () => {}
@@ -117,8 +117,8 @@ async function preparePublishTarget(packageDir, pkg) {
 
   const packDirectory = await mkdtemp(join(tmpdir(), 'intlify-npm-publish-'))
   try {
-    run('pnpm', ['--dir', packageDir, 'pack', '--pack-destination', packDirectory], {
-      cwd: rootDir
+    run('vp', ['pm', 'pack', '--pack-destination', packDirectory], {
+      cwd: packageDir
     })
     const tarballPath = join(packDirectory, packageTarballName(pkg))
     if (!existsSync(tarballPath)) {
@@ -167,7 +167,7 @@ async function preparePublishAuth(tokenEnv) {
   }
 }
 
-function requiresPnpmPackedTarball(pkg) {
+function requiresPackedTarball(pkg) {
   return (
     Boolean(
       Array.isArray(pkg.publishConfig?.executableFiles) &&
