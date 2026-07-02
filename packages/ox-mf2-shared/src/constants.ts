@@ -118,7 +118,8 @@ export const DiagnosticCode = {
   InvalidEscape: 12,
   AmbiguousMessageMode: 13,
   MissingRequiredWhitespace: 14,
-  MissingIdentifierName: 15
+  MissingIdentifierName: 15,
+  InvalidInputDeclaration: 16
 } as const
 
 /** Numeric diagnostic code value used in diagnostic records. */

@@ -34,7 +34,7 @@ use crate::semantic::MessageMode;
 use crate::source::SourceStore;
 use crate::span::{NodeId, SourceId, Span, TokenId};
 use crate::syntax_kind::SyntaxKind;
-use crate::tables::CstBuilder;
+use crate::tables::{CstBuilder, CstEdgeKind};
 use crate::workspace::ParseWorkspace;
 
 /// Result of [`Parser::eat_trivia`]: how many `ws` and `bidi` runs were
@@ -918,6 +918,19 @@ impl Parser<'_, '_> {
                 if self.cursor.peek_byte() == Some(b'{') {
                     let expr = self.parse_placeholder();
                     self.builder.push_node_edge(expr);
+                    // `input-declaration = input s variable-expression` —
+                    // a literal, function, or markup placeholder after
+                    // `.input` is a syntax error. The placeholder subtree is
+                    // kept so tooling can still inspect the offending value.
+                    if !self.placeholder_holds_variable_expression(expr) {
+                        let rec = self.builder.tables.node_at(expr);
+                        let expr_span = Span::new(rec.span_start, rec.span_end);
+                        self.diagnostics.push(
+                            self.source,
+                            expr_span,
+                            DiagnosticCode::InvalidInputDeclaration,
+                        );
+                    }
                 } else {
                     self.diagnostics.push(
                         self.source,
@@ -971,18 +984,28 @@ impl Parser<'_, '_> {
         self.builder.finish_node(pending, end)
     }
 
+    /// `true` when the finished placeholder's expression child is a
+    /// `VariableExpression`, i.e. the `.input` value is `{$name ...}`.
+    fn placeholder_holds_variable_expression(&self, placeholder: NodeId) -> bool {
+        let rec = self.builder.tables.node_at(placeholder);
+        self.builder.tables.edges_for(rec).iter().any(|edge| {
+            edge.kind == CstEdgeKind::Node as u16
+                && self.builder.tables.node_at(NodeId::new(edge.ref_id)).kind
+                    == SyntaxKind::VariableExpression as u16
+        })
+    }
+
     fn parse_match_body_recovered(&mut self, start: u32) -> NodeId {
         let pending = self.builder.start_node(SyntaxKind::Matcher, start);
         let kw_start = self.cursor.offset();
         self.cursor.set_offset(kw_start + 6); // ".match" length
-        let tok = self.commit_token(
-            SyntaxKind::MatchKeyword,
-            Span::new(kw_start, self.cursor.offset()),
-        );
+        let kw_span = Span::new(kw_start, self.cursor.offset());
+        let tok = self.commit_token(SyntaxKind::MatchKeyword, kw_span);
         self.builder.push_token_edge(tok);
 
         // 1*(s selector) — each selector requires `s` before it. Lookahead
         // first so the "no more selectors" exit is checkpoint-free.
+        let mut selector_count = 0usize;
         loop {
             let peek = peek_trivia(&self.cursor);
             if peek.next_byte != Some(b'$') {
@@ -1005,9 +1028,11 @@ impl Parser<'_, '_> {
             let sel_end = self.cursor.offset();
             let sel_id = self.builder.finish_node(sel_pending, sel_end);
             self.builder.push_node_edge(sel_id);
+            selector_count += 1;
         }
 
         // variant *(o variant) — `o` between variants is optional.
+        let mut variant_count = 0usize;
         loop {
             let peek = peek_trivia(&self.cursor);
             if !Self::is_variant_start_byte(peek.next_byte) {
@@ -1017,6 +1042,18 @@ impl Parser<'_, '_> {
             self.commit_peeked_trivia(peek, TriviaMode::Optional);
             let variant = self.parse_variant();
             self.builder.push_node_edge(variant);
+            variant_count += 1;
+        }
+
+        // `matcher = match-statement 1*variant` with
+        // `match-statement = match 1*(s selector)` — both lists are
+        // required. A selector-less matcher also covers non-variable
+        // selector input such as `.match |x|`, because only `$` enters the
+        // selector loop. One diagnostic anchored at the `.match` keyword;
+        // no cascade when both lists are empty.
+        if selector_count == 0 || variant_count == 0 {
+            self.diagnostics
+                .push(self.source, kw_span, DiagnosticCode::InvalidMatcherSyntax);
         }
 
         let end = self.cursor.offset();

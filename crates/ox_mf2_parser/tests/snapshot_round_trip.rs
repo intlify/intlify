@@ -723,3 +723,31 @@ fn batch_snapshot_carries_one_root_per_input() {
         assert_eq!(source.id().raw(), i as u32);
     }
 }
+
+#[test]
+fn invalid_input_declaration_code_round_trips_through_snapshot() {
+    // `InvalidInputDeclaration = 16` is the newest diagnostic code the
+    // parser emits into snapshot records; the decoder must accept it as a
+    // known value and hand it back unchanged.
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: ".input {|foo|}\n{{body}}",
+        ..Default::default()
+    });
+    let snap = parse_source_to_snapshot(
+        &sources,
+        id,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+
+    let view = decode_snapshot(&snap.bytes).expect("decode accepts code 16");
+    assert_eq!(view.diagnostic_count(), 1);
+    let diag = view.diagnostic(0).expect("diagnostic view");
+    assert_eq!(
+        diag.code(),
+        ox_mf2_parser::DiagnosticCode::InvalidInputDeclaration
+    );
+    assert_eq!(diag.span(), Span::new(7, 14));
+}

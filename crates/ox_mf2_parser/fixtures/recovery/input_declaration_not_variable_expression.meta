@@ -1,0 +1,4 @@
+spec_section = "syntax.md#input-declaration"
+production = "input-declaration"
+description = "input declaration whose placeholder is not a variable-expression"
+diagnostics_expected = "1"

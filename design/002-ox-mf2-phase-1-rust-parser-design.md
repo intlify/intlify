@@ -971,6 +971,14 @@ Expected recovery points:
 - unclosed quoted literal
 - unexpected end of input inside nested syntax
 
+### Zero-Diagnostic Guarantee
+
+A parse result with zero parser diagnostics means the message is syntactically valid under the MF2 ABNF. Grammar-invalid input that the recovering parser can still shape into a CST must always carry at least one parser diagnostic.
+
+Downstream consumers may rely on this guarantee. In particular, the Phase 3B formatter strict diagnostics policy in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md) formats only diagnostic-free parses, and the formatter IR in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) treats grammar-impossible CST shapes as internal invariant errors rather than recoverable formatter diagnostics.
+
+This guarantee covers syntax-level validity only. Data-model and semantic errors, such as a matcher without a catch-all `*` variant, duplicate declarations, or undefined variable references, are semantic diagnostics and do not violate the guarantee when a syntactically valid message parses with zero parser diagnostics.
+
 ## Allocation Contract
 
 The parse hot path avoids unnecessary heap allocation.

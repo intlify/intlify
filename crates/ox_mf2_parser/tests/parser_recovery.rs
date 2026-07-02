@@ -268,3 +268,99 @@ fn speculative_branch_does_not_duplicate_trivia() {
     let (_, result) = parse("{$x }");
     assert_eq!(result.cst.trivia_count(), 1, "expected one trivia record");
 }
+
+// ─── `.input` requires a variable-expression ───────────────────────────────
+//
+// `input-declaration = input s variable-expression` — a literal, function,
+// or markup placeholder after `.input` is a syntax error. The placeholder
+// subtree is still kept so tooling can inspect the offending value. This
+// backs the zero-diagnostic guarantee that the Phase 3B formatter strict
+// policy relies on.
+
+#[test]
+fn input_declaration_with_literal_expression_emits_diagnostic() {
+    let (sources, result) = parse(".input {|foo|}\n{{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidInputDeclaration]);
+    // The diagnostic anchors at the offending placeholder expression.
+    let diag = result.diagnostics.first().unwrap();
+    assert_eq!(diag.span.start, 7);
+    let view = CstView::new(&sources, result.source, &result.cst);
+    let root = view.root().unwrap();
+    let kinds = collect_kinds_recovery(root);
+    assert!(
+        kinds.contains(&SyntaxKind::LiteralExpression),
+        "{:?}",
+        kinds
+    );
+}
+
+#[test]
+fn input_declaration_with_literal_and_function_emits_diagnostic() {
+    let (_, result) = parse(".input {|foo| :number}\n{{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidInputDeclaration]);
+}
+
+#[test]
+fn input_declaration_with_function_expression_emits_diagnostic() {
+    let (_, result) = parse(".input {:number}\n{{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidInputDeclaration]);
+}
+
+#[test]
+fn input_declaration_with_markup_emits_diagnostic() {
+    let (_, result) = parse(".input {#b}\n{{body}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidInputDeclaration]);
+}
+
+#[test]
+fn input_declaration_with_variable_expression_stays_diagnostic_free() {
+    let (_, result) = parse(".input {$count :number}\n{{ok}}");
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+}
+
+// ─── Matcher requires selectors and variants ───────────────────────────────
+//
+// `matcher = match-statement 1*variant` with
+// `match-statement = match 1*(s selector)` — both lists are required. One
+// `InvalidMatcherSyntax` diagnostic is anchored at the `.match` keyword; a
+// matcher missing both lists must not cascade into two diagnostics.
+
+#[test]
+fn matcher_without_selectors_or_variants_emits_one_diagnostic() {
+    let (sources, result) = parse(".match");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidMatcherSyntax]);
+    let diag = result.diagnostics.first().unwrap();
+    assert_eq!((diag.span.start, diag.span.end), (0, 6));
+    // A root CST with a Matcher node still exists for recovery consumers.
+    let view = CstView::new(&sources, result.source, &result.cst);
+    let root = view.root().unwrap();
+    let kinds = collect_kinds_recovery(root);
+    assert!(kinds.contains(&SyntaxKind::Matcher), "{:?}", kinds);
+}
+
+#[test]
+fn matcher_without_variants_emits_diagnostic() {
+    let (_, result) = parse(".match $count");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidMatcherSyntax]);
+}
+
+#[test]
+fn matcher_with_non_variable_selector_emits_diagnostic() {
+    // `|x|` never enters the selector loop, so the selector list is empty
+    // and `|x| *` parse as variant keys of one variant instead.
+    let (_, result) = parse(".match |x| * {{y}}");
+    let codes: Vec<_> = result.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::InvalidMatcherSyntax]);
+}
+
+#[test]
+fn matcher_with_selector_and_variants_stays_diagnostic_free() {
+    let (_, result) = parse(".match $count\none {{one}}\n* {{other}}");
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+}
