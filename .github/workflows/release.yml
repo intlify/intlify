@@ -386,10 +386,9 @@ jobs:
       )
 
 
-    # npm Trusted Publishing is the normal path. NPM_TOKEN is an optional
-    # bootstrap fallback for first-time package publication before npm trusted
-    # publisher settings can exist, for example the first @intlify/cli-native
-    # release.
+    # npm Trusted Publishing is the normal path. A token is only allowed in the
+    # dedicated @intlify/cli-native bootstrap step because @intlify/cli already
+    # exists and should publish through trusted publishing.
     environment: npm-release
     permissions:
       contents: read
@@ -504,19 +503,23 @@ jobs:
           vp run check:cli-pack
           vp run test:cli-smoke
 
-      - name: Configure npm token fallback
+      - name: Bootstrap @intlify/cli-native with npm token
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+          NPM_TOKEN_BOOTSTRAP: ${{ secrets.NPM_TOKEN_BOOTSTRAP }}
         run: |
-          if [ -z "${NPM_TOKEN:-}" ]; then
-            echo "NPM_TOKEN is not configured; npm publish will use Trusted Publishing."
+          if [ -z "${NPM_TOKEN_BOOTSTRAP:-}" ]; then
+            echo "NPM_TOKEN_BOOTSTRAP is not configured; skipping token bootstrap."
             exit 0
           fi
 
-          npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          echo "Configured npm token fallback for first-time package publication."
+          node scripts/release-npm.mjs publish \
+            --npm-dir release-dir/ox-mf2-napi \
+            --tag "$NPM_DIST_TAG" \
+            --package @intlify/cli-native \
+            --token-env NPM_TOKEN_BOOTSTRAP
 
-      - name: Publish packages
+      - name: Publish packages with trusted publishing
         env:
           NPM_CONFIG_PROVENANCE: 'true'
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi --tag "$NPM_DIST_TAG"
