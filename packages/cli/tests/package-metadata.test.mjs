@@ -4,7 +4,6 @@ import { expect, test } from 'vite-plus/test'
 
 import { NATIVE_PACKAGE_NAME, NATIVE_TARGETS } from '../bin/intlify.mjs'
 
-const packageVersion = '0.14.0'
 const repositoryUrl = 'git+https://github.com/intlify/intlify.git'
 const nativeTargetMatrix = [
   {
@@ -49,6 +48,7 @@ const nativeTargetMatrix = [
 ]
 
 test('wrapper package metadata matches the public package contract', async () => {
+  const packageVersion = await readRootPackageVersion()
   const pkg = await readJson('../package.json')
 
   expect(pkg).toMatchObject({
@@ -84,6 +84,7 @@ test('wrapper package metadata matches the public package contract', async () =>
 })
 
 test('cli-native package metadata matches the native package source contract', async () => {
+  const packageVersion = await readRootPackageVersion()
   const pkg = await readJson('../../cli-native/package.json')
 
   expect(pkg).toMatchObject({
@@ -147,4 +148,8 @@ test('wrapper platform table matches the CLI native build matrix', () => {
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(new URL(relativePath, import.meta.url), 'utf8'))
+}
+
+async function readRootPackageVersion() {
+  return (await readJson('../../../package.json')).version
 }

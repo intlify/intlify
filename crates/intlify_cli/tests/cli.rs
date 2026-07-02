@@ -37,9 +37,10 @@ fn temp_project_root(name: &str) -> PathBuf {
 #[test]
 fn manifest_declares_cli_crate_contract() {
     let manifest = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
+    let expected_version = format!("version = \"{CLI_VERSION}\"");
 
     assert!(manifest.contains("name = \"intlify_cli\""));
-    assert!(manifest.contains("version = \"0.14.0\""));
+    assert!(manifest.contains(&expected_version));
     assert!(manifest.contains("publish = false"));
     assert!(manifest.contains("[[bin]]"));
     assert!(manifest.contains("name = \"intlify\""));
