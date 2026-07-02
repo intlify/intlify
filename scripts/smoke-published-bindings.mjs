@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const tag = process.argv[2] ?? process.env.TAG ?? process.env.GITHUB_REF_NAME
+const tag = firstNonEmpty(process.argv[2], process.env.TAG, process.env.GITHUB_REF_NAME)
 if (!tag?.startsWith('v')) {
   throw new Error(`release tag must start with "v": ${String(tag)}`)
 }
@@ -101,4 +101,8 @@ function readPositiveIntegerEnv(name, fallback) {
     throw new Error(`${name} must be a positive integer`)
   }
   return value
+}
+
+function firstNonEmpty(...values) {
+  return values.find(value => value != null && value !== '')
 }

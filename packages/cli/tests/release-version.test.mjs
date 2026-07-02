@@ -17,6 +17,19 @@ test('release version check accepts CLI release metadata', async () => {
   })
 })
 
+test('release version check falls back to TAG when positional tag is empty', async () => {
+  await withFixture(async fixtureRoot => {
+    const result = runCheckReleaseVersion(fixtureRoot, {
+      args: [''],
+      env: {
+        TAG: 'v0.14.0'
+      }
+    })
+
+    expect(result.status).toBe(0)
+  })
+})
+
 test('release version check rejects mismatched package versions', async () => {
   await withFixture(async fixtureRoot => {
     await patchJson(join(fixtureRoot, 'packages', 'cli-native', 'package.json'), pkg => {
@@ -68,14 +81,19 @@ async function withFixture(callback) {
   }
 }
 
-function runCheckReleaseVersion(fixtureRoot) {
-  return spawnSync(process.execPath, [checkReleaseVersionScript, 'v0.14.0'], {
-    env: {
-      ...process.env,
-      INTLIFY_RELEASE_ROOT: fixtureRoot
-    },
-    encoding: 'utf8'
-  })
+function runCheckReleaseVersion(fixtureRoot, options = {}) {
+  return spawnSync(
+    process.execPath,
+    [checkReleaseVersionScript, ...(options.args ?? ['v0.14.0'])],
+    {
+      env: {
+        ...process.env,
+        INTLIFY_RELEASE_ROOT: fixtureRoot,
+        ...options.env
+      },
+      encoding: 'utf8'
+    }
+  )
 }
 
 async function writeFixture(fixtureRoot) {

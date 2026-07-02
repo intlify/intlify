@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const rootDir = process.env.INTLIFY_RELEASE_ROOT
   ? resolve(process.env.INTLIFY_RELEASE_ROOT)
   : fileURLToPath(new URL('..', import.meta.url))
-const tag = process.argv[2] ?? process.env.TAG ?? process.env.GITHUB_REF_NAME
+const tag = firstNonEmpty(process.argv[2], process.env.TAG, process.env.GITHUB_REF_NAME)
 
 if (!tag) {
   throw new Error('release tag is required')
@@ -166,4 +166,8 @@ function semverCore(version) {
     throw new Error(`invalid semver version: ${version}`)
   }
   return match.slice(1).map(Number)
+}
+
+function firstNonEmpty(...values) {
+  return values.find(value => value != null && value !== '')
 }

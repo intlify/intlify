@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const tag = process.argv[2] ?? process.env.TAG ?? process.env.GITHUB_REF_NAME
+const tag = firstNonEmpty(process.argv[2], process.env.TAG, process.env.GITHUB_REF_NAME)
 
 if (!tag?.startsWith('v')) {
   throw new Error(`release tag must start with "v": ${String(tag)}`)
@@ -74,4 +74,8 @@ fn main() {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function firstNonEmpty(...values) {
+  return values.find(value => value != null && value !== '')
 }

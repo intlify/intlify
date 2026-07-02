@@ -76,7 +76,7 @@ jobs:
         run: vp install --frozen-lockfile
 
       - name: Verify release version
-        run: node scripts/check-release-version.mjs "$TAG"
+        run: node scripts/check-release-version.mjs
 
       - name: Build packages
         run: vpr build
@@ -566,7 +566,7 @@ jobs:
         run: vp install --frozen-lockfile
 
       - name: Verify release version
-        run: node scripts/check-release-version.mjs "$TAG"
+        run: node scripts/check-release-version.mjs
 
       - name: Print publish tool versions
         run: |
@@ -620,7 +620,7 @@ jobs:
           run-install: false
 
       - name: Smoke test published packages
-        run: node scripts/smoke-published-bindings.mjs "$TAG"
+        run: node scripts/smoke-published-bindings.mjs
 
   published-cli-smoke:
     name: Smoke test published CLI (${{ matrix.os }})
@@ -658,7 +658,7 @@ jobs:
           run-install: false
 
       - name: Smoke test published CLI
-        run: node scripts/smoke-published-cli.mjs "$TAG"
+        run: node scripts/smoke-published-cli.mjs
 
   published-crate-smoke:
     name: Smoke test published crates.io package
@@ -697,7 +697,7 @@ jobs:
           toolchain: '1.96.0'
 
       - name: Smoke test published crate
-        run: node scripts/smoke-published-crate.mjs "$TAG"
+        run: node scripts/smoke-published-crate.mjs
 
   release-notes:
     name: Create GitHub Release
