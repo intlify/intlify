@@ -346,7 +346,9 @@ The initial semantic diagnostic candidates are:
 
 - `undefined-variable`
 - `duplicate-declaration`
+- `duplicate-option-name`
 - `invalid-local-dependency`
+- `missing-selector-annotation`
 - `variant-key-arity-mismatch`
 - `missing-fallback-variant`
 - `duplicate-variant`

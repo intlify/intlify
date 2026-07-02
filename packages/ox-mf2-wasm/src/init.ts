@@ -17,7 +17,6 @@ type GeneratedWasmModule = WasmBinding & {
 
 let initialized = false
 let inFlight: Promise<void> | null = null
-let explicitInputUsed = false
 
 /**
  * Initialize the WASM runtime before parse or decode APIs are used.
@@ -34,13 +33,12 @@ export async function init(input?: WasmInitInput): Promise<void> {
   }
 
   if (inFlight) {
-    if (input === undefined || !explicitInputUsed) {
+    if (input === undefined) {
       return inFlight
     }
     throw initializationError('ox-mf2 WASM initialization is already in flight')
   }
 
-  explicitInputUsed = input !== undefined
   inFlight = initializeWasm(input)
   try {
     await inFlight

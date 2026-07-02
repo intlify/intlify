@@ -25,6 +25,12 @@ test('API before init reports initialization error', () => {
   expect(() => parseMessage('Hello {$name}')).toThrow(OxMf2InitializationError)
 })
 
+test('explicit init input is rejected while default init is in flight', async () => {
+  const initialization = init()
+  await expect(init(new Uint8Array())).rejects.toBeInstanceOf(OxMf2InitializationError)
+  await expect(initialization).resolves.toBeUndefined()
+})
+
 test('init initializes the generated WASM artifact', async () => {
   await expect(init()).resolves.toBeUndefined()
   await expect(init()).resolves.toBeUndefined()

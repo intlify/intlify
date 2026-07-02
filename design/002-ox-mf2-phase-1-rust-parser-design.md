@@ -195,7 +195,7 @@ Record size budget:
 | --- | --: | --- |
 | `CstNodeRecord` | 24 bytes | `kind: u16`, `flags: u16`, span, child range, `data_ref` |
 | `CstEdgeRecord` | 8 bytes | references node/token targets by `ref_id` |
-| `TokenRecord` | 24 bytes or less | token kind, SourceId, span, compact trivia range |
+| `TokenRecord` | 28 bytes or less | token kind, SourceId, span, compact trivia range |
 | `TriviaRecord` | 16 bytes or less | trivia kind, SourceId, span |
 | `DiagnosticRecord` | 32 bytes or less | SourceId, span, severity, code, message ref, label range |
 | `DiagnosticLabelRecord` | 16 bytes or less | SourceId, span, message ref |
@@ -801,7 +801,7 @@ SourceFile {
 }
 ```
 
-If source length or span does not fit in `u32`, the parser rejects it or emits a fatal diagnostic.
+If source length does not fit in `u32`, `SourceStore::add` panics and `SourceStore::try_add` returns the `SourceTooLarge` API error before parsing starts. The parser itself does not emit a `SpanOverflow` diagnostic on this path; the code remains reserved.
 
 ### Source Encoding Policy
 
@@ -1031,8 +1031,8 @@ TokenRecord {
   span_start: u32,
   span_end: u32,
   first_trivia: u32,
-  leading_trivia_count: u16,
-  trailing_trivia_count: u16,
+  leading_trivia_count: u32,
+  trailing_trivia_count: u32,
 }
 
 TriviaRecord {
@@ -1047,6 +1047,8 @@ TriviaRecord {
 Token text is read from `SourceStore` and `Span`. The normal parse path does not store token text as owned strings.
 
 To keep record size small, the Phase 1 `TokenRecord` represents leading/trailing trivia as one compact range plus two counts. `first_trivia` points to the first trivia item belonging to the token. The first `leading_trivia_count` items are leading trivia, and the next `trailing_trivia_count` items are trailing trivia. If the Phase 2 Binary AST snapshot needs separate `leading_trivia_start` / `trailing_trivia_start`, SnapshotWriter expands this compact range linearly.
+
+The compact counts are `u32`, matching the Phase 2 Binary AST snapshot wire counts. Trivia records are per-run, so adversarial input can create a very large number of alternating whitespace and bidi runs before a single token. The parser MUST NOT silently truncate or wrap the count. If a token's leading or trailing trivia run count would exceed `u32::MAX`, the parser cannot represent the token/trivia relation losslessly in either Phase 1 records or the snapshot wire format. That condition is treated as a resource-limit API error before a successful parse or snapshot is returned; it is not a grammar error, and no parser diagnostic is emitted.
 
 Trivia handling:
 
@@ -1090,6 +1092,8 @@ DiagnosticLabelRecord {
 
 `DiagnosticCode` is a parser diagnostic classification enum, not an API error code. It is intentionally outside the `OxMf2ErrorCode` range policy defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md).
 
+Some `DiagnosticCode` values are defined ahead of their emit sites because the code catalog is part of the snapshot compatibility surface. A defined code that is not yet emitted is reserved, not dead: removing or renumbering it is a snapshot compatibility change. `SpanOverflow` in particular is superseded on the current API surface by the `SourceStore::try_add` / `SourceTooLarge` API error; it remains reserved for a future path that reports oversized input as a fatal diagnostic instead of an API error.
+
 Diagnostics must be cheap on the success path.
 
 - Fully valid input performs no diagnostic allocation.
@@ -1111,7 +1115,6 @@ Parser diagnostics stay parser-focused. Examples:
 - invalid declaration start
 - invalid matcher syntax
 - invalid variant boundary
-- span overflow
 
 Semantic diagnostics belong to later phases. Examples:
 

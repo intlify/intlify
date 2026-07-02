@@ -250,7 +250,7 @@ enum LayoutVariantKey {
 }
 ```
 
-`LayoutMatcherTable` follows matcher grammar invariants. It has at least one selector and at least one row. Each row has exactly one key per selector. Before normalization, `column_widths` is empty. After normalization, `column_widths.len()` equals `selectors.len()`.
+`LayoutMatcherTable` follows matcher grammar invariants. It has at least one selector and at least one row. Each row has exactly one key per selector. Before normalization, `column_widths` is empty. After normalization, `column_widths.len()` equals `selectors.len()`. Like the `LayoutInputDeclaration` invariant, these matcher invariants assume the parser grammar-conformance prerequisite defined in the Phase 3B formatter design.
 
 Leaf tokens that must preserve source spelling are source-backed. `LayoutVariable` stores the full `$name` span. `LayoutIdentifier` stores the full identifier spelling, including any namespace separator such as `namespace:name`. Keywords such as `.input`, `.local`, and `.match`, as well as formatter-controlled delimiters and punctuation such as `{`, `}`, `{{`, `}}`, `=`, function-prefix `:`, `@`, `#`, and `/`, are generated formatter text rather than source-backed leaves. Punctuation that is part of a source-backed identifier, variable, literal, or pattern text remains inside that source slice.
 
@@ -586,4 +586,4 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Open Questions
 
-No formatter IR design open questions remain at this level. Later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
+Formatter IR open questions are tracked in the Phase 3B formatter design's [Open Questions](./007-ox-mf2-phase-3b-formatter-design.md#open-questions), in particular the trivia-less snapshot capability policy and the final LF / line-ending normalization scope, both of which affect IR construction inputs. No IR-only open questions remain beyond those; later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
