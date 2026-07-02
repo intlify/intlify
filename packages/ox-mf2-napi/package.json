@@ -1,6 +1,6 @@
 {
   "name": "@intlify/ox-mf2-napi",
-  "version": "0.14.0-alpha.3",
+  "version": "0.14.0-alpha.4",
   "description": "N-API runtime package for ox-mf2.",
   "keywords": [
     "intlify",
