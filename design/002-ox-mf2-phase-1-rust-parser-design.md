@@ -1115,7 +1115,6 @@ Parser diagnostics stay parser-focused. Examples:
 - invalid declaration start
 - invalid matcher syntax
 - invalid variant boundary
-- span overflow
 
 Semantic diagnostics belong to later phases. Examples:
 
