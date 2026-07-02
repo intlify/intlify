@@ -61,6 +61,9 @@ pub enum DiagnosticCode {
     /// A `namespace ":"` was given but the trailing `name` was absent
     /// (e.g. `{:foo:}`, `{#ns:}`).
     MissingIdentifierName = 15,
+    /// `.input` declaration value was not a variable expression
+    /// (e.g. `.input {|x|}`, `.input {:f}`, `.input {#m}`).
+    InvalidInputDeclaration = 16,
 }
 
 impl DiagnosticCode {
@@ -94,6 +97,9 @@ impl DiagnosticCode {
             Self::AmbiguousMessageMode => "ambiguous message mode; recovered as a simple message",
             Self::MissingRequiredWhitespace => "missing required whitespace between productions",
             Self::MissingIdentifierName => "missing identifier name after ':'",
+            Self::InvalidInputDeclaration => {
+                "'.input' declaration value must be a variable expression"
+            }
         }
     }
 
@@ -326,6 +332,9 @@ fn diagnostic_code_from_u16(value: u16) -> DiagnosticCode {
         v if v == DiagnosticCode::MissingIdentifierName as u16 => {
             DiagnosticCode::MissingIdentifierName
         }
+        v if v == DiagnosticCode::InvalidInputDeclaration as u16 => {
+            DiagnosticCode::InvalidInputDeclaration
+        }
         _ => DiagnosticCode::Unspecified,
     }
 }
@@ -408,6 +417,7 @@ mod tests {
             AmbiguousMessageMode,
             MissingRequiredWhitespace,
             MissingIdentifierName,
+            InvalidInputDeclaration,
         ] {
             let msg = code.static_message();
             assert!(!msg.is_empty(), "missing message for {code:?}");

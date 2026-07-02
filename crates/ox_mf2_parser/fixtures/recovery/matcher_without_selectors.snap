@@ -1,0 +1,7 @@
+Root @ 0..7
+  ComplexMessage @ 0..7
+    ComplexBody @ 0..6
+      Matcher @ 0..6
+        TOKEN MatchKeyword @ 0..6 ".match"
+--diagnostics--
+InvalidMatcherSyntax @ 0..6 (line 1, col 1): invalid matcher syntax

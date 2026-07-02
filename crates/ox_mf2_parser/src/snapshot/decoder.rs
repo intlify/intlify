@@ -923,6 +923,9 @@ pub(crate) fn diagnostic_code_from_u16_strict(value: u16) -> Option<DiagnosticCo
         v if v == DiagnosticCode::MissingIdentifierName.as_u16() => {
             DiagnosticCode::MissingIdentifierName
         }
+        v if v == DiagnosticCode::InvalidInputDeclaration.as_u16() => {
+            DiagnosticCode::InvalidInputDeclaration
+        }
         _ => return None,
     })
 }

@@ -1,0 +1,12 @@
+Root @ 0..14
+  ComplexMessage @ 0..14
+    ComplexBody @ 0..13
+      Matcher @ 0..13
+        TOKEN MatchKeyword @ 0..6 ".match"
+        Selector @ 7..13
+          Variable @ 7..13
+            TOKEN DollarToken @ 7..8 "$"
+            Name @ 8..13
+              TOKEN NameToken @ 8..13 "count"
+--diagnostics--
+InvalidMatcherSyntax @ 0..6 (line 1, col 1): invalid matcher syntax

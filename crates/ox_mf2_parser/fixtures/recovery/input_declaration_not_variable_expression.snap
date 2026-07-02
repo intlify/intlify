@@ -1,0 +1,21 @@
+Root @ 0..24
+  ComplexMessage @ 0..24
+    InputDeclaration @ 0..14
+      TOKEN InputKeyword @ 0..6 ".input"
+      Placeholder @ 7..14
+        LiteralExpression @ 7..14
+          TOKEN LeftBraceToken @ 7..8 "{"
+          QuotedLiteral @ 8..13
+            TOKEN PipeToken @ 8..9 "|"
+            TOKEN QuotedTextToken @ 9..12 "foo"
+            TOKEN PipeToken @ 12..13 "|"
+          TOKEN RightBraceToken @ 13..14 "}"
+    ComplexBody @ 15..23
+      QuotedPattern @ 15..23
+        TOKEN LeftDoubleBraceToken @ 15..17 "{{"
+        Pattern @ 17..21
+          Text @ 17..21
+            TOKEN TextToken @ 17..21 "body"
+        TOKEN RightDoubleBraceToken @ 21..23 "}}"
+--diagnostics--
+InvalidInputDeclaration @ 7..14 (line 1, col 8): '.input' declaration value must be a variable expression
