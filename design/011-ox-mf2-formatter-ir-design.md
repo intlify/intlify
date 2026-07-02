@@ -62,7 +62,7 @@ The formatter uses a two-layer IR:
 1. **MF2 Layout IR**: an ox-mf2-specific layout model that captures message structure and formatter intent.
 2. **Document IR**: a small Prettier-style document model that captures text rendering primitives.
 
-The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from `SnapshotView` spans and trivia during MF2 Layout IR construction.
+The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from `SnapshotView` spans plus trivia or verified source/token gaps during MF2 Layout IR construction.
 
 The Document IR is independent of MF2 semantics. It should not know about matcher tables, declarations, selectors, or pattern semantics. Its job is to render an already-decided document layout deterministically.
 
@@ -92,11 +92,18 @@ struct LayoutMessage {
 
 enum LayoutMessageBody {
     Pattern(LayoutPattern),
+    QuotedPattern(LayoutPattern),
     MatcherTable(LayoutMatcherTable),
 }
 ```
 
 The formatter IR only represents valid messages. Parser recovery, missing-node, and error-node shapes are not part of the initial IR because formatter APIs return `ok: false` when parser diagnostics exist.
+
+`Pattern` is used only for simple messages. `QuotedPattern` is used for a complex-message quoted body, including declaration-less `{{ ... }}` messages. The renderer emits `{{` / `}}` delimiters only for `QuotedPattern` bodies and matcher row values. Quoted-ness is taken from the CST and is never rewritten: a simple message stays a simple message, and a quoted body stays quoted.
+
+`LayoutMessage` follows the MF2 message grammar. `Pattern` requires `declarations` to be empty. `QuotedPattern` and `MatcherTable` represent complex message bodies and may be paired with zero or more declarations.
+
+All syntax sequence fields preserve source order. The formatter IR must not reorder declarations, options, attributes, matcher selectors, matcher rows, variant keys, or pattern chunks.
 
 Declarations are split by syntax shape:
 
@@ -118,7 +125,7 @@ struct LayoutLocalDeclaration {
 }
 ```
 
-`LayoutInputDeclaration` stores only the placeholder expression. The declared input variable is derived from the variable operand inside `value`, matching the parser and semantic model where `.input {$name}` owns one placeholder expression. Constructing a `LayoutInputDeclaration` whose `value` does not contain exactly one variable operand is an internal invariant error, not a recoverable formatter diagnostic, because formatter IR is built only after parser diagnostics have succeeded.
+`LayoutInputDeclaration` stores only the placeholder expression. The declared input variable is derived from the variable operand inside `value`, matching the parser and semantic model where `.input {$name}` owns one placeholder expression. Constructing a `LayoutInputDeclaration` whose `value` does not contain exactly one variable operand is an internal invariant error, not a recoverable formatter diagnostic, because formatter IR is built only after parser diagnostics have succeeded. This invariant assumes the parser grammar-conformance prerequisite defined in the Phase 3B formatter design.
 
 `LayoutLocalDeclaration` keeps `variable` and `value` separately because `.local $name = {...}` has an explicit left-hand-side variable outside the expression value.
 
@@ -159,6 +166,14 @@ enum LayoutLiteralOrVariable {
 ```
 
 `LayoutExpression.function` represents the optional `:` function syntax from the current MF2 grammar. The IR does not model a separate private-use annotation form because the current grammar and parser do not expose such a syntax. `@` syntax is represented only as `LayoutAttribute`.
+
+Valid `LayoutExpression` combinations are:
+
+- `operand: Some(_)` with `function: None` for literal and variable expressions without a function
+- `operand: Some(_)` with `function: Some(_)` for literal and variable expressions with a function
+- `operand: None` with `function: Some(_)` for function expressions
+
+`operand: None` with `function: None` is an internal invariant error because it does not correspond to a valid MF2 expression.
 
 Option values may be either literals or variables, matching `option = identifier "=" (literal / variable)`. Attribute values are literal-only, matching `attribute = "@" identifier ["=" literal]`; variables are not valid attribute values in the formatter IR.
 
@@ -235,7 +250,9 @@ enum LayoutVariantKey {
 }
 ```
 
-Leaf tokens that must preserve source spelling are source-backed. `LayoutVariable` stores the full `$name` span. Keywords such as `.input`, `.local`, and `.match`, as well as delimiters and punctuation such as `{`, `}`, `=`, `:`, and `@`, are generated formatter text rather than source-backed leaves.
+`LayoutMatcherTable` follows matcher grammar invariants. It has at least one selector and at least one row. Each row has exactly one key per selector. Before normalization, `column_widths` is empty. After normalization, `column_widths.len()` equals `selectors.len()`.
+
+Leaf tokens that must preserve source spelling are source-backed. `LayoutVariable` stores the full `$name` span. `LayoutIdentifier` stores the full identifier spelling, including any namespace separator such as `namespace:name`. Keywords such as `.input`, `.local`, and `.match`, as well as formatter-controlled delimiters and punctuation such as `{`, `}`, `{{`, `}}`, `=`, function-prefix `:`, `@`, `#`, and `/`, are generated formatter text rather than source-backed leaves. Punctuation that is part of a source-backed identifier, variable, literal, or pattern text remains inside that source slice.
 
 ```rust
 struct LayoutIdentifier {
@@ -279,7 +296,7 @@ blank_lines_before = 0 | 1
 
 `Flat` means the source shape should be treated as single-line where possible. `Break` means the source shape should be treated as multi-line. `Unknown` is used when standard mode is active, when source shape is not meaningful, or when shape cannot be recovered.
 
-`blank_lines_before` records whether a major node had a blank-line gap before it. Multiple blank lines are normalized to one blank line. This preserves grouping intent without letting arbitrary vertical spacing leak into formatter output.
+`blank_lines_before` records whether a major node had a blank-line gap before it. Multiple blank lines are normalized to one blank line. Before normalization, the raw count is stored as a `u8` and saturates at `255`. This preserves grouping intent without letting arbitrary vertical spacing leak into formatter output.
 
 Major nodes carry shared metadata:
 
@@ -291,9 +308,11 @@ struct LayoutNodeMeta {
 }
 ```
 
-`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. In standard mode, shape hints are `Unknown`. In preserve mode, a major node whose span contains no line break is `Flat`; a major node whose span contains a line break is `Break`; nodes without meaningful or recoverable source shape are `Unknown`. Pattern text line breaks contribute to the parent pattern's shape hint, but the pattern text itself remains a source slice and is not rewritten.
+`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia or verified source/token gaps, and token line positions. In standard mode, shape hints are `Unknown`. In preserve mode, a major node whose span contains no line break is `Flat`; a major node whose span contains a line break is `Break`; nodes without meaningful or recoverable source shape are `Unknown`. Pattern text line breaks contribute to the parent pattern's shape hint, but the pattern text itself remains a source slice and is not rewritten.
 
 `blank_lines_before` is computed from the major node's leading trivia or previous-token gap and then normalized to `0` or `1`. Preserve mode uses blank-line grouping only at major syntax boundaries such as top-level declarations, message body, matcher rows, and major pattern or markup chunks. Standard mode treats `blank_lines_before` as `0`. Leading blank lines before the message are not emitted, final output still ends with exactly one LF, and blank lines inside pattern text are preserved as semantically significant source slices rather than normalized as grouping metadata.
+
+Standard-mode IR construction does not use trivia for layout decisions. The public `formatSnapshot` capability policy for trivia-less snapshots is tracked as an open question in the Phase 3B formatter design. Preserve-mode IR construction requires token-level leading/trailing trivia capability or equivalent whitespace data derivable from verified source/token gaps. A snapshot-backed preserve-mode request without enough data to derive preserve-mode trivia fails before MF2 Layout IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`.
 
 MF2 does not define line comments or block comments. The formatter IR does not model comments, and Phase 3B does not support syntax-local formatter ignore directives. Attribute syntax remains part of expressions and markup, but attributes are not treated as formatter comments or suppression directives.
 
@@ -344,14 +363,14 @@ This keeps line-breaking intent explicit without implementing width-based wrappi
 
 `Text` and `SourceSlice` are separate:
 
-- `Text` is generated formatter syntax, such as `.input`, spaces, braces, separators, and normalized punctuation.
+- `Text` is generated formatter syntax, such as `.input`, spaces, braces, separators, and formatter-controlled punctuation.
 - `SourceSlice(span)` is verified source text copied from the original input, such as whitespace-sensitive pattern text, literal spelling, or escape spelling.
 
 `Text` uses `Cow<'static, str>` so static formatter tokens and computed generated text, such as matcher padding, can share one representation.
 
-Phase 3B generated `Text` is limited to fixed MF2 syntax tokens and whitespace: keywords such as `.input`, `.local`, and `.match`; punctuation such as `{`, `}`, `:`, `=`, and `@`; spaces; LF; indentation; and matcher padding. User-controlled identifiers, variables, literals, pattern text, and escape spelling are not generated as `Text`; they remain source-backed through `SourceSlice`. Future semantic rewriting or identifier normalization requires a separate escaping and validation design.
+Phase 3B generated `Text` is limited to fixed MF2 syntax tokens and whitespace: keywords such as `.input`, `.local`, and `.match`; formatter-controlled delimiters and punctuation such as `{`, `}`, `{{`, `}}`, function-prefix `:`, `=`, `@`, `#`, and `/`; spaces; LF; indentation; and matcher padding. User-controlled identifiers, variables, literals, pattern text, namespace separators inside identifiers, and escape spelling are not generated as `Text`; they remain source-backed through `SourceSlice`. Future semantic rewriting or identifier normalization requires a separate escaping and validation design.
 
-`SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed contiguous spans may cross multiple verified token boundaries, but they must be derived from verified token/source ranges and must remain valid UTF-8 byte boundaries. Snapshot/source consistency and span boundaries are checked during IR construction, before rendering.
+`SourceSlice(span)` remains a source span in Document IR and is resolved during rendering from the renderer source context. It may use token spans or formatter-computed contiguous spans. Formatter-computed contiguous spans may cross multiple verified token boundaries, but they must be derived from verified token/source ranges and must remain valid UTF-8 byte boundaries. Available snapshot/source consistency checks and span boundaries are checked during IR construction, before rendering.
 
 The renderer returns errors. IR invariant violations, invalid unverified source slices, or source access failures are converted to formatter operational errors such as `internal_error`; they must not leak as public API panics.
 
@@ -431,7 +450,9 @@ literal span=30..35 text="|foo|"
 pattern_text span=40..46 text="Hello "
 ```
 
-Generated keywords and punctuation, such as `.input`, `.local`, `.match`, `{`, `}`, `=`, `:`, and `@`, are not emitted in MF2 Layout IR dumps because they are not MF2 Layout IR nodes.
+Generated keywords and formatter-controlled punctuation, such as `.input`, `.local`, `.match`, `{`, `}`, `{{`, `}}`, `=`, function-prefix `:`, `@`, `#`, and `/`, are not emitted in MF2 Layout IR dumps because they are not MF2 Layout IR nodes. Punctuation inside source-backed identifiers, variables, literals, or pattern text appears only as part of those source-backed dump entries.
+
+When a message body is quoted, layout dumps must distinguish it as a `QuotedPattern` node. Matcher row values remain ordinary `Pattern` nodes because variant values are always quoted by the MF2 grammar.
 
 Expressions, patterns, markup, and matcher tables are dumped as trees instead of source-like formatted text:
 
@@ -506,19 +527,24 @@ Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for 
 
 Runtime invariant violations include:
 
+- message/body combinations that do not match MF2 grammar, such as `Pattern` with declarations
 - an invalid `SourceSlice(SourceSpan)` inside the IR, such as `start > end`, `end > source.len()`, or non-UTF-8 character boundaries
 - formatter-computed source spans that were not derived from verified token/source ranges or that cross unverified source boundaries
-- matcher table normalization state where `column_widths` does not match selector/key columns, row key counts are inconsistent, or uncomputed columns reach lowering
+- matcher table state where selectors or rows are empty, row key counts are inconsistent with selector count, `column_widths` does not match selector/key columns, or uncomputed columns reach lowering
 - Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
 
-`formatSnapshot(snapshot, source, options)` and `checkSnapshot(snapshot, source, options)` have a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Invalid snapshot bytes, unsupported snapshot versions, or missing formatter-required snapshot capabilities detected before IR construction return `invalid_snapshot`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
+`formatSnapshot(snapshot, source, options)` and `checkSnapshot(snapshot, source, options)` have a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Phase 3B keeps this check best-effort when the snapshot does not carry source identity data or consistency metadata. Invalid snapshot bytes, unsupported snapshot versions, or missing formatter-required snapshot capabilities detected before IR construction return `invalid_snapshot`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
+
+A snapshot-backed request without verifiable diagnostic capability fails before IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`. Formatter IR is only built after the formatter can verify the supplied snapshot represents a diagnostic-free parse. IR construction must not treat a zero diagnostic count as sufficient proof if the snapshot format cannot distinguish "no diagnostics" from "diagnostics were intentionally omitted."
 
 Parser diagnostics are not internal errors. If source text or a supplied snapshot contains parser diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and do not start IR construction. `errors` remains empty unless an independent operational error also occurred.
 
 Invalid options are rejected before IR construction:
 
 - CLI config/schema validation failures use `config_validation_failed`
-- Rust, N-API, and WASM formatter API option validation failures use `invalid_options`
+- raw external formatter option validation failures, such as N-API or WASM option values, use `invalid_options`
+
+The typed Rust `FormatOptions` API should not construct invalid option states. Validation belongs to raw input conversion before IR construction.
 
 Unsupported CLI input files or unsupported `--stdin-filepath` extensions are rejected during CLI/input discovery with `unsupported_input_file`. They do not enter parser or formatter IR construction.
 

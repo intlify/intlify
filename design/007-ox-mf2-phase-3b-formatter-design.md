@@ -86,11 +86,11 @@ Standard mode shows canonical spacing, indentation, LF line endings, exactly one
 
 ```mf2
 .input   {$count   :number}
-.local $label={$count:number}
+.local $label={$count :number}
 .match $count
 0 {{No items}}
 1 {{One item}}
-*   {{$label items}}
+*   {{{$label} items}}
 ```
 
 formats toward:
@@ -101,7 +101,7 @@ formats toward:
 .match $count
 0  {{No items}}
 1  {{One item}}
-*  {{$label items}}
+*  {{{$label} items}}
 ```
 
 Preserve mode may use the original single-line or multi-line source shape where the shape is meaningful, while still normalizing local spacing:
@@ -206,9 +206,9 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `source` is required for snapshot-backed formatting because preserve mode, source slicing, parser diagnostics, and editor position conversion depend on source text. Snapshot-backed formatting is parse-artifact reuse, not a source-free formatting mode.
 
-`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source identity validation best-effort and does not require snapshots to carry a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
+`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. Snapshot-backed formatting requires verifiable diagnostic capability in all modes; if diagnostics may have been omitted from the supplied snapshot, the formatter cannot prove that the parse was diagnostic-free and returns `invalid_snapshot` with `details.reason: "missing_capability"`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source consistency validation best-effort and does not require snapshots to carry source identity data or consistency metadata, such as a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
 
-`changed` is computed by byte equality between the formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Inputs with CRLF line endings, missing final LF, or multiple final newlines therefore report `changed: true` when the formatter normalizes them to LF and exactly one final LF. Snapshot-backed APIs compare against the supplied `source`; if embedded source identity exists and differs from the supplied source, the API returns a mismatch failure instead of a changed result.
+`changed` is computed by byte equality between the formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Inputs with CRLF line endings, missing final LF, or multiple final newlines therefore report `changed: true` when the formatter normalizes them to LF and exactly one final LF. Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
 ## Operational Error Codes
 
@@ -740,9 +740,9 @@ The formatter separates syntax traversal from rendering.
 
 The message-level core lives in a workspace-internal Rust crate named `intlify_format`. This crate is not published to crates.io in Phase 3B. It should still expose a clear workspace API for the CLI, N-API binding, WASM binding, and tests.
 
-The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build an internal layout/document representation before rendering text. The layout model should support delayed line, group, and indent decisions so standard mode, preserve mode, future line width support, and future resource/catalog adapters can reuse one formatter core.
+The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
 
-The exact IR node shape, printing algorithm, and line-breaking strategy are intentionally left to implementation design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
+Concrete Rust type names and implementation organization may still change during implementation, but the formatter pipeline and IR responsibilities follow the Phase 3B IR design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
 
 `@intlify/cli` owns the `intlify fmt` command and links the `intlify_format` crate through the native CLI binary. Programmatic formatter APIs are distributed separately:
 
@@ -760,7 +760,15 @@ The exact IR node shape, printing algorithm, and line-breaking strategy are inte
 
 The N-API package uses lazy native loading. Importing the package should not eagerly load the native binary; API calls load the binding as needed.
 
-`@intlify/format-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/format-napi`. After `await init()`, the WASM package exposes synchronous `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` APIs. Calling these APIs before `init()` is a usage error and may throw. Repeated `init()` calls are idempotent. The exact `init(input?)` loading parameter shape is implementation-defined in Phase 3B.
+`@intlify/format-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/format-napi`. After `await init()`, the WASM package exposes synchronous `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` APIs.
+
+The `@intlify/format-wasm` initialization contract follows the existing `@intlify/ox-mf2-wasm` package:
+
+- `init(input?)` accepts the same WASM initialization input shape as the parser WASM package.
+- Calling synchronous formatter APIs before initialization throws a WASM initialization error.
+- Repeated `init()` calls with no input after successful initialization are idempotent.
+- Reinitializing an already initialized runtime with an explicit input is an initialization error.
+- While initialization is in flight, `init()` with no input returns the in-flight promise. If the in-flight initialization started with default input, a later explicit input also returns the in-flight promise. If the in-flight initialization started with explicit input, a competing explicit input is an initialization error.
 
 New `@intlify/format-*` npm packages may require token-based bootstrap publishing for the first release. After the packages exist on npm and trusted publisher settings are configured, normal releases should use npm trusted publishing.
 
@@ -819,7 +827,7 @@ Rules:
 - the final key column and the variant value pattern start have at least 2 spaces between them
 - preserve mode may preserve existing single-line/multi-line shape and blank-line grouping, but still normalizes matcher rows to the table-like spacing rules
 
-Matcher column width is measured using Unicode display width, not UTF-8 byte length. Literal key width is measured from the raw source spelling that the formatter will emit, not from a decoded literal value. For example, escaped characters and quoted-literal delimiters count according to the emitted source slice. Row alignment applies only to variant key columns and the value pattern start. The value pattern's internal formatting is handled by normal pattern formatting, regardless of whether the pattern starts with quoted text, an expression, or markup. Phase 3B does not wrap long value patterns.
+Matcher column width is measured using Unicode display width, not UTF-8 byte length. The width algorithm follows the `unicode-width` crate's `UnicodeWidthStr` semantics; fixtures lock the observable behavior. Literal key width is measured from the raw source spelling that the formatter will emit, not from a decoded literal value. For example, escaped characters and quoted-literal delimiters count according to the emitted source slice. Row alignment applies only to variant key columns and the value pattern start. The value pattern's internal formatting is handled by normal pattern formatting, regardless of whether the pattern starts with quoted text, an expression, or markup. Phase 3B does not wrap long value patterns.
 
 Example:
 
@@ -852,6 +860,7 @@ Initial core style rules:
 - operand/function/options/attributes are separated by 1 space
 - option `=` and attribute `=` have no surrounding spaces
 - declaration `=` has 1 space on both sides
+- declaration, option, attribute, selector, variant row, variant key, and pattern chunk order is preserved
 - quoted literal spelling, unquoted literal spelling, and escape spelling are preserved
 
 Examples:
@@ -861,7 +870,7 @@ Examples:
 .local $label = {$count :number}
 .match $count
 one  {{One item}}
-*    {{$label items}}
+*    {{{$label} items}}
 ```
 
 ```mf2
@@ -878,18 +887,24 @@ Initial required helper semantics:
 - token traversal is available in source order
 - public node and token kind accessors expose stable symbolic names; numeric discriminants are internal
 - node and token spans are UTF-8 byte spans using half-open ranges `[start, end)`
-- source slicing is available through a `slice(span)`-style helper after source/snapshot consistency has been established
+- source slicing is available through a `slice(span)`-style helper after available source/snapshot consistency checks have passed
 - delimiter spans are exposed through delimiter token kind and span access; dedicated delimiter-specific accessors are not required
 - token raw text is not duplicated in the snapshot; consumers use token spans with `slice(span)`
-- token-level leading and trailing whitespace trivia spans are available for preserve mode
-- derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans and source slices
-- parser diagnostic access
+- token-level leading and trailing whitespace trivia spans are available for preserve mode, or equivalent trivia can be derived from verified source/token gaps
+- derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans or verified source/token gaps
+- parser diagnostic access is required for all snapshot-backed formatter modes, including a verifiable indication that diagnostics were encoded even when the diagnostic count is zero
 - recovered or missing node/token flags are not formatter requirements because snapshots with parser diagnostics do not produce formatted output
-- source/snapshot consistency checks are required when the snapshot carries a source hash or equivalent source identity; otherwise checks are best-effort
+- source/snapshot consistency checks are required when the snapshot carries source identity data or consistency metadata, such as a source hash or source length; otherwise checks are best-effort
+
+Snapshot-backed preserve mode requires access to source-shape and blank-line grouping inputs through token-level leading/trailing trivia spans or equivalent verified source/token gaps. If a supplied snapshot lacks the data needed to derive preserve-mode trivia, `formatSnapshot` and `checkSnapshot` return `invalid_snapshot` with `details.reason: "missing_capability"`. Whether trivia-less snapshots are rejected for all modes or only for preserve mode remains an open question.
+
+Snapshot-backed formatting also requires verifiable diagnostic capability in all modes. A zero diagnostic count is not enough by itself when the snapshot format cannot prove whether diagnostics were encoded or intentionally omitted. Phase 3B may satisfy this requirement with a snapshot capability marker or with an explicit zero-count diagnostics section when diagnostics are enabled. If a supplied snapshot lacks verifiable diagnostic capability, `formatSnapshot` and `checkSnapshot` return `invalid_snapshot` with `details.reason: "missing_capability"` before formatting.
+
+If the existing Binary AST snapshot format or `SnapshotView` accessor surface cannot expose this proof, the PR that introduces snapshot-backed formatter behavior must include the minimum snapshot versioning, writer, decoder, and accessor updates needed before treating snapshot input as formatter-supported.
 
 `formatMessage(source)` parses the same source it formats, so a public source/snapshot mismatch cannot occur. Span and UTF-8 boundary validation still happens as internal formatter validation.
 
-`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source identity when the snapshot carries a source hash, source length, or equivalent source identity. A mismatch returns `source_snapshot_mismatch`. Phase 3B does not require snapshots to carry source identity data. If the snapshot has no source identity, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
+`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source consistency when the snapshot carries source identity data or consistency metadata, such as a source hash or source length. A mismatch returns `source_snapshot_mismatch`. Phase 3B does not require snapshots to carry source identity data or consistency metadata. If the snapshot has no such data, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
 
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
@@ -899,7 +914,7 @@ If the formatter requires a Binary AST snapshot format change, the formatter PR 
 
 Formatter fixtures should be reviewable and stable.
 
-Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` API, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
+Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` source-backed and snapshot-backed APIs, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
 
 ### Minimum Coverage Matrix
 
@@ -910,6 +925,8 @@ Syntax coverage:
 | Coverage area | Required by | Requirement |
 | --- | --- | --- |
 | `.input` and `.local` declarations | Core formatter rules PR | `MUST` |
+| top-level simple pattern vs quoted pattern body preservation | Core formatter rules PR | `MUST` |
+| source order preservation for declarations, options, attributes, selectors, variants, keys, and pattern chunks | Core formatter rules PR | `MUST` |
 | expressions with operands and functions | Core formatter rules PR | `MUST` |
 | options and attributes | Core formatter rules PR | `MUST` |
 | markup syntax | Core formatter rules PR | `MUST` |
@@ -925,6 +942,7 @@ Behavior coverage:
 | Coverage area | Required by | Requirement |
 | --- | --- | --- |
 | `format_message` output and `check_format` changed/unchanged behavior | Core formatter PRs | `MUST` |
+| `format_snapshot` and `check_snapshot` source consistency, invalid snapshot, missing verifiable diagnostic capability, and missing preserve-mode trivia data behavior | Core formatter PRs | `MUST` |
 | idempotency of formatted output | Core formatter PRs | `MUST` |
 | formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
 | parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
@@ -933,7 +951,7 @@ Behavior coverage:
 | stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
 | JSON reporter success, difference, diagnostic, and operational-error output | CLI formatter PR | `MUST` |
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
-| unsupported file, unmatched input, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
+| unsupported file, unmatched input, glob-with-no-mf2-target zero-target success, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
 | ignore source precedence across root `.gitignore`, `--ignore-path`, and `fmt.ignorePatterns` | CLI formatter PR | `MUST` |
 | N-API `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | N-API binding PR | `MUST` |
 | WASM `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | WASM binding PR | `MUST` |
@@ -1110,6 +1128,8 @@ Phase 3B does not publish public command-specific output JSON Schemas while `sch
 
 Phase 3B formatter implementation should be split into reviewable PRs:
 
+Prerequisite: an `ox_mf2_parser` grammar-conformance PR must land before the core formatter rules PR. The strict diagnostics policy assumes that a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. The current parser accepts `.input` with a non-variable expression and selector-less or variant-less `.match` without diagnostics, which would let such input reach formatter IR invariants and surface as `internal_error`.
+
 1. `intlify_format` crate scaffold, result/options/config model, and fixture harness
 2. standard/preserve core formatter rules for direct `.mf2` messages
 3. `intlify fmt` CLI integration, file discovery, check/write mode, and JSON reporter
@@ -1140,4 +1160,10 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 ## Open Questions
 
-No formatter-specific open questions remain at this design level. Deferred items are tracked in [Deferred Follow-Up Notes](#deferred-follow-up-notes) or in later product-specific design documents.
+1. **Final LF / line-ending normalization scope.** The "exactly one final LF" and "line endings to LF" rules can change simple-message content when a final newline, CR, or CRLF is part of pattern text. That conflicts with preserving parse semantics and future SemanticView preservation assertions. Before the core formatter rules PR, decide whether these rules belong to the CLI file boundary, such as treating one final file LF as outside the message, or whether they apply only to formatter-generated trivia while excluding pattern text. The decision must cover empty files, `Hello` vs `Hello\n`, CRLF inside pattern text, and resource/editor adapters that must not inject newlines into extracted message text. This must be resolved before Implementation Phasing PR 2.
+
+2. **Bidi trivia policy.** Decide whether standard mode preserves or removes bidi marks that MF2 allows in `o` / `s` positions, such as LRM, RLM, ALM, and isolates, during spacing normalization.
+
+3. **Snapshot capability requirements per mode.** Decide how `formatSnapshot` handles snapshots without trivia, such as `collect_trivia=false` or `include_trivia=false`: always return `invalid_snapshot` with `details.reason: "missing_capability"`, or reject only preserve mode while allowing standard mode.
+
+4. **CLI input encoding.** Decide the error shape for non-UTF-8 `.mf2` input, such as adding `invalid_utf8` to `input_read_failed.details.reason`, and decide how UTF-8 BOM is handled.
