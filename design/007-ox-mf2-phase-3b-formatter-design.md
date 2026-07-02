@@ -1128,7 +1128,7 @@ Phase 3B does not publish public command-specific output JSON Schemas while `sch
 
 Phase 3B formatter implementation should be split into reviewable PRs:
 
-Prerequisite: an `ox_mf2_parser` grammar-conformance PR must land before the core formatter rules PR. The strict diagnostics policy assumes that a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. The current parser accepts `.input` with a non-variable expression and selector-less or variant-less `.match` without diagnostics, which would let such input reach formatter IR invariants and surface as `internal_error`.
+Prerequisite (landed): the `ox_mf2_parser` grammar-conformance work required by the strict diagnostics policy has landed. The parser now emits diagnostics for `.input` declarations whose placeholder is not a variable-expression, selector-less or variant-less `.match`, and related grammar violations, and the vendored Unicode MessageFormat WG test corpus is enforced by a permanent conformance test (`crates/ox_mf2_parser/tests/wg_conformance.rs`). The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) is therefore in effect: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF, and formatter IR invariants may treat grammar-impossible CST shapes as `internal_error`.
 
 1. `intlify_format` crate scaffold, result/options/config model, and fixture harness
 2. standard/preserve core formatter rules for direct `.mf2` messages
