@@ -355,7 +355,7 @@ fn lower_message_children(tables: &CstTables, node_rec: &CstNodeRecord, model: &
                 }
             }
         } else if kind == SyntaxKind::InputDeclaration as u16 {
-            // `.input s { $var [:func] }` — both the declared variable and
+            // `.input o { $var [:func] }` — both the declared variable and
             // (in valid input) the placeholder body live as direct children.
             // The placeholder subtree contains exactly one VariableExpression
             // whose Variable child is the declaration's LHS; capture it

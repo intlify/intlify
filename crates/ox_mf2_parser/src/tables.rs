@@ -12,7 +12,9 @@
 //! Record layouts are pinned by `size_of` tests so accidental field growth
 //! shows up at compile time rather than as a cache regression later.
 
-use crate::span::{NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32};
+use crate::span::{
+    usize_to_id_u32, usize_to_u32, NodeId, SourceId, Span, TokenId, TriviaId, NONE_U32,
+};
 use crate::syntax_kind::SyntaxKind;
 
 /// Edge-payload kind: does the edge point at a node or a token?
@@ -54,8 +56,8 @@ pub(crate) struct TokenRecord {
     pub span_start: u32,
     pub span_end: u32,
     pub first_trivia: u32,
-    pub leading_trivia_count: u16,
-    pub trailing_trivia_count: u16,
+    pub leading_trivia_count: u32,
+    pub trailing_trivia_count: u32,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -126,7 +128,10 @@ impl CstTables {
             // Builder always appends the root last (post-order), so it's the
             // final node in the table. Convention is captured here so that
             // accessors can stay simple.
-            Some(NodeId::new((self.nodes.len() - 1) as u32))
+            Some(NodeId::new(usize_to_id_u32(
+                self.nodes.len() - 1,
+                "node id",
+            )))
         }
     }
 
@@ -249,12 +254,12 @@ impl CstBuilder {
     #[allow(dead_code)]
     pub fn lengths(&self) -> BuilderLengths {
         BuilderLengths {
-            nodes: self.tables.nodes.len() as u32,
-            edges: self.tables.edges.len() as u32,
-            tokens: self.tables.tokens.len() as u32,
-            trivia: self.tables.trivia.len() as u32,
-            frame_depth: self.frame_starts.len() as u32,
-            pending_edges: self.pending_edges.len() as u32,
+            nodes: usize_to_u32(self.tables.nodes.len(), "node table length"),
+            edges: usize_to_u32(self.tables.edges.len(), "edge table length"),
+            tokens: usize_to_u32(self.tables.tokens.len(), "token table length"),
+            trivia: usize_to_u32(self.tables.trivia.len(), "trivia table length"),
+            frame_depth: usize_to_u32(self.frame_starts.len(), "frame stack length"),
+            pending_edges: usize_to_u32(self.pending_edges.len(), "pending edge stack length"),
         }
     }
 
@@ -279,8 +284,8 @@ impl CstBuilder {
     /// `push_*_edge` calls append to the shared `pending_edges` stack;
     /// `finish_node` later drains the range belonging to this node.
     pub fn start_node(&mut self, kind: SyntaxKind, span_start: u32) -> PendingNode {
-        let edge_start = self.pending_edges.len() as u32;
-        let depth = self.frame_starts.len() as u32;
+        let edge_start = usize_to_u32(self.pending_edges.len(), "pending edge stack length");
+        let depth = usize_to_u32(self.frame_starts.len(), "frame stack length");
         self.frame_starts.push(edge_start);
         PendingNode {
             kind,
@@ -309,14 +314,20 @@ impl CstBuilder {
         );
         let edge_start = self.frame_starts.pop().expect("frame for pending node");
         debug_assert_eq!(edge_start, pending.edge_start);
-        let first_child = self.tables.edges.len() as u32;
+        let first_child = usize_to_u32(self.tables.edges.len(), "edge table length");
         let edge_start_us = edge_start as usize;
-        let child_count = (self.pending_edges.len() - edge_start_us) as u32;
+        let child_count = usize_to_u32(
+            self.pending_edges.len() - edge_start_us,
+            "node child edge count",
+        );
         self.tables
             .edges
             .extend_from_slice(&self.pending_edges[edge_start_us..]);
         self.pending_edges.truncate(edge_start_us);
-        let id = NodeId::new(self.tables.nodes.len() as u32);
+        let id = NodeId::new(usize_to_id_u32(
+            self.tables.nodes.len(),
+            "node table length",
+        ));
         self.tables.nodes.push(CstNodeRecord {
             kind: pending.kind.as_u16(),
             flags: pending.flags,
@@ -365,10 +376,13 @@ impl CstBuilder {
         source: SourceId,
         span: Span,
         first_trivia: u32,
-        leading_trivia_count: u16,
-        trailing_trivia_count: u16,
+        leading_trivia_count: u32,
+        trailing_trivia_count: u32,
     ) -> TokenId {
-        let id = TokenId::new(self.tables.tokens.len() as u32);
+        let id = TokenId::new(usize_to_id_u32(
+            self.tables.tokens.len(),
+            "token table length",
+        ));
         self.tables.tokens.push(TokenRecord {
             kind: kind.as_u16(),
             flags: 0,
@@ -383,7 +397,10 @@ impl CstBuilder {
     }
 
     pub fn push_trivia(&mut self, kind: SyntaxKind, source: SourceId, span: Span) -> TriviaId {
-        let id = TriviaId::new(self.tables.trivia.len() as u32);
+        let id = TriviaId::new(usize_to_id_u32(
+            self.tables.trivia.len(),
+            "trivia table length",
+        ));
         self.tables.trivia.push(TriviaRecord {
             kind: kind.as_u16(),
             flags: 0,
@@ -405,7 +422,7 @@ mod tests {
         // Targets from design/002 §"Record Layout / Size Budget".
         assert_eq!(size_of::<CstNodeRecord>(), 24);
         assert_eq!(size_of::<CstEdgeRecord>(), 8);
-        assert_eq!(size_of::<TokenRecord>(), 24);
+        assert_eq!(size_of::<TokenRecord>(), 28);
         assert_eq!(size_of::<TriviaRecord>(), 16);
     }
 

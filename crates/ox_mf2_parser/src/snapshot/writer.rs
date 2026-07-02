@@ -597,7 +597,7 @@ impl SnapshotWriter {
                     && (token.leading_trivia_count != 0 || token.trailing_trivia_count != 0)
                 {
                     let lead_start_parser = token.first_trivia;
-                    let trail_start_parser = lead_start_parser + token.leading_trivia_count as u32;
+                    let trail_start_parser = lead_start_parser + token.leading_trivia_count;
                     let lead_start_snap = if token.leading_trivia_count == 0 {
                         0
                     } else {
@@ -610,9 +610,9 @@ impl SnapshotWriter {
                     };
                     (
                         lead_start_snap,
-                        token.leading_trivia_count as u32,
+                        token.leading_trivia_count,
                         trail_start_snap,
-                        token.trailing_trivia_count as u32,
+                        token.trailing_trivia_count,
                     )
                 } else {
                     (0, 0, 0, 0)

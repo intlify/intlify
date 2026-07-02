@@ -15,7 +15,7 @@
 use std::sync::OnceLock;
 
 use crate::error::{OxMf2ErrorCode, SourceTextErrorCode};
-use crate::span::{SourceId, Span};
+use crate::span::{usize_to_id_u32, SourceId, Span};
 
 /// Public input used to register a source file with [`SourceStore`].
 #[derive(Debug, Default, Clone, Copy)]
@@ -166,7 +166,7 @@ impl SourceStore {
         if input.source.len() > u32::MAX as usize {
             return Err(SourceStoreError::SourceTooLarge);
         }
-        let id = SourceId::new(self.files.len() as u32);
+        let id = SourceId::new(usize_to_id_u32(self.files.len(), "source id"));
         self.files.push(SourceFile {
             id,
             path: input.path.map(str::to_owned),

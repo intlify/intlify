@@ -18,7 +18,7 @@
 <text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">Token records carry source spans and trivia ranges; trivia is a separate fixed-record section.</text>
 <rect x="44" y="86" width="992" height="84" rx="6" class="surface" opacity="1"/>
 <text x="62" y="116" font-size="13" class="label" font-weight="700">Token and Trivia sections</text>
-<text x="62" y="138" font-size="11" class="muted">TokenRecord is 32 bytes; TriviaRecord is 16 bytes and optional.</text>
+<text x="62" y="138" font-size="11" class="muted">TokenRecord is 36 bytes with a reserved tail; TriviaRecord is 16 bytes and optional.</text>
 <rect x="44" y="202" width="992" height="164" rx="6" class="surface" opacity="1"/>
 <text x="62" y="232" font-size="13" class="label" font-weight="700">SectionRecord memory layout</text>
 <text x="62" y="254" font-size="11" class="muted">20-byte section table record; payload offset is buffer-relative and payload starts 8-byte aligned.</text>
@@ -56,7 +56,7 @@
 <text x="684.0" y="335" font-size="8" fill="#e5e7eb" text-anchor="middle">u32 records</text>
 <rect x="770" y="296" width="86" height="50" rx="3" class="table" opacity="0.72"/>
 <text x="813.0" y="317" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">rec_size</text>
-<text x="813.0" y="335" font-size="8" fill="#e5e7eb" text-anchor="middle">32 bytes</text>
+<text x="813.0" y="335" font-size="8" fill="#e5e7eb" text-anchor="middle">36 bytes</text>
 <rect x="856" y="296" width="43" height="50" rx="3" class="table" opacity="0.58"/>
 <text x="877.5" y="317" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">align</text>
 <text x="877.5" y="335" font-size="8" fill="#e5e7eb" text-anchor="middle">8</text>
@@ -69,49 +69,54 @@
 <path d="M 82 488 L 1018 488" fill="none" class="arrow" stroke-width="1.5"/>
 <line x1="82" y1="481" x2="82" y2="497" class="ruler" stroke-width="1"/>
 <text x="82" y="476" font-size="8" class="ruler-text" text-anchor="middle">0</text>
-<line x1="202" y1="481" x2="202" y2="497" class="ruler" stroke-width="1"/>
-<text x="202" y="476" font-size="8" class="ruler-text" text-anchor="middle">4</text>
-<line x1="322" y1="481" x2="322" y2="497" class="ruler" stroke-width="1"/>
-<text x="322" y="476" font-size="8" class="ruler-text" text-anchor="middle">8</text>
-<line x1="442" y1="481" x2="442" y2="497" class="ruler" stroke-width="1"/>
-<text x="442" y="476" font-size="8" class="ruler-text" text-anchor="middle">12</text>
-<line x1="562" y1="481" x2="562" y2="497" class="ruler" stroke-width="1"/>
-<text x="562" y="476" font-size="8" class="ruler-text" text-anchor="middle">16</text>
-<line x1="682" y1="481" x2="682" y2="497" class="ruler" stroke-width="1"/>
-<text x="682" y="476" font-size="8" class="ruler-text" text-anchor="middle">20</text>
-<line x1="802" y1="481" x2="802" y2="497" class="ruler" stroke-width="1"/>
-<text x="802" y="476" font-size="8" class="ruler-text" text-anchor="middle">24</text>
-<line x1="922" y1="481" x2="922" y2="497" class="ruler" stroke-width="1"/>
-<text x="922" y="476" font-size="8" class="ruler-text" text-anchor="middle">28</text>
+<line x1="186" y1="481" x2="186" y2="497" class="ruler" stroke-width="1"/>
+<text x="186" y="476" font-size="8" class="ruler-text" text-anchor="middle">4</text>
+<line x1="290" y1="481" x2="290" y2="497" class="ruler" stroke-width="1"/>
+<text x="290" y="476" font-size="8" class="ruler-text" text-anchor="middle">8</text>
+<line x1="394" y1="481" x2="394" y2="497" class="ruler" stroke-width="1"/>
+<text x="394" y="476" font-size="8" class="ruler-text" text-anchor="middle">12</text>
+<line x1="498" y1="481" x2="498" y2="497" class="ruler" stroke-width="1"/>
+<text x="498" y="476" font-size="8" class="ruler-text" text-anchor="middle">16</text>
+<line x1="602" y1="481" x2="602" y2="497" class="ruler" stroke-width="1"/>
+<text x="602" y="476" font-size="8" class="ruler-text" text-anchor="middle">20</text>
+<line x1="706" y1="481" x2="706" y2="497" class="ruler" stroke-width="1"/>
+<text x="706" y="476" font-size="8" class="ruler-text" text-anchor="middle">24</text>
+<line x1="810" y1="481" x2="810" y2="497" class="ruler" stroke-width="1"/>
+<text x="810" y="476" font-size="8" class="ruler-text" text-anchor="middle">28</text>
+<line x1="914" y1="481" x2="914" y2="497" class="ruler" stroke-width="1"/>
+<text x="914" y="476" font-size="8" class="ruler-text" text-anchor="middle">32</text>
 <line x1="1018" y1="481" x2="1018" y2="497" class="ruler" stroke-width="1"/>
-<text x="1018" y="476" font-size="8" class="ruler-text" text-anchor="middle">32</text>
-<rect x="82" y="502" width="60" height="58" rx="3" class="token" opacity="0.86"/>
-<text x="112.0" y="523" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">kind</text>
-<text x="112.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
-<rect x="142" y="502" width="60" height="58" rx="3" class="token" opacity="0.62"/>
-<text x="172.0" y="523" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">flags</text>
-<text x="172.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
-<rect x="202" y="502" width="120" height="58" rx="3" class="source" opacity="0.74"/>
-<text x="262.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">span_start</text>
-<text x="262.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="322" y="502" width="120" height="58" rx="3" class="source" opacity="0.84"/>
-<text x="382.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">span_end</text>
-<text x="382.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="442" y="502" width="120" height="58" rx="3" class="source" opacity="0.62"/>
-<text x="502.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">source_id</text>
-<text x="502.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="562" y="502" width="120" height="58" rx="3" class="trivia" opacity="0.78"/>
-<text x="622.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">lead_start</text>
-<text x="622.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="682" y="502" width="120" height="58" rx="3" class="trivia" opacity="0.62"/>
-<text x="742.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">lead_count</text>
-<text x="742.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="802" y="502" width="120" height="58" rx="3" class="trivia" opacity="0.78"/>
-<text x="862.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">trail_start</text>
+<text x="1018" y="476" font-size="8" class="ruler-text" text-anchor="middle">36</text>
+<rect x="82" y="502" width="52" height="58" rx="3" class="token" opacity="0.86"/>
+<text x="108.0" y="523" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">kind</text>
+<text x="108.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="134" y="502" width="52" height="58" rx="3" class="token" opacity="0.62"/>
+<text x="160.0" y="523" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">flags</text>
+<text x="160.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u16</text>
+<rect x="186" y="502" width="104" height="58" rx="3" class="source" opacity="0.74"/>
+<text x="238.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">span_start</text>
+<text x="238.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="290" y="502" width="104" height="58" rx="3" class="source" opacity="0.84"/>
+<text x="342.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">span_end</text>
+<text x="342.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="394" y="502" width="104" height="58" rx="3" class="source" opacity="0.62"/>
+<text x="446.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">source_id</text>
+<text x="446.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="498" y="502" width="104" height="58" rx="3" class="trivia" opacity="0.78"/>
+<text x="550.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">lead_start</text>
+<text x="550.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="602" y="502" width="104" height="58" rx="3" class="trivia" opacity="0.62"/>
+<text x="654.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">lead_count</text>
+<text x="654.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="706" y="502" width="104" height="58" rx="3" class="trivia" opacity="0.78"/>
+<text x="758.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">trail_start</text>
+<text x="758.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="810" y="502" width="104" height="58" rx="3" class="trivia" opacity="0.62"/>
+<text x="862.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">trail_count</text>
 <text x="862.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="922" y="502" width="96" height="58" rx="3" class="trivia" opacity="0.62"/>
-<text x="970.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">trail_count</text>
-<text x="970.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="914" y="502" width="104" height="58" rx="3" class="pad" opacity="0.58"/>
+<text x="966.0" y="523" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">reserved</text>
+<text x="966.0" y="541" font-size="8" fill="#e5e7eb" text-anchor="middle">u32 = 0</text>
 <rect x="44" y="606" width="992" height="164" rx="6" class="surface" opacity="1"/>
 <text x="62" y="636" font-size="13" class="label" font-weight="700">SectionRecord memory layout</text>
 <text x="62" y="658" font-size="11" class="muted">20-byte section table record; payload offset is buffer-relative and payload starts 8-byte aligned.</text>

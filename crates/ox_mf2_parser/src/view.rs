@@ -212,7 +212,7 @@ impl<'a> CstTokenView<'a> {
         CstTriviaRange {
             view: self.view,
             start: rec.first_trivia,
-            end: rec.first_trivia + u32::from(rec.leading_trivia_count),
+            end: rec.first_trivia + rec.leading_trivia_count,
             cursor: rec.first_trivia,
         }
     }
@@ -220,8 +220,8 @@ impl<'a> CstTokenView<'a> {
     /// Compact trailing-trivia range belonging to this token.
     pub fn trailing_trivia(&self) -> CstTriviaRange<'a> {
         let rec = self.view.tables.token_at(self.id);
-        let start = rec.first_trivia + u32::from(rec.leading_trivia_count);
-        let end = start + u32::from(rec.trailing_trivia_count);
+        let start = rec.first_trivia + rec.leading_trivia_count;
+        let end = start + rec.trailing_trivia_count;
         CstTriviaRange {
             view: self.view,
             start,
