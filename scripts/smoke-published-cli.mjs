@@ -20,6 +20,47 @@ const packages = ['@intlify/cli', '@intlify/cli-native']
 const npmAvailabilityMaxAttempts = readPositiveIntegerEnv('NPM_SMOKE_MAX_ATTEMPTS', 60)
 const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_000)
 const defaultRunTimeoutMs = readPositiveIntegerEnv('CLI_SMOKE_RUN_TIMEOUT_MS', 120_000)
+const nativeTargets = [
+  {
+    platform: 'darwin',
+    arch: 'x64',
+    rustTarget: 'x86_64-apple-darwin',
+    binaryName: 'intlify'
+  },
+  {
+    platform: 'darwin',
+    arch: 'arm64',
+    rustTarget: 'aarch64-apple-darwin',
+    binaryName: 'intlify'
+  },
+  {
+    platform: 'linux',
+    arch: 'x64',
+    libc: 'glibc',
+    rustTarget: 'x86_64-unknown-linux-gnu',
+    binaryName: 'intlify'
+  },
+  {
+    platform: 'linux',
+    arch: 'arm64',
+    libc: 'glibc',
+    rustTarget: 'aarch64-unknown-linux-gnu',
+    binaryName: 'intlify'
+  },
+  {
+    platform: 'linux',
+    arch: 'x64',
+    libc: 'musl',
+    rustTarget: 'x86_64-unknown-linux-musl',
+    binaryName: 'intlify'
+  },
+  {
+    platform: 'win32',
+    arch: 'x64',
+    rustTarget: 'x86_64-pc-windows-msvc',
+    binaryName: 'intlify.exe'
+  }
+]
 
 for (const packageName of packages) {
   await waitForPackage(packageName, version)
@@ -169,45 +210,3 @@ function readPositiveIntegerEnv(name, fallback) {
   }
   return value
 }
-
-const nativeTargets = [
-  {
-    platform: 'darwin',
-    arch: 'x64',
-    rustTarget: 'x86_64-apple-darwin',
-    binaryName: 'intlify'
-  },
-  {
-    platform: 'darwin',
-    arch: 'arm64',
-    rustTarget: 'aarch64-apple-darwin',
-    binaryName: 'intlify'
-  },
-  {
-    platform: 'linux',
-    arch: 'x64',
-    libc: 'glibc',
-    rustTarget: 'x86_64-unknown-linux-gnu',
-    binaryName: 'intlify'
-  },
-  {
-    platform: 'linux',
-    arch: 'arm64',
-    libc: 'glibc',
-    rustTarget: 'aarch64-unknown-linux-gnu',
-    binaryName: 'intlify'
-  },
-  {
-    platform: 'linux',
-    arch: 'x64',
-    libc: 'musl',
-    rustTarget: 'x86_64-unknown-linux-musl',
-    binaryName: 'intlify'
-  },
-  {
-    platform: 'win32',
-    arch: 'x64',
-    rustTarget: 'x86_64-pc-windows-msvc',
-    binaryName: 'intlify.exe'
-  }
-]
