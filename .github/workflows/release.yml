@@ -426,6 +426,23 @@ jobs:
           npm --version
           node -e "const v=require('node:child_process').execFileSync('npm',['--version'],{encoding:'utf8'}).trim().split('.').map(Number); if (v[0] < 11 || (v[0] === 11 && v[1] < 5) || (v[0] === 11 && v[1] === 5 && v[2] < 1)) throw new Error('npm >= 11.5.1 is required for Trusted Publishing')"
 
+      - name: Resolve npm dist-tag
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          import { distTagForVersion } from './scripts/release-npm.mjs'
+
+          const tag = process.env.TAG
+          if (!tag?.startsWith('v')) {
+            throw new Error(`release tag must start with "v": ${String(tag)}`)
+          }
+
+          const version = tag.slice(1)
+          const distTag = distTagForVersion(version)
+          appendFileSync(process.env.GITHUB_ENV, `NPM_DIST_TAG=${distTag}\n`)
+          console.log(`Resolved npm dist-tag ${distTag} for ${tag}`)
+          NODE
+
       - name: Download native bindings
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -502,7 +519,7 @@ jobs:
       - name: Publish packages
         env:
           NPM_CONFIG_PROVENANCE: 'true'
-        run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi
+        run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi --tag "$NPM_DIST_TAG"
 
   crate-publish:
     name: Publish crates.io package

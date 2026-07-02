@@ -104,9 +104,9 @@ The default reporter is `text`. Machine-readable JSON output is selected with `-
 
 Value-taking long options accept both separated and equals forms. `--reporter json` and `--reporter=json` are equivalent. `--config path` and `--config=path` are equivalent. Phase 3A does not define `-r` or `-c`; the only short options are `-h` and `-V`. Clustered short options such as `-hV` are not supported and are treated as invalid or unknown options rather than as multiple short flags. The `--` end-of-options marker is not special in Phase 3A and is treated as invalid or unknown input; file operand handling should be reconsidered in formatter and linter product phases.
 
-`intlify --version` reports the public `@intlify/cli` package version as the version number only, for example `0.14.0`. The JSON envelope `version` field uses the same value. The wrapper package, `@intlify/cli-native` native package source, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
+`intlify --version` reports the public `@intlify/cli` package version as the version number only, for example `0.14.0-alpha.0` for the initial CLI prerelease. The JSON envelope `version` field uses the same value. The wrapper package, `@intlify/cli-native` native package source, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
 
-The first monorepo-managed `@intlify/cli` release is `0.14.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, `@intlify/cli-native`, and the Rust CLI crate should all release as `0.14.0` for that release. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
+The first monorepo-managed `@intlify/cli` release line is `0.14.0`, but the first npm publish target is the prerelease `0.14.0-alpha.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, `@intlify/cli-native`, and the Rust CLI crate should all release with the same exact version for that release. Stable `0.14.0` follows after alpha validation. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
 
 Top-level help and version behavior:
 
@@ -293,7 +293,7 @@ Reserved command placeholder JSON output uses the same envelope. For example, `i
 {
   "schemaVersion": "0",
   "command": "fmt",
-  "version": "0.14.0",
+  "version": "0.14.0-alpha.0",
   "projectRoot": "/repo",
   "summary": {
     "status": "error"
@@ -423,12 +423,12 @@ For wrapper-level native resolution failures, the wrapper does not perform git-r
 
 If the wrapper emits a JSON envelope before the Rust CLI starts, the envelope `version` field uses the wrapper `@intlify/cli` package version read from its own package metadata. If the wrapper cannot safely determine that version or construct the envelope, it should use the minimal human-readable stderr fallback instead of emitting partial JSON.
 
-`@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release is `0.14.0`.
+`@intlify/cli` already exists as a standalone package and repository. Phase 3A treats this monorepo as the future source of truth for `@intlify/cli`; the standalone `intlify/cli` repository should be deprecated as part of the migration. Because the existing package has already reached `v0.13.1`, the first monorepo-managed `@intlify/cli` release line is `0.14.0`, with `0.14.0-alpha.0` as the first publish target.
 
 `packages/cli/package.json` contract:
 
 - `name`: `@intlify/cli`
-- `version`: monorepo release version; `0.14.0` for the first monorepo-managed release
+- `version`: monorepo release version; `0.14.0-alpha.0` for the first monorepo-managed publish, with stable `0.14.0` as a follow-up after alpha validation
 - `description`: public package summary for the `intlify` CLI
 - `keywords`: include at least `intlify`, `messageformat`, `mf2`, and `cli`
 - `homepage`: `https://github.com/intlify/intlify#readme`
@@ -506,6 +506,7 @@ Build and package assembly pipeline:
 - Validate that each published CLI package includes its expected `README.md`.
 - Publish `@intlify/cli-native` before publishing the public `@intlify/cli` wrapper package, because the wrapper depends on it.
 - Use npm trusted publishing for normal CLI package releases through `.github/workflows/release.yml`. The public `@intlify/cli` package already exists on npm, so it can use trusted publishing once its trusted publisher settings are configured. The new `@intlify/cli-native` package does not exist on npm before its first release, so its first publication may require a token-based bootstrap release through the `npm-release` environment's `NPM_TOKEN` secret. After it exists and trusted publisher settings are configured on npm, subsequent releases should omit `NPM_TOKEN` so the normal release path uses trusted publishing.
+- Publish the initial `0.14.0-alpha.0` CLI prerelease with a prerelease npm dist-tag such as `alpha`; do not publish it under `latest`. Stable `0.14.0` may use the normal release tag after alpha validation.
 - Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution through the `@intlify/cli` wrapper, direct execution of the `@intlify/cli-native` binary with `--version`, and schema file presence. Wrapper install smoke should install `@intlify/cli@<version>` from the published registry and verify that the compatible `@intlify/cli-native` package is resolved. Native direct smoke should install `@intlify/cli-native@<version>` on a compatible host runner and execute that package's `intlify` or `intlify.exe` binary directly. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
 
 The release workflow should order publish, smoke, and release-note steps as:
