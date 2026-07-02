@@ -521,7 +521,7 @@ JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON 
 {
   "schemaVersion": "0",
   "command": "fmt",
-  "version": "0.14.0",
+  "version": "0.14.0-alpha.0",
   "projectRoot": "/repo",
   "summary": {},
   "results": [],

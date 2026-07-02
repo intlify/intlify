@@ -3,25 +3,31 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
-const { dryRun, explicitTag, npmDir } = parseCliArgs(process.argv.slice(2))
 
-const packageDirs = [
-  ...collectGeneratedPackageDirs(npmDir),
-  join(rootDir, 'packages', 'ox-mf2-wasm'),
-  join(rootDir, 'packages', 'ox-mf2-napi'),
-  join(rootDir, 'packages', 'cli-native'),
-  join(rootDir, 'packages', 'cli')
-]
-
-for (const packageDir of packageDirs) {
-  await publishPackage(packageDir)
+if (isDirectRun()) {
+  const { dryRun, explicitTag, npmDir } = parseCliArgs(process.argv.slice(2))
+  await publishPackages({ dryRun, explicitTag, npmDir })
 }
 
-async function publishPackage(packageDir) {
+async function publishPackages({ dryRun, explicitTag, npmDir }) {
+  const packageDirs = [
+    ...collectGeneratedPackageDirs(npmDir),
+    join(rootDir, 'packages', 'ox-mf2-wasm'),
+    join(rootDir, 'packages', 'ox-mf2-napi'),
+    join(rootDir, 'packages', 'cli-native'),
+    join(rootDir, 'packages', 'cli')
+  ]
+
+  for (const packageDir of packageDirs) {
+    await publishPackage(packageDir, { dryRun, explicitTag })
+  }
+}
+
+async function publishPackage(packageDir, { dryRun, explicitTag }) {
   const pkg = await readJson(join(packageDir, 'package.json'))
   const distTag = explicitTag ?? distTagForVersion(pkg.version)
 
@@ -63,8 +69,20 @@ async function isPublished(packageName, version) {
   return result.status === 0 && result.stdout.trim() === version
 }
 
-function distTagForVersion(version) {
-  return version.includes('-') ? 'next' : 'latest'
+/**
+ * Resolve the npm dist-tag for a package version.
+ *
+ * @param version - Package version.
+ * @returns npm dist-tag.
+ */
+export function distTagForVersion(version) {
+  const prerelease = semverPrerelease(version)
+  if (!prerelease) {
+    return 'latest'
+  }
+
+  const candidate = prerelease.split('.')[0]
+  return isSafeDistTag(candidate) ? candidate : 'next'
 }
 
 async function preparePublishTarget(packageDir, pkg) {
@@ -161,4 +179,26 @@ function run(commandName, commandArgs, options) {
   if (result.status !== 0) {
     throw new Error(`${commandName} ${commandArgs.join(' ')} failed`)
   }
+}
+
+function semverPrerelease(version) {
+  if (!/^\d+\.\d+\.\d+(?:-[a-z0-9-]+(?:\.[a-z0-9-]+)*)?(?:\+[a-z0-9.-]+)?$/i.test(version)) {
+    throw new Error(`invalid package version: ${version}`)
+  }
+
+  const prereleaseStart = version.indexOf('-')
+  if (prereleaseStart === -1) {
+    return ''
+  }
+
+  const buildStart = version.indexOf('+', prereleaseStart)
+  return version.slice(prereleaseStart + 1, buildStart === -1 ? undefined : buildStart)
+}
+
+function isSafeDistTag(value) {
+  return /^[a-z][\w.-]*$/i.test(value) && !/^v?\d/i.test(value)
+}
+
+function isDirectRun() {
+  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
 }
