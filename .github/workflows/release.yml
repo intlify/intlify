@@ -386,9 +386,9 @@ jobs:
       )
 
 
-    # npm Trusted Publishing is the normal path. A token is only allowed in the
-    # dedicated @intlify/cli-native bootstrap step because @intlify/cli already
-    # exists and should publish through trusted publishing.
+    # npm Trusted Publishing is the normal path. The token-authenticated step is
+    # only for the first-ever @intlify/cli-native package creation; after the
+    # package exists, new versions are published by the trusted publishing step.
     environment: npm-release
     permissions:
       contents: read
@@ -508,12 +508,8 @@ jobs:
           NPM_CONFIG_PROVENANCE: 'true'
           NPM_TOKEN_BOOTSTRAP: ${{ secrets.NPM_TOKEN_BOOTSTRAP }}
         run: |
-          if [ -z "${NPM_TOKEN_BOOTSTRAP:-}" ]; then
-            echo "NPM_TOKEN_BOOTSTRAP is not configured; skipping token bootstrap."
-            exit 0
-          fi
-
           node scripts/release-npm.mjs publish \
+            --bootstrap-missing-package \
             --npm-dir release-dir/ox-mf2-napi \
             --tag "$NPM_DIST_TAG" \
             --package @intlify/cli-native \

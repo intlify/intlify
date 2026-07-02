@@ -9,13 +9,26 @@ import { parseArgs } from 'node:util'
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
 
 if (isDirectRun()) {
-  const { dryRun, explicitTag, npmDir, packageNames, tokenEnv } = parseCliArgs(
-    process.argv.slice(2)
-  )
-  await publishPackages({ dryRun, explicitTag, npmDir, packageNames, tokenEnv })
+  const { bootstrapMissingPackage, dryRun, explicitTag, npmDir, packageNames, tokenEnv } =
+    parseCliArgs(process.argv.slice(2))
+  await publishPackages({
+    bootstrapMissingPackage,
+    dryRun,
+    explicitTag,
+    npmDir,
+    packageNames,
+    tokenEnv
+  })
 }
 
-async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, tokenEnv }) {
+async function publishPackages({
+  bootstrapMissingPackage,
+  dryRun,
+  explicitTag,
+  npmDir,
+  packageNames,
+  tokenEnv
+}) {
   const selectedPackageNames = new Set(packageNames)
   const seenPackageNames = new Set()
   const publishTargets = []
@@ -44,12 +57,33 @@ async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, toke
   }
 
   for (const { packageDir, pkg } of publishTargets) {
-    await publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv })
+    await publishPackage(packageDir, {
+      bootstrapMissingPackage,
+      dryRun,
+      explicitTag,
+      pkg,
+      tokenEnv
+    })
   }
 }
 
-async function publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv }) {
+async function publishPackage(
+  packageDir,
+  { bootstrapMissingPackage, dryRun, explicitTag, pkg, tokenEnv }
+) {
   const distTag = explicitTag ?? distTagForVersion(pkg.version)
+
+  if (bootstrapMissingPackage && !dryRun) {
+    if (await packageExists(pkg.name)) {
+      console.log(`${pkg.name} already exists on npm; skipping initial package bootstrap`)
+      return
+    }
+    if (!tokenEnv) {
+      throw new Error(
+        `${pkg.name} does not exist on npm; initial package bootstrap requires --token-env`
+      )
+    }
+  }
 
   if (!dryRun && (await isPublished(pkg.name, pkg.version))) {
     console.log(`${pkg.name}@${pkg.version} is already published; skipping`)
@@ -89,6 +123,15 @@ async function isPublished(packageName, version) {
     stdio: ['ignore', 'pipe', 'ignore']
   })
   return result.status === 0 && result.stdout.trim() === version
+}
+
+async function packageExists(packageName) {
+  const result = spawnSync('npm', ['view', packageName, 'name'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  })
+  return result.status === 0 && result.stdout.trim() === packageName
 }
 
 /**
@@ -195,6 +238,7 @@ function parseCliArgs(args) {
   const { values, positionals } = parseArgs({
     args,
     options: {
+      'bootstrap-missing-package': { type: 'boolean' },
       'dry-run': { type: 'boolean' },
       'npm-dir': { type: 'string' },
       package: { type: 'string', multiple: true },
@@ -214,6 +258,7 @@ function parseCliArgs(args) {
   }
 
   return {
+    bootstrapMissingPackage: Boolean(values['bootstrap-missing-package']),
     dryRun: Boolean(values['dry-run']) || command === 'dry-run',
     explicitTag: values.tag,
     npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi'),
