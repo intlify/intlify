@@ -41,7 +41,7 @@
 //!
 //! [message-format-wg]: https://github.com/unicode-org/message-format-wg
 
-#![doc(html_root_url = "https://docs.rs/ox_mf2_parser/0.14.0-alpha.4")]
+#![doc(html_root_url = "https://docs.rs/ox_mf2_parser/0.14.0-alpha.5")]
 
 mod api;
 mod diagnostic;
