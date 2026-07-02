@@ -36,11 +36,11 @@ Implementation should be split by consumer-facing product surface:
    - `@intlify/format-napi` and `@intlify/format-wasm`
 
 3. **Phase 3C: Linter Product**
-   - `crates/ox_mf2_lint`
+   - `crates/intlify_lint`
    - `intlify lint`
    - parser, semantic, and lint diagnostic result contract
    - recommended preset and initial semantic diagnostics
-   - linter-specific N-API and WASM packages
+   - `@intlify/lint-napi` and `@intlify/lint-wasm`
 
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
@@ -225,15 +225,15 @@ Phase 3 should provide a dedicated lint CLI and reusable linter entry points for
 
 ### Crate Ownership
 
-The Rust linter engine should live in a separate `crates/ox_mf2_lint` crate that depends on `ox_mf2_parser`. The parser crate remains responsible for CST, diagnostics, snapshots, and semantic lowering, while the lint crate owns rule execution, presets, lint configuration, and lint result shaping.
+The Rust linter engine should live in a separate workspace-internal `crates/intlify_lint` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3C; public linter distribution happens through the `intlify lint` CLI and linter N-API/WASM packages. The parser crate remains responsible for CST, diagnostics, snapshots, and semantic lowering, while the lint crate owns rule execution, presets, lint configuration, and lint result shaping.
 
 ### CLI and Package Distribution
 
 The CLI binary should live in a separate `crates/intlify_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
 
-N-API and WASM linter bindings should be published as linter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while linter packages expose lint-specific APIs backed by `crates/ox_mf2_lint`.
+N-API and WASM linter bindings should be published as linter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while `@intlify/lint-napi` and `@intlify/lint-wasm` expose lint-specific APIs backed by `crates/intlify_lint`.
 
-The npm distribution surface should separate the CLI package from linter API packages. A CLI package owns native binary distribution for command-line use, a linter N-API package exposes Node APIs, and a linter WASM package supports browser, worker, and playground use cases. Exact package names are linter-specific design details.
+The npm distribution surface should separate the CLI package from linter API packages. `@intlify/cli` owns native binary distribution for command-line use, `@intlify/lint-napi` exposes Node APIs, and `@intlify/lint-wasm` supports browser, worker, and playground use cases.
 
 The Phase 3 linter deliverables are the Rust linter engine, CLI, N-API linter package, WASM linter package, and shared diagnostic result schema. LSP/editor integration and playground usage are consumers of those deliverables rather than separate direct products in this phase.
 
@@ -245,9 +245,9 @@ The primary CLI input unit is a single MF2 message file: one file contains one M
 
 ### Configuration
 
-The CLI should load JSON project configuration for rule severity, presets, and file include/exclude patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/ox_mf2_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
+The CLI should load JSON project configuration for rule severity, presets, and ignore patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/intlify_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
 
-The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to include/exclude and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
+The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to CLI operands and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
 
 ### Presets
 
@@ -342,18 +342,17 @@ The Phase 3 responsibility boundary is correctness in the linter and style in th
 
 ### Initial Semantic Diagnostic Candidates
 
-The initial semantic diagnostic candidates are:
+The initial core semantic diagnostics, classified by the detailed linter design, are:
 
-- `undefined-variable`
 - `duplicate-declaration`
-- `duplicate-option-name`
 - `invalid-local-dependency`
 - `missing-selector-annotation`
 - `variant-key-arity-mismatch`
 - `missing-fallback-variant`
 - `duplicate-variant`
-- `unreachable-variant`
-- `semantic-lowering-failed`
+- `duplicate-option-name`
+
+The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and semantic lowering failures after a clean parse are internal operational errors rather than user-facing diagnostics. The classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 ### Detailed Linter Design Reference
 
@@ -367,7 +366,7 @@ Suppression and directive comments are diagnostic-layer concerns. This document 
 
 Phase 3 linter core scope:
 
-- Rust linter engine in `crates/ox_mf2_lint`
+- Rust linter engine in `crates/intlify_lint`
 - CLI in `crates/intlify_cli`
 - npm-distributed native CLI package
 - linter-specific N-API package
