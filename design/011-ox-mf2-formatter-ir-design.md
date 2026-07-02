@@ -62,7 +62,7 @@ The formatter uses a two-layer IR:
 1. **MF2 Layout IR**: an ox-mf2-specific layout model that captures message structure and formatter intent.
 2. **Document IR**: a small Prettier-style document model that captures text rendering primitives.
 
-The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from `SnapshotView` spans plus trivia or verified source/token gaps during MF2 Layout IR construction.
+The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from `SnapshotView` spans and trivia during MF2 Layout IR construction.
 
 The Document IR is independent of MF2 semantics. It should not know about matcher tables, declarations, selectors, or pattern semantics. Its job is to render an already-decided document layout deterministically.
 
@@ -308,11 +308,11 @@ struct LayoutNodeMeta {
 }
 ```
 
-`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia or verified source/token gaps, and token line positions. In standard mode, shape hints are `Unknown`. In preserve mode, a major node whose span contains no line break is `Flat`; a major node whose span contains a line break is `Break`; nodes without meaningful or recoverable source shape are `Unknown`. Pattern text line breaks contribute to the parent pattern's shape hint, but the pattern text itself remains a source slice and is not rewritten.
+`ShapeHint` is computed during MF2 Layout IR construction from source spans, trivia, and token line positions. In standard mode, shape hints are `Unknown`. In preserve mode, a major node whose span contains no line break is `Flat`; a major node whose span contains a line break is `Break`; nodes without meaningful or recoverable source shape are `Unknown`. Pattern text line breaks contribute to the parent pattern's shape hint, but the pattern text itself remains a source slice and is not rewritten.
 
-`blank_lines_before` is computed from the major node's leading trivia or previous-token gap and then normalized to `0` or `1`. Preserve mode uses blank-line grouping only at major syntax boundaries such as top-level declarations, message body, matcher rows, and major pattern or markup chunks. Standard mode treats `blank_lines_before` as `0`. Leading blank lines before the message are not emitted, final output still ends with exactly one LF, and blank lines inside pattern text are preserved as semantically significant source slices rather than normalized as grouping metadata.
+`blank_lines_before` is computed from the major node's leading trivia or previous-token gap and then normalized to `0` or `1`. Preserve mode uses blank-line grouping only at major syntax boundaries such as top-level declarations, message body, matcher rows, and major pattern or markup chunks. Standard mode treats `blank_lines_before` as `0`. Leading blank lines before the message are not emitted, the final file LF is applied by CLI file framing rather than by message-level output, and blank lines inside pattern text are preserved as semantically significant source slices rather than normalized as grouping metadata.
 
-Standard-mode IR construction does not use trivia for layout decisions. The public `formatSnapshot` capability policy for trivia-less snapshots is tracked as an open question in the Phase 3B formatter design. Preserve-mode IR construction requires token-level leading/trailing trivia capability or equivalent whitespace data derivable from verified source/token gaps. A snapshot-backed preserve-mode request without enough data to derive preserve-mode trivia fails before MF2 Layout IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`.
+Standard-mode IR construction does not use trivia for layout decisions, so trivia-less snapshots are accepted in standard mode. Preserve-mode IR construction requires token-level leading/trailing trivia records. A snapshot-backed preserve-mode request on a snapshot without trivia records fails before MF2 Layout IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`. Deriving equivalent whitespace information from verified source/token gaps is a possible future optimization, not part of the Phase 3B contract.
 
 MF2 does not define line comments or block comments. The formatter IR does not model comments, and Phase 3B does not support syntax-local formatter ignore directives. Attribute syntax remains part of expressions and markup, but attributes are not treated as formatter comments or suppression directives.
 
@@ -586,4 +586,4 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Open Questions
 
-Formatter IR open questions are tracked in the Phase 3B formatter design's [Open Questions](./007-ox-mf2-phase-3b-formatter-design.md#open-questions), in particular the trivia-less snapshot capability policy and the final LF / line-ending normalization scope, both of which affect IR construction inputs. No IR-only open questions remain beyond those; later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
+The cross-document questions that affected IR construction inputs — the trivia-less snapshot capability policy and the final LF / line-ending normalization scope — have been resolved in the Phase 3B formatter design; see its [Open Questions](./007-ox-mf2-phase-3b-formatter-design.md#open-questions) section for the resolution record. No formatter IR design open questions remain; later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
