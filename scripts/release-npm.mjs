@@ -18,6 +18,7 @@ if (isDirectRun()) {
 async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, tokenEnv }) {
   const selectedPackageNames = new Set(packageNames)
   const seenPackageNames = new Set()
+  const publishTargets = []
   const packageDirs = [
     ...collectGeneratedPackageDirs(npmDir),
     join(rootDir, 'packages', 'ox-mf2-wasm'),
@@ -32,7 +33,7 @@ async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, toke
       continue
     }
     seenPackageNames.add(pkg.name)
-    await publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv })
+    publishTargets.push({ packageDir, pkg })
   }
 
   const missingPackageNames = [...selectedPackageNames].filter(
@@ -40,6 +41,10 @@ async function publishPackages({ dryRun, explicitTag, npmDir, packageNames, toke
   )
   if (missingPackageNames.length > 0) {
     throw new Error(`selected package(s) not found: ${missingPackageNames.join(', ')}`)
+  }
+
+  for (const { packageDir, pkg } of publishTargets) {
+    await publishPackage(packageDir, { dryRun, explicitTag, pkg, tokenEnv })
   }
 }
 
