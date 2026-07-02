@@ -145,6 +145,8 @@ Phase 3A input and routing error codes:
 - `unknown_command`: unknown subcommand, with `kind: "unsupported"`
 - `command_not_ready`: reserved command without an implementation in the current phase, with `kind: "unsupported"`
 
+Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
+
 Input and routing errors use small structured `details` payloads when the rejected token is available:
 
 - `unknown_cli_option`: `details.option`
@@ -221,7 +223,7 @@ The `$schema` field is optional. The CLI does not use the `$schema` value to loc
 
 Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt` and `lint` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
 
-In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
+In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. When a config file exists, both the `fmt` and `lint` sections are required. A config file that omits either section fails validation with `config_validation_failed`; the implicit default project config applies only when no root config file is discovered and no explicit `--config` path is given. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
 Phase 3A config error codes:
 
@@ -233,7 +235,7 @@ Phase 3A config error codes:
 - `config_validation_failed`: config parses successfully but fails schema or config-model validation
 - `config_schema_generation_failed`: config schema generation fails in a build or validation workflow
 
-Config validation errors should include the config path in `errors[].path`. When a specific invalid location is available, `errors[].details.pointer` uses JSON Pointer syntax, such as `/fmt/unknown`, and `errors[].details.reason` uses a stable short reason such as `unknown_field`.
+Config validation errors should include the config path in `errors[].path`. When a specific invalid location is available, `errors[].details.pointer` uses JSON Pointer syntax, such as `/fmt/unknown`, and `errors[].details.reason` uses a stable short reason such as `unknown_field`, `missing_field`, or `expected_object`.
 
 Config parse errors should include the config path in `errors[].path`. When available from the parser, `errors[].details.line` and `errors[].details.column` should report the parse error location. For JSONC, line and column should refer to the original config file, not to normalized intermediate text. If the parser or normalizer cannot report an accurate original position, line and column may be omitted.
 
@@ -329,7 +331,7 @@ If an unsupported reporter is requested, the CLI returns an operational reporter
 
 If `--reporter` is provided without a value, the CLI reports `missing_cli_option_value` with `details.option: "--reporter"`. If `--reporter` has a value outside `text` or `json`, such as `xml`, the CLI reports `reporter_not_supported`.
 
-If the Rust CLI can parse `--reporter json` before rejecting invalid command-line arguments, invalid arguments are reported as a JSON envelope with `kind: "input"`, `code: "invalid_cli_argument"`, and exit code `2`. If argument parsing fails before reporter selection can be determined, the CLI falls back to a human-readable stderr error and exits with code `2`.
+If the Rust CLI can parse `--reporter json` before rejecting invalid command-line arguments, invalid arguments without a more specific Phase 3A code are reported as a JSON envelope with `kind: "input"`, `code: "invalid_cli_argument"`, and exit code `2`. Phase 3A currently maps all implemented argv failures to more specific codes, so this remains a reserved fallback until a later command needs it. If argument parsing fails before reporter selection can be determined, the CLI falls back to a human-readable stderr error and exits with code `2`.
 
 Human-readable text output can optimize for users, but integrations should use `--reporter json` when they need to inspect diagnostics or formatting status. Phase 3A supports only `text` and `json` reporter names. The reporter name leaves room for future human-readable or integration-specific reporters without overloading formatter terminology.
 
