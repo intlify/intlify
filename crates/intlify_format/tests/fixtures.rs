@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 
 const UPDATE_ENV: &str = "INTLIFY_UPDATE_FORMAT_FIXTURES";
 
+// Core fixtures are intentionally directory-based so standard and preserve
+// expectations can share one input while invalid fixtures keep diagnostic
+// summaries separate from formatted output.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureManifest {
@@ -85,6 +88,8 @@ fn run_fixture(path: &Path) {
     }
 }
 
+// Valid fixtures lock the observable formatter contract: output equality,
+// idempotency, and reparse-without-diagnostics.
 fn run_valid_case(
     path: &Path,
     case: &FixtureCase,
@@ -131,6 +136,8 @@ fn run_valid_case(
     );
 }
 
+// Invalid fixtures exercise the strict diagnostics policy: parser diagnostics
+// are exposed, while formatted output is never produced.
 fn run_invalid_case(
     path: &Path,
     case: &FixtureCase,
@@ -232,6 +239,9 @@ fn write_message_fixture(path: &Path, source: &str) {
     fs::write(path, format!("{source}\n")).expect("message fixture is writable");
 }
 
+// Core fixtures use CLI file framing on disk, but the formatter API receives
+// exactly one message string. The harness removes the final file newline before
+// calling the message-level API.
 fn strip_fixture_final_newline(source: &str) -> &str {
     if let Some(stripped) = source.strip_suffix("\r\n") {
         stripped

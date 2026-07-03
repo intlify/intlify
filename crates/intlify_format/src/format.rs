@@ -7,6 +7,7 @@ use crate::{
     error::OperationalError, layout::LayoutDocument, options::FormatOptions, render::render,
 };
 
+/// Run the formatter pipeline after the public parser-diagnostics gate.
 pub(crate) fn format_parse_result(
     source: &str,
     parse: &ParseResult,
@@ -19,6 +20,9 @@ pub(crate) fn format_parse_result(
     Ok(render(&document))
 }
 
+// This is defensive because public APIs already reject parser diagnostics.
+// Keeping the check here documents the IR boundary: formatter internals should
+// only see syntactically valid parser output.
 fn ensure_parse_invariant(parse: &ParseResult) -> Result<(), OperationalError> {
     if parse.diagnostics.is_empty() {
         Ok(())
