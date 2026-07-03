@@ -139,6 +139,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_format"
+version = "0.14.0-alpha.7"
+dependencies = [
+ "ox_mf2_parser",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

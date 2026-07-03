@@ -1,0 +1,10 @@
+[
+  {
+    "code": "InvalidInputDeclaration",
+    "severity": "Error",
+    "span": {
+      "start": 7,
+      "end": 14
+    }
+  }
+]
