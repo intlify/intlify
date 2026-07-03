@@ -546,7 +546,7 @@ JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON 
 
 `schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
 
-The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field.
+The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field. Diagnostic entries use the shared diagnostic JSON shape defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 `summary.status` follows the Phase 3A status contract:
 

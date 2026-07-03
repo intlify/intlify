@@ -271,7 +271,7 @@ From Phase 2 onward, public AST input for linter APIs is the Binary AST decoder/
 
 Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on the same public Binary AST view whenever practical.
 
-For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
+For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires semantic analysis and no snapshot-to-semantic path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
 
 ### Location Model
 
@@ -455,7 +455,7 @@ Cached artifacts must be invalidated when the document version changes. Cache ow
 
 Editor diagnostics are produced by combining parser, semantic, and linter diagnostics through the shared diagnostic result contract.
 
-When an adapter uses `lintMessage` or `lintSnapshot`, that result should be treated as the preferred diagnostic source because it already contains parser, semantic, and lint diagnostics. Adapters must avoid publishing parser diagnostics twice when they also keep parser results in a separate cache.
+When an adapter uses `lintMessage` (or a future `lintSnapshot`), that result should be treated as the preferred diagnostic source because it already contains parser, semantic, and lint diagnostics. Adapters must avoid publishing parser diagnostics twice when they also keep parser results in a separate cache.
 
 The initial workflow is strict:
 
@@ -552,7 +552,6 @@ Initial Phase 3 benchmark phases:
 - format_check_cli_e2e
 - format_check_json
 - lint_message_core
-- lint_snapshot_core
 - lint_cli_e2e
 - lint_json
 - lint_binding_napi
@@ -569,6 +568,7 @@ The CLI startup benchmarks are Phase 3A foundation baselines. They should measur
 
 Future transport benchmark phases:
 
+- lint_snapshot_core
 - jsonrpc_baseline
 - messagepack_transport
 - lsp_jsonrpc

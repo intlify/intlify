@@ -276,7 +276,7 @@ SemanticModel {
   attributes: Vec<AttributeRecord>,
   selectors: Vec<SelectorRecord>,
   variants: Vec<VariantRecord>,
-  diagnostics: Vec<Diagnostic>,
+  diagnostics: Vec<SemanticDiagnostic>,
 }
 
 enum SemanticMessageKind {
@@ -284,6 +284,8 @@ enum SemanticMessageKind {
   Select,
 }
 ```
+
+`SemanticDiagnostic` is the semantic validation diagnostic defined by the Phase 3C linter design: a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections.
 
 Every semantic record must link back to a source NodeId and Span.
 

@@ -26,7 +26,7 @@ LSP/editor integration and playground usage are consumers of these deliverables,
 
 ## Ownership
 
-The Rust linter engine lives in a workspace-internal crate named `crates/intlify_lint` and depends on `ox_mf2_parser`. Like `intlify_format`, this crate is not published to crates.io in Phase 3C (`publish = false`); public linter distribution happens through the `intlify lint` CLI and the linter N-API/WASM packages. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The lint crate owns rule execution, presets, lint configuration, and lint result shaping.
+The Rust linter engine lives in a workspace-internal crate named `crates/intlify_lint` and depends on `ox_mf2_parser`. Like `intlify_format`, this crate is not published to crates.io in Phase 3C (`publish = false`); public linter distribution happens through the `intlify lint` CLI and the linter N-API/WASM packages. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, semantic lowering, and the semantic validation layer that emits the core semantic diagnostics. The lint crate owns rule execution, presets, lint configuration, and lint result shaping; it consumes semantic diagnostics from the parser crate and does not reimplement them.
 
 The user-facing CLI binary lives in `crates/intlify_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
 
@@ -66,6 +66,8 @@ Parser diagnostics are always included in lint results. If any parser diagnostic
 
 Core semantic diagnostics, when produced by semantic analysis, are included after successful parsing. If semantic analysis produces any semantic diagnostic, configurable lint rules do not run.
 
+Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The seven core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
+
 Configurable rules only run when parsing and semantic analysis complete without diagnostics.
 
 The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF, so semantic analysis and rules never see grammar-invalid CST shapes.
@@ -100,22 +102,31 @@ Classification result:
 
 ## Diagnostic Shape
 
-Every diagnostic carries:
+Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte span, and a message. The JSON representation is shared by the fmt and lint reporters and by the binding result objects:
 
-- category: `parser`, `semantic`, or `lint`
-- severity: `error` or `warning`
-- code or rule id
-- source id
-- UTF-8 byte span
-- message
-- optional labels
-- optional help text
+```json
+{
+  "category": "semantic",
+  "code": "duplicate-declaration",
+  "severity": "error",
+  "span": { "start": 32, "end": 38 },
+  "location": { "line": 2, "column": 8 },
+  "message": "variable $count is already declared",
+  "labels": [{ "span": { "start": 8, "end": 14 }, "message": "first declared here" }]
+}
+```
 
-Parser diagnostics use `category: "parser"` and the parser `DiagnosticCode` name; they have no rule id.
+- `category` is `"parser"`, `"semantic"`, or `"lint"`.
+- `code` is a single field across all categories: parser diagnostics use the parser `DiagnosticCode` name, semantic diagnostics use the semantic diagnostic code, and lint diagnostics use the rule id. There is no separate `ruleId` field.
+- `span` uses UTF-8 byte offsets with half-open ranges.
+- `location` uses the parser `SourceLocation` semantics: one-based `line` and zero-based UTF-8 byte `column`. It is `null` when source text is unavailable.
+- `labels` is an array of `{ span, message }` entries and may be empty.
+- `message` text and `labels` messages are not stable compatibility surfaces.
+- A `help` field is reserved for future static per-code help text; the initial release does not populate it. Adding help content is a follow-up once documentation pages exist for codes and rules.
 
-Semantic diagnostics use `category: "semantic"` and a stable semantic diagnostic code; they have no rule id.
+### Semantic Diagnostic Representation
 
-Lint rule diagnostics use `category: "lint"` and a stable rule id.
+Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. They are returned separately from parser diagnostics — the semantic validation pass that follows `parse_semantic = true` lowering produces them, they are carried on the `SemanticModel` (whose `diagnostics` field becomes `Vec<SemanticDiagnostic>`), and they are not mixed into `ParseResult.diagnostics`. They are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
 
 ## Failure Model
 
@@ -133,7 +144,6 @@ Operational errors:
 - file system and encoding errors
 - invalid CLI arguments
 - invalid binding options
-- invalid or capability-missing snapshots
 - internal failures, including semantic lowering failures after a clean parse
 
 Operational errors use the Phase 3A operational error shape `{ kind, code, message, path?, details? }` and the shared string code namespace. The CLI exit code classification follows Phase 3A: `0` success, `1` lint failure (any `error` diagnostic, or warnings over `--max-warnings`), `2` operational error, with `2 > 1 > 0` priority for mixed outcomes. JSON output uses the Phase 3A top-level envelope, including its top-level `errors` array for global operational errors and `results[].errors` for file-specific operational errors.
@@ -237,6 +247,7 @@ The lint schema definitions live under the unified project config schema publish
 - non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`
 - Phase 3C processes selected files sequentially; future parallel execution must not change observable output ordering
 - exit codes and the JSON envelope follow Phase 3A
+- the discovery, ignore, and input operational error codes defined in the formatter design (`unsupported_input_file`, `unmatched_input`, `invalid_ignore_pattern`, `ignore_file_read_failed`, `input_read_failed`) are shared CLI codes, not formatter-only codes; `intlify lint` reuses them with the same `kind`, exit code, and `details` shapes
 
 Resource/catalog input such as JSON and YAML i18n files is planned as a layered adapter workflow. When resource/catalog adapters arrive, they extend the supported-extension list and own host-file parsing, message extraction, and span mapping; the message-level linter core and this shared discovery contract do not change.
 
@@ -256,8 +267,8 @@ The flag surface intentionally mirrors oxlint's basic flags plus the oxfmt-style
 
 Flag semantics:
 
-- `--max-warnings <n>`: the CLI exits with `1` when the total warning count exceeds `n`, even when no `error` diagnostics are reported. The default is unlimited.
-- `--quiet`: `warning` diagnostics are not reported in text or JSON output. Exit code behavior does not change: `--max-warnings` still counts suppressed warnings, and summary counts still include them.
+- `--max-warnings <n>`: the CLI exits with `1` when the total warning count exceeds `n`, even when no `error` diagnostics are reported. The default is unlimited. `n` must be a non-negative integer; other values are `invalid_cli_argument` errors, the first emit site of that reserved Phase 3A code.
+- `--quiet`: `warning` diagnostics are not reported in text or JSON output, matching ESLint and oxlint behavior. Exit code behavior does not change: `--max-warnings` still counts suppressed warnings. `results[].status` and all summary counts are computed from the full diagnostic set; `--quiet` filters only the reported `diagnostics` arrays.
 - `--stdin-filepath <path>`: explicit stdin mode with the same semantics as `intlify fmt`: reads all source text from stdin, applies read framing, uses `<path>` as the virtual input path for extension checks, ignore rules, and output, and cannot be combined with file, directory, or glob operands.
 - `--ignore-path <path>`: same resolution and pattern rules as `intlify fmt`.
 - `--reporter <text|json>`: Phase 3A reporter selection.
@@ -266,17 +277,52 @@ Flag semantics:
 
 When no operands are provided and stdin mode is not selected, `intlify lint` behaves as `intlify lint .`.
 
-Human-readable output renders diagnostics to stderr-style problem output and keeps stdout machine-friendly, following the Phase 3A text reporter conventions; exact human wording is not a fixture-locked contract. JSON output uses the Phase 3A envelope with `command: "lint"`. Result entries carry the project-root-relative slash-normalized path and that file's diagnostics; summary counts include at least `status`, `matchedFiles`, `errorCount` for operational errors, and lint `error` / `warning` diagnostic counts. The exact JSON field set is locked by fixtures in the CLI implementation PR, following the same conventions as the fmt JSON reporter.
+Human-readable output renders diagnostics to stderr-style problem output and keeps stdout machine-friendly, following the Phase 3A text reporter conventions; exact human wording is not a fixture-locked contract.
+
+### JSON Reporter
+
+JSON output uses the Phase 3A envelope with `command: "lint"`. `schemaVersion`, `version`, `projectRoot`, path normalization, and the top-level `errors` array follow the Phase 3A shared envelope contract; file-specific operational errors live in `results[].errors`.
+
+Each `results[]` entry uses this shape:
+
+```json
+{
+  "path": "messages/foo.mf2",
+  "status": "problems",
+  "diagnostics": [],
+  "errors": []
+}
+```
+
+`status` is one of:
+
+- `"clean"`: the target produced no lint diagnostics
+- `"problems"`: the target produced at least one parser, semantic, or rule diagnostic
+- `"error"`: a file-specific operational error occurred
+
+`status` is computed from the full diagnostic set even when `--quiet` filters warnings out of the `diagnostics` array.
+
+`summary` fields:
+
+- `status`: `"success"` for exit `0`, `"failure"` for exit `1` (any `error`-severity diagnostic, or warnings over `--max-warnings`), `"error"` for exit `2`
+- `operation`: `"lint"` or `"stdin"`
+- `matchedFiles`: final selected lint targets
+- `cleanFiles`: targets with `status: "clean"`
+- `problemFiles`: targets with `status: "problems"`
+- `diagnosticErrorCount`: total `error`-severity diagnostics across all targets
+- `diagnosticWarningCount`: total `warning`-severity diagnostics across all targets, including warnings hidden by `--quiet`
+- `errorCount`: operational errors, counting top-level `errors` plus all `results[].errors`, matching the Phase 3A meaning of `errorCount`
+
+Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 
 Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), and concurrency controls such as `--threads`.
 
 ## Programmatic API Shape
 
-The primary Rust APIs mirror the formatter split between source-backed and snapshot-backed entry points:
+The primary Rust entry point is source-backed; the formatter's snapshot-backed counterpart has no lint equivalent in Phase 3C (see below):
 
 ```rust
 lint_message(source: &str, options: LintOptions) -> LintResult
-lint_snapshot(snapshot: SnapshotView<'_>, source: &str, options: LintOptions) -> LintResult
 ```
 
 N-API and WASM expose the same contract as a discriminated union, using the Phase 3A operational error shape:
@@ -287,20 +333,21 @@ type LintResult =
   | { ok: false; errors: OperationalError[] }
 
 function lintMessage(source: string, options?: LintOptions): LintResult
-function lintSnapshot(snapshot: Uint8Array, source: string, options?: LintOptions): LintResult
 ```
 
-`ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options, invalid snapshots, or internal failures.
+`ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
 
-`LintOptions` carries the resolved rule severities. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
+`LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
-Snapshot-backed linting follows the formatter's snapshot input constraints: the snapshot must carry verifiable diagnostic capability (a snapshot that may have omitted diagnostics returns `invalid_snapshot` with `details.reason: "missing_capability"`), source consistency checks are best-effort, and corrupt or unsupported snapshots return `invalid_snapshot`. Linting does not require trivia, so trivia-less snapshots are accepted.
+Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
 `@intlify/lint-wasm` follows the `@intlify/ox-mf2-wasm` initialization contract as specified for `@intlify/format-wasm` in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 
 ## Core Semantic Diagnostics
 
-Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors.
+Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors. They are implemented in the `ox_mf2_parser` semantic validation layer and surfaced through lint results; `intlify_lint` does not reimplement them.
+
+Reporting policy: semantic analysis reports every violation in one pass, ordered by primary span in source order; it does not stop at the first semantic diagnostic. Configurable rule diagnostics follow the same ordering when rules run: primary span source order, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
 
 ### duplicate-declaration
 
@@ -318,7 +365,7 @@ Reports a declaration that binds a variable that already appeared in a previous 
 {{{$label}}}
 ```
 
-Duplicate declarations are always semantic errors; there is no compatibility relaxation. The primary span is the later declaration's bound variable, with a label on the earlier declaration.
+Duplicate declarations are always semantic errors; there is no compatibility relaxation. The primary span is the later declaration's bound variable, with a label on the earlier declaration. This code covers only plain re-binding of an already-declared variable; dependency-order violations belong to `invalid-local-dependency`.
 
 ### invalid-local-dependency
 
@@ -335,11 +382,11 @@ Reports `.local` declarations that violate MF2 declaration dependency rules: a d
 {{{$a}}}
 ```
 
-The primary span is the bound variable of the declaration that completes the violation, with labels on the earlier appearances.
+The primary span is the bound variable of the declaration that completes the violation, with labels on the earlier appearances. Cases in this dependency family are never additionally reported as `duplicate-declaration`.
 
 ### missing-selector-annotation
 
-Reports a selector variable that does not directly or indirectly (through `.local` chains) reference a declaration with a function.
+Reports a selector variable that does not directly or indirectly (through `.local` chains) reference a declaration with a function. A selector variable with no declaration at all also reports this diagnostic — external input variables are valid in patterns, but MF2 requires every selector to resolve to an annotated declaration, independent of the `no-undeclared-variable` rule state.
 
 ```mf2
 .input {$count}
@@ -407,7 +454,7 @@ Initial configurable rules avoid style concerns. Style checks and formatting fix
 
 Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
-Reports a declared variable that is never referenced by a later declaration expression, a selector, or the message body.
+Reports a declared variable that is never referenced by a later declaration expression, a selector, or the message body. The rule applies to both `.input` and `.local` declarations: an unreferenced declaration has no runtime effect in MF2, so both kinds are treated as dead code. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
 
 ```mf2
 .input {$count :number}
@@ -419,7 +466,7 @@ Reports a declared variable that is never referenced by a later declaration expr
 
 Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
-Reports repeated attribute identifiers on one expression or markup placeholder. The MF2 spec says attribute identifiers SHOULD be unique and defines last-one-wins semantics for duplicates, so this is a warning-level rule rather than a semantic error.
+Reports repeated attribute identifiers on one expression or markup placeholder, covering expressions and open, close, and standalone markup. The MF2 spec says attribute identifiers SHOULD be unique and defines last-one-wins semantics for duplicates, so this is a warning-level rule rather than a semantic error. The primary span is the later duplicate attribute identifier, with a label on the first occurrence.
 
 ```mf2
 {$name :string @note=|a| @note=|b|}
@@ -435,6 +482,8 @@ Reports a variable reference that cannot be resolved to a visible `.input` or `.
 .input {$count :number}
 {{You have {$total} items.}}
 ```
+
+References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers all variable references: `.local` right-hand-side expressions, selectors, and the message body share the same visibility model. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
 
 Simple messages with no declarations reference external inputs by design; teams that enable this rule accept that such messages must move to `.input` declarations.
 
@@ -474,20 +523,66 @@ Directive syntax is not fixed yet. The linter result model should be able to rep
 
 ## Fixtures and Validation
 
-Core linter fixtures live under `crates/intlify_lint/fixtures` and follow the same directory-fixture and explicit-update-flag conventions as the formatter fixture harness, with diagnostics expectations instead of formatted output. CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions established by the fmt CLI fixtures. Exact harness details are locked in the implementation PRs.
+Core linter fixtures live under `crates/intlify_lint/fixtures` and use directory fixtures, mirroring the formatter fixture harness with diagnostics expectations instead of formatted output:
 
-Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, and binding parity for `lintMessage` / `lintSnapshot`.
+```text
+crates/intlify_lint/fixtures/
+  duplicate_declaration/
+    input.mf2
+    diagnostics.json
+    options.json
+```
+
+`options.json` is required and uses a strict `cases[]` array. Unknown fields are fixture authoring errors.
+
+```json
+{
+  "cases": [
+    {
+      "name": "default",
+      "rules": {},
+      "expectedDiagnostics": "diagnostics.json"
+    },
+    {
+      "name": "rule-off",
+      "rules": { "no-unused-declaration": "off" },
+      "expectedDiagnostics": "clean.json"
+    }
+  ]
+}
+```
+
+`rules` uses the same shape and validation as the config `lint.rules` map and overlays the implicit `recommended` defaults. `expectedDiagnostics` points to a JSON file containing the expected diagnostics as an ordered array; an empty array means the case is clean.
+
+```json
+[
+  {
+    "category": "semantic",
+    "code": "duplicate-declaration",
+    "severity": "error",
+    "span": [24, 30]
+  }
+]
+```
+
+Expected entries lock `category`, `code` (or rule id), `severity`, and the UTF-8 byte `span` of the primary diagnostic location, in report order. Diagnostic message text and labels are not fixture-locked; message wording may change for clarity without fixture churn.
+
+Fixture `.mf2` files use the CLI file framing convention: files end with one final LF that the harness strips when loading message text. Fixture updates use `INTLIFY_UPDATE_LINT_FIXTURES=1 cargo test -p intlify_lint`; update mode rewrites declared `expectedDiagnostics` files and never rewrites `options.json`. Fixture authoring errors — malformed `options.json`, unknown fields, unknown rule ids, or missing expected files — are hard test failures.
+
+CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions established by the fmt CLI fixtures, including scenario `options.json`, stdout/stderr/exit expectations, and `stdoutJson` structural comparison.
+
+Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, and binding parity for `lintMessage`.
 
 ## Benchmarks
 
-Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, semantic analysis cost, rule execution cost (per rule where practical), binding call cost, and CLI end-to-end cost, matching the Phase 3 benchmark names `lint_message_core`, `lint_snapshot_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. Benchmark commands must be executable and testable, but timings are not CI gates.
+Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, semantic analysis cost, rule execution cost (per rule where practical), binding call cost, and CLI end-to-end cost, matching the Phase 3 benchmark names `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. `lint_snapshot_core` becomes relevant when snapshot-backed linting lands. Benchmark commands must be executable and testable, but timings are not CI gates.
 
 ## Implementation Phasing
 
 Phase 3C linter implementation should be split into reviewable PRs:
 
-1. `intlify_lint` crate scaffold, result/options/config model, rule registry, and fixture harness
-2. core semantic diagnostics
+1. `ox_mf2_parser` semantic validation layer emitting the core semantic diagnostics (parser-side prerequisite PR, including the semantic diagnostic code catalog and fixtures)
+2. `intlify_lint` crate scaffold, result/options/config model, rule registry, fixture harness, and core semantic diagnostic integration
 3. configurable rules and the `recommended` preset
 4. `intlify lint` CLI integration, shared discovery/ignore/framing reuse, and JSON reporter
 5. `@intlify/lint-napi` wrapper and platform native packages
@@ -507,6 +602,8 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 - `unreachable-variant` selection-semantics modeling.
 - Resource/catalog adapters for JSON/YAML host files and resource-level rules.
 - Parallel file linting with deterministic output, and concurrency controls.
+- Snapshot-backed linting (`lintSnapshot`), including the snapshot-to-semantic path and snapshot capability checks.
+- The combined `intlify check` command: designed in a short dedicated addendum after both the formatter and linter products ship, once their JSON reporters and exit behavior exist as implemented contracts.
 
 ## Open Questions
 

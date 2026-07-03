@@ -145,7 +145,7 @@ Phase 3A input and routing error codes:
 - `unknown_command`: unknown subcommand, with `kind: "unsupported"`
 - `command_not_ready`: reserved command without an implementation in the current phase, with `kind: "unsupported"`
 
-Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
+Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation and by the Phase 3C `intlify lint` design for invalid `--max-warnings` values. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
 
 Input and routing errors use small structured `details` payloads when the rejected token is available:
 
