@@ -39,6 +39,16 @@ These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`
 
 Binding packages expose direct programmatic lint APIs. They do not host plugins and do not need a CLI callback bridge.
 
+## Architecture
+
+Phase 3C introduces the linter product behind the Phase 3A CLI shell while keeping parser and semantic validation ownership in `ox_mf2_parser`. The architecture has one Rust linter core that powers `intlify lint`, N-API, and WASM entry points.
+
+![Phase 3C linter architecture](./assets/008-ox-mf2-phase-3c-linter-architecture.svg)
+
+`crates/intlify_lint` owns rule execution, presets, lint configuration, and linter result shaping. Parser diagnostics and core semantic diagnostics remain parser-owned, so CLI, binding, editor, and future resource/catalog consumers see one consistent diagnostic model without duplicating parser or semantic behavior.
+
+The linter binding packages call the same source-backed `lintMessage(source, options)` flow as the CLI. Resource/catalog adapters remain outside the linter core: they extract message-level source text, call the linter product, and map diagnostics back to host-file ranges.
+
 ## Non-Goals
 
 - JavaScript custom rules.

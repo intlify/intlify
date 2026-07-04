@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Phase 3C linter architecture</title>
+<desc id="desc">The linter exposes CLI, N-API, and WASM entry points that call the same Rust lint core. The parser crate owns parsing and semantic validation, while the linter crate owns rule execution, presets, config, and result shaping.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .lint-boundary { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .entry { fill:#334155; }
+    .lint { fill:#0f766e; }
+    .parser { fill:#1d4ed8; }
+    .rule { fill:#7c3aed; }
+    .output { fill:#475569; }
+    .future { fill:#64748b; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .dashed { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .lint-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1240" height="760" fill="none"/>
+
+<text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Phase 3C linter architecture</text>
+<text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">One Rust linter core powers the CLI and bindings, while parser-owned diagnostics and semantic validation stay centralized.</text>
+
+<rect x="50" y="132" width="230" height="172" rx="12" class="panel" stroke-width="2"/>
+<text x="165" y="168" font-size="16" font-weight="700" text-anchor="middle" class="label">Consumers</text>
+<rect x="84" y="192" width="162" height="42" rx="7" class="entry"/>
+<text x="165" y="218" font-size="12" font-weight="700" text-anchor="middle" class="white">User / CI</text>
+<rect x="84" y="246" width="162" height="42" rx="7" class="entry"/>
+<text x="165" y="272" font-size="12" font-weight="700" text-anchor="middle" class="white">Editor / Playground</text>
+
+<rect x="50" y="438" width="230" height="132" rx="12" class="panel" stroke-width="2"/>
+<text x="165" y="474" font-size="15" font-weight="700" text-anchor="middle" class="label">Future adapters</text>
+<text x="165" y="500" font-size="11.5" text-anchor="middle" class="muted">Resource and catalog</text>
+<text x="165" y="518" font-size="11.5" text-anchor="middle" class="muted">host files extract</text>
+<text x="165" y="536" font-size="11.5" text-anchor="middle" class="muted">message-level input.</text>
+
+<rect x="330" y="112" width="590" height="572" rx="14" class="group" stroke-width="2"/>
+<text x="625" y="148" font-size="17" font-weight="700" text-anchor="middle" class="label">Phase 3C linter product</text>
+<text x="625" y="172" font-size="12" text-anchor="middle" class="muted">CLI and programmatic APIs call the same Rust lint pipeline and result model.</text>
+
+<rect x="370" y="204" width="510" height="92" rx="12" class="panel" stroke-width="2"/>
+<text x="625" y="228" font-size="13" font-weight="700" text-anchor="middle" class="label">Public entry points</text>
+<rect x="396" y="246" width="138" height="34" rx="7" class="entry"/>
+<text x="465" y="268" font-size="11.5" font-weight="700" text-anchor="middle" class="white">intlify lint</text>
+<rect x="556" y="246" width="138" height="34" rx="7" class="entry"/>
+<text x="625" y="268" font-size="11.5" font-weight="700" text-anchor="middle" class="white">@intlify/lint-napi</text>
+<rect x="716" y="246" width="138" height="34" rx="7" class="entry"/>
+<text x="785" y="268" font-size="11.5" font-weight="700" text-anchor="middle" class="white">@intlify/lint-wasm</text>
+
+<rect x="370" y="344" width="510" height="326" rx="14" class="lint-boundary" stroke-width="2"/>
+<text x="500" y="368" font-size="13" font-weight="700" text-anchor="middle" class="muted">crates/intlify_lint boundary</text>
+
+<rect x="492" y="396" width="266" height="58" rx="8" class="lint"/>
+<text x="625" y="420" font-size="13.5" font-weight="700" text-anchor="middle" class="white">lintMessage(source, options)</text>
+<text x="625" y="439" font-size="10.8" text-anchor="middle" class="soft-white">source-backed linter entry point</text>
+
+<rect x="420" y="492" width="220" height="68" rx="8" class="parser"/>
+<text x="530" y="518" font-size="12.5" font-weight="700" text-anchor="middle" class="white">ox_mf2_parser</text>
+<text x="530" y="538" font-size="10.6" text-anchor="middle" class="soft-white">parser diagnostics</text>
+<text x="530" y="554" font-size="10.6" text-anchor="middle" class="soft-white">and semantic validation</text>
+
+<rect x="704" y="492" width="152" height="68" rx="8" class="rule"/>
+<text x="780" y="520" font-size="12.5" font-weight="700" text-anchor="middle" class="white">lint rules</text>
+<text x="780" y="540" font-size="10.6" text-anchor="middle" class="soft-white">configurable</text>
+
+<rect x="408" y="592" width="154" height="58" rx="8" class="output"/>
+<text x="485" y="616" font-size="12.5" font-weight="700" text-anchor="middle" class="white">lint config</text>
+<text x="485" y="635" font-size="10.6" text-anchor="middle" class="soft-white">rules / presets</text>
+
+<rect x="600" y="592" width="210" height="58" rx="8" class="lint"/>
+<text x="705" y="616" font-size="12.5" font-weight="700" text-anchor="middle" class="white">result shaping</text>
+<text x="705" y="635" font-size="10.6" text-anchor="middle" class="soft-white">diagnostics and counts</text>
+
+<path d="M 625 296 L 625 396" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 625 454 L 625 474 L 530 474 L 530 492" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 640 526 L 704 526" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 530 560 L 530 574 L 650 574 L 650 592" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 780 560 L 780 574 L 740 574 L 740 592" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+<rect x="980" y="160" width="210" height="240" rx="12" class="panel" stroke-width="2"/>
+<text x="1085" y="196" font-size="16" font-weight="700" text-anchor="middle" class="label">Output contract</text>
+<rect x="1014" y="220" width="142" height="44" rx="7" class="lint"/>
+<text x="1085" y="247" font-size="12" font-weight="700" text-anchor="middle" class="white">LintResult</text>
+<rect x="1014" y="278" width="142" height="44" rx="7" class="output"/>
+<text x="1085" y="296" font-size="11.5" font-weight="700" text-anchor="middle" class="white">JSON envelope</text>
+<text x="1085" y="314" font-size="10.4" text-anchor="middle" class="soft-white">CLI reporter</text>
+<rect x="1014" y="336" width="142" height="34" rx="7" class="future"/>
+<text x="1085" y="358" font-size="11.4" font-weight="700" text-anchor="middle" class="white">exit codes: 0 / 1 / 2</text>
+
+<rect x="980" y="468" width="210" height="134" rx="12" class="panel" stroke-width="2"/>
+<text x="1085" y="504" font-size="15" font-weight="700" text-anchor="middle" class="label">Shared schema</text>
+<text x="1085" y="530" font-size="11.5" text-anchor="middle" class="muted">parser, semantic, and</text>
+<text x="1085" y="548" font-size="11.5" text-anchor="middle" class="muted">lint diagnostics use one</text>
+<text x="1085" y="566" font-size="11.5" text-anchor="middle" class="muted">stable JSON shape.</text>
+
+<path d="M 810 621 L 948 621 L 948 265 L 980 265" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 810 640 L 928 640 L 928 535 L 980 535" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<path d="M 280 213 L 342 213 L 342 250 L 370 250" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 280 267 L 318 267 L 318 250 L 370 250" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 280 504 L 320 504 L 320 425 L 492 425" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+</svg>
