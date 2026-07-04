@@ -92,7 +92,7 @@ Classification result:
 | `missing-fallback-variant` | core semantic | MF2 Missing Fallback Variant data model error |
 | `duplicate-variant` | core semantic | MF2 Duplicate Variant data model error |
 | `duplicate-option-name` | core semantic | MF2 Duplicate Option Name data model error |
-| `no-undeclared-variable` | configurable rule, default `off` | undeclared variables are valid external inputs in MF2, so this is a strict-workflow opt-in, not an error |
+| `no-undeclared-variable` | configurable rule, default `off` | undeclared variables are valid external inputs in MF2, so this is a strict-workflow opt-in, not an error; selector variables are handled by `missing-selector-annotation` |
 | `no-unused-declaration` | configurable rule, default `warn` | declared variable never referenced |
 | `no-duplicate-attribute` | configurable rule, default `warn` | the MF2 spec says attribute identifiers SHOULD be unique; duplicates are ignored with last-one-wins semantics |
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
@@ -483,7 +483,7 @@ Reports a variable reference that cannot be resolved to a visible `.input` or `.
 {{You have {$total} items.}}
 ```
 
-References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers all variable references: `.local` right-hand-side expressions, selectors, and the message body share the same visibility model. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
+References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers `.local` right-hand-side expressions and message body references. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
 
 Simple messages with no declarations reference external inputs by design; teams that enable this rule accept that such messages must move to `.input` declarations.
 

@@ -120,11 +120,11 @@ The Rust formatter engine should live in a separate workspace-internal `crates/i
 
 ### CLI and Package Distribution
 
-The CLI binary should live in `crates/intlify_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in `crates/intlify_cli` and expose `intlify fmt` alongside `intlify lint`. Distribution should happen through npm packages that let JavaScript users install and run the Rust CLI through the npm ecosystem: `@intlify/cli` is the JavaScript wrapper package, while `@intlify/cli-native` owns the compiled native CLI binary artifacts.
 
 N-API and WASM formatter bindings should be published as formatter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while `@intlify/format-napi` and `@intlify/format-wasm` expose formatter-specific APIs backed by `crates/intlify_format`.
 
-The npm distribution surface should separate the CLI package from formatter API packages. `@intlify/cli` owns native binary distribution for command-line use, `@intlify/format-napi` exposes Node APIs, and `@intlify/format-wasm` supports browser, worker, and playground use cases.
+The npm distribution surface should separate the CLI wrapper/native binary packages from formatter API packages. `@intlify/cli` exposes the command-line wrapper, `@intlify/cli-native` owns the compiled native binary artifacts, `@intlify/format-napi` exposes Node APIs, and `@intlify/format-wasm` supports browser, worker, and playground use cases.
 
 The Phase 3 formatter deliverables are the Rust formatter engine, CLI command, N-API formatter package, WASM formatter package, JSON configuration contract, generated JSON Schema, and formatter result contract. LSP/editor integration, playground usage, and resource/catalog formatting are consumers or layered workflows rather than separate direct products in this phase.
 
@@ -229,11 +229,11 @@ The Rust linter engine should live in a separate workspace-internal `crates/intl
 
 ### CLI and Package Distribution
 
-The CLI binary should live in a separate `crates/intlify_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that expose the compiled native CLI binary, so JavaScript users can install and run the Rust CLI through the npm ecosystem.
+The CLI binary should live in a separate `crates/intlify_cli` crate. That crate composes parser, formatter, and linter crates into user-facing commands such as `intlify lint`. Distribution should happen through npm packages that let JavaScript users install and run the Rust CLI through the npm ecosystem: `@intlify/cli` is the JavaScript wrapper package, while `@intlify/cli-native` owns the compiled native CLI binary artifacts.
 
 N-API and WASM linter bindings should be published as linter-specific packages rather than added to the existing parser binding packages. Parser bindings stay focused on parsing, snapshots, and parser-level APIs, while `@intlify/lint-napi` and `@intlify/lint-wasm` expose lint-specific APIs backed by `crates/intlify_lint`.
 
-The npm distribution surface should separate the CLI package from linter API packages. `@intlify/cli` owns native binary distribution for command-line use, `@intlify/lint-napi` exposes Node APIs, and `@intlify/lint-wasm` supports browser, worker, and playground use cases.
+The npm distribution surface should separate the CLI wrapper/native binary packages from linter API packages. `@intlify/cli` exposes the command-line wrapper, `@intlify/cli-native` owns the compiled native binary artifacts, `@intlify/lint-napi` exposes Node APIs, and `@intlify/lint-wasm` supports browser, worker, and playground use cases.
 
 The Phase 3 linter deliverables are the Rust linter engine, CLI, N-API linter package, WASM linter package, and shared diagnostic result schema. LSP/editor integration and playground usage are consumers of those deliverables rather than separate direct products in this phase.
 
