@@ -96,11 +96,13 @@ The message-level workflow is:
 4. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
 5. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
 6. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a diagnostic sink.
-7. Execute each enabled built-in rule by calling `LintRule::check(ctx)`.
+7. Execute each enabled built-in rule by calling `LintRule::check(ctx)` in registry declaration order.
 8. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
 9. Shape the result for the Rust API, bindings, or CLI reporter.
 
-Rule execution order is deterministic but not a compatibility surface. Report order is the compatibility surface.
+For a single lint target, parser diagnostics, semantic diagnostics, and configurable rule diagnostics are stage-exclusive. Parser diagnostics short-circuit semantic validation and configurable rules. Semantic diagnostics short-circuit configurable rules. Configurable rule diagnostics are produced only when parser and semantic diagnostics are empty.
+
+Rule execution order is deterministic and follows registry declaration order for reproducible debugging and benchmarking, but it is not a compatibility surface. Report order is the compatibility surface.
 
 ## Diagnostic Classification
 
@@ -243,6 +245,15 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 - `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
 - `no-duplicate-attribute` reads expression and markup attribute occurrences from `SemanticModel`
 
+The initial `SemanticModel` fact surface required by configurable rules includes:
+
+- declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
+- references: variable reference id, reference kind, source span, declaration visibility point, and resolved declaration id or unresolved state
+- selector references: variable references that appear as `.match` selectors
+- message body references: variable references that appear in pattern placeholders and body expressions
+- attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
+- shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
+
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
 The initial rule interface is not an ESLint-style CST visitor map. Rules do not register callbacks such as `VariableExpression(node)` or `Markup(node)`, and the linter does not dispatch every CST node to every rule. A rule owns its own check over `SemanticModel` and may use `CstView` only for the syntax relationships it needs.
@@ -311,7 +322,8 @@ Initial lint config supports:
 
 Schema-level lint config rules:
 
-- `lint` must be an object; the Phase 3A required-section and unknown-field rules apply
+- the `lint` section is optional; omitted `lint` resolves as `rules: {}` and `ignorePatterns: []` over the implicit `recommended` defaults
+- when present, `lint` must be an object; `lint: null` is invalid and the Phase 3A unknown-field rules apply
 - `lint.rules` is optional and defaults to `{}`
 - `lint.rules` keys must be known configurable rule ids; unknown rule ids are `config_validation_failed` errors
 - `lint.rules` values accept only the strings `"off"`, `"warn"`, or `"error"`; the ESLint-style `["warn", { ... }]` tuple form is reserved for future rules with options and is invalid in Phase 3C
@@ -363,7 +375,9 @@ Flag semantics:
 
 When no operands are provided and stdin mode is not selected, `intlify lint` behaves as `intlify lint .`.
 
-Human-readable output renders diagnostics to stderr-style problem output and keeps stdout machine-friendly, following the Phase 3A text reporter conventions; exact human wording is not a fixture-locked contract.
+Human-readable output renders diagnostics and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter. Exact human wording is not a fixture-locked contract.
+
+For `--reporter json`, the JSON envelope is emitted to stdout, including operational errors when the envelope can be constructed. Only fatal CLI failures that prevent envelope construction are emitted directly to stderr.
 
 ### JSON Reporter
 
@@ -424,6 +438,19 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 `ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
 
 `LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
+
+Binding option validation returns the first validation failure as `invalid_options` with stable `details`:
+
+```json
+{
+  "reason": "unknown_rule",
+  "path": "rules.no-such-rule",
+  "ruleId": "no-such-rule",
+  "value": "bad"
+}
+```
+
+`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. `details.ruleId` is required for rule-specific failures. `details.value` is included only when the invalid value is JSON-safe. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
 
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
@@ -554,6 +581,8 @@ Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
 Reports repeated attribute identifiers on one expression or markup placeholder, covering expressions and open, close, and standalone markup. The MF2 spec says attribute identifiers SHOULD be unique and defines last-one-wins semantics for duplicates, so this is a warning-level rule rather than a semantic error. The primary span is the later duplicate attribute identifier, with a label on the first occurrence.
 
+Duplicate detection is owner-local: attributes are compared only within the same expression placeholder, open markup placeholder, close markup placeholder, or standalone markup placeholder. Attribute identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. Attributes from different placeholder owners are never compared with each other.
+
 ```mf2
 {$name :string @note=|a| @note=|b|}
 ```
@@ -569,7 +598,7 @@ Reports a variable reference that cannot be resolved to a visible `.input` or `.
 {{You have {$total} items.}}
 ```
 
-References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers `.local` right-hand-side expressions and message body references. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
+References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers every unresolved non-selector variable reference exposed by `SemanticModel`, including `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup attribute values, and future non-selector reference kinds promoted into the semantic model. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
 
 Simple messages with no declarations reference external inputs by design; teams that enable this rule accept that such messages must move to `.input` declarations.
 
