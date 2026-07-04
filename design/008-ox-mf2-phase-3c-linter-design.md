@@ -82,6 +82,26 @@ Configurable rules only run when parsing and semantic analysis complete without 
 
 The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF, so semantic analysis and rules never see grammar-invalid CST shapes.
 
+### Lint Execution Workflow
+
+The CLI and binding entry points share the same message-level lint workflow. `intlify lint` adds file discovery, ignore handling, and file framing before entering the core linter; bindings call the same source-backed core directly.
+
+![Phase 3C lint execution workflow](./assets/008-ox-mf2-phase-3c-lint-execution-workflow.svg)
+
+The message-level workflow is:
+
+1. Parse source text and construct parser diagnostics, `CstView`, and `SemanticModel` when possible.
+2. If parser diagnostics exist, return parser diagnostics and skip semantic validation and configurable rules.
+3. Run parser-owned semantic validation over `SemanticModel`.
+4. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
+5. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
+6. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a diagnostic sink.
+7. Execute each enabled built-in rule by calling `LintRule::check(ctx)`.
+8. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
+9. Shape the result for the Rust API, bindings, or CLI reporter.
+
+Rule execution order is deterministic but not a compatibility surface. Report order is the compatibility surface.
+
 ## Diagnostic Classification
 
 Diagnostic candidates are classified into four groups. This classification is fixed by this document:
@@ -186,6 +206,62 @@ Metadata includes at least:
 - rule option schema when a rule accepts options
 
 No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail; the JSON-visible metadata fields above are the compatibility surface.
+
+## Rule Implementation Model
+
+Configurable lint rules are implemented as built-in Rust rules inside `crates/intlify_lint`. Phase 3C does not expose an ESLint-compatible custom-rule API, a JavaScript plugin API, or a stable Rust plugin API. The internal design is intentionally inspired by ESLint and oxlint: every rule receives a context object that exposes source text, semantic information, resolved rule configuration, and a diagnostic sink, but the compatibility surface is the rule ids, config schema, and lint result shape, not the Rust trait itself.
+
+The internal rule interface is model-level first:
+
+```rust
+trait LintRule {
+    fn metadata(&self) -> RuleMetadata;
+    fn check(&self, ctx: &mut RuleContext<'_>);
+}
+
+struct RuleContext<'a> {
+    source: &'a str,
+    cst: CstView<'a>,
+    semantic: &'a SemanticModel,
+    config: &'a ResolvedLintConfig,
+    diagnostics: &'a mut Vec<LintDiagnostic>,
+}
+```
+
+The exact Rust names are implementation details, but the responsibilities are fixed:
+
+- the rule registry owns the list of built-in configurable rules, their metadata, default severities, and recommended preset membership
+- resolved config decides which rules run and what severity their diagnostics receive
+- `CstView` is available as a read-only syntax accessor for rules that need exact node kind, token, trivia, or source-span relationships
+- rules report through the context rather than constructing JSON output directly, so category, code, severity, primary span, labels, and ordering stay centralized
+- rules run only after parser and core semantic diagnostics are clean, so rule implementations never need to handle grammar-invalid CST recovery shapes
+- style fixes are not available from the rule context in Phase 3C
+
+Initial rules should be implemented as one pass per enabled rule over `SemanticModel`, not as public AST-node listener callbacks. MF2 messages are small, and the initial rules are semantic facts checks:
+
+- `no-unused-declaration` reads declarations and references from `SemanticModel`
+- `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
+- `no-duplicate-attribute` reads expression and markup attribute occurrences from `SemanticModel`
+
+Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
+
+The initial rule interface is not an ESLint-style CST visitor map. Rules do not register callbacks such as `VariableExpression(node)` or `Markup(node)`, and the linter does not dispatch every CST node to every rule. A rule owns its own check over `SemanticModel` and may use `CstView` only for the syntax relationships it needs.
+
+For example, `no-unused-declaration` is expected to run as a model-level rule:
+
+```rust
+impl LintRule for NoUnusedDeclaration {
+    fn check(&self, ctx: &mut RuleContext<'_>) {
+        for declaration in ctx.semantic.declarations() {
+            if !ctx.semantic.is_referenced(declaration.id) {
+                ctx.report("no-unused-declaration", declaration.name_span);
+            }
+        }
+    }
+}
+```
+
+Future syntax-heavy rules may add internal visitor hooks such as `check_declaration`, `check_expression`, or `check_markup`, but those hooks remain an implementation detail. Adding them does not create a public plugin system or an ESLint-compatible rule API.
 
 ## Severity
 
