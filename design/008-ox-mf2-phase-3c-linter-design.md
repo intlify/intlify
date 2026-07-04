@@ -149,7 +149,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 ```
 
 - `category` is `"parser"`, `"semantic"`, or `"lint"`.
-- `code` is a single field across all categories: parser diagnostics use the parser `DiagnosticCode` name, semantic diagnostics use the semantic diagnostic code, and lint diagnostics use the rule id. There is no separate `ruleId` field.
+- `code` is a single field across all categories. Parser diagnostics, semantic diagnostics, and lint rule diagnostics all use JSON-visible kebab-case stable strings. Rust enum names such as `MissingRequiredWhitespace` are internal; lint JSON emits `"missing-required-whitespace"`. There is no separate `ruleId` field.
 - `span` uses UTF-8 byte offsets with half-open ranges.
 - `location` uses the parser `SourceLocation` semantics: one-based `line` and zero-based UTF-8 byte `column`. It is `null` when source text is unavailable.
 - `labels` is an array of `{ span, message }` entries and may be empty.
@@ -158,7 +158,15 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 
 ### Semantic Diagnostic Representation
 
-Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. They are returned separately from parser diagnostics — the semantic validation pass that follows `parse_semantic = true` lowering produces them, they are carried on the `SemanticModel` (whose `diagnostics` field becomes `Vec<SemanticDiagnostic>`), and they are not mixed into `ParseResult.diagnostics`. They are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
+Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. They are returned separately from parser diagnostics — the semantic validation pass follows `parse_semantic = true` lowering, but diagnostics are not stored permanently on `SemanticModel` and are not mixed into `ParseResult.diagnostics`.
+
+The parser crate exposes semantic validation as an explicit API:
+
+```rust
+fn validate_semantics(model: &SemanticModel) -> Vec<SemanticDiagnostic>
+```
+
+`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order. Linter, future validator, and LSP/editor consumers call this API after constructing a semantic model. Semantic diagnostics are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
 
 ## Failure Model
 
@@ -195,7 +203,7 @@ Diagnostic message text is not a stable compatibility surface and may change for
 
 ## Rule Metadata
 
-The lint crate exposes rule metadata for the CLI, bindings, generated documentation, and JSON Schema generation.
+The lint crate owns rule metadata for generated artifacts and internal runtime behavior.
 
 Metadata includes at least:
 
@@ -207,7 +215,7 @@ Metadata includes at least:
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options
 
-No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail; the JSON-visible metadata fields above are the compatibility surface.
+No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. Rule listing and introspection commands remain deferred.
 
 ## Rule Implementation Model
 
@@ -330,6 +338,57 @@ Schema-level lint config rules:
 - semantic diagnostic codes are not accepted as `lint.rules` keys; core semantic diagnostics are not configurable
 - `lint.ignorePatterns` is optional, defaults to `[]`, and uses the same gitignore-compatible subset and validation rules as `fmt.ignorePatterns`
 
+Valid examples:
+
+```json
+{}
+```
+
+```json
+{
+  "lint": {}
+}
+```
+
+```json
+{
+  "lint": {
+    "rules": {
+      "no-unused-declaration": "off"
+    },
+    "ignorePatterns": ["fixtures/**"]
+  }
+}
+```
+
+Invalid examples:
+
+```json
+{
+  "lint": null
+}
+```
+
+```json
+{
+  "lint": {
+    "rules": {
+      "duplicate-declaration": "off"
+    }
+  }
+}
+```
+
+```json
+{
+  "lint": {
+    "rules": {
+      "no-unused-declaration": ["warn", {}]
+    }
+  }
+}
+```
+
 The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
@@ -375,7 +434,17 @@ Flag semantics:
 
 When no operands are provided and stdin mode is not selected, `intlify lint` behaves as `intlify lint .`.
 
-Human-readable output renders diagnostics and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter. Exact human wording is not a fixture-locked contract.
+Human-readable output renders oxlint-style diagnostic blocks and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter. Exact wording, box drawing, and color styling are not fixture-locked contracts.
+
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^` or `~`. Labels may be rendered as additional underline messages when practical. Multi-line spans may initially render the primary start line and surrounding context only. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form. Text reporter line and column are human-facing; JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
+
+```text
+messages/foo.mf2:2:8 error duplicate-declaration variable $count is already declared
+
+  1 | .input {$count :number}
+  2 | .input {$count :number}
+    |        ^^^^^^ variable is already declared
+```
 
 For `--reporter json`, the JSON envelope is emitted to stdout, including operational errors when the envelope can be constructed. Only fatal CLI failures that prevent envelope construction are emitted directly to stderr.
 
@@ -461,6 +530,8 @@ Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requ
 Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors. They are implemented in the `ox_mf2_parser` semantic validation layer and surfaced through lint results; `intlify_lint` does not reimplement them.
 
 Reporting policy: semantic analysis reports every violation in one pass, ordered by primary span in source order; it does not stop at the first semantic diagnostic. Configurable rule diagnostics follow the same ordering when rules run: primary span source order, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
+
+Duplicate-family diagnostics report every duplicate after the first occurrence in each duplicate group. The first occurrence is not reported; the second and later occurrences each produce one diagnostic whose primary span is the duplicate occurrence and whose label points to the first occurrence. This applies to `duplicate-variant`, `duplicate-option-name`, and `no-duplicate-attribute`.
 
 ### duplicate-declaration
 
@@ -567,13 +638,23 @@ Initial configurable rules avoid style concerns. Style checks and formatting fix
 
 Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
-Reports a declared variable that is never referenced by a later declaration expression, a selector, or the message body. The rule applies to both `.input` and `.local` declarations: an unreferenced declaration has no runtime effect in MF2, so both kinds are treated as dead code. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
+Reports a declared variable that is not reachable from the message output or selector set. The rule applies to both `.input` and `.local` declarations: an unreachable declaration has no runtime effect in MF2, so both kinds are treated as dead code. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
+
+Reachability starts from message body references and selector references, then follows `.local` right-hand-side dependencies backwards through declarations. A declaration referenced only by another unreachable declaration is still unused.
 
 ```mf2
 .input {$count :number}
 .local $unused = {$count}
 {{You have {$count} items.}}
 ```
+
+```mf2
+.input {$count :number}
+.local $label = {$count}
+{{No count here}}
+```
+
+In the second example both `$label` and `$count` are reported: `$label` is not reachable from the body or selectors, and `$count` is only referenced by the unreachable `$label`.
 
 ### no-duplicate-attribute
 
