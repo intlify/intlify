@@ -14,7 +14,7 @@ This document captures the detailed design for the ox-mf2 linter. The Phase 3 to
 
 ## Deliverables
 
-Phase 3 linter deliverables:
+Phase 3C linter deliverables:
 
 - Rust linter engine
 - CLI
@@ -28,7 +28,7 @@ LSP/editor integration and playground usage are consumers of these deliverables,
 
 The Rust linter engine lives in a workspace-internal crate named `crates/intlify_lint` and depends on `ox_mf2_parser`. Like `intlify_format`, this crate is not published to crates.io in Phase 3C (`publish = false`); public linter distribution happens through the `intlify lint` CLI and the linter N-API/WASM packages. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, semantic lowering, and the semantic validation layer that emits the core semantic diagnostics. The lint crate owns rule execution, presets, lint configuration, and lint result shaping; it consumes semantic diagnostics from the parser crate and does not reimplement them.
 
-The user-facing CLI binary lives in `crates/intlify_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm packages distribute the compiled native CLI binary for JavaScript users.
+The user-facing CLI binary lives in `crates/intlify_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm distribution follows the Phase 3A CLI package boundary: `@intlify/cli` is the JavaScript wrapper package, while `@intlify/cli-native` owns the compiled native CLI binary artifacts.
 
 N-API and WASM linter bindings are distributed as linter-specific packages backed by `crates/intlify_lint`:
 
@@ -46,7 +46,7 @@ Binding packages expose direct programmatic lint APIs. They do not host plugins 
 - Style or formatting fixes in lint rules.
 - Recovery-aware rule execution on incomplete parser or semantic output.
 - Resource/catalog rule implementation details.
-- Suppression directive syntax in the first linter design.
+- Suppression directives or MF2 syntax extensions in the first linter design.
 - LSP/editor as a direct product.
 - Nested config discovery.
 - File-specific config overrides.
@@ -150,7 +150,7 @@ Operational errors use the Phase 3A operational error shape `{ kind, code, messa
 
 ## Stable Identifiers
 
-Semantic diagnostic codes and configurable lint rule ids are public stable identifiers. Config files, future suppression directives, JSON output, editor integrations, and external tools may depend on them.
+Semantic diagnostic codes and configurable lint rule ids are public stable identifiers. Config files, future suppression mechanisms, JSON output, editor integrations, and external tools may depend on them.
 
 Naming rules:
 
@@ -206,7 +206,7 @@ While the linter remains in 0.x, `recommended` may evolve by adding useful diagn
 
 ## Config Contract
 
-Project configuration is JSON, not JavaScript or TypeScript. Lint settings live in the `lint` section of one ox-mf2 tooling config shared with formatter settings. The Rust linter engine is the source of truth for the resolved config model.
+Project configuration is JSON or JSONC, not JavaScript or TypeScript. Lint settings live in the `lint` section of one ox-mf2 tooling config shared with formatter settings. The Rust linter engine is the source of truth for the resolved config model.
 
 Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design. Initial linter config does not support file-specific `overrides`.
 
@@ -232,7 +232,7 @@ Schema-level lint config rules:
 - semantic diagnostic codes are not accepted as `lint.rules` keys; core semantic diagnostics are not configurable
 - `lint.ignorePatterns` is optional, defaults to `[]`, and uses the same gitignore-compatible subset and validation rules as `fmt.ignorePatterns`
 
-The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
+The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -517,9 +517,11 @@ Future resource/catalog examples:
 
 Lint rules do not implement style fixes. Future `lint --fix` behavior should call formatter APIs for style-related fixes so style decisions remain consistent across formatter, linter, and editor integrations.
 
-## Suppression Directives
+## Suppression Model
 
-Directive syntax is not fixed yet. The linter result model should be able to represent suppressed diagnostics later, but the first implementation does not need a concrete MF2 suppression comment syntax.
+MF2 does not define line comments or block comments, and comment-like disable directives would be a syntax extension. Phase 3C therefore does not support message-local suppression directives.
+
+The linter result model should be able to represent suppressed diagnostics later, but any future suppression mechanism must be spec-compatible. Possible directions include baseline suppression files or resource/container-level metadata owned by a host format adapter; no inline comment-style directive is part of the initial linter product.
 
 ## Fixtures and Validation
 
@@ -593,7 +595,7 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 
 ## Deferred Follow-Up Notes
 
-- Suppression model: inline disable directives, unused directive diagnostics, and baseline suppression files.
+- Suppression model: spec-compatible suppression mechanisms such as baseline suppression files, resource/container-level metadata, and any unused-suppression diagnostics. Inline comment-style disable directives are not part of the initial direction because MF2 has no comments.
 - Fix model: safe fixes, suggestions, dangerous fixes, and how non-style fixes interact with formatter-owned style changes.
 - Machine reporter roadmap beyond `text` and `json`, including GitHub annotations and SARIF.
 - CLI inspection and debug modes: rule listing, resolved config printing, file discovery debugging, and rule timing output.
