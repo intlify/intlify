@@ -1,7 +1,10 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use crate::{document::Document, options::FormatOptions};
+use crate::{
+    document::Document,
+    options::{FormatMode, FormatOptions},
+};
 
 // LayoutDocument is the formatter-owned MF2 Layout IR root. The foundation PR
 // stores source text only; the next rules PR replaces this identity layout with
@@ -18,9 +21,7 @@ impl<'source> LayoutDocument<'source> {
 
     pub(crate) fn into_document(self) -> Document<'source> {
         match self.options.mode {
-            crate::FormatMode::Standard | crate::FormatMode::Preserve => {
-                Document::text(self.source)
-            }
+            FormatMode::Standard | FormatMode::Preserve => Document::text(self.source),
         }
     }
 }

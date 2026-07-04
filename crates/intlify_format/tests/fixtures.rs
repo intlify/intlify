@@ -32,7 +32,6 @@ struct FixtureCase {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct FixtureOptions {
     mode: Option<String>,
 }
