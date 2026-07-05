@@ -45,6 +45,23 @@ pub(crate) fn top_level_help() -> String {
     .to_owned()
 }
 
+pub(crate) fn fmt_help() -> String {
+    concat!(
+        "Usage: intlify fmt [options] [paths...]\n",
+        "\n",
+        "Options:\n",
+        "      --mode <standard|preserve> Select formatting mode.\n",
+        "      --check                    Check whether files are formatted.\n",
+        "      --list-different           Print paths that would be formatted.\n",
+        "      --stdin-filepath <path>    Format stdin as the given virtual path.\n",
+        "      --ignore-path <path>       Read additional ignore patterns.\n",
+        "      --reporter <text|json>     Select the output reporter.\n",
+        "  -h, --help                     Show help.\n",
+        "  -V, --version                  Show version.\n"
+    )
+    .to_owned()
+}
+
 pub(crate) fn reserved_help(command: &str) -> String {
     let extra = if command == "init" {
         "\nThis command is reserved for future config scaffolding.\n"

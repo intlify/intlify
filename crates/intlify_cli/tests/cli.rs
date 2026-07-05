@@ -124,7 +124,7 @@ fn reporter_json_without_command_prints_human_help() {
 
 #[test]
 fn reserved_command_text_reporter_writes_stderr() {
-    let result = run(&["fmt"]);
+    let result = run(&["lint"]);
 
     assert_eq!(result.exit_code, 2);
     assert!(result.stdout.is_empty());
@@ -133,7 +133,7 @@ fn reserved_command_text_reporter_writes_stderr() {
 
 #[test]
 fn explicit_text_reporter_writes_operational_errors_to_stderr() {
-    let result = run(&["fmt", "--reporter=text"]);
+    let result = run(&["lint", "--reporter=text"]);
 
     assert_eq!(result.exit_code, 2);
     assert!(result.stdout.is_empty());
@@ -142,7 +142,7 @@ fn explicit_text_reporter_writes_operational_errors_to_stderr() {
 
 #[test]
 fn reserved_command_help_prints_placeholder_help() {
-    for command in ["fmt", "lint", "check", "init"] {
+    for command in ["lint", "check", "init"] {
         let result = run(&[command, "--help"]);
 
         assert_eq!(result.exit_code, 0);
@@ -152,6 +152,17 @@ fn reserved_command_help_prints_placeholder_help() {
         assert!(result.stdout.contains("reserved but not available"));
         assert!(result.stderr.is_empty());
     }
+}
+
+#[test]
+fn fmt_help_prints_formatter_help() {
+    let result = run(&["fmt", "--help", "--config", "missing.json"]);
+
+    assert_eq!(result.exit_code, 0);
+    assert!(result.stdout.starts_with("Usage: intlify fmt"));
+    assert!(result.stdout.contains("--mode <standard|preserve>"));
+    assert!(!result.stdout.contains("reserved but not available"));
+    assert!(result.stderr.is_empty());
 }
 
 #[test]
@@ -165,7 +176,7 @@ fn init_help_mentions_future_config_scaffolding() {
 
 #[test]
 fn reserved_command_json_envelope_uses_stdout() {
-    let result = run(&["fmt", "--reporter", "json"]);
+    let result = run(&["lint", "--reporter", "json"]);
     let json = json_stdout(&result);
     let project_root = intlify_cli::config::discover_project_root(Path::new("."));
     let project_root = intlify_cli::config::slash_normalize_path(&project_root);
@@ -173,7 +184,7 @@ fn reserved_command_json_envelope_uses_stdout() {
     assert_eq!(result.exit_code, 2);
     assert!(result.stderr.is_empty());
     assert_eq!(json["schemaVersion"], "0");
-    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["command"], "lint");
     assert_eq!(json["version"], CLI_VERSION);
     assert_eq!(json["projectRoot"], project_root);
     assert_eq!(json["summary"]["status"], "error");
@@ -181,56 +192,47 @@ fn reserved_command_json_envelope_uses_stdout() {
     assert_eq!(json["errors"][0]["kind"], "unsupported");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
     assert_eq!(json["errors"][0]["details"]["phase"], "3A");
-    assert_eq!(json["errors"][0]["details"]["requiredPhase"], "3B");
+    assert_eq!(json["errors"][0]["details"]["requiredPhase"], "3C");
 }
 
 #[test]
 fn reserved_command_operands_do_not_change_placeholder_behavior() {
-    let result = run(&["fmt", "file.mf2", "--reporter=json"]);
+    let result = run(&["lint", "file.mf2", "--reporter=json"]);
     let json = json_stdout(&result);
 
     assert_eq!(result.exit_code, 2);
-    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["command"], "lint");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
 }
 
 #[test]
 fn reserved_command_accepts_global_options_before_and_after_command() {
-    let result = run(&["--config", "intlify.config.json", "fmt", "--reporter=json"]);
+    let result = run(&["--config", "intlify.config.json", "lint", "--reporter=json"]);
     let json = json_stdout(&result);
 
     assert_eq!(result.exit_code, 2);
-    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["command"], "lint");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
 }
 
 #[test]
 fn reporter_json_is_equivalent_before_or_after_reserved_command() {
-    let before = json_stdout(&run(&["--reporter", "json", "fmt"]));
-    let after = json_stdout(&run(&["fmt", "--reporter=json"]));
+    let before = json_stdout(&run(&["--reporter", "json", "lint"]));
+    let after = json_stdout(&run(&["lint", "--reporter=json"]));
 
-    assert_eq!(before["command"], "fmt");
-    assert_eq!(after["command"], "fmt");
+    assert_eq!(before["command"], "lint");
+    assert_eq!(after["command"], "lint");
     assert_eq!(before["errors"][0]["code"], "command_not_ready");
     assert_eq!(after["errors"][0]["code"], "command_not_ready");
 }
 
 #[test]
-fn reserved_command_help_skips_config_loading() {
-    let result = run(&["fmt", "--help", "--config", "missing.json"]);
-
-    assert_eq!(result.exit_code, 0);
-    assert!(result.stdout.starts_with("Usage: intlify fmt"));
-    assert!(result.stderr.is_empty());
-}
-
-#[test]
 fn reserved_command_does_not_load_missing_explicit_config() {
-    let result = run(&["fmt", "--config", "missing.json", "--reporter=json"]);
+    let result = run(&["lint", "--config", "missing.json", "--reporter=json"]);
     let json = json_stdout(&result);
 
     assert_eq!(result.exit_code, 2);
-    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["command"], "lint");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
     assert!(json["errors"][0].get("path").is_none());
 }
@@ -241,11 +243,11 @@ fn reserved_command_does_not_check_discovered_config_conflicts() {
     fs::write(root.join("intlify.config.json"), "{}").expect("json config should be written");
     fs::write(root.join("intlify.config.jsonc"), "{}").expect("jsonc config should be written");
 
-    let result = run_in(&["fmt", "--reporter=json"], &root);
+    let result = run_in(&["lint", "--reporter=json"], &root);
     let json = json_stdout(&result);
 
     assert_eq!(result.exit_code, 2);
-    assert_eq!(json["command"], "fmt");
+    assert_eq!(json["command"], "lint");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
     let _ = fs::remove_dir_all(root);
 }
@@ -401,7 +403,6 @@ fn unknown_positional_uses_first_token_as_command() {
 #[test]
 fn reserved_command_details_match_required_phases() {
     let cases = [
-        ("fmt", "3B", false),
         ("lint", "3C", false),
         ("check", "3B+3C", true),
         ("init", "3B+3C", true),
@@ -428,7 +429,8 @@ fn reserved_command_details_match_required_phases() {
 
 #[test]
 fn json_envelope_field_order_is_deterministic() {
-    let result = run(&["fmt", "--reporter=json"]);
+    let root = temp_project_root("fmt-field-order");
+    let result = run_in(&["fmt", "--reporter=json"], &root);
     let output = result.stdout.as_str();
 
     let keys = [
@@ -448,4 +450,5 @@ fn json_envelope_field_order_is_deterministic() {
     assert!(positions.windows(2).all(|window| window[0] < window[1]));
     assert!(output.ends_with('\n'));
     assert!(!output.contains('\n') || output.matches('\n').count() == 1);
+    let _ = fs::remove_dir_all(root);
 }

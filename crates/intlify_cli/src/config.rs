@@ -5,6 +5,7 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
+use intlify_format::FormatMode;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -15,15 +16,59 @@ const SUPPORTED_EXTENSIONS: [&str; 2] = [".json", ".jsonc"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProjectConfig {
-    pub fmt: EmptyConfig,
+    pub fmt: FormatterConfig,
     pub lint: EmptyConfig,
 }
 
 impl Default for ProjectConfig {
     fn default() -> Self {
         Self {
-            fmt: EmptyConfig {},
+            fmt: FormatterConfig::default(),
             lint: EmptyConfig {},
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FormatterConfig {
+    #[serde(default)]
+    #[schemars(description = "Formatting strategy. Defaults to standard.")]
+    pub mode: FormatterMode,
+    #[serde(default)]
+    #[schemars(description = "Project-root-relative formatter ignore patterns.")]
+    pub ignore_patterns: Vec<String>,
+}
+
+impl Default for FormatterConfig {
+    fn default() -> Self {
+        Self {
+            mode: FormatterMode::Standard,
+            ignore_patterns: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum FormatterMode {
+    #[default]
+    Standard,
+    Preserve,
+}
+
+impl FormatterMode {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Preserve => "preserve",
+        }
+    }
+
+    pub(crate) const fn to_format_mode(self) -> FormatMode {
+        match self {
+            Self::Standard => FormatMode::Standard,
+            Self::Preserve => FormatMode::Preserve,
         }
     }
 }
@@ -38,17 +83,17 @@ pub(crate) struct ProjectConfigFile {
     #[serde(rename = "$schema")]
     #[schemars(description = "Editor-facing schema metadata. Ignored by the CLI at runtime.")]
     pub(crate) schema: Option<String>,
-    #[schemars(description = "Formatter configuration. Phase 3A accepts only an empty object.")]
-    pub(crate) fmt: EmptyConfig,
-    #[schemars(description = "Linter configuration. Phase 3A accepts only an empty object.")]
-    pub(crate) lint: EmptyConfig,
+    #[schemars(description = "Formatter configuration.")]
+    pub(crate) fmt: Option<FormatterConfig>,
+    #[schemars(description = "Linter configuration. Phase 3C accepts only an empty object.")]
+    pub(crate) lint: Option<EmptyConfig>,
 }
 
 impl From<ProjectConfigFile> for ProjectConfig {
     fn from(file: ProjectConfigFile) -> Self {
         Self {
-            fmt: file.fmt,
-            lint: file.lint,
+            fmt: file.fmt.unwrap_or_default(),
+            lint: file.lint.unwrap_or_default(),
         }
     }
 }
@@ -281,14 +326,72 @@ fn validate_config_value(value: &Value, path_label: &str) -> Result<(), ConfigEr
                     return validation_error(path_label, "/$schema", "expected_string");
                 }
             }
-            "fmt" | "lint" => validate_empty_section(path_label, key, value)?,
+            "fmt" => validate_formatter_section(path_label, value)?,
+            "lint" => validate_empty_section(path_label, key, value)?,
             key => return validation_error(path_label, &json_pointer(&[key]), "unknown_field"),
         }
     }
 
-    for section in ["fmt", "lint"] {
-        if !root.contains_key(section) {
-            return validation_error(path_label, &json_pointer(&[section]), "missing_field");
+    Ok(())
+}
+
+fn validate_formatter_section(path_label: &str, value: &Value) -> Result<(), ConfigError> {
+    let Some(fields) = value.as_object() else {
+        return validation_error(path_label, "/fmt", "expected_object");
+    };
+
+    for (key, field) in fields {
+        match key.as_str() {
+            "mode" => validate_formatter_mode(path_label, field)?,
+            "ignorePatterns" => validate_formatter_ignore_patterns(path_label, field)?,
+            key => {
+                return validation_error(path_label, &json_pointer(&["fmt", key]), "unknown_field")
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_formatter_mode(path_label: &str, value: &Value) -> Result<(), ConfigError> {
+    let Some(mode) = value.as_str() else {
+        return validation_error(path_label, "/fmt/mode", "expected_string");
+    };
+
+    if matches!(mode, "standard" | "preserve") {
+        Ok(())
+    } else {
+        validation_error_with_details(
+            path_label,
+            "/fmt/mode",
+            "invalid_value",
+            json!({
+                "allowedValues": ["standard", "preserve"]
+            }),
+        )
+    }
+}
+
+fn validate_formatter_ignore_patterns(path_label: &str, value: &Value) -> Result<(), ConfigError> {
+    let Some(patterns) = value.as_array() else {
+        return validation_error(path_label, "/fmt/ignorePatterns", "expected_array");
+    };
+
+    for (index, pattern) in patterns.iter().enumerate() {
+        let pointer = format!("/fmt/ignorePatterns/{index}");
+        let Some(pattern) = pattern.as_str() else {
+            return validation_error(path_label, &pointer, "expected_string");
+        };
+        if let Err(reason) = validate_formatter_ignore_pattern(pattern) {
+            return validation_error_with_details(
+                path_label,
+                &pointer,
+                "invalid_ignore_pattern",
+                json!({
+                    "pattern": pattern,
+                    "patternReason": reason
+                }),
+            );
         }
     }
 
@@ -316,15 +419,57 @@ fn validation_error<T>(
     pointer: &str,
     reason: &'static str,
 ) -> Result<T, ConfigError> {
+    validation_error_with_details(path_label, pointer, reason, Value::Null)
+}
+
+fn validation_error_with_details<T>(
+    path_label: &str,
+    pointer: &str,
+    reason: &'static str,
+    extra: Value,
+) -> Result<T, ConfigError> {
+    let mut details = serde_json::Map::new();
+    details.insert("pointer".to_owned(), json!(pointer));
+    details.insert("reason".to_owned(), json!(reason));
+    if let Value::Object(extra) = extra {
+        for (key, value) in extra {
+            details.insert(key, value);
+        }
+    }
+
     Err(ConfigError::new(
         "config_validation_failed",
         format!("Config file is not valid: {path_label}"),
         Some(path_label.to_owned()),
-        Some(json!({
-            "pointer": pointer,
-            "reason": reason
-        })),
+        Some(Value::Object(details)),
     ))
+}
+
+pub(crate) fn validate_formatter_ignore_pattern(pattern: &str) -> Result<(), &'static str> {
+    let Some(pattern) = normalize_ignore_pattern(pattern) else {
+        return Ok(());
+    };
+
+    let body = pattern.strip_prefix('!').unwrap_or(pattern);
+    if body.is_empty() {
+        return Err("empty_negation");
+    }
+
+    let body = body.strip_prefix('/').unwrap_or(body);
+    let body = body.strip_suffix('/').unwrap_or(body);
+    if body.is_empty() {
+        return Err("empty_pattern");
+    }
+
+    glob::Pattern::new(body).map_err(|_| "invalid_glob")?;
+    Ok(())
+}
+
+pub(crate) fn normalize_ignore_pattern(pattern: &str) -> Option<&str> {
+    if pattern.trim().is_empty() || pattern.starts_with('#') {
+        return None;
+    }
+    Some(pattern)
 }
 
 fn json_pointer(parts: &[&str]) -> String {
