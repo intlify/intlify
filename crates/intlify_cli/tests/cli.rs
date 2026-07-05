@@ -2,37 +2,15 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::Path;
 
 use serde_json::Value;
 
+mod common;
+
+use common::{json_stdout, run, run_in, temp_project_root};
+
 const CLI_VERSION: &str = intlify_cli::version::VERSION;
-
-fn run(args: &[&str]) -> intlify_cli::CliRunResult {
-    run_in(args, Path::new("."))
-}
-
-fn run_in(args: &[&str], cwd: &Path) -> intlify_cli::CliRunResult {
-    intlify_cli::run(args.iter().copied(), cwd)
-}
-
-fn json_stdout(result: &intlify_cli::CliRunResult) -> Value {
-    serde_json::from_str(result.stdout.trim_end()).expect("stdout should be JSON")
-}
-
-fn temp_project_root(name: &str) -> PathBuf {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock should be after unix epoch")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!(
-        "intlify-cli-{name}-{}-{unique}",
-        std::process::id()
-    ));
-    fs::create_dir_all(root.join(".git")).expect("temp project git marker should be created");
-    root
-}
 
 #[test]
 fn manifest_declares_cli_crate_contract() {
@@ -161,6 +139,7 @@ fn fmt_help_prints_formatter_help() {
     assert_eq!(result.exit_code, 0);
     assert!(result.stdout.starts_with("Usage: intlify fmt"));
     assert!(result.stdout.contains("--mode <standard|preserve>"));
+    assert!(result.stdout.contains("--config <path>"));
     assert!(!result.stdout.contains("reserved but not available"));
     assert!(result.stderr.is_empty());
 }
@@ -249,7 +228,6 @@ fn reserved_command_does_not_check_discovered_config_conflicts() {
     assert_eq!(result.exit_code, 2);
     assert_eq!(json["command"], "lint");
     assert_eq!(json["errors"][0]["code"], "command_not_ready");
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -450,5 +428,4 @@ fn json_envelope_field_order_is_deterministic() {
     assert!(positions.windows(2).all(|window| window[0] < window[1]));
     assert!(output.ends_with('\n'));
     assert!(!output.contains('\n') || output.matches('\n').count() == 1);
-    let _ = fs::remove_dir_all(root);
 }

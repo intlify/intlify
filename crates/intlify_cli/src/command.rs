@@ -55,6 +55,7 @@ pub(crate) fn fmt_help() -> String {
         "      --list-different           Print paths that would be formatted.\n",
         "      --stdin-filepath <path>    Format stdin as the given virtual path.\n",
         "      --ignore-path <path>       Read additional ignore patterns.\n",
+        "      --config <path>            Use an explicit project config path.\n",
         "      --reporter <text|json>     Select the output reporter.\n",
         "  -h, --help                     Show help.\n",
         "  -V, --version                  Show version.\n"

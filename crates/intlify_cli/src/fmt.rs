@@ -845,6 +845,10 @@ fn collect_directory(
     targets: &mut BTreeMap<String, Target>,
     errors: &mut Vec<OperationalError>,
 ) {
+    if dir != project_root && should_skip_discovered_dir_path(project_root, dir, ignore_matcher) {
+        return;
+    }
+
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(error) => {
@@ -862,7 +866,6 @@ fn collect_directory(
             }
         };
         let path = entry.path();
-        let file_name = entry.file_name().to_string_lossy().into_owned();
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(error) => {
@@ -872,7 +875,7 @@ fn collect_directory(
         };
 
         if file_type.is_symlink() {
-            if !is_hidden_name(&file_name)
+            if !should_skip_discovered_file_path(project_root, &path, ignore_matcher)
                 && is_supported_mf2_path(&path)
                 && fs::metadata(&path).is_ok_and(|metadata| metadata.is_file())
             {
@@ -882,11 +885,13 @@ fn collect_directory(
         }
 
         if file_type.is_dir() {
-            if should_skip_discovered_dir(&file_name) {
+            if should_skip_discovered_dir_path(project_root, &path, ignore_matcher) {
                 continue;
             }
             collect_directory(project_root, &path, ignore_matcher, targets, errors);
-        } else if file_type.is_file() && !is_hidden_name(&file_name) && is_supported_mf2_path(&path)
+        } else if file_type.is_file()
+            && !should_skip_discovered_file_path(project_root, &path, ignore_matcher)
+            && is_supported_mf2_path(&path)
         {
             add_target(project_root, &path, ignore_matcher, targets);
         }
@@ -914,12 +919,15 @@ fn discover_glob(
         let path = match entry {
             Ok(path) => path,
             Err(error) => {
+                if should_skip_discovered_file_path(project_root, error.path(), ignore_matcher) {
+                    continue;
+                }
                 let label = display_path(project_root, error.path());
                 errors.push(input_read_error(&label, error.error()));
                 continue;
             }
         };
-        if should_skip_discovered_path(project_root, &path) {
+        if should_skip_discovered_file_path(project_root, &path, ignore_matcher) {
             continue;
         }
         if fs::metadata(&path).is_ok_and(|metadata| metadata.is_file())
@@ -1081,6 +1089,8 @@ impl FramedSource {
 
 fn framed_output(code: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(code.len() + 1);
+    // Per CLI file framing, a leading UTF-8 BOM is removed at read time and
+    // intentionally not emitted again; only one final LF is reconstructed.
     output.extend_from_slice(code.as_bytes());
     output.push(b'\n');
     output
@@ -1141,12 +1151,21 @@ impl IgnoreMatcher {
         }
         ignored
     }
+
+    fn is_ignored_for_directory_prune(&self, path_label: &str) -> bool {
+        self.is_ignored(path_label)
+            && !self
+                .rules
+                .iter()
+                .any(|rule| rule.negated && rule.may_match_descendant_of(path_label))
+    }
 }
 
 #[derive(Debug, Clone)]
 struct IgnoreRule {
     negated: bool,
     directory_only: bool,
+    pattern_sources: Vec<String>,
     patterns: Vec<Pattern>,
 }
 
@@ -1189,13 +1208,14 @@ impl IgnoreRule {
         }
 
         let patterns = pattern_sources
-            .into_iter()
-            .map(|pattern| Pattern::new(&pattern).map_err(|_| "invalid_glob"))
+            .iter()
+            .map(|pattern| Pattern::new(pattern).map_err(|_| "invalid_glob"))
             .collect::<Result<Vec<_>, _>>();
 
         Some(patterns.map(|patterns| Self {
             negated,
             directory_only,
+            pattern_sources,
             patterns,
         }))
     }
@@ -1214,6 +1234,21 @@ impl IgnoreRule {
         self.patterns
             .iter()
             .any(|pattern| pattern.matches_with(path, options))
+    }
+
+    fn may_match_descendant_of(&self, dir_label: &str) -> bool {
+        let dir = dir_label.trim_matches('/');
+        if dir.is_empty() {
+            return true;
+        }
+
+        let dir_prefix = format!("{dir}/");
+        self.pattern_sources.iter().any(|source| {
+            source.starts_with("**/")
+                || has_glob_meta(source)
+                || source == dir
+                || source.starts_with(&dir_prefix)
+        })
     }
 }
 
@@ -1692,8 +1727,25 @@ fn should_skip_discovered_dir(name: &str) -> bool {
     is_hidden_name(name) || DEFAULT_EXCLUDED_DIRS.contains(&name)
 }
 
-fn should_skip_discovered_path(project_root: &Path, path: &Path) -> bool {
+fn should_skip_discovered_file_path(
+    project_root: &Path,
+    path: &Path,
+    ignore_matcher: &IgnoreMatcher,
+) -> bool {
     let label = display_path(project_root, path);
+    should_skip_discovered_label(&label) || ignore_matcher.is_ignored(&label)
+}
+
+fn should_skip_discovered_dir_path(
+    project_root: &Path,
+    path: &Path,
+    ignore_matcher: &IgnoreMatcher,
+) -> bool {
+    let label = display_path(project_root, path);
+    should_skip_discovered_label(&label) || ignore_matcher.is_ignored_for_directory_prune(&label)
+}
+
+fn should_skip_discovered_label(label: &str) -> bool {
     label
         .split('/')
         .any(|part| should_skip_discovered_dir(part) || is_hidden_name(part))

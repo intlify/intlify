@@ -2,45 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde_json::Value;
+mod common;
 
-fn run(args: &[&str], cwd: &Path) -> intlify_cli::CliRunResult {
-    intlify_cli::run(args.iter().copied(), cwd)
-}
-
-fn run_stdin(args: &[&str], cwd: &Path, stdin: &str) -> intlify_cli::CliRunResult {
-    intlify_cli::run_with_stdin(args.iter().copied(), cwd, stdin.as_bytes())
-}
-
-fn json_stdout(result: &intlify_cli::CliRunResult) -> Value {
-    serde_json::from_str(result.stdout.trim_end()).expect("stdout should be JSON")
-}
-
-fn temp_project_root(name: &str) -> PathBuf {
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock should be after unix epoch")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!(
-        "intlify-fmt-{name}-{}-{unique}",
-        std::process::id()
-    ));
-    fs::create_dir_all(root.join(".git")).expect("temp project git marker should be created");
-    root
-}
-
-fn write(path: &Path, source: &str) {
-    fs::create_dir_all(path.parent().expect("fixture parent"))
-        .expect("fixture parent should be created");
-    fs::write(path, source).expect("fixture should be written");
-}
-
-fn read(path: &Path) -> String {
-    fs::read_to_string(path).expect("fixture should be readable")
-}
+use common::{json_stdout, read, run_in as run, run_stdin, temp_project_root, write};
 
 fn unformatted_message() -> &'static str {
     ".input   {$count   :number}\n{{Value {$count   :number}}}"
@@ -67,7 +32,6 @@ fn write_mode_formats_files_in_place() {
     assert_eq!(unchanged.exit_code, 0);
     assert!(unchanged.stdout.is_empty());
     assert!(unchanged.stderr.is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -86,7 +50,6 @@ fn check_and_list_different_report_paths_without_writing() {
     assert_eq!(list.exit_code, 1);
     assert_eq!(list.stdout, "messages/count.mf2\n");
     assert!(list.stderr.is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -110,7 +73,6 @@ fn stdin_formatting_and_check_use_virtual_path() {
     assert_eq!(check.exit_code, 1);
     assert_eq!(check.stdout, "virtual/count.mf2\n");
     assert!(check.stderr.is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -135,7 +97,6 @@ fn json_reporter_reports_check_differences() {
     assert_eq!(json["results"][0]["path"], "messages/count.mf2");
     assert_eq!(json["results"][0]["status"], "would_format");
     assert_eq!(json["results"][0]["changed"], true);
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -167,7 +128,6 @@ fn mode_config_and_cli_precedence_are_reported() {
     );
     let cli_json = json_stdout(&cli_mode);
     assert_eq!(cli_json["summary"]["mode"], "standard");
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -185,7 +145,6 @@ fn parser_diagnostics_are_file_results() {
     assert_eq!(json["results"][0]["status"], "diagnostic");
     assert_eq!(json["results"][0]["changed"], false);
     assert!(json["errors"].as_array().expect("errors").is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -206,7 +165,6 @@ fn mixed_operational_errors_continue_processing_valid_targets() {
     assert_eq!(json["results"][0]["path"], "valid.mf2");
     assert_eq!(json["results"][0]["status"], "formatted");
     assert_eq!(read(&valid), formatted_message_with_lf());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -228,7 +186,6 @@ fn discovery_excludes_hidden_and_output_dirs_but_accepts_explicit_hidden_file() 
     assert_eq!(explicit_hidden.exit_code, 0);
     assert_eq!(explicit_hidden.stdout, ".hidden.mf2\n");
     assert_eq!(read(&root.join(".hidden.mf2")), formatted_message_with_lf());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -242,7 +199,6 @@ fn end_of_options_treats_dash_prefixed_paths_as_operands() {
     assert_eq!(result.exit_code, 0);
     assert_eq!(result.stdout, "--dash.mf2\n");
     assert_eq!(read(&file), formatted_message_with_lf());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -271,7 +227,6 @@ fn unsupported_unmatched_and_no_target_globs_are_distinct() {
         .as_array()
         .expect("errors")
         .is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -304,7 +259,28 @@ fn ignore_sources_apply_in_precedence_order() {
         read(&root.join("ignored/skip.mf2")),
         formatted_message_with_lf()
     );
-    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn ignored_directories_are_pruned_before_reading_entries() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = temp_project_root("ignore-prune");
+    let ignored = root.join("ignored");
+    fs::create_dir_all(&ignored).expect("ignored directory should be created");
+    fs::set_permissions(&ignored, fs::Permissions::from_mode(0o000))
+        .expect("ignored directory permissions should be restricted");
+    write(&root.join(".gitignore"), "ignored/\n");
+
+    let result = run(&["fmt", ".", "--reporter=json"], &root);
+
+    fs::set_permissions(&ignored, fs::Permissions::from_mode(0o700))
+        .expect("ignored directory permissions should be restored");
+    let json = json_stdout(&result);
+    assert_eq!(result.exit_code, 0);
+    assert_eq!(json["summary"]["matchedFiles"], 0);
+    assert!(json["errors"].as_array().expect("errors").is_empty());
 }
 
 #[test]
@@ -340,7 +316,6 @@ fn stdin_ignore_uses_passthrough_or_zero_target_json() {
     assert_eq!(output["summary"]["operation"], "stdin-check");
     assert_eq!(output["summary"]["matchedFiles"], 0);
     assert!(output["results"].as_array().expect("results").is_empty());
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -380,7 +355,6 @@ fn ignore_path_setup_errors_are_operational_errors() {
         invalid_json["errors"][0]["details"]["source"],
         "ignore-path"
     );
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -397,7 +371,6 @@ fn file_framing_removes_bom_and_normalizes_final_lf() {
         fs::read(&file).expect("fixture should be readable"),
         b"Hello {$name}\n"
     );
-    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -417,5 +390,4 @@ fn invalid_cli_combinations_are_json_reported() {
     assert_eq!(mode.exit_code, 2);
     assert_eq!(mode_json["errors"][0]["code"], "invalid_cli_argument");
     assert_eq!(mode_json["errors"][0]["details"]["option"], "--mode");
-    let _ = fs::remove_dir_all(root);
 }
