@@ -71,7 +71,7 @@ enum ReferenceKind {
     Selector,
     MessageBody,
     FunctionOption,
-    MarkupAttribute,
+    MarkupOption,
 }
 ```
 
@@ -86,11 +86,11 @@ enum OptionOwnerKind {
 
 Function options and markup options are both collected into the semantic fact surface. Owner-local option checks compare only options with the same owner id and owner kind. Function and markup owners are never compared with each other, and different markup placeholders are never compared with each other. Open, close, and standalone markup placeholders are separate owners.
 
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`.
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isLocalDependency = true`. Attributes do not produce variable references in the current MF2 grammar because attribute values are literals only.
 
 The parser should expose shared semantic helpers for facts that multiple consumers need:
 
-- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds.
+- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds.
 - `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and local dependency references used by that selector setup.
 
 These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design.
@@ -282,6 +282,8 @@ one {{One item}}
 * {{Items}}
 ```
 
+The primary span is the `.match` selector variable occurrence. If the selector is declared but the resolved declaration chain has no function annotation, labels may point to the relevant declaration or chain entries. If the selector variable is undeclared, the selector occurrence remains the primary span and labels are optional. If an invalid dependency chain makes annotation resolution unreliable, the dependent `missing-selector-annotation` is suppressed as described in the cascade policy.
+
 ### variant-key-arity-mismatch
 
 Reports a matcher variant whose key count does not match the selector count. The parser accepts arbitrary key counts syntactically, so this is a semantic diagnostic. The primary span is the offending variant's key list, with a label on the selector list.
@@ -297,6 +299,8 @@ male {{He has items.}}
 one few {{Items}}
 * {{Fallback}}
 ```
+
+The primary span is the variant key list: from the first key start to the last key end. This applies to both extra-key and missing-key cases. If a recovered CST cannot provide a key-list span, semantic validation falls back to the variant span, and then to an empty current-offset span only as a last resort. The selector list may be used as a label to show the expected key count.
 
 ### missing-fallback-variant
 

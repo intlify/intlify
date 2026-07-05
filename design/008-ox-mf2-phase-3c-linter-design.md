@@ -95,7 +95,7 @@ The message-level workflow is:
 3. Run parser-owned semantic validation over `SemanticModel`.
 4. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
 5. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
-6. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a diagnostic sink.
+6. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a `RuleReport` sink.
 7. Execute each enabled built-in rule by calling `LintRule::check(ctx)` in registry declaration order.
 8. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
 9. Shape the result for the Rust API, bindings, or CLI reporter.
@@ -223,7 +223,7 @@ No initial rule accepts options, so rule option schemas are an empty surface in 
 
 ## Rule Implementation Model
 
-Configurable lint rules are implemented as built-in Rust rules inside `crates/intlify_lint`. Phase 3C does not expose an ESLint-compatible custom-rule API, a JavaScript plugin API, or a stable Rust plugin API. The internal design is intentionally inspired by ESLint and oxlint: every rule receives a context object that exposes source text, semantic information, resolved rule configuration, and a diagnostic sink, but the compatibility surface is the rule ids, config schema, and lint result shape, not the Rust trait itself.
+Configurable lint rules are implemented as built-in Rust rules inside `crates/intlify_lint`. Phase 3C does not expose an ESLint-compatible custom-rule API, a JavaScript plugin API, or a stable Rust plugin API. The internal design is intentionally inspired by ESLint and oxlint: every rule receives a context object that exposes source text, semantic information, resolved rule configuration, and a `RuleReport` sink, but the compatibility surface is the rule ids, config schema, and lint result shape, not the Rust trait itself.
 
 The internal rule interface is model-level first:
 
@@ -261,7 +261,7 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 
 From the linter consumer view, the initial rules need these parser-owned fact groups: declarations, resolved and unresolved references, selector references, message-body references, option occurrences with function or markup owner kind, attribute occurrences, matcher variants, and the shared `output_references()` / `selection_references()` helpers. The detailed reference taxonomy, dependency context, and helper ownership live in the parser semantic validation design; this document only defines how the linter consumes those facts.
 
-`no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
+`no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup option values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
 
 Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, optional labels, and optional typed message arguments. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
 
@@ -398,6 +398,8 @@ Invalid examples:
 
 The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
 
+`intlify lint` validates the shared project config as a whole. Invalid `fmt` configuration in the same file still produces `config_validation_failed` during a lint command, and invalid `lint` configuration likewise fails formatter commands. Command-specific CLI overrides are applied only for the active command after the shared config has validated. When no config file is discovered and no explicit `--config` is provided, the implicit default project config is used.
+
 CLI config validation reports the first deterministic `config_validation_failed` error. Validation order is:
 
 1. top-level config shape: root must be an object, then unknown top-level fields in ASCII ascending order
@@ -409,6 +411,18 @@ CLI config validation reports the first deterministic `config_validation_failed`
 Object-map validation uses ASCII ascending order. Array validation uses source order. This keeps validation independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
 
 Invalid `lint.ignorePatterns` entries use `config_validation_failed` with JSON pointers such as `/lint/ignorePatterns/0`, including non-string entries, invalid pattern syntax, and unsupported constructs. Unsupported or unrecognized patterns in the root `.gitignore` are ignored as non-fatal compatibility behavior. Invalid patterns in `--ignore-path` files remain operational errors and use `invalid_ignore_pattern`, matching the shared formatter contract.
+
+Lint config validation failures use stable `details`:
+
+```json
+{
+  "reason": "unknown_rule",
+  "pointer": "/lint/rules/no-such-rule",
+  "ruleId": "no-such-rule"
+}
+```
+
+`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. `details.field` is included for unknown fields, `details.ruleId` for rule failures, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -661,7 +675,7 @@ Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
 Reports a declared variable that is not reachable from the message output or selector set. The rule applies to both `.input` and `.local` declarations in the recommended preset: an unreachable declaration has no runtime effect in MF2, so both kinds are treated as dead code and reported as `warn` by default. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
 
-Reachability starts from `SemanticModel::output_references()` and `SemanticModel::selection_references()`, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds. Selection references include selector variables and dependencies used by selector declaration chains, including function annotations and selector annotation option values. References inside function option values and markup attribute values are considered used when their owner expression or markup is reachable from the message body or selector setup. A declaration referenced only by another unreachable declaration is still unused.
+Reachability starts from `SemanticModel::output_references()` and `SemanticModel::selection_references()`, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds. Selection references include selector variables and dependencies used by selector declaration chains, including function annotations and selector annotation option values. References inside function option values and markup option values are considered used when their owner expression or markup is reachable from the message body or selector setup. A declaration referenced only by another unreachable declaration is still unused.
 
 ```mf2
 .input {$count :number}
@@ -724,11 +738,11 @@ Reports a variable reference that cannot be resolved to a visible `.input` or `.
 {{You have {$total} items.}}
 ```
 
-References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers every unresolved non-selector variable reference exposed by `SemanticModel`, including `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup attribute values, and future non-selector reference kinds promoted into the semantic model. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
+References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers every unresolved non-selector variable reference exposed by `SemanticModel`, including `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into the semantic model. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
 
 Simple messages with no declarations reference external inputs by design; teams that enable this rule accept that such messages must move to `.input` declarations.
 
-Only the selector variable occurrence itself is excluded. Nested references inside selector declarations, function option values, or markup attribute values remain normal non-selector references and are reported by this rule when unresolved:
+Only the selector variable occurrence itself is excluded. Nested references inside selector declarations, function option values, or markup option values remain normal non-selector references and are reported by this rule when unresolved:
 
 ```mf2
 .input {$count :number minimumFractionDigits=$digits}
