@@ -100,7 +100,7 @@ The message-level workflow is:
 8. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
 9. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a `RuleReport` sink.
 10. Execute each enabled built-in rule by calling `LintRule::check(ctx) -> Result<(), LintRuleInvariantError>` in registry declaration order.
-11. If a rule returns `Err(LintRuleInvariantError)`, return an `internal_error` operational error with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`.
+11. If a rule returns `Err(LintRuleInvariantError)`, discard any partial rule diagnostics for that lint target and return a target-level `internal_error` operational error with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`.
 12. Normalize emitted rule diagnostics into deterministic report order: primary span start, primary span end, JSON-visible rule id in ASCII ascending order, and the stable occurrence key carried by the `RuleReport` for exact ties.
 13. Shape the result for the Rust API, bindings, or CLI reporter.
 
@@ -200,7 +200,7 @@ Operational errors:
 
 Operational errors use the Phase 3A operational error shape `{ kind, code, message, path?, details? }` and the shared string code namespace. The CLI exit code classification follows Phase 3A: `0` success, `1` lint failure (any `error` diagnostic, or warnings over `--max-warnings`), `2` operational error, with `2 > 1 > 0` priority for mixed outcomes. JSON output uses the Phase 3A top-level envelope, including its top-level `errors` array for global operational errors and `results[].errors` for file-specific operational errors.
 
-Semantic invariant failures use `internal_error` with `details.reason: "semantic_invariant_failed"` and a `details.stage` of `"semantic_model_construction"` or `"semantic_validation"`. Built-in rule invariant failures use `internal_error` with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. These details are debugging aids for implementation failures; they are not user-facing diagnostics and are not configurable through `lint.rules`.
+Semantic invariant failures use `internal_error` with `details.reason: "semantic_invariant_failed"` and a `details.stage` of `"semantic_model_construction"` or `"semantic_validation"`. Built-in rule invariant failures use `internal_error` with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. Rule invariant failures are target-level operational errors: any diagnostics already emitted by earlier rules for that target are discarded because the target's lint result is incomplete, while other targets in the same CLI run may still finish normally. These details are debugging aids for implementation failures; they are not user-facing diagnostics and are not configurable through `lint.rules`.
 
 ## Stable Identifiers
 
@@ -274,7 +274,7 @@ From the linter consumer view, the initial rules need these parser-owned fact gr
 
 `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup option values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
 
-Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, optional labels, and optional typed message arguments. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
+Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, stable occurrence key, optional labels, and optional typed message arguments. The occurrence key is required on every report and is derived from the `SemanticModel` fact that caused the report, such as declaration order, reference source order, owner primary source order plus owner-local occurrence order, or matcher variant order. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -307,12 +307,12 @@ Future syntax-heavy rules may add internal visitor hooks such as `check_declarat
 Rule configuration uses an ESLint/oxlint-style state:
 
 - `off`: disable a configurable rule
-- `warn`: report configurable rule diagnostics as warnings
+- `warn`: report configurable rule diagnostics as warning diagnostics
 - `error`: report configurable rule diagnostics as errors
 
 `off` is not an emitted severity.
 
-Parser and semantic diagnostics are independent from rule configuration and are emitted as `error`. Future compatibility, deprecation, or best-practice diagnostics may use `warning`.
+Parser and semantic diagnostics are independent from rule configuration and are emitted as `error`. Future compatibility, deprecation, or best-practice diagnostics may use `"warn"` severity.
 
 In prose, "warning" refers to diagnostics whose JSON `severity` is `"warn"`.
 
@@ -498,7 +498,7 @@ The flag surface intentionally mirrors oxlint's basic flags plus the oxfmt-style
 Flag semantics:
 
 - `--max-warnings <n>`: the CLI exits with `1` when the total warning count exceeds `n`, even when no `error` diagnostics are reported. The default is unlimited. `n` must be ASCII decimal digits only and parse as a `u32`; leading zeros are accepted. Empty strings, signs, whitespace, decimal points, exponent notation, non-ASCII digits, and values greater than `u32::MAX` are `invalid_cli_argument` errors with `details.option: "--max-warnings"`, `details.value`, and `details.reason: "invalid_non_negative_integer"`.
-- `--quiet`: `warning` diagnostics are not reported in text or JSON output, matching ESLint and oxlint behavior. Exit code behavior does not change: `--max-warnings` still counts suppressed warnings. `results[].status` and all summary counts are computed from the full diagnostic set; `--quiet` filters only the reported `diagnostics` arrays.
+- `--quiet`: warning diagnostics are not reported in text or JSON output, matching ESLint and oxlint behavior. Exit code behavior does not change: `--max-warnings` still counts suppressed warnings. `results[].status` and all summary counts are computed from the full diagnostic set; `--quiet` filters only the reported `diagnostics` arrays.
 - `--stdin-filepath <path>`: explicit stdin mode with the same semantics as `intlify fmt`: reads all source text from stdin, applies read framing, uses `<path>` as the virtual input path for extension checks, ignore rules, and output, and cannot be combined with file, directory, or glob operands.
 - `--ignore-path <path>`: same resolution and pattern rules as `intlify fmt`.
 - `--reporter <text|json>`: Phase 3A reporter selection.
@@ -589,14 +589,14 @@ When any file-specific operational error is present, the process exit code is `2
 - `operation`: `"lint"` or `"stdin"`
 - `matchedFiles`: final selected lint targets
 - `cleanFiles`: targets with `status: "clean"`
-- `problemFiles`: targets with `status: "problems"`
+- `problemFiles`: targets with `status: "problems"`, including targets whose only diagnostics are warnings hidden by `--quiet`
 - `diagnosticErrorCount`: total `error`-severity diagnostics across all targets
-- `diagnosticWarningCount`: total `warning`-severity diagnostics across all targets, including warnings hidden by `--quiet`
+- `diagnosticWarningCount`: total diagnostics whose severity is `"warn"` across all targets, including warnings hidden by `--quiet`
 - `errorCount`: operational errors, counting top-level `errors` plus all `results[].errors`, matching the Phase 3A meaning of `errorCount`
 
 Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 
-When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status` and summary counts still use the full diagnostic set. In other words, `results[].status` is computed from the full diagnostic set, while `results[].diagnostics` contains only the reporter-visible diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
+When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status`, `problemFiles`, and summary counts still use the full diagnostic set. In other words, `results[].status` is computed from the full diagnostic set, while `results[].diagnostics` contains only the reporter-visible diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
 
 ```json
 {

@@ -49,7 +49,7 @@ fn semantic_model_from_parse_result(
 ) -> Result<SemanticModel, SemanticInvariantError>
 ```
 
-Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. If parser diagnostics are empty and construction still returns `Err`, the downstream host boundary converts that error to `internal_error`. The Rust API should avoid panic for recoverable host boundaries.
+Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. Downstream host boundaries convert this misuse to `internal_error` with `details.reason: "semantic_api_misuse"` rather than panicking, because CLI, N-API, and WASM callers should receive structured operational errors for implementation bugs. If parser diagnostics are empty and construction still returns `Err`, the downstream host boundary converts that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
 
 ## SemanticModel Fact Surface
 
@@ -71,11 +71,11 @@ SemanticModel fact iterators have stable semantic order, not implementation coll
 - references: source order
 - selector references: `.match` selector order
 - message body references: source order
-- option occurrences: owner id order, then owner-local occurrence order
-- attribute occurrences: owner id order, then owner-local occurrence order
-- matcher variants: matcher owner order, then variant order
+- option occurrences: owner primary span source order, then owner-local occurrence order
+- attribute occurrences: owner primary span source order, then owner-local occurrence order
+- matcher variants: matcher owner primary span source order, then variant order
 
-These orders are part of the consumer contract because semantic diagnostics and lint rules use them as final tie-breakers for otherwise identical spans and codes. The exact id types are implementation details, but ids used for owner order and occurrence order must be deterministic for a given source message.
+These orders are part of the consumer contract because semantic diagnostics and lint rules use them as final tie-breakers for otherwise identical spans and codes. The exact id types are implementation details. Implementations may assign owner ids in source order, but the public ordering contract is owner primary span source order, not raw id allocation order.
 
 The initial reference kind taxonomy is:
 
