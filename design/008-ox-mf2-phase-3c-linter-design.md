@@ -262,6 +262,20 @@ The initial `SemanticModel` fact surface required by configurable rules includes
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
 
+The initial reference kind taxonomy is:
+
+```rust
+enum ReferenceKind {
+    LocalRhs,
+    Selector,
+    MessageBody,
+    FunctionOption,
+    MarkupAttribute,
+}
+```
+
+`LocalRhs` covers references inside `.local` right-hand-side expressions. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values. `no-unused-declaration` uses `Selector` and `MessageBody` as reachability roots and follows `LocalRhs` dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
+
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
 The initial rule interface is not an ESLint-style CST visitor map. Rules do not register callbacks such as `VariableExpression(node)` or `Markup(node)`, and the linter does not dispatch every CST node to every rule. A rule owns its own check over `SemanticModel` and may use `CstView` only for the syntax relationships it needs.
@@ -271,14 +285,18 @@ For example, `no-unused-declaration` is expected to run as a model-level rule:
 ```rust
 impl LintRule for NoUnusedDeclaration {
     fn check(&self, ctx: &mut RuleContext<'_>) {
+        let reachable = ctx.semantic.reachable_declarations_from_outputs();
+
         for declaration in ctx.semantic.declarations() {
-            if !ctx.semantic.is_referenced(declaration.id) {
+            if !reachable.contains(declaration.id) {
                 ctx.report("no-unused-declaration", declaration.name_span);
             }
         }
     }
 }
 ```
+
+`reachable_declarations_from_outputs` is conceptual pseudocode: it starts from message body and selector references, then walks `.local` right-hand-side dependencies to mark declarations that can affect message output or selection.
 
 Future syntax-heavy rules may add internal visitor hooks such as `check_declaration`, `check_expression`, or `check_markup`, but those hooks remain an implementation detail. Adding them does not create a public plugin system or an ESLint-compatible rule API.
 
@@ -436,7 +454,9 @@ When no operands are provided and stdin mode is not selected, `intlify lint` beh
 
 Human-readable output renders oxlint-style diagnostic blocks and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter. Exact wording, box drawing, and color styling are not fixture-locked contracts.
 
-Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^` or `~`. Labels may be rendered as additional underline messages when practical. Multi-line spans may initially render the primary start line and surrounding context only. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form. Text reporter line and column are human-facing; JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^` or `~`. Labels may be rendered as additional underline messages when practical. Multi-line spans may initially render the primary start line and surrounding context only. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+
+Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
 
 ```text
 messages/foo.mf2:2:8 error duplicate-declaration variable $count is already declared
@@ -484,6 +504,30 @@ Each `results[]` entry uses this shape:
 
 Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 
+When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status` and summary counts still use the full diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
+
+```json
+{
+  "results": [
+    {
+      "path": "messages/foo.mf2",
+      "status": "problems",
+      "diagnostics": [],
+      "errors": []
+    }
+  ],
+  "summary": {
+    "status": "success",
+    "matchedFiles": 1,
+    "cleanFiles": 0,
+    "problemFiles": 1,
+    "diagnosticErrorCount": 0,
+    "diagnosticWarningCount": 1,
+    "errorCount": 0
+  }
+}
+```
+
 Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), and concurrency controls such as `--threads`.
 
 ## Programmatic API Shape
@@ -519,7 +563,7 @@ Binding option validation returns the first validation failure as `invalid_optio
 }
 ```
 
-`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. `details.ruleId` is required for rule-specific failures. `details.value` is included only when the invalid value is JSON-safe. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
+`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only when the invalid value is JSON-safe. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
 
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
@@ -574,6 +618,34 @@ Reports a selector variable that does not directly or indirectly (through `.loca
 
 ```mf2
 .input {$count}
+.match $count
+one {{One item}}
+* {{Items}}
+```
+
+Selector annotations can be reached indirectly through `.local` chains:
+
+```mf2
+.input {$count :number}
+.local $selector = {$count}
+.match $selector
+one {{One item}}
+* {{Items}}
+```
+
+If the chain reaches an unannotated declaration, the selector still reports `missing-selector-annotation`:
+
+```mf2
+.input {$count}
+.local $selector = {$count}
+.match $selector
+one {{One item}}
+* {{Items}}
+```
+
+If the selector variable is undeclared, this diagnostic is still emitted independently from the `no-undeclared-variable` rule state:
+
+```mf2
 .match $count
 one {{One item}}
 * {{Items}}
