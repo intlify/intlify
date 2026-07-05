@@ -15,6 +15,8 @@ test('package metadata describes the formatter WASM package', async () => {
   expect(packageJson.name).toBe('@intlify/format-wasm')
   expect(packageJson.files).toEqual(['README.md', 'dist'])
   expect(packageJson.publishConfig.access).toBe('public')
+  expect(packageJson.scripts.build).toContain('ox-mf2-shared#build')
+  expect(packageJson.scripts.test).toContain('ox-mf2-shared#build')
   expect(packageJson.scripts['build:wasm']).toContain('../../scripts/build-wasm-package.mjs')
   expect(packageJson.scripts['build:wasm']).toContain('../../crates/intlify_format_wasm')
   expect(packageJson.scripts['build:wasm']).toContain('--out-name intlify_format_wasm')
