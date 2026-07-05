@@ -76,7 +76,7 @@ Parser diagnostics are always included in lint results. If any parser diagnostic
 
 Core semantic diagnostics, when produced by semantic analysis, are included after successful parsing. If semantic analysis produces any semantic diagnostic, configurable lint rules do not run.
 
-Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The seven core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
+Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The seven core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) is the canonical parser-owned contract for semantic validation. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
 
 Configurable rules only run when parsing and semantic analysis complete without diagnostics.
 
@@ -150,7 +150,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 
 - `category` is `"parser"`, `"semantic"`, or `"lint"`.
 - `code` is a single field across all categories. Parser diagnostics, semantic diagnostics, and lint rule diagnostics all use JSON-visible kebab-case stable strings. Rust enum names such as `MissingRequiredWhitespace` are internal; lint JSON emits `"missing-required-whitespace"`. There is no separate `ruleId` field.
-- JSON-visible diagnostic codes share one global namespace across parser, semantic, and lint categories. Category is classification metadata, not a namespace escape hatch. Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids must not collide; registry or test coverage should fail new code additions that reuse an existing JSON-visible code.
+- JSON-visible diagnostic codes share one global namespace across parser, semantic, and lint categories. Category is classification metadata, not a namespace escape hatch. Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids must not collide. The parser crate exposes parser and semantic diagnostic code catalogs, and `intlify_lint` owns a collision test that combines those catalogs with the lint rule registry.
 - `span` uses UTF-8 byte offsets with half-open ranges.
 - `location` uses the parser `SourceLocation` semantics: one-based `line` and zero-based UTF-8 byte `column`. It is `null` when source text is unavailable.
 - `labels` is an array of `{ span, message }` entries and may be empty.
@@ -159,7 +159,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 
 ### Semantic Diagnostic Representation
 
-Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. They are returned separately from parser diagnostics — the semantic validation pass follows `parse_semantic = true` lowering, but diagnostics are not stored permanently on `SemanticModel` and are not mixed into `ParseResult.diagnostics`.
+Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. The canonical semantic diagnostic contract is defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). This section only states the linter-visible API shape.
 
 The parser crate exposes semantic validation as an explicit API:
 
@@ -184,6 +184,7 @@ Operational errors:
 - config errors (parse, validation, conflict)
 - file system and encoding errors
 - invalid CLI arguments
+- invalid binding inputs
 - invalid binding options
 - internal failures, including semantic lowering failures after a clean parse
 
@@ -266,6 +267,7 @@ The initial `SemanticModel` fact surface required by configurable rules includes
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
 - output reference helper: a conceptual `SemanticModel::output_references()` or equivalent helper returns non-selector references owned by the message body's expression and markup subtree
+- selection dependency helper: a conceptual `SemanticModel::selection_references()` or equivalent helper returns selector references plus references used by selector declaration chains, function annotations, and selector annotation option values
 
 The initial reference kind taxonomy is:
 
@@ -281,7 +283,7 @@ enum ReferenceKind {
 
 `ReferenceKind` is the syntactic occurrence kind. `LocalRhs` covers a direct reference inside a `.local` right-hand-side expression. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values.
 
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses selector references and `SemanticModel::output_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -303,7 +305,7 @@ impl LintRule for NoUnusedDeclaration {
 }
 ```
 
-`reachable_declarations_from_outputs` is conceptual pseudocode: it starts from selector references and `SemanticModel::output_references()`, then walks `.local` right-hand-side dependencies to mark declarations that can affect message output, markup, function options, or selection.
+`reachable_declarations_from_outputs` is conceptual pseudocode: it starts from `SemanticModel::output_references()` and `SemanticModel::selection_references()`, then walks `.local` right-hand-side dependencies to mark declarations that can affect message output, markup, function options, selector annotations, or selection.
 
 Future syntax-heavy rules may add internal visitor hooks such as `check_declaration`, `check_expression`, or `check_markup`, but those hooks remain an implementation detail. Adding them does not create a public plugin system or an ESLint-compatible rule API.
 
@@ -562,9 +564,13 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 `ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
 
+`source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with an `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
+
 `LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
 Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known rule ids. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
+
+Binding validation is split into a JS-shape gate and Rust semantic validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM must share the helper or maintain parity tests for the JS-shape gate.
 
 Binding option validation returns the first validation failure as `invalid_options` with stable `details`:
 
@@ -589,17 +595,15 @@ Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requ
 
 Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors. They are implemented in the `ox_mf2_parser` semantic validation layer and surfaced through lint results; `intlify_lint` does not reimplement them.
 
-The diagnostic behavior in this section is the linter-visible requirement, not a lint-crate-owned implementation contract. The parser-side semantic validation design is the canonical owner for diagnostic ordering, duplicate-family partitioning, cascade suppression, primary spans, and labels for core semantic diagnostics. That canonical contract should live in `design/012-ox-mf2-parser-semantic-validation-design.md` as the Phase 3C parser prerequisite. Before implementation, these details must be synchronized into the parser-owned design/API so other consumers can rely on the same behavior without depending on linter internals. `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters; it must not reimplement parser-owned semantic checks.
+The canonical diagnostic catalog, ordering policy, duplicate-family partitioning, cascade suppression, primary spans, labels, and parser fixtures live in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). This document keeps only the linter-visible contract:
 
-Reporting policy: semantic analysis reports every violation in one pass; it does not stop at the first semantic diagnostic. Semantic diagnostics are ordered by primary span start, then primary span end, then semantic diagnostic code. Configurable rule diagnostics follow the same primary span ordering when rules run, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
+- semantic diagnostics are included in `lintMessage(source)` and `intlify lint` results
+- semantic diagnostics short-circuit configurable lint rules
+- semantic diagnostics are emitted as `error`
+- semantic diagnostic codes participate in the shared JSON-visible diagnostic code namespace
+- `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters
 
-Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-local-dependency` makes a selector chain unreliable, the dependent `missing-selector-annotation` is not emitted for that same chain. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector. Fixtures should expect root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom.
-
-Duplicate-family diagnostics report every duplicate after the first occurrence in each duplicate group. The first occurrence is not reported; the second and later occurrences each produce one diagnostic whose primary span is the duplicate occurrence and whose label points to the first occurrence. This applies to `duplicate-declaration`, `duplicate-variant`, `duplicate-option-name`, and `no-duplicate-attribute`.
-
-### duplicate-declaration
-
-Reports a declaration that binds a variable that already appeared in a previous declaration. `.input` and `.local` share one variable namespace, per the MF2 declaration rules.
+Representative semantic diagnostics:
 
 ```mf2
 .input {$count :number}
@@ -607,73 +611,7 @@ Reports a declaration that binds a variable that already appeared in a previous 
 {{{$count}}}
 ```
 
-```mf2
-.local $label = {$count}
-.local $label = {|items|}
-{{{$label}}}
-```
-
-Duplicate declarations are always semantic errors; there is no compatibility relaxation. The primary span is the later declaration's bound variable, with a label on the first declaration. When three or more declarations bind the same variable, every declaration after the first produces one diagnostic. This code covers only plain re-binding of an already-declared variable; dependency-order violations belong to `invalid-local-dependency`.
-
-### invalid-local-dependency
-
-Reports `.local` declarations that violate MF2 declaration dependency rules: a declaration must not bind a variable that appears in its own expression, and must not bind a variable that already appeared in a previous declaration's expression. Self-references, forward references that are later bound, and therefore all dependency cycles are invalid — including acyclic-looking forward references, which the MF2 Duplicate Declaration rules still prohibit.
-
-```mf2
-.local $label = {$label}
-{{{$label}}}
-```
-
-```mf2
-.local $a = {$b}
-.local $b = {$a}
-{{{$a}}}
-```
-
-The primary span is the bound variable of the declaration that completes the violation, with labels on the earlier appearances. Cases in this dependency family are never additionally reported as `duplicate-declaration`.
-
-### missing-selector-annotation
-
-Reports a selector variable that does not directly or indirectly (through `.local` chains) reference a declaration with a function. A selector variable with no declaration at all also reports this diagnostic — external input variables are valid in patterns, but MF2 requires every selector to resolve to an annotated declaration, independent of the `no-undeclared-variable` rule state.
-
-```mf2
-.input {$count}
-.match $count
-one {{One item}}
-* {{Items}}
-```
-
-Selector annotations can be reached indirectly through `.local` chains:
-
-```mf2
-.input {$count :number}
-.local $selector = {$count}
-.match $selector
-one {{One item}}
-* {{Items}}
-```
-
-The function annotation may also come from the `.local` expression itself:
-
-```mf2
-.input {$count}
-.local $selector = {$count :number}
-.match $selector
-one {{One item}}
-* {{Items}}
-```
-
-If the chain reaches an unannotated declaration, the selector still reports `missing-selector-annotation`:
-
-```mf2
-.input {$count}
-.local $selector = {$count}
-.match $selector
-one {{One item}}
-* {{Items}}
-```
-
-If the selector variable is undeclared, this diagnostic is still emitted independently from the `no-undeclared-variable` rule state:
+The parser reports `duplicate-declaration`; the linter includes it and skips configurable rules.
 
 ```mf2
 .match $count
@@ -681,62 +619,7 @@ one {{One item}}
 * {{Items}}
 ```
 
-### variant-key-arity-mismatch
-
-Reports a matcher variant whose key count does not match the selector count. The parser accepts arbitrary key counts syntactically, so this stays a semantic diagnostic. The primary span is the offending variant's key list, with a label on the selector list.
-
-```mf2
-.match $gender $count
-male {{He has items.}}
-* * {{Fallback}}
-```
-
-```mf2
-.match $count
-one few {{Items}}
-* {{Fallback}}
-```
-
-### missing-fallback-variant
-
-Reports a matcher without a fallback variant. Per the MF2 rule, at least one variant must have all keys equal to the catch-all key `*`, regardless of selector functions or selector domains.
-
-The primary span is the `.match` keyword span, because no fallback token exists. Recovery cases that cannot recover the `.match` keyword span use the current offset empty span. Labels may point at the matcher body or variant list for human-readable output, but labels are not fixture-locked.
-
-```mf2
-.match $count
-0 {{No items}}
-1 {{One item}}
-```
-
-```mf2
-.match $gender $count
-male 1 {{He has one item}}
-female 1 {{She has one item}}
-```
-
-### duplicate-variant
-
-Reports duplicate variant key tuples. Literal keys are compared by their cooked string values after the NFC normalization rule defined in the Phase 1 parser design, not by syntactical appearance, so `1` and `|1|` collide.
-
-Arity-invalid variants do not participate in duplicate tuple comparison, because their tuple cannot be evaluated against the selector list. They also do not count as fallback candidates for `missing-fallback-variant`. This means an arity-invalid catch-all such as `* *` in a single-selector matcher reports `variant-key-arity-mismatch` and still allows `missing-fallback-variant` to report independently.
-
-```mf2
-.match $count
-1 {{One item}}
-|1| {{Single item}}
-* {{Items}}
-```
-
-### duplicate-option-name
-
-Reports duplicate option identifiers within one function. Per the MF2 rule, option identifiers must be unique within a function; duplicates are a Duplicate Option Name data model error.
-
-Duplicate detection is owner-local: options are compared only within the same function call. Option identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. The primary span is the later duplicate option identifier, with a label on the first occurrence. When three or more options share the same cooked identifier, every option after the first produces one diagnostic.
-
-```mf2
-{$count :number minimumFractionDigits=2 minimumFractionDigits=3}
-```
+The parser reports `missing-selector-annotation`; this is independent from the configurable `no-undeclared-variable` rule state.
 
 ## Configurable Rules
 
@@ -748,7 +631,7 @@ Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
 Reports a declared variable that is not reachable from the message output or selector set. The rule applies to both `.input` and `.local` declarations in the recommended preset: an unreachable declaration has no runtime effect in MF2, so both kinds are treated as dead code and reported as `warn` by default. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
 
-Reachability starts from selector references and `SemanticModel::output_references()`, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds. References inside function option values and markup attribute values are considered used when their owner expression or markup is reachable from the message body. A declaration referenced only by another unreachable declaration is still unused.
+Reachability starts from `SemanticModel::output_references()` and `SemanticModel::selection_references()`, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds. Selection references include selector variables and dependencies used by selector declaration chains, including function annotations and selector annotation option values. References inside function option values and markup attribute values are considered used when their owner expression or markup is reachable from the message body or selector setup. A declaration referenced only by another unreachable declaration is still unused.
 
 ```mf2
 .input {$count :number}
@@ -775,6 +658,18 @@ References nested inside reachable output constructs also mark declarations as u
 .input {$digits :number}
 {{{$count :number minimumFractionDigits=$digits}}}
 ```
+
+Selector annotation dependencies also mark declarations as used:
+
+```mf2
+.input {$digits :number}
+.input {$count :number minimumFractionDigits=$digits}
+.match $count
+one {{One}}
+* {{Other}}
+```
+
+In this example `$count` is used by the selector, and `$digits` is used by the selector declaration's function option value.
 
 ### no-duplicate-attribute
 
