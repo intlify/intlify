@@ -84,6 +84,27 @@ The parser should expose shared semantic helpers for facts that multiple consume
 
 These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design.
 
+Shared helper APIs should return read-only view iterators rather than raw ids only. A conceptual shape is:
+
+```rust
+impl SemanticModel {
+    fn output_references(&self) -> impl Iterator<Item = ReferenceRef<'_>>;
+    fn selection_references(&self) -> impl Iterator<Item = ReferenceRef<'_>>;
+}
+
+struct ReferenceRef<'a> {
+    id: ReferenceId,
+    name: &'a str,
+    kind: ReferenceKind,
+    span: Span,
+    resolved_declaration: Option<DeclarationId>,
+    enclosing_declaration: Option<DeclarationId>,
+    is_local_dependency: bool,
+}
+```
+
+The exact Rust names and lifetimes are implementation details, but consumers should be able to read source span, resolved state, syntactic occurrence kind, and dependency context without mutating the model. Declaration, function option, attribute, and matcher variant facts should follow the same read-only iterator/view pattern.
+
 ## Diagnostic Shape
 
 Semantic diagnostics use a parser-owned representation:
@@ -200,6 +221,16 @@ Reports `.local` declarations that violate MF2 declaration dependency rules: a d
 ```
 
 The primary span is the bound variable of the declaration that completes the violation, with labels on the earlier appearances. Cases in this dependency family are never additionally reported as `duplicate-declaration`.
+
+Primary span selection is deterministic:
+
+- self-reference: the self-referencing declaration's bound variable span
+- forward reference later bound: the later declaration's bound variable span, because the violation is only known when the referenced variable becomes locally bound
+- direct cycle: the declaration that closes the cycle, usually the later declaration in source order
+- longer forward chain: the declaration whose binding completes the previously referenced chain
+- multiple previous appearances of the same later-bound variable: one diagnostic on the later declaration's bound variable span, with labels on the earlier appearances
+
+This rule avoids reporting the same dependency root cause multiple times while keeping the primary location on the source construct that makes the dependency invalid.
 
 ### missing-selector-annotation
 
@@ -388,7 +419,7 @@ Suggested implementation steps:
 
 ## Deferred Follow-Up Notes
 
-- Snapshot-backed semantic validation, including the snapshot-to-semantic path.
+- Snapshot-backed semantic validation, including the snapshot-to-semantic path. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional semantic facts needed by resource/catalog adapters.
 - Documentation pages and static help text for semantic diagnostic codes.

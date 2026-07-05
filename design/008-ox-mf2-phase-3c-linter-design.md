@@ -157,6 +157,8 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 - `message` text and `labels` messages are not stable compatibility surfaces.
 - A `help` field is reserved for future static per-code help text; the initial release does not populate it. Adding help content is a follow-up once documentation pages exist for codes and rules.
 
+The UTF-8 span contract is canonical across CLI JSON, Rust, N-API, and WASM outputs. Bindings do not add binding-specific UTF-16 range fields to diagnostic objects. JavaScript, editor, and LSP consumers convert UTF-8 spans to UTF-16 or another editor encoding through source-text helper APIs or adapter layers. Future LSP/editor adapters own `PositionEncodingKind` conversion and must not change the linter diagnostic shape.
+
 ### Semantic Diagnostic Representation
 
 Semantic diagnostics get their own representation in `ox_mf2_parser`: a `SemanticDiagnosticCode` Rust enum whose public stable names are the kebab-case codes, and a `SemanticDiagnostic` value carrying code, severity, span, and labels. The canonical semantic diagnostic contract is defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). This section only states the linter-visible API shape.
@@ -236,7 +238,7 @@ struct RuleContext<'a> {
     cst: CstView<'a>,
     semantic: &'a SemanticModel,
     config: &'a ResolvedLintConfig,
-    diagnostics: &'a mut Vec<LintDiagnostic>,
+    reports: &'a mut Vec<RuleReport>,
 }
 ```
 
@@ -260,6 +262,8 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 From the linter consumer view, the initial rules need these parser-owned fact groups: declarations, resolved and unresolved references, selector references, message-body references, function option occurrences, attribute occurrences, matcher variants, and the shared `output_references()` / `selection_references()` helpers. The detailed reference taxonomy, dependency context, and helper ownership live in the parser semantic validation design; this document only defines how the linter consumes those facts.
 
 `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
+
+Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, optional labels, and optional typed message arguments. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -393,6 +397,16 @@ Invalid examples:
 ```
 
 The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
+
+CLI config validation reports the first deterministic `config_validation_failed` error. Validation order is:
+
+1. top-level config shape: root must be an object, then unknown top-level fields
+2. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields
+3. `lint.rules` shape: `rules` must be an object when present
+4. `lint.rules` entries: rule ids are processed in ASCII ascending order; unknown rule ids are reported before invalid severity values for known rule ids
+5. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string entry is reported
+
+This order is independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -574,6 +588,8 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 `ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
 
+For programmatic APIs, `errorCount` and `warningCount` are derived from the returned `diagnostics` array. `errorCount` is the number of diagnostics whose severity is `"error"` and `warningCount` is the number whose severity is `"warn"`, across parser, semantic, and configurable lint rule diagnostics. Parser and semantic diagnostics are always counted as errors. Configurable rule diagnostics use their resolved severity. CLI-only reporter behavior such as `--quiet` does not affect programmatic counts, and operational errors are represented only by the `ok: false` branch.
+
 `source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
 `LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
@@ -598,6 +614,8 @@ Binding option validation returns the first validation failure as `invalid_optio
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, unknown rule ids are reported before invalid severity values; known rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
+
+A future `lintSnapshot` requires, at minimum: a parser-owned path from snapshot bytes to `SemanticModel`; verifiable parser diagnostic capability so diagnostic absence can be trusted; snapshot schema/version support for all semantic facts needed by linting; source/span consistency guarantees equivalent to source-backed linting; fixtures proving that snapshot-backed and source-backed semantic validation produce the same diagnostic codes, order, and spans; and a contract that the API does not silently reparse source text behind a snapshot entry point.
 
 `@intlify/lint-wasm` follows the `@intlify/ox-mf2-wasm` initialization contract as specified for `@intlify/format-wasm` in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 
