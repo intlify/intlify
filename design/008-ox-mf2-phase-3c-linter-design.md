@@ -150,6 +150,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 
 - `category` is `"parser"`, `"semantic"`, or `"lint"`.
 - `code` is a single field across all categories. Parser diagnostics, semantic diagnostics, and lint rule diagnostics all use JSON-visible kebab-case stable strings. Rust enum names such as `MissingRequiredWhitespace` are internal; lint JSON emits `"missing-required-whitespace"`. There is no separate `ruleId` field.
+- JSON-visible diagnostic codes share one global namespace across parser, semantic, and lint categories. Category is classification metadata, not a namespace escape hatch. Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids must not collide; registry or test coverage should fail new code additions that reuse an existing JSON-visible code.
 - `span` uses UTF-8 byte offsets with half-open ranges.
 - `location` uses the parser `SourceLocation` semantics: one-based `line` and zero-based UTF-8 byte `column`. It is `null` when source text is unavailable.
 - `labels` is an array of `{ span, message }` entries and may be empty.
@@ -264,6 +265,7 @@ The initial `SemanticModel` fact surface required by configurable rules includes
 - function option occurrences: function call owner id, option identifier, cooked identifier, identifier span, and owner-local occurrence order
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
+- output reference helper: a conceptual `SemanticModel::output_references()` or equivalent helper returns non-selector references owned by the message body's expression and markup subtree
 
 The initial reference kind taxonomy is:
 
@@ -279,7 +281,7 @@ enum ReferenceKind {
 
 `ReferenceKind` is the syntactic occurrence kind. `LocalRhs` covers a direct reference inside a `.local` right-hand-side expression. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values.
 
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses selector references and all non-selector references reachable from the message body as reachability roots, including nested references inside expression placeholders, function option values, and markup attribute values. It then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses selector references and `SemanticModel::output_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -301,7 +303,7 @@ impl LintRule for NoUnusedDeclaration {
 }
 ```
 
-`reachable_declarations_from_outputs` is conceptual pseudocode: it starts from selector references and every non-selector reference reachable from the message body, then walks `.local` right-hand-side dependencies to mark declarations that can affect message output, markup, function options, or selection.
+`reachable_declarations_from_outputs` is conceptual pseudocode: it starts from selector references and `SemanticModel::output_references()`, then walks `.local` right-hand-side dependencies to mark declarations that can affect message output, markup, function options, or selection.
 
 Future syntax-heavy rules may add internal visitor hooks such as `check_declaration`, `check_expression`, or `check_markup`, but those hooks remain an implementation detail. Adding them does not create a public plugin system or an ESLint-compatible rule API.
 
@@ -459,7 +461,7 @@ When no operands are provided and stdin mode is not selected, `intlify lint` beh
 
 Human-readable output renders oxlint-style diagnostic blocks and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter.
 
-The initial visual target is a colorful oxlint-style diagnostic block on TTY output: severity and failing rule/code are emphasized, file locations are visually distinct, source lines are dimmed or neutral, primary spans are underlined, labels point back to the highlighted source range, and optional help text is visually separated. The stable compatibility surface is the presence of path, line, display column, severity, code, message, primary source line, primary underline, and any available label/help content. Exact wording, colors, box drawing characters, underline glyphs, and spacing are not fixture-locked contracts.
+The initial visual target is a colorful oxlint-style diagnostic block on TTY output: severity and failing rule/code are emphasized, file locations are visually distinct, source lines are dimmed or neutral, primary spans are underlined, and labels point back to the highlighted source range. The stable compatibility surface is the presence of path, line, display column, severity, code, message, primary source line, primary underline, and any available label content. Exact wording, colors, box drawing characters, underline glyphs, and spacing are not fixture-locked contracts.
 
 Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
 
@@ -474,8 +476,6 @@ x lint(duplicate-declaration): variable $count is already declared
   1 | .input {$count :number}
   2 | .input {$count :number}
     |        ^^^^^^ variable is already declared here
-
-help: Rename this declaration or remove the duplicate binding.
 ```
 
 For `--reporter json`, the JSON envelope is emitted to stdout, including operational errors when the envelope can be constructed. Only fatal CLI failures that prevent envelope construction are emitted directly to stderr.
@@ -564,7 +564,7 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 `LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
-Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` must otherwise be a plain object; `null`, arrays, primitives, functions, and symbols report `invalid_options_shape`. `rules` must be a plain object when present; `null`, arrays, primitives, functions, and symbols report `invalid_rules_shape`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known rule ids. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs.
+Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known rule ids. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
 
 Binding option validation returns the first validation failure as `invalid_options` with stable `details`:
 
@@ -577,7 +577,7 @@ Binding option validation returns the first validation failure as `invalid_optio
 }
 ```
 
-`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only when the invalid value is JSON-safe. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
+`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only for scalar values: string, number, boolean, or `null`. Arrays and objects are omitted even when JSON-safe; `undefined`, functions, and symbols are omitted because they have no JSON representation. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
 
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, unknown rule ids are reported before invalid severity values; known rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
@@ -589,7 +589,7 @@ Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requ
 
 Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors. They are implemented in the `ox_mf2_parser` semantic validation layer and surfaced through lint results; `intlify_lint` does not reimplement them.
 
-The diagnostic behavior in this section is the linter-visible requirement, not a lint-crate-owned implementation contract. The parser-side semantic validation design is the canonical owner for diagnostic ordering, duplicate-family partitioning, cascade suppression, primary spans, and labels for core semantic diagnostics. Before implementation, these details must be synchronized into the parser-owned design/API so other consumers can rely on the same behavior without depending on linter internals. `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters; it must not reimplement parser-owned semantic checks.
+The diagnostic behavior in this section is the linter-visible requirement, not a lint-crate-owned implementation contract. The parser-side semantic validation design is the canonical owner for diagnostic ordering, duplicate-family partitioning, cascade suppression, primary spans, and labels for core semantic diagnostics. That canonical contract should live in `design/012-ox-mf2-parser-semantic-validation-design.md` as the Phase 3C parser prerequisite. Before implementation, these details must be synchronized into the parser-owned design/API so other consumers can rely on the same behavior without depending on linter internals. `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters; it must not reimplement parser-owned semantic checks.
 
 Reporting policy: semantic analysis reports every violation in one pass; it does not stop at the first semantic diagnostic. Semantic diagnostics are ordered by primary span start, then primary span end, then semantic diagnostic code. Configurable rule diagnostics follow the same primary span ordering when rules run, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
 
@@ -748,7 +748,7 @@ Category: `best-practice`. Default: `warn`, enabled in `recommended`.
 
 Reports a declared variable that is not reachable from the message output or selector set. The rule applies to both `.input` and `.local` declarations in the recommended preset: an unreachable declaration has no runtime effect in MF2, so both kinds are treated as dead code and reported as `warn` by default. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
 
-Reachability starts from selector references and all non-selector references that are reachable from the message body, then follows `.local` right-hand-side dependencies backwards through declarations. References inside function option values and markup attribute values are considered used when their owner expression or markup is reachable from the message body. A declaration referenced only by another unreachable declaration is still unused.
+Reachability starts from selector references and `SemanticModel::output_references()`, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds. References inside function option values and markup attribute values are considered used when their owner expression or markup is reachable from the message body. A declaration referenced only by another unreachable declaration is still unused.
 
 ```mf2
 .input {$count :number}
@@ -900,6 +900,8 @@ Fixture `.mf2` files use the CLI file framing convention: files end with one fin
 
 CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions established by the fmt CLI fixtures, including scenario `options.json`, stdout/stderr/exit expectations, and `stdoutJson` structural comparison.
 
+Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs assert no output, and problem runs assert that stderr contains the essential path, severity, code, and message fragments. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
+
 Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, and binding parity for `lintMessage`.
 
 ## Benchmarks
@@ -910,7 +912,7 @@ Linter benchmarks are local-first tooling under `tools/`, following the parser a
 
 Phase 3C linter implementation should be split into reviewable PRs:
 
-1. `ox_mf2_parser` semantic validation layer emitting the core semantic diagnostics (parser-side prerequisite PR, including the semantic diagnostic code catalog and fixtures)
+1. `ox_mf2_parser` semantic validation layer emitting the core semantic diagnostics (parser-side prerequisite PR, specified by `design/012-ox-mf2-parser-semantic-validation-design.md`, including the semantic diagnostic code catalog and fixtures)
 2. `intlify_lint` crate scaffold, result/options/config model, rule registry, fixture harness, and core semantic diagnostic integration
 3. configurable rules and the `recommended` preset
 4. `intlify lint` CLI integration, shared discovery/ignore/framing reuse, and JSON reporter
