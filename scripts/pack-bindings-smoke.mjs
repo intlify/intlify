@@ -11,8 +11,10 @@ const packDir = await mkdtemp(join(tmpdir(), 'ox-mf2-pack-'))
 try {
   const napiPackage = packPackage('packages/ox-mf2-napi')
   const wasmPackage = packPackage('packages/ox-mf2-wasm')
+  const formatNapiPackage = packPackage('packages/format-napi')
   const napiContents = listPackage(napiPackage)
   const wasmContents = listPackage(wasmPackage)
+  const formatNapiContents = listPackage(formatNapiPackage)
 
   assertIncludes(
     napiContents,
@@ -42,6 +44,31 @@ try {
     wasmContents,
     entry => entry === 'package/dist/ox_mf2_wasm.js',
     'WASM JS glue artifact'
+  )
+  assertIncludes(
+    formatNapiContents,
+    entry => entry.startsWith('package/dist/') && entry.endsWith('.node'),
+    'formatter N-API .node artifact'
+  )
+  assertIncludes(
+    formatNapiContents,
+    entry => entry === 'package/dist/index.js',
+    'formatter N-API JS entry'
+  )
+  assertIncludes(
+    formatNapiContents,
+    entry => entry === 'package/dist/index.d.ts',
+    'formatter N-API types entry'
+  )
+  assertIncludes(
+    formatNapiContents,
+    entry => entry === 'package/dist/native-binding.js',
+    'formatter N-API native binding JS glue'
+  )
+  assertIncludes(
+    formatNapiContents,
+    entry => entry === 'package/dist/native-binding.d.ts',
+    'formatter N-API native binding types'
   )
 } finally {
   await rm(packDir, { force: true, recursive: true })
