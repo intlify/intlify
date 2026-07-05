@@ -9,7 +9,12 @@ if (!tag?.startsWith('v')) {
 }
 
 const version = tag.slice(1)
-const packages = ['@intlify/ox-mf2-napi', '@intlify/ox-mf2-wasm']
+const packages = [
+  '@intlify/ox-mf2-napi',
+  '@intlify/ox-mf2-wasm',
+  '@intlify/format-napi',
+  '@intlify/format-wasm'
+]
 const npmAvailabilityMaxAttempts = readPositiveIntegerEnv('NPM_SMOKE_MAX_ATTEMPTS', 60)
 const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_000)
 
@@ -53,6 +58,44 @@ try {
         const result = parseMessage('hello')
         if (result.snapshot.rootCount() < 1) throw new Error('WASM smoke failed')
         console.log('@intlify/ox-mf2-wasm smoke ok')
+      `
+    ],
+    { cwd: tempDir }
+  )
+
+  run(
+    'node',
+    [
+      '--input-type=module',
+      '-e',
+      `
+        import { checkFormat, formatMessage } from '@intlify/format-napi'
+        const source = '.input   {$count   :number}\\n{{Value {$count   :number}}}'
+        const formatted = formatMessage(source)
+        if (!formatted.ok || formatted.code !== '.input {$count :number}\\n{{Value {$count :number}}}') {
+          throw new Error('formatter N-API formatMessage smoke failed')
+        }
+        const checked = checkFormat(source)
+        if (!checked.ok || checked.changed !== true) throw new Error('formatter N-API checkFormat smoke failed')
+        console.log('@intlify/format-napi smoke ok')
+      `
+    ],
+    { cwd: tempDir }
+  )
+
+  run(
+    'node',
+    [
+      '--input-type=module',
+      '-e',
+      `
+        import { init, formatMessage } from '@intlify/format-wasm'
+        await init()
+        const result = formatMessage('.input   {$count   :number}\\n{{Value {$count   :number}}}')
+        if (!result.ok || result.code !== '.input {$count :number}\\n{{Value {$count :number}}}') {
+          throw new Error('formatter WASM smoke failed')
+        }
+        console.log('@intlify/format-wasm smoke ok')
       `
     ],
     { cwd: tempDir }

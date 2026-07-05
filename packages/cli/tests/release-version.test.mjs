@@ -71,6 +71,19 @@ test('release version check rejects public intlify_cli crates.io publishing', as
   })
 })
 
+test('release version check rejects public formatter crates.io publishing', async () => {
+  await withFixture(async fixtureRoot => {
+    const cargoTomlPath = join(fixtureRoot, 'crates', 'intlify_format', 'Cargo.toml')
+    const source = await readFile(cargoTomlPath, 'utf8')
+    await writeFile(cargoTomlPath, source.replace('publish = false', 'publish = true'))
+
+    const result = runCheckReleaseVersion(fixtureRoot)
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('crates/intlify_format/Cargo.toml must set publish = false')
+  })
+})
+
 async function withFixture(callback) {
   const fixtureRoot = await mkdtemp(join(tmpdir(), 'intlify-release-version-'))
   try {
@@ -102,7 +115,8 @@ async function writeFixture(fixtureRoot) {
     version: '0.14.0',
     private: true,
     scripts: {
-      release: 'bumpp "package.json" "packages/cli/package.json" "packages/cli-native/package.json"'
+      release:
+        'bumpp "package.json" "packages/format-napi/package.json" "packages/format-wasm/package.json" "packages/cli/package.json" "packages/cli-native/package.json"'
     }
   })
 
@@ -121,6 +135,16 @@ async function writeFixture(fixtureRoot) {
     version: '0.14.0',
     private: true
   })
+  await writePackageJson(fixtureRoot, 'packages/format-napi/package.json', {
+    name: '@intlify/format-napi',
+    version: '0.14.0',
+    repository: { directory: 'packages/format-napi' }
+  })
+  await writePackageJson(fixtureRoot, 'packages/format-wasm/package.json', {
+    name: '@intlify/format-wasm',
+    version: '0.14.0',
+    repository: { directory: 'packages/format-wasm' }
+  })
   await writePackageJson(fixtureRoot, 'packages/cli/package.json', {
     name: '@intlify/cli',
     version: '0.14.0',
@@ -138,6 +162,25 @@ async function writeFixture(fixtureRoot) {
   await writeCargoToml(fixtureRoot, 'crates/ox_mf2_parser/Cargo.toml', 'ox_mf2_parser')
   await writeCargoToml(fixtureRoot, 'crates/ox_mf2_napi/Cargo.toml', 'ox_mf2_napi')
   await writeCargoToml(fixtureRoot, 'crates/ox_mf2_wasm/Cargo.toml', 'ox_mf2_wasm')
+  await writeCargoToml(fixtureRoot, 'crates/intlify_format/Cargo.toml', 'intlify_format', {
+    publishFalse: true
+  })
+  await writeCargoToml(
+    fixtureRoot,
+    'crates/intlify_format_napi/Cargo.toml',
+    'intlify_format_napi',
+    {
+      publishFalse: true
+    }
+  )
+  await writeCargoToml(
+    fixtureRoot,
+    'crates/intlify_format_wasm/Cargo.toml',
+    'intlify_format_wasm',
+    {
+      publishFalse: true
+    }
+  )
   await writeCargoToml(fixtureRoot, 'crates/intlify_cli/Cargo.toml', 'intlify_cli', {
     publishFalse: true
   })
@@ -147,7 +190,7 @@ async function writeFixture(fixtureRoot) {
   )
   await writeText(
     join(fixtureRoot, 'Cargo.lock'),
-    `${cargoLockPackage('ox_mf2_parser')}${cargoLockPackage('ox_mf2_napi')}${cargoLockPackage('ox_mf2_wasm')}${cargoLockPackage('intlify_cli')}`
+    `${cargoLockPackage('ox_mf2_parser')}${cargoLockPackage('ox_mf2_napi')}${cargoLockPackage('ox_mf2_wasm')}${cargoLockPackage('intlify_format')}${cargoLockPackage('intlify_format_napi')}${cargoLockPackage('intlify_format_wasm')}${cargoLockPackage('intlify_cli')}`
   )
 }
 

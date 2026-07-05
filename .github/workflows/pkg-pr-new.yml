@@ -72,7 +72,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -116,13 +116,112 @@ jobs:
             packages/ox-mf2-napi/dist/native-binding.js
             packages/ox-mf2-napi/dist/native-binding.d.ts
 
+  build-format-napi:
+    name: Build @intlify/format-napi (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: darwin-arm64
+            target: aarch64-apple-darwin
+            extra_args: ''
+          - os: macos-latest
+            label: darwin-x64
+            target: x86_64-apple-darwin
+            extra_args: ''
+          - os: ubuntu-latest
+            label: linux-x64-gnu
+            target: x86_64-unknown-linux-gnu
+            extra_args: '--use-napi-cross'
+          - os: ubuntu-latest
+            label: linux-x64-musl
+            target: x86_64-unknown-linux-musl
+            extra_args: '--use-napi-cross'
+          - os: ubuntu-latest
+            label: linux-arm64-gnu
+            target: aarch64-unknown-linux-gnu
+            extra_args: '--use-napi-cross'
+          - os: windows-latest
+            label: win32-x64-msvc
+            target: x86_64-pc-windows-msvc
+            extra_args: ''
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Enable long paths
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: '1.96.0'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Setup cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+
+      - name: Add Rust target
+        env:
+          TARGET: ${{ matrix.target }}
+        run: rustup target add "$TARGET"
+
+      - name: Build formatter native binding
+        working-directory: packages/format-napi
+        env:
+          TARGET: ${{ matrix.target }}
+          EXTRA_ARGS: ${{ matrix.extra_args }}
+        run: |
+          # shellcheck disable=SC2086
+          npm exec -- napi build \
+            --manifest-path ../../crates/intlify_format_napi/Cargo.toml \
+            --output-dir dist \
+            --platform \
+            --esm \
+            --no-dts-header \
+            --js native-binding.js \
+            --dts native-binding.d.ts \
+            --release \
+            --target "$TARGET" \
+            $EXTRA_ARGS
+
+      - name: Upload formatter native binding
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          if-no-files-found: error
+          name: format-napi-${{ matrix.target }}
+          path: |
+            packages/format-napi/dist/*.node
+            packages/format-napi/dist/native-binding.js
+            packages/format-napi/dist/native-binding.d.ts
+
   publish-preview:
     name: Publish pkg.pr.new preview
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
       - build-napi
-    if: always() && needs.build-napi.result == 'success'
+      - build-format-napi
+    if: always() && needs.build-napi.result == 'success' && needs.build-format-napi.result == 'success'
     steps:
       - name: Checkout codes
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -138,7 +237,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -162,14 +261,17 @@ jobs:
       - name: Build WASM package
         run: vp run --no-cache @intlify/ox-mf2-wasm#build
 
+      - name: Build formatter WASM package
+        run: vp run --no-cache @intlify/format-wasm#build
+
       - name: Prepare N-API preview packages
         working-directory: packages/ox-mf2-napi
         run: |
           rm -rf dist ../../release-dir/ox-mf2-napi
           mkdir -p dist ../../release-dir/ox-mf2-napi
 
-          binding_js=$(find ../../artifacts -name native-binding.js | sort | head -n 1)
-          binding_dts=$(find ../../artifacts -name native-binding.d.ts | sort | head -n 1)
+          binding_js=$(find ../../artifacts -path '*/ox-mf2-napi-*/native-binding.js' | sort | head -n 1)
+          binding_dts=$(find ../../artifacts -path '*/ox-mf2-napi-*/native-binding.d.ts' | sort | head -n 1)
           if [ -z "$binding_js" ] || [ -z "$binding_dts" ]; then
             echo "native-binding.js/native-binding.d.ts artifact is missing" >&2
             exit 1
@@ -182,10 +284,32 @@ jobs:
           npm exec -- napi artifacts --package-json-path package.json --output-dir ../../artifacts --npm-dir ../../release-dir/ox-mf2-napi
           npm exec -- napi pre-publish --skip-optional-publish --no-gh-release -t npm --package-json-path package.json --npm-dir ../../release-dir/ox-mf2-napi
 
+      - name: Prepare formatter N-API preview packages
+        working-directory: packages/format-napi
+        run: |
+          rm -rf dist ../../release-dir/format-napi
+          mkdir -p dist ../../release-dir/format-napi
+
+          binding_js=$(find ../../artifacts -path '*/format-napi-*/native-binding.js' | sort | head -n 1)
+          binding_dts=$(find ../../artifacts -path '*/format-napi-*/native-binding.d.ts' | sort | head -n 1)
+          if [ -z "$binding_js" ] || [ -z "$binding_dts" ]; then
+            echo "formatter native-binding.js/native-binding.d.ts artifact is missing" >&2
+            exit 1
+          fi
+          cp "$binding_js" dist/native-binding.js
+          cp "$binding_dts" dist/native-binding.d.ts
+
+          vp run --no-cache @intlify/format-napi#build:pack
+          npm exec -- napi create-npm-dirs --package-json-path package.json --npm-dir ../../release-dir/format-napi
+          npm exec -- napi artifacts --package-json-path package.json --output-dir ../../artifacts --npm-dir ../../release-dir/format-napi
+          npm exec -- napi pre-publish --skip-optional-publish --no-gh-release -t npm --package-json-path package.json --npm-dir ../../release-dir/format-napi
+
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
 
-      - name: Publish preview packages
+      # pkg.pr.new preview publishing authenticates through the preview service.
+      # npm Trusted Publishing is reserved for real npm releases in release.yml.
+      - name: Publish preview packages # zizmor: ignore[use-trusted-publishing]
         run: >
-          npm exec -- pkg-pr-new publish --packageManager=npm --no-template "release-dir/ox-mf2-napi/*" "packages/ox-mf2-wasm" "packages/ox-mf2-napi"
+          npm exec -- pkg-pr-new publish --packageManager=npm --no-template "release-dir/ox-mf2-napi/*" "release-dir/format-napi/*" "packages/ox-mf2-napi" "packages/ox-mf2-wasm" "packages/format-napi" "packages/format-wasm"
 

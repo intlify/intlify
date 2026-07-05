@@ -1,0 +1,20 @@
+{
+  "fixtures": [
+    {
+      "name": "basic-message",
+      "path": "../../crates/intlify_format/fixtures/basic-message/input.mf2"
+    },
+    {
+      "name": "matcher-table",
+      "path": "../../crates/intlify_format/fixtures/matcher-table/input.mf2"
+    },
+    {
+      "name": "complex-spacing",
+      "path": "../../crates/intlify_format/fixtures/complex-spacing/input.mf2"
+    },
+    {
+      "name": "preserve-blank-lines",
+      "path": "../../crates/intlify_format/fixtures/preserve-blank-lines/input.mf2"
+    }
+  ]
+}
