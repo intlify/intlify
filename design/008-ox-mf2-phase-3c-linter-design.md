@@ -99,13 +99,14 @@ The message-level workflow is:
 7. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
 8. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
 9. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a `RuleReport` sink.
-10. Execute each enabled built-in rule by calling `LintRule::check(ctx)` in registry declaration order.
-11. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
-12. Shape the result for the Rust API, bindings, or CLI reporter.
+10. Execute each enabled built-in rule by calling `LintRule::check(ctx) -> Result<(), LintRuleInvariantError>` in registry declaration order.
+11. If a rule returns `Err(LintRuleInvariantError)`, return an `internal_error` operational error with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`.
+12. Normalize emitted rule diagnostics into deterministic report order: primary span start, primary span end, JSON-visible rule id in ASCII ascending order, and the stable occurrence key carried by the `RuleReport` for exact ties.
+13. Shape the result for the Rust API, bindings, or CLI reporter.
 
 For a single lint target, parser diagnostics, semantic diagnostics, and configurable rule diagnostics are stage-exclusive. Parser diagnostics short-circuit semantic validation and configurable rules. Semantic diagnostics short-circuit configurable rules. Configurable rule diagnostics are produced only when parser and semantic diagnostics are empty.
 
-Rule execution order is deterministic and follows registry declaration order for reproducible debugging and benchmarking, but it is not a compatibility surface. Report order is the compatibility surface.
+Rule execution order is deterministic and follows registry declaration order for reproducible debugging and benchmarking, but it is not a compatibility surface. Report order is the compatibility surface. Rules that can emit multiple reports with the same primary span and rule id must attach a stable occurrence key derived from `SemanticModel` fact order; the initial rules use declaration order, reference source order, owner-local option or attribute order, and matcher variant order as appropriate.
 
 ## Diagnostic Classification
 
@@ -133,7 +134,7 @@ Classification result:
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
 | `semantic-invariant-failed` | internal | see below |
 
-`semantic-invariant-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. Configurable rules do not run after such failures.
+`semantic-invariant-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. The operational error includes `details.reason: "semantic_invariant_failed"` and `details.stage`, where `stage` is `"semantic_model_construction"` or `"semantic_validation"`. Configurable rules do not run after such failures.
 
 ## Diagnostic Shape
 
@@ -175,7 +176,7 @@ fn validate_semantics(
 ) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>
 ```
 
-`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. If validation hits an invariant failure, it returns `Err(SemanticInvariantError)`, and downstream host boundaries convert that to an `internal_error` operational error. Linter, future validator, and LSP/editor consumers call this API after constructing a semantic model. Semantic diagnostics are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
+`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. If validation hits an invariant failure, it returns `Err(SemanticInvariantError)`, and downstream host boundaries convert that to an `internal_error` operational error with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_validation"`. Linter, future validator, and LSP/editor consumers call this API after constructing a semantic model. Semantic diagnostics are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
 
 ## Failure Model
 
@@ -195,8 +196,11 @@ Operational errors:
 - invalid binding inputs
 - invalid binding options
 - internal failures, including semantic invariant failures after a clean parse
+- internal failures from built-in lint rule invariant errors
 
 Operational errors use the Phase 3A operational error shape `{ kind, code, message, path?, details? }` and the shared string code namespace. The CLI exit code classification follows Phase 3A: `0` success, `1` lint failure (any `error` diagnostic, or warnings over `--max-warnings`), `2` operational error, with `2 > 1 > 0` priority for mixed outcomes. JSON output uses the Phase 3A top-level envelope, including its top-level `errors` array for global operational errors and `results[].errors` for file-specific operational errors.
+
+Semantic invariant failures use `internal_error` with `details.reason: "semantic_invariant_failed"` and a `details.stage` of `"semantic_model_construction"` or `"semantic_validation"`. Built-in rule invariant failures use `internal_error` with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. These details are debugging aids for implementation failures; they are not user-facing diagnostics and are not configurable through `lint.rules`.
 
 ## Stable Identifiers
 
@@ -236,7 +240,7 @@ The internal rule interface is model-level first:
 ```rust
 trait LintRule {
     fn metadata(&self) -> RuleMetadata;
-    fn check(&self, ctx: &mut RuleContext<'_>);
+    fn check(&self, ctx: &mut RuleContext<'_>) -> Result<(), LintRuleInvariantError>;
 }
 
 struct RuleContext<'a> {
@@ -255,6 +259,7 @@ The exact Rust names are implementation details, but the responsibilities are fi
 - `CstView` is available as a read-only syntax accessor for rules that need exact node kind, token, trivia, or source-span relationships
 - rules report through the context rather than constructing JSON output directly, so category, code, severity, primary span, labels, and ordering stay centralized
 - rules run only after parser and core semantic diagnostics are clean, so rule implementations never need to handle grammar-invalid CST recovery shapes
+- rule invariant failures are returned as `Err(LintRuleInvariantError)` and converted by host boundaries into `internal_error` with `details.reason: "lint_rule_invariant_failed"` and the failing rule id
 - style fixes are not available from the rule context in Phase 3C
 
 `SemanticModel` is the shared fact owner for parser-owned semantic validation and configurable lint rules. Its canonical fact surface is defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Facts needed by both layers are derived once by the parser-side semantic model construction path and are then consumed by `validate_semantics` and `intlify_lint` rules. The lint crate must not build a parallel semantic fact model for declarations, references, option occurrences, attributes, or matcher variants; rule-local CST traversal is only for syntax-local details that are not yet useful as shared semantic facts.
@@ -279,7 +284,7 @@ For example, `no-unused-declaration` is expected to run as a model-level rule:
 
 ```rust
 impl LintRule for NoUnusedDeclaration {
-    fn check(&self, ctx: &mut RuleContext<'_>) {
+    fn check(&self, ctx: &mut RuleContext<'_>) -> Result<(), LintRuleInvariantError> {
         let reachable = ctx.semantic.reachable_declarations_from_outputs();
 
         for declaration in ctx.semantic.declarations() {
@@ -287,6 +292,8 @@ impl LintRule for NoUnusedDeclaration {
                 ctx.report("no-unused-declaration", declaration.name_span);
             }
         }
+
+        Ok(())
     }
 }
 ```
@@ -433,6 +440,28 @@ Lint config validation failures use stable `details`:
 }
 ```
 
+Parser and semantic diagnostic codes are not configurable rule ids. For example, this config is invalid because `duplicate-declaration` is a core semantic diagnostic and must remain an always-on `error`:
+
+```json
+{
+  "lint": {
+    "rules": {
+      "duplicate-declaration": "off"
+    }
+  }
+}
+```
+
+It reports:
+
+```json
+{
+  "reason": "non_configurable_diagnostic",
+  "pointer": "/lint/rules/duplicate-declaration",
+  "ruleId": "duplicate-declaration"
+}
+```
+
 `details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
@@ -484,7 +513,7 @@ The initial visual target is a colorful oxlint-style diagnostic block on TTY out
 
 Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
 
-Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels may be rendered as additional underline messages when practical. Multi-line spans may initially render the primary start line and surrounding context only; the full byte span remains available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels may be rendered as additional underline messages when practical. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span remains available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
 
 Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
 
@@ -633,6 +662,17 @@ Binding option validation returns the first validation failure as `invalid_optio
   "path": "rules.no-such-rule",
   "ruleId": "no-such-rule",
   "value": "bad"
+}
+```
+
+Using a parser or semantic diagnostic code as a binding rule id reports the same semantic reason with binding-specific dot-path details:
+
+```json
+{
+  "reason": "non_configurable_diagnostic",
+  "path": "rules.duplicate-declaration",
+  "ruleId": "duplicate-declaration",
+  "value": "off"
 }
 ```
 
