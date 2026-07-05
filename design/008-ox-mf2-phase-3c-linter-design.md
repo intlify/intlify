@@ -72,11 +72,11 @@ The initial linter pipeline is strict:
 parser -> semantic -> rules
 ```
 
-Parser diagnostics are always included in lint results. If any parser diagnostic is produced, semantic lowering and configurable lint rules do not run.
+Parser diagnostics are always included in lint results. If any parser diagnostic is produced, `SemanticModel` construction, semantic validation, and configurable lint rules do not run.
 
 Core semantic diagnostics, when produced by semantic analysis, are included after successful parsing. If semantic analysis produces any semantic diagnostic, configurable lint rules do not run.
 
-Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The seven core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) is the canonical parser-owned contract for semantic validation. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
+Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The seven core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) is the canonical parser-owned contract for semantic validation. `SemanticModel` construction happens only after parser diagnostics are empty. If construction or validation hits an invariant failure, the host boundary reports an `internal_error` operational error. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
 
 Configurable rules only run when parsing and semantic analysis complete without diagnostics.
 
@@ -90,15 +90,18 @@ The CLI and binding entry points share the same message-level lint workflow. `in
 
 The message-level workflow is:
 
-1. Parse source text and construct parser diagnostics, `CstView`, and `SemanticModel` when possible.
-2. If parser diagnostics exist, return parser diagnostics and skip semantic validation and configurable rules.
-3. Run parser-owned semantic validation over `SemanticModel`.
-4. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
-5. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
-6. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a `RuleReport` sink.
-7. Execute each enabled built-in rule by calling `LintRule::check(ctx)` in registry declaration order.
-8. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
-9. Shape the result for the Rust API, bindings, or CLI reporter.
+1. Parse source text and construct parser diagnostics plus a `CstView`.
+2. If parser diagnostics exist, return parser diagnostics and skip `SemanticModel` construction, semantic validation, and configurable rules.
+3. Construct `SemanticModel` from the diagnostic-free parse result.
+4. If `SemanticModel` construction hits an invariant failure, return an `internal_error` operational error.
+5. Run parser-owned semantic validation over `SemanticModel`.
+6. If semantic validation hits an invariant failure, return an `internal_error` operational error.
+7. If semantic diagnostics exist, return semantic diagnostics and skip configurable rules.
+8. Resolve the lint rule registry against `recommended` defaults and `lint.rules` overrides.
+9. Construct one `RuleContext` per lint target, carrying source text, read-only `CstView`, `SemanticModel`, resolved config, and a `RuleReport` sink.
+10. Execute each enabled built-in rule by calling `LintRule::check(ctx)` in registry declaration order.
+11. Normalize emitted rule diagnostics into deterministic report order: primary span source order, with same-span ties ordered by rule id.
+12. Shape the result for the Rust API, bindings, or CLI reporter.
 
 For a single lint target, parser diagnostics, semantic diagnostics, and configurable rule diagnostics are stage-exclusive. Parser diagnostics short-circuit semantic validation and configurable rules. Semantic diagnostics short-circuit configurable rules. Configurable rule diagnostics are produced only when parser and semantic diagnostics are empty.
 
@@ -130,7 +133,7 @@ Classification result:
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
 | `semantic-lowering-failed` | internal | see below |
 
-`semantic-lowering-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, semantic lowering must succeed for any parse result with zero parser diagnostics; a lowering failure therefore indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary.
+`semantic-lowering-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. Configurable rules do not run after such failures.
 
 ## Diagnostic Shape
 
@@ -154,6 +157,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 - `span` uses UTF-8 byte offsets with half-open ranges.
 - `location` uses the parser `SourceLocation` semantics: one-based `line` and zero-based UTF-8 byte `column`. It is `null` when source text is unavailable.
 - `labels` is an array of `{ span, message }` entries and may be empty.
+- `severity` is `"warn"` or `"error"`. Parser and semantic diagnostics are always `"error"`. Configurable lint rule diagnostics use the resolved rule severity. The JSON value `"warning"` is not emitted.
 - `message` text and `labels` messages are not stable compatibility surfaces.
 - A `help` field is reserved for future static per-code help text; the initial release does not populate it. Adding help content is a follow-up once documentation pages exist for codes and rules.
 
@@ -403,10 +407,13 @@ The resolved configuration is the implicit `recommended` defaults overlaid with 
 CLI config validation reports the first deterministic `config_validation_failed` error. Validation order is:
 
 1. top-level config shape: root must be an object, then unknown top-level fields in ASCII ascending order
-2. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
-3. `lint.rules` shape: `rules` must be an object when present
-4. `lint.rules` entries: rule ids are processed in ASCII ascending order; unknown rule ids are reported before invalid severity values for known rule ids
-5. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
+2. `fmt` section validation, using the formatter config validation order from the Phase 3B formatter design
+3. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
+4. `lint.rules` shape: `rules` must be an object when present
+5. `lint.rules` entries: rule ids are processed in ASCII ascending order; unknown rule ids are reported before invalid severity values for known rule ids
+6. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
+
+This order is command-independent. If both `fmt` and `lint` sections are invalid, `fmt` validation reports first even during `intlify lint`, because the shared project config has one deterministic first-error contract.
 
 Object-map validation uses ASCII ascending order. Array validation uses source order. This keeps validation independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
 

@@ -227,7 +227,7 @@ The `$schema` field is optional. The CLI does not use the `$schema` value to loc
 
 Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt` and `lint` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
 
-In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. When a config file exists, both the `fmt` and `lint` sections are required. A config file that omits either section fails validation with `config_validation_failed`; the implicit default project config applies only when no root config file is discovered and no explicit `--config` path is given. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
+In Phase 3A, `fmt` and `lint` are optional product sections. Omitted product sections resolve as empty product configs. When present, `fmt` and `lint` must be objects, and only empty objects are valid in Phase 3A. Therefore `{}`, `{ "fmt": {} }`, `{ "lint": {} }`, and `{ "fmt": {}, "lint": {} }` are valid project configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
 Phase 3A config error codes:
 
