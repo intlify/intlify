@@ -57,7 +57,7 @@ Calling this boundary with a parse result that contains parser diagnostics is ca
 
 Initial facts include:
 
-- declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
+- declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, source declaration order, bound-name span, and declaration span
 - references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
