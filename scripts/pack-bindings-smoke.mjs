@@ -12,9 +12,11 @@ try {
   const napiPackage = packPackage('packages/ox-mf2-napi')
   const wasmPackage = packPackage('packages/ox-mf2-wasm')
   const formatNapiPackage = packPackage('packages/format-napi')
+  const formatWasmPackage = packPackage('packages/format-wasm')
   const napiContents = listPackage(napiPackage)
   const wasmContents = listPackage(wasmPackage)
   const formatNapiContents = listPackage(formatNapiPackage)
+  const formatWasmContents = listPackage(formatWasmPackage)
 
   assertIncludes(
     napiContents,
@@ -69,6 +71,26 @@ try {
     formatNapiContents,
     entry => entry === 'package/dist/native-binding.d.ts',
     'formatter N-API native binding types'
+  )
+  assertIncludes(
+    formatWasmContents,
+    entry => entry === 'package/dist/index.js',
+    'formatter WASM JS entry'
+  )
+  assertIncludes(
+    formatWasmContents,
+    entry => entry === 'package/dist/index.d.ts',
+    'formatter WASM types entry'
+  )
+  assertIncludes(
+    formatWasmContents,
+    entry => entry === 'package/dist/intlify_format_wasm_bg.wasm',
+    'formatter WASM binary artifact'
+  )
+  assertIncludes(
+    formatWasmContents,
+    entry => entry === 'package/dist/intlify_format_wasm.js',
+    'formatter WASM JS glue artifact'
   )
 } finally {
   await rm(packDir, { force: true, recursive: true })
