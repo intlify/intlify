@@ -37,7 +37,17 @@ fn validate_semantics(model: &SemanticModel) -> Vec<SemanticDiagnostic>
 
 `SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections.
 
-SemanticModel construction is also part of the parser-owned invariant boundary. If parser diagnostics exist, downstream tooling does not run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`. The Rust API should avoid panic for recoverable host boundaries and use `Result<SemanticModel, SemanticInvariantError>` or an equivalent internal representation when construction can fail.
+SemanticModel construction is also part of the parser-owned invariant boundary. If parser diagnostics exist, downstream tooling does not run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`.
+
+The implementation should expose an internal parser boundary equivalent to:
+
+```rust
+fn semantic_model_from_parse_result(
+    parse: &ParseResult,
+) -> Result<SemanticModel, SemanticInvariantError>
+```
+
+Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. If parser diagnostics are empty and construction still returns `Err`, the downstream host boundary converts that error to `internal_error`. The Rust API should avoid panic for recoverable host boundaries.
 
 ## SemanticModel Fact Surface
 
@@ -302,6 +312,53 @@ Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/se
 - cooked identifier comparison and NFC normalization for duplicate options and duplicate variants
 
 Fixtures lock diagnostic code, severity, primary span, and report order. Message text and label wording are not fixture-locked.
+
+The minimum cascade fixture set includes these compound cases:
+
+- `invalid-local-dependency` suppresses the dependent `missing-selector-annotation` for the same broken selector chain:
+
+  ```mf2
+  .local $selector = {$later}
+  .local $later = {|x|}
+  .match $selector
+  * {{ok}}
+  ```
+
+  Expected diagnostics: `invalid-local-dependency` only.
+
+- a broken selector chain does not suppress an independent `variant-key-arity-mismatch`:
+
+  ```mf2
+  .input {$count :number}
+  .local $selector = {$later}
+  .local $later = {|x|}
+  .match $selector $count
+  one {{bad}}
+  * * {{ok}}
+  ```
+
+  Expected diagnostics: `invalid-local-dependency` and `variant-key-arity-mismatch`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
+
+- a broken selector chain does not suppress `missing-selector-annotation` for another independent selector:
+
+  ```mf2
+  .local $selector = {$later}
+  .local $later = {|x|}
+  .match $selector $other
+  * * {{ok}}
+  ```
+
+  Expected diagnostics: `invalid-local-dependency` and `missing-selector-annotation` for `$other`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
+
+- dependency-family violations do not also report `duplicate-declaration` for the same root cause:
+
+  ```mf2
+  .local $a = {$b}
+  .local $b = {$a}
+  {{{$a}}}
+  ```
+
+  Expected diagnostics: `invalid-local-dependency`; no `duplicate-declaration` for the dependency root cause.
 
 Fixture updates follow the existing parser fixture update flow. The semantic fixture test should support an update command equivalent to:
 

@@ -257,33 +257,9 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 - `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
 - `no-duplicate-attribute` reads expression and markup attribute occurrences from `SemanticModel`
 
-The linter depends on this initial subset of the parser-owned `SemanticModel` fact surface:
+From the linter consumer view, the initial rules need these parser-owned fact groups: declarations, resolved and unresolved references, selector references, message-body references, function option occurrences, attribute occurrences, matcher variants, and the shared `output_references()` / `selection_references()` helpers. The detailed reference taxonomy, dependency context, and helper ownership live in the parser semantic validation design; this document only defines how the linter consumes those facts.
 
-- declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
-- references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
-- selector references: variable references that appear as `.match` selectors
-- message body references: variable references that appear in pattern placeholders and body expressions
-- function option occurrences: function call owner id, option identifier, cooked identifier, identifier span, and owner-local occurrence order
-- attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
-- shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
-- output reference helper: a conceptual `SemanticModel::output_references()` or equivalent helper returns non-selector references owned by the message body's expression and markup subtree
-- selection dependency helper: a conceptual `SemanticModel::selection_references()` or equivalent helper returns selector references plus references used by selector declaration chains, function annotations, and selector annotation option values
-
-The initial reference kind taxonomy is:
-
-```rust
-enum ReferenceKind {
-    LocalRhs,
-    Selector,
-    MessageBody,
-    FunctionOption,
-    MarkupAttribute,
-}
-```
-
-`ReferenceKind` is the syntactic occurrence kind. `LocalRhs` covers a direct reference inside a `.local` right-hand-side expression. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values.
-
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
+`no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -505,6 +481,38 @@ Each `results[]` entry uses this shape:
 
 `status` is computed from the full diagnostic set even when `--quiet` filters warnings out of the `diagnostics` array.
 
+`results[]` is always ordered by the stable selected target path order, even when diagnostics and file-specific operational errors are mixed. A target that hits a file-specific operational error such as `input_read_failed` is not parsed or linted; it reports `status: "error"`, an empty `diagnostics` array, and the error in `errors`. Other targets in the same run may still report diagnostics normally. Top-level `errors` remains reserved for global operational errors. File-specific read, encoding, and framing errors live in `results[].errors`.
+
+When any file-specific operational error is present, the process exit code is `2` because Phase 3A exit priority is `2 > 1 > 0`, even if other files also produced lint diagnostics. The summary still counts every selected target:
+
+```json
+{
+  "results": [
+    {
+      "path": "a.mf2",
+      "status": "problems",
+      "diagnostics": [{ "code": "no-unused-declaration" }],
+      "errors": []
+    },
+    {
+      "path": "b.mf2",
+      "status": "error",
+      "diagnostics": [],
+      "errors": [{ "code": "input_read_failed" }]
+    }
+  ],
+  "summary": {
+    "status": "error",
+    "matchedFiles": 2,
+    "cleanFiles": 0,
+    "problemFiles": 1,
+    "diagnosticErrorCount": 0,
+    "diagnosticWarningCount": 1,
+    "errorCount": 1
+  }
+}
+```
+
 `summary` fields:
 
 - `status`: `"success"` for exit `0`, `"failure"` for exit `1` (any `error`-severity diagnostic, or warnings over `--max-warnings`), `"error"` for exit `2`
@@ -552,6 +560,8 @@ The primary Rust entry point is source-backed; the formatter's snapshot-backed c
 lint_message(source: &str, options: LintOptions) -> LintResult
 ```
 
+`LintOptions` is the caller-facing unresolved input model. It carries rule severity overrides but does not represent the fully resolved rule state. `crates/intlify_lint` resolves `LintOptions` by applying the implicit `recommended` defaults, validating rule ids and severities, and constructing an internal `ResolvedLintConfig` before any rule runs. `RuleContext` always receives `ResolvedLintConfig`, not raw options. CLI config, N-API options, and WASM options normalize into the same `LintOptions`-equivalent model before entering the lint core, so preset expansion and rule validation stay inside `crates/intlify_lint`.
+
 N-API and WASM expose the same contract as a discriminated union, using the Phase 3A operational error shape:
 
 ```ts
@@ -566,11 +576,11 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 `source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
-`LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
+`LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
 Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known rule ids. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
 
-Binding validation is split into a JS-shape gate and Rust semantic validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM must share the helper or maintain parity tests for the JS-shape gate.
+Binding validation is split into a JS-shape gate and Rust semantic validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM may implement their JS-shape gates locally, but they must be covered by parity tests so equivalent inputs produce the same `code`, `details.reason`, `details.path`, and `details.ruleId`.
 
 Binding option validation returns the first validation failure as `invalid_options` with stable `details`:
 
@@ -797,7 +807,7 @@ CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions es
 
 Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs assert no output, and problem runs assert that stderr contains the essential path, severity, code, and message fragments. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
 
-Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, and binding parity for `lintMessage`.
+Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_options_shape`, `invalid_rules_shape`, `unknown_rule`, and `invalid_rule_severity`.
 
 ## Benchmarks
 
