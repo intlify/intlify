@@ -55,6 +55,8 @@ packages/ox-mf2-napi/native-binding.d.ts
 packages/cli-native/bin
 packages/ox-mf2-wasm/dist
 packages/ox-mf2-wasm/.wasm-build.lock
+packages/format-wasm/.wasm-build.lock
+.wasm-pack-build.lock
 
 # others
 .plans

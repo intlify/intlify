@@ -1,12 +1,12 @@
 {
-  "name": "@intlify/ox-mf2-wasm",
+  "name": "@intlify/format-wasm",
   "version": "0.14.0-alpha.7",
-  "description": "WASM runtime package for ox-mf2.",
+  "description": "WASM formatter package for ox-mf2.",
   "keywords": [
+    "formatter",
     "intlify",
     "messageformat",
     "mf2",
-    "parser",
     "wasm"
   ],
   "homepage": "https://github.com/intlify/intlify#readme",
@@ -17,7 +17,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/intlify/intlify.git",
-    "directory": "packages/ox-mf2-wasm"
+    "directory": "packages/format-wasm"
   },
   "files": [
     "README.md",
@@ -39,10 +39,10 @@
   "scripts": {
     "build": "vp run build:wasm && vp run build:pack",
     "prebuild:wasm": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build:wasm": "node ../../scripts/build-wasm-package.mjs --crate ../../crates/ox_mf2_wasm --out-dir ../../packages/ox-mf2-wasm/dist --out-name ox_mf2_wasm",
+    "build:wasm": "node ../../scripts/build-wasm-package.mjs --crate ../../crates/intlify_format_wasm --out-dir ../../packages/format-wasm/dist --out-name intlify_format_wasm",
     "postbuild:wasm": "node -e \"require('node:fs').rmSync('dist/.gitignore',{force:true})\"",
     "build:pack": "vp pack",
-    "test": "vp test"
+    "test": "vp run ox-mf2-shared#build && vp test"
   },
   "devDependencies": {
     "@intlify/ox-mf2-shared": "workspace:*",

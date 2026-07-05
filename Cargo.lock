@@ -169,6 +169,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_format_wasm"
+version = "0.14.0-alpha.7"
+dependencies = [
+ "intlify_format",
+ "ox_mf2_parser",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

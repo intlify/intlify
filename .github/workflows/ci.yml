@@ -42,6 +42,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
+          targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
       - name: Install dependencies
@@ -84,6 +85,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -173,6 +175,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -208,6 +211,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -248,6 +252,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
