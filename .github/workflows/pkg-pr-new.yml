@@ -72,7 +72,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -170,7 +170,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -237,7 +237,7 @@ jobs:
           run-install: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: '1.96.0'
 
@@ -307,7 +307,9 @@ jobs:
       - name: Inspect package contents
         run: node scripts/inspect-binding-packages.mjs
 
-      - name: Publish preview packages
+      # pkg.pr.new preview publishing authenticates through the preview service.
+      # npm Trusted Publishing is reserved for real npm releases in release.yml.
+      - name: Publish preview packages # zizmor: ignore[use-trusted-publishing]
         run: >
           npm exec -- pkg-pr-new publish --packageManager=npm --no-template "release-dir/ox-mf2-napi/*" "release-dir/format-napi/*" "packages/ox-mf2-napi" "packages/ox-mf2-wasm" "packages/format-napi" "packages/format-wasm"
 
