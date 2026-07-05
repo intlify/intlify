@@ -259,6 +259,7 @@ The initial `SemanticModel` fact surface required by configurable rules includes
 - references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
+- function option occurrences: function call owner id, option identifier, cooked identifier, identifier span, and owner-local occurrence order
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - shared semantic helpers: the facts used by parser-owned semantic validation and configurable rules should be derived once and shared instead of re-created by rule-local CST traversal
 
@@ -569,6 +570,8 @@ Binding option validation returns the first validation failure as `invalid_optio
 
 `details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only when the invalid value is JSON-safe. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
 
+The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, unknown rule ids are reported before invalid severity values; known rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
+
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
 `@intlify/lint-wasm` follows the `@intlify/ox-mf2-wasm` initialization contract as specified for `@intlify/format-wasm` in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
@@ -581,7 +584,7 @@ Reporting policy: semantic analysis reports every violation in one pass; it does
 
 Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-local-dependency` makes a selector chain unreliable, the dependent `missing-selector-annotation` is not emitted for that same chain. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector. Fixtures should expect root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom.
 
-Duplicate-family diagnostics report every duplicate after the first occurrence in each duplicate group. The first occurrence is not reported; the second and later occurrences each produce one diagnostic whose primary span is the duplicate occurrence and whose label points to the first occurrence. This applies to `duplicate-variant`, `duplicate-option-name`, and `no-duplicate-attribute`.
+Duplicate-family diagnostics report every duplicate after the first occurrence in each duplicate group. The first occurrence is not reported; the second and later occurrences each produce one diagnostic whose primary span is the duplicate occurrence and whose label points to the first occurrence. This applies to `duplicate-declaration`, `duplicate-variant`, `duplicate-option-name`, and `no-duplicate-attribute`.
 
 ### duplicate-declaration
 
@@ -599,7 +602,7 @@ Reports a declaration that binds a variable that already appeared in a previous 
 {{{$label}}}
 ```
 
-Duplicate declarations are always semantic errors; there is no compatibility relaxation. The primary span is the later declaration's bound variable, with a label on the earlier declaration. This code covers only plain re-binding of an already-declared variable; dependency-order violations belong to `invalid-local-dependency`.
+Duplicate declarations are always semantic errors; there is no compatibility relaxation. The primary span is the later declaration's bound variable, with a label on the first declaration. When three or more declarations bind the same variable, every declaration after the first produces one diagnostic. This code covers only plain re-binding of an already-declared variable; dependency-order violations belong to `invalid-local-dependency`.
 
 ### invalid-local-dependency
 
@@ -687,6 +690,8 @@ one few {{Items}}
 
 Reports a matcher without a fallback variant. Per the MF2 rule, at least one variant must have all keys equal to the catch-all key `*`, regardless of selector functions or selector domains.
 
+The primary span is the `.match` keyword span, because no fallback token exists. Recovery cases that cannot recover the `.match` keyword span use the current offset empty span. Labels may point at the matcher body or variant list for human-readable output, but labels are not fixture-locked.
+
 ```mf2
 .match $count
 0 {{No items}}
@@ -703,6 +708,8 @@ female 1 {{She has one item}}
 
 Reports duplicate variant key tuples. Literal keys are compared by their cooked string values after the NFC normalization rule defined in the Phase 1 parser design, not by syntactical appearance, so `1` and `|1|` collide.
 
+Arity-invalid variants do not participate in duplicate tuple comparison, because their tuple cannot be evaluated against the selector list. They also do not count as fallback candidates for `missing-fallback-variant`. This means an arity-invalid catch-all such as `* *` in a single-selector matcher reports `variant-key-arity-mismatch` and still allows `missing-fallback-variant` to report independently.
+
 ```mf2
 .match $count
 1 {{One item}}
@@ -713,6 +720,8 @@ Reports duplicate variant key tuples. Literal keys are compared by their cooked 
 ### duplicate-option-name
 
 Reports duplicate option identifiers within one function. Per the MF2 rule, option identifiers must be unique within a function; duplicates are a Duplicate Option Name data model error.
+
+Duplicate detection is owner-local: options are compared only within the same function call. Option identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. The primary span is the later duplicate option identifier, with a label on the first occurrence. When three or more options share the same cooked identifier, every option after the first produces one diagnostic.
 
 ```mf2
 {$count :number minimumFractionDigits=2 minimumFractionDigits=3}
