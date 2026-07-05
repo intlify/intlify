@@ -64,8 +64,8 @@ Use it from `intlify.config.json`:
 Local formatter benchmark tooling lives in `tools/format-bench`.
 
 ```sh
-vp run bench:format
-vp run bench:format:smoke
+vp run format-bench#bench
+vp run format-bench#bench:smoke
 ```
 
 The benchmark result schema is validated, but timing thresholds are not used as CI gates.

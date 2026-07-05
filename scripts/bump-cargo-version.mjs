@@ -1,37 +1,19 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
+import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
+
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
 const version = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 ).version
 
-const cargoTomlFiles = [
-  'crates/ox_mf2_parser/Cargo.toml',
-  'crates/ox_mf2_napi/Cargo.toml',
-  'crates/ox_mf2_wasm/Cargo.toml',
-  'crates/intlify_format/Cargo.toml',
-  'crates/intlify_format_napi/Cargo.toml',
-  'crates/intlify_format_wasm/Cargo.toml',
-  'crates/intlify_cli/Cargo.toml'
-]
-
-const cargoLockPackages = [
-  'ox_mf2_parser',
-  'ox_mf2_napi',
-  'ox_mf2_wasm',
-  'intlify_format',
-  'intlify_format_napi',
-  'intlify_format_wasm',
-  'intlify_cli'
-]
-
-for (const relativePath of cargoTomlFiles) {
+for (const relativePath of releaseCargoTomlFiles) {
   await replacePackageVersion(relativePath, version)
 }
 
 await replaceHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', version)
-await replaceCargoLockVersions('Cargo.lock', cargoLockPackages, version)
+await replaceCargoLockVersions('Cargo.lock', releaseCargoLockPackages, version)
 
 async function replacePackageVersion(relativePath, nextVersion) {
   const file = new URL(relativePath, `file://${rootDir}/`)

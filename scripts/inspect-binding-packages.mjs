@@ -30,20 +30,7 @@ await inspectPackage({
     'dist/native-binding.js',
     'dist/native-binding.d.ts'
   ],
-  extraChecks({ files, pkg }) {
-    const hasLocalNative = [...files].some(
-      file => file.startsWith('dist/') && file.endsWith('.node')
-    )
-    const optionalDependencies = pkg.optionalDependencies ?? {}
-    const missingOptionalPackages = optionalNapiPackages.filter(
-      packageName => optionalDependencies[packageName] !== pkg.version
-    )
-    if (!hasLocalNative && missingOptionalPackages.length > 0) {
-      throw new Error(
-        `${pkg.name} must include a local .node file or optionalDependencies for all N-API platform packages; missing ${missingOptionalPackages.join(', ')}`
-      )
-    }
-  }
+  extraChecks: createNativeBindingCheck(optionalNapiPackages, 'N-API')
 })
 
 await inspectPackage({
@@ -64,20 +51,7 @@ await inspectPackage({
     'dist/native-binding.js',
     'dist/native-binding.d.ts'
   ],
-  extraChecks({ files, pkg }) {
-    const hasLocalNative = [...files].some(
-      file => file.startsWith('dist/') && file.endsWith('.node')
-    )
-    const optionalDependencies = pkg.optionalDependencies ?? {}
-    const missingOptionalPackages = optionalFormatNapiPackages.filter(
-      packageName => optionalDependencies[packageName] !== pkg.version
-    )
-    if (!hasLocalNative && missingOptionalPackages.length > 0) {
-      throw new Error(
-        `${pkg.name} must include a local .node file or optionalDependencies for all formatter N-API platform packages; missing ${missingOptionalPackages.join(', ')}`
-      )
-    }
-  }
+  extraChecks: createNativeBindingCheck(optionalFormatNapiPackages, 'formatter N-API')
 })
 
 await inspectPackage({
@@ -112,6 +86,23 @@ async function inspectPackage({ packagePath, requiredFiles, extraChecks }) {
 
   extraChecks?.({ files, pkg })
   console.log(`${pkg.name} package contents ok`)
+}
+
+function createNativeBindingCheck(optionalPackages, platformLabel) {
+  return ({ files, pkg }) => {
+    const hasLocalNative = [...files].some(
+      file => file.startsWith('dist/') && file.endsWith('.node')
+    )
+    const optionalDependencies = pkg.optionalDependencies ?? {}
+    const missingOptionalPackages = optionalPackages.filter(
+      packageName => optionalDependencies[packageName] !== pkg.version
+    )
+    if (!hasLocalNative && missingOptionalPackages.length > 0) {
+      throw new Error(
+        `${pkg.name} must include a local .node file or optionalDependencies for all ${platformLabel} platform packages; missing ${missingOptionalPackages.join(', ')}`
+      )
+    }
+  }
 }
 
 async function packFiles(packagePath) {

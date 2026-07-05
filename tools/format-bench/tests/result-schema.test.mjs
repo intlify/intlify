@@ -41,6 +41,16 @@ test('result schema rejects malformed cost names', () => {
   )
 })
 
+test('result schema rejects phase and cost mismatches', () => {
+  const result = validResult()
+  result.results[0].phase = 'format_check_cli_e2e'
+  result.results[0].cost = 'napi_binding_call'
+
+  expect(() => assertValidFormatBenchmarkResult(result)).toThrow(
+    '/results/0/cost must be a valid cost for phase "format_check_cli_e2e"'
+  )
+})
+
 test('benchmark command reads fixtures and emits a schema-valid result', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'intlify-format-bench-test-'))
   try {

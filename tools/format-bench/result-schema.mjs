@@ -53,6 +53,9 @@ function assertResults(results) {
 
   const phaseNames = new Set(FORMAT_BENCHMARK_PHASE_NAMES)
   const costNames = new Set(FORMAT_BENCHMARK_COST_NAMES)
+  const phaseCostMap = new Map(
+    FORMAT_BENCHMARK_PHASES.map(phase => [phase.name, new Set(phase.costs)])
+  )
   for (const [index, result] of results.entries()) {
     const pointer = `/results/${index}`
     assertObject(result, pointer)
@@ -70,6 +73,11 @@ function assertResults(results) {
       costNames.has(result.cost),
       true,
       `${pointer}/cost must be a formatter benchmark cost`
+    )
+    assertEqual(
+      phaseCostMap.get(result.phase)?.has(result.cost) ?? false,
+      true,
+      `${pointer}/cost must be a valid cost for phase "${result.phase}"`
     )
 
     if (result.status === 'skipped') {

@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
+
 const rootDir = process.env.INTLIFY_RELEASE_ROOT
   ? resolve(process.env.INTLIFY_RELEASE_ROOT)
   : fileURLToPath(new URL('..', import.meta.url))
@@ -30,40 +32,19 @@ const packageFiles = [
   'packages/cli-native/package.json'
 ]
 
-const cargoTomlFiles = [
-  'crates/ox_mf2_parser/Cargo.toml',
-  'crates/ox_mf2_napi/Cargo.toml',
-  'crates/ox_mf2_wasm/Cargo.toml',
-  'crates/intlify_format/Cargo.toml',
-  'crates/intlify_format_napi/Cargo.toml',
-  'crates/intlify_format_wasm/Cargo.toml',
-  'crates/intlify_cli/Cargo.toml'
-]
-
 for (const relativePath of packageFiles) {
   const pkg = await readJson(relativePath)
   assertEqual(`${relativePath} version`, pkg.version, expectedVersion)
 }
 
-for (const relativePath of cargoTomlFiles) {
+for (const relativePath of releaseCargoTomlFiles) {
   const source = await readText(relativePath)
   const version = source.match(/^version = "([^"]+)"/m)?.[1]
   assertEqual(`${relativePath} version`, version, expectedVersion)
 }
 
 await assertHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', expectedVersion)
-await assertCargoLockVersions(
-  [
-    'ox_mf2_parser',
-    'ox_mf2_napi',
-    'ox_mf2_wasm',
-    'intlify_format',
-    'intlify_format_napi',
-    'intlify_format_wasm',
-    'intlify_cli'
-  ],
-  expectedVersion
-)
+await assertCargoLockVersions(releaseCargoLockPackages, expectedVersion)
 await assertPublicPackageMetadata('packages/ox-mf2-napi/package.json')
 await assertPublicPackageMetadata('packages/ox-mf2-wasm/package.json')
 await assertPublicPackageMetadata('packages/format-napi/package.json')
