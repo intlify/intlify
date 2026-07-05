@@ -37,6 +37,43 @@ fn validate_semantics(model: &SemanticModel) -> Vec<SemanticDiagnostic>
 
 `SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections.
 
+SemanticModel construction is also part of the parser-owned invariant boundary. If parser diagnostics exist, downstream tooling does not run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`. The Rust API should avoid panic for recoverable host boundaries and use `Result<SemanticModel, SemanticInvariantError>` or an equivalent internal representation when construction can fail.
+
+## SemanticModel Fact Surface
+
+`SemanticModel` is the canonical owner for semantic facts shared by parser semantic validation, the Phase 3C linter, and future LSP/editor or resource/catalog consumers. The lint crate must not build a parallel semantic fact model for these records.
+
+Initial facts include:
+
+- declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
+- references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
+- selector references: variable references that appear as `.match` selectors
+- message body references: variable references that appear in pattern placeholders and body expressions
+- function option occurrences: function call owner id, option identifier, cooked identifier, identifier span, and owner-local occurrence order
+- attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
+- matcher variants: matcher owner id, selector count, variant id, key tuple, key spans, body span, and variant order
+
+The initial reference kind taxonomy is:
+
+```rust
+enum ReferenceKind {
+    LocalRhs,
+    Selector,
+    MessageBody,
+    FunctionOption,
+    MarkupAttribute,
+}
+```
+
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`.
+
+The parser should expose shared semantic helpers for facts that multiple consumers need:
+
+- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup attribute values, and future body-owned reference kinds.
+- `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and local dependency references used by that selector setup.
+
+These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design.
+
 ## Diagnostic Shape
 
 Semantic diagnostics use a parser-owned representation:
@@ -74,6 +111,24 @@ The exact Rust names are implementation details, but the JSON-visible stable cod
 
 All semantic diagnostics are emitted as `error`. Message wording and label wording are not stable compatibility surfaces. Code, severity, primary span, and report ordering are stable.
 
+## Diagnostic Code Catalog API
+
+The parser crate exposes JSON-visible diagnostic code catalogs through enum-owned iterator APIs rather than generated string-only tables:
+
+```rust
+impl DiagnosticCode {
+    pub fn all() -> &'static [DiagnosticCode];
+    pub fn json_code(self) -> &'static str;
+}
+
+impl SemanticDiagnosticCode {
+    pub fn all() -> &'static [SemanticDiagnosticCode];
+    pub fn json_code(self) -> &'static str;
+}
+```
+
+The exact names are implementation details, but parser diagnostics and semantic diagnostics must both expose an equivalent `all()` plus JSON-visible code mapping. Downstream crates, especially `intlify_lint`, collect these catalogs and combine them with lint rule ids to test that the shared JSON-visible diagnostic `code` namespace has no collisions. Parser tests should also detect when an enum variant is added without being included in `all()`.
+
 ## Diagnostic Ordering and Cascade Policy
 
 Semantic validation reports every independent violation in one pass; it does not stop at the first semantic diagnostic.
@@ -87,6 +142,8 @@ Semantic diagnostics are ordered by:
 Each violation site produces exactly one diagnostic with exactly one code. Overlapping semantic candidates are partitioned so that no source location is reported under two semantic codes for the same root cause.
 
 Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-local-dependency` makes a selector chain unreliable, dependent `missing-selector-annotation` diagnostics for that same chain are suppressed. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector.
+
+For example, a message can have one selector declaration chain broken by `invalid-local-dependency` and also contain a variant whose key count does not match the selector count. The dependent `missing-selector-annotation` for the broken selector chain is suppressed, but the independent `variant-key-arity-mismatch` still reports. Semantic validation should produce root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom and not a global stop-after-first-error result.
 
 ## Duplicate Family Policy
 
@@ -232,7 +289,7 @@ Duplicate detection is owner-local: options are compared only within the same fu
 
 ## Fixtures and Validation
 
-Parser semantic validation fixtures live with parser fixtures and tests. They must cover:
+Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/semantic/` and are exercised by parser crate tests. They must cover:
 
 - every semantic diagnostic with positive and negative cases
 - deterministic report ordering
@@ -245,6 +302,14 @@ Parser semantic validation fixtures live with parser fixtures and tests. They mu
 - cooked identifier comparison and NFC normalization for duplicate options and duplicate variants
 
 Fixtures lock diagnostic code, severity, primary span, and report order. Message text and label wording are not fixture-locked.
+
+Fixture updates follow the existing parser fixture update flow. The semantic fixture test should support an update command equivalent to:
+
+```sh
+UPDATE_SNAPSHOTS=1 cargo test -p ox_mf2_parser semantic
+```
+
+The exact test filter can differ, but semantic diagnostics must be updateable through the parser crate's normal snapshot/fixture workflow. Rust unit tests may cover narrow helper behavior, but span/order regression coverage should come from semantic fixtures.
 
 The parser crate should expose parser diagnostic code and semantic diagnostic code catalogs so downstream crates can verify JSON-visible diagnostic code namespace uniqueness.
 
@@ -262,6 +327,7 @@ Suggested implementation steps:
 6. implement duplicate option diagnostics
 7. add fixtures and ordering/cascade tests
 8. expose parser and semantic diagnostic code catalogs
+9. add the cross-catalog collision test in `intlify_lint` once the linter crate exists
 
 ## Deferred Follow-Up Notes
 

@@ -147,6 +147,10 @@ Phase 3A input and routing error codes:
 
 Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation and by the Phase 3C `intlify lint` design for invalid `--max-warnings` values. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
 
+Phase 3A also reserves a shared binding/API operational code for later product packages:
+
+- `invalid_input`: raw external binding or programmatic API input shape is invalid before typed command-specific input can be constructed, with `kind: "input"`. This is for values such as a non-string `source` argument or non-`Uint8Array` snapshot argument. Product-specific option/config validation remains separate and uses product-owned codes such as `invalid_options` or `config_validation_failed`.
+
 Input and routing errors use small structured `details` payloads when the rejected token is available:
 
 - `unknown_cli_option`: `details.option`

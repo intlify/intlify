@@ -249,7 +249,7 @@ The exact Rust names are implementation details, but the responsibilities are fi
 - rules run only after parser and core semantic diagnostics are clean, so rule implementations never need to handle grammar-invalid CST recovery shapes
 - style fixes are not available from the rule context in Phase 3C
 
-`SemanticModel` is the shared fact owner for parser-owned semantic validation and configurable lint rules. Facts needed by both layers are derived once by the parser-side semantic model construction path and are then consumed by `validate_semantics` and `intlify_lint` rules. The lint crate must not build a parallel semantic fact model for declarations, references, option occurrences, attributes, or matcher variants; rule-local CST traversal is only for syntax-local details that are not yet useful as shared semantic facts.
+`SemanticModel` is the shared fact owner for parser-owned semantic validation and configurable lint rules. Its canonical fact surface is defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Facts needed by both layers are derived once by the parser-side semantic model construction path and are then consumed by `validate_semantics` and `intlify_lint` rules. The lint crate must not build a parallel semantic fact model for declarations, references, option occurrences, attributes, or matcher variants; rule-local CST traversal is only for syntax-local details that are not yet useful as shared semantic facts.
 
 Initial rules should be implemented as one pass per enabled rule over `SemanticModel`, not as public AST-node listener callbacks. MF2 messages are small, and the initial rules are semantic facts checks:
 
@@ -257,7 +257,7 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 - `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
 - `no-duplicate-attribute` reads expression and markup attribute occurrences from `SemanticModel`
 
-The initial `SemanticModel` fact surface required by configurable rules includes:
+The linter depends on this initial subset of the parser-owned `SemanticModel` fact surface:
 
 - declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
 - references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
@@ -564,7 +564,7 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 `ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
 
-`source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with an `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
+`source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
 `LintOptions` carries the resolved rule severities; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
