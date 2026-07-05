@@ -37,10 +37,10 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp run build:napi && vp run build:pack",
+    "build": "vp run ox-mf2-shared#build && vp run build:napi && vp run build:pack",
     "build:napi": "napi build --manifest-path ../../crates/intlify_format_napi/Cargo.toml --output-dir dist --platform --esm --no-dts-header --js native-binding.js --dts native-binding.d.ts",
     "build:pack": "vp pack",
-    "test": "vp test"
+    "test": "vp run ox-mf2-shared#build && vp test"
   },
   "devDependencies": {
     "@intlify/ox-mf2-shared": "workspace:*",

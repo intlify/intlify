@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/default -- Vite ?url imports expose a default URL string.
 import editorWorkerUrl from 'monaco-editor/esm/vs/editor/editor.worker?url'
 import { utf16OffsetToUtf8ByteOffset, utf8ByteOffsetToUtf16Offset } from '@intlify/ox-mf2-wasm'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
 import { logger } from 'void/log'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
