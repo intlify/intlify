@@ -5,11 +5,13 @@ mod args;
 mod command;
 pub mod config;
 mod error;
+mod fmt;
 mod output;
 pub mod schema;
 pub mod version;
 
 use std::env;
+use std::io::{self, Read};
 use std::path::Path;
 
 use args::{parse_args, ParsedCommand};
@@ -20,9 +22,18 @@ use output::{render_error, render_reserved_command};
 pub use output::CliRunResult;
 
 pub fn run_env() -> CliRunResult {
-    let args = env::args().skip(1);
+    let raw_args = env::args().skip(1).collect::<Vec<_>>();
     let cwd = env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-    run(args, cwd)
+    let stdin = if fmt::argv_requests_stdin(&raw_args) && !argv_has_help_or_version(&raw_args) {
+        let mut stdin = Vec::new();
+        if let Err(error) = io::stdin().read_to_end(&mut stdin) {
+            return fmt::render_stdin_read_error(&raw_args, &cwd, &error);
+        }
+        stdin
+    } else {
+        Vec::new()
+    };
+    run_with_stdin(raw_args, cwd, stdin)
 }
 
 pub fn run<I, S>(args: I, cwd: impl AsRef<Path>) -> CliRunResult
@@ -31,22 +42,35 @@ where
     S: Into<String>,
 {
     let raw_args = args.into_iter().map(Into::into).collect::<Vec<_>>();
-    run_with_slice(&raw_args, cwd.as_ref())
+    run_with_slice(&raw_args, cwd.as_ref(), &[])
 }
 
-fn run_with_slice(raw_args: &[String], cwd: &Path) -> CliRunResult {
+pub fn run_with_stdin<I, S>(args: I, cwd: impl AsRef<Path>, stdin: impl AsRef<[u8]>) -> CliRunResult
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let raw_args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+    run_with_slice(&raw_args, cwd.as_ref(), stdin.as_ref())
+}
+
+fn run_with_slice(raw_args: &[String], cwd: &Path, stdin: &[u8]) -> CliRunResult {
     let parsed = parse_args(raw_args);
 
     // Help and version are intentionally resolved before argument errors so
     // discovery or invalid future command operands never block those exits.
     if parsed.help {
-        return match parsed
-            .command
-            .as_ref()
-            .and_then(ParsedCommand::reserved_name)
-        {
-            Some(command) => CliRunResult::success(command::reserved_help(command)),
-            None => CliRunResult::success(top_level_help()),
+        return if fmt::is_fmt_invocation(raw_args) {
+            CliRunResult::success(command::fmt_help())
+        } else {
+            match parsed
+                .command
+                .as_ref()
+                .and_then(ParsedCommand::reserved_name)
+            {
+                Some(command) => CliRunResult::success(command::reserved_help(command)),
+                None => CliRunResult::success(top_level_help()),
+            }
         };
     }
 
@@ -56,6 +80,10 @@ fn run_with_slice(raw_args: &[String], cwd: &Path) -> CliRunResult {
 
     if raw_args.is_empty() {
         return CliRunResult::success(top_level_help());
+    }
+
+    if fmt::is_fmt_invocation(raw_args) {
+        return fmt::run(raw_args, cwd, stdin);
     }
 
     let project_root = config::discover_project_root(cwd);
@@ -93,4 +121,9 @@ fn run_with_slice(raw_args: &[String], cwd: &Path) -> CliRunResult {
         ),
         None => CliRunResult::success(top_level_help()),
     }
+}
+
+fn argv_has_help_or_version(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| matches!(arg.as_str(), "--help" | "-h" | "--version" | "-V"))
 }

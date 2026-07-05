@@ -14,8 +14,9 @@ fn generated_config_schema_matches_design_contract() {
     assert!(json.get("$id").is_none());
     assert!(json.get("$defs").is_none());
     assert!(json.get("definitions").is_some());
-    assert_eq!(json["required"][0], "fmt");
-    assert_eq!(json["required"][1], "lint");
+    assert!(json.get("required").is_none());
+    assert!(json["definitions"].get("FormatterConfig").is_some());
+    assert!(json["definitions"].get("FormatterMode").is_some());
     assert!(schema.ends_with('\n'));
 }
 

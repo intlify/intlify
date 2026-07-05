@@ -28,6 +28,8 @@ const unixExecutableMask = 0o111
 const executableMode = 0o755
 const defaultRunTimeoutMs = 300_000
 const timeoutKillGraceMs = 5_000
+const formatterSmokeInput = '.input   {$count   :number}\n{{Value {$count   :number}}}'
+const formatterSmokeOutput = '.input {$count :number}\n{{Value {$count :number}}}\n'
 
 const command = process.argv[2]
 
@@ -126,14 +128,28 @@ async function smokeCli() {
   const wrapper = await run(process.execPath, [wrapperBinPath, '--version'], { capture: true })
   assertStdoutEquals(wrapper, await cliVersion())
 
-  const reserved = await run(process.execPath, [wrapperBinPath, 'fmt', '--reporter=json'], {
-    capture: true,
-    allowExitCodes: [2]
-  })
-  const envelope = JSON.parse(reserved.stdout)
-  assertEqual(envelope.command, 'fmt', 'reserved command envelope command')
-  assertEqual(envelope.errors?.[0]?.code, 'command_not_ready', 'reserved command error code')
-  assertEqual(envelope.errors?.[0]?.details?.phase, '3A', 'reserved command phase')
+  const formatterRoot = await mkdtemp(join(tmpdir(), 'intlify-cli-fmt-smoke-'))
+  try {
+    const fixturePath = join(formatterRoot, 'count.mf2')
+    await writeFile(fixturePath, formatterSmokeInput)
+
+    const formatted = await run(
+      process.execPath,
+      [wrapperBinPath, 'fmt', '--reporter=json', 'count.mf2'],
+      { cwd: formatterRoot, capture: true }
+    )
+    const envelope = JSON.parse(formatted.stdout)
+    assertEqual(formatted.stderr, '', 'formatter smoke stderr')
+    assertEqual(envelope.command, 'fmt', 'formatter smoke envelope command')
+    assertEqual(envelope.summary?.status, 'success', 'formatter smoke summary status')
+    assertEqual(envelope.summary?.operation, 'write', 'formatter smoke operation')
+    assertEqual(envelope.summary?.formattedFiles, 1, 'formatter smoke formatted file count')
+    assertEqual(envelope.results?.[0]?.path, 'count.mf2', 'formatter smoke result path')
+    assertEqual(envelope.results?.[0]?.status, 'formatted', 'formatter smoke result status')
+    assertEqual(await readFile(fixturePath, 'utf8'), formatterSmokeOutput, 'formatter smoke output')
+  } finally {
+    await rm(formatterRoot, { recursive: true, force: true })
+  }
 
   console.log('CLI smoke validation passed')
 }

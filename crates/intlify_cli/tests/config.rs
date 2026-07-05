@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use intlify_cli::config::{
-    load_project_config, slash_normalize_path, ConfigSource, EmptyConfig, LoadedProjectConfig,
-    ProjectConfig,
+    load_project_config, slash_normalize_path, ConfigSource, EmptyConfig, FormatterConfig,
+    FormatterMode, LoadedProjectConfig, ProjectConfig,
 };
 
 fn temp_root(name: &str) -> PathBuf {
@@ -31,7 +31,7 @@ fn assert_default_config(loaded: &LoadedProjectConfig) {
     assert_eq!(
         loaded.config,
         ProjectConfig {
-            fmt: EmptyConfig {},
+            fmt: FormatterConfig::default(),
             lint: EmptyConfig {}
         }
     );
@@ -271,15 +271,83 @@ fn validates_unknown_fmt_and_lint_fields() {
 }
 
 #[test]
-fn validates_required_fmt_and_lint_objects() {
+fn fmt_and_lint_sections_are_optional() {
+    let root = temp_root("optional-sections");
+    write(&root.join("intlify.config.json"), "{}");
+
+    let loaded = load_project_config(&root, None).expect("empty config should use defaults");
+
+    assert_default_config(&loaded);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn parses_formatter_config() {
+    let root = temp_root("fmt-config");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{"fmt":{"mode":"preserve","ignorePatterns":["ignored/**","!ignored/keep.mf2"]}}"#,
+    );
+
+    let loaded = load_project_config(&root, None).expect("formatter config should load");
+
+    assert_eq!(
+        loaded.config.fmt,
+        FormatterConfig {
+            mode: FormatterMode::Preserve,
+            ignore_patterns: vec!["ignored/**".to_owned(), "!ignored/keep.mf2".to_owned()]
+        }
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn validates_fmt_and_lint_section_shapes() {
     for (fixture, pointer, reason) in [
-        (r#"{"lint":{}}"#, "/fmt", "missing_field"),
+        (r#"{"fmt":null}"#, "/fmt", "expected_object"),
         (r#"{"fmt":{},"lint":[]}"#, "/lint", "expected_object"),
     ] {
         let root = temp_root("required-sections");
         write(&root.join("intlify.config.json"), fixture);
 
         let error = load_project_config(&root, None).expect_err("invalid section should fail");
+        let details = error.details.expect("validation details");
+
+        assert_eq!(error.code, "config_validation_failed");
+        assert_eq!(details["pointer"], pointer);
+        assert_eq!(details["reason"], reason);
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[test]
+fn validates_formatter_mode_and_ignore_patterns() {
+    for (fixture, pointer, reason) in [
+        (
+            r#"{"fmt":{"mode":"compact"}}"#,
+            "/fmt/mode",
+            "invalid_value",
+        ),
+        (
+            r#"{"fmt":{"ignorePatterns":"ignored/**"}}"#,
+            "/fmt/ignorePatterns",
+            "expected_array",
+        ),
+        (
+            r#"{"fmt":{"ignorePatterns":[1]}}"#,
+            "/fmt/ignorePatterns/0",
+            "expected_string",
+        ),
+        (
+            r#"{"fmt":{"ignorePatterns":["["]}}"#,
+            "/fmt/ignorePatterns/0",
+            "invalid_ignore_pattern",
+        ),
+    ] {
+        let root = temp_root("fmt-validation");
+        write(&root.join("intlify.config.json"), fixture);
+
+        let error = load_project_config(&root, None).expect_err("invalid fmt config should fail");
         let details = error.details.expect("validation details");
 
         assert_eq!(error.code, "config_validation_failed");
