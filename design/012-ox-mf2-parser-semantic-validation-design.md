@@ -67,7 +67,7 @@ Initial facts include:
 
 SemanticModel fact iterators have stable semantic order, not implementation collection order:
 
-- declarations: declaration order
+- declarations: source declaration order
 - references: source order
 - selector references: `.match` selector order
 - message body references: source order

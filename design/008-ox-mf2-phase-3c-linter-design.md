@@ -196,11 +196,12 @@ Operational errors:
 - invalid binding inputs
 - invalid binding options
 - internal failures, including semantic invariant failures after a clean parse
+- internal parser API misuse, including accidental `SemanticModel` construction attempts after parser diagnostics
 - internal failures from built-in lint rule invariant errors
 
 Operational errors use the Phase 3A operational error shape `{ kind, code, message, path?, details? }` and the shared string code namespace. The CLI exit code classification follows Phase 3A: `0` success, `1` lint failure (any `error` diagnostic, or warnings over `--max-warnings`), `2` operational error, with `2 > 1 > 0` priority for mixed outcomes. JSON output uses the Phase 3A top-level envelope, including its top-level `errors` array for global operational errors and `results[].errors` for file-specific operational errors.
 
-Semantic invariant failures use `internal_error` with `details.reason: "semantic_invariant_failed"` and a `details.stage` of `"semantic_model_construction"` or `"semantic_validation"`. Built-in rule invariant failures use `internal_error` with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. Rule invariant failures are target-level operational errors: any diagnostics already emitted by earlier rules for that target are discarded because the target's lint result is incomplete, while other targets in the same CLI run may still finish normally. These details are debugging aids for implementation failures; they are not user-facing diagnostics and are not configurable through `lint.rules`.
+Semantic invariant failures use `internal_error` with `details.reason: "semantic_invariant_failed"` and a `details.stage` of `"semantic_model_construction"` or `"semantic_validation"`. Semantic API misuse uses `internal_error` with `details.reason: "semantic_api_misuse"` when a host boundary accidentally asks the parser semantic layer to build a `SemanticModel` from a parse result that still has parser diagnostics. Built-in rule invariant failures use `internal_error` with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. Rule invariant failures are target-level operational errors: any diagnostics already emitted by earlier rules for that target are discarded because the target's lint result is incomplete, while other targets in the same CLI run may still finish normally. These details are debugging aids for implementation failures; they are not user-facing diagnostics and are not configurable through `lint.rules`.
 
 ## Stable Identifiers
 
@@ -274,7 +275,7 @@ From the linter consumer view, the initial rules need these parser-owned fact gr
 
 `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup option values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
 
-Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, stable occurrence key, optional labels, and optional typed message arguments. The occurrence key is required on every report and is derived from the `SemanticModel` fact that caused the report, such as declaration order, reference source order, owner primary source order plus owner-local occurrence order, or matcher variant order. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
+Rule diagnostics are built in two stages. A rule emits an internal `RuleReport` containing the rule id, primary span, stable occurrence key, optional labels, and optional typed message arguments. The occurrence key is required on every report and is derived from the `SemanticModel` fact that caused the report, such as declaration order, reference source order, owner primary source order plus owner-local occurrence order, or matcher variant order. It is an opaque comparable key with a stable total ordering; the exact representation may be an enum, tuple, or compact integer as long as central report sorting does not depend on emission order. It does not choose the final severity, JSON category, JSON code, or reporter shape. The linter's central shaper converts `RuleReport` into `LintDiagnostic`: category is `"lint"`, code is the rule id, severity comes from `ResolvedLintConfig`, messages come from rule metadata/templates, and report ordering is normalized centrally. This keeps rule implementations focused on detection and prevents each rule from owning reporter-compatible diagnostics.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -553,6 +554,27 @@ Each `results[]` entry uses this shape:
 
 `results[]` is always ordered by the stable selected target path order, even when diagnostics and file-specific operational errors are mixed. A target that hits a file-specific operational error such as `input_read_failed` is not parsed or linted; it reports `status: "error"`, an empty `diagnostics` array, and the error in `errors`. Other targets in the same run may still report diagnostics normally. Top-level `errors` remains reserved for global operational errors. File-specific read, encoding, and framing errors live in `results[].errors`.
 
+Rule invariant failures use the same target-level `results[].errors` surface. The target reports `status: "error"`, an empty `diagnostics` array, and an `internal_error` entry with `details.reason: "lint_rule_invariant_failed"` and `details.ruleId`. Partial rule diagnostics emitted before the failing rule are discarded:
+
+```json
+{
+  "path": "messages/foo.mf2",
+  "status": "error",
+  "diagnostics": [],
+  "errors": [
+    {
+      "kind": "internal",
+      "code": "internal_error",
+      "message": "internal linter error",
+      "details": {
+        "reason": "lint_rule_invariant_failed",
+        "ruleId": "no-unused-declaration"
+      }
+    }
+  ]
+}
+```
+
 When any file-specific operational error is present, the process exit code is `2` because Phase 3A exit priority is `2 > 1 > 0`, even if other files also produced lint diagnostics. The summary still counts every selected target:
 
 ```json
@@ -642,7 +664,7 @@ type LintResult =
 function lintMessage(source: string, options?: LintOptions): LintResult
 ```
 
-`ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures.
+`ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures. Semantic invariant failures, semantic API misuse, and rule invariant failures all return `ok: false` with the same `internal_error` details used by the CLI boundary, including `details.reason: "semantic_invariant_failed"`, `"semantic_api_misuse"`, or `"lint_rule_invariant_failed"` as appropriate.
 
 For programmatic APIs, `errorCount` and `warningCount` are derived from the returned `diagnostics` array. `errorCount` is the number of diagnostics whose severity is `"error"` and `warningCount` is the number whose severity is `"warn"`, across parser, semantic, and configurable lint rule diagnostics. Parser and semantic diagnostics are always counted as errors. Configurable rule diagnostics use their resolved severity. CLI-only reporter behavior such as `--quiet` does not affect programmatic counts, and operational errors are represented only by the `ok: false` branch.
 
@@ -893,6 +915,8 @@ CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions es
 Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs assert no output, and problem runs assert that stderr contains the essential path, severity, code, and message fragments. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
 
 Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_utf16`, `invalid_options_shape`, `invalid_rules_shape`, `non_configurable_diagnostic`, `unknown_rule`, and `invalid_rule_severity`.
+
+Internal implementation failures such as `lint_rule_invariant_failed` and `semantic_api_misuse` are not normal `.mf2` fixture cases because user input should not trigger them. They should be covered by unit or synthetic tests: for example, a test-only rule that returns `Err(LintRuleInvariantError)` for result shaping, and a parser semantic API misuse test that passes a diagnostic-bearing parse result to the semantic model boundary.
 
 ## Benchmarks
 
