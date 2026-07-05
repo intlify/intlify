@@ -39,7 +39,7 @@
   "scripts": {
     "build": "vp run build:wasm && vp run build:pack",
     "prebuild:wasm": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build:wasm": "wasm-pack build ../../crates/intlify_format_wasm --target web --no-pack --out-dir ../../packages/format-wasm/dist --out-name intlify_format_wasm",
+    "build:wasm": "node ../../scripts/build-wasm-package.mjs --crate ../../crates/intlify_format_wasm --out-dir ../../packages/format-wasm/dist --out-name intlify_format_wasm",
     "postbuild:wasm": "node -e \"require('node:fs').rmSync('dist/.gitignore',{force:true})\"",
     "build:pack": "vp pack",
     "test": "vp run ox-mf2-shared#build && vp test"

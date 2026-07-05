@@ -39,7 +39,7 @@
   "scripts": {
     "build": "vp run build:wasm && vp run build:pack",
     "prebuild:wasm": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build:wasm": "wasm-pack build ../../crates/ox_mf2_wasm --target web --no-pack --out-dir ../../packages/ox-mf2-wasm/dist --out-name ox_mf2_wasm",
+    "build:wasm": "node ../../scripts/build-wasm-package.mjs --crate ../../crates/ox_mf2_wasm --out-dir ../../packages/ox-mf2-wasm/dist --out-name ox_mf2_wasm",
     "postbuild:wasm": "node -e \"require('node:fs').rmSync('dist/.gitignore',{force:true})\"",
     "build:pack": "vp pack",
     "test": "vp test"
