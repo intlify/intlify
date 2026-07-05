@@ -32,10 +32,12 @@ Semantic validation runs after parsing and semantic lowering. The zero diagnosti
 The parser crate exposes semantic validation as an explicit API:
 
 ```rust
-fn validate_semantics(model: &SemanticModel) -> Vec<SemanticDiagnostic>
+fn validate_semantics(
+    model: &SemanticModel,
+) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>
 ```
 
-`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections.
+`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections. If semantic validation detects an invariant failure, it returns `Err(SemanticInvariantError)`; downstream host boundaries convert that error to `internal_error`.
 
 SemanticModel construction is also part of the parser-owned invariant boundary. If parser diagnostics exist, downstream tooling does not run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`.
 
@@ -427,7 +429,7 @@ The parser semantic validation implementation is a Phase 3C prerequisite for the
 Suggested implementation steps:
 
 1. define `SemanticDiagnosticCode` and `SemanticDiagnostic`
-2. expose `validate_semantics(model: &SemanticModel)`
+2. expose `validate_semantics(model: &SemanticModel) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>`
 3. implement declaration dependency diagnostics
 4. implement selector annotation diagnostics
 5. implement matcher variant diagnostics

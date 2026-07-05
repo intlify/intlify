@@ -131,9 +131,9 @@ Classification result:
 | `no-unused-declaration` | configurable rule, default `warn` | declaration is not reachable from message output or selectors |
 | `no-duplicate-attribute` | configurable rule, default `warn` | the MF2 spec says attribute identifiers SHOULD be unique; duplicates are ignored with last-one-wins semantics |
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
-| `semantic-lowering-failed` | internal | see below |
+| `semantic-invariant-failed` | internal | see below |
 
-`semantic-lowering-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. Configurable rules do not run after such failures.
+`semantic-invariant-failed` is not a user-facing diagnostic. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. Configurable rules do not run after such failures.
 
 ## Diagnostic Shape
 
@@ -170,10 +170,12 @@ Semantic diagnostics get their own representation in `ox_mf2_parser`: a `Semanti
 The parser crate exposes semantic validation as an explicit API:
 
 ```rust
-fn validate_semantics(model: &SemanticModel) -> Vec<SemanticDiagnostic>
+fn validate_semantics(
+    model: &SemanticModel,
+) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>
 ```
 
-`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order. Linter, future validator, and LSP/editor consumers call this API after constructing a semantic model. Semantic diagnostics are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
+`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. If validation hits an invariant failure, it returns `Err(SemanticInvariantError)`, and downstream host boundaries convert that to an `internal_error` operational error. Linter, future validator, and LSP/editor consumers call this API after constructing a semantic model. Semantic diagnostics are also not encoded into Binary AST snapshot diagnostics sections, consistent with the standing policy that semantic information stays outside the lossless snapshot; snapshot-carried diagnostics remain parser diagnostics only.
 
 ## Failure Model
 
@@ -192,7 +194,7 @@ Operational errors:
 - invalid CLI arguments
 - invalid binding inputs
 - invalid binding options
-- internal failures, including semantic lowering failures after a clean parse
+- internal failures, including semantic invariant failures after a clean parse
 
 Operational errors use the Phase 3A operational error shape `{ kind, code, message, path?, details? }` and the shared string code namespace. The CLI exit code classification follows Phase 3A: `0` success, `1` lint failure (any `error` diagnostic, or warnings over `--max-warnings`), `2` operational error, with `2 > 1 > 0` priority for mixed outcomes. JSON output uses the Phase 3A top-level envelope, including its top-level `errors` array for global operational errors and `results[].errors` for file-specific operational errors.
 
@@ -305,6 +307,8 @@ Rule configuration uses an ESLint/oxlint-style state:
 
 Parser and semantic diagnostics are independent from rule configuration and are emitted as `error`. Future compatibility, deprecation, or best-practice diagnostics may use `warning`.
 
+In prose, "warning" refers to diagnostics whose JSON `severity` is `"warn"`.
+
 `info` and `hint` are reserved for LSP/editor or advice-style layers.
 
 ## Presets
@@ -346,7 +350,7 @@ Schema-level lint config rules:
 - `lint.rules` is optional and defaults to `{}`
 - `lint.rules` keys must be known configurable rule ids; unknown rule ids are `config_validation_failed` errors
 - `lint.rules` values accept only the strings `"off"`, `"warn"`, or `"error"`; the ESLint-style `["warn", { ... }]` tuple form is reserved for future rules with options and is invalid in Phase 3C
-- semantic diagnostic codes are not accepted as `lint.rules` keys; core semantic diagnostics are not configurable
+- parser and semantic diagnostic codes are not accepted as `lint.rules` keys; core parser and semantic diagnostics are not configurable
 - `lint.ignorePatterns` is optional, defaults to `[]`, and uses the same gitignore-compatible subset and validation rules as `fmt.ignorePatterns`
 
 Valid examples:
@@ -410,7 +414,7 @@ CLI config validation reports the first deterministic `config_validation_failed`
 2. `fmt` section validation, using the formatter config validation order from the Phase 3B formatter design
 3. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
 4. `lint.rules` shape: `rules` must be an object when present
-5. `lint.rules` entries: rule ids are processed in ASCII ascending order; unknown rule ids are reported before invalid severity values for known rule ids
+5. `lint.rules` entries: rule ids are processed in ASCII ascending order; for each entry, parser or semantic diagnostic codes are reported before unknown rule ids, and unknown rule ids are reported before invalid severity values for known configurable rule ids
 6. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
 
 This order is command-independent. If both `fmt` and `lint` sections are invalid, `fmt` validation reports first even during `intlify lint`, because the shared project config has one deterministic first-error contract.
@@ -429,7 +433,7 @@ Lint config validation failures use stable `details`:
 }
 ```
 
-`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. `details.field` is included for unknown fields, `details.ruleId` for rule failures, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
+`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -563,7 +567,7 @@ When any file-specific operational error is present, the process exit code is `2
 
 Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 
-When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status` and summary counts still use the full diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
+When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status` and summary counts still use the full diagnostic set. In other words, `results[].status` is computed from the full diagnostic set, while `results[].diagnostics` contains only the reporter-visible diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
 
 ```json
 {
@@ -615,9 +619,9 @@ For programmatic APIs, `errorCount` and `warningCount` are derived from the retu
 
 `source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. JavaScript strings containing unpaired surrogates are rejected before parsing with `details.reason: "invalid_utf16"`; bindings must not replace them with U+FFFD because that would make diagnostics refer to a different source string. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
-`LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
+`LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Parser or semantic diagnostic codes used as rule ids are also rejected as `invalid_options` with `details.reason: "non_configurable_diagnostic"`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
-Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known rule ids. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
+Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known configurable rule ids. Parser or semantic diagnostic codes report `non_configurable_diagnostic` before their value shape is considered. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
 
 Binding validation is split into a JS-shape gate and Rust semantic validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM may implement their JS-shape gates locally, but they must be covered by parity tests so equivalent inputs produce the same `code`, `details.reason`, `details.path`, and `details.ruleId`.
 
@@ -632,9 +636,9 @@ Binding option validation returns the first validation failure as `invalid_optio
 }
 ```
 
-`details.reason` is required and is one of `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only for scalar values: string, number, boolean, or `null`. Arrays and objects are omitted even when JSON-safe; `undefined`, functions, and symbols are omitted because they have no JSON representation. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
+`details.reason` is required and is one of `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. It is a dot path, not a JSON Pointer: the root object field is `rules`, and the rule id is used as the next segment, such as `rules.no-unused-declaration`. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only for scalar values: string, number, boolean, or `null`. Arrays and objects are omitted even when JSON-safe; `undefined`, functions, and symbols are omitted because they have no JSON representation. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
 
-The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, unknown rule ids are reported before invalid severity values; known rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
+The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. A future `lintSnapshot` must define the snapshot-to-semantic path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
@@ -848,7 +852,7 @@ CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions es
 
 Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs assert no output, and problem runs assert that stderr contains the essential path, severity, code, and message fragments. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
 
-Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_utf16`, `invalid_options_shape`, `invalid_rules_shape`, `unknown_rule`, and `invalid_rule_severity`.
+Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_utf16`, `invalid_options_shape`, `invalid_rules_shape`, `non_configurable_diagnostic`, `unknown_rule`, and `invalid_rule_severity`.
 
 ## Benchmarks
 
