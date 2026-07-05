@@ -1,0 +1,4 @@
+.input {$count :number}
+
+.local $label={$count :number}
+{{{$label} items}}

@@ -1,0 +1,4 @@
+.match $count $gender
+0   male    {{No items for him}}
+10  female  {{Ten items for her}}
+*   *       {{Other}}

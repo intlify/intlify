@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "name": "standard",
+      "options": {
+        "mode": "standard"
+      },
+      "expected": "standard.mf2"
+    },
+    {
+      "name": "preserve",
+      "options": {
+        "mode": "preserve"
+      },
+      "expected": "preserve.mf2"
+    }
+  ]
+}
