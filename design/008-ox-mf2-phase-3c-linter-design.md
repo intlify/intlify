@@ -125,7 +125,7 @@ Classification result:
 | `duplicate-variant` | core semantic | MF2 Duplicate Variant data model error |
 | `duplicate-option-name` | core semantic | MF2 Duplicate Option Name data model error |
 | `no-undeclared-variable` | configurable rule, default `off` | undeclared variables are valid external inputs in MF2, so this is a strict-workflow opt-in, not an error; selector variables are handled by `missing-selector-annotation` |
-| `no-unused-declaration` | configurable rule, default `warn` | declared variable never referenced |
+| `no-unused-declaration` | configurable rule, default `warn` | declaration is not reachable from message output or selectors |
 | `no-duplicate-attribute` | configurable rule, default `warn` | the MF2 spec says attribute identifiers SHOULD be unique; duplicates are ignored with last-one-wins semantics |
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
 | `semantic-lowering-failed` | internal | see below |
@@ -256,7 +256,7 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 The initial `SemanticModel` fact surface required by configurable rules includes:
 
 - declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, declaration order, bound-name span, and declaration span
-- references: variable reference id, reference kind, source span, declaration visibility point, and resolved declaration id or unresolved state
+- references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
@@ -274,7 +274,9 @@ enum ReferenceKind {
 }
 ```
 
-`LocalRhs` covers references inside `.local` right-hand-side expressions. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values. `no-unused-declaration` uses `Selector` and `MessageBody` as reachability roots and follows `LocalRhs` dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
+`ReferenceKind` is the syntactic occurrence kind. `LocalRhs` covers a direct reference inside a `.local` right-hand-side expression. `Selector` covers `.match` selector references. `MessageBody` covers references inside simple or quoted pattern bodies. `FunctionOption` covers references inside function option values. `MarkupAttribute` covers references inside markup attribute values.
+
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`. `no-unused-declaration` uses `Selector` and `MessageBody` as reachability roots and follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except `Selector`, which is owned by `missing-selector-annotation`.
 
 Rules may use `CstView` when a check is inherently syntax-local, for example to distinguish exact placeholder shape, inspect markup syntax, walk tokens, or compute labels from source spans. Rule implementations should still prefer `SemanticModel` when the needed information is semantic, and should not perform ad hoc reparsing. If multiple rules need the same syntax-derived fact, that fact should be promoted into `SemanticModel` or a shared helper instead of duplicating CST traversal in each rule.
 
@@ -454,6 +456,8 @@ When no operands are provided and stdin mode is not selected, `intlify lint` beh
 
 Human-readable output renders oxlint-style diagnostic blocks and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter. Exact wording, box drawing, and color styling are not fixture-locked contracts.
 
+Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
+
 Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^` or `~`. Labels may be rendered as additional underline messages when practical. Multi-line spans may initially render the primary start line and surrounding context only. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
 
 Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
@@ -573,7 +577,9 @@ Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requ
 
 Core semantic diagnostics are always enabled after successful parsing, are reported as `error`, and are not configurable. They correspond to MF2 Data Model Errors. They are implemented in the `ox_mf2_parser` semantic validation layer and surfaced through lint results; `intlify_lint` does not reimplement them.
 
-Reporting policy: semantic analysis reports every violation in one pass, ordered by primary span in source order; it does not stop at the first semantic diagnostic. Configurable rule diagnostics follow the same ordering when rules run: primary span source order, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
+Reporting policy: semantic analysis reports every violation in one pass; it does not stop at the first semantic diagnostic. Semantic diagnostics are ordered by primary span start, then primary span end, then semantic diagnostic code. Configurable rule diagnostics follow the same primary span ordering when rules run, with same-span ties ordered by rule id. Each violation site produces exactly one diagnostic with exactly one code — overlapping candidates are partitioned so that no source location is reported under two codes. In particular, `duplicate-declaration` and `invalid-local-dependency` split the MF2 Duplicate Declaration family exclusively: self-references and forward references that are later bound report `invalid-local-dependency` only, while plain re-binding of an already-declared variable reports `duplicate-declaration` only.
+
+Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-local-dependency` makes a selector chain unreliable, the dependent `missing-selector-annotation` is not emitted for that same chain. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector. Fixtures should expect root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom.
 
 Duplicate-family diagnostics report every duplicate after the first occurrence in each duplicate group. The first occurrence is not reported; the second and later occurrences each produce one diagnostic whose primary span is the duplicate occurrence and whose label points to the first occurrence. This applies to `duplicate-variant`, `duplicate-option-name`, and `no-duplicate-attribute`.
 
@@ -628,6 +634,16 @@ Selector annotations can be reached indirectly through `.local` chains:
 ```mf2
 .input {$count :number}
 .local $selector = {$count}
+.match $selector
+one {{One item}}
+* {{Items}}
+```
+
+The function annotation may also come from the `.local` expression itself:
+
+```mf2
+.input {$count}
+.local $selector = {$count :number}
 .match $selector
 one {{One item}}
 * {{Items}}
@@ -867,6 +883,7 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 - Fix model: safe fixes, suggestions, dangerous fixes, and how non-style fixes interact with formatter-owned style changes.
 - Machine reporter roadmap beyond `text` and `json`, including GitHub annotations and SARIF.
 - CLI inspection and debug modes: rule listing, resolved config printing, file discovery debugging, and rule timing output.
+- Explicit color control such as `--color always|auto|never`; Phase 3C only provides automatic TTY/CI/`NO_COLOR` behavior.
 - Rule options and the `["severity", { options }]` config tuple form, once a rule needs options.
 - `preset` config field or preset composition, once presets beyond `recommended` exist.
 - `unreachable-variant` selection-semantics modeling.
