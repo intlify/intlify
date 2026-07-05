@@ -1,0 +1,11 @@
+{
+  "cases": [
+    {
+      "name": "invalid-input-declaration",
+      "options": {
+        "mode": "standard"
+      },
+      "expectedDiagnostics": "diagnostics.json"
+    }
+  ]
+}
