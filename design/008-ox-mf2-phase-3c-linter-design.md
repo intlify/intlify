@@ -259,7 +259,7 @@ Initial rules should be implemented as one pass per enabled rule over `SemanticM
 - `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
 - `no-duplicate-attribute` reads expression and markup attribute occurrences from `SemanticModel`
 
-From the linter consumer view, the initial rules need these parser-owned fact groups: declarations, resolved and unresolved references, selector references, message-body references, function option occurrences, attribute occurrences, matcher variants, and the shared `output_references()` / `selection_references()` helpers. The detailed reference taxonomy, dependency context, and helper ownership live in the parser semantic validation design; this document only defines how the linter consumes those facts.
+From the linter consumer view, the initial rules need these parser-owned fact groups: declarations, resolved and unresolved references, selector references, message-body references, option occurrences with function or markup owner kind, attribute occurrences, matcher variants, and the shared `output_references()` / `selection_references()` helpers. The detailed reference taxonomy, dependency context, and helper ownership live in the parser semantic validation design; this document only defines how the linter consumes those facts.
 
 `no-unused-declaration` uses `SemanticModel::output_references()` and `SemanticModel::selection_references()` as reachability roots. Output references are non-selector references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup attribute values, and future body-owned expression/reference kinds. Selection references include selector variables, selector declaration chains, function annotations used to annotate selectors, and selector annotation option value references. The rule then follows references marked as local dependencies. `no-undeclared-variable` reports unresolved references for every kind except selector references, which are owned by `missing-selector-annotation`.
 
@@ -400,13 +400,15 @@ The resolved configuration is the implicit `recommended` defaults overlaid with 
 
 CLI config validation reports the first deterministic `config_validation_failed` error. Validation order is:
 
-1. top-level config shape: root must be an object, then unknown top-level fields
-2. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields
+1. top-level config shape: root must be an object, then unknown top-level fields in ASCII ascending order
+2. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
 3. `lint.rules` shape: `rules` must be an object when present
 4. `lint.rules` entries: rule ids are processed in ASCII ascending order; unknown rule ids are reported before invalid severity values for known rule ids
-5. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string entry is reported
+5. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
 
-This order is independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
+Object-map validation uses ASCII ascending order. Array validation uses source order. This keeps validation independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
+
+Invalid `lint.ignorePatterns` entries use `config_validation_failed` with JSON pointers such as `/lint/ignorePatterns/0`, including non-string entries, invalid pattern syntax, and unsupported constructs. Unsupported or unrecognized patterns in the root `.gitignore` are ignored as non-fatal compatibility behavior. Invalid patterns in `--ignore-path` files remain operational errors and use `invalid_ignore_pattern`, matching the shared formatter contract.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -441,7 +443,7 @@ The flag surface intentionally mirrors oxlint's basic flags plus the oxfmt-style
 
 Flag semantics:
 
-- `--max-warnings <n>`: the CLI exits with `1` when the total warning count exceeds `n`, even when no `error` diagnostics are reported. The default is unlimited. `n` must be a non-negative integer; other values are `invalid_cli_argument` errors, the first emit site of that reserved Phase 3A code.
+- `--max-warnings <n>`: the CLI exits with `1` when the total warning count exceeds `n`, even when no `error` diagnostics are reported. The default is unlimited. `n` must be ASCII decimal digits only and parse as a `u32`; leading zeros are accepted. Empty strings, signs, whitespace, decimal points, exponent notation, non-ASCII digits, and values greater than `u32::MAX` are `invalid_cli_argument` errors with `details.option: "--max-warnings"`, `details.value`, and `details.reason: "invalid_non_negative_integer"`.
 - `--quiet`: `warning` diagnostics are not reported in text or JSON output, matching ESLint and oxlint behavior. Exit code behavior does not change: `--max-warnings` still counts suppressed warnings. `results[].status` and all summary counts are computed from the full diagnostic set; `--quiet` filters only the reported `diagnostics` arrays.
 - `--stdin-filepath <path>`: explicit stdin mode with the same semantics as `intlify fmt`: reads all source text from stdin, applies read framing, uses `<path>` as the virtual input path for extension checks, ignore rules, and output, and cannot be combined with file, directory, or glob operands.
 - `--ignore-path <path>`: same resolution and pattern rules as `intlify fmt`.
@@ -590,7 +592,7 @@ function lintMessage(source: string, options?: LintOptions): LintResult
 
 For programmatic APIs, `errorCount` and `warningCount` are derived from the returned `diagnostics` array. `errorCount` is the number of diagnostics whose severity is `"error"` and `warningCount` is the number whose severity is `"warn"`, across parser, semantic, and configurable lint rule diagnostics. Parser and semantic diagnostics are always counted as errors. Configurable rule diagnostics use their resolved severity. CLI-only reporter behavior such as `--quiet` does not affect programmatic counts, and operational errors are represented only by the `ok: false` branch.
 
-`source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
+`source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. JavaScript strings containing unpaired surrogates are rejected before parsing with `details.reason: "invalid_utf16"`; bindings must not replace them with U+FFFD because that would make diagnostics refer to a different source string. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
 `LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
 
@@ -825,7 +827,7 @@ CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions es
 
 Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs assert no output, and problem runs assert that stderr contains the essential path, severity, code, and message fragments. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
 
-Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` and `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_options_shape`, `invalid_rules_shape`, `unknown_rule`, and `invalid_rule_severity`.
+Minimum coverage includes: every core semantic diagnostic with positive and negative cases, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-local-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Binding parity fixtures must include `invalid_source_type`, `invalid_utf16`, `invalid_options_shape`, `invalid_rules_shape`, `unknown_rule`, and `invalid_rule_severity`.
 
 ## Benchmarks
 

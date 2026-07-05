@@ -59,7 +59,7 @@ Initial facts include:
 - references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
-- function option occurrences: function call owner id, option identifier, cooked identifier, identifier span, and owner-local occurrence order
+- option occurrences: owner id, owner kind, option identifier, cooked identifier, identifier span, and owner-local occurrence order
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - matcher variants: matcher owner id, selector count, variant id, key tuple, key spans, body span, and variant order
 
@@ -74,6 +74,17 @@ enum ReferenceKind {
     MarkupAttribute,
 }
 ```
+
+Option occurrences distinguish the owner kind:
+
+```rust
+enum OptionOwnerKind {
+    Function,
+    Markup,
+}
+```
+
+Function options and markup options are both collected into the semantic fact surface. Owner-local option checks compare only options with the same owner id and owner kind. Function and markup owners are never compared with each other, and different markup placeholders are never compared with each other. Open, close, and standalone markup placeholders are separate owners.
 
 Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupAttribute` while still having `isLocalDependency = true`.
 
@@ -103,7 +114,7 @@ struct ReferenceRef<'a> {
 }
 ```
 
-The exact Rust names and lifetimes are implementation details, but consumers should be able to read source span, resolved state, syntactic occurrence kind, and dependency context without mutating the model. Declaration, function option, attribute, and matcher variant facts should follow the same read-only iterator/view pattern.
+The exact Rust names and lifetimes are implementation details, but consumers should be able to read source span, resolved state, syntactic occurrence kind, and dependency context without mutating the model. Declaration, option, attribute, and matcher variant facts should follow the same read-only iterator/view pattern.
 
 ## Diagnostic Shape
 
@@ -320,12 +331,16 @@ Arity-invalid variants do not participate in duplicate tuple comparison, because
 
 ### duplicate-option-name
 
-Reports duplicate option identifiers within one function. Per the MF2 rule, option identifiers must be unique within a function; duplicates are a Duplicate Option Name data model error.
+Reports duplicate option identifiers within one option owner. Function and markup options are both represented as data-model `Options`, and duplicates are a Duplicate Option Name data model error.
 
-Duplicate detection is owner-local: options are compared only within the same function call. Option identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. The primary span is the later duplicate option identifier, with a label on the first occurrence. When three or more options share the same cooked identifier, every option after the first produces one diagnostic.
+Duplicate detection is owner-local: options are compared only within the same function call or the same markup placeholder. Function options and markup options are not compared with each other. Different markup placeholders are not compared with each other; open, close, and standalone markup placeholders are separate owners. Option identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. The primary span is the later duplicate option identifier, with a label on the first occurrence. When three or more options share the same cooked identifier, every option after the first produces one diagnostic.
 
 ```mf2
 {$count :number minimumFractionDigits=2 minimumFractionDigits=3}
+```
+
+```mf2
+{{{#link href=|/a| href=|/b|/}}}
 ```
 
 ## Fixtures and Validation
