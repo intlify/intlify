@@ -24,8 +24,10 @@ async function publishPackages({ dryRun, explicitTag, npmDir, packageNames }) {
   const publishTargets = []
   const packageDirs = [
     ...collectGeneratedPackageDirs(npmDir),
-    join(rootDir, 'packages', 'ox-mf2-wasm'),
     join(rootDir, 'packages', 'ox-mf2-napi'),
+    join(rootDir, 'packages', 'ox-mf2-wasm'),
+    join(rootDir, 'packages', 'format-napi'),
+    join(rootDir, 'packages', 'format-wasm'),
     join(rootDir, 'packages', 'cli-native'),
     join(rootDir, 'packages', 'cli')
   ]
@@ -77,14 +79,16 @@ async function publishPackage(packageDir, { dryRun, explicitTag, pkg }) {
   }
 }
 
-function collectGeneratedPackageDirs(directory) {
-  if (!existsSync(directory)) {
-    return []
-  }
-  return readdirSync(directory)
-    .map(name => join(directory, name))
-    .filter(path => statSync(path).isDirectory() && existsSync(join(path, 'package.json')))
-    .sort((a, b) => a.localeCompare(b))
+function collectGeneratedPackageDirs(directories) {
+  return directories.flatMap(directory => {
+    if (!existsSync(directory)) {
+      return []
+    }
+    return readdirSync(directory)
+      .map(name => join(directory, name))
+      .filter(path => statSync(path).isDirectory() && existsSync(join(path, 'package.json')))
+      .sort((a, b) => a.localeCompare(b))
+  })
 }
 
 async function isPublished(packageName, version) {
@@ -171,7 +175,7 @@ function parseCliArgs(args) {
     args,
     options: {
       'dry-run': { type: 'boolean' },
-      'npm-dir': { type: 'string' },
+      'npm-dir': { type: 'string', multiple: true },
       package: { type: 'string', multiple: true },
       tag: { type: 'string' }
     },
@@ -190,7 +194,10 @@ function parseCliArgs(args) {
   return {
     dryRun: Boolean(values['dry-run']) || command === 'dry-run',
     explicitTag: values.tag,
-    npmDir: values['npm-dir'] ?? join(rootDir, 'release-dir', 'ox-mf2-napi'),
+    npmDir: values['npm-dir'] ?? [
+      join(rootDir, 'release-dir', 'ox-mf2-napi'),
+      join(rootDir, 'release-dir', 'format-napi')
+    ],
     packageNames: values.package ?? []
   }
 }

@@ -27,7 +27,10 @@ Use it from `intlify.config.json`:
 ```json
 {
   "$schema": "./node_modules/@intlify/cli/schema/config.schema.json",
-  "fmt": {},
+  "fmt": {
+    "mode": "standard",
+    "ignorePatterns": ["dist/**", "node_modules/**"]
+  },
   "lint": {}
 }
 ```
@@ -45,3 +48,24 @@ Use it from `intlify.config.json`:
   "lint": {}
 }
 ```
+
+## Formatter Limitations
+
+`intlify fmt` in Phase 3B is scoped to direct `.mf2` files.
+
+- resource/catalog formatting is not supported
+- line wrapping is not supported
+- formatter ignore directives inside MF2 files are not supported
+- range formatting is not supported
+- `.editorconfig` is not loaded
+
+## Formatter Benchmarks
+
+Local formatter benchmark tooling lives in `tools/format-bench`.
+
+```sh
+vp run bench:format
+vp run bench:format:smoke
+```
+
+The benchmark result schema is validated, but timing thresholds are not used as CI gates.

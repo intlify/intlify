@@ -24,6 +24,8 @@ const packageFiles = [
   'packages/ox-mf2-napi/package.json',
   'packages/ox-mf2-wasm/package.json',
   'packages/ox-mf2-shared/package.json',
+  'packages/format-napi/package.json',
+  'packages/format-wasm/package.json',
   'packages/cli/package.json',
   'packages/cli-native/package.json'
 ]
@@ -32,6 +34,9 @@ const cargoTomlFiles = [
   'crates/ox_mf2_parser/Cargo.toml',
   'crates/ox_mf2_napi/Cargo.toml',
   'crates/ox_mf2_wasm/Cargo.toml',
+  'crates/intlify_format/Cargo.toml',
+  'crates/intlify_format_napi/Cargo.toml',
+  'crates/intlify_format_wasm/Cargo.toml',
   'crates/intlify_cli/Cargo.toml'
 ]
 
@@ -48,15 +53,28 @@ for (const relativePath of cargoTomlFiles) {
 
 await assertHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', expectedVersion)
 await assertCargoLockVersions(
-  ['ox_mf2_parser', 'ox_mf2_napi', 'ox_mf2_wasm', 'intlify_cli'],
+  [
+    'ox_mf2_parser',
+    'ox_mf2_napi',
+    'ox_mf2_wasm',
+    'intlify_format',
+    'intlify_format_napi',
+    'intlify_format_wasm',
+    'intlify_cli'
+  ],
   expectedVersion
 )
 await assertPublicPackageMetadata('packages/ox-mf2-napi/package.json')
 await assertPublicPackageMetadata('packages/ox-mf2-wasm/package.json')
+await assertPublicPackageMetadata('packages/format-napi/package.json')
+await assertPublicPackageMetadata('packages/format-wasm/package.json')
 await assertPublicPackageMetadata('packages/cli/package.json')
 await assertPublicPackageMetadata('packages/cli-native/package.json')
 await assertCliPackageConsistency(expectedVersion)
-await assertInternalCliCrate()
+await assertInternalRustCrate('crates/intlify_cli/Cargo.toml')
+await assertInternalRustCrate('crates/intlify_format/Cargo.toml')
+await assertInternalRustCrate('crates/intlify_format_napi/Cargo.toml')
+await assertInternalRustCrate('crates/intlify_format_wasm/Cargo.toml')
 await assertReleaseBumpTargets()
 
 async function assertPublicPackageMetadata(relativePath) {
@@ -102,17 +120,22 @@ async function assertCliPackageConsistency(expected) {
   assertEqual('CLI release version', cliPackage.version, expected)
 }
 
-async function assertInternalCliCrate() {
-  const source = await readText('crates/intlify_cli/Cargo.toml')
+async function assertInternalRustCrate(relativePath) {
+  const source = await readText(relativePath)
   if (!/^publish\s*=\s*false$/m.test(source)) {
-    throw new Error('crates/intlify_cli/Cargo.toml must set publish = false')
+    throw new Error(`${relativePath} must set publish = false`)
   }
 }
 
 async function assertReleaseBumpTargets() {
   const pkg = await readJson('package.json')
   const releaseScript = pkg.scripts?.release ?? ''
-  for (const relativePath of ['packages/cli/package.json', 'packages/cli-native/package.json']) {
+  for (const relativePath of [
+    'packages/format-napi/package.json',
+    'packages/format-wasm/package.json',
+    'packages/cli/package.json',
+    'packages/cli-native/package.json'
+  ]) {
     if (!releaseScript.includes(`"${relativePath}"`)) {
       throw new Error(`package.json release script must bump ${relativePath}`)
     }
