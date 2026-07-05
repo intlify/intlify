@@ -1,6 +1,6 @@
 SNAPSHOT v0.1
-bytes: 695
-section_count: 8
+bytes: 719
+section_count: 9
 
 roots:
   [0] root=node#7 source=source#0 diags=[0,1) (count=1)

@@ -153,7 +153,7 @@ Defaults:
 
 Whether whitespace / bidi trivia is collected by the parser is controlled by Phase 1 `ParseOptions.collect_trivia`. `SnapshotOptions.include_trivia` only controls whether already-produced trivia records are encoded into the snapshot. If a snapshot is built from a parse result produced with `collect_trivia = false`, there is no trivia to encode even when `include_trivia = true`.
 
-When `include_trivia = true` but the parse result was produced with `collect_trivia = false`, SnapshotWriter encodes no trivia. TokenRecord trivia starts and counts are written as `0`, and the optional trivia section is omitted because it is empty. SnapshotWriter must not rescan source text to reconstruct trivia.
+When `include_trivia = true` but the parse result was produced with `collect_trivia = false`, SnapshotWriter encodes no trivia records. TokenRecord trivia starts and counts are written as `0`, and the optional trivia section is still emitted with `count = 0` as a capability marker. SnapshotWriter must not rescan source text to reconstruct trivia.
 
 ### Result Types
 
@@ -276,15 +276,15 @@ The section table remains the source of truth for decoders; decoders must not re
 
 Section kind entries must be unique. If the section table contains the same `SectionKind` more than once, the decoder rejects the snapshot. The decoder reads sections through the section table and does not require physical section order to match SectionKind order. The v0.1 writer still emits sections in SectionKind order for deterministic output.
 
-Optional sections are omitted when empty.
+Optional sections are usually omitted when empty, except when an enabled snapshot option needs section presence as a capability proof.
 
-Required core sections are always emitted, even when their count or byte length is zero where the format permits it. Optional sections such as trivia, diagnostics, diagnostic labels, source text data, and extended data are emitted only when they contain data or when a future option explicitly requires their presence for debugging. The v0.1 default writer omits empty optional sections.
+Required core sections are always emitted, even when their count or byte length is zero where the format permits it. Optional sections such as trivia, diagnostics, diagnostic labels, source text data, and extended data are emitted only when they contain data or when an enabled writer option explicitly requires their presence. The v0.1 default writer emits empty `Trivia` when `include_trivia = true`, empty `Diagnostics` when `include_diagnostics = true`, and empty `SourceTextData` when `include_source_text = true`.
 
-Decoders treat a missing optional section as an empty section. This keeps `include_trivia = false`, `include_diagnostics = false`, and `include_source_text = false` compact in the binary layout while preserving a simple read contract.
+Decoders treat a missing optional section as an empty section for traversal counts. Capability-sensitive consumers must use section presence, not only a zero count, to distinguish an empty enabled section from data that was intentionally omitted. This keeps `include_trivia = false`, `include_diagnostics = false`, and `include_source_text = false` compact in the binary layout while preserving a simple read contract.
 
-Note: because a missing optional section is indistinguishable from an intentionally omitted one, the current format cannot prove that a snapshot represents a diagnostic-free parse. The Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)) requires such a proof for snapshot-backed formatting. Adding a diagnostics capability marker, or an always-present empty diagnostics section when diagnostics are enabled, is a planned draft-format change. Per the changelog update rule, that change must land together with snapshot versioning, writer, decoder, and fixture updates in the PR that introduces snapshot-backed formatter behavior.
+Section presence for empty `Trivia` and `Diagnostics` is the v0.1 capability proof required by the Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)). A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot.
 
-Empty required sections still receive an aligned `offset`. The `offset` represents the section start and must satisfy `offset <= snapshot.len()` and the normal alignment rule even when `byte_len = 0`. Optional empty sections are omitted instead of being represented with `byte_len = 0`.
+Empty emitted sections still receive an aligned `offset`. The `offset` represents the section start and must satisfy `offset <= snapshot.len()` and the normal alignment rule even when `byte_len = 0`. Optional sections that are disabled by writer options are omitted instead of being represented with `byte_len = 0`.
 
 ### Explicit Wire Encoding
 
@@ -475,7 +475,7 @@ nodes, edges, tokens, roots, sources, string offsets, and string data are core s
 
 Minimum counts for core sections are `roots.count >= 1`, `sources.count >= 1`, and `nodes.count >= 1`. `edges.count` and `tokens.count` may be `0`. string offsets may have `count = 0` when there are no strings, and string data may have `byte_len = 0`.
 
-source text data, trivia, diagnostics, diagnostic labels, and extended data are optional sections. Optional sections normally use `SectionFlags.required = false`. They may be empty depending on options or content. A missing optional section is equivalent to `count = 0`.
+source text data, trivia, diagnostics, diagnostic labels, and extended data are optional sections. Optional sections normally use `SectionFlags.required = false`. They may be empty depending on options or content. A missing optional section is equivalent to `count = 0` for traversal, but not for capability checks that depend on section presence.
 
 In v0.1, section flags are strict:
 
@@ -767,7 +767,7 @@ The internal Phase 1 `TokenRecord` may use a compact layout with `first_trivia` 
 
 Formatters, especially preserve mode, use token and trivia sections to reconstruct source faithfully without relying on a nested object tree.
 
-When `include_trivia = false`, TokenRecord layout does not change. `leading_trivia_count` and `trailing_trivia_count` are `0`, and `leading_trivia_start` and `trailing_trivia_start` are also `0`. The trivia section may be empty or absent as an optional section. Decoders must not vary TokenRecord record_size by option.
+When `include_trivia = false`, TokenRecord layout does not change. `leading_trivia_count` and `trailing_trivia_count` are `0`, and `leading_trivia_start` and `trailing_trivia_start` are also `0`. The trivia section is absent. When `include_trivia = true`, the trivia section is present even when its count is `0`. Decoders must not vary TokenRecord record_size by option.
 
 v0.1 TokenRecord / TriviaRecord has no `text_ref`. Original token / trivia text is referenced by `source_id + span_start/span_end`. With `include_source_text = false`, external source text is used. With `include_source_text = true`, `SourceRecord.text` points to the source text data section. If normalized text, cooked text, or debug text becomes necessary and cannot be represented only by source spans, add extended data or an optional token-text section instead of growing TokenRecord / TriviaRecord.
 
@@ -775,7 +775,7 @@ v0.1 TokenRecord / TriviaRecord has no `text_ref`. Original token / trivia text 
 
 ![ox-mf2 diagnostics section](./assets/003-ox-mf2-diagnostics-section.svg)
 
-When `include_diagnostics = true`, SnapshotWriter encodes parser diagnostics and diagnostic labels when they are present. The diagnostics and diagnostic labels sections are optional and may still be omitted when empty. This allows snapshots to be inspected or transported with parse diagnostics attached without forcing empty optional sections into every snapshot.
+When `include_diagnostics = true`, SnapshotWriter emits the diagnostics section even when its count is `0`. This lets consumers prove that diagnostics were encoded and the parse was diagnostic-free. Diagnostic labels are encoded when they are present; the diagnostic labels section may be omitted when empty. When `include_diagnostics = false`, the diagnostics and diagnostic labels sections are absent.
 
 ```text
 DiagnosticRecord {

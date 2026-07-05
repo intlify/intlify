@@ -878,15 +878,20 @@ impl SnapshotWriter {
             bytes: tokens_bytes,
             count: tokens_count,
         });
-        // Trivia is omitted when empty (even when include_trivia=true).
-        if options.include_trivia && trivia_count > 0 {
+        // Emit an empty Trivia section when trivia was requested so preserve
+        // formatters can distinguish "no trivia in source" from "trivia was
+        // intentionally omitted".
+        if options.include_trivia {
             assembler.push(EmittedSection {
                 kind: SectionKind::Trivia,
                 bytes: trivia_bytes,
                 count: trivia_count,
             });
         }
-        if options.include_diagnostics && diagnostics_count > 0 {
+        // Emit an empty Diagnostics section when diagnostics were requested so
+        // downstream tools can distinguish "diagnostic-free parse" from
+        // "diagnostics intentionally omitted".
+        if options.include_diagnostics {
             assembler.push(EmittedSection {
                 kind: SectionKind::Diagnostics,
                 bytes: diagnostics_bytes,

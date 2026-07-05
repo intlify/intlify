@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 ox_mf2_parser = { path = "../ox_mf2_parser" }
+unicode-width = "0.2"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

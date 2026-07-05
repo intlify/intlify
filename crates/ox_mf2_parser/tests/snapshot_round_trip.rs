@@ -150,6 +150,22 @@ fn include_diagnostics_false_drops_diagnostic_sections_and_bytes() {
 }
 
 #[test]
+fn default_snapshot_emits_empty_capability_sections() {
+    let snap = ox_mf2_parser::parse_message_to_snapshot(
+        "Hello",
+        None,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .unwrap();
+    let view = decode_snapshot(&snap.bytes).unwrap();
+
+    assert_eq!(view.diagnostic_count(), 0);
+    assert_eq!(view.section(SectionKind::Diagnostics).unwrap().count, 0);
+    assert_eq!(view.section(SectionKind::Trivia).unwrap().count, 0);
+}
+
+#[test]
 fn snapshot_omits_optional_sections_when_disabled() {
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {

@@ -1,0 +1,3 @@
+.input {$count :number min=1 @unit=|item|}
+.local $label = {$count :number}
+{{Hello {$count :number min=1 @unit=|item|}}}

@@ -141,6 +141,23 @@ impl OperationalError {
             .with_detail("reason", "missing_capability")
     }
 
+    /// Build an invalid snapshot input error with a stable reason.
+    #[must_use]
+    pub fn invalid_snapshot(message: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Input, FormatErrorCode::InvalidSnapshot, message)
+            .with_detail("reason", reason)
+    }
+
+    /// Build a source/snapshot mismatch error.
+    #[must_use]
+    pub fn source_snapshot_mismatch(message: impl Into<String>) -> Self {
+        Self::new(
+            ErrorKind::Input,
+            FormatErrorCode::SourceSnapshotMismatch,
+            message,
+        )
+    }
+
     /// Build an internal formatter invariant error.
     #[must_use]
     pub fn internal(message: impl Into<String>) -> Self {
