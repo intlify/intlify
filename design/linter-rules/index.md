@@ -18,15 +18,15 @@ Metadata tables in these pages are design-time summaries for readers. They are n
 
 Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.
 
-| Diagnostic Code | Description | Details |
-| --- | --- | --- |
-| `duplicate-declaration` | Report duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
-| `invalid-local-dependency` | Report invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
-| `missing-selector-annotation` | Report MF2 selectors that do not resolve to an annotated declaration. | [missing-selector-annotation](./missing-selector-annotation.md) |
-| `variant-key-arity-mismatch` | Report MF2 variant key counts that do not match selector counts. | [variant-key-arity-mismatch](./variant-key-arity-mismatch.md) |
-| `missing-fallback-variant` | Report MF2 matchers without a catch-all fallback variant. | [missing-fallback-variant](./missing-fallback-variant.md) |
-| `duplicate-variant` | Report duplicate MF2 matcher variant key tuples. | [duplicate-variant](./duplicate-variant.md) |
-| `duplicate-option-name` | Report duplicate MF2 option names on one owner. | [duplicate-option-name](./duplicate-option-name.md) |
+| Diagnostic Code | Severity | Configurable | Description | Details |
+| --- | --- | --- | --- | --- |
+| `duplicate-declaration` | `error` | no | Report duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
+| `invalid-local-dependency` | `error` | no | Report invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
+| `missing-selector-annotation` | `error` | no | Report MF2 selectors that do not resolve to an annotated declaration. | [missing-selector-annotation](./missing-selector-annotation.md) |
+| `variant-key-arity-mismatch` | `error` | no | Report MF2 variant key counts that do not match selector counts. | [variant-key-arity-mismatch](./variant-key-arity-mismatch.md) |
+| `missing-fallback-variant` | `error` | no | Report MF2 matchers without a catch-all fallback variant. | [missing-fallback-variant](./missing-fallback-variant.md) |
+| `duplicate-variant` | `error` | no | Report duplicate MF2 matcher variant key tuples. | [duplicate-variant](./duplicate-variant.md) |
+| `duplicate-option-name` | `error` | no | Report duplicate MF2 option names on one owner. | [duplicate-option-name](./duplicate-option-name.md) |
 
 ## Configurable Lint Rules
 
@@ -34,8 +34,8 @@ Configurable lint rules run only after parser and semantic diagnostics are clean
 
 The configurable-rule table mirrors the product-level metadata in the Phase 3C linter design for navigation convenience.
 
-| Rule ID | Category | Default | Recommended | Description | Details |
-| --- | --- | --- | --- | --- | --- |
-| `no-unused-declaration` | `best-practice` | `warn` | yes | Report MF2 declarations that do not affect output or selector setup. | [no-unused-declaration](./no-unused-declaration.md) |
-| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Report duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
-| `no-undeclared-variable` | `correctness` | `off` | no | Report undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |
+| Rule ID | Category | Default Severity | Recommended | Configurable | Fixable | Description | Details |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | yes | no | Report MF2 declarations that do not affect output or selector setup. | [no-unused-declaration](./no-unused-declaration.md) |
+| `no-duplicate-attribute` | `best-practice` | `warn` | yes | yes | no | Report duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
+| `no-undeclared-variable` | `correctness` | `off` | no | yes | no | Report undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |
