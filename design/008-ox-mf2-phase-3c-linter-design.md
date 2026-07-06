@@ -39,6 +39,8 @@ These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`
 
 Binding packages expose direct programmatic lint APIs. They do not host plugins and do not need a CLI callback bridge.
 
+This design fixes the linter package boundary and public entry points, not the npm release procedure. Trusted publishing setup, dist-tag policy, native package publish order, smoke tests for published artifacts, and bootstrap-token handling belong to the Phase 3C implementation or release plan.
+
 ## Architecture
 
 Phase 3C introduces the linter product behind the Phase 3A CLI shell while keeping parser and semantic validation ownership in `ox_mf2_parser`. The architecture has one Rust linter core that powers `intlify lint`, N-API, and WASM entry points.
@@ -959,6 +961,7 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 - Resource/catalog adapters for JSON/YAML host files and resource-level rules.
 - Parallel file linting with deterministic output, and concurrency controls.
 - Snapshot-backed linting (`lintSnapshot`), including the snapshot-to-semantic path and snapshot capability checks.
+- Linter npm release flow details: trusted publishing setup, dist-tag policy, native package publish order, published-artifact smoke tests, and any bootstrap-token migration for first-time native package publication.
 - The combined `intlify check` command: designed in a short dedicated addendum after both the formatter and linter products ship, once their JSON reporters and exit behavior exist as implemented contracts.
 
 ## Open Questions
