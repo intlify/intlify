@@ -34,6 +34,6 @@ The configurable-rule table mirrors the product-level metadata in the Phase 3C l
 
 | Rule ID | Category | Default | Recommended | Description | Details |
 | --- | --- | --- | --- | --- | --- |
-| `no-unused-declaration` | `best-practice` | `warn` | yes | Report MF2 declarations that do not affect output or selection. | [no-unused-declaration](./no-unused-declaration.md) |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | Report MF2 declarations that do not affect output or selector setup. | [no-unused-declaration](./no-unused-declaration.md) |
 | `no-duplicate-attribute` | `best-practice` | `warn` | yes | Report duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
 | `no-undeclared-variable` | `correctness` | `off` | no | Report undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |

@@ -341,7 +341,7 @@ The initial preset is `recommended`. It is applied implicitly as the default rul
 
 `no-undeclared-variable` defaults to `off` and is not part of `recommended`, because undeclared variables are valid external inputs in MF2.
 
-While the linter remains in 0.x, `recommended` may evolve by adding useful diagnostics as needed. Preset stability policy should be finalized before a 1.0 release. `strict`, `nursery`, `experimental`, and resource/catalog-oriented presets are future design work.
+While the linter remains in 0.x, `recommended` may evolve by adding useful diagnostics in minor releases. Patch releases should avoid changing the preset except to correct implementation bugs or documentation drift. Preset stability policy should be finalized before a 1.0 release. `strict`, `nursery`, `experimental`, and resource/catalog-oriented presets are future design work.
 
 ## Config Contract
 
@@ -725,7 +725,17 @@ Using a parser or semantic diagnostic code as a binding rule id reports the same
 }
 ```
 
-`details.reason` is required and is one of `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is required when the invalid location is known. Root `options` shape failures use `details.path: "options"`, `rules` shape failures use `details.path: "rules"`, and rule-specific failures use `rules.<rule-id>`, such as `rules.no-unused-declaration`. The path is a dot path, not a JSON Pointer. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only for scalar values: string, number, boolean, or `null`. Arrays and objects are omitted even when JSON-safe; `undefined`, functions, and symbols are omitted because they have no JSON representation. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
+`details.reason` is required and is one of `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_rules_shape"`, or `"invalid_options_shape"`. `details.path` is always required for Phase 3C `invalid_options`. Root `options` shape failures use `details.path: "options"`, `rules` shape failures use `details.path: "rules"`, and rule-specific failures use `rules.<rule-id>`, such as `rules.no-unused-declaration`. The path is a dot path, not a JSON Pointer. Phase 3C rule ids are kebab-case ASCII and require no escaping; future rule option paths may extend the notation if escaping becomes necessary. `details.ruleId` is required for rule-specific failures. `details.value` is included only for scalar values: string, number, boolean, or `null`. Arrays and objects are omitted even when JSON-safe; `undefined`, functions, and symbols are omitted because they have no JSON representation. CLI config validation continues to use `config_validation_failed`; this `invalid_options` detail shape is binding-specific.
+
+| Error code | Detail field | Required | Meaning |
+| --- | --- | --- | --- |
+| `invalid_input` | `details.reason` | yes | `invalid_source_type` or `invalid_utf16`. |
+| `invalid_input` | `details.path` | yes | Always `source`. |
+| `invalid_input` | `details.value` | no | Included only for JSON-safe scalar invalid source values. |
+| `invalid_options` | `details.reason` | yes | One of the stable option-validation reasons listed above. |
+| `invalid_options` | `details.path` | yes | `options`, `rules`, or `rules.<rule-id>`. |
+| `invalid_options` | `details.ruleId` | rule-specific only | The invalid configurable rule id. |
+| `invalid_options` | `details.value` | no | Included only for scalar invalid option values. |
 
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 

@@ -1,6 +1,6 @@
 # no-unused-declaration
 
-> disallow MF2 declarations that do not affect output or selection
+> disallow MF2 declarations that do not affect output or selector setup
 
 ## Metadata
 
@@ -10,7 +10,7 @@
 
 ## Details
 
-This configurable lint rule reports a declared variable that is not reachable from the message output or selector set.
+This configurable lint rule reports a declared variable that is not reachable from the message output or selector setup.
 
 The rule applies to both `.input` and `.local` declarations. An unreachable declaration has no runtime effect in MF2, so the recommended preset reports it as `warn` by default.
 

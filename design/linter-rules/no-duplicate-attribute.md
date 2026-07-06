@@ -18,6 +18,8 @@ Duplicate detection is owner-local. Attributes are compared only within the same
 
 The rule consumes the parser-owned attribute owner facts, including `AttributeOwnerKind`, and does not reconstruct attribute owner taxonomy by walking the CST.
 
+This boundary is intentionally different from `duplicate-option-name`: duplicate attributes are configurable lint diagnostics, while duplicate option names are parser-owned semantic diagnostics because MF2 models option duplicates as data-model errors.
+
 ### Fail
 
 Some examples of **incorrect** code for this rule:
