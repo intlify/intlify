@@ -1,6 +1,6 @@
 # variant-key-arity-mismatch
 
-> require MF2 variant key counts to match selector counts
+> report MF2 variant key counts that do not match selector counts
 
 ## Details
 
@@ -57,9 +57,9 @@ This diagnostic has no configuration. It is always enabled as `error` and cannot
 
 ## Status
 
-Designed for the Phase 3C linter as a parser-owned semantic diagnostic.
+Designed as a parser-owned semantic diagnostic surfaced by the Phase 3C linter.
 
 ## Design References
 
-- [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)
+- [Linter design](../008-ox-mf2-phase-3c-linter-design.md)

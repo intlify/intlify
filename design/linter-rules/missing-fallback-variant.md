@@ -1,6 +1,6 @@
 # missing-fallback-variant
 
-> require MF2 matchers to include a catch-all fallback variant
+> report MF2 matchers without a catch-all fallback variant
 
 ## Details
 
@@ -59,9 +59,9 @@ This diagnostic has no configuration. It is always enabled as `error` and cannot
 
 ## Status
 
-Designed for the Phase 3C linter as a parser-owned semantic diagnostic.
+Designed as a parser-owned semantic diagnostic surfaced by the Phase 3C linter.
 
 ## Design References
 
-- [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)
+- [Linter design](../008-ox-mf2-phase-3c-linter-design.md)

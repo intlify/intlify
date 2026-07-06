@@ -1,4 +1,4 @@
-# Linter Rules
+# Linter Diagnostics and Rules
 
 This directory documents the semantic diagnostics and configurable lint rules surfaced by the ox-mf2 Phase 3C linter.
 

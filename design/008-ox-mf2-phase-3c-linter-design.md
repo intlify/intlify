@@ -873,7 +873,9 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 
 ## Deferred Follow-Up Notes
 
-These items are intentionally deferred and do not block the Phase 3C design described above.
+These items are intentionally deferred and do not block this design document's Phase 3C contract. Later implementation or release plans may promote individual items when they become necessary.
+
+Parser-owned deferred items remain specified by the semantic validation design; this list tracks only their linter product impact.
 
 - Suppression model: spec-compatible suppression mechanisms such as baseline suppression files, resource/container-level metadata, and any unused-suppression diagnostics. Inline comment-style disable directives are not part of the initial direction because MF2 has no comments.
 - Fix model: safe fixes, suggestions, dangerous fixes, and how non-style fixes interact with formatter-owned style changes.
