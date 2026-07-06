@@ -18,6 +18,23 @@ In other words, "selector setup reference" and "selector variable occurrence" ar
 
 References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. References to variables declared later are already [invalid-local-dependency](./invalid-local-dependency.md) semantic errors and are not double-reported by this rule.
 
+### Boundary Examples
+
+The selector occurrence itself is not reported by this rule, even when the message is still invalid under [missing-selector-annotation](./missing-selector-annotation.md):
+
+```mf2
+.match $count
+* {{Items}}
+```
+
+When this rule is enabled, a non-selector reference used while setting up selector annotations is reported:
+
+```mf2
+.input {$count :number minimumFractionDigits=$digits}
+.match $count
+* {{Items}}
+```
+
 ### Fail
 
 Some examples of **incorrect** code for this rule:

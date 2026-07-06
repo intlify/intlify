@@ -2,6 +2,12 @@
 
 > report duplicate MF2 option names on one owner
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports duplicate option identifiers within one function call or markup placeholder.

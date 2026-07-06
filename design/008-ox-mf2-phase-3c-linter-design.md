@@ -241,7 +241,7 @@ Metadata includes at least:
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options
 
-No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. The generated docs slug is internal generated metadata, not a runtime or JSON compatibility surface; exposing docs URLs or populating diagnostic `help` requires a separate public contract. The design-time pages under `design/linter-rules/` are not the generated-docs source of truth unless a later documentation pipeline explicitly adopts them. They are also not the source for runtime `help` text or public documentation URLs. Rule listing and introspection commands remain deferred.
+No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. The generated docs slug is internal generated metadata for a future generated documentation or help pipeline, not the current `design/linter-rules/*.md` path and not a runtime or JSON compatibility surface. Exposing docs URLs or populating diagnostic `help` requires a separate public contract. The design-time pages under `design/linter-rules/` are not the generated-docs source of truth unless a later documentation pipeline explicitly adopts them. They are also not the source for runtime `help` text or public documentation URLs. Having a design-time rule page does not make the JSON `help` field, CLI output URL, npm docs page, or website docs URL available. Rule listing and introspection commands remain deferred.
 
 ## Rule Implementation Model
 
@@ -737,6 +737,16 @@ Using a parser or semantic diagnostic code as a binding rule id reports the same
 | `invalid_options` | `details.ruleId` | rule-specific only | The invalid configurable rule id. |
 | `invalid_options` | `details.value` | no | Included only for scalar invalid option values. |
 
+Reason-specific `invalid_options` details:
+
+| Reason | `details.path` | `details.ruleId` | `details.value` |
+| --- | --- | --- | --- |
+| `invalid_options_shape` | `options` | omitted | scalar invalid `options` values only |
+| `invalid_rules_shape` | `rules` | omitted | scalar invalid `rules` values only |
+| `non_configurable_diagnostic` | `rules.<rule-id>` | required | scalar configured severity only |
+| `unknown_rule` | `rules.<rule-id>` | required | scalar configured severity only |
+| `invalid_rule_severity` | `rules.<rule-id>` | required | scalar invalid severity only |
+
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
 Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. The parser semantic validation design owns the future snapshot-to-`SemanticModel` path; this linter design owns only the future `lintSnapshot` API and consumer contract once that parser path exists. A future `lintSnapshot` must define how it consumes that parser-owned path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
@@ -884,6 +894,8 @@ Phase 3C linter implementation should be split into reviewable PRs:
 7. local-first linter benchmarks under `tools/`
 
 Each PR should be cut from `main` and keep linter work separated from formatter work. Shared CLI infrastructure (discovery, ignore, framing, envelope) introduced by the fmt CLI PR should be reused, not duplicated.
+
+This design records product contracts and implementation boundaries. PR sequencing, CI jobs, benchmark command wiring, release-flow tasks, and exact fixture update commands should be expanded in the Phase 3C implementation plan rather than duplicated further in this design file.
 
 ## Deferred Follow-Up Notes
 

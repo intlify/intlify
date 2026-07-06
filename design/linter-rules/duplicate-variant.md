@@ -2,6 +2,12 @@
 
 > report duplicate MF2 matcher variant key tuples
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports duplicate matcher variant key tuples.

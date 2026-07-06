@@ -2,6 +2,12 @@
 
 > report MF2 selectors that do not resolve to an annotated declaration
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports a selector variable that does not directly or indirectly resolve to a declaration with a function annotation.

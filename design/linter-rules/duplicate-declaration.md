@@ -2,6 +2,12 @@
 
 > report duplicate MF2 variable declarations
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports a declaration that binds a variable that was already declared earlier in the same MF2 message.

@@ -2,6 +2,12 @@
 
 > report invalid MF2 local declaration dependencies
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports `.local` declaration dependency patterns that violate the MF2 declaration rules.

@@ -2,6 +2,12 @@
 
 > report MF2 variant key counts that do not match selector counts
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports a matcher variant whose key count does not match the number of selectors in the `.match` statement.

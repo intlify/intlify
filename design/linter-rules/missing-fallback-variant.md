@@ -2,6 +2,12 @@
 
 > report MF2 matchers without a catch-all fallback variant
 
+## Metadata
+
+| Category   | Severity | Configurable |
+| ---------- | -------- | ------------ |
+| `semantic` | `error`  | no           |
+
 ## Details
 
 This core semantic diagnostic reports a matcher that does not include a fallback variant whose keys are all catch-all keys, `*`.
