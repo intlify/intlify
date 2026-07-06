@@ -2,6 +2,8 @@
 
 This directory documents the semantic diagnostics and configurable lint rules surfaced by the ox-mf2 Phase 3C linter.
 
+These pages are design-time reader-facing documentation for Phase 3C review. They are not the public runtime contract for diagnostic JSON `help`, CLI output URLs, npm package docs, or website docs. Public docs, generated docs, and static help text remain future product decisions.
+
 ## Canonical Sources
 
 - [008-ox-mf2-phase-3c-linter-design.md](../008-ox-mf2-phase-3c-linter-design.md) owns the linter product contract, pipeline, configuration, reporters, bindings, and release boundaries.
@@ -12,7 +14,7 @@ This directory documents the semantic diagnostics and configurable lint rules su
 
 Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.
 
-| Rule ID | Description | Details |
+| Diagnostic Code | Description | Details |
 | --- | --- | --- |
 | `duplicate-declaration` | Disallow duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
 | `invalid-local-dependency` | Disallow invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
@@ -26,8 +28,8 @@ Core semantic diagnostics are always enabled after successful parsing, always re
 
 Configurable lint rules run only after parser and semantic diagnostics are clean. They can be configured through `lint.rules` with `"off"`, `"warn"`, or `"error"`.
 
-| Rule ID | Description | Details |
-| --- | --- | --- |
-| `no-unused-declaration` | Disallow MF2 declarations that do not affect output or selection. | [no-unused-declaration](./no-unused-declaration.md) |
-| `no-duplicate-attribute` | Disallow duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
-| `no-undeclared-variable` | Disallow undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |
+| Rule ID | Category | Default | Recommended | Description | Details |
+| --- | --- | --- | --- | --- | --- |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | Disallow MF2 declarations that do not affect output or selection. | [no-unused-declaration](./no-unused-declaration.md) |
+| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Disallow duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
+| `no-undeclared-variable` | `correctness` | `off` | no | Disallow undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |

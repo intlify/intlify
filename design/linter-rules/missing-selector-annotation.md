@@ -44,11 +44,11 @@ Some examples of **correct** code for this diagnostic:
 * {{Items}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [no-undeclared-variable](./no-undeclared-variable.md)
 - [invalid-local-dependency](./invalid-local-dependency.md)

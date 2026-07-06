@@ -41,11 +41,11 @@ Some examples of **correct** code for this diagnostic:
 {{{$label}}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [duplicate-declaration](./duplicate-declaration.md)
 - [missing-selector-annotation](./missing-selector-annotation.md)

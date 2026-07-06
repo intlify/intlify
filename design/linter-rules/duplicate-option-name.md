@@ -34,11 +34,11 @@ Some examples of **correct** code for this diagnostic:
 {{{#link href=|/a| title=|docs|/}}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [no-duplicate-attribute](./no-duplicate-attribute.md)
 

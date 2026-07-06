@@ -36,13 +36,13 @@ Some examples of **correct** code for this rule:
 {{{#link @kind=|primary| @target=|docs|}docs{/link}}}
 ```
 
-## Options
+## Configuration
 
 Nothing in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It is enabled as `"warn"` in `recommended`.
 
-## Related rules
+## Related diagnostics and rules
 
 - [duplicate-option-name](./duplicate-option-name.md)
 

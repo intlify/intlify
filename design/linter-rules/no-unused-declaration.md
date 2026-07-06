@@ -48,13 +48,13 @@ Some examples of **correct** code for this rule:
 * {{Items}}
 ```
 
-## Options
+## Configuration
 
 Nothing in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It is enabled as `"warn"` in `recommended`.
 
-## Related rules
+## Related diagnostics and rules
 
 - [no-undeclared-variable](./no-undeclared-variable.md)
 - [duplicate-declaration](./duplicate-declaration.md)

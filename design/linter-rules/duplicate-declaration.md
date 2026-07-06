@@ -40,11 +40,11 @@ Some examples of **correct** code for this diagnostic:
 {{Count: {$count}, price: {$price}}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [invalid-local-dependency](./invalid-local-dependency.md)
 - [no-unused-declaration](./no-unused-declaration.md)

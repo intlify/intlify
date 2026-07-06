@@ -46,11 +46,11 @@ male 1 {{He has one item.}}
 * {{Items}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [missing-fallback-variant](./missing-fallback-variant.md)
 - [duplicate-variant](./duplicate-variant.md)

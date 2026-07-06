@@ -47,13 +47,13 @@ Some examples of **correct** code for this rule:
 * {{Items}}
 ```
 
-## Options
+## Configuration
 
 Nothing in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It defaults to `"off"` and is not enabled in `recommended`.
 
-## Related rules
+## Related diagnostics and rules
 
 - [missing-selector-annotation](./missing-selector-annotation.md)
 - [no-unused-declaration](./no-unused-declaration.md)

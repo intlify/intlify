@@ -743,7 +743,7 @@ The canonical diagnostic catalog, ordering policy, duplicate-family partitioning
 - semantic diagnostic codes participate in the shared JSON-visible diagnostic code namespace
 - `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters
 
-The complete rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule. This section intentionally does not duplicate per-diagnostic examples; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the canonical semantic validation behavior, and `design/linter-rules/` owns reader-facing rule documentation.
+The complete diagnostic and rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule. This section intentionally does not duplicate per-diagnostic examples; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the canonical semantic validation behavior, and `design/linter-rules/` owns design-time reader-facing documentation. Those pages are not the runtime `help` field or public docs URL contract.
 
 ## Configurable Rules
 
@@ -796,6 +796,8 @@ MF2 does not define line comments or block comments, and comment-like disable di
 The linter result model should be able to represent suppressed diagnostics later, but any future suppression mechanism must be spec-compatible. Possible directions include baseline suppression files or resource/container-level metadata owned by a host format adapter; no inline comment-style directive is part of the initial linter product.
 
 ## Fixtures and Validation
+
+Fixture ownership is split by source of truth. Parser semantic fixtures in `crates/ox_mf2_parser` are canonical for core semantic diagnostic codes, primary spans, report order, duplicate-family partitioning, and cascade suppression. Linter fixtures verify that parser semantic diagnostics flow through `LintResult`, CLI reporters, binding results, and target-level envelopes. Configurable lint rule detection, severity resolution, and rule-specific ordering are canonical in `crates/intlify_lint` fixtures.
 
 Core linter fixtures live under `crates/intlify_lint/fixtures` and use directory fixtures, mirroring the formatter fixture harness with diagnostics expectations instead of formatted output:
 

@@ -48,11 +48,11 @@ female 1 {{She has one item}}
 * * {{Fallback}}
 ```
 
-## Options
+## Configuration
 
 Nothing. This is a core semantic diagnostic and is not configurable.
 
-## Related rules
+## Related diagnostics and rules
 
 - [variant-key-arity-mismatch](./variant-key-arity-mismatch.md)
 - [duplicate-variant](./duplicate-variant.md)
