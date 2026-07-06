@@ -14,7 +14,7 @@ This configurable lint rule reports a declared variable that is not reachable fr
 
 The rule applies to both `.input` and `.local` declarations. An unreachable declaration has no runtime effect in MF2, so the recommended preset reports it as `warn` by default.
 
-Reachability starts from message output references and selector references, then follows `.local` right-hand-side dependencies backwards through declarations. References inside reachable function option values and markup option values also mark declarations as used. A declaration referenced only by another unreachable declaration is still unused.
+Reachability starts from message output references and selector setup references, then follows `.local` right-hand-side dependencies backwards through declarations. Selector setup references include selector variables, selector declaration chains, selector annotations, and option value references used by selector annotations. References inside reachable function option values and markup option values also mark declarations as used. A declaration referenced only by another unreachable declaration is still unused.
 
 ### Fail
 

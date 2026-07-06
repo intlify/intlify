@@ -10,6 +10,8 @@ A `.local` declaration must not bind a variable that appears in its own expressi
 
 This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
+Primary spans, labels, ordering, cascade behavior, and duplicate-family partitioning are defined canonically by the semantic validation design.
+
 ### Fail
 
 Some examples of **incorrect** code for this diagnostic:

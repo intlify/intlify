@@ -8,6 +8,8 @@ This core semantic diagnostic reports duplicate matcher variant key tuples.
 
 Variant keys are compared by their cooked string values after the parser's NFC normalization rule. Syntactically different keys can therefore collide if they represent the same cooked value. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
+Primary spans, labels, ordering, cascade behavior, and duplicate handling are defined canonically by the semantic validation design.
+
 ### Fail
 
 Some examples of **incorrect** code for this diagnostic:

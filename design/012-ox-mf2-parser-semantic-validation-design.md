@@ -65,7 +65,7 @@ Initial facts include:
 - attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - matcher variants: matcher owner id, selector count, variant id, key tuple, key spans, body span, and variant order
 
-SemanticModel fact iterators have stable semantic order, not implementation collection order:
+SemanticModel fact iterators have stable semantic order, not implementation collection order. This document is the canonical source for parser-owned fact ordering:
 
 - declarations: source declaration order
 - references: source order
@@ -75,7 +75,7 @@ SemanticModel fact iterators have stable semantic order, not implementation coll
 - attribute occurrences: owner primary span source order, then owner-local occurrence order
 - matcher variants: matcher owner primary span source order, then variant order
 
-These orders are part of the consumer contract because semantic diagnostics and lint rules use them as final tie-breakers for otherwise identical spans and codes. The exact id types are implementation details. Implementations may assign owner ids in source order, but the public ordering contract is owner primary span source order, not raw id allocation order.
+These orders are part of the consumer contract because semantic diagnostics and lint rules use them as final tie-breakers for otherwise identical spans and codes. Downstream consumers such as `intlify_lint` may derive their own report occurrence keys from these orders, but they must not redefine parser-owned fact ordering. The exact id types are implementation details. Implementations may assign owner ids in source order, but the public ordering contract is owner primary span source order, not raw id allocation order.
 
 The initial reference kind taxonomy is:
 
@@ -457,7 +457,7 @@ Suggested implementation steps:
 
 These items are intentionally deferred and do not block this design document's Phase 3C contract. Later implementation or release plans may promote individual items when they become necessary.
 
-- Snapshot-backed semantic validation, including the snapshot-to-semantic path. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
+- Snapshot-backed semantic validation, including the snapshot-to-`SemanticModel` path. This parser-owned path is the canonical prerequisite for any future linter `lintSnapshot` API. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional semantic facts needed by resource/catalog adapters.
 - Public documentation pages and static help text for semantic diagnostic codes. The design-time pages under `design/linter-rules/` do not define the runtime `help` field or public docs URL contract.

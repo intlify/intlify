@@ -8,6 +8,8 @@ This core semantic diagnostic reports a matcher that does not include a fallback
 
 The fallback requirement is independent from selector functions or known selector domains. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
+Primary spans, labels, ordering, and cascade behavior are defined canonically by the semantic validation design.
+
 ### Fail
 
 Some examples of **incorrect** code for this diagnostic:

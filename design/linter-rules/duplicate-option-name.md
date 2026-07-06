@@ -10,6 +10,8 @@ Duplicate detection is owner-local. Function options are compared only with opti
 
 This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
+Primary spans, labels, ordering, cascade behavior, and duplicate handling are defined canonically by the semantic validation design.
+
 ### Fail
 
 Some examples of **incorrect** code for this diagnostic:

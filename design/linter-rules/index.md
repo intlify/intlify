@@ -10,6 +10,8 @@ These pages are design-time reader-facing documentation for Phase 3C review. The
 - [012-ox-mf2-parser-semantic-validation-design.md](../012-ox-mf2-parser-semantic-validation-design.md) owns parser semantic validation details for core semantic diagnostics, including spans, labels, ordering, and cascade suppression.
 - This directory owns design-time reader-facing documentation, examples, configuration notes, and related diagnostic/rule links.
 
+The examples in these pages are illustrative reader-facing examples. They are not parser fixtures, linter fixtures, or conformance tests.
+
 ## Core Semantic Diagnostics
 
 Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.
@@ -32,6 +34,6 @@ The configurable-rule table mirrors the product-level metadata in the Phase 3C l
 
 | Rule ID | Category | Default | Recommended | Description | Details |
 | --- | --- | --- | --- | --- | --- |
-| `no-unused-declaration` | `best-practice` | `warn` | yes | Disallow MF2 declarations that do not affect output or selection. | [no-unused-declaration](./no-unused-declaration.md) |
-| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Disallow duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
-| `no-undeclared-variable` | `correctness` | `off` | no | Disallow undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | Report MF2 declarations that do not affect output or selection. | [no-unused-declaration](./no-unused-declaration.md) |
+| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Report duplicate MF2 attributes on one placeholder. | [no-duplicate-attribute](./no-duplicate-attribute.md) |
+| `no-undeclared-variable` | `correctness` | `off` | no | Report undeclared non-selector MF2 variable references. | [no-undeclared-variable](./no-undeclared-variable.md) |
