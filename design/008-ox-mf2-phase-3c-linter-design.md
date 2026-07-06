@@ -241,7 +241,7 @@ Metadata includes at least:
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options
 
-No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. The generated docs slug is internal generated metadata, not a runtime or JSON compatibility surface; exposing docs URLs or populating diagnostic `help` requires a separate public contract. Rule listing and introspection commands remain deferred.
+No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. The generated docs slug is internal generated metadata, not a runtime or JSON compatibility surface; exposing docs URLs or populating diagnostic `help` requires a separate public contract. The design-time pages under `design/linter-rules/` are not the generated-docs source of truth unless a later documentation pipeline explicitly adopts them. Rule listing and introspection commands remain deferred.
 
 ## Rule Implementation Model
 

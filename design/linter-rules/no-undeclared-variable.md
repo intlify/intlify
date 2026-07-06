@@ -2,13 +2,13 @@
 
 > disallow undeclared non-selector MF2 variable references
 
-## Rule Details
+## Details
 
 This configurable lint rule reports a non-selector variable reference that cannot be resolved to a visible `.input` or `.local` declaration.
 
 Category: `correctness`. Default: `off`. Not enabled in `recommended`.
 
-Undeclared variables are valid external inputs in MF2, so this rule is an opt-in rule for teams that adopt a declare-all-inputs workflow. Selector variables are excluded because missing selector declarations are reported by the core semantic [missing-selector-annotation](./missing-selector-annotation.md) diagnostic.
+Undeclared variables are valid external inputs in MF2, so this rule is an opt-in rule for teams that adopt a declare-all-inputs workflow. Selector variables are excluded because missing selector declarations are reported by the core semantic [missing-selector-annotation](./missing-selector-annotation.md) diagnostic. Selector exclusion applies only to the selector variable occurrence itself; unresolved variables inside selector annotations or their option values remain non-selector references and may be reported by this rule.
 
 References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. References to variables declared later are already [invalid-local-dependency](./invalid-local-dependency.md) semantic errors and are not double-reported by this rule.
 
@@ -49,7 +49,7 @@ Some examples of **correct** code for this rule:
 
 ## Configuration
 
-Nothing in Phase 3C.
+No rule-specific options exist in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It defaults to `"off"` and is not enabled in `recommended`.
 

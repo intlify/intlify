@@ -2,7 +2,7 @@
 
 > disallow duplicate MF2 variable declarations
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports a declaration that binds a variable that was already declared earlier in the same MF2 message.
 
@@ -42,7 +42,7 @@ Some examples of **correct** code for this diagnostic:
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 

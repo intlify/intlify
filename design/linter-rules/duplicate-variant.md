@@ -2,7 +2,7 @@
 
 > disallow duplicate MF2 matcher variant key tuples
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports duplicate matcher variant key tuples.
 
@@ -52,7 +52,7 @@ female 1 {{She has one item}}
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 

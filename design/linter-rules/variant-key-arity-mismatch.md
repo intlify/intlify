@@ -2,7 +2,7 @@
 
 > require MF2 variant key counts to match selector counts
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports a matcher variant whose key count does not match the number of selectors in the `.match` statement.
 
@@ -48,7 +48,7 @@ male 1 {{He has one item.}}
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 

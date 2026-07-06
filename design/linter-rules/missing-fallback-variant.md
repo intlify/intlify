@@ -2,7 +2,7 @@
 
 > require MF2 matchers to include a catch-all fallback variant
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports a matcher that does not include a fallback variant whose keys are all catch-all keys, `*`.
 
@@ -50,7 +50,7 @@ female 1 {{She has one item}}
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 

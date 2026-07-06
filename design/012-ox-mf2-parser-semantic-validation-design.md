@@ -458,7 +458,7 @@ Suggested implementation steps:
 - Snapshot-backed semantic validation, including the snapshot-to-semantic path. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional semantic facts needed by resource/catalog adapters.
-- Documentation pages and static help text for semantic diagnostic codes.
+- Public documentation pages and static help text for semantic diagnostic codes. The design-time pages under `design/linter-rules/` do not define the runtime `help` field or public docs URL contract.
 
 ## Open Questions
 

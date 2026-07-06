@@ -2,7 +2,7 @@
 
 > disallow duplicate MF2 option names on one owner
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports duplicate option identifiers within one function call or markup placeholder.
 
@@ -36,7 +36,7 @@ Some examples of **correct** code for this diagnostic:
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 

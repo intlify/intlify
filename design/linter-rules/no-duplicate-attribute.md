@@ -2,7 +2,7 @@
 
 > disallow duplicate MF2 attributes on one placeholder
 
-## Rule Details
+## Details
 
 This configurable lint rule reports repeated attribute identifiers on one expression or markup placeholder.
 
@@ -38,7 +38,7 @@ Some examples of **correct** code for this rule:
 
 ## Configuration
 
-Nothing in Phase 3C.
+No rule-specific options exist in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It is enabled as `"warn"` in `recommended`.
 

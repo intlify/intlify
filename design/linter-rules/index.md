@@ -8,7 +8,7 @@ These pages are design-time reader-facing documentation for Phase 3C review. The
 
 - [008-ox-mf2-phase-3c-linter-design.md](../008-ox-mf2-phase-3c-linter-design.md) owns the linter product contract, pipeline, configuration, reporters, bindings, and release boundaries.
 - [012-ox-mf2-parser-semantic-validation-design.md](../012-ox-mf2-parser-semantic-validation-design.md) owns parser semantic validation details for core semantic diagnostics, including spans, labels, ordering, and cascade suppression.
-- This directory owns reader-facing rule documentation, examples, options, and related-rule links.
+- This directory owns design-time reader-facing documentation, examples, configuration notes, and related diagnostic/rule links.
 
 ## Core Semantic Diagnostics
 
@@ -27,6 +27,8 @@ Core semantic diagnostics are always enabled after successful parsing, always re
 ## Configurable Lint Rules
 
 Configurable lint rules run only after parser and semantic diagnostics are clean. They can be configured through `lint.rules` with `"off"`, `"warn"`, or `"error"`.
+
+The configurable-rule table mirrors the product-level metadata in the Phase 3C linter design for navigation convenience.
 
 | Rule ID | Category | Default | Recommended | Description | Details |
 | --- | --- | --- | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 > disallow MF2 declarations that do not affect output or selection
 
-## Rule Details
+## Details
 
 This configurable lint rule reports a declared variable that is not reachable from the message output or selector set.
 
@@ -50,7 +50,7 @@ Some examples of **correct** code for this rule:
 
 ## Configuration
 
-Nothing in Phase 3C.
+No rule-specific options exist in Phase 3C.
 
 This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"error"`. It is enabled as `"warn"` in `recommended`.
 

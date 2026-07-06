@@ -2,7 +2,7 @@
 
 > disallow invalid MF2 local declaration dependencies
 
-## Rule Details
+## Details
 
 This core semantic diagnostic reports `.local` declaration dependency patterns that violate the MF2 declaration rules.
 
@@ -43,7 +43,7 @@ Some examples of **correct** code for this diagnostic:
 
 ## Configuration
 
-Nothing. This is a core semantic diagnostic and is not configurable.
+This diagnostic has no configuration. It is always enabled as `error` and cannot be configured through `lint.rules`.
 
 ## Related diagnostics and rules
 
