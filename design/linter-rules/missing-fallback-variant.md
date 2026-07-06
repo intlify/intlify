@@ -57,11 +57,11 @@ This diagnostic has no configuration. It is always enabled as `error` and cannot
 - [variant-key-arity-mismatch](./variant-key-arity-mismatch.md)
 - [duplicate-variant](./duplicate-variant.md)
 
-## Version
+## Status
 
-This diagnostic is part of the Phase 3C linter design.
+Designed for the Phase 3C linter as a parser-owned semantic diagnostic.
 
-## Implementation
+## Design References
 
 - [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)

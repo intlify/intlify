@@ -2,13 +2,17 @@
 
 > disallow undeclared non-selector MF2 variable references
 
+## Metadata
+
+| Category      | Default | Recommended |
+| ------------- | ------- | ----------- |
+| `correctness` | `off`   | no          |
+
 ## Details
 
 This configurable lint rule reports a non-selector variable reference that cannot be resolved to a visible `.input` or `.local` declaration.
 
-Category: `correctness`. Default: `off`. Not enabled in `recommended`.
-
-Undeclared variables are valid external inputs in MF2, so this rule is an opt-in rule for teams that adopt a declare-all-inputs workflow. Selector variables are excluded because missing selector declarations are reported by the core semantic [missing-selector-annotation](./missing-selector-annotation.md) diagnostic. Selector exclusion applies only to the selector variable occurrence itself; unresolved variables inside selector annotations or their option values remain non-selector references and may be reported by this rule.
+Undeclared variables are valid external inputs in MF2, so this rule is an opt-in rule for teams that adopt a declare-all-inputs workflow. Selector variables are excluded because missing selector declarations are reported by the core semantic [missing-selector-annotation](./missing-selector-annotation.md) diagnostic. Selector exclusion applies only to the `.match` selector variable occurrence itself. Other unresolved variables that appear while setting up selector annotations, such as annotation option values, remain non-selector references and may be reported by this rule.
 
 References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. References to variables declared later are already [invalid-local-dependency](./invalid-local-dependency.md) semantic errors and are not double-reported by this rule.
 
@@ -59,11 +63,11 @@ This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"erro
 - [no-unused-declaration](./no-unused-declaration.md)
 - [invalid-local-dependency](./invalid-local-dependency.md)
 
-## Version
+## Status
 
-This rule is part of the Phase 3C linter design.
+Designed for the Phase 3C linter as a configurable lint rule.
 
-## Implementation
+## Design References
 
 - [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)

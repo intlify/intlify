@@ -2,11 +2,15 @@
 
 > disallow MF2 declarations that do not affect output or selection
 
+## Metadata
+
+| Category        | Default | Recommended |
+| --------------- | ------- | ----------- |
+| `best-practice` | `warn`  | yes         |
+
 ## Details
 
 This configurable lint rule reports a declared variable that is not reachable from the message output or selector set.
-
-Category: `best-practice`. Default: `warn`. Enabled in `recommended`.
 
 The rule applies to both `.input` and `.local` declarations. An unreachable declaration has no runtime effect in MF2, so the recommended preset reports it as `warn` by default.
 
@@ -60,11 +64,11 @@ This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"erro
 - [duplicate-declaration](./duplicate-declaration.md)
 - [invalid-local-dependency](./invalid-local-dependency.md)
 
-## Version
+## Status
 
-This rule is part of the Phase 3C linter design.
+Designed for the Phase 3C linter as a configurable lint rule.
 
-## Implementation
+## Design References
 
 - [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)

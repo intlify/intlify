@@ -873,6 +873,8 @@ Each PR should be cut from `main` and keep linter work separated from formatter 
 
 ## Deferred Follow-Up Notes
 
+These items are intentionally deferred and do not block the Phase 3C design described above.
+
 - Suppression model: spec-compatible suppression mechanisms such as baseline suppression files, resource/container-level metadata, and any unused-suppression diagnostics. Inline comment-style disable directives are not part of the initial direction because MF2 has no comments.
 - Fix model: safe fixes, suggestions, dangerous fixes, and how non-style fixes interact with formatter-owned style changes.
 - Machine reporter roadmap beyond `text` and `json`, including GitHub annotations and SARIF.

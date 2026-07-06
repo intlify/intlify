@@ -2,11 +2,15 @@
 
 > disallow duplicate MF2 attributes on one placeholder
 
+## Metadata
+
+| Category        | Default | Recommended |
+| --------------- | ------- | ----------- |
+| `best-practice` | `warn`  | yes         |
+
 ## Details
 
 This configurable lint rule reports repeated attribute identifiers on one expression or markup placeholder.
-
-Category: `best-practice`. Default: `warn`. Enabled in `recommended`.
 
 The MF2 specification says attribute identifiers SHOULD be unique and defines last-one-wins behavior for duplicates. This makes duplicate attributes a best-practice lint warning rather than a core semantic error.
 
@@ -46,11 +50,11 @@ This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"erro
 
 - [duplicate-option-name](./duplicate-option-name.md)
 
-## Version
+## Status
 
-This rule is part of the Phase 3C linter design.
+Designed for the Phase 3C linter as a configurable lint rule.
 
-## Implementation
+## Design References
 
 - [Linter design](../008-ox-mf2-phase-3c-linter-design.md)
 - [Semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md)

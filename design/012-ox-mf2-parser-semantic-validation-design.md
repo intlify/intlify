@@ -455,6 +455,8 @@ Suggested implementation steps:
 
 ## Deferred Follow-Up Notes
 
+These items are intentionally deferred and do not block the Phase 3C design described above.
+
 - Snapshot-backed semantic validation, including the snapshot-to-semantic path. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional semantic facts needed by resource/catalog adapters.
