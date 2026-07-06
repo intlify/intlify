@@ -743,9 +743,9 @@ Reason-specific `invalid_options` details:
 | --- | --- | --- | --- |
 | `invalid_options_shape` | `options` | omitted | scalar invalid `options` values only |
 | `invalid_rules_shape` | `rules` | omitted | scalar invalid `rules` values only |
-| `non_configurable_diagnostic` | `rules.<rule-id>` | required | scalar configured severity only |
-| `unknown_rule` | `rules.<rule-id>` | required | scalar configured severity only |
-| `invalid_rule_severity` | `rules.<rule-id>` | required | scalar invalid severity only |
+| `non_configurable_diagnostic` | `rules.<rule-id>` | required | scalar configured rule value only |
+| `unknown_rule` | `rules.<rule-id>` | required | scalar configured rule value only |
+| `invalid_rule_severity` | `rules.<rule-id>` | required | scalar invalid severity value only |
 
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
@@ -821,7 +821,7 @@ The linter result model should be able to represent suppressed diagnostics later
 
 ## Fixtures and Validation
 
-Fixture ownership is split by source of truth. Parser semantic fixtures in `crates/ox_mf2_parser` are canonical for core semantic diagnostic codes, primary spans, report order, duplicate-family partitioning, and cascade suppression. Linter fixtures verify that parser semantic diagnostics flow through `LintResult`, CLI reporters, binding results, and target-level envelopes. They should not duplicate the parser semantic fixture suite as a second canonical source for semantic spans or ordering. Configurable lint rule detection, severity resolution, and rule-specific ordering are canonical in `crates/intlify_lint` fixtures.
+Fixture ownership is split by source of truth. The parser semantic validation design owns parser semantic fixtures in `crates/ox_mf2_parser`; this linter design owns linter flow-through, reporter, binding, and configurable-rule fixtures. Parser semantic fixtures are canonical for core semantic diagnostic codes, primary spans, report order, duplicate-family partitioning, and cascade suppression. Linter fixtures verify that parser semantic diagnostics flow through `LintResult`, CLI reporters, binding results, and target-level envelopes. They should not duplicate the parser semantic fixture suite as a second canonical source for semantic spans or ordering. Configurable lint rule detection, severity resolution, and rule-specific ordering are canonical in `crates/intlify_lint` fixtures.
 
 Core linter fixtures live under `crates/intlify_lint/fixtures` and use directory fixtures, mirroring the formatter fixture harness with diagnostics expectations instead of formatted output:
 

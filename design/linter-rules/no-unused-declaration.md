@@ -4,9 +4,9 @@
 
 ## Metadata
 
-| Category        | Default | Recommended |
-| --------------- | ------- | ----------- |
-| `best-practice` | `warn`  | yes         |
+| Category        | Default Severity | Recommended | Configurable | Fixable |
+| --------------- | ---------------- | ----------- | ------------ | ------- |
+| `best-practice` | `warn`           | yes         | yes          | no      |
 
 ## Details
 

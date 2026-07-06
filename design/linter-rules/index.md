@@ -12,6 +12,8 @@ These pages are design-time reader-facing documentation for Phase 3C review. The
 
 The examples in these pages are illustrative reader-facing examples. They are not parser fixtures, linter fixtures, or conformance tests.
 
+Metadata tables in these pages are design-time summaries for readers. They are not the runtime rule metadata source, generated docs source, or public help-text contract.
+
 ## Core Semantic Diagnostics
 
 Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.

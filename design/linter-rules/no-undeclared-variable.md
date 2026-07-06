@@ -4,9 +4,9 @@
 
 ## Metadata
 
-| Category      | Default | Recommended |
-| ------------- | ------- | ----------- |
-| `correctness` | `off`   | no          |
+| Category      | Default Severity | Recommended | Configurable | Fixable |
+| ------------- | ---------------- | ----------- | ------------ | ------- |
+| `correctness` | `off`            | no          | yes          | no      |
 
 ## Details
 
@@ -20,7 +20,7 @@ References are resolved against declarations visible at the reference point, mea
 
 ### Boundary Examples
 
-The selector occurrence itself is not reported by this rule, even when the message is still invalid under [missing-selector-annotation](./missing-selector-annotation.md):
+The selector occurrence itself is not reported by this rule. In practice, this example produces [missing-selector-annotation](./missing-selector-annotation.md), so configurable rules short-circuit before this rule runs:
 
 ```mf2
 .match $count
