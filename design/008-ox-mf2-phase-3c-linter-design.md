@@ -49,6 +49,17 @@ Phase 3C introduces the linter product behind the Phase 3A CLI shell while keepi
 
 `crates/intlify_lint` owns rule execution, presets, lint configuration, and linter result shaping. Parser diagnostics and core semantic diagnostics remain parser-owned, so CLI, binding, editor, and future resource/catalog consumers see one consistent diagnostic model without duplicating parser or semantic behavior.
 
+At the npm package level, `@intlify/cli` owns the `intlify lint` command and links `crates/intlify_lint` through the native CLI binary distributed by `@intlify/cli-native`. Programmatic linter APIs are distributed separately:
+
+- `@intlify/lint-napi`
+- `@intlify/lint-wasm`
+
+`@intlify/lint-napi` is a wrapper package with platform-specific native packages named by the normalized triple contract `@intlify/lint-napi-<platform-triple>`. The wrapper uses lazy native loading: importing `@intlify/lint-napi` must not eagerly load a native binary, and API calls load the binding as needed.
+
+`@intlify/lint-wasm` is browser-first for playground, worker, and browser tooling use cases. Node users should prefer `@intlify/lint-napi`. After `await init()`, the WASM package exposes the synchronous `lintMessage(source, options?)` API. The initialization contract follows `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`; this design does not redefine the shared WASM init state machine.
+
+Existing parser binding packages remain focused on parser-level APIs. Linter APIs are not added to `@intlify/ox-mf2-napi` or `@intlify/ox-mf2-wasm`, and linter binding packages do not have runtime dependencies on parser binding packages.
+
 The linter binding packages call the same source-backed `lintMessage(source, options)` flow as the CLI. Resource/catalog adapters remain outside the linter core: they extract message-level source text, call the linter product, and map diagnostics back to host-file ranges.
 
 ## Non-Goals
