@@ -35,7 +35,7 @@ N-API and WASM linter bindings are distributed as linter-specific packages backe
 - `@intlify/lint-napi`
 - `@intlify/lint-wasm`
 
-These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
+These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. Platform native package names use the existing N-API normalized triple rule: `@intlify/lint-napi-<platform-triple>`, for example `@intlify/lint-napi-linux-x64-gnu`, `@intlify/lint-napi-linux-x64-musl`, `@intlify/lint-napi-linux-arm64-gnu`, `@intlify/lint-napi-darwin-x64`, `@intlify/lint-napi-darwin-arm64`, and `@intlify/lint-napi-win32-x64-msvc`. Optional dependency wiring, package files, and lazy native loading follow the formatter N-API package model. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
 
 Binding packages expose direct programmatic lint APIs. They do not host plugins and do not need a CLI callback bridge.
 
@@ -512,7 +512,9 @@ The initial visual target is a colorful oxlint-style diagnostic block on TTY out
 
 Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
 
-Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the primary source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels on the same source line may be rendered as additional underline messages when practical. Labels on other source lines may be omitted or rendered as compact summary text in Phase 3C. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span plus labels remain available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the primary source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels on the same source line may be rendered as additional underline messages when practical. Labels on other source lines should prefer compact summary text in Phase 3C and may be omitted when rendering them would make the block misleading. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span plus labels remain available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+
+Text reporter summaries are best-effort human output, not a compatibility surface. Implementations may print a final count summary for problem runs, including warning counts hidden by `--quiet`, but tests must not fixture-lock the summary wording or require summary output to exist.
 
 Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
 
@@ -840,7 +842,7 @@ Reports variants that cannot be selected. Deferred: it must only report cases th
 
 Categories are rule metadata, not part of rule ids, so a rule can be recategorized without a breaking change.
 
-Rule categories are documentation and grouping metadata. They are not the diagnostic JSON `category` field: every configurable rule diagnostic uses `category: "lint"` in JSON output regardless of its rule category metadata.
+Rule categories are documentation and grouping metadata. They are not the diagnostic JSON `category` field: every configurable rule diagnostic uses `category: "lint"` in JSON output regardless of its rule category metadata. Phase 3C diagnostic JSON objects do not include rule category metadata fields such as `ruleCategory`; a future metadata surface would require an explicit JSON contract update.
 
 ## Resource and Catalog Linting
 
