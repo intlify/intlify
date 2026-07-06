@@ -512,7 +512,7 @@ The initial visual target is a colorful oxlint-style diagnostic block on TTY out
 
 Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
 
-Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the relevant source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels may be rendered as additional underline messages when practical. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span remains available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the primary source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels on the same source line may be rendered as additional underline messages when practical. Labels on other source lines may be omitted or rendered as compact summary text in Phase 3C. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span plus labels remain available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
 
 Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
 
@@ -530,6 +530,8 @@ For `--reporter json`, the JSON envelope is emitted to stdout, including operati
 ### JSON Reporter
 
 JSON output uses the Phase 3A envelope with `command: "lint"`. `schemaVersion`, `version`, `projectRoot`, path normalization, and the top-level `errors` array follow the Phase 3A shared envelope contract; file-specific operational errors live in `results[].errors`.
+
+Global operational errors that occur before target selection or before any target can be linted, such as `config_validation_failed`, are reported in the top-level `errors` array with `results: []`, `summary.status: "error"`, and exit code `2`. Their `summary.operation` is `"lint"` unless the failure is specific to stdin mode before target execution.
 
 Each `results[]` entry uses this shape:
 
@@ -837,6 +839,8 @@ Reports variants that cannot be selected. Deferred: it must only report cases th
 - `resource`: future resource/catalog-level checks
 
 Categories are rule metadata, not part of rule ids, so a rule can be recategorized without a breaking change.
+
+Rule categories are documentation and grouping metadata. They are not the diagnostic JSON `category` field: every configurable rule diagnostic uses `category: "lint"` in JSON output regardless of its rule category metadata.
 
 ## Resource and Catalog Linting
 

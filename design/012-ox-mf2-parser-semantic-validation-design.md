@@ -107,9 +107,9 @@ The parser should expose shared semantic helpers for facts that multiple consume
 - `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds.
 - `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and local dependency references used by that selector setup.
 
-These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design.
+These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design. Selector annotation reachability is owned by parser semantic helpers: downstream consumers must not reimplement `.input` / `.local` selector chains, selector annotation discovery, annotation option references, or invalid-dependency cascade behavior from raw declaration facts.
 
-Shared helper APIs should return read-only view iterators rather than raw ids only. A conceptual shape is:
+Shared helper APIs should return read-only view iterators rather than raw ids only. At minimum, a reference view must expose a reference id, variable name, reference kind, source span, resolved declaration id or unresolved state, enclosing declaration id, and local dependency flag. A conceptual shape is:
 
 ```rust
 impl SemanticModel {
