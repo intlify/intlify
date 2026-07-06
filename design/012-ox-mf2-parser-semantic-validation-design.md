@@ -258,7 +258,7 @@ Primary span selection is deterministic:
 - longer forward chain: the declaration whose binding completes the previously referenced chain
 - multiple previous appearances of the same later-bound variable: one diagnostic on the later declaration's bound variable span, with labels on the earlier appearances
 
-This rule avoids reporting the same dependency root cause multiple times while keeping the primary location on the source construct that makes the dependency invalid.
+The semantic validation policy reports the root dependency violation once, keeping the primary location on the source construct that makes the dependency invalid.
 
 ### missing-selector-annotation
 

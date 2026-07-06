@@ -16,13 +16,13 @@ Core semantic diagnostics are always enabled after successful parsing, always re
 
 | Diagnostic Code | Description | Details |
 | --- | --- | --- |
-| `duplicate-declaration` | Disallow duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
-| `invalid-local-dependency` | Disallow invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
-| `missing-selector-annotation` | Require MF2 selectors to resolve to an annotated declaration. | [missing-selector-annotation](./missing-selector-annotation.md) |
-| `variant-key-arity-mismatch` | Require MF2 variant key counts to match selector counts. | [variant-key-arity-mismatch](./variant-key-arity-mismatch.md) |
-| `missing-fallback-variant` | Require MF2 matchers to include a catch-all fallback variant. | [missing-fallback-variant](./missing-fallback-variant.md) |
-| `duplicate-variant` | Disallow duplicate MF2 matcher variant key tuples. | [duplicate-variant](./duplicate-variant.md) |
-| `duplicate-option-name` | Disallow duplicate MF2 option names on one owner. | [duplicate-option-name](./duplicate-option-name.md) |
+| `duplicate-declaration` | Report duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
+| `invalid-local-dependency` | Report invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
+| `missing-selector-annotation` | Report MF2 selectors that do not resolve to an annotated declaration. | [missing-selector-annotation](./missing-selector-annotation.md) |
+| `variant-key-arity-mismatch` | Report MF2 variant key counts that do not match selector counts. | [variant-key-arity-mismatch](./variant-key-arity-mismatch.md) |
+| `missing-fallback-variant` | Report MF2 matchers without a catch-all fallback variant. | [missing-fallback-variant](./missing-fallback-variant.md) |
+| `duplicate-variant` | Report duplicate MF2 matcher variant key tuples. | [duplicate-variant](./duplicate-variant.md) |
+| `duplicate-option-name` | Report duplicate MF2 option names on one owner. | [duplicate-option-name](./duplicate-option-name.md) |
 
 ## Configurable Lint Rules
 
