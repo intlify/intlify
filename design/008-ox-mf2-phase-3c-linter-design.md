@@ -743,6 +743,8 @@ The canonical diagnostic catalog, ordering policy, duplicate-family partitioning
 - semantic diagnostic codes participate in the shared JSON-visible diagnostic code namespace
 - `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters
 
+The complete rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule.
+
 Representative semantic diagnostics:
 
 ```mf2
