@@ -102,12 +102,12 @@ Function options and markup options are both collected into the semantic fact su
 
 Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isLocalDependency = true`. Attributes do not produce variable references in the current MF2 grammar because attribute values are literals only.
 
-The parser should expose shared semantic helpers for facts that multiple consumers need:
+The parser must expose shared semantic helper capability for facts that multiple consumers need:
 
 - `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds.
 - `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and local dependency references used by that selector setup.
 
-These helper names are conceptual. The implementation may choose different Rust names, but the fact ownership and traversal boundary are part of this design. Selector annotation reachability is owned by parser semantic helpers: downstream consumers must not reimplement `.input` / `.local` selector chains, selector annotation discovery, annotation option references, or invalid-dependency cascade behavior from raw declaration facts.
+These helper names are conceptual. The implementation may choose different Rust names, but the ability to read output references and selection references through parser-owned read-only views is required by this design. The fact ownership and traversal boundary are also required. Selector annotation reachability is owned by parser semantic helpers: downstream consumers must not reimplement `.input` / `.local` selector chains, selector annotation discovery, annotation option references, or invalid-dependency cascade behavior from raw declaration facts.
 
 Shared helper APIs should return read-only view iterators rather than raw ids only. At minimum, a reference view must expose a reference id, variable name, reference kind, source span, resolved declaration id or unresolved state, enclosing declaration id, and local dependency flag. A conceptual shape is:
 

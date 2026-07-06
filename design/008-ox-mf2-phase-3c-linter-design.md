@@ -510,18 +510,18 @@ When no operands are provided and stdin mode is not selected, `intlify lint` beh
 
 Human-readable output renders oxlint-style diagnostic blocks and summaries to stderr and keeps stdout machine-friendly and normally empty, following the Phase 3A text reporter conventions. Clean text-reporter runs produce no stdout or stderr output by default. `--quiet` suppresses reported warnings but still emits remaining error diagnostics to stderr. Operational errors are emitted to stderr for the text reporter.
 
-The initial visual target is a colorful oxlint-style diagnostic block on TTY output: severity and failing rule/code are emphasized, file locations are visually distinct, source lines are dimmed or neutral, primary spans are underlined, and labels point back to the highlighted source range. The stable compatibility surface is the presence of path, line, display column, severity, code, message, primary source line, primary underline, and any available label content. Exact wording, colors, box drawing characters, underline glyphs, and spacing are not fixture-locked contracts.
+The initial visual target is a colorful oxlint-style diagnostic block on TTY output: severity and failing category/code are emphasized, file locations are visually distinct, source lines are dimmed or neutral, primary spans are underlined, and labels point back to the highlighted source range. The text reporter heading uses `category(code)`, where category is `parser`, `semantic`, or `lint`, so parser and semantic diagnostics are not presented as configurable lint rules. The stable compatibility surface is the presence of path, line, display column, severity, category, code, message, primary source line, primary underline, and any available label content. Exact wording, colors, box drawing characters, underline glyphs, and spacing are not fixture-locked contracts.
 
 Text color is automatic in Phase 3C: color is emitted only when stderr is a TTY, `NO_COLOR` is not set, and the process is not running under `CI=true`. Non-TTY output, CI output, and JSON reporter output are always uncolored. Color is not fixture-locked.
 
-Each text diagnostic block includes at least path, one-based line and one-based display column, severity, code, and message. When source text is available, the block includes the primary source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels on the same source line may be rendered as additional underline messages when practical. Labels on other source lines should prefer compact summary text in Phase 3C and may be omitted when rendering them would make the block misleading. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span plus labels remain available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity code message` form.
+Each text diagnostic block includes at least path, one-based line and one-based display column, severity, category, code, and message. When source text is available, the block includes the primary source line and marks the primary span with underline indicators such as `^`, `~`, or line-style glyphs. Labels on the same source line may be rendered as additional underline messages when practical. Labels on other source lines should prefer compact summary text in Phase 3C and may be omitted when rendering them would make the block misleading. Multi-line spans render only the primary start line and optional surrounding context in Phase 3C; full multi-line rendering is deferred, and the full byte span plus labels remain available in JSON output. When source text is unavailable, the reporter falls back to a compact `path:line:column severity category(code) message` form.
 
 Text reporter summaries are best-effort human output, not a compatibility surface. Implementations may print a final count summary for problem runs, including warning counts hidden by `--quiet`, but tests must not fixture-lock the summary wording or require summary output to exist.
 
 Text reporter line and column are human-facing: line is one-based, column is one-based display column, and underline placement uses the same display-width calculation. Display width follows the Rust `unicode-width` crate semantics for `UnicodeWidthStr` / `UnicodeWidthChar`: combining marks are width `0`, East Asian wide/fullwidth characters are width `2`, and tabs are width `1` in the initial implementation. JSON `location.column` remains the zero-based UTF-8 byte column defined by `SourceLocation`.
 
 ```text
-x lint(duplicate-declaration): variable $count is already declared
+x semantic(duplicate-declaration): variable $count is already declared
   [messages/foo.mf2:2:8]
 
   1 | .input {$count :number}
@@ -673,6 +673,8 @@ type LintResult =
 
 function lintMessage(source: string, options?: LintOptions): LintResult
 ```
+
+`@intlify/lint-napi` and `@intlify/lint-wasm` both export these public TypeScript types: `LintRuleSeverity`, `LintOptions`, `LintResult`, `LintDiagnostic`, and `OperationalError`. The two packages must keep those exported type names and their structural shape in sync so browser, worker, and Node callers can share typed integration code.
 
 `ok: true` results always include parser, semantic, and rule diagnostics in one flat array with category markers; a message with parser diagnostics is still an `ok: true` lint result. `ok: false` is reserved for operational errors such as invalid options or internal failures. Semantic invariant failures, semantic API misuse, and rule invariant failures all return `ok: false` with the same `internal_error` details used by the CLI boundary, including `details.reason: "semantic_invariant_failed"`, `"semantic_api_misuse"`, or `"lint_rule_invariant_failed"` as appropriate. If a rule invariant failure happens after earlier rules emitted reports, those partial reports are discarded and are not returned through the programmatic API.
 
