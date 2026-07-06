@@ -2,6 +2,12 @@
 
 This directory documents the semantic diagnostics and configurable lint rules surfaced by the ox-mf2 Phase 3C linter.
 
+## Canonical Sources
+
+- [008-ox-mf2-phase-3c-linter-design.md](../008-ox-mf2-phase-3c-linter-design.md) owns the linter product contract, pipeline, configuration, reporters, bindings, and release boundaries.
+- [012-ox-mf2-parser-semantic-validation-design.md](../012-ox-mf2-parser-semantic-validation-design.md) owns parser semantic validation details for core semantic diagnostics, including spans, labels, ordering, and cascade suppression.
+- This directory owns reader-facing rule documentation, examples, options, and related-rule links.
+
 ## Core Semantic Diagnostics
 
 Core semantic diagnostics are always enabled, always reported as `error`, and cannot be configured through `lint.rules`.

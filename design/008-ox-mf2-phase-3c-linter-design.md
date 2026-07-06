@@ -123,7 +123,7 @@ Rule execution order is deterministic and follows registry declaration order for
 
 ## Diagnostic Classification
 
-Diagnostic candidates are classified into four groups. This classification is fixed by this document:
+Diagnostic candidates are classified into three groups. This classification is fixed by this document:
 
 - **core semantic diagnostic**: always enabled after successful parsing, independent from rule configuration, and reported as `error`. These correspond to MF2 Data Model Errors: messages that carry them are not valid MF2 and will fail or misbehave at runtime, so they must not be configurable.
 - **configurable lint rule**: runs only after parser and semantic diagnostics are clean, and is controlled by `off`, `warn`, or `error`.
@@ -743,113 +743,19 @@ The canonical diagnostic catalog, ordering policy, duplicate-family partitioning
 - semantic diagnostic codes participate in the shared JSON-visible diagnostic code namespace
 - `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters
 
-The complete rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule.
-
-Representative semantic diagnostics:
-
-```mf2
-.input {$count :number}
-.input {$count :number}
-{{{$count}}}
-```
-
-The parser reports `duplicate-declaration`; the linter includes it and skips configurable rules.
-
-```mf2
-.match $count
-one {{One item}}
-* {{Items}}
-```
-
-The parser reports `missing-selector-annotation`; this is independent from the configurable `no-undeclared-variable` rule state.
+The complete rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule. This section intentionally does not duplicate per-diagnostic examples; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the canonical semantic validation behavior, and `design/linter-rules/` owns reader-facing rule documentation.
 
 ## Configurable Rules
 
 Initial configurable rules avoid style concerns. Style checks and formatting fixes are delegated to the formatter API/crate.
 
-### no-unused-declaration
+Detailed configurable rule behavior and examples live in [linter-rules/index.md](./linter-rules/index.md). This design document keeps only the product-level contract:
 
-Category: `best-practice`. Default: `warn`, enabled in `recommended`.
-
-Reports a declared variable that is not reachable from the message output or selector set. The rule applies to both `.input` and `.local` declarations in the recommended preset: an unreachable declaration has no runtime effect in MF2, so both kinds are treated as dead code and reported as `warn` by default. Teams that keep unreferenced `.input` declarations as external-input documentation can set the rule to `off`; an `ignoreInput`-style rule option can be introduced later together with the reserved severity-plus-options tuple form.
-
-Reachability starts from the parser-owned output-reference and selection-reference helpers, then follows `.local` right-hand-side dependencies backwards through declarations. Output references are references owned by the message body's expression or markup subtree, including pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds. Selection references include selector variables and dependencies used by selector declaration chains, including function annotations and selector annotation option values. References inside function option values and markup option values are considered used when their owner expression or markup is reachable from the message body or selector setup. A declaration referenced only by another unreachable declaration is still unused.
-
-```mf2
-.input {$count :number}
-.local $unused = {$count}
-{{You have {$count} items.}}
-```
-
-```mf2
-.input {$count :number}
-.local $label = {$count}
-{{No count here}}
-```
-
-In the second example both `$label` and `$count` are reported: `$label` is not reachable from the body or selectors, and `$count` is only referenced by the unreachable `$label`.
-
-References nested inside reachable output constructs also mark declarations as used:
-
-```mf2
-.input {$url :string}
-{{Click {#link href=$url}here{/link}}}
-```
-
-```mf2
-.input {$digits :number}
-{{{$count :number minimumFractionDigits=$digits}}}
-```
-
-Selector annotation dependencies also mark declarations as used:
-
-```mf2
-.input {$digits :number}
-.input {$count :number minimumFractionDigits=$digits}
-.match $count
-one {{One}}
-* {{Other}}
-```
-
-In this example `$count` is used by the selector, and `$digits` is used by the selector declaration's function option value.
-
-### no-duplicate-attribute
-
-Category: `best-practice`. Default: `warn`, enabled in `recommended`.
-
-Reports repeated attribute identifiers on one expression or markup placeholder, covering expressions and open, close, and standalone markup. The MF2 spec says attribute identifiers SHOULD be unique and defines last-one-wins semantics for duplicates, so this is a warning-level rule rather than a semantic error. The primary span is the later duplicate attribute identifier, with a label on the first occurrence.
-
-Duplicate detection is owner-local: attributes are compared only within the same expression placeholder, open markup placeholder, close markup placeholder, or standalone markup placeholder. Attribute identifiers are compared by cooked identifier string after the NFC normalization rule defined in the Phase 1 parser design, and comparison is case-sensitive. Attributes from different placeholder owners are never compared with each other.
-
-```mf2
-{$name :string @note=|a| @note=|b|}
-```
-
-### no-undeclared-variable
-
-Category: `correctness`. Default: `off`, not in `recommended`.
-
-Reports a variable reference that cannot be resolved to a visible `.input` or `.local` declaration. Undeclared variables are valid external input variables in MF2, so this rule is an opt-in for teams that adopt a declare-all-inputs workflow. Enabling it also catches declaration typos such as declaring `$count` and referencing `$conut`.
-
-```mf2
-.input {$count :number}
-{{You have {$total} items.}}
-```
-
-References are resolved against the declarations visible at the reference point, meaning earlier declarations only. The rule covers every unresolved non-selector variable reference exposed by `SemanticModel`, including `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into the semantic model. Selector variables are excluded because an unbound selector is always reported by the core semantic `missing-selector-annotation` diagnostic, independent of this rule's severity. References to variables declared later are already `invalid-local-dependency` semantic errors and are not double-reported by this rule.
-
-Simple messages with no declarations reference external inputs by design; teams that enable this rule accept that such messages must move to `.input` declarations.
-
-Only the selector variable occurrence itself is excluded. Nested references inside selector declarations, function option values, or markup option values remain normal non-selector references and are reported by this rule when unresolved:
-
-```mf2
-.input {$count :number minimumFractionDigits=$digits}
-.match $count
-one {{One}}
-* {{Other}}
-```
-
-In this example `$count` is the selector and belongs to core semantic validation, while `$digits` is a function option value reference and belongs to `no-undeclared-variable` when the rule is enabled.
+| Rule ID | Category | Default | Recommended | Notes |
+| --- | --- | --- | --- | --- |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | Reports `.input` or `.local` declarations that are not reachable from message output or selector setup. |
+| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Reports repeated attributes on one expression or markup placeholder. |
+| `no-undeclared-variable` | `correctness` | `off` | no | Opt-in declare-all-inputs check for unresolved non-selector references. |
 
 ## Deferred Diagnostics
 

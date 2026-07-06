@@ -213,6 +213,8 @@ The duplicate declaration family is partitioned:
 
 ## Diagnostic Catalog
 
+This section is the canonical parser-owned semantic validation catalog. Reader-facing linter documentation for the same JSON-visible codes lives in [linter-rules/index.md](./linter-rules/index.md), but those pages do not redefine spans, ordering, cascade suppression, or duplicate-family partitioning.
+
 ### duplicate-declaration
 
 Reports a declaration that binds a variable that already appeared in a previous declaration. `.input` and `.local` share one variable namespace, per the MF2 declaration rules.
