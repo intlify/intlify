@@ -228,7 +228,7 @@ Metadata includes at least:
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options
 
-No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. Rule listing and introspection commands remain deferred.
+No initial rule accepts options, so rule option schemas are an empty surface in Phase 3C. The exact Rust metadata struct is an implementation detail. Rule metadata is used to generate the unified config schema and can feed future documentation generation, but Phase 3C does not expose a runtime metadata API through CLI, N-API, or WASM. The generated docs slug is internal generated metadata, not a runtime or JSON compatibility surface; exposing docs URLs or populating diagnostic `help` requires a separate public contract. Rule listing and introspection commands remain deferred.
 
 ## Rule Implementation Model
 
@@ -659,6 +659,12 @@ lint_message(source: &str, options: LintOptions) -> LintResult
 N-API and WASM expose the same contract as a discriminated union, using the Phase 3A operational error shape:
 
 ```ts
+type LintRuleSeverity = 'off' | 'warn' | 'error'
+
+type LintOptions = {
+  rules?: Record<string, LintRuleSeverity>
+}
+
 type LintResult =
   | { ok: true; diagnostics: LintDiagnostic[]; errorCount: number; warningCount: number }
   | { ok: false; errors: OperationalError[] }
@@ -672,7 +678,7 @@ For programmatic APIs, `errorCount` and `warningCount` are derived from the retu
 
 `source` must be a JavaScript string for N-API and WASM bindings. Bindings do not apply `String(value)` coercion. `null`, numbers, booleans, arrays, objects, `Uint8Array`, functions, and symbols return `ok: false` with the shared Phase 3A `invalid_input` operational error and `details.reason: "invalid_source_type"`. JavaScript strings containing unpaired surrogates are rejected before parsing with `details.reason: "invalid_utf16"`; bindings must not replace them with U+FFFD because that would make diagnostics refer to a different source string. The Rust API accepts `&str`, so this validation is a binding-boundary concern.
 
-`LintOptions` carries rule severity overrides; the binding shape is `{ rules?: Record<string, "off" | "warn" | "error"> }`, validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Parser or semantic diagnostic codes used as rule ids are also rejected as `invalid_options` with `details.reason: "non_configurable_diagnostic"`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection; `lint.ignorePatterns` is CLI-only, matching the formatter's `FormatOptions` boundary. Programmatic API sources are treated as whole messages: no file framing is applied, matching `formatMessage`.
+`LintOptions` carries rule severity overrides; the binding shape is validated like the config `lint.rules` map, with unknown rule ids rejected as `invalid_options`. Parser or semantic diagnostic codes used as rule ids are also rejected as `invalid_options` with `details.reason: "non_configurable_diagnostic"`. Omitted `options` and omitted `rules` use the implicit `recommended` defaults during config resolution; `null` options are invalid, matching the formatter binding contract. The `ok: true` result uses plain `errorCount` / `warningCount` for diagnostic counts because no operational error count coexists on that surface; only the CLI summary needs the `diagnostic*` prefix. Message-level APIs do not perform file selection or file framing, so `lint.ignorePatterns` is CLI config only and intentionally absent from programmatic `LintOptions`; programmatic API sources are treated as whole messages, matching `formatMessage`.
 
 Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects: their JavaScript prototype must be `Object.prototype` or `null`. `Object.create(null)` is accepted. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known configurable rule ids. Parser or semantic diagnostic codes report `non_configurable_diagnostic` before their value shape is considered. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
 
