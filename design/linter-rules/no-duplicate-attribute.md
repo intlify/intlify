@@ -16,6 +16,8 @@ The MF2 specification says attribute identifiers SHOULD be unique and defines la
 
 Duplicate detection is owner-local. Attributes are compared only within the same expression placeholder, open markup placeholder, close markup placeholder, or standalone markup placeholder. Attribute identifiers are compared by cooked identifier string after the parser's NFC normalization rule, and comparison is case-sensitive. The primary span is the later duplicate attribute identifier, with a label on the first occurrence.
 
+The rule consumes the parser-owned attribute owner facts, including `AttributeOwnerKind`, and does not reconstruct attribute owner taxonomy by walking the CST.
+
 ### Fail
 
 Some examples of **incorrect** code for this rule:

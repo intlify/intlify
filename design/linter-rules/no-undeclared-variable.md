@@ -14,6 +14,8 @@ This configurable lint rule reports a non-selector variable reference that canno
 
 Undeclared variables are valid external inputs in MF2, so this rule is an opt-in rule for teams that adopt a declare-all-inputs workflow. Selector variables are excluded because missing selector declarations are reported by the core semantic [missing-selector-annotation](./missing-selector-annotation.md) diagnostic. Selector exclusion applies only to the `.match` selector variable occurrence itself. Other unresolved variables that appear while setting up selector annotations, such as annotation option values, remain non-selector references and may be reported by this rule.
 
+In other words, "selector setup reference" and "selector variable occurrence" are not the same boundary. The selector occurrence belongs to semantic validation; unresolved non-selector references used by selector setup still belong to this rule when no parser or semantic diagnostic short-circuits configurable rules.
+
 References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. References to variables declared later are already [invalid-local-dependency](./invalid-local-dependency.md) semantic errors and are not double-reported by this rule.
 
 ### Fail
