@@ -62,7 +62,7 @@ Initial facts include:
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
 - option occurrences: owner id, owner kind, option identifier, cooked identifier, identifier span, and owner-local occurrence order
-- attribute occurrences: expression and markup placeholder owner id, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
+- attribute occurrences: expression and markup placeholder owner id, owner kind, attribute identifier, cooked identifier, identifier span, and owner-local occurrence order
 - matcher variants: matcher owner id, selector count, variant id, key tuple, key spans, body span, and variant order
 
 SemanticModel fact iterators have stable semantic order, not implementation collection order. This document is the canonical source for parser-owned fact ordering:
@@ -99,6 +99,19 @@ enum OptionOwnerKind {
 ```
 
 Function options and markup options are both collected into the semantic fact surface. Owner-local option checks compare only options with the same owner id and owner kind. Function and markup owners are never compared with each other, and different markup placeholders are never compared with each other. Open, close, and standalone markup placeholders are separate owners.
+
+Attribute occurrences also distinguish the owner kind:
+
+```rust
+enum AttributeOwnerKind {
+    Expression,
+    MarkupOpen,
+    MarkupClose,
+    MarkupStandalone,
+}
+```
+
+Owner-local attribute checks compare only attributes with the same owner id and owner kind. The `no-duplicate-attribute` lint rule consumes this parser-owned fact surface and must not reconstruct attribute owner taxonomy by walking the CST.
 
 Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isLocalDependency = true`. Attributes do not produce variable references in the current MF2 grammar because attribute values are literals only.
 
