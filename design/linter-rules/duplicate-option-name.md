@@ -6,7 +6,9 @@
 
 This core semantic diagnostic reports duplicate option identifiers within one function call or markup placeholder.
 
-Duplicate detection is owner-local. Function options are compared only with options on the same function call, and markup options are compared only with options on the same markup placeholder. This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+Duplicate detection is owner-local. Function options are compared only with options on the same function call, and markup options are compared only with options on the same markup placeholder. Different markup placeholders are separate owners. Option identifiers are compared by cooked identifier string after the parser's NFC normalization rule, and comparison is case-sensitive.
+
+This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 

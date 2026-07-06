@@ -6,7 +6,7 @@
 
 This core semantic diagnostic reports a matcher that does not include a fallback variant whose keys are all catch-all keys, `*`.
 
-The fallback requirement is independent from selector functions or known selector domains. This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+The fallback requirement is independent from selector functions or known selector domains. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 

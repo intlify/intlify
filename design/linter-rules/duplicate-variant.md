@@ -6,7 +6,7 @@
 
 This core semantic diagnostic reports duplicate matcher variant key tuples.
 
-Variant keys are compared by their cooked string values after the parser's NFC normalization rule. Syntactically different keys can therefore collide if they represent the same cooked value. This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+Variant keys are compared by their cooked string values after the parser's NFC normalization rule. Syntactically different keys can therefore collide if they represent the same cooked value. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 

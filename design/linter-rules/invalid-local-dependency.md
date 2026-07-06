@@ -8,7 +8,7 @@ This core semantic diagnostic reports `.local` declaration dependency patterns t
 
 A `.local` declaration must not bind a variable that appears in its own expression, and must not bind a variable that already appeared in a previous declaration's expression. This covers self references, forward references that are later bound, and dependency cycles.
 
-This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 

@@ -10,7 +10,7 @@ This directory documents the semantic diagnostics and configurable lint rules su
 
 ## Core Semantic Diagnostics
 
-Core semantic diagnostics are always enabled, always reported as `error`, and cannot be configured through `lint.rules`.
+Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.
 
 | Rule ID | Description | Details |
 | --- | --- | --- |

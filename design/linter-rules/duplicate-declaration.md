@@ -6,7 +6,7 @@
 
 This core semantic diagnostic reports a declaration that binds a variable that was already declared earlier in the same MF2 message.
 
-`.input` and `.local` declarations share one variable namespace. This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+`.input` and `.local` declarations share one variable namespace. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 

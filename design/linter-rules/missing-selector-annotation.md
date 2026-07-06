@@ -6,7 +6,7 @@
 
 This core semantic diagnostic reports a selector variable that does not directly or indirectly resolve to a declaration with a function annotation.
 
-External variables are valid in normal message output, but MF2 selectors require an annotated declaration so selection behavior can be determined. This diagnostic is always enabled, is emitted as `error`, and cannot be configured through `lint.rules`.
+External variables are valid in normal message output, but MF2 selectors require an annotated declaration so selection behavior can be determined. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 ### Fail
 
