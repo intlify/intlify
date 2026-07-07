@@ -16,6 +16,8 @@ The examples in these pages are illustrative reader-facing examples. They are no
 
 Metadata tables in these pages are design-time summaries for readers. They are not the runtime rule metadata source, generated docs source, or public help-text contract. In semantic diagnostic pages, `Diagnostic Category` describes the JSON-visible diagnostic category such as `semantic`. In configurable rule pages, `Category` describes rule metadata such as `best-practice` or `correctness`; those rule metadata categories are not diagnostic JSON `category` values.
 
+Default severity and `Recommended` columns describe the initial Phase 3C metadata snapshot. The `recommended` preset evolution policy in [008-ox-mf2-phase-3c-linter-design.md](../008-ox-mf2-phase-3c-linter-design.md) remains canonical while the linter is in 0.x.
+
 ## Core Semantic Diagnostics
 
 Core semantic diagnostics are always enabled after successful parsing, always reported as `error`, and cannot be configured through `lint.rules`.
