@@ -16,7 +16,7 @@ Undeclared variables are valid external inputs in MF2, so this rule is an opt-in
 
 In other words, "selector setup reference" and "selector variable occurrence" are not the same boundary. The selector occurrence belongs to semantic validation; unresolved non-selector references used by selector setup still belong to this rule when no parser or semantic diagnostic short-circuits configurable rules.
 
-References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. References to variables declared later are already [invalid-local-dependency](./invalid-local-dependency.md) semantic errors and are not double-reported by this rule.
+References are resolved against declarations visible at the reference point, meaning earlier declarations only. The rule covers unresolved non-selector references in `.local` right-hand-side expressions, pattern and placeholder expressions, function option values, markup option values, and future non-selector reference kinds promoted into `SemanticModel`. Forward references in `.local` dependency contexts that become [invalid-local-dependency](./invalid-local-dependency.md) semantic errors are not double-reported by this rule.
 
 ### Boundary Examples
 
