@@ -47,7 +47,7 @@ The initial editor workflow follows the same strict pipeline as CLI and bindings
 - lint diagnostics are reported only when parser and semantic diagnostics are clean
 - parser diagnostics prevent semantic validation and linter rule execution
 
-Editor layers may add protocol-specific advice later, but the core linter initially emits only `error` and `warning` severities.
+Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at the adapter boundary; adapters convert `"warn"` to the editor's warning severity. Editor layers may add protocol-specific advice later, but the core linter does not emit `info` or `hint` diagnostics initially.
 
 ## Formatting Edits
 

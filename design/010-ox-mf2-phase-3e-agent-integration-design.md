@@ -31,9 +31,9 @@ Agents can run:
 - `intlify fmt` to apply formatting when the task explicitly allows edits
 - future `intlify` check commands when formatter and linter workflows are composed
 
-Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic categories, rule ids, severities, and suggested follow-up actions.
+Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic `category`, diagnostic `code`, `severity`, and suggested follow-up actions. For configurable lint diagnostics, `code` is the rule id.
 
-Lint result contracts, rule ids, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
+Lint result contracts, diagnostic codes, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
 
 ## Integration Shapes
 

@@ -261,7 +261,7 @@ The initial CLI output formats should include human-readable `text` output and m
 
 Machine-readable output schemas are distinct from the unified project config schema. `lint`, `fmt --check`, and a future combined `check` command may use command-specific JSON result schemas, while sharing common grouping and summary conventions where practical.
 
-The CLI exits with a failure status when any `error` diagnostic is reported. `warning` diagnostics do not fail the process by default. A `--max-warnings <n>` option should allow CI users to fail when the warning count exceeds the configured threshold.
+The CLI exits with a failure status when any diagnostic whose JSON `severity` is `"error"` is reported. Diagnostics whose JSON `severity` is `"warn"` do not fail the process by default. A `--max-warnings <n>` option should allow CI users to fail when the warning count exceeds the configured threshold.
 
 Detailed CLI option semantics, including quiet mode, fix mode, linter config section schema details, ignore/include behavior, unmatched-pattern behavior, and additional output formats, belong to the linter-specific design document rather than this Phase 3 consumer contract.
 
@@ -283,16 +283,15 @@ CLI JSON output, Rust results, N-API results, WASM results, and LSP bridges shou
 
 - result grouping by file or message entry
 - diagnostics with `parser`, `semantic`, or `lint` category
-- `error` or `warning` severity
+- `"error"` or `"warn"` severity
+- a single JSON-visible `code` field across parser, semantic, and lint diagnostics
 - UTF-8 byte span as the canonical location
 - optional derived line/column or UTF-16 positions for CLI/editor consumers
-- stable rule id for configurable lint diagnostics
-- stable diagnostic code for parser and semantic diagnostics
 - summary counts such as `errorCount` and `warningCount`
 
 ### Stable Identifiers and Rule Metadata
 
-Semantic diagnostic codes and configurable lint rule ids are public stable identifiers because configs, suppressions, JSON output, editor integrations, and external tooling may depend on them. Human-readable diagnostic message text is not a stable compatibility surface and may change for clarity.
+Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids share one JSON-visible diagnostic `code` namespace and are public stable identifiers because configs, suppressions, JSON output, editor integrations, and external tooling may depend on them. Human-readable diagnostic message text is not a stable compatibility surface and may change for clarity.
 
 The lint crate should expose rule metadata for CLI, bindings, generated docs, and JSON Schema generation. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, documentation link or docs slug, and rule option schema when a rule accepts options. Exact metadata fields are linter-specific design details.
 
@@ -314,15 +313,15 @@ CLI file discovery should use an explicit supported-extension list owned by the 
 
 ### Lint Pipeline
 
-`lintMessage(source)` should parse the message, perform semantic lowering as needed, run enabled rules, and return parser, semantic, and lint diagnostics in one result. Parser diagnostics are always included in the lint result, even when no lint rules run, so CLI and editor users can treat syntax failures as lint failures.
+`lintMessage(source)` should parse the message, perform semantic validation as needed, run enabled rules, and return parser, semantic, and lint diagnostics in one result. Parser diagnostics are always included in the lint result, even when no lint rules run, so CLI and editor users can treat syntax failures as lint failures.
 
-Diagnostics should identify their source category and rule id when applicable. Parser diagnostics use `category: "parser"` and no rule id, or a reserved parser rule id if a specific output format requires one. Parser diagnostics are independent of rule configuration and are emitted as `error` in the initial design, including recoverable syntax errors. `warning` is reserved for future compatibility or deprecation-style parser diagnostics.
+Diagnostics should identify their source category and stable JSON-visible code. Parser diagnostics use `category: "parser"` and a parser diagnostic code. Parser diagnostics are independent of rule configuration and are emitted with `severity: "error"` in the initial design, including recoverable syntax errors. `severity: "warn"` is reserved for future compatibility or deprecation-style parser diagnostics.
 
-If parsing produces any parser diagnostics, the initial linter stops before semantic lowering and rule execution. This keeps rule implementations from depending on incomplete recovery AST shapes. A future recovery-aware editor mode may run selected rules on partial syntax, but that is outside the initial linter core.
+If parsing produces any parser diagnostics, the initial linter stops before semantic validation and rule execution. This keeps rule implementations from depending on incomplete recovery AST shapes. A future recovery-aware editor mode may run selected rules on partial syntax, but that is outside the initial linter core.
 
-Semantic diagnostics, when produced by semantic lowering, are included in `lintMessage(source)` after successful parsing. They use `category: "semantic"` and no rule id, or a reserved semantic rule id if an output format requires one. These diagnostics represent MF2 meaning errors rather than configurable lint rules. Initial semantic diagnostics are emitted as `error`; `warning` is reserved for future best-practice or ambiguous-but-valid semantic diagnostics.
+Semantic diagnostics, when produced by parser-owned semantic validation, are included in `lintMessage(source)` after successful parsing. They use `category: "semantic"` and a semantic diagnostic code. These diagnostics represent MF2 meaning errors rather than configurable lint rules. Initial semantic diagnostics are emitted with `severity: "error"`; `severity: "warn"` is reserved for future best-practice or ambiguous-but-valid semantic diagnostics.
 
-If semantic lowering produces any semantic diagnostics, configurable lint rules do not run. The initial linter pipeline is strictly `parser -> semantic -> rules`, and each stage must complete without diagnostics before the next stage runs.
+If semantic validation produces any semantic diagnostics, configurable lint rules do not run. The initial linter pipeline is strictly `parser -> semantic -> rules`, and each stage must complete without diagnostics before the next stage runs.
 
 ### Severity
 
@@ -332,7 +331,7 @@ Rule configuration uses an ESLint/oxlint-style severity state:
 - `warn`: report diagnostics as warnings
 - `error`: report diagnostics as errors
 
-Emitted linter diagnostics initially use only `warning` and `error`. `off` is a rule configuration state, not an emitted diagnostic severity. `info` and `hint` are reserved for LSP/editor or advice-style layers, not for the initial linter core.
+Emitted linter diagnostics initially use only `"warn"` and `"error"`. In prose, "warning" refers to diagnostics whose JSON `severity` is `"warn"`. `off` is a rule configuration state, not an emitted diagnostic severity. `info` and `hint` are reserved for LSP/editor or advice-style layers, not for the initial linter core.
 
 ### Fixes and Formatter Boundary
 
@@ -464,7 +463,7 @@ The initial workflow is strict:
 - linter diagnostics are reported only when parser and semantic diagnostics are clean
 - parser diagnostics prevent semantic validation and linter rule execution
 
-Shared `error` and `warning` severities map to editor/LSP diagnostic severity at the adapter boundary. The core linter does not emit `info` or `hint` diagnostics initially, but editor layers may add advice-style diagnostics on top of the shared results.
+Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at the adapter boundary; adapters convert `"warn"` to the editor's warning severity. The core linter does not emit `info` or `hint` diagnostics initially, but editor layers may add advice-style diagnostics on top of the shared results.
 
 Recovery-aware partial semantic or lint diagnostics for incomplete editor buffers are a future editor-mode concern. The initial editor workflow keeps the same strict `parser -> semantic -> rules` pipeline used by CLI and bindings.
 
