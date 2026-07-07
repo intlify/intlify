@@ -117,7 +117,7 @@ Reference records also carry dependency context separately from their syntactic 
 
 The parser must expose shared semantic helper capability for facts that multiple consumers need:
 
-- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option value references, markup option value references, and future body-owned reference kinds.
+- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option value references, and markup option value references.
 - `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variable occurrences, the resolved selector declaration chain, the function annotation subtree that annotates the selector, function option value references inside that selector annotation subtree, and declaration dependency references used by that selector setup.
 
 `selection_references()` is the conceptual parser API name; reader-facing linter documentation may describe the same reachability roots as "selector setup references".
@@ -345,13 +345,13 @@ one few {{Items}}
 * {{Fallback}}
 ```
 
-The primary span is the variant key list: from the first key start to the last key end. This applies to both extra-key and missing-key cases. If a recovered CST cannot provide a key-list span, semantic validation falls back to the variant span, and then to an empty current-offset span only as a last resort. The selector list may be used as a label to show the expected key count.
+The primary span is the variant key list: from the first key start to the last key end. This applies to both extra-key and missing-key cases. For diagnostic-free parses, a key-list span should be available. If the implementation cannot derive one, semantic validation falls back to the variant span, and then to an empty current-offset span only as a defensive last resort. The selector list may be used as a label to show the expected key count.
 
 ### missing-fallback-variant
 
 Reports a matcher without a fallback variant. Per the MF2 rule, at least one variant must have all keys equal to the catch-all key `*`, regardless of selector functions or selector domains.
 
-The primary span is the `.match` keyword span, because no fallback token exists. Recovery cases that cannot recover the `.match` keyword span use the current offset empty span. Labels may point at the matcher body or variant list for human-readable output, but labels are not fixture-locked.
+The primary span is the `.match` keyword span, because no fallback token exists. For diagnostic-free parses, the `.match` keyword span should be available. If the implementation cannot derive it, semantic validation uses the current-offset empty span only as a defensive last resort. Labels may point at the matcher body or variant list for human-readable output, but labels are not fixture-locked.
 
 ```mf2
 .match $count
@@ -489,6 +489,7 @@ These items are intentionally deferred and do not block this design document's P
 
 - Snapshot-backed semantic validation, including the snapshot-to-`SemanticModel` path. This parser-owned path is the canonical prerequisite for any future linter `lintSnapshot` API. A future snapshot-backed path must construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans.
 - Selector-function domain modeling for future `unreachable-variant`.
+- Additional body-owned reference kinds beyond the Phase 3C initial `output_references()` fact surface.
 - Additional semantic facts needed by resource/catalog adapters.
 - Public documentation pages and static help text for semantic diagnostic codes. The design-time pages under `design/linter-rules/` do not define the runtime `help` field or public docs URL contract.
 

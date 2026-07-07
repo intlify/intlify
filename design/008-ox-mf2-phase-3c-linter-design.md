@@ -634,7 +634,7 @@ When any file-specific operational error is present, the process exit code is `2
 
 Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 
-When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status`, `problemFiles`, and summary counts still use the full diagnostic set. In other words, `results[].status` is computed from the full diagnostic set, while `results[].diagnostics` contains only the reporter-visible diagnostic set. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
+When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, but `status`, `problemFiles`, and summary counts still use the full diagnostic set. In other words, `results[].status` is computed from the full diagnostic set, while `results[].diagnostics` contains only the reporter-visible diagnostic set. `summary.status` remains the process-level exit classification, while `results[].status` remains the target-level diagnostic classification before reporter filtering. For example, a file with one warning and no errors reports an empty `diagnostics` array with `--quiet --reporter json`, while still counting the warning and classifying the file as a problem:
 
 ```json
 {
@@ -910,7 +910,7 @@ Phase 3C linter implementation should be split into reviewable PRs:
 
 Each PR should be cut from `main` and keep linter work separated from formatter work. Shared CLI infrastructure (discovery, ignore, framing, envelope) introduced by the fmt CLI PR should be reused, not duplicated.
 
-This design records product contracts and implementation boundaries. PR sequencing, CI jobs, benchmark command wiring, release-flow tasks, and exact fixture update commands should be expanded in the Phase 3C implementation plan rather than duplicated further in this design file.
+This design records product contracts and implementation boundaries. Only the coarse milestone order belongs in this design file. PR sequencing, CI jobs, benchmark command wiring, release-flow tasks, and exact fixture update commands should be expanded in the Phase 3C implementation plan rather than duplicated further in this design file.
 
 ## Deferred Follow-Up Notes
 
