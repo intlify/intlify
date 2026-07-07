@@ -77,6 +77,8 @@ The linter binding packages call the same source-backed `lintMessage(source, opt
 - `lint --fix`, rule listing/introspection commands, and resolved-config printing in the first CLI version.
 - Per-rule CLI severity flags such as oxlint-style `-A` / `-W` / `-D`; CLI rule severity is controlled through `lint.rules` config, while programmatic callers use `LintOptions.rules`.
 
+Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-up-notes) when they are plausible future linter product work; they are excluded only from the Phase 3C initial contract.
+
 ## Pipeline
 
 The initial linter pipeline is strict:

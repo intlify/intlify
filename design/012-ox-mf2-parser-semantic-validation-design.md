@@ -19,6 +19,8 @@ This document defines the parser-owned semantic validation contract for ox-mf2. 
 - Snapshot-backed semantic validation.
 - JavaScript plugin APIs or custom semantic validators.
 
+Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-up-notes) when they are plausible future parser-owned work; they are excluded only from the Phase 3C initial contract.
+
 ## Ownership
 
 `ox_mf2_parser` owns CST construction, parser diagnostics, semantic lowering, `SemanticModel`, and core semantic validation. The parser crate exposes semantic diagnostics through a parser-owned API so downstream consumers do not need to infer MF2 data model errors themselves.
