@@ -770,6 +770,16 @@ The canonical diagnostic catalog, ordering policy, duplicate-family partitioning
 - semantic diagnostic codes participate in the shared JSON-visible diagnostic code namespace
 - `intlify_lint` consumes parser semantic diagnostics and shapes them for reporters
 
+The initial semantic diagnostic codes surfaced by the linter are:
+
+- `duplicate-declaration`
+- `invalid-local-dependency`
+- `missing-selector-annotation`
+- `variant-key-arity-mismatch`
+- `missing-fallback-variant`
+- `duplicate-variant`
+- `duplicate-option-name`
+
 The complete diagnostic and rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule. This section intentionally does not duplicate per-diagnostic examples; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the canonical semantic validation behavior, and `design/linter-rules/` owns design-time reader-facing documentation. Those pages are not the runtime `help` field or public docs URL contract.
 
 ## Configurable Rules

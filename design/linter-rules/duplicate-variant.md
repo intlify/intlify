@@ -4,9 +4,9 @@
 
 ## Metadata
 
-| Category   | Severity | Configurable |
-| ---------- | -------- | ------------ |
-| `semantic` | `error`  | no           |
+| Diagnostic Category | Severity | Configurable |
+| ------------------- | -------- | ------------ |
+| `semantic`          | `error`  | no           |
 
 ## Details
 
