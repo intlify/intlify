@@ -75,7 +75,7 @@ The linter binding packages call the same source-backed `lintMessage(source, opt
 - File-specific config overrides.
 - Output formats beyond `text` and `json` in the first CLI contract.
 - `lint --fix`, rule listing/introspection commands, and resolved-config printing in the first CLI version.
-- Per-rule CLI severity flags such as oxlint-style `-A` / `-W` / `-D`; rule severity is controlled through `lint.rules` config.
+- Per-rule CLI severity flags such as oxlint-style `-A` / `-W` / `-D`; CLI rule severity is controlled through `lint.rules` config, while programmatic callers use `LintOptions.rules`.
 
 ## Pipeline
 
@@ -424,7 +424,7 @@ Invalid examples:
 }
 ```
 
-The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files and passes the resolved data through the Rust config model. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
+The resolved configuration is the implicit `recommended` defaults overlaid with `lint.rules`. `crates/intlify_lint` owns the rule registry, default severities, preset expansion, config defaults, and resolved config validation. The CLI loads JSON or JSONC config files, validates the shared project config, applies command-specific CLI overrides, and passes lint-specific unresolved config input into the Rust config model. `crates/intlify_lint` then expands defaults, validates rule ids and severities, and constructs `ResolvedLintConfig`. N-API and WASM entry points accept equivalent structured options and normalize them through the same Rust validation path; invalid binding options use `invalid_options`.
 
 `intlify lint` validates the shared project config as a whole. Invalid `fmt` configuration in the same file still produces `config_validation_failed` during a lint command, and invalid `lint` configuration likewise fails formatter commands. Command-specific CLI overrides are applied only for the active command after the shared config has validated. When no config file is discovered and no explicit `--config` is provided, the implicit default project config is used.
 
@@ -506,7 +506,7 @@ Initial CLI flags:
 - `--ignore-path <path>`; may be provided multiple times
 - `--reporter <text|json>`
 
-The flag surface intentionally mirrors oxlint's basic flags plus the oxfmt-style explicit stdin mode already adopted by `intlify fmt`. Per-rule CLI severity flags (`-A` / `-W` / `-D`) are intentionally not provided; rule severity lives in `lint.rules`.
+The flag surface intentionally mirrors oxlint's basic flags plus the oxfmt-style explicit stdin mode already adopted by `intlify fmt`. Per-rule CLI severity flags (`-A` / `-W` / `-D`) are intentionally not provided; CLI rule severity lives in `lint.rules`, while programmatic callers use `LintOptions.rules`.
 
 Flag semantics:
 
@@ -702,7 +702,7 @@ Binding source validation always reports `details.path: "source"` for `invalid_i
 
 Binding options use a JSON-compatible strict model across N-API and WASM. `options === undefined` and `rules: undefined` are treated as omitted. `options` and `rules` must otherwise be strict plain objects from the current JavaScript realm: their JavaScript prototype must be the current realm's `Object.prototype` or `null`. `Object.create(null)` is accepted. Cross-realm plain objects are intentionally rejected so N-API and WASM wrappers can keep the same observable boundary. A cross-realm `options` object reports `invalid_options_shape`; a cross-realm `rules` object reports `invalid_rules_shape`. Class instances, `Map`, `Date`, arrays, `null`, primitives, functions, and symbols report `invalid_options_shape` for `options` and `invalid_rules_shape` for `rules`. Rule values must be the strings `"off"`, `"warn"`, or `"error"`; `undefined`, `null`, booleans, numbers, arrays, objects, functions, symbols, and other strings report `invalid_rule_severity` for known configurable rule ids. Parser or semantic diagnostic codes report `non_configurable_diagnostic` before their value shape is considered. Unknown rule ids report `unknown_rule` before their value shape is considered. Both binding packages normalize through the same Rust validation path and return the same `invalid_options` details for equivalent inputs; binding parity tests should cover the strict plain object boundary.
 
-Binding validation is split into a JS-shape gate and Rust semantic validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM may implement their JS-shape gates locally, but they must be covered by parity tests so equivalent inputs produce the same `code`, `details.reason`, `details.path`, and `details.ruleId`.
+Binding validation is split into a JS-shape gate and Rust lint option validation. N-API and WASM wrappers own JavaScript-specific shape checks, including string source validation, strict plain object prototype checks, and rejection of functions or symbols. Values that pass the JS-shape gate are normalized into Rust-owned option data. Rust lint option validation then owns default expansion, unknown rule detection, severity validation, deterministic first-failure ordering, and stable `invalid_options` details. N-API and WASM may implement their JS-shape gates locally, but they must be covered by parity tests so equivalent inputs produce the same `code`, `details.reason`, `details.path`, and `details.ruleId`.
 
 Binding option validation returns the first validation failure as `invalid_options` with stable `details`:
 
