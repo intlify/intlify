@@ -141,7 +141,7 @@ Classification result:
 | `duplicate-variant` | core semantic | MF2 Duplicate Variant data model error |
 | `duplicate-option-name` | core semantic | MF2 Duplicate Option Name data model error |
 | `no-undeclared-variable` | configurable rule, default `off` | undeclared variables are valid external inputs in MF2, so this is a strict-workflow opt-in, not an error; selector variables are handled by `missing-selector-annotation` |
-| `no-unused-declaration` | configurable rule, default `warn` | declaration is not reachable from message output or selectors |
+| `no-unused-declaration` | configurable rule, default `warn` | declaration is not reachable from message output or selector setup |
 | `no-duplicate-attribute` | configurable rule, default `warn` | the MF2 spec says attribute identifiers SHOULD be unique; duplicates are ignored with last-one-wins semantics |
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
 
@@ -293,7 +293,7 @@ Rules may use `CstView` when a check is inherently syntax-local, for example to 
 
 The initial rule interface is not an ESLint-style CST visitor map. Rules do not register callbacks such as `VariableExpression(node)` or `Markup(node)`, and the linter does not dispatch every CST node to every rule. A rule owns its own check over `SemanticModel` and may use `CstView` only for the syntax relationships it needs.
 
-For example, `no-unused-declaration` is expected to run as a model-level rule:
+For example, `no-unused-declaration` is expected to run as a model-level rule. This is conceptual shorthand; the concrete report API still supplies the required occurrence key, message arguments, and labels needed to construct a `RuleReport`.
 
 ```rust
 impl LintRule for NoUnusedDeclaration {
@@ -346,7 +346,7 @@ While the linter remains in 0.x, `recommended` may evolve by adding useful diagn
 
 ## Config Contract
 
-Project configuration is JSON or JSONC, not JavaScript or TypeScript. Lint settings live in the `lint` section of one ox-mf2 tooling config shared with formatter settings. The Rust linter engine is the source of truth for the resolved config model.
+Project configuration is JSON or JSONC, not JavaScript or TypeScript. Lint settings live in the `lint` section of one ox-mf2 tooling config shared with formatter settings. The Phase 3A CLI foundation owns shared config discovery, JSON/JSONC parsing, and the unified project schema; `crates/intlify_lint` is the source of truth for turning lint-specific config and binding options into `ResolvedLintConfig`.
 
 Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design. Initial linter config does not support file-specific `overrides`.
 
@@ -475,7 +475,7 @@ It reports:
 }
 ```
 
-`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
+`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location because CLI config errors point into a JSON/JSONC document: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. Binding option validation uses dot paths instead because it points into JavaScript object input rather than a config document. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
