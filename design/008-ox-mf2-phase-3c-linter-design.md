@@ -912,6 +912,8 @@ Phase 3C linter implementation should be split into reviewable PRs:
 
 Each PR should be cut from `main` and keep linter work separated from formatter work. Shared CLI infrastructure (discovery, ignore, framing, envelope) introduced by the fmt CLI PR should be reused, not duplicated.
 
+The parser-side implementation steps listed in the semantic validation design describe the internal scope of the first prerequisite PR; this section owns the product-level milestone order for the linter as a whole.
+
 This design records product contracts and implementation boundaries. Only the coarse milestone order belongs in this design file. PR sequencing, CI jobs, benchmark command wiring, release-flow tasks, and exact fixture update commands should be expanded in the Phase 3C implementation plan rather than duplicated further in this design file.
 
 ## Deferred Follow-Up Notes

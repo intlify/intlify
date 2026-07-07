@@ -408,7 +408,7 @@ Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/se
 - selector annotation chains through `.input` and `.local`
 - cooked identifier comparison and NFC normalization for duplicate options and duplicate variants
 
-Fixtures lock diagnostic code, severity, primary span, and report order. Message text and label wording are not fixture-locked.
+Fixtures lock diagnostic code, severity, primary span, and report order. Diagnostic-free parses should provide the normal primary spans described above, so defensive last-resort fallback spans are not expected in ordinary semantic fixtures. Message text and label wording are not fixture-locked.
 
 The minimum cascade fixture set includes these compound cases:
 
@@ -469,7 +469,7 @@ The parser crate should expose parser diagnostic code and semantic diagnostic co
 
 ## Implementation Phasing
 
-The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics.
+The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics. Product-level linter PR ordering remains owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md); this section scopes only the parser-side prerequisite work.
 
 Suggested implementation steps:
 
