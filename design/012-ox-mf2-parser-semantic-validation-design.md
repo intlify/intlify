@@ -401,7 +401,7 @@ Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/se
 - duplicate-family partitioning
 - duplicate groups with three or more occurrences
 - cascade suppression for broken dependency chains
-- input declaration function option self-reference and forward-dependency cases, including multiple forward references to the same later-bound variable
+- input declaration function option value self-reference and forward-dependency cases, including multiple forward references to the same later-bound variable
 - direct and three-or-more declaration cycle primary span behavior
 - arity-invalid variants excluded from duplicate and fallback candidate checks
 - missing fallback primary span behavior

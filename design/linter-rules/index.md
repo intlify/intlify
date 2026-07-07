@@ -10,6 +10,8 @@ These pages are design-time reader-facing documentation for Phase 3C review. The
 - [012-ox-mf2-parser-semantic-validation-design.md](../012-ox-mf2-parser-semantic-validation-design.md) owns parser semantic validation details for core semantic diagnostics, including spans, labels, ordering, and cascade suppression.
 - This directory owns design-time reader-facing documentation, examples, configuration notes, and related diagnostic/rule links.
 
+Configurable lint rule pages may describe rule-specific detection boundaries, primary span intent, and fixture expectations at design time. Core semantic diagnostic pages do not redefine those details; they point back to the parser-owned semantic validation design.
+
 The examples in these pages are illustrative reader-facing examples. They are not parser fixtures, linter fixtures, or conformance tests.
 
 Metadata tables in these pages are design-time summaries for readers. They are not the runtime rule metadata source, generated docs source, or public help-text contract. In semantic diagnostic pages, `Diagnostic Category` describes the JSON-visible diagnostic category such as `semantic`. In configurable rule pages, `Category` describes rule metadata such as `best-practice` or `correctness`; those rule metadata categories are not diagnostic JSON `category` values.
