@@ -235,8 +235,9 @@ Metadata includes at least:
 
 - rule id
 - category
-- default/recommended status
 - default severity
+- recommended preset membership
+- whether the diagnostic is configurable
 - fix capability (always `false` in the initial rules)
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options
@@ -775,11 +776,11 @@ Initial configurable rules avoid style concerns. Style checks and formatting fix
 
 Detailed configurable rule behavior and examples live in [linter-rules/index.md](./linter-rules/index.md). This design document keeps only the product-level contract:
 
-| Rule ID | Category | Default | Recommended | Notes |
-| --- | --- | --- | --- | --- |
-| `no-unused-declaration` | `best-practice` | `warn` | yes | Reports `.input` or `.local` declarations that are not reachable from message output or selector setup. |
-| `no-duplicate-attribute` | `best-practice` | `warn` | yes | Reports repeated attributes on one expression or markup placeholder. |
-| `no-undeclared-variable` | `correctness` | `off` | no | Opt-in declare-all-inputs check for unresolved non-selector references. |
+| Rule ID | Category | Default Severity | Recommended | Configurable | Fixable | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `no-unused-declaration` | `best-practice` | `warn` | yes | yes | no | Reports `.input` or `.local` declarations that are not reachable from message output or selector setup. |
+| `no-duplicate-attribute` | `best-practice` | `warn` | yes | yes | no | Reports repeated attributes on one expression or markup placeholder. |
+| `no-undeclared-variable` | `correctness` | `off` | no | yes | no | Opt-in declare-all-inputs check for unresolved non-selector references. |
 
 ## Deferred Diagnostics
 
