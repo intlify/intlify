@@ -89,7 +89,7 @@ Future editor features should build on stable core concepts rather than adding L
 - Should editor diagnostics always use `lintMessage` as the initial single diagnostic source, or should adapters be allowed to compose parser, semantic, and linter diagnostics manually when they can guarantee de-duplication?
 - Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
 - Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
-- What stable key should identify diagnostics across document updates: source span, diagnostic code/rule id, resource key, or a combined identity?
+- What stable key should identify diagnostics across document updates: source span, diagnostic code, resource key, or a combined identity?
 - What exact document version checks are required before returning formatting `TextEdit` values?
 - When a format request uses stale parse artifacts or stale message mapping, should the adapter silently no-op or report an operational editor error?
 - Should editor formatting initially replace the whole containing message range, or should the adapter compute the smallest practical `TextEdit` even though minimal-diff formatting is outside the formatter core?

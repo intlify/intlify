@@ -116,7 +116,7 @@ Phase 3 should provide a dedicated formatter engine and reusable formatter entry
 
 ### Crate Ownership
 
-The Rust formatter engine should live in a separate workspace-internal `crates/intlify_format` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3B; public formatter distribution happens through the `intlify fmt` CLI and formatter N-API/WASM packages. The parser crate remains responsible for CST construction, parser diagnostics, Binary AST snapshots, and semantic lowering. The formatter crate owns formatting modes, formatter configuration, layout construction, rendering, and formatter result shaping.
+The Rust formatter engine should live in a separate workspace-internal `crates/intlify_format` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3B; public formatter distribution happens through the `intlify fmt` CLI and formatter N-API/WASM packages. The parser crate remains responsible for CST construction, parser diagnostics, Binary AST snapshots, SemanticModel construction, and parser-owned semantic validation. The formatter crate owns formatting modes, formatter configuration, layout construction, rendering, and formatter result shaping.
 
 ### CLI and Package Distribution
 
@@ -225,7 +225,7 @@ Phase 3 should provide a dedicated lint CLI and reusable linter entry points for
 
 ### Crate Ownership
 
-The Rust linter engine should live in a separate workspace-internal `crates/intlify_lint` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3C; public linter distribution happens through the `intlify lint` CLI and linter N-API/WASM packages. The parser crate remains responsible for CST, diagnostics, snapshots, and semantic lowering, while the lint crate owns rule execution, presets, lint configuration, and lint result shaping.
+The Rust linter engine should live in a separate workspace-internal `crates/intlify_lint` crate that depends on `ox_mf2_parser`. This crate is not a crates.io deliverable in Phase 3C; public linter distribution happens through the `intlify lint` CLI and linter N-API/WASM packages. The parser crate remains responsible for CST, diagnostics, snapshots, SemanticModel construction, and parser-owned semantic validation, while the lint crate owns rule execution, presets, lint configuration, and lint result shaping.
 
 ### CLI and Package Distribution
 
@@ -351,7 +351,7 @@ The initial core semantic diagnostics, classified by the detailed linter design,
 - `duplicate-variant`
 - `duplicate-option-name`
 
-The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and semantic lowering failures after a clean parse are internal operational errors rather than user-facing diagnostics. The linter product classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
+The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and SemanticModel construction or semantic validation invariant failures after a clean parse are internal operational errors rather than user-facing diagnostics. The linter product classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 ### Detailed Linter Design Reference
 
@@ -531,11 +531,11 @@ It is a future transport candidate for long-lived language-service workflows suc
 
 MessagePack transport is not an initial Phase 3 deliverable. The initial transport baseline is JSON-based CLI/API output and JSON-RPC-style language-service communication. MessagePack remains a future optimization candidate for long-lived sessions after JSON payload costs are measured.
 
-If MessagePack transport is added later, its overhead must be measured separately from parser, semantic lowering, snapshot encoding, snapshot decoding, binding cost, and LSP request handling.
+If MessagePack transport is added later, its overhead must be measured separately from parser, SemanticModel construction, semantic validation, snapshot encoding, snapshot decoding, binding cost, and LSP request handling.
 
 MessagePack payloads should transport query/response data or language-service session messages. They should not become a second AST format that competes with the Binary AST snapshot.
 
-Linter results should be transportable over JSON-RPC or a future MessagePack session using the shared diagnostic result contract. Transport payloads may carry source text, Binary AST snapshot bytes, or diagnostic results depending on the consumer, but the transport layer must not redefine lint diagnostics or AST structure. Benchmarks must keep parse, semantic lowering, rule execution, snapshot encode/decode, diagnostic serialization, and transport overhead as separate phases.
+Linter results should be transportable over JSON-RPC or a future MessagePack session using the shared diagnostic result contract. Transport payloads may carry source text, Binary AST snapshot bytes, or diagnostic results depending on the consumer, but the transport layer must not redefine lint diagnostics or AST structure. Benchmarks must keep parse, SemanticModel construction, semantic validation, rule execution, snapshot encode/decode, diagnostic serialization, and transport overhead as separate phases.
 
 ## Benchmarks
 
@@ -575,4 +575,4 @@ Future transport benchmark phases:
 - cache_hit_query
 - long_lived_session_query
 
-Reports should separate parser, semantic lowering, snapshot encode/decode, binding calls, CLI wrapper startup, native package resolution, native process spawn overhead, CLI JSON serialization, JSON-RPC transport, MessagePack transport, cache hit/miss behavior, and actual rule/formatter work.
+Reports should separate parser, SemanticModel construction, semantic validation, snapshot encode/decode, binding calls, CLI wrapper startup, native package resolution, native process spawn overhead, CLI JSON serialization, JSON-RPC transport, MessagePack transport, cache hit/miss behavior, and actual rule/formatter work.

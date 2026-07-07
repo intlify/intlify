@@ -74,7 +74,7 @@ crates/
   ox_mf2_wasm/      # wasm-bindgen binding crate
 ```
 
-Both binding crates depend on `ox_mf2_parser`. They must not duplicate parser grammar, snapshot encoding rules, semantic lowering, diagnostic code definitions, or snapshot validation logic.
+Both binding crates depend on `ox_mf2_parser`. They must not duplicate parser grammar, snapshot encoding rules, SemanticModel construction, parser-owned semantic validation, diagnostic code definitions, or snapshot validation logic.
 
 N-API uses `napi-rs`. WASM uses `wasm-bindgen`.
 

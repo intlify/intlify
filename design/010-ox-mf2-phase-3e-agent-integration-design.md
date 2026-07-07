@@ -46,7 +46,7 @@ Agent integrations may be distributed in several forms:
 - agent plugins that bundle skills, commands, hooks, MCP config, or documentation
 - headless scripts for CI, review, release, and migration workflows
 
-These integration shapes should call shared CLI, Rust, N-API, WASM, or future MCP APIs. They should not implement separate MF2 parsing, semantic lowering, formatting, or linting logic.
+These integration shapes should call shared CLI, Rust, N-API, WASM, or future MCP APIs. They should not implement separate MF2 parsing, SemanticModel construction, parser-owned semantic validation, formatting, or linting logic.
 
 ## Open Questions
 

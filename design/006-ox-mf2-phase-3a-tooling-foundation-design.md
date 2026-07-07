@@ -64,7 +64,7 @@ The CLI crate owns command routing, config discovery, config loading, output for
 
 Formatter and linter crates own their resolved config models once Phase 3B and Phase 3C begin. Phase 3A owns only the project-level config envelope, schema generation boundary, and normalization path that lets the CLI pass `fmt` and `lint` sections to product-specific crates later.
 
-Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, and semantic lowering. Phase 3A should not move parser behavior into the CLI crate.
+Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, SemanticModel construction, and parser-owned semantic validation. Phase 3A should not move parser behavior into the CLI crate.
 
 ## Architecture
 
