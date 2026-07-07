@@ -934,7 +934,7 @@ Parser-owned deferred items remain specified by the semantic validation design; 
 - Additional body-owned reference kinds that extend the parser-owned `output_references()` fact surface and affect configurable rule reachability.
 - Resource/catalog adapters for JSON/YAML host files and resource-level rules.
 - Parallel file linting with deterministic output, and concurrency controls.
-- Snapshot-backed linting (`lintSnapshot`), including how the linter consumes the parser-owned snapshot-to-`SemanticModel` path and applies snapshot capability checks.
+- Snapshot-backed linting (`lintSnapshot`), including how the linter consumes the parser-owned snapshot-to-`SemanticModel` path and applies snapshot capability checks after that parser path exists.
 - Linter npm release flow details: trusted publishing setup, dist-tag policy, native package publish order, published-artifact smoke tests, and any bootstrap-token migration for first-time native package publication.
 - The combined `intlify check` command: designed in a short dedicated addendum after both the formatter and linter products ship, once their JSON reporters and exit behavior exist as implemented contracts.
 
