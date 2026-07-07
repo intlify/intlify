@@ -12,7 +12,7 @@
 
 This core semantic diagnostic reports declaration dependency patterns that violate the MF2 declaration rules.
 
-A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation. A local declaration must not bind a variable that appears in its own expression. This covers input function option self references, input function option forward references that are later bound, `.local` self references, forward references that are later bound, and dependency cycles. Plain re-binding of an already-declared bound variable belongs to [duplicate-declaration](./duplicate-declaration.md).
+A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation subtree, including option value references inside that subtree. A local declaration must not bind a variable that appears in its own expression. This covers input function option value self references, input function option value forward references that are later bound, `.local` self references, forward references that are later bound, and dependency cycles. Plain re-binding of an already-declared bound variable belongs to [duplicate-declaration](./duplicate-declaration.md).
 
 This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
@@ -27,6 +27,11 @@ Some examples of **incorrect** code for this diagnostic:
 ```mf2
 .input {$count :number minimumFractionDigits=$digits}
 .input {$digits :number}
+{{{$count}}}
+```
+
+```mf2
+.input {$count :number minimumFractionDigits=$count}
 {{{$count}}}
 ```
 

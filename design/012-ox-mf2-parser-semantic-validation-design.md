@@ -113,12 +113,12 @@ enum AttributeOwnerKind {
 
 Owner-local attribute checks compare only attributes with the same owner id and owner kind. The `no-duplicate-attribute` lint rule consumes this parser-owned fact surface and must not reconstruct attribute owner taxonomy by walking the CST.
 
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isDeclarationDependency` flag. A reference inside an input declaration's function options or a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isDeclarationDependency = true`. Bound variable occurrences are declaration facts, not dependency references. Attributes do not produce variable references in the current normative MF2 ABNF because attribute values are literals only. Older exploration documents or stale test descriptions that mention variable-valued attributes are not part of this design contract.
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isDeclarationDependency` flag. A reference inside an input declaration's function annotation subtree or a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isDeclarationDependency = true`. The function annotation subtree is the whole annotation attached to an expression, while function option value references are the variable references that occur inside annotation options. Bound variable occurrences are declaration facts, not dependency references. Attributes do not produce variable references in the current normative MF2 ABNF in `refers/message-format-wg/spec/message.abnf` because attribute values are literals only. Older exploration documents or stale test descriptions that mention variable-valued attributes are not part of this design contract.
 
 The parser must expose shared semantic helper capability for facts that multiple consumers need:
 
-- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds.
-- `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and declaration dependency references used by that selector setup.
+- `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option value references, markup option value references, and future body-owned reference kinds.
+- `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variable occurrences, the resolved selector declaration chain, the function annotation subtree that annotates the selector, function option value references inside that selector annotation subtree, and declaration dependency references used by that selector setup.
 
 `selection_references()` is the conceptual parser API name; reader-facing linter documentation may describe the same reachability roots as "selector setup references".
 
@@ -251,11 +251,16 @@ The primary span is the later declaration's bound variable, with a label on the 
 
 ### invalid-declaration-dependency
 
-Reports declarations that violate MF2 declaration dependency rules. A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation. A local declaration must not bind a variable that appears in its own expression. Self-references, forward references that are later bound, and therefore all dependency cycles are invalid, including acyclic-looking forward references. Bound variable occurrences are excluded from this diagnostic and belong to `duplicate-declaration` when plainly re-bound.
+Reports declarations that violate MF2 declaration dependency rules. A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation subtree, including option value references inside that subtree. A local declaration must not bind a variable that appears in its own expression. Self-references, forward references that are later bound, and therefore all dependency cycles are invalid, including acyclic-looking forward references. Bound variable occurrences are excluded from this diagnostic and belong to `duplicate-declaration` when plainly re-bound.
 
 ```mf2
 .input {$count :number minimumFractionDigits=$digits}
 .input {$digits :number}
+{{{$count}}}
+```
+
+```mf2
+.input {$count :number minimumFractionDigits=$count}
 {{{$count}}}
 ```
 
@@ -274,8 +279,8 @@ The primary span is the bound variable of the declaration that completes the vio
 
 Primary span selection is deterministic:
 
-- self-reference: the self-referencing declaration's bound variable span, whether the reference appears in an input declaration function annotation or a local declaration expression
-- forward reference later bound: the later declaration's bound variable span, because the violation is only known when the referenced variable becomes locally bound; this applies equally to input declaration function option references and local declaration expression references
+- self-reference: the self-referencing declaration's bound variable span, whether the reference appears in an input declaration function annotation subtree or a local declaration expression
+- forward reference later bound: the later declaration's bound variable span, because the violation is only known when the referenced variable becomes locally bound; this applies equally to input declaration function option value references and local declaration expression references
 - direct cycle: the declaration that closes the cycle, usually the later declaration in source order
 - longer forward chain: the declaration whose binding completes the previously referenced chain
 - multiple previous appearances of the same later-bound variable: one diagnostic on the later declaration's bound variable span, with labels on the earlier appearances
