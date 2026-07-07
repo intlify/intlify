@@ -780,6 +780,8 @@ The initial semantic diagnostic codes surfaced by the linter are:
 - `duplicate-variant`
 - `duplicate-option-name`
 
+This list records the initial linter-visible semantic diagnostic surface. The parser-owned semantic validation design remains the canonical source for each diagnostic's meaning, spans, labels, ordering, cascade suppression, and fixtures.
+
 The complete diagnostic and rule documentation index lives at [linter-rules/index.md](./linter-rules/index.md), with one page per semantic diagnostic and configurable lint rule. This section intentionally does not duplicate per-diagnostic examples; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the canonical semantic validation behavior, and `design/linter-rules/` owns design-time reader-facing documentation. Those pages are not the runtime `help` field or public docs URL contract.
 
 ## Configurable Rules

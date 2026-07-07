@@ -12,7 +12,7 @@ These pages are design-time reader-facing documentation for Phase 3C review. The
 
 The examples in these pages are illustrative reader-facing examples. They are not parser fixtures, linter fixtures, or conformance tests.
 
-Metadata tables in these pages are design-time summaries for readers. They are not the runtime rule metadata source, generated docs source, or public help-text contract. Rule categories such as `best-practice` and `correctness` are metadata categories, not diagnostic JSON `category` values.
+Metadata tables in these pages are design-time summaries for readers. They are not the runtime rule metadata source, generated docs source, or public help-text contract. In semantic diagnostic pages, `Diagnostic Category` describes the JSON-visible diagnostic category such as `semantic`. In configurable rule pages, `Category` describes rule metadata such as `best-practice` or `correctness`; those rule metadata categories are not diagnostic JSON `category` values.
 
 ## Core Semantic Diagnostics
 
