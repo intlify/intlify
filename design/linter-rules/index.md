@@ -21,7 +21,7 @@ Core semantic diagnostics are always enabled after successful parsing, always re
 | Diagnostic Code | Severity | Configurable | Description | Details |
 | --- | --- | --- | --- | --- |
 | `duplicate-declaration` | `error` | no | Report duplicate MF2 variable declarations. | [duplicate-declaration](./duplicate-declaration.md) |
-| `invalid-local-dependency` | `error` | no | Report invalid MF2 local declaration dependencies. | [invalid-local-dependency](./invalid-local-dependency.md) |
+| `invalid-declaration-dependency` | `error` | no | Report invalid MF2 declaration self-references and forward dependencies. | [invalid-declaration-dependency](./invalid-declaration-dependency.md) |
 | `missing-selector-annotation` | `error` | no | Report MF2 selectors that do not resolve to an annotated declaration. | [missing-selector-annotation](./missing-selector-annotation.md) |
 | `variant-key-arity-mismatch` | `error` | no | Report MF2 variant key counts that do not match selector counts. | [variant-key-arity-mismatch](./variant-key-arity-mismatch.md) |
 | `missing-fallback-variant` | `error` | no | Report MF2 matchers without a catch-all fallback variant. | [missing-fallback-variant](./missing-fallback-variant.md) |

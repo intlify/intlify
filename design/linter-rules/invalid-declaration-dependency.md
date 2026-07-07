@@ -1,6 +1,6 @@
-# invalid-local-dependency
+# invalid-declaration-dependency
 
-> report invalid MF2 local declaration dependencies
+> report invalid MF2 declaration self-references and forward dependencies
 
 ## Metadata
 
@@ -10,17 +10,25 @@
 
 ## Details
 
-This core semantic diagnostic reports `.local` declaration dependency patterns that violate the MF2 declaration rules.
+This core semantic diagnostic reports declaration dependency patterns that violate the MF2 declaration rules.
 
-A `.local` declaration must not bind a variable that appears in its own expression, and must not bind a variable that already appeared in a previous declaration's expression. This covers self references, forward references that are later bound, and dependency cycles.
+A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation. A local declaration must not bind a variable that appears in its own expression. This covers input function option self references, input function option forward references that are later bound, `.local` self references, forward references that are later bound, and dependency cycles. Plain re-binding of an already-declared bound variable belongs to [duplicate-declaration](./duplicate-declaration.md).
 
 This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 Primary spans, labels, ordering, cascade behavior, and duplicate-family partitioning are defined canonically by the [semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md).
 
+At a high level, the primary span is the bound variable of the declaration that completes the invalid dependency. Reference occurrences that caused the dependency are labels.
+
 ### Fail
 
 Some examples of **incorrect** code for this diagnostic:
+
+```mf2
+.input {$count :number minimumFractionDigits=$digits}
+.input {$digits :number}
+{{{$count}}}
+```
 
 ```mf2
 .local $label = {$label}
@@ -36,6 +44,12 @@ Some examples of **incorrect** code for this diagnostic:
 ### Pass
 
 Some examples of **correct** code for this diagnostic:
+
+```mf2
+.input {$digits :number}
+.input {$count :number minimumFractionDigits=$digits}
+{{{$count}}}
+```
 
 ```mf2
 .local $label = {|items|}

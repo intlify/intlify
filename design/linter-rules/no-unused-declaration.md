@@ -14,7 +14,7 @@ This configurable lint rule reports a declared variable that is not reachable fr
 
 The rule applies to both `.input` and `.local` declarations. An unreachable declaration has no runtime effect in MF2, so the recommended preset reports it as `warn` by default.
 
-Reachability starts from message output references and selector setup references, then follows `.local` right-hand-side dependencies backwards through declarations. Selector setup references include selector variables, selector declaration chains, selector function annotations, and option value references used by those selector function annotations. References inside reachable function option values and markup option values also mark declarations as used. A declaration referenced only by another unreachable declaration is still unused.
+Reachability starts from message output references and selector setup references, then follows declaration dependency references backwards through declarations. Declaration dependency references include input declaration function option references and local declaration expression references. Selector setup references include selector variables, selector declaration chains, selector function annotations, and option value references used by those selector function annotations. References inside reachable function option values and markup option values also mark declarations as used. A declaration referenced only by another unreachable declaration is still unused. This rule runs only after parser and semantic diagnostics are clean, so invalid declaration dependency graphs are reported by [invalid-declaration-dependency](./invalid-declaration-dependency.md) before this rule runs.
 
 ### Fail
 
@@ -62,7 +62,7 @@ This rule is configurable through `lint.rules` with `"off"`, `"warn"`, or `"erro
 
 - [no-undeclared-variable](./no-undeclared-variable.md)
 - [duplicate-declaration](./duplicate-declaration.md)
-- [invalid-local-dependency](./invalid-local-dependency.md)
+- [invalid-declaration-dependency](./invalid-declaration-dependency.md)
 
 ## Status
 

@@ -58,7 +58,7 @@ Calling this boundary with a parse result that contains parser diagnostics is ca
 Initial facts include:
 
 - declarations: `.input` and `.local` declarations, declaration id, variable name, declaration kind, source declaration order, bound-name span, and declaration span
-- references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and local-dependency context
+- references: variable reference id, reference kind, source span, declaration visibility point, resolved declaration id or unresolved state, and declaration-dependency context
 - selector references: variable references that appear as `.match` selectors
 - message body references: variable references that appear in pattern placeholders and body expressions
 - option occurrences: owner id, owner kind, option identifier, cooked identifier, identifier span, and owner-local occurrence order
@@ -113,18 +113,18 @@ enum AttributeOwnerKind {
 
 Owner-local attribute checks compare only attributes with the same owner id and owner kind. The `no-duplicate-attribute` lint rule consumes this parser-owned fact surface and must not reconstruct attribute owner taxonomy by walking the CST.
 
-Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isLocalDependency` flag. A reference inside a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isLocalDependency = true`. Attributes do not produce variable references in the current MF2 grammar because attribute values are literals only.
+Reference records also carry dependency context separately from their syntactic kind: an optional enclosing declaration id and an `isDeclarationDependency` flag. A reference inside an input declaration's function options or a `.local` right-hand side can therefore be `FunctionOption` or `MarkupOption` while still having `isDeclarationDependency = true`. Bound variable occurrences are declaration facts, not dependency references. Attributes do not produce variable references in the current normative MF2 ABNF because attribute values are literals only. Older exploration documents or stale test descriptions that mention variable-valued attributes are not part of this design contract.
 
 The parser must expose shared semantic helper capability for facts that multiple consumers need:
 
 - `output_references()` or equivalent returns non-selector references owned by the message body's expression and markup subtree. This includes pattern placeholder expressions, function option values, markup option values, and future body-owned reference kinds.
-- `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and local dependency references used by that selector setup.
+- `selection_references()` or equivalent returns selector setup reachability roots. This includes `.match` selector variables, selector declaration chains, selector declaration or `.local` selector expression function annotations, selector annotation option value references, and declaration dependency references used by that selector setup.
 
 `selection_references()` is the conceptual parser API name; reader-facing linter documentation may describe the same reachability roots as "selector setup references".
 
 These helper names are conceptual. The implementation may choose different Rust names, but the ability to read output references and selection references through parser-owned read-only views is required by this design. The fact ownership and traversal boundary are also required. Selector annotation reachability is owned by parser semantic helpers: downstream consumers must not reimplement `.input` / `.local` selector chains, selector annotation discovery, annotation option references, or invalid-dependency cascade behavior from raw declaration facts.
 
-Shared helper APIs should return read-only view iterators rather than raw ids only. At minimum, a reference view must expose a reference id, variable name, reference kind, source span, resolved declaration id or unresolved state, enclosing declaration id, and local dependency flag. A conceptual shape is:
+Shared helper APIs should return read-only view iterators rather than raw ids only. At minimum, a reference view must expose a reference id, variable name, reference kind, source span, resolved declaration id or unresolved state, enclosing declaration id, and declaration dependency flag. A conceptual shape is:
 
 ```rust
 impl SemanticModel {
@@ -139,7 +139,7 @@ struct ReferenceRef<'a> {
     span: Span,
     resolved_declaration: Option<DeclarationId>,
     enclosing_declaration: Option<DeclarationId>,
-    is_local_dependency: bool,
+    is_declaration_dependency: bool,
 }
 ```
 
@@ -152,7 +152,7 @@ Semantic diagnostics use a parser-owned representation:
 ```rust
 enum SemanticDiagnosticCode {
     DuplicateDeclaration,
-    InvalidLocalDependency,
+    InvalidDeclarationDependency,
     MissingSelectorAnnotation,
     VariantKeyArityMismatch,
     MissingFallbackVariant,
@@ -173,7 +173,7 @@ The exact Rust names are implementation details, but the JSON-visible stable cod
 | Code | Meaning |
 | --- | --- |
 | `duplicate-declaration` | MF2 Duplicate Declaration data model error |
-| `invalid-local-dependency` | self-reference and forward-binding cases of the Duplicate Declaration family |
+| `invalid-declaration-dependency` | self-reference and forward-binding cases of the Duplicate Declaration family |
 | `missing-selector-annotation` | MF2 Missing Selector Annotation data model error |
 | `variant-key-arity-mismatch` | MF2 Variant Key Mismatch data model error |
 | `missing-fallback-variant` | MF2 Missing Fallback Variant data model error |
@@ -213,9 +213,9 @@ Semantic diagnostics are ordered by:
 
 Each violation site produces exactly one diagnostic with exactly one code. Overlapping semantic candidates are partitioned so that no source location is reported under two semantic codes for the same root cause.
 
-Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-local-dependency` makes a selector chain unreliable, dependent `missing-selector-annotation` diagnostics for that same chain are suppressed. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector.
+Semantic validation suppresses cascade diagnostics when a broken dependency chain would otherwise produce secondary errors. For example, if an `invalid-declaration-dependency` makes a selector chain unreliable, dependent `missing-selector-annotation` diagnostics for that same chain are suppressed. Independent diagnostics that do not rely on the broken chain are still emitted, such as variant key arity mismatches, missing fallback variants, or `missing-selector-annotation` for another selector.
 
-For example, a message can have one selector declaration chain broken by `invalid-local-dependency` and also contain a variant whose key count does not match the selector count. The dependent `missing-selector-annotation` for the broken selector chain is suppressed, but the independent `variant-key-arity-mismatch` still reports. Semantic validation should produce root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom and not a global stop-after-first-error result.
+For example, a message can have one selector declaration chain broken by `invalid-declaration-dependency` and also contain a variant whose key count does not match the selector count. The dependent `missing-selector-annotation` for the broken selector chain is suppressed, but the independent `variant-key-arity-mismatch` still reports. Semantic validation should produce root-cause diagnostics plus independent diagnostics, not every derivable downstream symptom and not a global stop-after-first-error result.
 
 ## Duplicate Family Policy
 
@@ -223,8 +223,9 @@ Duplicate-family diagnostics report every duplicate after the first occurrence i
 
 The duplicate declaration family is partitioned:
 
-- self-references and forward references that are later bound report `invalid-local-dependency` only
+- declaration self-references and forward references that are later bound report `invalid-declaration-dependency` only
 - plain re-binding of an already-declared variable reports `duplicate-declaration` only
+- a declaration's bound variable occurrence is not a dependency reference
 
 ## Diagnostic Catalog
 
@@ -232,7 +233,7 @@ This section is the canonical parser-owned semantic validation catalog. Reader-f
 
 ### duplicate-declaration
 
-Reports a declaration that binds a variable that already appeared in a previous declaration. `.input` and `.local` share one variable namespace, per the MF2 declaration rules.
+Reports a declaration that plainly re-binds a variable that was already bound by a previous declaration. `.input` and `.local` declarations share one variable namespace, per the MF2 declaration rules. Dependency-position occurrences in previous declarations belong to `invalid-declaration-dependency`, not this diagnostic.
 
 ```mf2
 .input {$count :number}
@@ -246,11 +247,17 @@ Reports a declaration that binds a variable that already appeared in a previous 
 {{{$label}}}
 ```
 
-The primary span is the later declaration's bound variable, with a label on the first declaration. When three or more declarations bind the same variable, every declaration after the first produces one diagnostic. Dependency-order violations belong to `invalid-local-dependency`.
+The primary span is the later declaration's bound variable, with a label on the first declaration. When three or more declarations bind the same variable, every declaration after the first produces one diagnostic. Dependency-order violations belong to `invalid-declaration-dependency`.
 
-### invalid-local-dependency
+### invalid-declaration-dependency
 
-Reports `.local` declarations that violate MF2 declaration dependency rules: a declaration must not bind a variable that appears in its own expression, and must not bind a variable that already appeared in a previous declaration's expression. Self-references, forward references that are later bound, and therefore all dependency cycles are invalid, including acyclic-looking forward references.
+Reports declarations that violate MF2 declaration dependency rules. A declaration must not bind a variable that appeared in a dependency/reference position within a previous declaration. An input declaration must not bind a variable that appears in its own function annotation. A local declaration must not bind a variable that appears in its own expression. Self-references, forward references that are later bound, and therefore all dependency cycles are invalid, including acyclic-looking forward references. Bound variable occurrences are excluded from this diagnostic and belong to `duplicate-declaration` when plainly re-bound.
+
+```mf2
+.input {$count :number minimumFractionDigits=$digits}
+.input {$digits :number}
+{{{$count}}}
+```
 
 ```mf2
 .local $label = {$label}
@@ -267,11 +274,12 @@ The primary span is the bound variable of the declaration that completes the vio
 
 Primary span selection is deterministic:
 
-- self-reference: the self-referencing declaration's bound variable span
-- forward reference later bound: the later declaration's bound variable span, because the violation is only known when the referenced variable becomes locally bound
+- self-reference: the self-referencing declaration's bound variable span, whether the reference appears in an input declaration function annotation or a local declaration expression
+- forward reference later bound: the later declaration's bound variable span, because the violation is only known when the referenced variable becomes locally bound; this applies equally to input declaration function option references and local declaration expression references
 - direct cycle: the declaration that closes the cycle, usually the later declaration in source order
 - longer forward chain: the declaration whose binding completes the previously referenced chain
 - multiple previous appearances of the same later-bound variable: one diagnostic on the later declaration's bound variable span, with labels on the earlier appearances
+- three-or-more declaration cycle: the source-order declaration that first completes the cycle is the primary span owner, with labels on the relevant earlier dependency references
 
 The semantic validation policy reports the root dependency violation once, keeping the primary location on the source construct that makes the dependency invalid.
 
@@ -388,6 +396,8 @@ Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/se
 - duplicate-family partitioning
 - duplicate groups with three or more occurrences
 - cascade suppression for broken dependency chains
+- input declaration function option self-reference and forward-dependency cases, including multiple forward references to the same later-bound variable
+- direct and three-or-more declaration cycle primary span behavior
 - arity-invalid variants excluded from duplicate and fallback candidate checks
 - missing fallback primary span behavior
 - selector annotation chains through `.input` and `.local`
@@ -397,7 +407,7 @@ Fixtures lock diagnostic code, severity, primary span, and report order. Message
 
 The minimum cascade fixture set includes these compound cases:
 
-- `invalid-local-dependency` suppresses the dependent `missing-selector-annotation` for the same broken selector chain:
+- `invalid-declaration-dependency` suppresses the dependent `missing-selector-annotation` for the same broken selector chain:
 
   ```mf2
   .local $selector = {$later}
@@ -406,7 +416,7 @@ The minimum cascade fixture set includes these compound cases:
   * {{ok}}
   ```
 
-  Expected diagnostics: `invalid-local-dependency` only.
+  Expected diagnostics: `invalid-declaration-dependency` only.
 
 - a broken selector chain does not suppress an independent `variant-key-arity-mismatch`:
 
@@ -419,7 +429,7 @@ The minimum cascade fixture set includes these compound cases:
   * * {{ok}}
   ```
 
-  Expected diagnostics: `invalid-local-dependency` and `variant-key-arity-mismatch`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
+  Expected diagnostics: `invalid-declaration-dependency` and `variant-key-arity-mismatch`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
 
 - a broken selector chain does not suppress `missing-selector-annotation` for another independent selector:
 
@@ -430,7 +440,7 @@ The minimum cascade fixture set includes these compound cases:
   * * {{ok}}
   ```
 
-  Expected diagnostics: `invalid-local-dependency` and `missing-selector-annotation` for `$other`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
+  Expected diagnostics: `invalid-declaration-dependency` and `missing-selector-annotation` for `$other`; the dependent `missing-selector-annotation` for `$selector` is suppressed.
 
 - dependency-family violations do not also report `duplicate-declaration` for the same root cause:
 
@@ -440,7 +450,7 @@ The minimum cascade fixture set includes these compound cases:
   {{{$a}}}
   ```
 
-  Expected diagnostics: `invalid-local-dependency`; no `duplicate-declaration` for the dependency root cause.
+  Expected diagnostics: `invalid-declaration-dependency`; no `duplicate-declaration` for the dependency root cause.
 
 Fixture updates follow the existing parser fixture update flow. The semantic fixture test should support an update command equivalent to:
 

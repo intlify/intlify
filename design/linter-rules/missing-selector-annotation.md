@@ -59,7 +59,7 @@ This diagnostic has no configuration. It is always enabled as `error` and cannot
 ## Related diagnostics and rules
 
 - [no-undeclared-variable](./no-undeclared-variable.md)
-- [invalid-local-dependency](./invalid-local-dependency.md)
+- [invalid-declaration-dependency](./invalid-declaration-dependency.md)
 
 ## Status
 

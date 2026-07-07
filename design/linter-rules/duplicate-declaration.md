@@ -10,9 +10,11 @@
 
 ## Details
 
-This core semantic diagnostic reports a declaration that binds a variable that was already declared earlier in the same MF2 message.
+This core semantic diagnostic reports a declaration that plainly re-binds a variable that was already declared earlier in the same MF2 message.
 
 `.input` and `.local` declarations share one variable namespace. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
+
+Plain re-binding of an already-declared bound variable belongs to this diagnostic. Declaration dependency violations, including self references and forward references that are later bound from dependency/reference positions, belong to [invalid-declaration-dependency](./invalid-declaration-dependency.md).
 
 Primary spans, labels, ordering, cascade behavior, and duplicate-family partitioning are defined canonically by the [semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md).
 
@@ -54,7 +56,7 @@ This diagnostic has no configuration. It is always enabled as `error` and cannot
 
 ## Related diagnostics and rules
 
-- [invalid-local-dependency](./invalid-local-dependency.md)
+- [invalid-declaration-dependency](./invalid-declaration-dependency.md)
 - [no-unused-declaration](./no-unused-declaration.md)
 - [no-undeclared-variable](./no-undeclared-variable.md)
 
