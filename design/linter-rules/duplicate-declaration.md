@@ -14,7 +14,7 @@ This core semantic diagnostic reports a declaration that binds a variable that w
 
 `.input` and `.local` declarations share one variable namespace. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
-Primary spans, labels, ordering, cascade behavior, and duplicate-family partitioning are defined canonically by the semantic validation design.
+Primary spans, labels, ordering, cascade behavior, and duplicate-family partitioning are defined canonically by the [semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md).
 
 ### Fail
 

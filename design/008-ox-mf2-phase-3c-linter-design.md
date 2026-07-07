@@ -171,7 +171,7 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
 - `labels` is an array of `{ span, message }` entries and may be empty.
 - `severity` is `"warn"` or `"error"`. Parser and semantic diagnostics are always `"error"`. Configurable lint rule diagnostics use the resolved rule severity. The JSON value `"warning"` is not emitted.
 - `message` text and `labels` messages are not stable compatibility surfaces.
-- A `help` field is reserved for future static per-code help text; the initial release does not populate it. Adding help content is a follow-up once documentation pages exist for codes and rules.
+- A `help` field is reserved for future static per-code help text; the initial release does not populate it. Adding help content is a follow-up after a public generated documentation or static help contract is defined for codes and rules.
 
 The UTF-8 span contract is canonical across CLI JSON, Rust, N-API, and WASM outputs. Bindings do not add binding-specific UTF-16 range fields to diagnostic objects. JavaScript, editor, and LSP consumers convert UTF-8 spans to UTF-16 or another editor encoding through source-text helper APIs or adapter layers. Future LSP/editor adapters own `PositionEncodingKind` conversion and must not change the linter diagnostic shape.
 
@@ -237,7 +237,7 @@ Metadata includes at least:
 - category
 - default severity
 - recommended preset membership
-- whether the diagnostic is configurable
+- whether the rule severity is configurable through `lint.rules`
 - fix capability (always `false` in the initial rules)
 - docs slug, generated from the rule id
 - rule option schema when a rule accepts options

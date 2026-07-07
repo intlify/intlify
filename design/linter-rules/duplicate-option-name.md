@@ -16,7 +16,7 @@ Duplicate detection is owner-local. Function options are compared only with opti
 
 This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
-Primary spans, labels, ordering, cascade behavior, and duplicate handling are defined canonically by the semantic validation design.
+Primary spans, labels, ordering, cascade behavior, and duplicate handling are defined canonically by the [semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md).
 
 ### Fail
 
