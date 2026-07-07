@@ -267,11 +267,11 @@ Detailed CLI option semantics, including quiet mode, fix mode, linter config sec
 
 ### Public Syntax and Semantic Input
 
-From Phase 2 onward, public AST input for linter APIs is the Binary AST decoder/accessor view plus optional SemanticView.
+The initial public linter API is source-backed: `lintMessage(source, options?)` parses, performs semantic validation, and runs enabled rules over one MF2 message.
 
-Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on the same public Binary AST view whenever practical.
+The Binary AST decoder/accessor view and optional SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on these shared views whenever practical.
 
-For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires semantic analysis and no snapshot-to-semantic path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
+For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires semantic analysis and no snapshot-to-`SemanticModel` path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
 
 ### Location Model
 
@@ -460,13 +460,13 @@ When an adapter uses `lintMessage` (or a future `lintSnapshot`), that result sho
 The initial workflow is strict:
 
 - parser diagnostics are always reported
-- semantic diagnostics are reported when parse recovery provides enough structure for semantic lowering
-- linter diagnostics are reported only when parsing and semantic lowering succeed
-- parse failure prevents the linter from running
+- semantic diagnostics are reported only when parsing has no parser diagnostics and semantic validation runs
+- linter diagnostics are reported only when parser and semantic diagnostics are clean
+- parser diagnostics prevent semantic validation and linter rule execution
 
 Shared `error` and `warning` severities map to editor/LSP diagnostic severity at the adapter boundary. The core linter does not emit `info` or `hint` diagnostics initially, but editor layers may add advice-style diagnostics on top of the shared results.
 
-Recovery-aware partial linting for incomplete editor buffers is a future editor-mode concern. The initial editor workflow keeps the same strict `parser -> semantic -> rules` pipeline used by CLI and bindings.
+Recovery-aware partial semantic or lint diagnostics for incomplete editor buffers are a future editor-mode concern. The initial editor workflow keeps the same strict `parser -> semantic -> rules` pipeline used by CLI and bindings.
 
 ### Formatting Workflow
 

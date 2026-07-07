@@ -43,9 +43,9 @@ The preferred initial path is to use source-backed `lintMessage` as the diagnost
 The initial editor workflow follows the same strict pipeline as CLI and bindings:
 
 - parser diagnostics are always reported
-- semantic diagnostics are reported only when parsing provides enough structure for semantic lowering
-- lint diagnostics are reported only when parsing and semantic lowering succeed
-- parse failure prevents linter rule execution
+- semantic diagnostics are reported only when parsing has no parser diagnostics and semantic validation runs
+- lint diagnostics are reported only when parser and semantic diagnostics are clean
+- parser diagnostics prevent semantic validation and linter rule execution
 
 Editor layers may add protocol-specific advice later, but the core linter initially emits only `error` and `warning` severities.
 
@@ -88,6 +88,7 @@ Future editor features should build on stable core concepts rather than adding L
 - Should a shared resource adapter crate/package own JSON/YAML parsing and mapping, or should each editor integration implement that layer independently?
 - Should editor diagnostics always use `lintMessage` as the initial single diagnostic source, or should adapters be allowed to compose parser, semantic, and linter diagnostics manually when they can guarantee de-duplication?
 - Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
+- Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
 - What stable key should identify diagnostics across document updates: source span, diagnostic code/rule id, resource key, or a combined identity?
 - What exact document version checks are required before returning formatting `TextEdit` values?
 - When a format request uses stale parse artifacts or stale message mapping, should the adapter silently no-op or report an operational editor error?
