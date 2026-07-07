@@ -119,11 +119,11 @@ Adopt `diagnostics foundation`.
 
 The initial MVP does not need to implement many lint rules. However, the diagnostic model is designed early so that parser errors and lint diagnostics can share the same foundation.
 
-From Phase 2 onward, the linter's public AST input is the Binary AST decoder/accessor view. Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on the same public Binary AST view whenever practical.
+The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. The Binary AST decoder/accessor view and SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
 
 Core diagnostics use SourceId and UTF-8 byte Span as the canonical location model. Labels also have byte spans. CLI, LSP, and editor integration are responsible for converting spans to line/column or UTF-16 positions through SourceStore.
 
-The concrete diagnostic shape and success-path cost constraints are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
+Parser diagnostics, SemanticModel foundations, and success-path parser cost constraints are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Parser-owned semantic diagnostics are defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Linter result shape, rule diagnostics, reporter behavior, and binding contracts are defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 ### SemanticModel / SemanticView
 
@@ -198,13 +198,13 @@ MF2 workloads often contain many messages in one file, one locale set, or one pr
 
 The Phase 1 parser APIs, SourceStore contract, ParseInput metadata, ParseOptions defaults, and result types are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot-producing APIs are defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md).
 
-### Suppression / Directive Comments
+### Suppression Model
 
 Adopt `diagnostic suppression boundary only`.
 
-At the initial stage, ox-mf2 does not fix a concrete directive comment syntax inside MF2. However, the diagnostic pipeline has a boundary where diagnostics can be suppressed.
+At the initial stage, ox-mf2 does not define inline directive comments inside MF2. MF2 has no line or block comments, so comment-style disable directives would be a syntax extension rather than a parser or linter foundation feature.
 
-Suppression is treated as a diagnostic-layer concern, not a parser syntax policy. The concrete suppression data shape can be defined when linter and language-service workflows enter the implementation phase.
+Suppression is treated as a diagnostic-layer concern, not a parser syntax policy. Future suppression must be spec-compatible, such as baseline suppression files or resource/container-level metadata owned by a host format adapter. The linter product design tracks the future suppression model in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 ### Benchmark
 
