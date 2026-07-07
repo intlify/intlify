@@ -285,7 +285,7 @@ enum SemanticMessageKind {
 }
 ```
 
-`SemanticDiagnostic` is the semantic validation diagnostic defined by the Phase 3C linter design: a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections.
+`SemanticDiagnostic` is the parser-owned semantic validation diagnostic defined by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md): a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections. The Phase 3C linter consumes and surfaces these diagnostics; it does not own their detection semantics.
 
 Every semantic record must link back to a source NodeId and Span.
 
@@ -324,7 +324,7 @@ SemanticModel does not replace CST. Formatters use CST; linters, compilers, and 
 
 The MF2 spec separates _Syntax Errors_ for malformed syntax from _Data Model Errors_ for invalid message structure.
 
-The Phase 1 parser primarily handles Syntax Errors. Data Model Errors belong to the validation layer that uses SemanticModel.
+The Phase 1 parser primarily handles Syntax Errors. Data Model Errors belong to the validation layer that uses SemanticModel. This document defines the SemanticModel foundation and source links needed by validation; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the detailed semantic validation contract, diagnostic catalog, spans, ordering, and cascade policy.
 
 Information that Phase 1 should expose to validation:
 
@@ -341,6 +341,7 @@ Examples of Data Model Errors:
 - Missing Fallback Variant
 - Missing Selector Annotation
 - Duplicate Declaration
+- Invalid Declaration Dependency
 - Duplicate Option Name
 - Duplicate Variant
 

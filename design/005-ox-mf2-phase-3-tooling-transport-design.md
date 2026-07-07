@@ -345,22 +345,22 @@ The Phase 3 responsibility boundary is correctness in the linter and style in th
 The initial core semantic diagnostics, classified by the detailed linter design, are:
 
 - `duplicate-declaration`
-- `invalid-local-dependency`
+- `invalid-declaration-dependency`
 - `missing-selector-annotation`
 - `variant-key-arity-mismatch`
 - `missing-fallback-variant`
 - `duplicate-variant`
 - `duplicate-option-name`
 
-The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and semantic lowering failures after a clean parse are internal operational errors rather than user-facing diagnostics. The classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
+The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and semantic lowering failures after a clean parse are internal operational errors rather than user-facing diagnostics. The linter product classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 ### Detailed Linter Design Reference
 
-Detailed rule semantics, examples, and implementation contracts should be specified in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). This phase document only fixes the consumer-facing pipeline and initial scope.
+Detailed linter product behavior, pipeline rules, reporter behavior, binding contracts, and implementation contracts are specified in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). The parser-owned semantic validation catalog, spans, ordering, duplicate-family partitioning, and cascade behavior are specified in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Reader-facing design-time rule and semantic diagnostic pages live in [linter-rules/index.md](./linter-rules/index.md). This phase document only fixes the consumer-facing pipeline and initial scope.
 
 ### Suppression
 
-Suppression and directive comments are diagnostic-layer concerns. This document does not fix a concrete directive comment syntax inside MF2. A future linter design can define the suppression data shape when rule execution enters implementation.
+MF2 does not define line or block comments, so inline comment-style linter disable directives are not part of the initial linter product. Future suppression must be spec-compatible, such as baseline suppression files or resource/container-level metadata owned by a host format adapter. The detailed linter design owns the suppression model notes.
 
 ### Phase 3 Linter Scope
 
@@ -386,7 +386,7 @@ Future or layered linter scope:
 - resource/catalog linting
 - nested config discovery
 - recovery-aware editor linting
-- suppression directive syntax
+- spec-compatible suppression model
 - `lint --fix`
 - LSP/editor as a direct product
 - output formats beyond `text` and `json`

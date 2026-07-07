@@ -7,7 +7,7 @@ The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport
 ## Goals
 
 - Let agent coding tools use ox-mf2 parser, formatter, linter, and snapshot workflows without depending on editor-specific APIs.
-- Treat the `ox-mf2` CLI and stable machine-readable output as the first agent-facing integration surface.
+- Treat the `intlify` CLI and stable machine-readable output as the first agent-facing integration surface.
 - Keep agent plugins, skills, commands, hooks, MCP servers, and ACP clients as wrappers around the shared core contracts.
 - Make diagnostics, formatting results, config errors, and operational errors easy for agents to parse and summarize.
 - Preserve one source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, and semantic analysis.
@@ -33,6 +33,8 @@ Agents can run:
 
 Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic categories, rule ids, severities, and suggested follow-up actions.
 
+Lint result contracts, rule ids, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
+
 ## Integration Shapes
 
 Agent integrations may be distributed in several forms:
@@ -49,7 +51,7 @@ These integration shapes should call shared CLI, Rust, N-API, WASM, or future MC
 ## Open Questions
 
 - Which CLI JSON output fields are required for reliable agent consumption across lint, format-check, and combined check workflows?
-- Should `ox-mf2` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
+- Should `intlify` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
 - Which integration shape should be implemented first after the CLI: repo instructions, agent skill, MCP server, or plugin bundle?
 - Should an MCP server expose high-level tools such as `lint_file` and `format_file`, or lower-level tools such as `parse_message`, `lint_message`, and `format_message`?
 - How should agent integrations report operational errors separately from parser, semantic, formatter, and linter diagnostics?

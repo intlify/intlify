@@ -26,7 +26,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 - Implementing an LSP server, editor extension, or editor adapter.
 - Implementing agent-specific plugins, skills, hooks, MCP servers, or ACP integrations.
 - Implementing MessagePack transport or a long-lived daemon.
-- Defining formatter layout rules, linter rule semantics, suppression directives, or resource/catalog mapping details.
+- Defining formatter layout rules, linter rule semantics, suppression mechanisms, or resource/catalog mapping details.
 - Supporting nested config discovery or nearest-config-wins behavior in the initial foundation.
 - Supporting file-specific config overrides in the initial foundation.
 

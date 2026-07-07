@@ -10,6 +10,8 @@ This document is the **bridge** between Phase 1's parser API and the Phase 2 dic
 
 This is a design note, not a Phase 1 deliverable.
 
+Phase 3C's initial linter remains source-backed: `lintMessage(source, options)` parses and validates the supplied source text directly. Cache-backed or snapshot-backed linting is a future optimization for dictionary tooling, LSP/editor adapters, and batch workflows after the parser owns a snapshot-to-`SemanticModel` path. This cache note therefore describes a layered reuse strategy, not an initial linter API requirement.
+
 ## Non-goals
 
 - The parser core stays oblivious of dictionaries, locales, and keys. The cache lives in a higher layer (`ox_mf2_dict`, `ox_mf2_lsp`, an i18n checker, etc.).
