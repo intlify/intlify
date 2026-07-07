@@ -290,7 +290,7 @@ The semantic validation policy reports the root dependency violation once, keepi
 
 ### missing-selector-annotation
 
-Reports a selector variable that does not directly or indirectly through `.local` chains reference a declaration with a function. A selector variable with no declaration also reports this diagnostic. External input variables are valid in patterns, but MF2 requires every selector to resolve to an annotated declaration.
+Reports a selector variable that does not directly or indirectly through `.local` chains reference a declaration with a function annotation subtree. A selector variable with no declaration also reports this diagnostic. External input variables are valid in patterns, but MF2 requires every selector to resolve to an annotated declaration.
 
 ```mf2
 .input {$count}

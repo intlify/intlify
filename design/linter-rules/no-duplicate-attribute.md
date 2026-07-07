@@ -12,7 +12,7 @@
 
 This configurable lint rule reports repeated attribute identifiers on one expression or markup placeholder.
 
-The MF2 specification says attribute identifiers SHOULD be unique and defines last-one-wins behavior for duplicates. This makes duplicate attributes a best-practice lint warning rather than a core semantic error.
+The MF2 syntax specification (`refers/message-format-wg/spec/syntax.md`) says attribute identifiers SHOULD be unique and defines last-one-wins behavior for duplicates. This makes duplicate attributes a best-practice lint warning rather than a core semantic error.
 
 Duplicate detection is owner-local. Attributes are compared only within the same expression placeholder, open markup placeholder, close markup placeholder, or standalone markup placeholder. Attribute identifiers are compared by cooked identifier string after the parser's NFC normalization rule, and comparison is case-sensitive. The primary span is the later duplicate attribute identifier, with a label on the first occurrence.
 
