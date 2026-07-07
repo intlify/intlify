@@ -12,7 +12,7 @@
 
 This core semantic diagnostic reports a matcher variant whose key count does not match the number of selectors in the `.match` statement.
 
-The parser can recover a matcher shape syntactically, but the MF2 data model is not valid unless every variant has the same arity as the selector list. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
+The MF2 grammar permits matcher variants to be parsed before data-model arity checks run, but the data model is not valid unless every variant has the same arity as the selector list. This diagnostic is always enabled after successful parsing, is emitted as `error`, and cannot be configured through `lint.rules`.
 
 Primary spans, labels, ordering, and cascade behavior are defined canonically by the [semantic validation design](../012-ox-mf2-parser-semantic-validation-design.md).
 
