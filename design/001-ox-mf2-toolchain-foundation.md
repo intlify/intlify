@@ -80,7 +80,7 @@ The formatter primarily uses CST, tokens, and trivia. The linter and compiler pr
 
 Adopt a `recovering parser`.
 
-Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. If a fatal gap exists, the SemanticModel may be partially generated or not generated at all.
+Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. Downstream tooling that requires semantic analysis must skip SemanticModel construction when parser diagnostics exist. Fatal gaps where even the root node cannot be built are API errors rather than partial semantic results.
 
 The Phase 1 result shape, recovery behavior, and diagnostic cost model are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 

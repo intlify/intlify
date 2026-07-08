@@ -501,7 +501,7 @@ The following features are deferred from the initial Phase 3 editor workflow:
 - recovery-aware partial linting for incomplete buffers
 - dedicated LSP server CLI, protocol handlers, and extension packaging
 
-Future editor adapters may map stable linter rule ids and formatter output into quick fixes. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
+Future editor adapters may map stable diagnostic codes, configurable rule metadata, and formatter output into quick fixes. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
 
 ### Implementation Targets
 

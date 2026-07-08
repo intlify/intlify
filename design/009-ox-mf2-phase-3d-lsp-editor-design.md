@@ -79,7 +79,7 @@ Detailed cache ownership, eviction, and invalidation policy belongs to the LSP/e
 
 The initial workflow does not require code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, or minimal-diff formatting.
 
-Future editor features should build on stable core concepts rather than adding LSP-specific state to parser, formatter, or linter crates. Quick fixes can use stable linter rule ids and formatter output. Semantic features should build on `SemanticView`.
+Future editor features should build on stable core concepts rather than adding LSP-specific state to parser, formatter, or linter crates. Quick fixes can use stable diagnostic codes, configurable rule metadata, and formatter output. Semantic features should build on `SemanticView`.
 
 ## Open Questions
 

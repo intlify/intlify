@@ -276,7 +276,6 @@ SemanticModel {
   attributes: Vec<AttributeRecord>,
   selectors: Vec<SelectorRecord>,
   variants: Vec<VariantRecord>,
-  diagnostics: Vec<SemanticDiagnostic>,
 }
 
 enum SemanticMessageKind {
@@ -285,7 +284,7 @@ enum SemanticMessageKind {
 }
 ```
 
-`SemanticDiagnostic` is the parser-owned semantic validation diagnostic defined by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md): a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections. The Phase 3C linter consumes and surfaces these diagnostics; it does not own their detection semantics.
+SemanticModel owns semantic facts, not semantic diagnostics. Parser-owned semantic validation diagnostics are produced by the `validate_semantics(model)` boundary defined by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). `SemanticDiagnostic` is a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections. The Phase 3C linter consumes and surfaces these diagnostics; it does not own their detection semantics.
 
 Every semantic record must link back to a source NodeId and Span.
 
@@ -980,7 +979,7 @@ A parse result with zero parser diagnostics means the message is syntactically v
 
 Downstream consumers may rely on this guarantee. In particular, the Phase 3B formatter strict diagnostics policy in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md) formats only diagnostic-free parses, and the formatter IR in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) treats grammar-impossible CST shapes as internal invariant errors rather than recoverable formatter diagnostics.
 
-This guarantee covers syntax-level validity only. Data-model and semantic errors, such as a matcher without a catch-all `*` variant, duplicate declarations, or undefined variable references, are semantic diagnostics and do not violate the guarantee when a syntactically valid message parses with zero parser diagnostics.
+This guarantee covers syntax-level validity only. Data-model and semantic errors, such as a matcher without a catch-all `*` variant, duplicate declarations, or missing selector annotations, are semantic diagnostics and do not violate the guarantee when a syntactically valid message parses with zero parser diagnostics. Configurable lint findings, such as undeclared non-selector variable references, are also outside the parser zero-diagnostic guarantee.
 
 ## Allocation Contract
 
