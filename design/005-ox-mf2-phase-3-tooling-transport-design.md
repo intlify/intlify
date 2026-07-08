@@ -6,13 +6,13 @@ This document defines the Phase 3 design boundary for tooling and transport work
 
 Phase 1 parser design is defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Phase 2 Binary AST snapshot design is defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). Phase 2 language binding design is defined in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 
-This document focuses on formatter/linter input, SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
+This document focuses on formatter/linter input, future SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
 
 ## Basic Policy
 
 The standard CST/AST product boundary remains the versioned Binary AST snapshot. Tooling may use Rust-internal construction-time tables for fast paths, but public cross-language tooling input should converge on the Binary AST decoder/accessor view.
 
-Semantic information is exposed separately as SemanticView or a later compact semantic snapshot. It is not forced into the lossless Binary AST snapshot.
+Semantic information can be exposed later as SemanticView or a later compact semantic snapshot. It is not forced into the lossless Binary AST snapshot.
 
 MessagePack is not the CST/AST representation of ox-mf2. It is reserved as a future transport for long-lived language-service workflows.
 
@@ -93,20 +93,19 @@ These helpers should not become a second AST format. If a helper cannot be deriv
 
 SemanticView is separate from the lossless Binary AST snapshot.
 
-Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles semantic facts.
+Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles semantic facts and source links derived from `ox_mf2_parser`-owned `SemanticModel` data.
 
 - declarations
 - references
 - selectors
 - variants
 - fallback/default information
-- duplicate keys
-- coverage metadata
 - links to NodeId and Span
+- future duplicate-key or coverage metadata if those facts become part of the shared semantic surface
 
-Linters, compilers, validators, and language-service features can combine Binary AST decoder/accessor traversal with SemanticView.
+Bindings, editors, future snapshot-backed linting, compiler-like consumers, and language-service features can combine Binary AST decoder/accessor traversal with SemanticView. Initial Phase 3C built-in lint rules use the Rust-internal `RuleContext` described in the linter input section instead of requiring SemanticView as a public rule API.
 
-SemanticView should remain derived from `ox_mf2_parser`-owned `SemanticModel` data and parser-owned semantic validation inputs. In the initial Phase 3 scope, it is a parser and linter-facing contract rather than a fixed N-API/WASM public API. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
+Semantic diagnostics are produced separately by the parser-owned `validate_semantics(model)` boundary. SemanticView is not the diagnostic owner; it is the semantic fact/source-link concept that consumers can combine with diagnostics and Binary AST traversal. In the initial Phase 3 scope, it is a tooling-facing semantic concept and future public semantic surface rather than a fixed N-API/WASM public API or built-in lint rule API. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
 
 ## Formatter Input
 
@@ -175,7 +174,7 @@ Benchmarks should report formatter concurrency settings separately from parser, 
 
 The formatter should load JSON project configuration. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears.
 
-The project configuration surface should use one unified JSON Schema with `fmt` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published with the npm packages. CLI output schemas are separate from this config schema and may be split by command.
+The project configuration surface should use one unified JSON Schema with `fmt` and `lint` sections. Formatter and linter crates may keep separate resolved config models internally, but editor completion and config validation should point users at the unified ox-mf2 tooling config schema published through `@intlify/cli/schema/config.schema.json`. CLI output schemas are separate from this config schema and may be split by command.
 
 Formatter configuration should support `ignorePatterns` but not file-specific `overrides` in the initial design. The initial formatter target is a narrow MF2 message file/resource workflow, so file-kind-specific overrides are unnecessary. If future resource/catalog or multi-file-kind workflows need per-file options, overrides can be reconsidered then.
 
@@ -247,7 +246,7 @@ The primary CLI input unit is a single MF2 message file: one file contains one M
 
 The CLI should load JSON project configuration for rule severity, presets, and ignore patterns. Formatter and linter configuration are separate responsibility areas, but they should be sections of one ox-mf2 tooling config so the CLI can resolve `fmt` and `lint` settings from the same root project configuration. The initial config discovery model is intentionally simple: only the root config defined by the Phase 3A CLI foundation is loaded. Nearest-config-wins and nested config discovery are out of scope until a concrete multi-workspace need appears. `crates/intlify_lint` is the source of truth for the resolved lint config model, rule registry, preset expansion, defaults, and validation so the CLI, N-API, and WASM entry points share the same behavior.
 
-The JSON configuration surface should have a generated JSON Schema published with the npm packages. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to CLI operands and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
+The JSON configuration surface should be part of the unified config JSON Schema published through `@intlify/cli/schema/config.schema.json`. This schema is part of the tooling contract for editor completion and config validation, while the Rust config model remains the source of truth. Linter configuration should not support file-specific `overrides` in the initial design; file selection belongs to CLI operands and ignore patterns. Resource/catalog linting can revisit this if per-resource configuration becomes necessary.
 
 ### Presets
 
@@ -269,7 +268,7 @@ Detailed CLI option semantics, including quiet mode, fix mode, linter config sec
 
 The initial public linter API is source-backed: `lintMessage(source, options?)` parses, performs semantic validation, and runs enabled rules over one MF2 message.
 
-The Binary AST decoder/accessor view and optional SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on these shared views whenever practical.
+The initial linter rule API is Rust-internal. Built-in rules receive a `RuleContext` that can expose CST access, parser-owned `SemanticModel` facts, source links, and resolved lint configuration without making public bindings depend on a fixed `SemanticView` API. The Binary AST decoder/accessor view remains the shared syntax foundation. Future SemanticView exposure remains the semantic foundation for bindings, editors, and future snapshot-backed linting, but Phase 3C rules do not require SemanticView to be a public N-API/WASM contract.
 
 For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires `SemanticModel` construction and parser-owned semantic validation, and no snapshot-to-`SemanticModel` path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
 
@@ -341,7 +340,7 @@ Initial configurable lint rules should be built into the Rust linter crate. Java
 
 The Phase 3 responsibility boundary is correctness in the linter and style in the formatter. Formatting style diagnostics are not part of the initial linter core. If a future lint workflow needs formatting checks or style fixes, it should call formatter check/format APIs rather than duplicate formatting logic in lint rules. Non-style lint fixes, if added later, should remain semantic-safe and independent from formatter output.
 
-### Initial Semantic Diagnostic Candidates
+### Initial Core Semantic Diagnostics
 
 The initial core semantic diagnostics are classified by the linter product design and specified by the parser-owned semantic validation design:
 
@@ -352,6 +351,8 @@ The initial core semantic diagnostics are classified by the linter product desig
 - `missing-fallback-variant`
 - `duplicate-variant`
 - `duplicate-option-name`
+
+Reader-facing design-time explanations for these semantic diagnostics and configurable lint rules are indexed in [linter-rules/index.md](./linter-rules/index.md). Canonical semantic diagnostic spans, ordering, duplicate-family partitioning, and cascade behavior remain owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 The remaining early candidates were classified out of the core semantic set: undeclared-variable checking is the configurable rule `no-undeclared-variable` because undeclared variables are valid external inputs in MF2, `unreachable-variant` is deferred, and SemanticModel construction or semantic validation invariant failures after a clean parse are internal operational errors rather than user-facing diagnostics. The linter product classification is owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
@@ -408,7 +409,7 @@ Out-of-scope linter features:
 
 ### Product Boundary
 
-Phase 3 does not require a dedicated LSP server or editor extension as a direct product. Instead, LSP and editor integrations are treated as adapter workflows built on top of the parser, formatter, linter, `SnapshotView`, `SemanticView`, and binding packages.
+Phase 3 does not require a dedicated LSP server or editor extension as a direct product. Instead, LSP and editor integrations are treated as adapter workflows built on top of the parser, formatter, linter, binding packages, `SnapshotView` for syntax traversal, and future `SemanticView` once semantic APIs are exposed.
 
 The parser, formatter, and linter cores remain LSP-agnostic. They should not return LSP protocol types such as `Diagnostic`, `TextEdit`, `CodeAction`, or UTF-16 positions directly.
 
@@ -416,7 +417,7 @@ The parser, formatter, and linter cores remain LSP-agnostic. They should not ret
 
 The initial editor workflow focuses on diagnostics and formatting.
 
-Code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, and minimal-diff formatting are not required in the initial workflow. `SemanticView` should still preserve enough stable semantic relationships to support those future editor features.
+Code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, and minimal-diff formatting are not required in the initial workflow. Future `SemanticView` exposure should preserve enough stable semantic relationships to support those future editor features.
 
 ### Document and Message Mapping
 
@@ -452,7 +453,7 @@ Long-lived language-service workflows may reuse parse artifacts per document ver
 
 - `SourceStore` / `SourceView` for source identity and location conversion
 - binary AST snapshot or decoded `SnapshotView` for syntax traversal
-- `SemanticView` for semantic queries
+- future `SemanticView` for semantic queries once semantic APIs are exposed
 - diagnostics store for parser, semantic, and linter diagnostics
 
 Cached artifacts must be invalidated when the document version changes. Cache ownership and eviction are adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
@@ -508,7 +509,7 @@ The following features are deferred from the initial Phase 3 editor workflow:
 - recovery-aware partial linting for incomplete buffers
 - dedicated LSP server CLI, protocol handlers, and extension packaging
 
-Future editor quick fixes are adapter-owned. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
+Future editor quick fixes are adapter-owned. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Future semantic editor features should build on future `SemanticView` exposure rather than requiring LSP-specific semantic state in the parser core.
 
 ### Implementation Targets
 

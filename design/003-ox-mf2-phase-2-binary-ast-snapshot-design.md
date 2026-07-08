@@ -372,7 +372,7 @@ Phase 2 snapshot focuses on the lossless CST surface.
 - diagnostics
 - roots section / RootRecord entry points
 
-The semantic model remains available inside Rust and is exposed separately as SemanticView or a later compact semantic snapshot.
+The semantic model remains available inside Rust and can be exposed later as SemanticView or a later compact semantic snapshot. Phase 2 snapshots stay focused on the lossless CST surface.
 
 Source metadata is a core section. Source text bytes are an optional `source text data` section. The snapshot does not have a separate spans section; NodeRecord, TokenRecord, TriviaRecord, and DiagnosticRecord hold `span_start` / `span_end` inline. With `include_source_text = false`, the decoder cannot resolve `source_slice(source_id, span)` from the snapshot alone. In that case, the decoder/accessor uses external source text retained by the source owner or reports source text unavailable.
 

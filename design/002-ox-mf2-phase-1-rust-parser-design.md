@@ -344,6 +344,8 @@ Examples of Data Model Errors, using the canonical parser-owned semantic diagnos
 - `duplicate-option-name`
 - `duplicate-variant`
 
+Reader-facing design-time explanations for these semantic diagnostics are indexed in [linter-rules/index.md](./linter-rules/index.md), but semantic validation behavior remains canonical in the parser-owned semantic validation design.
+
 These are not parser syntax errors. However, SemanticModel keeps the source links needed by the parser-owned semantic validation boundary defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 ## Name / Identifier / Literal Value Design
@@ -695,6 +697,8 @@ ParseSessionResult<'a> {
 
 `ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
+`SemanticView<'a>` in `ParseSessionResult` is a Rust-internal borrowed view over semantic facts. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
+
 Batch parsing uses a separate option type so execution strategy can evolve without changing parse semantics.
 
 ```rust
@@ -840,7 +844,7 @@ pub struct Span {
 }
 ```
 
-The same identifier model is used by construction-time CST tables, future Binary AST snapshots, SemanticView, diagnostics, formatters, linters, and language bindings.
+The same identifier model is used by construction-time CST tables, future Binary AST snapshots, diagnostics, formatters, linters, language bindings, and future SemanticView exposure.
 
 Span does not include source_id. Source identity is held by the record or context.
 

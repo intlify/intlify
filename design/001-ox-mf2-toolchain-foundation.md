@@ -12,7 +12,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 - In Phase 1, build a recovering, lossless, snapshot-friendly parser foundation.
 - In Phase 2, make a versioned Binary AST snapshot the standard boundary for the public CST/AST view.
 - Treat N-API and WASM as the primary language binding targets.
-- Keep SemanticView separate from the lossless Binary AST snapshot and link it to NodeId / Span.
+- Keep future SemanticView exposure separate from the lossless Binary AST snapshot and link semantic facts to NodeId / Span.
 - Treat the Unicode WG interchange data model as an on-demand compatibility surface, not as a Phase 1 or Phase 2 deliverable.
 - Reserve MessagePack for future LSP/editor transport, not as an AST representation.
 - The Rust parser / AST / performance details for Phase 1 live in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
@@ -90,7 +90,7 @@ The Phase 1 result shape, recovery behavior, and diagnostic cost model are defin
 
 Adopt `flat indexed tables`.
 
-Core identifiers use stable `u32` indexes, and spans use UTF-8 byte offsets. The same identifier model is shared by construction-time CST tables, future Binary AST snapshots, SemanticView, diagnostics, formatters, linters, and language bindings.
+Core identifiers use stable `u32` indexes, and spans use UTF-8 byte offsets. The same identifier model is shared by construction-time CST tables, future Binary AST snapshots, diagnostics, formatters, linters, language bindings, and future SemanticView exposure.
 
 Linters, formatters, and compilers do not depend directly on typed node structs. They read through NodeId and accessors.
 
@@ -119,7 +119,7 @@ Adopt `diagnostics foundation`.
 
 The initial Phase 3C linter is intentionally small, but it is not empty. It integrates parser diagnostics, parser-owned core semantic diagnostics, and the initial built-in configurable lint rules documented in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) and [linter-rules/index.md](./linter-rules/index.md).
 
-The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. The Binary AST decoder/accessor view and SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
+The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. Initial built-in rules run through a Rust-internal `RuleContext` over CST access and parser-owned `SemanticModel` facts. The Binary AST decoder/accessor view remains the shared syntax foundation, and future SemanticView exposure remains the semantic foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
 
 Core diagnostics use SourceId and UTF-8 byte Span as the canonical location model. Labels also have byte spans. CLI, LSP, and editor integration are responsible for converting spans to line/column or UTF-16 positions through SourceStore.
 
@@ -135,7 +135,7 @@ Adopt a `shared semantic model`.
 
 This is not a low-level IR immediately before runtime execution. It is a semantic information model shared by the linter, compiler, and validation.
 
-From Phase 2 onward, the public semantic surface is SemanticView, and semantic facts are linked to Binary AST NodeId and Span. Semantic information is not forced into the initial Binary AST snapshot. Binary AST handles the lossless CST surface, while SemanticView handles semantic facts such as declarations, references, selectors, variants, fallback/default information, duplicate keys, and coverage metadata.
+SemanticView is the planned public semantic surface once semantic APIs are exposed. Phase 2 bindings do not expose SemanticView yet; they expose the Binary AST syntax snapshot and parser diagnostics only. Semantic facts are linked to Binary AST NodeId and Span. Semantic information is not forced into the initial Binary AST snapshot. Binary AST handles the lossless CST surface, while SemanticView handles semantic facts such as declarations, references, selectors, variants, and fallback/default information.
 
 Candidate contents:
 
@@ -146,9 +146,8 @@ Candidate contents:
 - selector list
 - variant matrix
 - fallback/default variant
-- duplicate key set
-- reachability / coverage metadata
 - source span mapping
+- future duplicate key or coverage metadata if those facts become part of the shared semantic surface
 
 ### Unicode WG Interchange Data Model
 
@@ -184,7 +183,7 @@ The binding layer is an ergonomic surface, not a place to duplicate MF2 behavior
 
 When returning full CST/AST output across a language boundary, the canonical Phase 2 product boundary is a versioned Binary AST snapshot, not a nested JSON AST. Debug JSON and compatibility JSON may exist, but they are not the standard hot-path representation.
 
-The Phase 2 Binary AST snapshot focuses on the lossless CST surface. Semantic information is exposed separately as SemanticView or a later semantic snapshot. N-API and WASM bindings return result objects with lazy decoder/accessors rather than eagerly materialized object trees. Raw snapshot bytes are not included in the default result; they are available only through explicit advanced/debug/transport APIs.
+The Phase 2 Binary AST snapshot focuses on the lossless CST surface. Semantic information can be exposed later as SemanticView or a later semantic snapshot; Phase 2 bindings expose syntax snapshots and parser diagnostics only. N-API and WASM bindings return result objects with lazy decoder/accessors rather than eagerly materialized object trees. Raw snapshot bytes are not included in the default result; they are available only through explicit advanced/debug/transport APIs.
 
 MessagePack is not the CST/AST representation of ox-mf2. It is reserved as a future transport for long-lived language-service workflows such as LSP, editor integration, daemon mode, and repeated semantic queries.
 
@@ -355,7 +354,7 @@ The second phase adds the cross-language product boundary.
 - N-API binding with lazy decoder/accessor API
 - WASM binding with portable decoder/accessor API
 - first-class parseBatch API with shared snapshot buffer and shared string table
-- semantic model exposed separately as SemanticView or a future semantic snapshot
+- semantic model can be exposed later as SemanticView or a future semantic snapshot
 - C ABI design preparation without requiring a stable C ABI implementation
 - snapshot encoding / decoding / binding benchmarks
 
