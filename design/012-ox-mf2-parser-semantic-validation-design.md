@@ -23,13 +23,13 @@ Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-
 
 ## Ownership
 
-`ox_mf2_parser` owns CST construction, parser diagnostics, semantic lowering, `SemanticModel`, and core semantic validation. The parser crate exposes semantic diagnostics through a parser-owned API so downstream consumers do not need to infer MF2 data model errors themselves.
+`ox_mf2_parser` owns CST construction, parser diagnostics, `SemanticModel` construction, and core semantic validation. The parser crate exposes semantic diagnostics through a parser-owned API so downstream consumers do not need to infer MF2 data model errors themselves.
 
 `intlify_lint` consumes parser semantic diagnostics and shapes them for CLI, N-API, and WASM outputs. It must not reimplement parser-owned semantic checks.
 
 ## SemanticModel and Validation API
 
-Semantic validation runs after parsing and semantic lowering. The zero diagnostic guarantee from [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. Semantic validation may therefore assume grammar-valid CST shapes.
+Semantic validation runs after parsing and `SemanticModel` construction. The zero diagnostic guarantee from [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. Semantic validation may therefore assume grammar-valid CST shapes.
 
 The parser crate exposes semantic validation as an explicit API:
 

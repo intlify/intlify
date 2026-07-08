@@ -13,14 +13,14 @@
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
       .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .view { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.5; }
-      .lowering { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
+      .construction { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
       .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
       .diagnostic { fill: #fff1f2; stroke: #be123c; stroke-width: 1.5; }
       .boundary { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .row { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
       .row-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
       .view-item { fill: #ffffff; stroke: #14b8a6; stroke-width: 1.2; }
-      .lowering-item { fill: #ffffff; stroke: #d97706; stroke-width: 1.2; }
+      .construction-item { fill: #ffffff; stroke: #d97706; stroke-width: 1.2; }
       .semantic-item { fill: #ffffff; stroke: #a855f7; stroke-width: 1.2; }
       .diagnostic-item { fill: #ffffff; stroke: #fb7185; stroke-width: 1.2; }
       .label { fill: #111827; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; }
@@ -38,14 +38,14 @@
         .frame { fill: #111827; stroke: #475569; }
         .table { fill: #1e293b; stroke: #64748b; }
         .view { fill: #134e4a; stroke: #2dd4bf; }
-        .lowering { fill: #451a03; stroke: #f59e0b; }
+        .construction { fill: #451a03; stroke: #f59e0b; }
         .semantic { fill: #3b0764; stroke: #c084fc; }
         .diagnostic { fill: #4c0519; stroke: #fb7185; }
         .boundary { fill: #1e293b; stroke: #64748b; }
         .row { fill: #1e293b; stroke: #475569; }
         .row-alt { fill: #263449; stroke: #475569; }
         .view-item { fill: #0f766e; stroke: #5eead4; }
-        .lowering-item { fill: #78350f; stroke: #fbbf24; }
+        .construction-item { fill: #78350f; stroke: #fbbf24; }
         .semantic-item { fill: #581c87; stroke: #d8b4fe; }
         .diagnostic-item { fill: #881337; stroke: #fda4af; }
         .label { fill: #f8fafc; }
@@ -67,12 +67,12 @@
   <rect class="frame" x="24" y="24" width="1072" height="712" rx="8" />
 
   <text class="group-label" x="66" y="66">parser output</text>
-  <text class="group-label" x="414" y="66">optional lowering phase</text>
+  <text class="group-label" x="414" y="66">SemanticModel construction</text>
   <text class="group-label" x="784" y="66">semantic side tables</text>
 
   <rect class="table" x="56" y="92" width="300" height="488" rx="8" />
   <text class="label" x="206" y="128" text-anchor="middle">ParseResult syntax data</text>
-  <text class="caption" x="206" y="150" text-anchor="middle">Always built before semantic lowering.</text>
+  <text class="caption" x="206" y="150" text-anchor="middle">Always built before SemanticModel construction.</text>
 
   <rect class="row-alt" x="84" y="184" width="244" height="52" rx="6" />
   <text class="small" x="106" y="206">CstTables</text>
@@ -92,25 +92,25 @@
 
   <rect class="boundary" x="84" y="480" width="244" height="58" rx="6" />
   <text class="small" x="106" y="504">parse_semantic = false</text>
-  <text class="tiny" x="106" y="522">semantic: None, no lowering cost</text>
+  <text class="tiny" x="106" y="522">semantic: None, no construction cost</text>
 
-  <rect class="lowering" x="410" y="92" width="300" height="488" rx="8" />
-  <text class="label" x="560" y="128" text-anchor="middle">SemanticLowerer</text>
+  <rect class="construction" x="410" y="92" width="300" height="488" rx="8" />
+  <text class="label" x="560" y="128" text-anchor="middle">SemanticModelBuilder</text>
   <text class="caption" x="560" y="150" text-anchor="middle">Runs only when parse_semantic = true.</text>
 
-  <rect class="lowering-item" x="438" y="184" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="184" width="244" height="46" rx="6" />
   <text class="small" x="560" y="204" text-anchor="middle">read message mode</text>
   <text class="tiny" x="560" y="220" text-anchor="middle">simple / complex syntax decision</text>
 
-  <rect class="lowering-item" x="438" y="248" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="248" width="244" height="46" rx="6" />
   <text class="small" x="560" y="268" text-anchor="middle">derive message kind</text>
   <text class="tiny" x="560" y="284" text-anchor="middle">Pattern or Select data model</text>
 
-  <rect class="lowering-item" x="438" y="312" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="312" width="244" height="46" rx="6" />
   <text class="small" x="560" y="332" text-anchor="middle">collect local facts</text>
   <text class="tiny" x="560" y="348" text-anchor="middle">declarations, refs, expressions</text>
 
-  <rect class="lowering-item" x="438" y="376" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="376" width="244" height="46" rx="6" />
   <text class="small" x="560" y="396" text-anchor="middle">collect matcher facts</text>
   <text class="tiny" x="560" y="412" text-anchor="middle">selectors, variants, fallback</text>
 
@@ -167,6 +167,6 @@
 
   <rect class="boundary" x="84" y="630" width="952" height="66" rx="8" />
   <text class="label" x="112" y="660">Phase 1 boundary</text>
-  <text class="caption" x="112" y="684">Parser syntax correctness is measured separately from semantic lowering throughput.</text>
+  <text class="caption" x="112" y="684">Parser syntax correctness is measured separately from SemanticModel construction throughput.</text>
   <text class="caption" x="654" y="684">Full data-model validation remains a later validation layer.</text>
 </svg>

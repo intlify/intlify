@@ -12,7 +12,7 @@ The formatter should provide a deterministic ox-mf2 style while keeping the publ
 
 Primary goals:
 
-- format MF2 messages through a workspace-internal Rust core crate named `intlify_format`
+- format MF2 messages through a workspace-internal Rust formatter crate named `intlify_format`
 - expose a dedicated `intlify fmt` CLI backed by the same core
 - expose the formatter through `@intlify/format-napi` and `@intlify/format-wasm` without duplicating formatting logic
 - use Binary AST `SnapshotView` / binding-side snapshot accessors as the stable public syntax view

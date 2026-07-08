@@ -7,7 +7,7 @@ This document captures the detailed design for the ox-mf2 linter. The Phase 3 to
 - Provide a message-level linter core for MF2 messages.
 - Provide a dedicated lint CLI backed by the same core.
 - Include parser and semantic diagnostics in `lintMessage(source)` results.
-- Keep initial rules implemented in Rust core.
+- Keep initial configurable lint rules implemented in the Rust linter crate.
 - Expose stable linter results through Rust, N-API, and WASM bindings for playgrounds, editor integrations, and Node-based tools.
 - Share the file discovery, ignore, file framing, exit code, and JSON envelope contracts with `intlify fmt`.
 - Leave resource/catalog linting as a layer above message-level linting.
@@ -26,7 +26,7 @@ LSP/editor integration and playground usage are consumers of these deliverables,
 
 ## Ownership
 
-The Rust linter engine lives in a workspace-internal crate named `crates/intlify_lint` and depends on `ox_mf2_parser`. Like `intlify_format`, this crate is not published to crates.io in Phase 3C (`publish = false`); public linter distribution happens through the `intlify lint` CLI and the linter N-API/WASM packages. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, semantic lowering, and the semantic validation layer that emits the core semantic diagnostics. The lint crate owns rule execution, presets, lint configuration, and lint result shaping; it consumes semantic diagnostics from the parser crate and does not reimplement them.
+The Rust linter engine lives in a workspace-internal crate named `crates/intlify_lint` and depends on `ox_mf2_parser`. Like `intlify_format`, this crate is not published to crates.io in Phase 3C (`publish = false`); public linter distribution happens through the `intlify lint` CLI and the linter N-API/WASM packages. The parser crate owns CST construction, parser diagnostics, Binary AST snapshots, `SemanticModel` construction, and the semantic validation layer that emits the core semantic diagnostics. The lint crate owns rule execution, presets, lint configuration, and lint result shaping; it consumes semantic diagnostics from the parser crate and does not reimplement them.
 
 The user-facing CLI binary lives in `crates/intlify_cli`. It composes the parser, formatter, and linter crates into commands such as `intlify lint`. npm distribution follows the Phase 3A CLI package boundary: `@intlify/cli` is the JavaScript wrapper package, while `@intlify/cli-native` owns the compiled native CLI binary artifacts.
 
@@ -89,13 +89,13 @@ parser -> semantic -> rules
 
 Parser diagnostics are always included in lint results. If any parser diagnostic is produced, `SemanticModel` construction, semantic validation, and configurable lint rules do not run.
 
-Core semantic diagnostics, when produced by semantic analysis, are included after successful parsing. If semantic analysis produces any semantic diagnostic, configurable lint rules do not run.
+Core semantic diagnostics, when produced by parser-owned semantic validation, are included after successful parsing. If semantic validation produces any semantic diagnostic, configurable lint rules do not run.
 
-Semantic analysis is the `ox_mf2_parser` SemanticModel validation layer. The core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) is the canonical parser-owned contract for semantic validation. `SemanticModel` construction happens only after parser diagnostics are empty. If construction or validation hits an invariant failure, the host boundary reports an `internal_error` operational error. The current semantic lowering collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
+Parser-owned semantic validation is the `ox_mf2_parser` validation layer over a constructed `SemanticModel`. The core semantic diagnostic codes and their catalog live in the parser crate, so a future compiler, validator, or LSP shares one implementation with the linter. [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) is the canonical parser-owned contract for semantic validation. `SemanticModel` construction happens only after parser diagnostics are empty. If construction or validation hits an invariant failure, the host boundary reports an `internal_error` operational error. The current `SemanticModel` construction collects records without emitting validation diagnostics, so the parser-side semantic validation layer is a Phase 3C prerequisite PR.
 
-Configurable rules only run when parsing and semantic analysis complete without diagnostics.
+Configurable rules only run when parsing and parser-owned semantic validation complete without diagnostics.
 
-The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF, so semantic analysis and rules never see grammar-invalid CST shapes.
+The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF, so `SemanticModel` construction, semantic validation, and rules never see grammar-invalid CST shapes.
 
 ### Lint Execution Workflow
 
@@ -147,7 +147,7 @@ Classification result:
 | `no-duplicate-attribute` | configurable rule, default `warn` | the MF2 spec says attribute identifiers SHOULD be unique; duplicates are ignored with last-one-wins semantics |
 | `unreachable-variant` | deferred | needs sound selection-semantics and selector-domain modeling |
 
-Semantic invariant failures are intentionally absent from the diagnostic classification table. They are not parser, semantic, or lint diagnostics and never appear as a diagnostic `code`. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic lowering must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. The operational error uses `code: "internal_error"` with `details.reason: "semantic_invariant_failed"` and `details.stage`, where `stage` is `"semantic_model_construction"` or `"semantic_validation"`. Configurable rules do not run after such failures.
+Semantic invariant failures are intentionally absent from the diagnostic classification table. They are not parser, semantic, or lint diagnostics and never appear as a diagnostic `code`. Under the zero-diagnostic guarantee, `SemanticModel` construction and semantic validation must succeed for any parse result with zero parser diagnostics. Semantic validation may return user-facing semantic diagnostics, but it must not fail internally. An invariant failure in any of those steps indicates an implementation bug and is reported as an `internal_error` operational error, mirroring the formatter's invariant-violation boundary. The operational error uses `code: "internal_error"` with `details.reason: "semantic_invariant_failed"` and `details.stage`, where `stage` is `"semantic_model_construction"` or `"semantic_validation"`. Configurable rules do not run after such failures.
 
 ## Diagnostic Shape
 
@@ -279,7 +279,7 @@ The exact Rust names are implementation details, but the responsibilities are fi
 
 `SemanticModel` is the shared fact owner for parser-owned semantic validation and configurable lint rules. Its canonical fact surface is defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Facts needed by both layers are derived once by the parser-side semantic model construction path and are then consumed by `validate_semantics` and `intlify_lint` rules. The lint crate must not build a parallel semantic fact model for declarations, references, option occurrences, attributes, or matcher variants; rule-local CST traversal is only for syntax-local details that are not yet useful as shared semantic facts.
 
-Initial rules should be implemented as one pass per enabled rule over `SemanticModel`, not as public AST-node listener callbacks. MF2 messages are small, and the initial rules are semantic facts checks:
+Initial configurable lint rules should be implemented as one pass per enabled rule over `SemanticModel`, not as public AST-node listener callbacks. MF2 messages are small, and the initial rules are semantic facts checks:
 
 - `no-unused-declaration` reads declarations and references from `SemanticModel`
 - `no-undeclared-variable` reads unresolved variable references from `SemanticModel`
@@ -754,7 +754,7 @@ Reason-specific `invalid_options` details:
 
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
-Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires semantic analysis, and no path currently exists from decoded snapshot bytes to the parser's SemanticModel, so a snapshot-backed entry point would either reimplement semantic analysis over snapshot traversal or silently reparse the supplied source. The parser semantic validation design owns the future snapshot-to-`SemanticModel` path; this linter design owns only the future `lintSnapshot` API and consumer contract once that parser path exists. A future `lintSnapshot` must define how it consumes that parser-owned path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
+Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires `SemanticModel` construction and parser-owned semantic validation, and no path currently exists from decoded snapshot bytes to the parser's `SemanticModel`. A snapshot-backed entry point would either reimplement parser-owned semantic behavior over snapshot traversal or silently reparse the supplied source. The parser semantic validation design owns the future snapshot-to-`SemanticModel` path; this linter design owns only the future `lintSnapshot` API and consumer contract once that parser path exists. A future `lintSnapshot` must define how it consumes that parser-owned path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
 
 A future `lintSnapshot` requires, at minimum: a parser-owned path from snapshot bytes to `SemanticModel`; verifiable parser diagnostic capability so diagnostic absence can be trusted; snapshot schema/version support for all semantic facts needed by linting; source/span consistency guarantees equivalent to source-backed linting; fixtures proving that snapshot-backed and source-backed semantic validation produce the same diagnostic codes, order, and spans; and a contract that the API does not silently reparse source text behind a snapshot entry point.
 
@@ -898,7 +898,7 @@ Internal implementation failures such as `semantic_invariant_failed`, `lint_rule
 
 ## Benchmarks
 
-Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, semantic analysis cost, rule execution cost (per rule where practical), binding call cost, and CLI end-to-end cost, matching the Phase 3 benchmark names `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. `lint_snapshot_core` becomes relevant when snapshot-backed linting lands. Benchmark commands must be executable and testable, but timings are not CI gates.
+Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, `SemanticModel` construction cost, parser-owned semantic validation cost, rule execution cost (per rule where practical), binding call cost, and CLI end-to-end cost, matching the Phase 3 benchmark names `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. `lint_snapshot_core` becomes relevant when snapshot-backed linting lands. Benchmark commands must be executable and testable, but timings are not CI gates.
 
 ## Implementation Phasing
 
