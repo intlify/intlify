@@ -109,7 +109,7 @@ Nothing in Phase 1 changes:
 - `parse_source_session` continues to return a borrowed `ParseSessionResult` tied to a `ParseWorkspace`.
 - `parse_batch` continues to return ordered `BatchParseItem`s.
 
-The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst` / `lower_semantic`) still describe the cost the cache pays on a miss.
+The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst` / `lower_semantic`) still describe the cost the cache pays on a miss. Here `lower_semantic` means SemanticModel construction only; parser-owned `semantic_validation` is a separate benchmark phase.
 
 ## What the cache layer should also measure
 

@@ -16,7 +16,7 @@ Primary goals:
 
 1. Keep the parse hot path small.
 2. Preserve tokens, trivia, spans, and source slices required by downstream tools.
-3. Separate parser work from semantic lowering and validation.
+3. Separate parser work from SemanticModel construction and semantic validation.
 4. Avoid a public typed AST object graph.
 5. Use table-oriented records that can later be passed to SnapshotWriter.
 6. Make parser, diagnostics, recovery, and allocation costs measurable separately.
@@ -47,7 +47,7 @@ source
   -> lexer / scanner helpers
   -> recovering CST parser
   -> diagnostics
-  -> optional semantic lowering
+  -> optional SemanticModel construction
   -> later formatter / linter / compiler
 ```
 
@@ -69,7 +69,7 @@ Parser non-responsibilities:
 - linter rule policy
 - Intl.MessageFormat API behavior
 
-Semantic lowering and validation can interpret the CST later.
+SemanticModel construction and semantic validation can interpret the CST later.
 
 ## Phase 1 Deliverables
 
@@ -84,7 +84,7 @@ Phase 1 deliverables:
 - `SyntaxKind`: stable compact kind enum for message modes, nodes, tokens, trivia, errors, and missing nodes.
 - `CstTables`: flat indexed tables containing nodes, edges, tokens, and trivia. Spans are stored inline in records.
 - `CstView`: accessor surface for reading CST from NodeId / TokenId / Span.
-- `SemanticModel`: optional semantic lowering result shared by linter/compiler/validation.
+- `SemanticModel`: optional semantic fact model shared by linter/compiler/validation.
 - `Diagnostic`: shared location model for parser diagnostics and future lint diagnostics.
 - `Fixture runner`: test harness for spec fixtures, implementation fixtures, and recovery fixtures.
 - `Benchmark harness`: phase-separated benchmarks and hyperfine CLI benchmarks.
@@ -100,7 +100,7 @@ CST and AST have different purposes.
 - CST, Concrete Syntax Tree: represents the concrete source syntax as losslessly as possible. It keeps tokens, delimiters, trivia, escapes, missing/error nodes, and source spans needed to reconstruct, diagnose, and format the original source.
 - AST, Abstract Syntax Tree: abstracts away surface syntax and is easier to process semantically. It often omits delimiters, trivia, parentheses, and quote presence, and focuses on semantic units such as declarations, references, selectors, and variants.
 
-MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is lowered from the CST.
+MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is constructed from the CST.
 
 `CstTables + CstView + optional SemanticModel` is conceptually a tree, but physically represented as flat indexed tables and side tables.
 
@@ -109,7 +109,7 @@ MF2 requires good formatting, diagnostics, recovery, and preserve-mode formattin
 This document uses the following terms.
 
 - CST: a lossless syntax tree that preserves tokens, trivia, delimiters, error/missing nodes, and byte spans.
-- SemanticModel: semantic information lowered from CST, such as declarations, references, selectors, and variants.
+- SemanticModel: semantic information constructed from CST, such as declarations, references, selectors, and variants.
 - Binary AST snapshot: the Phase 2 cross-language public CST/AST view. It is not the normal Phase 1 parse output.
 - typed AST object graph: a recursive Rust struct tree. It is not adopted as the Phase 1 public API.
 
@@ -295,7 +295,7 @@ SemanticRef {
 }
 ```
 
-Phase 1 semantic lowering performs:
+Phase 1 SemanticModel construction records:
 
 - record message mode
 - record data-model message kind
@@ -740,7 +740,7 @@ Phase 1 implements `BatchExecution::Sequential`. Requesting `BatchExecution::Par
 
 The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
 
-`parse_semantic` defaults to `false` so parser throughput and semantic lowering throughput can be measured separately.
+`parse_semantic` defaults to `false` so parser throughput and SemanticModel construction throughput can be measured separately.
 
 ## Parallel Parsing Design
 
@@ -1144,7 +1144,7 @@ Do not add low-level annotations such as `#[inline(always)]` or `#[cold]` by gue
 
 ## Test Strategy
 
-Phase 1 tests separate parser correctness, CST stability, recovery quality, semantic lowering, and performance guards.
+Phase 1 tests separate parser correctness, CST stability, recovery quality, SemanticModel construction, and performance guards.
 
 Test categories:
 
@@ -1152,7 +1152,7 @@ Test categories:
 - message mode tests: simple/complex mode detection, whitespace significance, empty simple message
 - CST snapshot tests: SyntaxKind tree, token/trivia, and span snapshots generated from input
 - recovery tests: malformed input returns a root CST and useful diagnostics
-- semantic lowering tests: declarations, references, selectors, and variants link correctly to NodeId / Span
+- SemanticModel construction tests: declarations, references, selectors, and variants link correctly to NodeId / Span
 - data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
 - source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
 - batch parse tests: ParseInput metadata, SourceId, and diagnostic mapping remain stable
@@ -1183,6 +1183,7 @@ Phase 1 benchmark levels:
    - parse_cst
    - parse_cst_no_trivia
    - lower_semantic
+   - semantic_validation
    - owned_materialize
    - cst_view_traversal
    - diagnostics for malformed input
@@ -1213,10 +1214,11 @@ Reproducibility policy:
 - separate valid corpus, invalid corpus, and recovery-heavy corpus
 - separate `collect_trivia = true` and `collect_trivia = false`
 - separate `parse_semantic = false` and `parse_semantic = true`
+- separate `lower_semantic` from `semantic_validation`
 - state allocator conditions in benchmark reports
 - fix hyperfine warmup, minimum runs, setup command, working directory, and whether CLI startup is included
 
-Primary comparison with other parsers targets the closest available parse-only equivalent first. For ox-mf2, `parse_cst_no_trivia` and `parse_cst` are the parser-core baselines; `parse_message_owned` is reported when comparing public convenience APIs. Internal ox-mf2 micro/component benchmarks separate scanner, parser, semantic lowering, source mapping, owned materialization, and snapshot encode.
+Primary comparison with other parsers targets the closest available parse-only equivalent first. For ox-mf2, `parse_cst_no_trivia` and `parse_cst` are the parser-core baselines; `parse_message_owned` is reported when comparing public convenience APIs. Internal ox-mf2 micro/component benchmarks separate scanner, parser, SemanticModel construction (`lower_semantic`), semantic validation, source mapping, owned materialization, and snapshot encode.
 
 Relevant phase names:
 
@@ -1226,6 +1228,7 @@ parse_message_owned
 parse_cst
 parse_cst_no_trivia
 lower_semantic
+semantic_validation
 owned_materialize
 cst_view_traversal
 diagnostics
@@ -1244,13 +1247,14 @@ Phase meanings:
 - `parse_message_owned`: convenience `parse_message` path with fresh workspace setup and owned result construction. This is useful for API ergonomics and smoke comparisons, but it is not the pure parser-core baseline.
 - `parse_cst`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = true`.
 - `parse_cst_no_trivia`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = false`.
-- `lower_semantic`: parser-core plus `SemanticModel` lowering.
+- `lower_semantic`: parser-core plus `SemanticModel` construction. This benchmark name is kept for compatibility with existing harnesses, but it does not include parser-owned semantic validation diagnostics.
+- `semantic_validation`: `validate_semantics(model)` cost over an already-constructed `SemanticModel`.
 - `owned_materialize`: cost of converting the session/table output into an owned `ParseResult`.
 - `parse_batch_session`: one `SourceStore` and one reused `ParseWorkspace` over a corpus, returning borrowed session results.
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `allocations`: allocation count and bytes for a selected parse path.
 
-External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, semantic lowering, or CLI startup.
+External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, SemanticModel construction, semantic validation, or CLI startup.
 
 ## Benchmark Corpus
 
@@ -1296,7 +1300,7 @@ Comparisons must state exactly what is being measured.
 
 - parser only
 - parser plus diagnostics
-- parser plus semantic lowering
+- parser plus SemanticModel construction
 - parser plus snapshot encoding
 - CLI startup included or excluded
 
@@ -1308,8 +1312,8 @@ Every performance change should answer these questions.
 - Does it increase CstTables memory traffic?
 - Does it make recovery worse?
 - Does it preserve trivia and source fidelity?
-- Does it move work from parser to semantic lowering? If yes, is that intentional?
+- Does it move work from parser to SemanticModel construction? If yes, is that intentional?
 - Does it improve parser-only numbers while making batch or formatter/linter usage worse?
 - Does it hide snapshot, binding, or CLI overhead inside parser timing?
 
-The desirable tradeoff is not always the fastest parser-only number. ox-mf2 is a toolchain foundation, so parser performance must preserve the data required by diagnostics, formatters, linters, semantic lowering, and Phase 2 Binary AST snapshot encoding.
+The desirable tradeoff is not always the fastest parser-only number. ox-mf2 is a toolchain foundation, so parser performance must preserve the data required by diagnostics, formatters, linters, SemanticModel construction, and Phase 2 Binary AST snapshot encoding.

@@ -34,7 +34,7 @@ The parser is central, but the goal is not merely to build the fastest standalon
 
 ox-mf2 may reuse some crates provided by oxc. This is not only about crate reuse. ox-mf2 also explicitly inherits oxc's high-performance design philosophy: phase separation, data-oriented tables, allocation control, and benchmark-driven design.
 
-- phase separation: make lexer, parse, semantic lowering, diagnostics, formatting, and linting individually measurable.
+- phase separation: make lexer, parse, SemanticModel construction, diagnostics, formatting, and linting individually measurable.
 - data-oriented tables: avoid relying only on pointer traversal, and use NodeId plus flat indexed tables to make downstream work fast.
 - stable identifiers: allow AST/CST nodes, tokens, and sources to be referenced by IDs.
 - allocation control: avoid unnecessary heap allocation during the parse phase.
@@ -44,9 +44,9 @@ However, ox-mf2 does not adopt the same arena typed AST model as oxc. MF2 has a 
 
 ### Make the Core Extensible Into a Toolchain
 
-Existing dedicated parser toolchains show that it is effective to put the parser, CST/AST, semantic analysis, and diagnostics in the core, and place CLI, LSP, formatter, linter, and external toolchain integrations around it as adapters.
+Existing dedicated parser toolchains show that it is effective to put parser, CST/AST, parser diagnostics, and parser-owned semantic analysis in the core, and place CLI, LSP, formatter, linter, and external toolchain integrations around it as adapters.
 
-ox-mf2 follows the same direction. It puts the MF2-specific parser, CST, semantic model, and diagnostics in the core, while external toolchain integrations are designed as adapters. This keeps the core focused on MF2 while allowing extension to Node bindings, CLI, LSP, and various linter integrations.
+ox-mf2 follows the same direction. It puts the MF2-specific parser, CST, SemanticModel construction, parser diagnostics, and parser-owned semantic validation in `ox_mf2_parser`, while configurable lint rules, formatter behavior, CLI routing, and external toolchain integrations live in product crates or adapters. This keeps the parser core focused on MF2 while allowing extension to Node bindings, CLI, LSP, and various linter integrations.
 
 ### Binary AST Is Not the Initial Internal Representation
 
@@ -94,7 +94,7 @@ Core identifiers use stable `u32` indexes, and spans use UTF-8 byte offsets. The
 
 Linters, formatters, and compilers do not depend directly on typed node structs. They read through NodeId and accessors.
 
-Internal tables are snapshot-friendly. ox-mf2 avoids building a public typed AST first and then recursively converting it to Binary AST. Instead, the parser and lowering phase generate table-oriented records so that SnapshotWriter can emit nodes, edges, tokens, trivia, inline span fields, strings, and diagnostics in a linear pass.
+Internal tables are snapshot-friendly. ox-mf2 avoids building a public typed AST first and then recursively converting it to Binary AST. Instead, the parser and SemanticModel construction paths generate table-oriented records so that SnapshotWriter can emit nodes, edges, tokens, trivia, inline span fields, strings, and diagnostics in a linear pass.
 
 Phase 1 Rust tools may directly use construction-time flat indexed tables. From Phase 2 onward, the Binary AST decoder/accessor view shared by Rust, N-API, WASM, and other consumers becomes the canonical public AST view. This aligns the public AST surface across languages while allowing the parser to use efficient internal construction tables.
 
@@ -111,7 +111,7 @@ From Phase 2 onward, the formatter's public AST input is the Binary AST decoder/
 A future formatter should support at least two modes.
 
 - preserve mode: preserve the original representation as much as possible.
-- canonical mode: format to the standard ox-mf2 style.
+- standard mode: format to the standard ox-mf2 style.
 
 ### Linter
 
@@ -122,6 +122,8 @@ The initial MVP does not need to implement many lint rules. However, the diagnos
 The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. The Binary AST decoder/accessor view and SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
 
 Core diagnostics use SourceId and UTF-8 byte Span as the canonical location model. Labels also have byte spans. CLI, LSP, and editor integration are responsible for converting spans to line/column or UTF-16 positions through SourceStore.
+
+Diagnostic ownership is split by source of truth. Parser diagnostics and parser-owned semantic diagnostics live in `ox_mf2_parser`; configurable lint rule diagnostics live in `intlify_lint`; reporter shaping and JSON envelopes belong to the CLI, binding, or lint result layer. These layers share the same location model and JSON-visible diagnostic code contract, but they do not redefine each other's detection semantics.
 
 Parser diagnostics, SemanticModel foundations, and success-path parser cost constraints are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Parser-owned semantic diagnostics are defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Linter result shape, rule diagnostics, reporter behavior, and binding contracts are defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
@@ -225,7 +227,7 @@ Target phases:
 - binding_call
 - parse_batch_to_snapshot
 - format_preserve
-- format_canonical
+- format_standard
 - e2e_parse
 - e2e_lint
 
@@ -233,28 +235,20 @@ The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1
 
 ### Crate Structure
 
-Adopt `core split minimal`.
+Adopt `parser core plus product crates`.
 
-Initial candidates:
+The parser crate is the MF2 foundation crate. Formatter, linter, and CLI behavior live in separate workspace-internal product crates so each product can own its configuration, result shaping, fixtures, and release boundary without duplicating parser behavior.
 
 ```text
 crates/
-  ox_mf2_syntax        # lexer, token, CST, parser, recovery
-  ox_mf2_semantic      # semantic model, symbol/reference/selector/variant analysis
-  ox_mf2_diagnostics   # Diagnostic, Severity, Label, suppression boundary
-  ox_mf2               # facade API
+  ox_mf2_parser     # parser, CST, parser diagnostics, snapshots, SemanticModel,
+                    # and parser-owned semantic validation
+  intlify_cli       # native intlify command shell and subcommand routing
+  intlify_format    # formatter engine, formatter config, layout, and rendering
+  intlify_lint      # linter engine, rule registry, lint config, and result shaping
 ```
 
-Future candidates:
-
-```text
-intlify_lint
-intlify_format
-ox_mf2_codegen
-intlify_cli
-ox_mf2_napi
-ox_mf2_wasm
-```
+The product crates depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal product crates do not imply crates.io publishing.
 
 ### Spec Tracking
 
@@ -379,7 +373,7 @@ The initial stage does not implement the following.
 - Binary AST-first internal representation in Phase 1
 - Unicode WG data model import/export API unless a compatibility surface is required
 - full linter ruleset
-- canonical formatter
+- standard formatter
 - N-API / WASM binding
 - MessagePack transport
 - complete Intl.MessageFormat runtime
