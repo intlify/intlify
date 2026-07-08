@@ -21,7 +21,7 @@ catalog:
   '@vitejs/plugin-vue': ^6.0.7
   monaco-editor: ^0.55.1
   vize: ^0.268.0
-  void: ^0.9.3
+  void: ^0.10.0
   vite-plus: 0.2.1
   '@kazupon/vp-config': ^0.5.1
   wasm-pack: 0.15.0
