@@ -38,7 +38,7 @@ Host document parsing, string escaping, decoded-to-raw offset mapping, and outer
 
 Editor diagnostics should be produced from the shared diagnostic result contract used by parser, semantic, and linter workflows.
 
-The preferred initial path is to use source-backed `lintMessage` as the diagnostic source for editor publication because it already includes parser, semantic, and lint diagnostics. A future `lintSnapshot` path is an optimization for parse-artifact reuse after the parser owns a snapshot-to-`SemanticModel` path. If an adapter composes diagnostics manually from cached parser, semantic, and linter results, it must avoid publishing duplicate parser diagnostics.
+The preferred initial path is to use source-backed `lintMessage` as the diagnostic source for editor publication because it already includes parser, semantic, and lint diagnostics. A future `lintSnapshot` path is an optimization for parse-artifact reuse after the parser owns a snapshot-to-`SemanticModel` path. If an adapter composes diagnostics manually from cached parser, semantic, and linter results, that composition is an internal optimization only and must preserve the same ordering, category/code/severity values, and de-duplication behavior as `lintMessage`.
 
 The initial editor workflow follows the same strict pipeline as CLI and bindings:
 
@@ -86,7 +86,6 @@ Future editor features should build on stable core concepts rather than adding L
 - What exact mapping data structure should represent a standalone `.mf2` document versus a JSON/YAML resource entry?
 - For JSON/YAML resources, how should adapters model raw host value ranges, decoded MF2 message text, decoded-to-raw offset mapping, and string re-escaping?
 - Should a shared resource adapter crate/package own JSON/YAML parsing and mapping, or should each editor integration implement that layer independently?
-- Should editor diagnostics always use `lintMessage` as the initial single diagnostic source, or should adapters be allowed to compose parser, semantic, and linter diagnostics manually when they can guarantee de-duplication?
 - Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
 - Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
 - What stable key should identify diagnostics across document updates: source span, diagnostic code, resource key, or a combined identity?

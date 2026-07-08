@@ -309,7 +309,9 @@ The linter should support message-level linting first and allow resource/catalog
 
 ### File Discovery
 
-CLI file discovery should use an explicit supported-extension list owned by the linter/CLI crates. Unsupported files and unmatched patterns are CLI input conditions rather than parser diagnostics. Detailed file discovery, ignore, and unmatched-pattern semantics should be resolved as open questions in the linter-specific design document.
+CLI file discovery should use an explicit supported-extension list owned by the linter/CLI crates. The initial linter CLI supports direct `.mf2` message files. Unsupported files and unmatched patterns are CLI input conditions rather than parser diagnostics.
+
+The detailed discovery, ignore, file framing, unmatched-pattern, invalid-glob, and shared input error semantics are fixed by the linter-specific [File Discovery and Shared CLI Contract](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract). Resource/catalog input remains a future layered adapter workflow that can extend the supported-extension list without changing the message-level linter core.
 
 ### Lint Pipeline
 
@@ -373,7 +375,7 @@ Phase 3 linter core scope:
 - JSON project configuration
 - generated JSON Schema for configuration
 - shared diagnostic result contract
-- rule metadata and rule listing/introspection surface
+- rule metadata for config, schema, and documentation generation
 - message-level linting for single MF2 message files
 - `recommended` preset
 - parser and semantic diagnostics integrated into lint results
@@ -387,6 +389,10 @@ Future or layered linter scope:
 - recovery-aware editor linting
 - spec-compatible suppression model
 - `lint --fix`
+- rule listing/introspection commands
+- resolved config printing
+- file discovery debugging
+- rule timing output
 - LSP/editor as a direct product
 - output formats beyond `text` and `json`
 
