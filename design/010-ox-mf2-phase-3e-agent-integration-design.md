@@ -54,7 +54,7 @@ These integration shapes should call shared CLI, Rust, N-API, WASM, or future MC
 - Should `intlify` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
 - Which integration shape should be implemented first after the CLI: repo instructions, agent skill, MCP server, or plugin bundle?
 - Should an MCP server expose high-level tools such as `lint_file` and `format_file`, or lower-level tools such as `parse_message`, `lint_message`, and `format_message`?
-- How should agent integrations report operational errors separately from parser, semantic, formatter, and linter diagnostics?
+- How should agent integrations summarize and present existing JSON envelope `errors[]` separately from parser, semantic, formatter, and linter diagnostics without redefining their schemas?
 - How should agent hooks avoid modifying files unexpectedly when the user's agent workflow is read-only or review-only?
 - Should agent integrations support resource/catalog-aware workflows before the formatter and linter core own those layers?
 - How should Codex, Claude Code, Grok Build, and future agent plugin formats be documented without making one vendor's format canonical?

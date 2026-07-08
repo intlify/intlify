@@ -25,11 +25,13 @@ This document is organized in implementation order.
 
 ## Basic Policy
 
-ox-mf2 uses the Rust core as the single semantic implementation. MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, and linting are not reimplemented in other languages.
+ox-mf2 uses Rust crates as the single implementation of MF2 behavior. `ox_mf2_parser` owns MF2 parsing, CST construction, parser diagnostics, SemanticModel construction, and parser-owned semantic validation. Phase 3 product crates own formatter and linter behavior. These behaviors are not reimplemented in other languages.
 
 Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for cross-language CST/AST views, persistence, worker transfer, and batch transfer.
 
 The Rust core hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust core parse output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
+
+The snapshot is a cross-language syntax view and transport artifact. It does not become the owner of semantic validation, formatter rules, or linter rules; those remain in the parser or Phase 3 product crates.
 
 This design avoids the following path.
 

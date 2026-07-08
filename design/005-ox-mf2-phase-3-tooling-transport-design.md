@@ -293,7 +293,7 @@ CLI JSON output, Rust results, N-API results, WASM results, and LSP bridges shou
 
 Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids share one JSON-visible diagnostic `code` namespace and are public stable identifiers because configs, suppressions, JSON output, editor integrations, and external tooling may depend on them. Human-readable diagnostic message text is not a stable compatibility surface and may change for clarity.
 
-The lint crate should expose rule metadata for CLI, bindings, generated docs, and JSON Schema generation. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, documentation link or docs slug, and rule option schema when a rule accepts options. Exact metadata fields are linter-specific design details.
+The lint crate should own rule metadata used by config validation, JSON Schema generation, generated artifacts, documentation pipelines, and internal runtime behavior. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, documentation link or docs slug, and rule option schema when a rule accepts options. Exact metadata fields are linter-specific design details. Runtime rule listing or introspection APIs for CLI, N-API, or WASM are deferred from the initial linter product.
 
 ### Operational Errors
 

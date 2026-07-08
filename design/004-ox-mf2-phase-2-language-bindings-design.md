@@ -10,7 +10,9 @@ API error code ranges are defined in [appendix-ox-mf2-error-code.md](./appendix-
 
 ## Basic Policy
 
-ox-mf2 uses the Rust core as the single semantic implementation. Bindings are ergonomic wrappers around the Rust parser, snapshot writer, decoder/accessor view, diagnostics, and later formatter/linter APIs.
+ox-mf2 uses the Rust core as the single semantic implementation. Phase 2 bindings are ergonomic wrappers around the Rust parser, snapshot writer, decoder/accessor view, and parser diagnostics.
+
+Formatter and linter APIs are not added to the parser binding packages. Phase 3 product bindings are distributed through product-specific packages such as `@intlify/format-napi`, `@intlify/format-wasm`, `@intlify/lint-napi`, and `@intlify/lint-wasm`, as defined by the Phase 3 tooling designs.
 
 Bindings must not expose a nested JSON AST as the standard hot-path output. The standard public CST/AST view is a lazy accessor over the versioned Binary AST snapshot. Debug JSON may exist, but it is not the compatibility boundary.
 
@@ -22,6 +24,8 @@ Phase 2 provides two public runtime npm packages under the `@intlify` scope:
 
 - `@intlify/ox-mf2-napi`
 - `@intlify/ox-mf2-wasm`
+
+These packages are parser/snapshot packages. They expose parser-level APIs, Binary AST snapshot APIs, decoder/accessor views, and parser diagnostics. Formatter and linter APIs use the separate Phase 3 product packages instead of expanding this package surface.
 
 There is no `@intlify/ox-mf2` wrapper package in Phase 2. The N-API and WASM packages expose the same public TypeScript API as much as possible, but consumers choose the runtime-specific package explicitly.
 
