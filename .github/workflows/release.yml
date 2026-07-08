@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -162,7 +162,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -265,7 +265,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -368,7 +368,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -510,7 +510,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -670,7 +670,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -732,7 +732,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: false
@@ -770,7 +770,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: false
@@ -804,7 +804,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: false
@@ -851,7 +851,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
