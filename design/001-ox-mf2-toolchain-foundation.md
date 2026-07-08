@@ -8,7 +8,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 
 ## Design Overview
 
-- Make the Rust core the single semantic implementation.
+- Make Rust crates the single source of truth for MF2 behavior across parser, formatter, and linter products.
 - In Phase 1, build a recovering, lossless, snapshot-friendly parser foundation.
 - In Phase 2, make a versioned Binary AST snapshot the standard boundary for the public CST/AST view.
 - Treat N-API and WASM as the primary language binding targets.
@@ -44,7 +44,7 @@ However, ox-mf2 does not adopt the same arena typed AST model as oxc. MF2 has a 
 
 ### Make the Core Extensible Into a Toolchain
 
-Existing dedicated parser toolchains show that it is effective to put parser, CST/AST, parser diagnostics, and parser-owned semantic analysis in the core, and place CLI, LSP, formatter, linter, and external toolchain integrations around it as adapters.
+Existing dedicated parser toolchains show that it is effective to put parser, CST/AST, parser diagnostics, `SemanticModel` construction, and parser-owned semantic validation in the parser core, then place CLI, LSP, formatter, linter, and external toolchain integrations around it as product crates or adapters.
 
 ox-mf2 follows the same direction. It puts the MF2-specific parser, CST, SemanticModel construction, parser diagnostics, and parser-owned semantic validation in `ox_mf2_parser`, while configurable lint rules, formatter behavior, CLI routing, and external toolchain integrations live in product crates or adapters. This keeps the parser core focused on MF2 while allowing extension to Node bindings, CLI, LSP, and various linter integrations.
 
@@ -80,7 +80,7 @@ The formatter primarily uses CST, tokens, and trivia. The linter and compiler pr
 
 Adopt a `recovering parser`.
 
-Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. Downstream tooling that requires semantic analysis must skip SemanticModel construction when parser diagnostics exist. Fatal gaps where even the root node cannot be built are API errors rather than partial semantic results.
+Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. Downstream tooling that requires SemanticModel construction or parser-owned semantic validation must skip that work when parser diagnostics exist. Fatal gaps where even the root node cannot be built are API errors rather than partial semantic results.
 
 The Phase 1 result shape, recovery behavior, and diagnostic cost model are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
@@ -166,11 +166,11 @@ This keeps the hot parser and binding path compact while preserving a clear path
 
 ![ox-mf2 language binding architecture](./assets/001-ox-mf2-language-binding.svg)
 
-Adopt `Rust core as the single semantic implementation`.
+Adopt `Rust crates as the single MF2 behavior implementation`.
 
-ox-mf2 does not reimplement MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, or linting per target language. The Rust core is the only implementation of MF2 semantics, and each language binding is a thin ergonomic wrapper around that core.
+ox-mf2 does not reimplement MF2 behavior per target language. `ox_mf2_parser` owns MF2 parsing, CST construction, parser diagnostics, `SemanticModel` construction, and parser-owned semantic validation. Phase 3 product crates own product behavior: `intlify_format` owns formatter modes, layout, rendering, and formatter configuration; `intlify_lint` owns configurable lint rule execution, presets, lint configuration, and result shaping.
 
-N-API, WASM, C ABI, and other language bindings are not required in the initial MVP. However, the Rust core external API is designed to be binding-friendly from the beginning.
+N-API, WASM, C ABI, and other language bindings are not required in the initial MVP. However, the Rust crate APIs are designed to be binding-friendly from the beginning.
 
 Binding implementation priority:
 
@@ -178,9 +178,9 @@ Binding implementation priority:
 2. WASM binding: the portable target for browsers, playgrounds, editor extensions, and edge runtime integration
 3. C ABI binding design: the foundation for future Go, Swift, C#, Zig, Python FFI, and broader native language integration
 
-Rust internal types are not directly exposed to other languages. Boundary types such as Binary AST decoder/accessor views, DiagnosticView, and encoded snapshot views are allowed.
+Rust internal types are not directly exposed to other languages. Boundary types such as Binary AST decoder/accessor views, DiagnosticView, formatter results, lint results, and encoded snapshot views are allowed.
 
-The binding layer is an ergonomic surface, not a place to duplicate MF2 semantics. JS, WASM, C ABI, Go, Swift, C#, and other consumers call the same Rust core and receive stable views, handles, diagnostics, formatted text, and encoded snapshots.
+The binding layer is an ergonomic surface, not a place to duplicate MF2 behavior. JS, WASM, C ABI, Go, Swift, C#, and other consumers call the owning Rust crate for each product and receive stable views, handles, diagnostics, formatted text, lint results, or encoded snapshots as appropriate for that product boundary.
 
 When returning full CST/AST output across a language boundary, the canonical Phase 2 product boundary is a versioned Binary AST snapshot, not a nested JSON AST. Debug JSON and compatibility JSON may exist, but they are not the standard hot-path representation.
 

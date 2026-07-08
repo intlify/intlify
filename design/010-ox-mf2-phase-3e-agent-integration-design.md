@@ -10,7 +10,7 @@ The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport
 - Treat the `intlify` CLI and stable machine-readable output as the first agent-facing integration surface.
 - Keep agent plugins, skills, commands, hooks, MCP servers, and ACP clients as wrappers around the shared core contracts.
 - Make diagnostics, formatting results, config errors, and operational errors easy for agents to parse and summarize.
-- Preserve one source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, and semantic analysis.
+- Preserve one source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, parser-owned semantic validation, and linter result contracts.
 
 ## Non-Goals
 

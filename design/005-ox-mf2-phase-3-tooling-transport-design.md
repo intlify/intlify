@@ -106,7 +106,7 @@ Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles s
 
 Linters, compilers, validators, and language-service features can combine Binary AST decoder/accessor traversal with SemanticView.
 
-SemanticView should remain derived from the Rust core semantic model. In the initial Phase 3 scope, it is a Rust core and linter-facing contract rather than a fixed N-API/WASM public API. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
+SemanticView should remain derived from `ox_mf2_parser`-owned `SemanticModel` data and parser-owned semantic validation inputs. In the initial Phase 3 scope, it is a parser and linter-facing contract rather than a fixed N-API/WASM public API. Bindings may expose it later, but they must not implement a separate semantic analyzer in JavaScript or another host language.
 
 ## Formatter Input
 
@@ -271,7 +271,7 @@ The initial public linter API is source-backed: `lintMessage(source, options?)` 
 
 The Binary AST decoder/accessor view and optional SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on these shared views whenever practical.
 
-For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires semantic analysis and no snapshot-to-`SemanticModel` path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
+For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires `SemanticModel` construction and parser-owned semantic validation, and no snapshot-to-`SemanticModel` path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
 
 ### Location Model
 
@@ -337,13 +337,13 @@ Emitted linter diagnostics initially use only `"warn"` and `"error"`. In prose, 
 
 ### Fixes and Formatter Boundary
 
-Initial rules should be Rust core built-ins. JavaScript custom rules and linter plugins are out of scope. Auto-fix is also out of scope initially; future style fixes should delegate to the formatter API/crate so formatting behavior stays consistent between formatter and linter integrations.
+Initial configurable lint rules should be built into the Rust linter crate. JavaScript custom rules and linter plugins are out of scope. Auto-fix is also out of scope initially; future style fixes should delegate to the formatter API/crate so formatting behavior stays consistent between formatter and linter integrations.
 
 The Phase 3 responsibility boundary is correctness in the linter and style in the formatter. Formatting style diagnostics are not part of the initial linter core. If a future lint workflow needs formatting checks or style fixes, it should call formatter check/format APIs rather than duplicate formatting logic in lint rules. Non-style lint fixes, if added later, should remain semantic-safe and independent from formatter output.
 
 ### Initial Semantic Diagnostic Candidates
 
-The initial core semantic diagnostics, classified by the detailed linter design, are:
+The initial core semantic diagnostics are classified by the linter product design and specified by the parser-owned semantic validation design:
 
 - `duplicate-declaration`
 - `invalid-declaration-dependency`

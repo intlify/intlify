@@ -365,7 +365,7 @@ Phase 1 policy:
 
 - The parser does not create cooked values on the hot path.
 - CST keeps raw source spans, delimiters, and escape sequences.
-- SemanticModel computes values lazily or during lowering only when needed.
+- SemanticModel computes values lazily or during SemanticModel construction only when needed.
 - Cooked values and comparison keys are records that can link back to source spans.
 - NFC normalization is confined to semantic validation / comparison paths, not parse hot paths.
 

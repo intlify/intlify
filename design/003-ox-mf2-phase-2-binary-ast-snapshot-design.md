@@ -44,7 +44,7 @@ public typed AST
 The intended path is as follows.
 
 ```text
-parser / lowering
+parser construction tables
   -> snapshot-friendly construction tables
   -> SnapshotWriter
   -> versioned Binary AST snapshot
@@ -1140,7 +1140,7 @@ Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot
 - `parse_message_owned`: convenience `parse_message` path, including fresh workspace setup and owned `ParseResult` materialization.
 - `parse_cst`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = true`.
 - `parse_cst_no_trivia`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = false`.
-- `lower_semantic`: parser-core cost plus `SemanticModel` lowering.
+- `lower_semantic`: parser-core cost plus `SemanticModel` construction.
 - `owned_materialize`: cost to create an owned `ParseResult` from borrowed session / table output.
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
 - `parse_cst_and_encode_snapshot`: combined parse + snapshot encode cost for one message. This is a product-path measurement and must not be used as the parser-core baseline.
