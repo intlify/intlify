@@ -39,7 +39,7 @@ Implementation should be split by consumer-facing product surface:
    - `crates/intlify_lint`
    - `intlify lint`
    - parser, semantic, and lint diagnostic result contract
-   - recommended preset and initial semantic diagnostics
+   - recommended preset, core semantic diagnostics, and initial configurable lint rules
    - `@intlify/lint-napi` and `@intlify/lint-wasm`
 
 4. **Phase 3D: LSP/Editor Integration**
@@ -379,6 +379,7 @@ Phase 3 linter core scope:
 - message-level linting for single MF2 message files
 - `recommended` preset
 - parser and semantic diagnostics integrated into lint results
+- initial configurable lint rules
 
 ### Future or Layered Linter Scope
 

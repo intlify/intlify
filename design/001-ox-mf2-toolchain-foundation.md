@@ -231,6 +231,8 @@ Target phases:
 - e2e_parse
 - e2e_lint
 
+`lower_semantic` is kept as a compatibility benchmark phase name and means SemanticModel construction, not parser-owned semantic validation.
+
 The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
 ### Crate Structure
