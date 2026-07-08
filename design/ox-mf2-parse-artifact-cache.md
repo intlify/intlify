@@ -51,7 +51,7 @@ struct CachedParse {
 ## Invariants enforced by the cache layer (not the parser)
 
 1. **One parse per `(key, parser_version)` per dictionary update.** Re-parsing the same source under the same parser version is a bug in the cache, not in the parser.
-2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves.
+2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
 3. **Cache invalidation is explicit at file/dictionary update boundaries.** Either the dictionary layer wipes the entry on write, or it stamps each entry with `(source_hash, parser_version)` and lazily invalidates on mismatch.
 
 ## Suggested implementation skeleton

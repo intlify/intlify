@@ -334,15 +334,15 @@ Information that Phase 1 should expose to validation:
 - option identifiers
 - source span and cooked value for literal keys
 
-Examples of Data Model Errors:
+Examples of Data Model Errors, using the canonical parser-owned semantic diagnostic codes from [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md):
 
-- Variant Key Mismatch
-- Missing Fallback Variant
-- Missing Selector Annotation
-- Duplicate Declaration
-- Invalid Declaration Dependency
-- Duplicate Option Name
-- Duplicate Variant
+- `variant-key-arity-mismatch`
+- `missing-fallback-variant`
+- `missing-selector-annotation`
+- `duplicate-declaration`
+- `invalid-declaration-dependency`
+- `duplicate-option-name`
+- `duplicate-variant`
 
 These are not parser syntax errors. However, SemanticModel keeps the source links needed by the parser-owned semantic validation boundary defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
@@ -1253,6 +1253,7 @@ Phase meanings:
 - `parse_batch_session`: one `SourceStore` and one reused `ParseWorkspace` over a corpus, returning borrowed session results.
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `allocations`: allocation count and bytes for a selected parse path.
+- `e2e_lint`: legacy broad benchmark alias. Canonical Phase 3 linter benchmark names are `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`.
 
 External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, SemanticModel construction, semantic validation, or CLI startup.
 
