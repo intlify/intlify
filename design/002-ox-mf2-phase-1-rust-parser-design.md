@@ -344,7 +344,7 @@ Examples of Data Model Errors:
 - Duplicate Option Name
 - Duplicate Variant
 
-These are not parser syntax errors. However, when optional semantic validation is enabled in Phase 1, SemanticModel keeps the source links needed to report them as diagnostics.
+These are not parser syntax errors. However, SemanticModel keeps the source links needed by the parser-owned semantic validation boundary defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 ## Name / Identifier / Literal Value Design
 

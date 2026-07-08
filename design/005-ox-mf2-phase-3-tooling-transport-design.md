@@ -293,7 +293,7 @@ CLI JSON output, Rust results, N-API results, WASM results, and LSP bridges shou
 
 Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids share one JSON-visible diagnostic `code` namespace and are public stable identifiers because configs, suppressions, JSON output, editor integrations, and external tooling may depend on them. Human-readable diagnostic message text is not a stable compatibility surface and may change for clarity.
 
-The lint crate should own rule metadata used by config validation, JSON Schema generation, generated artifacts, documentation pipelines, and internal runtime behavior. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, documentation link or docs slug, and rule option schema when a rule accepts options. Exact metadata fields are linter-specific design details. Runtime rule listing or introspection APIs for CLI, N-API, or WASM are deferred from the initial linter product.
+The lint crate should own rule metadata used by config validation, JSON Schema generation, generated artifacts, documentation pipelines, and internal runtime behavior. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, docs slug, and rule option schema when a rule accepts options. The docs slug is internal generated metadata unless the linter-specific design defines a public documentation URL, JSON `help`, or CLI display contract. Exact metadata fields are linter-specific design details. Runtime rule listing or introspection APIs for CLI, N-API, or WASM are deferred from the initial linter product.
 
 ### Operational Errors
 
@@ -508,7 +508,7 @@ The following features are deferred from the initial Phase 3 editor workflow:
 - recovery-aware partial linting for incomplete buffers
 - dedicated LSP server CLI, protocol handlers, and extension packaging
 
-Future editor adapters may map stable diagnostic codes, configurable rule metadata, and formatter output into quick fixes. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
+Future editor quick fixes are adapter-owned. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Future semantic editor features should build on `SemanticView` rather than requiring LSP-specific semantic state in the parser core.
 
 ### Implementation Targets
 

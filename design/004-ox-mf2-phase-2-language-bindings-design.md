@@ -551,6 +551,8 @@ OxMf2ErrorCode.InitializationNativeBindingUnavailable
 OxMf2ErrorCode.BindingValidationInvalidOptions
 ```
 
+These numeric binding validation codes are parser/snapshot binding API errors. They are separate from Phase 3 product-level operational string codes such as formatter or linter `invalid_options`.
+
 The exact constant set is generated or hand-maintained from the Rust error code domains, but the public shape stays as a numeric const object plus `oxMf2ErrorCodeName(code)`.
 
 ## Numeric Constants
