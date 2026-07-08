@@ -73,7 +73,7 @@ SemanticModel construction and semantic validation can interpret the CST later.
 
 ## Phase 1 Deliverables
 
-Phase 1 is not only "a fast parser"; it builds the Rust core foundation needed to add later tools without breaking downstream consumers.
+Phase 1 is not only "a fast parser"; it builds the Rust parser foundation needed to add later tools without breaking downstream consumers.
 
 Phase 1 deliverables:
 
@@ -524,7 +524,7 @@ parse_source_session<'a>(
 
 API roles:
 
-- `parse_source`: normal Rust core API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
+- `parse_source`: normal `ox_mf2_parser` API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
 - `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests. The valid-input hot path parses directly from the borrowed `&str`; malformed inputs may build a temporary SourceStore only to materialize diagnostic locations.
 - `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
 - `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.

@@ -29,7 +29,7 @@ ox-mf2 uses Rust crates as the single implementation of MF2 behavior. `ox_mf2_pa
 
 Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for cross-language CST/AST views, persistence, worker transfer, and batch transfer.
 
-The Rust core hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust core parse output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
+The Rust parser hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust parser output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
 
 The snapshot is a cross-language syntax view and transport artifact. It does not become the owner of semantic validation, formatter rules, or linter rules; those remain in the parser or Phase 3 product crates.
 
@@ -356,7 +356,7 @@ Persistent caches that store snapshot bytes must include at least the snapshot f
 
 ### Format Overview
 
-Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust core parse output, and it is not a second semantic implementation.
+Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust parser output, and it is not a second semantic implementation.
 
 ![ox-mf2 Binary AST snapshot format layout](./assets/003-ox-mf2-binary-ast-format-layout.svg)
 
@@ -957,7 +957,7 @@ Once eager validation succeeds, accessors read records from `bytes + SectionInde
 
 `SnapshotViewOwned` owns snapshot bytes as `Arc<[u8]>`. Long-lived caches, daemons, language bindings, LSP, and worker handoff use owned views when accessors may outlive the original buffer owner.
 
-`Arc<[u8]>` is the v0.1 owned backing storage. It gives cheap immutable clones, can be shared across threads, and avoids adding a bytes/buffer dependency to the Rust core. Single-owner storage such as `Box<[u8]>` may be used internally before ownership is promoted, but the public owned view stores `Arc<[u8]>`.
+`Arc<[u8]>` is the v0.1 owned backing storage. It gives cheap immutable clones, can be shared across threads, and avoids adding a bytes/buffer dependency to the parser crate. Single-owner storage such as `Box<[u8]>` may be used internally before ownership is promoted, but the public owned view stores `Arc<[u8]>`.
 
 Accessors do not expand snapshot bytes into a recursive object tree. They slice the snapshot buffer and return values only when consumers read nodes, tokens, strings, or diagnostics.
 

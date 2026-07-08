@@ -37,16 +37,16 @@ The public API error code namespace starts at `1000`. Values below `1000` are re
 | `1000..1999` | `DecodeErrorCode` | Snapshot byte validation and decode failures. |
 | `2000..2999` | `SnapshotWriteErrorCode` | Snapshot encode failures from parser output, source metadata, or snapshot options. |
 | `3000..3999` | `SourceTextErrorCode` | Source text attachment, lookup, and source slicing failures. |
-| `4000..9999` | Reserved Rust core range | Reserved for future Rust core API error domains. |
+| `4000..9999` | Reserved Rust crate API range | Reserved for future Rust crate API error domains. |
 | `10000..10999` | `InitializationErrorCode` | Binding runtime initialization failures, especially WASM init failures. |
 | `11000..11999` | `BindingValidationErrorCode` | Binding input validation failures that are not better represented by built-in `TypeError` or `RangeError`. |
 | `12000+` | Reserved binding range | Reserved for future binding and host-runtime error domains. |
 
-The gap between Rust core ranges and binding ranges is intentional. It leaves space for future Rust core error domains without forcing binding-owned errors to move.
+The gap between Rust crate API ranges and binding ranges is intentional. It leaves space for future Rust crate error domains without forcing binding-owned errors to move.
 
-## Rust Core Error Domains
+## Rust Crate API Error Domains
 
-Rust core error domains are errors produced by the parser crate or snapshot layer and then optionally mapped through bindings.
+Rust crate API error domains are errors produced by Rust crates such as the parser crate, snapshot layer, or future product crates, and then optionally mapped through bindings.
 
 ### DecodeErrorCode
 
@@ -70,7 +70,7 @@ It covers failures related to external source text access after parsing or decod
 
 ## Binding Error Domains
 
-Binding error domains are produced by N-API or WASM wrapper code rather than the Rust core snapshot format itself.
+Binding error domains are produced by N-API or WASM wrapper code rather than the Rust crate API or snapshot format itself.
 
 ### InitializationErrorCode
 
@@ -88,7 +88,7 @@ Most wrong input types, invalid numeric ranges, and indexed accessor misuse shou
 
 Once a numeric API error code is released, its meaning is stable within the relevant compatibility line. Names may be documented more clearly over time, but a numeric value must not be reused for a different error.
 
-Adding a new error to an existing range is allowed when it belongs to that domain. If an error belongs to a new domain, allocate it from the reserved Rust core range or the reserved binding range rather than overloading an existing domain.
+Adding a new error to an existing range is allowed when it belongs to that domain. If an error belongs to a new domain, allocate it from the reserved Rust crate API range or the reserved binding range rather than overloading an existing domain.
 
 Changing `SyntaxKind`, `DiagnosticCode`, `DiagnosticSeverity`, or `SectionKind` values is a Binary AST / parser compatibility concern, not an `OxMf2ErrorCode` range concern.
 
