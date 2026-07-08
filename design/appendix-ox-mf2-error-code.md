@@ -27,6 +27,8 @@ These enums are compact parser / snapshot values. They are allowed to use small 
 
 CLI JSON operational error codes, such as `config_not_found` or `command_not_ready`, are stable string identifiers in the CLI output contract. They are not numeric `OxMf2ErrorCode` values and are not allocated from the ranges in this appendix. A CLI operational error may include lower-level API error information in structured details when needed, but the CLI `errors[].code` field remains a string namespace.
 
+Product-level formatter and linter operational errors exposed through CLI, N-API, or WASM, such as `invalid_options`, `invalid_input`, `internal_error`, or `source_snapshot_mismatch`, are also stable string identifiers. They are not allocated from the numeric `OxMf2ErrorCode` ranges unless a lower-level binding, runtime initialization, snapshot, or source-text failure needs a numeric API error code.
+
 ## Range Allocation
 
 The public API error code namespace starts at `1000`. Values below `1000` are reserved and should not be used for ox-mf2 API errors.

@@ -562,11 +562,9 @@ Initial Phase 3 benchmark phases:
 - lint_json
 - lint_binding_napi
 - lint_binding_wasm
-- lint_lsp_diagnostics
 - check_cli_e2e
 - check_json
 - agent_cli_json
-- semantic_query
 - cache_miss_parse
 - e2e_format
 
@@ -575,6 +573,8 @@ The CLI startup benchmarks are Phase 3A foundation baselines. They should measur
 Future transport benchmark phases:
 
 - lint_snapshot_core
+- lint_lsp_diagnostics
+- semantic_query
 - jsonrpc_baseline
 - messagepack_transport
 - lsp_jsonrpc

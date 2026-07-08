@@ -117,7 +117,7 @@ A future formatter should support at least two modes.
 
 Adopt `diagnostics foundation`.
 
-The initial MVP does not need to implement many lint rules. However, the diagnostic model is designed early so that parser errors and lint diagnostics can share the same foundation.
+The initial Phase 3C linter is intentionally small, but it is not empty. It integrates parser diagnostics, parser-owned core semantic diagnostics, and the initial built-in configurable lint rules documented in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) and [linter-rules/index.md](./linter-rules/index.md).
 
 The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. The Binary AST decoder/accessor view and SemanticView remain the shared syntax and semantic view foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
 
@@ -247,7 +247,8 @@ crates/
                     # and parser-owned semantic validation
   intlify_cli       # native intlify command shell and subcommand routing
   intlify_format    # formatter engine, formatter config, layout, and rendering
-  intlify_lint      # linter engine, rule registry, lint config, and result shaping
+  intlify_lint      # linter engine, configurable rule execution, presets,
+                    # lint config, rule registry, and result shaping
 ```
 
 The product crates depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal product crates do not imply crates.io publishing.
