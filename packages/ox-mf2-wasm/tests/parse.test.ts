@@ -7,12 +7,12 @@ import {
   parseBatch,
   parseMessage
 } from '../src/index.ts'
-import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
+import { ensureWasmArtifacts, wasmArtifactTimeoutMs } from './ensure-wasm-artifact.ts'
 
 beforeAll(async () => {
   await ensureWasmArtifacts()
   await init()
-})
+}, wasmArtifactTimeoutMs)
 
 test('parseMessage returns a snapshot-backed result', () => {
   const result = parseMessage('Hello {$name}')

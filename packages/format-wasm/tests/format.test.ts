@@ -1,13 +1,13 @@
 import { beforeAll, expect, test } from 'vite-plus/test'
 import { checkFormat, checkSnapshot, formatMessage, formatSnapshot, init } from '../src/index.ts'
-import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
+import { ensureWasmArtifacts, wasmArtifactTimeoutMs } from './ensure-wasm-artifact.ts'
 import { FORMAT_SNAPSHOT_SOURCE, formatSnapshotBytes } from './fixtures.ts'
 import { expectFormatFailure } from './helpers.ts'
 
 beforeAll(async () => {
   await ensureWasmArtifacts()
   await init()
-})
+}, wasmArtifactTimeoutMs)
 
 test('formatMessage formats standard mode output', () => {
   const result = formatMessage('.input   {$count   :number}\n{{Value {$count   :number}}}')

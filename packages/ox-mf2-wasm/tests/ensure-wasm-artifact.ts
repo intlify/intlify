@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { open, rm, unlink } from 'node:fs/promises'
+import { open, readFile, rm, unlink } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -10,7 +10,7 @@ const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const crateDir = resolve(packageDir, '../../crates/ox_mf2_wasm')
 const distDir = resolve(packageDir, 'dist')
 const lockPath = resolve(packageDir, '.wasm-build.lock')
-const waitTimeoutMs = 5 * 60 * 1000
+export const wasmArtifactTimeoutMs = 5 * 60 * 1000
 const waitIntervalMs = 250
 
 let ensurePromise: Promise<void> | null = null
@@ -30,7 +30,7 @@ async function buildIfNeeded(): Promise<void> {
     return
   }
 
-  const deadline = Date.now() + waitTimeoutMs
+  const deadline = Date.now() + wasmArtifactTimeoutMs
 
   while (Date.now() < deadline) {
     if (hasWasmArtifacts()) {
@@ -82,7 +82,7 @@ async function runWasmPackBuild(): Promise<void> {
       {
         cwd: packageDir,
         maxBuffer: 10 * 1024 * 1024,
-        timeout: waitTimeoutMs,
+        timeout: wasmArtifactTimeoutMs,
         killSignal: 'SIGKILL'
       }
     )
@@ -107,10 +107,32 @@ async function tryAcquireLock(): Promise<boolean> {
     return true
   } catch (error) {
     if (isAlreadyExistsError(error)) {
+      if (await removeStaleLock()) {
+        return tryAcquireLock()
+      }
       return false
     }
     throw error
   }
+}
+
+async function removeStaleLock(): Promise<boolean> {
+  let ownerPid = 0
+  try {
+    ownerPid = Number((await readFile(lockPath, 'utf8')).trim())
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      await releaseLock()
+      return true
+    }
+  }
+
+  if (Number.isInteger(ownerPid) && ownerPid > 0 && isProcessAlive(ownerPid)) {
+    return false
+  }
+
+  await releaseLock()
+  return true
 }
 
 async function releaseLock(): Promise<void> {
@@ -154,4 +176,13 @@ function isAlreadyExistsError(error: unknown): boolean {
 
 function isMissingFileError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error instanceof Error && 'code' in error && error.code === 'EPERM'
+  }
 }
