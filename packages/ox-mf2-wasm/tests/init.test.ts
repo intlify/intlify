@@ -6,11 +6,11 @@ import {
   utf16OffsetToUtf8ByteOffset,
   utf8ByteOffsetToUtf16Offset
 } from '../src/index.ts'
-import { ensureWasmArtifacts } from './ensure-wasm-artifact.ts'
+import { ensureWasmArtifacts, wasmArtifactTimeoutMs } from './ensure-wasm-artifact.ts'
 
 beforeAll(async () => {
   await ensureWasmArtifacts()
-})
+}, wasmArtifactTimeoutMs)
 
 test('module import succeeds before WASM init', () => {
   expect(typeof init).toBe('function')
