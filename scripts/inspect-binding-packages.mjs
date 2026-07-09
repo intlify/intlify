@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
 
@@ -22,47 +23,83 @@ const optionalFormatNapiPackages = [
   '@intlify/format-napi-win32-x64-msvc'
 ]
 
-await inspectPackage({
-  packagePath: 'packages/ox-mf2-napi',
-  requiredFiles: [
-    'dist/index.js',
-    'dist/index.d.ts',
-    'dist/native-binding.js',
-    'dist/native-binding.d.ts'
-  ],
-  extraChecks: createNativeBindingCheck(optionalNapiPackages, 'N-API')
-})
+const packageChecks = [
+  {
+    packageName: '@intlify/ox-mf2-napi',
+    packagePath: 'packages/ox-mf2-napi',
+    requiredFiles: [
+      'dist/index.js',
+      'dist/index.d.ts',
+      'dist/native-binding.js',
+      'dist/native-binding.d.ts'
+    ],
+    extraChecks: createNativeBindingCheck(optionalNapiPackages, 'N-API')
+  },
+  {
+    packageName: '@intlify/ox-mf2-wasm',
+    packagePath: 'packages/ox-mf2-wasm',
+    requiredFiles: [
+      'dist/index.js',
+      'dist/index.d.ts',
+      'dist/ox_mf2_wasm.js',
+      'dist/ox_mf2_wasm_bg.wasm'
+    ]
+  },
+  {
+    packageName: '@intlify/format-napi',
+    packagePath: 'packages/format-napi',
+    requiredFiles: [
+      'dist/index.js',
+      'dist/index.d.ts',
+      'dist/native-binding.js',
+      'dist/native-binding.d.ts'
+    ],
+    extraChecks: createNativeBindingCheck(optionalFormatNapiPackages, 'formatter N-API')
+  },
+  {
+    packageName: '@intlify/format-wasm',
+    packagePath: 'packages/format-wasm',
+    requiredFiles: [
+      'dist/index.js',
+      'dist/index.d.ts',
+      'dist/intlify_format_wasm.js',
+      'dist/intlify_format_wasm_bg.wasm'
+    ]
+  }
+]
 
-await inspectPackage({
-  packagePath: 'packages/ox-mf2-wasm',
-  requiredFiles: [
-    'dist/index.js',
-    'dist/index.d.ts',
-    'dist/ox_mf2_wasm.js',
-    'dist/ox_mf2_wasm_bg.wasm'
-  ]
-})
+const selectedPackageNames = parseSelectedPackageNames(process.argv.slice(2))
+const selectedPackageChecks =
+  selectedPackageNames.size === 0
+    ? packageChecks
+    : packageChecks.filter(check => selectedPackageNames.has(check.packageName))
+const missingPackageNames = [...selectedPackageNames].filter(
+  packageName => !packageChecks.some(check => check.packageName === packageName)
+)
 
-await inspectPackage({
-  packagePath: 'packages/format-napi',
-  requiredFiles: [
-    'dist/index.js',
-    'dist/index.d.ts',
-    'dist/native-binding.js',
-    'dist/native-binding.d.ts'
-  ],
-  extraChecks: createNativeBindingCheck(optionalFormatNapiPackages, 'formatter N-API')
-})
+if (missingPackageNames.length > 0) {
+  throw new Error(`unknown package(s): ${missingPackageNames.join(', ')}`)
+}
 
-await inspectPackage({
-  packagePath: 'packages/format-wasm',
-  requiredFiles: [
-    'dist/index.js',
-    'dist/index.d.ts',
-    'dist/intlify_format_wasm.js',
-    'dist/intlify_format_wasm_bg.wasm'
-  ]
-})
+for (const packageCheck of selectedPackageChecks) {
+  await inspectPackage(packageCheck)
+}
+
+function parseSelectedPackageNames(args) {
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      package: { type: 'string', multiple: true }
+    },
+    allowPositionals: true
+  })
+
+  if (positionals.length > 0) {
+    throw new Error(`unexpected positional argument(s): ${positionals.join(' ')}`)
+  }
+
+  return new Set(values.package ?? [])
+}
 
 async function inspectPackage({ packagePath, requiredFiles, extraChecks }) {
   const pkg = await readJson(`${packagePath}/package.json`)

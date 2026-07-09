@@ -16,6 +16,7 @@ on:
         options:
           - all
           - npm-publish
+          - formatter-npm-bootstrap
           - crate-publish
           - published-smoke
           - published-cli-smoke
@@ -25,6 +26,16 @@ on:
         description: 'Existing tag to release, e.g. v0.1.0.'
         type: string
         required: true
+      formatter_bootstrap_dry_run:
+        description: 'Dry-run formatter npm bootstrap publish without requiring the bootstrap token.'
+        type: boolean
+        required: false
+        default: true
+      formatter_bootstrap_provenance:
+        description: 'Attach npm provenance during formatter npm bootstrap publish when possible.'
+        type: boolean
+        required: false
+        default: true
 
 env:
   CI: true
@@ -45,7 +56,8 @@ jobs:
     timeout-minutes: 30
     if: >-
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
-        (inputs.job == 'all' || inputs.job == 'npm-publish' || inputs.job == 'crate-publish'))
+        (inputs.job == 'all' || inputs.job == 'npm-publish' ||
+          inputs.job == 'formatter-npm-bootstrap' || inputs.job == 'crate-publish'))
 
 
     steps:
@@ -218,7 +230,8 @@ jobs:
       - validate
     if: >-
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
-        (inputs.job == 'all' || inputs.job == 'npm-publish'))
+        (inputs.job == 'all' || inputs.job == 'npm-publish' ||
+          inputs.job == 'formatter-npm-bootstrap'))
 
 
     strategy:
@@ -638,6 +651,188 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: 'true'
         run: node scripts/release-npm.mjs publish --npm-dir release-dir/ox-mf2-napi --npm-dir release-dir/format-napi --tag "$NPM_DIST_TAG"
+
+  formatter-npm-bootstrap:
+    name: Bootstrap formatter npm packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - validate
+      - build-format-napi
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && inputs.job == 'formatter-npm-bootstrap' && needs.validate.result == 'success' && needs.build-format-napi.result == 'success'
+
+
+    # Temporary one-time bootstrap path for formatter packages that do not yet
+    # exist on npm. After package pages exist, configure npm Trusted Publishing
+    # for these packages and remove this token-based job.
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: '1.96.1'
+
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Print publish tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Resolve npm dist-tag
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          import { distTagForVersion } from './scripts/release-npm.mjs'
+
+          const tag = process.env.TAG
+          if (!tag?.startsWith('v')) {
+            throw new Error(`release tag must start with "v": ${String(tag)}`)
+          }
+
+          const version = tag.slice(1)
+          const distTag = distTagForVersion(version)
+          appendFileSync(process.env.GITHUB_ENV, `NPM_DIST_TAG=${distTag}\n`)
+          console.log(`Resolved npm dist-tag ${distTag} for ${tag}`)
+          NODE
+
+      - name: Download formatter native bindings
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: format-napi-*
+          path: artifacts
+
+      - name: Build shared package
+        run: vp run --no-cache @intlify/ox-mf2-shared#build
+
+      - name: Build formatter WASM package
+        run: vp run --no-cache @intlify/format-wasm#build
+
+      - name: Prepare formatter N-API release packages
+        working-directory: packages/format-napi
+        run: |
+          rm -rf dist ../../release-dir/format-napi
+          mkdir -p dist ../../release-dir/format-napi
+
+          binding_js=$(find ../../artifacts -path '*/format-napi-*/native-binding.js' | sort | head -n 1)
+          binding_dts=$(find ../../artifacts -path '*/format-napi-*/native-binding.d.ts' | sort | head -n 1)
+          if [ -z "$binding_js" ] || [ -z "$binding_dts" ]; then
+            echo "formatter native-binding.js/native-binding.d.ts artifact is missing" >&2
+            exit 1
+          fi
+          cp "$binding_js" dist/native-binding.js
+          cp "$binding_dts" dist/native-binding.d.ts
+
+          vp run --no-cache @intlify/format-napi#build:pack
+          npm exec -- napi create-npm-dirs --package-json-path package.json --npm-dir ../../release-dir/format-napi
+          npm exec -- napi artifacts --package-json-path package.json --output-dir ../../artifacts --npm-dir ../../release-dir/format-napi
+          npm exec -- napi pre-publish --skip-optional-publish --no-gh-release -t npm --package-json-path package.json --npm-dir ../../release-dir/format-napi
+
+      - name: Inspect formatter package contents
+        run: |
+          node scripts/inspect-binding-packages.mjs \
+            --package @intlify/format-napi \
+            --package @intlify/format-wasm
+
+      - name: Dry-run formatter bootstrap publish
+        run: |
+          node scripts/release-npm.mjs dry-run \
+            --npm-dir release-dir/format-napi \
+            --package @intlify/format-napi \
+            --package @intlify/format-wasm \
+            --package @intlify/format-napi-darwin-arm64 \
+            --package @intlify/format-napi-darwin-x64 \
+            --package @intlify/format-napi-linux-x64-gnu \
+            --package @intlify/format-napi-linux-x64-musl \
+            --package @intlify/format-napi-linux-arm64-gnu \
+            --package @intlify/format-napi-win32-x64-msvc \
+            --tag "$NPM_DIST_TAG"
+
+      - name: Verify formatter bootstrap token
+        if: ${{ inputs.formatter_bootstrap_dry_run == false }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_FORMATTER_BOOTSTRAP }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN_FORMATTER_BOOTSTRAP is required for formatter bootstrap publish" >&2
+            exit 1
+          fi
+
+      - name: Configure formatter bootstrap token
+        if: ${{ inputs.formatter_bootstrap_dry_run == false }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_FORMATTER_BOOTSTRAP }}
+        run: npm config set //registry.npmjs.org/:_authToken "$NODE_AUTH_TOKEN"
+
+      - name: Publish formatter packages with bootstrap token
+        if: ${{ inputs.formatter_bootstrap_dry_run == false }}
+        env:
+          NPM_CONFIG_PROVENANCE: ${{ inputs.formatter_bootstrap_provenance && 'true' || 'false' }}
+        run: |
+          node scripts/release-npm.mjs publish \
+            --npm-dir release-dir/format-napi \
+            --package @intlify/format-napi \
+            --package @intlify/format-wasm \
+            --package @intlify/format-napi-darwin-arm64 \
+            --package @intlify/format-napi-darwin-x64 \
+            --package @intlify/format-napi-linux-x64-gnu \
+            --package @intlify/format-napi-linux-x64-musl \
+            --package @intlify/format-napi-linux-arm64-gnu \
+            --package @intlify/format-napi-win32-x64-msvc \
+            --tag "$NPM_DIST_TAG"
+
+  formatter-bootstrap-smoke:
+    name: Smoke test bootstrapped formatter packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - formatter-npm-bootstrap
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && inputs.job == 'formatter-npm-bootstrap' && inputs.formatter_bootstrap_dry_run == false && needs.formatter-npm-bootstrap.result == 'success'
+
+
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
+        with:
+          node-version: 24
+          cache: false
+          run-install: false
+
+      - name: Smoke test bootstrapped formatter packages
+        run: |
+          node scripts/smoke-published-bindings.mjs \
+            --package @intlify/format-napi \
+            --package @intlify/format-wasm
 
   crate-publish:
     name: Publish crates.io package
