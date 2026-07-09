@@ -123,8 +123,13 @@ test('root package exposes CLI local validation entry points', async () => {
     'schema:cli:check': 'vp run cli#schema:check',
     'check:cli-pack': 'vp run cli#pack:check',
     'test:cli-smoke': 'vp run cli#smoke',
-    'bench:cli-startup': 'vp run cli#bench:startup'
+    'bench:cli-startup': 'vp run cli#bench:startup',
+    'bench:format': 'vp run format-bench#bench',
+    'bench:format:smoke': 'vp run format-bench#bench:smoke',
+    'bench:format:validate': 'vp run format-bench#validate'
   })
+  expect(pkg.scripts.release).toContain('"packages/format-napi/package.json"')
+  expect(pkg.scripts.release).toContain('"packages/format-wasm/package.json"')
   expect(pkg.scripts.release).toContain('"packages/cli/package.json"')
   expect(pkg.scripts.release).toContain('"packages/cli-native/package.json"')
   expect(pkg.scripts.test).toContain('cargo test -p intlify_cli --all-targets')

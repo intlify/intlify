@@ -30,7 +30,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - Optional sections: trivia, diagnostics, diagnostic labels, source text data, extended data.
 - Snapshot SourceId values are snapshot-local indexes into the sources section; SnapshotWriter remaps Phase 1 SourceId values during encoding.
 - Required core sections are emitted even when the format permits an empty count or byte length.
-- Empty optional sections are omitted by the v0.1 default writer.
+- Empty optional sections are usually omitted, but the v0.1 default writer emits empty `Trivia` when `SnapshotOptions.include_trivia = true`, empty `Diagnostics` when `SnapshotOptions.include_diagnostics = true`, and empty `SourceTextData` when `SnapshotOptions.include_source_text = true`.
 - v0.1 writer does not emit extended data.
 - v0.1 writer does not deduplicate SourceRecord entries or source text bytes.
 - String table deduplicates metadata and diagnostics strings only.

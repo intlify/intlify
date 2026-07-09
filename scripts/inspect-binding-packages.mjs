@@ -13,6 +13,15 @@ const optionalNapiPackages = [
   '@intlify/ox-mf2-napi-win32-x64-msvc'
 ]
 
+const optionalFormatNapiPackages = [
+  '@intlify/format-napi-darwin-arm64',
+  '@intlify/format-napi-darwin-x64',
+  '@intlify/format-napi-linux-x64-gnu',
+  '@intlify/format-napi-linux-x64-musl',
+  '@intlify/format-napi-linux-arm64-gnu',
+  '@intlify/format-napi-win32-x64-msvc'
+]
+
 await inspectPackage({
   packagePath: 'packages/ox-mf2-napi',
   requiredFiles: [
@@ -21,20 +30,7 @@ await inspectPackage({
     'dist/native-binding.js',
     'dist/native-binding.d.ts'
   ],
-  extraChecks({ files, pkg }) {
-    const hasLocalNative = [...files].some(
-      file => file.startsWith('dist/') && file.endsWith('.node')
-    )
-    const optionalDependencies = pkg.optionalDependencies ?? {}
-    const missingOptionalPackages = optionalNapiPackages.filter(
-      packageName => optionalDependencies[packageName] !== pkg.version
-    )
-    if (!hasLocalNative && missingOptionalPackages.length > 0) {
-      throw new Error(
-        `${pkg.name} must include a local .node file or optionalDependencies for all N-API platform packages; missing ${missingOptionalPackages.join(', ')}`
-      )
-    }
-  }
+  extraChecks: createNativeBindingCheck(optionalNapiPackages, 'N-API')
 })
 
 await inspectPackage({
@@ -44,6 +40,27 @@ await inspectPackage({
     'dist/index.d.ts',
     'dist/ox_mf2_wasm.js',
     'dist/ox_mf2_wasm_bg.wasm'
+  ]
+})
+
+await inspectPackage({
+  packagePath: 'packages/format-napi',
+  requiredFiles: [
+    'dist/index.js',
+    'dist/index.d.ts',
+    'dist/native-binding.js',
+    'dist/native-binding.d.ts'
+  ],
+  extraChecks: createNativeBindingCheck(optionalFormatNapiPackages, 'formatter N-API')
+})
+
+await inspectPackage({
+  packagePath: 'packages/format-wasm',
+  requiredFiles: [
+    'dist/index.js',
+    'dist/index.d.ts',
+    'dist/intlify_format_wasm.js',
+    'dist/intlify_format_wasm_bg.wasm'
   ]
 })
 
@@ -69,6 +86,23 @@ async function inspectPackage({ packagePath, requiredFiles, extraChecks }) {
 
   extraChecks?.({ files, pkg })
   console.log(`${pkg.name} package contents ok`)
+}
+
+function createNativeBindingCheck(optionalPackages, platformLabel) {
+  return ({ files, pkg }) => {
+    const hasLocalNative = [...files].some(
+      file => file.startsWith('dist/') && file.endsWith('.node')
+    )
+    const optionalDependencies = pkg.optionalDependencies ?? {}
+    const missingOptionalPackages = optionalPackages.filter(
+      packageName => optionalDependencies[packageName] !== pkg.version
+    )
+    if (!hasLocalNative && missingOptionalPackages.length > 0) {
+      throw new Error(
+        `${pkg.name} must include a local .node file or optionalDependencies for all ${platformLabel} platform packages; missing ${missingOptionalPackages.join(', ')}`
+      )
+    }
+  }
 }
 
 async function packFiles(packagePath) {

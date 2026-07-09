@@ -1,0 +1,21 @@
+{
+  "name": "format-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node scripts/run.mjs",
+    "bench:smoke": "node scripts/run.mjs --iterations 1 --fixture basic-message",
+    "validate": "node scripts/validate-result.mjs results/latest.json",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@intlify/format-napi": "workspace:*",
+    "@intlify/format-wasm": "workspace:*",
+    "@intlify/ox-mf2-napi": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

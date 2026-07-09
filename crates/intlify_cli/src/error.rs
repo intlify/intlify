@@ -60,6 +60,15 @@ impl CliError {
             details: Some(json!({ "command": command })),
         }
     }
+
+    pub(crate) fn invalid_argument(message: impl Into<String>, details: Value) -> Self {
+        Self {
+            kind: "input",
+            code: "invalid_cli_argument",
+            message: message.into(),
+            details: Some(details),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -81,6 +90,36 @@ impl From<CliError> for OperationalError {
             message: error.message,
             path: None,
             details: error.details,
+        }
+    }
+}
+
+impl From<crate::config::ConfigError> for OperationalError {
+    fn from(error: crate::config::ConfigError) -> Self {
+        Self {
+            kind: error.kind,
+            code: error.code,
+            message: error.message,
+            path: error.path,
+            details: error.details,
+        }
+    }
+}
+
+impl From<intlify_format::OperationalError> for OperationalError {
+    fn from(error: intlify_format::OperationalError) -> Self {
+        let details = if error.details.is_empty() {
+            None
+        } else {
+            Some(json!(error.details))
+        };
+
+        Self {
+            kind: error.kind.as_str(),
+            code: error.code.as_str(),
+            message: error.message,
+            path: error.path,
+            details,
         }
     }
 }

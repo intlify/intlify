@@ -2,7 +2,9 @@
 
 The `@intlify/cli` package provides the public `intlify` command for Intlify MessageFormat 2 tooling.
 
-Phase 3A reserves `fmt`, `lint`, `check`, and `init` so integrations can target a stable command surface before formatter and linter engines are implemented. Invoking those commands in this release returns a `command_not_ready` operational error.
+`intlify fmt` formats `.mf2` files with the native formatter. It supports write mode, `--check`, `--list-different`, `--stdin-filepath`, `--mode standard|preserve`, `--ignore-path`, and `--reporter json`.
+
+`lint`, `check`, and `init` remain reserved command names. Invoking those commands in this release returns a `command_not_ready` operational error.
 
 ## Install
 
@@ -25,7 +27,10 @@ Use it from `intlify.config.json`:
 ```json
 {
   "$schema": "./node_modules/@intlify/cli/schema/config.schema.json",
-  "fmt": {},
+  "fmt": {
+    "mode": "standard",
+    "ignorePatterns": ["dist/**", "node_modules/**"]
+  },
   "lint": {}
 }
 ```
@@ -35,9 +40,32 @@ Use it from `intlify.config.json`:
 ```jsonc
 {
   "$schema": "./node_modules/@intlify/cli/schema/config.schema.json",
-  // Formatter options are added in Phase 3B.
-  "fmt": {},
+  "fmt": {
+    "mode": "standard",
+    "ignorePatterns": []
+  },
   // Linter options are added in Phase 3C.
   "lint": {}
 }
 ```
+
+## Formatter Limitations
+
+`intlify fmt` in Phase 3B is scoped to direct `.mf2` files.
+
+- resource/catalog formatting is not supported
+- line wrapping is not supported
+- formatter ignore directives inside MF2 files are not supported
+- range formatting is not supported
+- `.editorconfig` is not loaded
+
+## Formatter Benchmarks
+
+Local formatter benchmark tooling lives in `tools/format-bench`.
+
+```sh
+vp run format-bench#bench
+vp run format-bench#bench:smoke
+```
+
+The benchmark result schema is validated, but timing thresholds are not used as CI gates.

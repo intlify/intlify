@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -20,6 +20,8 @@ const packages = ['@intlify/cli', '@intlify/cli-native']
 const npmAvailabilityMaxAttempts = readPositiveIntegerEnv('NPM_SMOKE_MAX_ATTEMPTS', 60)
 const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_000)
 const defaultRunTimeoutMs = readPositiveIntegerEnv('CLI_SMOKE_RUN_TIMEOUT_MS', 120_000)
+const formatterSmokeInput = '.input   {$count   :number}\n{{Value {$count   :number}}}'
+const formatterSmokeOutput = '.input {$count :number}\n{{Value {$count :number}}}\n'
 const nativeTargets = [
   {
     platform: 'darwin',
@@ -85,15 +87,25 @@ try {
   const wrapperVersion = run(wrapperBinPath, ['--version'], { cwd: tempDir, capture: true })
   assertStdoutEquals(wrapperVersion, version, 'published wrapper version')
 
-  const reserved = run(wrapperBinPath, ['fmt', '--reporter=json'], {
+  const formatterFixturePath = join(tempDir, 'count.mf2')
+  await writeFile(formatterFixturePath, formatterSmokeInput)
+  const formatted = run(wrapperBinPath, ['fmt', '--reporter=json', 'count.mf2'], {
     cwd: tempDir,
-    capture: true,
-    allowExitCodes: [2]
+    capture: true
   })
-  const envelope = JSON.parse(reserved.stdout)
-  assertEqual(envelope.command, 'fmt', 'reserved command envelope command')
-  assertEqual(envelope.errors?.[0]?.code, 'command_not_ready', 'reserved command error code')
-  assertEqual(envelope.errors?.[0]?.details?.phase, '3A', 'reserved command phase')
+  const envelope = JSON.parse(formatted.stdout)
+  assertEqual(formatted.stderr, '', 'published formatter smoke stderr')
+  assertEqual(envelope.command, 'fmt', 'published formatter envelope command')
+  assertEqual(envelope.summary?.status, 'success', 'published formatter summary status')
+  assertEqual(envelope.summary?.operation, 'write', 'published formatter operation')
+  assertEqual(envelope.summary?.formattedFiles, 1, 'published formatter formatted file count')
+  assertEqual(envelope.results?.[0]?.path, 'count.mf2', 'published formatter result path')
+  assertEqual(envelope.results?.[0]?.status, 'formatted', 'published formatter result status')
+  assertEqual(
+    await readFile(formatterFixturePath, 'utf8'),
+    formatterSmokeOutput,
+    'published formatter output'
+  )
 
   const schemaPath = join(
     tempDir,

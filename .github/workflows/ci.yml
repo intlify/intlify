@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -41,7 +41,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
+          targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
       - name: Install dependencies
@@ -74,7 +75,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -83,7 +84,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -119,7 +121,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -128,7 +130,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -163,7 +165,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -172,7 +174,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -198,7 +201,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -207,7 +210,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -238,7 +242,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@2dec1e33f4ab2c6d5bce1b0c4607961bb1a3f7a1 # v1.12.0
+        uses: voidzero-dev/setup-vp@35171c92dd08b67d5a9d3f2a4327800e58396f2a # v1.13.0
         with:
           node-version: 24
           cache: true
@@ -247,7 +251,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.96.0'
+          toolchain: '1.96.1'
+          targets: wasm32-unknown-unknown
 
       - name: Install dependencies
         run: vp install --frozen-lockfile

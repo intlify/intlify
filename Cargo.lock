@@ -130,12 +130,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
 name = "intlify_cli"
 version = "0.14.0-alpha.7"
 dependencies = [
+ "glob",
+ "intlify_format",
+ "ox_mf2_parser",
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "intlify_format"
+version = "0.14.0-alpha.7"
+dependencies = [
+ "ox_mf2_parser",
+ "serde",
+ "serde_json",
+ "unicode-width",
+]
+
+[[package]]
+name = "intlify_format_napi"
+version = "0.14.0-alpha.7"
+dependencies = [
+ "intlify_format",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "ox_mf2_parser",
+]
+
+[[package]]
+name = "intlify_format_wasm"
+version = "0.14.0-alpha.7"
+dependencies = [
+ "intlify_format",
+ "ox_mf2_parser",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -448,6 +489,12 @@ name = "unicode-segmentation"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
 name = "wasm-bindgen"

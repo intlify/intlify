@@ -5,6 +5,33 @@
     "EmptyConfig": {
       "additionalProperties": false,
       "type": "object"
+    },
+    "FormatterConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "ignorePatterns": {
+          "default": [],
+          "description": "Project-root-relative formatter ignore patterns.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/FormatterMode"
+            }
+          ],
+          "default": "standard",
+          "description": "Formatting strategy. Defaults to standard."
+        }
+      },
+      "type": "object"
+    },
+    "FormatterMode": {
+      "enum": ["standard", "preserve"],
+      "type": "string"
     }
   },
   "properties": {
@@ -13,23 +40,14 @@
       "type": "string"
     },
     "fmt": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/EmptyConfig"
-        }
-      ],
-      "description": "Formatter configuration. Phase 3A accepts only an empty object."
+      "$ref": "#/definitions/FormatterConfig",
+      "description": "Formatter configuration."
     },
     "lint": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/EmptyConfig"
-        }
-      ],
-      "description": "Linter configuration. Phase 3A accepts only an empty object."
+      "$ref": "#/definitions/EmptyConfig",
+      "description": "Linter configuration. Phase 3C accepts only an empty object."
     }
   },
-  "required": ["fmt", "lint"],
   "title": "ProjectConfigFile",
   "type": "object"
 }

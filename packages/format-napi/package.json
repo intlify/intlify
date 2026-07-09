@@ -1,0 +1,67 @@
+{
+  "name": "@intlify/format-napi",
+  "version": "0.14.0-alpha.7",
+  "description": "N-API formatter package for ox-mf2.",
+  "keywords": [
+    "formatter",
+    "intlify",
+    "messageformat",
+    "mf2",
+    "napi"
+  ],
+  "homepage": "https://github.com/intlify/intlify#readme",
+  "bugs": {
+    "url": "https://github.com/intlify/intlify/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intlify/intlify.git",
+    "directory": "packages/format-napi"
+  },
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp run ox-mf2-shared#build && vp run build:napi && vp run build:pack",
+    "build:napi": "napi build --manifest-path ../../crates/intlify_format_napi/Cargo.toml --output-dir dist --platform --esm --no-dts-header --js native-binding.js --dts native-binding.d.ts",
+    "build:pack": "vp pack",
+    "test": "vp run ox-mf2-shared#build && vp test"
+  },
+  "devDependencies": {
+    "@intlify/ox-mf2-shared": "workspace:*",
+    "@napi-rs/cli": "^3.7.2",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "napi": {
+    "binaryName": "intlify_format_napi",
+    "packageName": "@intlify/format-napi",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
