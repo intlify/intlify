@@ -1,6 +1,6 @@
 {
   "name": "@intlify/cli-native",
-  "version": "0.14.0-alpha.8",
+  "version": "0.14.0-alpha.9",
   "description": "Native intlify CLI binary package source.",
   "keywords": [
     "cli",
