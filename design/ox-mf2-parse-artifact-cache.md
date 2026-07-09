@@ -10,6 +10,8 @@ This document is the **bridge** between Phase 1's parser API and the Phase 2 dic
 
 This is a design note, not a Phase 1 deliverable.
 
+Phase 3C's initial linter remains source-backed: `lintMessage(source, options)` parses and validates the supplied source text directly. Cache-backed or snapshot-backed linting is a future optimization for dictionary tooling, LSP/editor adapters, and batch workflows after the parser owns a snapshot-to-`SemanticModel` path. This cache note therefore describes a layered reuse strategy, not an initial linter API requirement.
+
 ## Non-goals
 
 - The parser core stays oblivious of dictionaries, locales, and keys. The cache lives in a higher layer (`ox_mf2_dict`, `ox_mf2_lsp`, an i18n checker, etc.).
@@ -49,7 +51,7 @@ struct CachedParse {
 ## Invariants enforced by the cache layer (not the parser)
 
 1. **One parse per `(key, parser_version)` per dictionary update.** Re-parsing the same source under the same parser version is a bug in the cache, not in the parser.
-2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves.
+2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
 3. **Cache invalidation is explicit at file/dictionary update boundaries.** Either the dictionary layer wipes the entry on write, or it stamps each entry with `(source_hash, parser_version)` and lazily invalidates on mismatch.
 
 ## Suggested implementation skeleton
@@ -107,7 +109,7 @@ Nothing in Phase 1 changes:
 - `parse_source_session` continues to return a borrowed `ParseSessionResult` tied to a `ParseWorkspace`.
 - `parse_batch` continues to return ordered `BatchParseItem`s.
 
-The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst` / `lower_semantic`) still describe the cost the cache pays on a miss.
+The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst` / `lower_semantic`) still describe the cost the cache pays on a miss. Here `lower_semantic` means SemanticModel construction only; parser-owned `semantic_validation` is a separate benchmark phase.
 
 ## What the cache layer should also measure
 

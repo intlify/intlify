@@ -26,7 +26,7 @@ The broader Phase 3 tooling and consumer boundary is defined in [005-ox-mf2-phas
 - Implementing an LSP server, editor extension, or editor adapter.
 - Implementing agent-specific plugins, skills, hooks, MCP servers, or ACP integrations.
 - Implementing MessagePack transport or a long-lived daemon.
-- Defining formatter layout rules, linter rule semantics, suppression directives, or resource/catalog mapping details.
+- Defining formatter layout rules, linter rule semantics, suppression mechanisms, or resource/catalog mapping details.
 - Supporting nested config discovery or nearest-config-wins behavior in the initial foundation.
 - Supporting file-specific config overrides in the initial foundation.
 
@@ -64,7 +64,7 @@ The CLI crate owns command routing, config discovery, config loading, output for
 
 Formatter and linter crates own their resolved config models once Phase 3B and Phase 3C begin. Phase 3A owns only the project-level config envelope, schema generation boundary, and normalization path that lets the CLI pass `fmt` and `lint` sections to product-specific crates later.
 
-Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, and semantic lowering. Phase 3A should not move parser behavior into the CLI crate.
+Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, SemanticModel construction, and parser-owned semantic validation. Phase 3A should not move parser behavior into the CLI crate.
 
 ## Architecture
 
@@ -145,7 +145,11 @@ Phase 3A input and routing error codes:
 - `unknown_command`: unknown subcommand, with `kind: "unsupported"`
 - `command_not_ready`: reserved command without an implementation in the current phase, with `kind: "unsupported"`
 
-Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
+Two Phase 3A codes are defined ahead of their emit sites. `invalid_cli_argument` currently has no Phase 3A emit path because every argv failure maps to a more specific code; it is reserved as the generic fallback and is used by the Phase 3B `intlify fmt` design for operand and option-combination validation and by the Phase 3C `intlify lint` design for invalid `--max-warnings` values. `config_schema_generation_failed` is reserved for build/validation workflows; schema generation runs through the `cli#schema` / `cli#schema:check` tasks and currently reports failures as ordinary process failures rather than through the CLI JSON envelope. Defining codes ahead of their emit sites keeps the output contract stable for integrations.
+
+Phase 3A also reserves a shared binding/API operational code for later product packages:
+
+- `invalid_input`: raw external binding or programmatic API input shape is invalid before typed command-specific input can be constructed, with `kind: "input"`. This is for values such as a non-string `source` argument or non-`Uint8Array` snapshot argument. Product-specific option/config validation remains separate and uses product-owned codes such as `invalid_options` or `config_validation_failed`.
 
 Input and routing errors use small structured `details` payloads when the rejected token is available:
 
@@ -223,7 +227,7 @@ The `$schema` field is optional. The CLI does not use the `$schema` value to loc
 
 Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt` and `lint` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates.
 
-In Phase 3A, `fmt` and `lint` must be objects and only empty objects are valid product configs. When a config file exists, both the `fmt` and `lint` sections are required. A config file that omits either section fails validation with `config_validation_failed`; the implicit default project config applies only when no root config file is discovered and no explicit `--config` path is given. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
+In Phase 3A, `fmt` and `lint` are optional product sections. Omitted product sections resolve as empty product configs. When present, `fmt` and `lint` must be objects, and only empty objects are valid in Phase 3A. Therefore `{}`, `{ "fmt": {} }`, `{ "lint": {} }`, and `{ "fmt": {}, "lint": {} }` are valid project configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
 Phase 3A config error codes:
 
@@ -505,7 +509,7 @@ Build and package assembly pipeline:
 - Validate executable permissions for `packages/cli/bin/intlify.mjs` and Unix `@intlify/cli-native` binaries during pack or release validation.
 - Validate that each published CLI package includes its expected `README.md`.
 - Publish `@intlify/cli-native` before publishing the public `@intlify/cli` wrapper package, because the wrapper depends on it.
-- Use npm trusted publishing for normal CLI package releases through `.github/workflows/release.yml`. The public `@intlify/cli` package already exists on npm, so it should publish through trusted publishing once its trusted publisher settings are configured. The new `@intlify/cli-native` package may require a token-based bootstrap release before npm trusted publisher settings can exist. That bootstrap must be limited to a dedicated `@intlify/cli-native` publish step using the `npm-release` environment's `NPM_TOKEN_BOOTSTRAP` secret. The normal publish step should not configure an npm token, so existing packages such as `@intlify/cli` keep using trusted publishing.
+- Use npm trusted publishing for CLI package releases through `.github/workflows/release.yml`. Both `@intlify/cli-native` and `@intlify/cli` publish through trusted publishing once their trusted publisher settings are configured. The release workflow must not configure npm tokens for normal publishes.
 - Publish the initial `0.14.0-alpha.0` CLI prerelease with a prerelease npm dist-tag such as `alpha`; do not publish it under `latest`. Stable `0.14.0` may use the normal release tag after alpha validation.
 - Run release-time installed-package smoke tests for `intlify --version`, reserved command placeholder behavior, native package resolution through the `@intlify/cli` wrapper, direct execution of the `@intlify/cli-native` binary with `--version`, and schema file presence. Wrapper install smoke should install `@intlify/cli@<version>` from the published registry and verify that the compatible `@intlify/cli-native` package is resolved. Native direct smoke should install `@intlify/cli-native@<version>` on a compatible host runner and execute that package's `intlify` or `intlify.exe` binary directly. Do not use npm lifecycle `postinstall` for smoke testing in user environments.
 
@@ -601,7 +605,7 @@ The following items are intentionally not delivered in Phase 3A, but should rema
 - Formatter and linter engines remain follow-up products. Phase 3A only reserves `intlify fmt`, `intlify lint`, `intlify check`, and `intlify init` and returns placeholder operational errors for those commands.
 - User-visible `intlify init` config scaffolding is deferred until Phase 3B formatter and Phase 3C linter config fields are stable enough to write. Its future default output should be `intlify.config.json`; JSONC remains supported for users who want comments, but the scaffolded default should be strict JSON.
 - User-visible `intlify check` behavior is deferred until both Phase 3B formatter and Phase 3C linter products exist.
-- Formatter-specific option names, defaults, layout rules, ignore directive behavior, and formatter result schemas belong to [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
+- Formatter-specific option names, defaults, layout rules, ignore behavior, and formatter result schemas belong to [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 - Linter-specific rule semantics, presets, include/exclude behavior, ignore behavior, severity policy details, and diagnostic result schemas belong to [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 - Command-specific JSON result schemas for `fmt --check`, `lint`, and combined `check` are deferred to the product phases. Phase 3A owns only the shared envelope and operational error shape.
 - Formatter and linter N-API/WASM packages are deferred to their product phases. Phase 3A only records package boundaries and keeps parser binding packages focused on parser-level APIs.

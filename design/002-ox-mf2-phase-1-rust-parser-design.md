@@ -16,7 +16,7 @@ Primary goals:
 
 1. Keep the parse hot path small.
 2. Preserve tokens, trivia, spans, and source slices required by downstream tools.
-3. Separate parser work from semantic lowering and validation.
+3. Separate parser work from SemanticModel construction and semantic validation.
 4. Avoid a public typed AST object graph.
 5. Use table-oriented records that can later be passed to SnapshotWriter.
 6. Make parser, diagnostics, recovery, and allocation costs measurable separately.
@@ -47,7 +47,7 @@ source
   -> lexer / scanner helpers
   -> recovering CST parser
   -> diagnostics
-  -> optional semantic lowering
+  -> optional SemanticModel construction
   -> later formatter / linter / compiler
 ```
 
@@ -69,11 +69,11 @@ Parser non-responsibilities:
 - linter rule policy
 - Intl.MessageFormat API behavior
 
-Semantic lowering and validation can interpret the CST later.
+SemanticModel construction and semantic validation can interpret the CST later.
 
 ## Phase 1 Deliverables
 
-Phase 1 is not only "a fast parser"; it builds the Rust core foundation needed to add later tools without breaking downstream consumers.
+Phase 1 is not only "a fast parser"; it builds the Rust parser foundation needed to add later tools without breaking downstream consumers.
 
 Phase 1 deliverables:
 
@@ -84,7 +84,7 @@ Phase 1 deliverables:
 - `SyntaxKind`: stable compact kind enum for message modes, nodes, tokens, trivia, errors, and missing nodes.
 - `CstTables`: flat indexed tables containing nodes, edges, tokens, and trivia. Spans are stored inline in records.
 - `CstView`: accessor surface for reading CST from NodeId / TokenId / Span.
-- `SemanticModel`: optional semantic lowering result shared by linter/compiler/validation.
+- `SemanticModel`: optional semantic fact model shared by linter/compiler/validation.
 - `Diagnostic`: shared location model for parser diagnostics and future lint diagnostics.
 - `Fixture runner`: test harness for spec fixtures, implementation fixtures, and recovery fixtures.
 - `Benchmark harness`: phase-separated benchmarks and hyperfine CLI benchmarks.
@@ -100,7 +100,7 @@ CST and AST have different purposes.
 - CST, Concrete Syntax Tree: represents the concrete source syntax as losslessly as possible. It keeps tokens, delimiters, trivia, escapes, missing/error nodes, and source spans needed to reconstruct, diagnose, and format the original source.
 - AST, Abstract Syntax Tree: abstracts away surface syntax and is easier to process semantically. It often omits delimiters, trivia, parentheses, and quote presence, and focuses on semantic units such as declarations, references, selectors, and variants.
 
-MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is lowered from the CST.
+MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is constructed from the CST.
 
 `CstTables + CstView + optional SemanticModel` is conceptually a tree, but physically represented as flat indexed tables and side tables.
 
@@ -109,7 +109,7 @@ MF2 requires good formatting, diagnostics, recovery, and preserve-mode formattin
 This document uses the following terms.
 
 - CST: a lossless syntax tree that preserves tokens, trivia, delimiters, error/missing nodes, and byte spans.
-- SemanticModel: semantic information lowered from CST, such as declarations, references, selectors, and variants.
+- SemanticModel: semantic information constructed from CST, such as declarations, references, selectors, and variants.
 - Binary AST snapshot: the Phase 2 cross-language public CST/AST view. It is not the normal Phase 1 parse output.
 - typed AST object graph: a recursive Rust struct tree. It is not adopted as the Phase 1 public API.
 
@@ -276,7 +276,6 @@ SemanticModel {
   attributes: Vec<AttributeRecord>,
   selectors: Vec<SelectorRecord>,
   variants: Vec<VariantRecord>,
-  diagnostics: Vec<Diagnostic>,
 }
 
 enum SemanticMessageKind {
@@ -284,6 +283,8 @@ enum SemanticMessageKind {
   Select,
 }
 ```
+
+SemanticModel owns semantic facts, not semantic diagnostics. Parser-owned semantic validation diagnostics are produced by the `validate_semantics(model)` boundary defined by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). `SemanticDiagnostic` is a separate type with its own kebab-case `SemanticDiagnosticCode` catalog, kept out of `ParseResult.diagnostics` and out of Binary AST snapshot diagnostics sections. The Phase 3C linter consumes and surfaces these diagnostics; it does not own their detection semantics.
 
 Every semantic record must link back to a source NodeId and Span.
 
@@ -294,7 +295,7 @@ SemanticRef {
 }
 ```
 
-Phase 1 semantic lowering performs:
+Phase 1 SemanticModel construction records:
 
 - record message mode
 - record data-model message kind
@@ -322,7 +323,7 @@ SemanticModel does not replace CST. Formatters use CST; linters, compilers, and 
 
 The MF2 spec separates _Syntax Errors_ for malformed syntax from _Data Model Errors_ for invalid message structure.
 
-The Phase 1 parser primarily handles Syntax Errors. Data Model Errors belong to the validation layer that uses SemanticModel.
+The Phase 1 parser primarily handles Syntax Errors. Data Model Errors belong to the validation layer that uses SemanticModel. This document defines the SemanticModel foundation and source links needed by validation; [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) owns the detailed semantic validation contract, diagnostic catalog, spans, ordering, and cascade policy.
 
 Information that Phase 1 should expose to validation:
 
@@ -333,16 +334,19 @@ Information that Phase 1 should expose to validation:
 - option identifiers
 - source span and cooked value for literal keys
 
-Examples of Data Model Errors:
+Examples of Data Model Errors, using the canonical parser-owned semantic diagnostic codes from [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md):
 
-- Variant Key Mismatch
-- Missing Fallback Variant
-- Missing Selector Annotation
-- Duplicate Declaration
-- Duplicate Option Name
-- Duplicate Variant
+- `variant-key-arity-mismatch`
+- `missing-fallback-variant`
+- `missing-selector-annotation`
+- `duplicate-declaration`
+- `invalid-declaration-dependency`
+- `duplicate-option-name`
+- `duplicate-variant`
 
-These are not parser syntax errors. However, when optional semantic validation is enabled in Phase 1, SemanticModel keeps the source links needed to report them as diagnostics.
+Reader-facing design-time explanations for these semantic diagnostics are indexed in [linter-rules/index.md](./linter-rules/index.md), but semantic validation behavior remains canonical in the parser-owned semantic validation design.
+
+These are not parser syntax errors. However, SemanticModel keeps the source links needed by the parser-owned semantic validation boundary defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 ## Name / Identifier / Literal Value Design
 
@@ -363,7 +367,7 @@ Phase 1 policy:
 
 - The parser does not create cooked values on the hot path.
 - CST keeps raw source spans, delimiters, and escape sequences.
-- SemanticModel computes values lazily or during lowering only when needed.
+- SemanticModel computes values lazily or during SemanticModel construction only when needed.
 - Cooked values and comparison keys are records that can link back to source spans.
 - NFC normalization is confined to semantic validation / comparison paths, not parse hot paths.
 
@@ -522,7 +526,7 @@ parse_source_session<'a>(
 
 API roles:
 
-- `parse_source`: normal Rust core API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
+- `parse_source`: normal `ox_mf2_parser` API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
 - `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests. The valid-input hot path parses directly from the borrowed `&str`; malformed inputs may build a temporary SourceStore only to materialize diagnostic locations.
 - `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
 - `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.
@@ -693,6 +697,8 @@ ParseSessionResult<'a> {
 
 `ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
+`SemanticView<'a>` in `ParseSessionResult` is a Rust-internal borrowed view over semantic facts. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
+
 Batch parsing uses a separate option type so execution strategy can evolve without changing parse semantics.
 
 ```rust
@@ -738,7 +744,7 @@ Phase 1 implements `BatchExecution::Sequential`. Requesting `BatchExecution::Par
 
 The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
 
-`parse_semantic` defaults to `false` so parser throughput and semantic lowering throughput can be measured separately.
+`parse_semantic` defaults to `false` so parser throughput and SemanticModel construction throughput can be measured separately.
 
 ## Parallel Parsing Design
 
@@ -838,7 +844,7 @@ pub struct Span {
 }
 ```
 
-The same identifier model is used by construction-time CST tables, future Binary AST snapshots, SemanticView, diagnostics, formatters, linters, and language bindings.
+The same identifier model is used by construction-time CST tables, future Binary AST snapshots, diagnostics, formatters, linters, language bindings, and future SemanticView exposure.
 
 Span does not include source_id. Source identity is held by the record or context.
 
@@ -977,7 +983,7 @@ A parse result with zero parser diagnostics means the message is syntactically v
 
 Downstream consumers may rely on this guarantee. In particular, the Phase 3B formatter strict diagnostics policy in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md) formats only diagnostic-free parses, and the formatter IR in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) treats grammar-impossible CST shapes as internal invariant errors rather than recoverable formatter diagnostics.
 
-This guarantee covers syntax-level validity only. Data-model and semantic errors, such as a matcher without a catch-all `*` variant, duplicate declarations, or undefined variable references, are semantic diagnostics and do not violate the guarantee when a syntactically valid message parses with zero parser diagnostics.
+This guarantee covers syntax-level validity only. Data-model and semantic errors, such as a matcher without a catch-all `*` variant, duplicate declarations, or missing selector annotations, are semantic diagnostics and do not violate the guarantee when a syntactically valid message parses with zero parser diagnostics. Configurable lint findings, such as undeclared non-selector variable references, are also outside the parser zero-diagnostic guarantee.
 
 ## Allocation Contract
 
@@ -1142,7 +1148,7 @@ Do not add low-level annotations such as `#[inline(always)]` or `#[cold]` by gue
 
 ## Test Strategy
 
-Phase 1 tests separate parser correctness, CST stability, recovery quality, semantic lowering, and performance guards.
+Phase 1 tests separate parser correctness, CST stability, recovery quality, SemanticModel construction, and performance guards.
 
 Test categories:
 
@@ -1150,7 +1156,7 @@ Test categories:
 - message mode tests: simple/complex mode detection, whitespace significance, empty simple message
 - CST snapshot tests: SyntaxKind tree, token/trivia, and span snapshots generated from input
 - recovery tests: malformed input returns a root CST and useful diagnostics
-- semantic lowering tests: declarations, references, selectors, and variants link correctly to NodeId / Span
+- SemanticModel construction tests: declarations, references, selectors, and variants link correctly to NodeId / Span
 - data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
 - source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
 - batch parse tests: ParseInput metadata, SourceId, and diagnostic mapping remain stable
@@ -1181,6 +1187,7 @@ Phase 1 benchmark levels:
    - parse_cst
    - parse_cst_no_trivia
    - lower_semantic
+   - semantic_validation
    - owned_materialize
    - cst_view_traversal
    - diagnostics for malformed input
@@ -1211,10 +1218,11 @@ Reproducibility policy:
 - separate valid corpus, invalid corpus, and recovery-heavy corpus
 - separate `collect_trivia = true` and `collect_trivia = false`
 - separate `parse_semantic = false` and `parse_semantic = true`
+- separate `lower_semantic` from `semantic_validation`
 - state allocator conditions in benchmark reports
 - fix hyperfine warmup, minimum runs, setup command, working directory, and whether CLI startup is included
 
-Primary comparison with other parsers targets the closest available parse-only equivalent first. For ox-mf2, `parse_cst_no_trivia` and `parse_cst` are the parser-core baselines; `parse_message_owned` is reported when comparing public convenience APIs. Internal ox-mf2 micro/component benchmarks separate scanner, parser, semantic lowering, source mapping, owned materialization, and snapshot encode.
+Primary comparison with other parsers targets the closest available parse-only equivalent first. For ox-mf2, `parse_cst_no_trivia` and `parse_cst` are the parser-core baselines; `parse_message_owned` is reported when comparing public convenience APIs. Internal ox-mf2 micro/component benchmarks separate scanner, parser, SemanticModel construction (`lower_semantic`), semantic validation, source mapping, owned materialization, and snapshot encode.
 
 Relevant phase names:
 
@@ -1224,6 +1232,7 @@ parse_message_owned
 parse_cst
 parse_cst_no_trivia
 lower_semantic
+semantic_validation
 owned_materialize
 cst_view_traversal
 diagnostics
@@ -1242,13 +1251,15 @@ Phase meanings:
 - `parse_message_owned`: convenience `parse_message` path with fresh workspace setup and owned result construction. This is useful for API ergonomics and smoke comparisons, but it is not the pure parser-core baseline.
 - `parse_cst`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = true`.
 - `parse_cst_no_trivia`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = false`.
-- `lower_semantic`: parser-core plus `SemanticModel` lowering.
+- `lower_semantic`: parser-core plus `SemanticModel` construction. This benchmark name is kept for compatibility with existing harnesses, but it does not include parser-owned semantic validation diagnostics.
+- `semantic_validation`: `validate_semantics(model)` cost over an already-constructed `SemanticModel`.
 - `owned_materialize`: cost of converting the session/table output into an owned `ParseResult`.
 - `parse_batch_session`: one `SourceStore` and one reused `ParseWorkspace` over a corpus, returning borrowed session results.
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `allocations`: allocation count and bytes for a selected parse path.
+- `e2e_lint`: legacy broad benchmark alias. Canonical Phase 3 linter benchmark names are `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`.
 
-External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, semantic lowering, or CLI startup.
+External parser comparison primarily reports `parse_cst_no_trivia`, `parse_cst`, and `parse_message_owned` depending on what the compared parser exposes. The report must clearly state whether the number includes trivia collection, source registration, workspace reuse, owned materialization, diagnostics, SemanticModel construction, semantic validation, or CLI startup.
 
 ## Benchmark Corpus
 
@@ -1294,7 +1305,7 @@ Comparisons must state exactly what is being measured.
 
 - parser only
 - parser plus diagnostics
-- parser plus semantic lowering
+- parser plus SemanticModel construction
 - parser plus snapshot encoding
 - CLI startup included or excluded
 
@@ -1306,8 +1317,8 @@ Every performance change should answer these questions.
 - Does it increase CstTables memory traffic?
 - Does it make recovery worse?
 - Does it preserve trivia and source fidelity?
-- Does it move work from parser to semantic lowering? If yes, is that intentional?
+- Does it move work from parser to SemanticModel construction? If yes, is that intentional?
 - Does it improve parser-only numbers while making batch or formatter/linter usage worse?
 - Does it hide snapshot, binding, or CLI overhead inside parser timing?
 
-The desirable tradeoff is not always the fastest parser-only number. ox-mf2 is a toolchain foundation, so parser performance must preserve the data required by diagnostics, formatters, linters, semantic lowering, and Phase 2 Binary AST snapshot encoding.
+The desirable tradeoff is not always the fastest parser-only number. ox-mf2 is a toolchain foundation, so parser performance must preserve the data required by diagnostics, formatters, linters, SemanticModel construction, and Phase 2 Binary AST snapshot encoding.

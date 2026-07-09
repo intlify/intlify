@@ -4,13 +4,15 @@
 
 This document defines the Phase 2 language binding boundary for ox-mf2.
 
-Binary AST snapshot wire format, snapshot-producing APIs, decoder/accessor APIs, and snapshot ownership are defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). This document focuses on how N-API and WASM expose that snapshot-backed model without reimplementing MF2 semantics outside Rust.
+Binary AST snapshot wire format, snapshot-producing APIs, decoder/accessor APIs, and snapshot ownership are defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). This document focuses on how N-API and WASM expose that snapshot-backed parser model without reimplementing parser or snapshot behavior outside Rust.
 
 API error code ranges are defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). Bindings expose those codes through the unified `OxMf2ErrorCode` namespace while keeping parser diagnostics in the separate `DiagnosticCode` namespace.
 
 ## Basic Policy
 
-ox-mf2 uses the Rust core as the single semantic implementation. Bindings are ergonomic wrappers around the Rust parser, snapshot writer, decoder/accessor view, diagnostics, and later formatter/linter APIs.
+Phase 2 bindings are ergonomic wrappers around `ox_mf2_parser`: the Rust parser, CST tables, parser diagnostics, snapshot writer, and decoder/accessor view. They do not own formatter behavior, linter behavior, configurable lint rules, or parser-owned semantic validation semantics.
+
+Formatter and linter APIs are not added to the parser binding packages. Phase 3 product bindings are distributed through product-specific packages such as `@intlify/format-napi`, `@intlify/format-wasm`, `@intlify/lint-napi`, and `@intlify/lint-wasm`, as defined by the Phase 3 tooling designs.
 
 Bindings must not expose a nested JSON AST as the standard hot-path output. The standard public CST/AST view is a lazy accessor over the versioned Binary AST snapshot. Debug JSON may exist, but it is not the compatibility boundary.
 
@@ -22,6 +24,8 @@ Phase 2 provides two public runtime npm packages under the `@intlify` scope:
 
 - `@intlify/ox-mf2-napi`
 - `@intlify/ox-mf2-wasm`
+
+These packages are parser/snapshot packages. They expose parser-level APIs, Binary AST snapshot APIs, decoder/accessor views, and parser diagnostics. Formatter and linter APIs use the separate Phase 3 product packages instead of expanding this package surface.
 
 There is no `@intlify/ox-mf2` wrapper package in Phase 2. The N-API and WASM packages expose the same public TypeScript API as much as possible, but consumers choose the runtime-specific package explicitly.
 
@@ -61,7 +65,7 @@ Out-of-scope bindings include, but are not limited to:
 - Ruby
 - Java / Kotlin
 
-Future non-JavaScript bindings should be designed in separate documents. They should reuse the same Rust core and versioned Binary AST snapshot compatibility boundary, but their ABI shape, ownership model, error mapping, package format, threading model, and host-language accessor API are not defined here.
+Future non-JavaScript bindings should be designed in separate documents. They should reuse the Rust parser crate and versioned Binary AST snapshot compatibility boundary, but their ABI shape, ownership model, error mapping, package format, threading model, and host-language accessor API are not defined here.
 
 ## Crate Layout
 
@@ -74,7 +78,7 @@ crates/
   ox_mf2_wasm/      # wasm-bindgen binding crate
 ```
 
-Both binding crates depend on `ox_mf2_parser`. They must not duplicate parser grammar, snapshot encoding rules, semantic lowering, diagnostic code definitions, or snapshot validation logic.
+Both binding crates depend on `ox_mf2_parser`. They must not duplicate parser grammar, snapshot encoding rules, SemanticModel construction, parser-owned semantic validation, diagnostic code definitions, or snapshot validation logic.
 
 N-API uses `napi-rs`. WASM uses `wasm-bindgen`.
 
@@ -243,7 +247,7 @@ Input type and range errors use built-in JS errors:
 
 Bindings map `messageId` to Rust/snapshot `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset. JavaScript string UTF-16 position conversion is a binding/editor adapter responsibility and is not stored in snapshot node fields.
 
-Phase 2 bindings reject JavaScript strings that contain unpaired surrogates with `TypeError`. The Rust core path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
+Phase 2 bindings reject JavaScript strings that contain unpaired surrogates with `TypeError`. The Rust parser path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
 
 ## Result Object Boundary
 
@@ -386,7 +390,7 @@ Bindings may retain original source text on the caller side or in the binding re
 
 If the binding result keeps external source text, context-bound `source.sourceSlice(span)` may succeed even with `includeSourceText = false`. If the binding result does not keep source text and the snapshot has no source text data, `source.sourceSlice(span)` throws `OxMf2SourceTextError`.
 
-For `parseMessage` and `parseBatch`, bindings retain source text as binding-owned UTF-8 bytes. They do not keep only the original JS string and do not convert UTF-8 byte offsets to JS string indexes on every slice. This keeps `Span` slicing and byte-oriented location computation aligned with the Rust core and snapshot.
+For `parseMessage` and `parseBatch`, bindings retain source text as binding-owned UTF-8 bytes. They do not keep only the original JS string and do not convert UTF-8 byte offsets to JS string indexes on every slice. This keeps `Span` slicing and byte-oriented location computation aligned with the Rust parser crate and snapshot.
 
 Line-start tables are built lazily per source and cached on the binding-owned source text object. Parsing and snapshot creation do not eagerly build line indexes for every source. Diagnostics or future location helpers pay the line-index cost only when locations are read.
 
@@ -415,7 +419,7 @@ If `sources.length !== snapshot.sourceCount()`, `withSources` throws `OxMf2Sourc
 
 ## Source Location Boundary
 
-Binding `Span` and `SourceLocation` values use the same coordinate system as the Rust core and Binary AST snapshot. `Span.start`, `Span.end`, and `SourceLocation.column` are UTF-8 byte offsets. `SourceLocation.line` is one-based and `SourceLocation.column` is zero-based within the line.
+Binding `Span` and `SourceLocation` values use the same coordinate system as the Rust parser crate and Binary AST snapshot. `Span.start`, `Span.end`, and `SourceLocation.column` are UTF-8 byte offsets. `SourceLocation.line` is one-based and `SourceLocation.column` is zero-based within the line.
 
 Phase 2 bindings do not expose UTF-16 location helpers such as `source.locationUtf16(offset)` or `source.spanLocationUtf16(span)`. UTF-16 code unit columns are an LSP/editor/source-map adapter concern. Those adapters may add explicit UTF-16 helper APIs later, but the standard binding accessor surface remains byte-oriented.
 
@@ -518,7 +522,7 @@ Each dedicated error class sets `error.name` to the class name, such as `OxMf2Sn
 
 The binding boundary preserves error code, message, optional section kind, optional offset, and optional record index. Human-readable messages may be returned for developer ergonomics, but compact error codes are the base for programmatic handling.
 
-`OxMf2ErrorCode` follows the range policy in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). Binding-owned errors start at `10000` so future Rust core error domains can be added under `10000` without moving binding codes.
+`OxMf2ErrorCode` follows the range policy in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). Binding-owned errors start at `10000` so future Rust crate error domains can be added under `10000` without moving binding codes.
 
 Binding error class mapping:
 
@@ -546,6 +550,8 @@ OxMf2ErrorCode.InitializationWasmNotInitialized
 OxMf2ErrorCode.InitializationNativeBindingUnavailable
 OxMf2ErrorCode.BindingValidationInvalidOptions
 ```
+
+These numeric binding validation codes are parser/snapshot binding API errors. They are separate from Phase 3 product-level operational string codes such as formatter or linter `invalid_options`.
 
 The exact constant set is generated or hand-maintained from the Rust error code domains, but the public shape stays as a numeric const object plus `oxMf2ErrorCodeName(code)`.
 

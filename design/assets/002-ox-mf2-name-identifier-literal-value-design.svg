@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
   <title id="title">ox-mf2 Name Identifier Literal value design</title>
-  <desc id="desc">Phase 1 keeps raw source representation in the lossless CST, derives NameValue and LiteralValue lazily or during semantic lowering, and keeps StringRef and comparison keys linked back to source spans.</desc>
+  <desc id="desc">Phase 1 keeps raw source representation in the lossless CST, derives NameValue and LiteralValue lazily or during SemanticModel construction, and keeps StringRef and comparison keys linked back to source spans.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -12,12 +12,12 @@
       .bg { fill: none; }
       .frame { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; }
       .table { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
-      .lowering { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
+      .construction { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; }
       .semantic { fill: #faf5ff; stroke: #7e22ce; stroke-width: 1.5; }
       .boundary { fill: #f8fafc; stroke: #64748b; stroke-width: 1.5; }
       .row { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
       .row-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1.2; }
-      .lowering-item { fill: #ffffff; stroke: #d97706; stroke-width: 1.2; }
+      .construction-item { fill: #ffffff; stroke: #d97706; stroke-width: 1.2; }
       .semantic-item { fill: #ffffff; stroke: #a855f7; stroke-width: 1.2; }
       .note { fill: #ecfdf5; stroke: #0f766e; stroke-width: 1.2; }
       .diagnostic { fill: #fff1f2; stroke: #fb7185; stroke-width: 1.2; }
@@ -33,12 +33,12 @@
       @media (prefers-color-scheme: dark) {
         .frame { fill: #111827; stroke: #475569; }
         .table { fill: #1e293b; stroke: #64748b; }
-        .lowering { fill: #451a03; stroke: #f59e0b; }
+        .construction { fill: #451a03; stroke: #f59e0b; }
         .semantic { fill: #3b0764; stroke: #c084fc; }
         .boundary { fill: #1e293b; stroke: #64748b; }
         .row { fill: #1e293b; stroke: #475569; }
         .row-alt { fill: #263449; stroke: #475569; }
-        .lowering-item { fill: #78350f; stroke: #fbbf24; }
+        .construction-item { fill: #78350f; stroke: #fbbf24; }
         .semantic-item { fill: #581c87; stroke: #d8b4fe; }
         .note { fill: #0f766e; stroke: #5eead4; }
         .diagnostic { fill: #881337; stroke: #fda4af; }
@@ -90,23 +90,23 @@
   <text class="small" x="106" y="530">bidi marks / isolates</text>
   <text class="tiny" x="106" y="546">preserved in source slices</text>
 
-  <rect class="lowering" x="410" y="92" width="300" height="500" rx="8" />
+  <rect class="construction" x="410" y="92" width="300" height="500" rx="8" />
   <text class="label" x="560" y="128" text-anchor="middle">ValueExtractor</text>
-  <text class="caption" x="560" y="150" text-anchor="middle">Runs lazily or during semantic lowering.</text>
+  <text class="caption" x="560" y="150" text-anchor="middle">Runs lazily or during SemanticModel construction.</text>
 
-  <rect class="lowering-item" x="438" y="184" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="184" width="244" height="46" rx="6" />
   <text class="small" x="560" y="204" text-anchor="middle">strip syntax sigils</text>
   <text class="tiny" x="560" y="220" text-anchor="middle">$, :, #, / are not data names</text>
 
-  <rect class="lowering-item" x="438" y="246" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="246" width="244" height="46" rx="6" />
   <text class="small" x="560" y="266" text-anchor="middle">decode literal value</text>
   <text class="tiny" x="560" y="282" text-anchor="middle">quoted and unquoted can match</text>
 
-  <rect class="lowering-item" x="438" y="308" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="308" width="244" height="46" rx="6" />
   <text class="small" x="560" y="328" text-anchor="middle">skip bidi controls</text>
   <text class="tiny" x="560" y="344" text-anchor="middle">matching ignores boundary marks</text>
 
-  <rect class="lowering-item" x="438" y="370" width="244" height="46" rx="6" />
+  <rect class="construction-item" x="438" y="370" width="244" height="46" rx="6" />
   <text class="small" x="560" y="390" text-anchor="middle">compute comparison key</text>
   <text class="tiny" x="560" y="406" text-anchor="middle">NFC path, outside parse hot path</text>
 

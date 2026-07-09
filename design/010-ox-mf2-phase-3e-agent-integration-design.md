@@ -7,10 +7,10 @@ The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport
 ## Goals
 
 - Let agent coding tools use ox-mf2 parser, formatter, linter, and snapshot workflows without depending on editor-specific APIs.
-- Treat the `ox-mf2` CLI and stable machine-readable output as the first agent-facing integration surface.
+- Treat the `intlify` CLI and stable machine-readable output as the first agent-facing integration surface.
 - Keep agent plugins, skills, commands, hooks, MCP servers, and ACP clients as wrappers around the shared core contracts.
 - Make diagnostics, formatting results, config errors, and operational errors easy for agents to parse and summarize.
-- Preserve one source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, and semantic analysis.
+- Preserve one source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, parser-owned semantic validation, and linter result contracts.
 
 ## Non-Goals
 
@@ -31,7 +31,11 @@ Agents can run:
 - `intlify fmt` to apply formatting when the task explicitly allows edits
 - future `intlify` check commands when formatter and linter workflows are composed
 
-Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic categories, rule ids, severities, and suggested follow-up actions.
+Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic `category`, diagnostic `code`, and `severity`. For configurable lint diagnostics, `code` is the rule id. Suggested follow-up actions are agent-derived helper output built from diagnostics, rule documentation, and workflow context; the initial formatter and linter core contracts do not expose a fix or suggestion API.
+
+Lint result contracts, diagnostic codes, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
+
+Agent integrations should use [linter-rules/index.md](./linter-rules/index.md) as the rule documentation entry point when they need rule descriptions, docs slugs, or user-facing remediation context. They may summarize or link those docs for a specific environment, but they should not invent a separate rule catalog.
 
 ## Integration Shapes
 
@@ -44,15 +48,15 @@ Agent integrations may be distributed in several forms:
 - agent plugins that bundle skills, commands, hooks, MCP config, or documentation
 - headless scripts for CI, review, release, and migration workflows
 
-These integration shapes should call shared CLI, Rust, N-API, WASM, or future MCP APIs. They should not implement separate MF2 parsing, semantic lowering, formatting, or linting logic.
+These integration shapes should call shared CLI, Rust, N-API, WASM, or future MCP APIs. They should not implement separate MF2 parsing, SemanticModel construction, parser-owned semantic validation, formatting, or linting logic.
 
 ## Open Questions
 
 - Which CLI JSON output fields are required for reliable agent consumption across lint, format-check, and combined check workflows?
-- Should `ox-mf2` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
+- Should `intlify` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
 - Which integration shape should be implemented first after the CLI: repo instructions, agent skill, MCP server, or plugin bundle?
 - Should an MCP server expose high-level tools such as `lint_file` and `format_file`, or lower-level tools such as `parse_message`, `lint_message`, and `format_message`?
-- How should agent integrations report operational errors separately from parser, semantic, formatter, and linter diagnostics?
+- How should agent integrations summarize and present existing JSON envelope `errors[]` separately from parser, semantic, formatter, and linter diagnostics without redefining their schemas?
 - How should agent hooks avoid modifying files unexpectedly when the user's agent workflow is read-only or review-only?
 - Should agent integrations support resource/catalog-aware workflows before the formatter and linter core own those layers?
 - How should Codex, Claude Code, Grok Build, and future agent plugin formats be documented without making one vendor's format canonical?

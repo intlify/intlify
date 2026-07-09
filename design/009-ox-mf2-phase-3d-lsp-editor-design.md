@@ -6,7 +6,7 @@ The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport
 
 ## Goals
 
-- Reuse the parser, formatter, linter, `SnapshotView`, and `SemanticView` without making the core crates depend on LSP protocol types.
+- Reuse the parser, formatter, linter, `SnapshotView`, and future `SemanticView` without making the core crates depend on LSP protocol types.
 - Support diagnostics and formatting for standalone `.mf2` files.
 - Support diagnostics and formatting for MF2 messages embedded in JSON/YAML resource or catalog files through adapter-owned extraction and mapping.
 - Convert core UTF-8 byte spans into editor-facing UTF-16 positions at the adapter boundary.
@@ -38,16 +38,18 @@ Host document parsing, string escaping, decoded-to-raw offset mapping, and outer
 
 Editor diagnostics should be produced from the shared diagnostic result contract used by parser, semantic, and linter workflows.
 
-The preferred path is to use `lintMessage` or `lintSnapshot` as the diagnostic source for editor publication because those results already include parser, semantic, and lint diagnostics. If an adapter composes diagnostics manually from cached parser, semantic, and linter results, it must avoid publishing duplicate parser diagnostics.
+The preferred initial path is to use source-backed `lintMessage` as the diagnostic source for editor publication because it already includes parser, semantic, and lint diagnostics. A future `lintSnapshot` path is an optimization for parse-artifact reuse after the parser owns a snapshot-to-`SemanticModel` path. If an adapter composes diagnostics manually from cached parser, semantic, and linter results, that composition is an internal optimization only and must preserve the same ordering, category/code/severity values, and de-duplication behavior as `lintMessage`.
+
+The editor adapter consumes the linter result contract from [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic catalog and ordering details remain owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Rule-facing documentation and rule ids are indexed from [linter-rules/index.md](./linter-rules/index.md). Editor integrations should not redefine diagnostic meaning, rule metadata, or semantic validation behavior.
 
 The initial editor workflow follows the same strict pipeline as CLI and bindings:
 
 - parser diagnostics are always reported
-- semantic diagnostics are reported only when parsing provides enough structure for semantic lowering
-- lint diagnostics are reported only when parsing and semantic lowering succeed
-- parse failure prevents linter rule execution
+- semantic diagnostics are reported only when parsing has no parser diagnostics and semantic validation runs
+- lint diagnostics are reported only when parser and semantic diagnostics are clean
+- parser diagnostics prevent semantic validation and linter rule execution
 
-Editor layers may add protocol-specific advice later, but the core linter initially emits only `error` and `warning` severities.
+Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at the adapter boundary; adapters convert `"warn"` to the editor's warning severity. Editor layers may add protocol-specific advice later, but the core linter does not emit `info` or `hint` diagnostics initially.
 
 ## Formatting Edits
 
@@ -69,7 +71,7 @@ Configuration loading failures are operational editor errors. They should not be
 
 ## Artifact Cache and Invalidation
 
-Editor adapters may cache source views, decoded snapshots, semantic views, and diagnostics per document version.
+Editor adapters may cache source views, decoded snapshots, diagnostics, and future semantic views per document version once semantic APIs are exposed.
 
 Cached artifacts must be invalidated when the document changes. Configuration changes may also invalidate formatter, linter, semantic, or diagnostic artifacts depending on which options changed.
 
@@ -79,15 +81,16 @@ Detailed cache ownership, eviction, and invalidation policy belongs to the LSP/e
 
 The initial workflow does not require code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, or minimal-diff formatting.
 
-Future editor features should build on stable core concepts rather than adding LSP-specific state to parser, formatter, or linter crates. Quick fixes can use stable linter rule ids and formatter output. Semantic features should build on `SemanticView`.
+Future editor features should build on stable core concepts rather than adding LSP-specific state to parser, formatter, or linter crates. Quick fixes are a future adapter-owned feature. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Semantic features should build on future `SemanticView` exposure.
 
 ## Open Questions
 
 - What exact mapping data structure should represent a standalone `.mf2` document versus a JSON/YAML resource entry?
 - For JSON/YAML resources, how should adapters model raw host value ranges, decoded MF2 message text, decoded-to-raw offset mapping, and string re-escaping?
 - Should a shared resource adapter crate/package own JSON/YAML parsing and mapping, or should each editor integration implement that layer independently?
-- Should editor diagnostics always use `lintMessage` / `lintSnapshot` as the single diagnostic source, or should adapters be allowed to compose parser, semantic, and linter diagnostics manually when they can guarantee de-duplication?
-- What stable key should identify diagnostics across document updates: source span, diagnostic code/rule id, resource key, or a combined identity?
+- Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
+- Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
+- What stable key should identify diagnostics across document updates: source span, diagnostic code, resource key, or a combined identity?
 - What exact document version checks are required before returning formatting `TextEdit` values?
 - When a format request uses stale parse artifacts or stale message mapping, should the adapter silently no-op or report an operational editor error?
 - Should editor formatting initially replace the whole containing message range, or should the adapter compute the smallest practical `TextEdit` even though minimal-diff formatting is outside the formatter core?

@@ -8,11 +8,11 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 
 ## Design Overview
 
-- Make the Rust core the single semantic implementation.
+- Make Rust crates the single source of truth for MF2 behavior across parser, formatter, and linter products.
 - In Phase 1, build a recovering, lossless, snapshot-friendly parser foundation.
 - In Phase 2, make a versioned Binary AST snapshot the standard boundary for the public CST/AST view.
 - Treat N-API and WASM as the primary language binding targets.
-- Keep SemanticView separate from the lossless Binary AST snapshot and link it to NodeId / Span.
+- Keep future SemanticView exposure separate from the lossless Binary AST snapshot and link semantic facts to NodeId / Span.
 - Treat the Unicode WG interchange data model as an on-demand compatibility surface, not as a Phase 1 or Phase 2 deliverable.
 - Reserve MessagePack for future LSP/editor transport, not as an AST representation.
 - The Rust parser / AST / performance details for Phase 1 live in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
@@ -34,7 +34,7 @@ The parser is central, but the goal is not merely to build the fastest standalon
 
 ox-mf2 may reuse some crates provided by oxc. This is not only about crate reuse. ox-mf2 also explicitly inherits oxc's high-performance design philosophy: phase separation, data-oriented tables, allocation control, and benchmark-driven design.
 
-- phase separation: make lexer, parse, semantic lowering, diagnostics, formatting, and linting individually measurable.
+- phase separation: make lexer, parse, SemanticModel construction, diagnostics, formatting, and linting individually measurable.
 - data-oriented tables: avoid relying only on pointer traversal, and use NodeId plus flat indexed tables to make downstream work fast.
 - stable identifiers: allow AST/CST nodes, tokens, and sources to be referenced by IDs.
 - allocation control: avoid unnecessary heap allocation during the parse phase.
@@ -44,9 +44,9 @@ However, ox-mf2 does not adopt the same arena typed AST model as oxc. MF2 has a 
 
 ### Make the Core Extensible Into a Toolchain
 
-Existing dedicated parser toolchains show that it is effective to put the parser, CST/AST, semantic analysis, and diagnostics in the core, and place CLI, LSP, formatter, linter, and external toolchain integrations around it as adapters.
+Existing dedicated parser toolchains show that it is effective to put parser, CST/AST, parser diagnostics, `SemanticModel` construction, and parser-owned semantic validation in the parser core, then place CLI, LSP, formatter, linter, and external toolchain integrations around it as product crates or adapters.
 
-ox-mf2 follows the same direction. It puts the MF2-specific parser, CST, semantic model, and diagnostics in the core, while external toolchain integrations are designed as adapters. This keeps the core focused on MF2 while allowing extension to Node bindings, CLI, LSP, and various linter integrations.
+ox-mf2 follows the same direction. It puts the MF2-specific parser, CST, SemanticModel construction, parser diagnostics, and parser-owned semantic validation in `ox_mf2_parser`, while configurable lint rules, formatter behavior, CLI routing, and external toolchain integrations live in product crates or adapters. This keeps the parser core focused on MF2 while allowing extension to Node bindings, CLI, LSP, and various linter integrations.
 
 ### Binary AST Is Not the Initial Internal Representation
 
@@ -80,7 +80,7 @@ The formatter primarily uses CST, tokens, and trivia. The linter and compiler pr
 
 Adopt a `recovering parser`.
 
-Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. If a fatal gap exists, the SemanticModel may be partially generated or not generated at all.
+Even when syntax errors are found, the parser builds as much CST as possible and returns diagnostics. Downstream tooling that requires SemanticModel construction or parser-owned semantic validation must skip that work when parser diagnostics exist. Fatal gaps where even the root node cannot be built are API errors rather than partial semantic results.
 
 The Phase 1 result shape, recovery behavior, and diagnostic cost model are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
@@ -90,11 +90,11 @@ The Phase 1 result shape, recovery behavior, and diagnostic cost model are defin
 
 Adopt `flat indexed tables`.
 
-Core identifiers use stable `u32` indexes, and spans use UTF-8 byte offsets. The same identifier model is shared by construction-time CST tables, future Binary AST snapshots, SemanticView, diagnostics, formatters, linters, and language bindings.
+Core identifiers use stable `u32` indexes, and spans use UTF-8 byte offsets. The same identifier model is shared by construction-time CST tables, future Binary AST snapshots, diagnostics, formatters, linters, language bindings, and future SemanticView exposure.
 
 Linters, formatters, and compilers do not depend directly on typed node structs. They read through NodeId and accessors.
 
-Internal tables are snapshot-friendly. ox-mf2 avoids building a public typed AST first and then recursively converting it to Binary AST. Instead, the parser and lowering phase generate table-oriented records so that SnapshotWriter can emit nodes, edges, tokens, trivia, inline span fields, strings, and diagnostics in a linear pass.
+Internal tables are snapshot-friendly. ox-mf2 avoids building a public typed AST first and then recursively converting it to Binary AST. Instead, the parser and SemanticModel construction paths generate table-oriented records so that SnapshotWriter can emit nodes, edges, tokens, trivia, inline span fields, strings, and diagnostics in a linear pass.
 
 Phase 1 Rust tools may directly use construction-time flat indexed tables. From Phase 2 onward, the Binary AST decoder/accessor view shared by Rust, N-API, WASM, and other consumers becomes the canonical public AST view. This aligns the public AST surface across languages while allowing the parser to use efficient internal construction tables.
 
@@ -111,19 +111,21 @@ From Phase 2 onward, the formatter's public AST input is the Binary AST decoder/
 A future formatter should support at least two modes.
 
 - preserve mode: preserve the original representation as much as possible.
-- canonical mode: format to the standard ox-mf2 style.
+- standard mode: format to the standard ox-mf2 style.
 
 ### Linter
 
 Adopt `diagnostics foundation`.
 
-The initial MVP does not need to implement many lint rules. However, the diagnostic model is designed early so that parser errors and lint diagnostics can share the same foundation.
+The initial Phase 3C linter is intentionally small, but it is not empty. It integrates parser diagnostics, parser-owned core semantic diagnostics, and the initial built-in configurable lint rules documented in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) and [linter-rules/index.md](./linter-rules/index.md).
 
-From Phase 2 onward, the linter's public AST input is the Binary AST decoder/accessor view. Rule implementations may use Rust-internal semantic fast paths, but rule-facing / binding-facing traversal should converge on the same public Binary AST view whenever practical.
+The initial Phase 3C linter API is source-backed: `lintMessage(source, options)` parses, performs semantic validation, and runs enabled rules over one MF2 message. Initial built-in rules run through a Rust-internal `RuleContext` over CST access and parser-owned `SemanticModel` facts. The Binary AST decoder/accessor view remains the shared syntax foundation, and future SemanticView exposure remains the semantic foundation for bindings, editors, and future snapshot-backed linting. Snapshot-backed linting is deferred until the parser owns a snapshot-to-`SemanticModel` path.
 
 Core diagnostics use SourceId and UTF-8 byte Span as the canonical location model. Labels also have byte spans. CLI, LSP, and editor integration are responsible for converting spans to line/column or UTF-16 positions through SourceStore.
 
-The concrete diagnostic shape and success-path cost constraints are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
+Diagnostic ownership is split by source of truth. Parser diagnostics and parser-owned semantic diagnostics live in `ox_mf2_parser`; configurable lint rule diagnostics live in `intlify_lint`; reporter shaping and JSON envelopes belong to the CLI, binding, or lint result layer. These layers share the same location model and JSON-visible diagnostic code contract, but they do not redefine each other's detection semantics.
+
+Parser diagnostics, SemanticModel foundations, and success-path parser cost constraints are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Parser-owned semantic diagnostics are defined in [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Linter result shape, rule diagnostics, reporter behavior, and binding contracts are defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 ### SemanticModel / SemanticView
 
@@ -133,7 +135,7 @@ Adopt a `shared semantic model`.
 
 This is not a low-level IR immediately before runtime execution. It is a semantic information model shared by the linter, compiler, and validation.
 
-From Phase 2 onward, the public semantic surface is SemanticView, and semantic facts are linked to Binary AST NodeId and Span. Semantic information is not forced into the initial Binary AST snapshot. Binary AST handles the lossless CST surface, while SemanticView handles semantic facts such as declarations, references, selectors, variants, fallback/default information, duplicate keys, and coverage metadata.
+SemanticView is the planned public semantic surface once semantic APIs are exposed. Phase 2 bindings do not expose SemanticView yet; they expose the Binary AST syntax snapshot and parser diagnostics only. Semantic facts are linked to Binary AST NodeId and Span. Semantic information is not forced into the initial Binary AST snapshot. Binary AST handles the lossless CST surface, while SemanticView handles semantic facts such as declarations, references, selectors, variants, and fallback/default information.
 
 Candidate contents:
 
@@ -144,9 +146,8 @@ Candidate contents:
 - selector list
 - variant matrix
 - fallback/default variant
-- duplicate key set
-- reachability / coverage metadata
 - source span mapping
+- future duplicate key or coverage metadata if those facts become part of the shared semantic surface
 
 ### Unicode WG Interchange Data Model
 
@@ -164,11 +165,11 @@ This keeps the hot parser and binding path compact while preserving a clear path
 
 ![ox-mf2 language binding architecture](./assets/001-ox-mf2-language-binding.svg)
 
-Adopt `Rust core as the single semantic implementation`.
+Adopt `Rust crates as the single MF2 behavior implementation`.
 
-ox-mf2 does not reimplement MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, or linting per target language. The Rust core is the only implementation of MF2 semantics, and each language binding is a thin ergonomic wrapper around that core.
+ox-mf2 does not reimplement MF2 behavior per target language. `ox_mf2_parser` owns MF2 parsing, CST construction, parser diagnostics, `SemanticModel` construction, and parser-owned semantic validation. Phase 3 product crates own product behavior: `intlify_format` owns formatter modes, layout, rendering, and formatter configuration; `intlify_lint` owns configurable lint rule execution, presets, lint configuration, and result shaping.
 
-N-API, WASM, C ABI, and other language bindings are not required in the initial MVP. However, the Rust core external API is designed to be binding-friendly from the beginning.
+N-API, WASM, C ABI, and other language bindings are not required in the initial MVP. However, the Rust crate APIs are designed to be binding-friendly from the beginning.
 
 Binding implementation priority:
 
@@ -176,13 +177,13 @@ Binding implementation priority:
 2. WASM binding: the portable target for browsers, playgrounds, editor extensions, and edge runtime integration
 3. C ABI binding design: the foundation for future Go, Swift, C#, Zig, Python FFI, and broader native language integration
 
-Rust internal types are not directly exposed to other languages. Boundary types such as Binary AST decoder/accessor views, DiagnosticView, and encoded snapshot views are allowed.
+Rust internal types are not directly exposed to other languages. Boundary types such as Binary AST decoder/accessor views, DiagnosticView, formatter results, lint results, and encoded snapshot views are allowed.
 
-The binding layer is an ergonomic surface, not a place to duplicate MF2 semantics. JS, WASM, C ABI, Go, Swift, C#, and other consumers call the same Rust core and receive stable views, handles, diagnostics, formatted text, and encoded snapshots.
+The binding layer is an ergonomic surface, not a place to duplicate MF2 behavior. JS, WASM, C ABI, Go, Swift, C#, and other consumers call the owning Rust crate for each product and receive stable views, handles, diagnostics, formatted text, lint results, or encoded snapshots as appropriate for that product boundary.
 
 When returning full CST/AST output across a language boundary, the canonical Phase 2 product boundary is a versioned Binary AST snapshot, not a nested JSON AST. Debug JSON and compatibility JSON may exist, but they are not the standard hot-path representation.
 
-The Phase 2 Binary AST snapshot focuses on the lossless CST surface. Semantic information is exposed separately as SemanticView or a later semantic snapshot. N-API and WASM bindings return result objects with lazy decoder/accessors rather than eagerly materialized object trees. Raw snapshot bytes are not included in the default result; they are available only through explicit advanced/debug/transport APIs.
+The Phase 2 Binary AST snapshot focuses on the lossless CST surface. Semantic information can be exposed later as SemanticView or a later semantic snapshot; Phase 2 bindings expose syntax snapshots and parser diagnostics only. N-API and WASM bindings return result objects with lazy decoder/accessors rather than eagerly materialized object trees. Raw snapshot bytes are not included in the default result; they are available only through explicit advanced/debug/transport APIs.
 
 MessagePack is not the CST/AST representation of ox-mf2. It is reserved as a future transport for long-lived language-service workflows such as LSP, editor integration, daemon mode, and repeated semantic queries.
 
@@ -198,13 +199,13 @@ MF2 workloads often contain many messages in one file, one locale set, or one pr
 
 The Phase 1 parser APIs, SourceStore contract, ParseInput metadata, ParseOptions defaults, and result types are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Snapshot-producing APIs are defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md).
 
-### Suppression / Directive Comments
+### Suppression Model
 
 Adopt `diagnostic suppression boundary only`.
 
-At the initial stage, ox-mf2 does not fix a concrete directive comment syntax inside MF2. However, the diagnostic pipeline has a boundary where diagnostics can be suppressed.
+At the initial stage, ox-mf2 does not define inline directive comments inside MF2. MF2 has no line or block comments, so comment-style disable directives would be a syntax extension rather than a parser or linter foundation feature.
 
-Suppression is treated as a diagnostic-layer concern, not a parser syntax policy. The concrete suppression data shape can be defined when linter and language-service workflows enter the implementation phase.
+Suppression is treated as a diagnostic-layer concern, not a parser syntax policy. Future suppression must be spec-compatible, such as baseline suppression files or resource/container-level metadata owned by a host format adapter. The linter product design tracks the future suppression model in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 ### Benchmark
 
@@ -217,6 +218,7 @@ Target phases:
 - lexer
 - parse_cst
 - lower_semantic
+- semantic_validation
 - diagnostics
 - encode_snapshot
 - decode_snapshot
@@ -225,36 +227,31 @@ Target phases:
 - binding_call
 - parse_batch_to_snapshot
 - format_preserve
-- format_canonical
+- format_standard
 - e2e_parse
 - e2e_lint
+
+`lower_semantic` is kept as a compatibility benchmark phase name and means SemanticModel construction, not parser-owned semantic validation. `e2e_lint` is kept as a broad legacy benchmark alias. Canonical Phase 3 linter benchmark names are defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md) and [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
 ### Crate Structure
 
-Adopt `core split minimal`.
+Adopt `parser core plus product crates`.
 
-Initial candidates:
+The parser crate is the MF2 foundation crate. Formatter, linter, and CLI behavior live in separate workspace-internal product crates so each product can own its configuration, result shaping, fixtures, and release boundary without duplicating parser behavior.
 
 ```text
 crates/
-  ox_mf2_syntax        # lexer, token, CST, parser, recovery
-  ox_mf2_semantic      # semantic model, symbol/reference/selector/variant analysis
-  ox_mf2_diagnostics   # Diagnostic, Severity, Label, suppression boundary
-  ox_mf2               # facade API
+  ox_mf2_parser     # parser, CST, parser diagnostics, snapshots, SemanticModel,
+                    # and parser-owned semantic validation
+  intlify_cli       # native intlify command shell and subcommand routing
+  intlify_format    # formatter engine, formatter config, layout, and rendering
+  intlify_lint      # linter engine, configurable rule execution, presets,
+                    # lint config, rule registry, and result shaping
 ```
 
-Future candidates:
-
-```text
-ox_mf2_linter
-ox_mf2_formatter
-ox_mf2_codegen
-intlify_cli
-ox_mf2_napi
-ox_mf2_wasm
-```
+The product crates depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal product crates do not imply crates.io publishing.
 
 ### Spec Tracking
 
@@ -357,7 +354,7 @@ The second phase adds the cross-language product boundary.
 - N-API binding with lazy decoder/accessor API
 - WASM binding with portable decoder/accessor API
 - first-class parseBatch API with shared snapshot buffer and shared string table
-- semantic model exposed separately as SemanticView or a future semantic snapshot
+- semantic model can be exposed later as SemanticView or a future semantic snapshot
 - C ABI design preparation without requiring a stable C ABI implementation
 - snapshot encoding / decoding / binding benchmarks
 
@@ -379,7 +376,7 @@ The initial stage does not implement the following.
 - Binary AST-first internal representation in Phase 1
 - Unicode WG data model import/export API unless a compatibility surface is required
 - full linter ruleset
-- canonical formatter
+- standard formatter
 - N-API / WASM binding
 - MessagePack transport
 - complete Intl.MessageFormat runtime

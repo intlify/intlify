@@ -25,11 +25,13 @@ This document is organized in implementation order.
 
 ## Basic Policy
 
-ox-mf2 uses the Rust core as the single semantic implementation. MF2 parsing, CST construction, semantic analysis, diagnostics, formatting, and linting are not reimplemented in other languages.
+ox-mf2 uses Rust crates as the single implementation of MF2 behavior. `ox_mf2_parser` owns MF2 parsing, CST construction, parser diagnostics, SemanticModel construction, and parser-owned semantic validation. Phase 3 product crates own formatter and linter behavior. These behaviors are not reimplemented in other languages.
 
 Phase 1 builds a recovering parser and snapshot-friendly construction-time tables. Phase 2 introduces a versioned Binary AST snapshot as the product boundary for cross-language CST/AST views, persistence, worker transfer, and batch transfer.
 
-The Rust core hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust core parse output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
+The Rust parser hot path keeps `CstTables` / `CstView` / `SemanticModel`. Binary AST snapshot is not the normal Rust parser output. It is an encoded representation derived from `CstTables` for language boundaries, persistence, worker transfer, and batch transfer.
+
+The snapshot is a cross-language syntax view and transport artifact. It does not become the owner of semantic validation, formatter rules, or linter rules; those remain in the parser or Phase 3 product crates.
 
 This design avoids the following path.
 
@@ -42,7 +44,7 @@ public typed AST
 The intended path is as follows.
 
 ```text
-parser / lowering
+parser construction tables
   -> snapshot-friendly construction tables
   -> SnapshotWriter
   -> versioned Binary AST snapshot
@@ -284,6 +286,8 @@ Decoders treat a missing optional section as an empty section for traversal coun
 
 Section presence for empty `Trivia` and `Diagnostics` is the v0.1 capability proof required by the Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)). A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot.
 
+Future snapshot-backed linting also requires verifiable parser diagnostic capability. It additionally requires a parser-owned snapshot-to-`SemanticModel` path before `lintSnapshot` can be supported. Per the changelog update rule, any new snapshot capability required for linting must land together with snapshot versioning, writer, decoder, and fixture updates in the PR that introduces snapshot-backed linter behavior.
+
 Empty emitted sections still receive an aligned `offset`. The `offset` represents the section start and must satisfy `offset <= snapshot.len()` and the normal alignment rule even when `byte_len = 0`. Optional sections that are disabled by writer options are omitted instead of being represented with `byte_len = 0`.
 
 ### Explicit Wire Encoding
@@ -354,7 +358,7 @@ Persistent caches that store snapshot bytes must include at least the snapshot f
 
 ### Format Overview
 
-Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust core parse output, and it is not a second semantic implementation.
+Binary AST snapshot is the canonical Phase 2 cross-language CST/AST product boundary and persistence format. It does not replace the normal Rust parser output, and it is not a second semantic implementation.
 
 ![ox-mf2 Binary AST snapshot format layout](./assets/003-ox-mf2-binary-ast-format-layout.svg)
 
@@ -370,7 +374,7 @@ Phase 2 snapshot focuses on the lossless CST surface.
 - diagnostics
 - roots section / RootRecord entry points
 
-The semantic model remains available inside Rust and is exposed separately as SemanticView or a later compact semantic snapshot.
+The semantic model remains available inside Rust and can be exposed later as SemanticView or a later compact semantic snapshot. Phase 2 snapshots stay focused on the lossless CST surface.
 
 Source metadata is a core section. Source text bytes are an optional `source text data` section. The snapshot does not have a separate spans section; NodeRecord, TokenRecord, TriviaRecord, and DiagnosticRecord hold `span_start` / `span_end` inline. With `include_source_text = false`, the decoder cannot resolve `source_slice(source_id, span)` from the snapshot alone. In that case, the decoder/accessor uses external source text retained by the source owner or reports source text unavailable.
 
@@ -955,7 +959,7 @@ Once eager validation succeeds, accessors read records from `bytes + SectionInde
 
 `SnapshotViewOwned` owns snapshot bytes as `Arc<[u8]>`. Long-lived caches, daemons, language bindings, LSP, and worker handoff use owned views when accessors may outlive the original buffer owner.
 
-`Arc<[u8]>` is the v0.1 owned backing storage. It gives cheap immutable clones, can be shared across threads, and avoids adding a bytes/buffer dependency to the Rust core. Single-owner storage such as `Box<[u8]>` may be used internally before ownership is promoted, but the public owned view stores `Arc<[u8]>`.
+`Arc<[u8]>` is the v0.1 owned backing storage. It gives cheap immutable clones, can be shared across threads, and avoids adding a bytes/buffer dependency to the parser crate. Single-owner storage such as `Box<[u8]>` may be used internally before ownership is promoted, but the public owned view stores `Arc<[u8]>`.
 
 Accessors do not expand snapshot bytes into a recursive object tree. They slice the snapshot buffer and return values only when consumers read nodes, tokens, strings, or diagnostics.
 
@@ -1117,6 +1121,7 @@ Relevant benchmark phases:
 - parse_cst
 - parse_cst_no_trivia
 - lower_semantic
+- semantic_validation
 - owned_materialize
 - diagnostics
 - source_mapping
@@ -1138,7 +1143,8 @@ Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot
 - `parse_message_owned`: convenience `parse_message` path, including fresh workspace setup and owned `ParseResult` materialization.
 - `parse_cst`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = true`.
 - `parse_cst_no_trivia`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = false`.
-- `lower_semantic`: parser-core cost plus `SemanticModel` lowering.
+- `lower_semantic`: parser-core cost plus `SemanticModel` construction. It does not include parser-owned semantic validation diagnostics.
+- `semantic_validation`: `validate_semantics(model)` cost over an already-constructed `SemanticModel`.
 - `owned_materialize`: cost to create an owned `ParseResult` from borrowed session / table output.
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
 - `parse_cst_and_encode_snapshot`: combined parse + snapshot encode cost for one message. This is a product-path measurement and must not be used as the parser-core baseline.

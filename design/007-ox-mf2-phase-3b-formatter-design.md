@@ -12,7 +12,7 @@ The formatter should provide a deterministic ox-mf2 style while keeping the publ
 
 Primary goals:
 
-- format MF2 messages through a workspace-internal Rust core crate named `intlify_format`
+- format MF2 messages through a workspace-internal Rust formatter crate named `intlify_format`
 - expose a dedicated `intlify fmt` CLI backed by the same core
 - expose the formatter through `@intlify/format-napi` and `@intlify/format-wasm` without duplicating formatting logic
 - use Binary AST `SnapshotView` / binding-side snapshot accessors as the stable public syntax view
@@ -234,6 +234,7 @@ Formatter also reuses Phase 3A common codes:
 | Code | Kind | Exit | When |
 | --- | --- | --- | --- |
 | `invalid_cli_argument` | `input` | `2` | Invalid CLI values or combinations, such as `--mode compact`, `--list-different --reporter json`, or an invalid input glob. |
+| `invalid_input` | `input` | `2` | Raw external binding or programmatic API input shape is invalid before typed formatter input can be constructed, such as a non-string `source` or non-`Uint8Array` snapshot argument. |
 | `missing_cli_option_value` | `input` | `2` | A value-taking CLI option such as `--mode`, `--stdin-filepath`, `--ignore-path`, or `--reporter` is missing its value. |
 | `duplicate_cli_option` | `input` | `2` | A non-repeatable CLI option is provided more than once. |
 | `reporter_not_supported` | `reporter` | `2` | `--reporter` is provided with a value outside `text` or `json`. |
@@ -299,7 +300,7 @@ Standardized `details` fields:
   }
   ```
 
-  JavaScript binding calls use `invalid_options` for invalid argument shape or option values, including `null` options, unknown option fields, non-string `source`, non-`Uint8Array` snapshot input, and invalid `mode`. The typed Rust `FormatOptions` API should not allow invalid option states; raw external input is validated before constructing typed options.
+  JavaScript binding calls use `invalid_options` for invalid formatter option shape or option values, including `null` options, unknown option fields, and invalid `mode`. The typed Rust `FormatOptions` API should not allow invalid option states; raw external option input is validated before constructing typed options. Raw binding input shape that is not formatter options, such as non-string `source` or non-`Uint8Array` snapshot arguments, uses the shared `invalid_input` code.
 
 - `invalid_cli_argument` for `--list-different --reporter json`:
 
@@ -333,7 +334,7 @@ Standardized `details` fields:
 
   Initial reason values are `corrupt`, `unsupported_version`, `missing_capability`, and `unknown`.
 
-  `invalid_snapshot` is used after the public binding argument shape has been accepted as snapshot bytes. Non-`Uint8Array` snapshot arguments use `invalid_options`.
+  `invalid_snapshot` is used after the public binding argument shape has been accepted as snapshot bytes. Non-`Uint8Array` snapshot arguments use the shared `invalid_input` code.
 
 - `input_read_failed` and `output_write_failed`:
 
@@ -546,7 +547,7 @@ JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON 
 
 `schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
 
-The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field.
+The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field. Diagnostic entries use the shared diagnostic JSON shape defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 `summary.status` follows the Phase 3A status contract:
 
@@ -715,7 +716,7 @@ Default `mode` is `standard`.
 
 For N-API and WASM, omitted `options` uses the default options. `null` options are invalid. Unknown option fields are invalid to catch typos; `details.pointer` points at the unknown field, `details.reason` is `"unknown_field"`, and `details.allowedFields` may include `["mode"]`.
 
-The Rust API accepts typed `FormatOptions` and should not expose invalid runtime option states. Conversion from raw external inputs, such as N-API values, WASM values, CLI strings, or config data, validates before constructing typed formatter options. Invalid CLI and config input use their CLI/config error codes; invalid programmatic binding options use `invalid_options`.
+The Rust API accepts typed `FormatOptions` and should not expose invalid runtime option states. Conversion from raw external inputs, such as N-API values, WASM values, CLI strings, or config data, validates before constructing typed formatter options. Invalid CLI and config input use their CLI/config error codes; invalid programmatic binding input shape uses `invalid_input`, and invalid programmatic binding options use `invalid_options`.
 
 Options deferred until fixtures prove a need:
 
