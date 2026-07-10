@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">Document IR structure</title>
-<desc id="desc">Document IR is lowered from normalized MF2 Layout IR into MF2-agnostic rendering primitives. It separates generated text, verified source slices, line primitives, structure primitives, and fixed group modes before deterministic rendering.</desc>
+<desc id="desc">Document IR is lowered from normalized MF2 Layout IR into MF2-agnostic rendering primitives. The renderer returns unframed message text, while optional CLI file framing appends one final line feed outside the message API.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -102,19 +102,26 @@
 <path d="M 620 506 L 734 506" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
 <path d="M 835 554 L 835 604" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
 
-<rect x="1020" y="164" width="230" height="350" rx="12" class="panel" stroke-width="2"/>
+<rect x="1020" y="124" width="230" height="600" rx="12" class="panel" stroke-width="2"/>
 <text x="1135" y="202" font-size="16" font-weight="700" text-anchor="middle" class="label">Renderer result</text>
 <rect x="1050" y="248" width="170" height="52" rx="8" class="render"/>
 <text x="1135" y="270" font-size="12.4" font-weight="700" text-anchor="middle" class="white">Document renderer</text>
 <text x="1135" y="288" font-size="10.2" text-anchor="middle" class="soft-white">deterministic render</text>
-<rect x="1050" y="348" width="170" height="48" rx="8" class="output"/>
+<rect x="1050" y="348" width="170" height="52" rx="8" class="output"/>
 <text x="1135" y="369" font-size="12.2" font-weight="700" text-anchor="middle" class="white">formatted text</text>
-<text x="1135" y="386" font-size="10.2" text-anchor="middle" class="soft-white">exactly one final LF</text>
-<rect x="1050" y="444" width="170" height="48" rx="8" class="note"/>
-<text x="1135" y="465" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">render errors become</text>
-<text x="1135" y="482" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">internal_error</text>
+<text x="1135" y="387" font-size="10.2" text-anchor="middle" class="soft-white">unframed, no implicit LF</text>
+
+<rect x="1040" y="454" width="190" height="112" rx="9" class="doc-boundary" stroke-width="1.8"/>
+<text x="1135" y="478" font-size="11.2" font-weight="700" text-anchor="middle" class="muted">optional CLI / file framing</text>
+<text x="1135" y="501" font-size="10.2" text-anchor="middle" class="muted">outside message-level API</text>
+<rect x="1058" y="520" width="154" height="30" rx="6" class="note"/>
+<text x="1135" y="540" font-size="10.2" font-weight="700" text-anchor="middle" class="note-text">append exactly one final LF</text>
+
+<rect x="1050" y="626" width="170" height="48" rx="8" class="note"/>
+<text x="1135" y="647" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">render errors become</text>
+<text x="1135" y="664" font-size="10.8" font-weight="700" text-anchor="middle" class="note-text">internal_error</text>
 
 <path d="M 950 506 L 1000 506 L 1000 274 L 1044 274" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 <path d="M 1135 300 L 1135 342" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
-<path d="M 1135 396 L 1135 438" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 1135 400 L 1135 448" fill="none" class="dashed-arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
 </svg>

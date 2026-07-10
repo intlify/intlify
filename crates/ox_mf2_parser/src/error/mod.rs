@@ -10,9 +10,11 @@
 //! Range policy: `design/appendix-ox-mf2-error-code.md`.
 
 pub mod binding;
+pub mod parse;
 pub mod source_text;
 
 pub use binding::{BindingValidationErrorCode, InitializationErrorCode};
+pub use parse::{BatchParseError, ParseError, ParseErrorCode, ParseResource};
 pub use source_text::SourceTextErrorCode;
 
 /// Unified numeric API error code exposed to language bindings.
@@ -30,6 +32,9 @@ pub const OX_MF2_SNAPSHOT_WRITE_ERROR_MAX: OxMf2ErrorCode = 2999;
 pub const OX_MF2_SOURCE_TEXT_ERROR_MIN: OxMf2ErrorCode = 3000;
 pub const OX_MF2_SOURCE_TEXT_ERROR_MAX: OxMf2ErrorCode = 3999;
 
+pub const OX_MF2_PARSE_ERROR_MIN: OxMf2ErrorCode = 4000;
+pub const OX_MF2_PARSE_ERROR_MAX: OxMf2ErrorCode = 4999;
+
 pub const OX_MF2_INITIALIZATION_ERROR_MIN: OxMf2ErrorCode = 10_000;
 pub const OX_MF2_INITIALIZATION_ERROR_MAX: OxMf2ErrorCode = 10_999;
 
@@ -42,6 +47,7 @@ pub enum OxMf2ErrorDomain {
     Decode,
     SnapshotWrite,
     SourceText,
+    Parse,
     Initialization,
     BindingValidation,
     Unknown,
@@ -56,6 +62,8 @@ pub const fn ox_mf2_error_domain(code: OxMf2ErrorCode) -> OxMf2ErrorDomain {
         OxMf2ErrorDomain::SnapshotWrite
     } else if code >= OX_MF2_SOURCE_TEXT_ERROR_MIN && code <= OX_MF2_SOURCE_TEXT_ERROR_MAX {
         OxMf2ErrorDomain::SourceText
+    } else if code >= OX_MF2_PARSE_ERROR_MIN && code <= OX_MF2_PARSE_ERROR_MAX {
+        OxMf2ErrorDomain::Parse
     } else if code >= OX_MF2_INITIALIZATION_ERROR_MIN && code <= OX_MF2_INITIALIZATION_ERROR_MAX {
         OxMf2ErrorDomain::Initialization
     } else if code >= OX_MF2_BINDING_VALIDATION_ERROR_MIN
@@ -80,6 +88,9 @@ pub fn ox_mf2_error_code_name(code: OxMf2ErrorCode) -> &'static str {
     if let Some(name) = source_text_error_code_name(code) {
         return name;
     }
+    if let Some(name) = parse_error_code_name(code) {
+        return name;
+    }
     if let Some(name) = initialization_error_code_name(code) {
         return name;
     }
@@ -87,6 +98,25 @@ pub fn ox_mf2_error_code_name(code: OxMf2ErrorCode) -> &'static str {
         return name;
     }
     "unknown"
+}
+
+fn parse_error_code_name(code: OxMf2ErrorCode) -> Option<&'static str> {
+    use ParseErrorCode::{
+        InvalidSourceId, MissingRoot, SourceTooLarge, TooManyDiagnostics, TooManyEdges,
+        TooManyNodes, TooManySources, TooManyTokens, TooManyTrivia,
+    };
+    match code {
+        4000 => Some(SourceTooLarge.name()),
+        4001 => Some(InvalidSourceId.name()),
+        4002 => Some(TooManySources.name()),
+        4003 => Some(TooManyNodes.name()),
+        4004 => Some(TooManyEdges.name()),
+        4005 => Some(TooManyTokens.name()),
+        4006 => Some(TooManyTrivia.name()),
+        4007 => Some(TooManyDiagnostics.name()),
+        4008 => Some(MissingRoot.name()),
+        _ => None,
+    }
 }
 
 fn decode_error_code_name(code: OxMf2ErrorCode) -> Option<&'static str> {
@@ -149,6 +179,7 @@ fn snapshot_write_error_code_name(code: OxMf2ErrorCode) -> Option<&'static str> 
         2011 => Some(SnapshotWriteErrorCode::MissingRoot.name()),
         2012 => Some(SnapshotWriteErrorCode::InvalidSourceId.name()),
         2013 => Some(SnapshotWriteErrorCode::InconsistentSourceId.name()),
+        2014 => Some(SnapshotWriteErrorCode::TriviaNotCollected.name()),
         _ => None,
     }
 }

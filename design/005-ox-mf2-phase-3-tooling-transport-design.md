@@ -133,7 +133,7 @@ From Phase 2 onward, public AST input for formatter APIs is the Binary AST decod
 
 Formatter implementation may have Rust-internal fast paths over construction-time tables when formatting immediately after parse. However, stable public formatter input is the Binary AST view shared by Rust, N-API, WASM, and later consumers.
 
-The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. A snapshot-based entry point such as `formatSnapshot(snapshot, source?, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. Source text is still needed for preserve mode, source slicing, parser diagnostics, and editor position conversion. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
+The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. `formatSnapshot(snapshot, source, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The complete source string is required in every formatter mode for source slicing, parser diagnostic materialization, output comparison, and available snapshot/source consistency checks; preserve mode additionally uses it for source-shape decisions. The Phase 3 formatter does not expose a source-free snapshot mode. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
 
 ### Formatting Modes
 
@@ -250,9 +250,9 @@ The JSON configuration surface should be part of the unified config JSON Schema 
 
 ### Presets
 
-The initial linter preset should be a `recommended`-style preset focused on broadly useful correctness diagnostics. Stricter, nursery, experimental, and resource/catalog-oriented presets are future or linter-specific design details rather than Phase 3 core requirements.
+The initial linter preset should be a `recommended`-style preset focused on broadly useful, low-noise message-level diagnostics. Rule category alone does not determine preset membership: the initial recommended rules are best-practice warnings, while a context-dependent correctness rule may remain opt-in. Parser and semantic correctness diagnostics are independent of configurable presets and remain enabled by their pipeline contract. Stricter, nursery, experimental, and resource/catalog-oriented presets are future or linter-specific design details rather than Phase 3 core requirements.
 
-While the linter remains in 0.x, the `recommended` preset may evolve by adding broadly useful correctness diagnostics as needed. Preset stability policy should be finalized before a 1.0 release.
+While the linter remains in 0.x, the `recommended` preset may evolve by adding broadly useful, low-noise configurable diagnostics from suitable categories. Preset stability policy should be finalized before a 1.0 release.
 
 ### CLI Output and Exit Behavior
 
@@ -486,11 +486,11 @@ Editor adapters should:
 3. compare the original and formatted message text
 4. create editor `TextEdit` values at the adapter boundary
 
-For standalone `.mf2` documents, the resulting edit may replace the whole document. For JSON/YAML resources, the edit should replace only the containing message value range.
+The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document. For JSON/YAML resources, it is only the containing message value range after required host-string re-escaping.
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 
-Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the mapping is stale or the containing message range can no longer be identified, the adapter should no-op. Exact version checks and edit conflict behavior belong in the dedicated LSP/editor design.
+Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message range can no longer be identified, the adapter silently returns no edits rather than an operational editor error. Exact protocol-specific version comparisons belong in the dedicated LSP/editor implementation design.
 
 ### Configuration
 

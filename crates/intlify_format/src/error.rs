@@ -3,8 +3,10 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::{json, Value};
+
 /// Stable key/value details attached to an operational formatter error.
-pub type ErrorDetails = BTreeMap<String, String>;
+pub type ErrorDetails = BTreeMap<String, Value>;
 
 /// Broad error class used by CLI and binding reporters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,7 +131,7 @@ impl OperationalError {
 
     /// Attach one stable detail entry for JSON reporters.
     #[must_use]
-    pub fn with_detail(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn with_detail(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
         self.details.insert(key.into(), value.into());
         self
     }
@@ -145,7 +147,24 @@ impl OperationalError {
     #[must_use]
     pub fn invalid_snapshot(message: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::new(ErrorKind::Input, FormatErrorCode::InvalidSnapshot, message)
-            .with_detail("reason", reason)
+            .with_detail("reason", Value::String(reason.into()))
+    }
+
+    /// Build an unsupported snapshot version error using wire-level versions.
+    #[must_use]
+    pub fn unsupported_snapshot_version(
+        message: impl Into<String>,
+        major: u16,
+        minor: u16,
+        supported_versions: &[(u16, u16)],
+    ) -> Self {
+        let supported_versions = supported_versions
+            .iter()
+            .map(|(major, minor)| json!({ "major": major, "minor": minor }))
+            .collect();
+        Self::invalid_snapshot(message, "unsupported_version")
+            .with_detail("version", json!({ "major": major, "minor": minor }))
+            .with_detail("supportedVersions", Value::Array(supported_versions))
     }
 
     /// Build a source/snapshot mismatch error.

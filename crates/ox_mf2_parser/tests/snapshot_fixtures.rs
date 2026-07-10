@@ -63,7 +63,7 @@ fn snapshot_fixtures_round_trip() {
             source: &input,
             ..Default::default()
         });
-        let result = parse_source(&sources, id, ParseOptions::default());
+        let result = parse_source(&sources, id, ParseOptions::default()).expect("fixture parses");
         let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default())
             .expect("snapshot encode succeeds");
 

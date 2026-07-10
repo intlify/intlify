@@ -126,7 +126,7 @@ fn run_valid_case(
         case.name
     );
 
-    let reparse = parse_message(&expected);
+    let reparse = parse_message(&expected).expect("formatted output parses");
     assert!(
         reparse.diagnostics.is_empty(),
         "fixture case {} expected output reparses with diagnostics: {:?}",

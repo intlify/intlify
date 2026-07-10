@@ -55,7 +55,7 @@ fn valid_input_does_not_emit_diagnostics() {
         ".input {$x}\n{{Hi {$x}}}",
         ".match $x\n* {{fallback}}",
     ] {
-        let result = parse_message(case);
+        let result = parse_message(case).expect("parse succeeds");
         assert!(
             result.diagnostics.is_empty(),
             "case `{case}` produced diagnostics: {:?}",
@@ -80,7 +80,8 @@ fn workspace_reuse_does_not_regrow_capacity() {
 
     // Warm up so capacity reflects steady-state.
     for _ in 0..4 {
-        let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+        let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default())
+            .expect("parse succeeds");
     }
     let cap_after_warmup = workspace.node_capacity();
     let pending_cap_after_warmup = workspace.pending_edges_capacity();
@@ -88,7 +89,8 @@ fn workspace_reuse_does_not_regrow_capacity() {
 
     // Many more iterations of the same source must not regrow capacity.
     for _ in 0..1024 {
-        let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+        let _ = parse_source_session(&sources, id, &mut workspace, ParseOptions::default())
+            .expect("parse succeeds");
     }
     assert_eq!(workspace.node_capacity(), cap_after_warmup);
     // Staging stacks belong to the workspace too — their capacity must
@@ -107,7 +109,7 @@ fn trivia_runs_collapse_contiguous_whitespace() {
     // same-kind run becomes a single record — three spaces ⇒ one record.
     // Source fidelity is preserved because each record's span still
     // covers the whole run.
-    let result = parse_message(".local   $x = {$y}\n{{Hi}}");
+    let result = parse_message(".local   $x = {$y}\n{{Hi}}").expect("parse succeeds");
     // Whitespace runs that the parser commits as trivia (each becomes
     // exactly one record):
     //   ".local" ␣␣␣ "$x" ␣ "=" ␣ "{$y}" \n "{{Hi}}"
@@ -124,7 +126,7 @@ fn trivia_runs_collapse_contiguous_whitespace() {
 
 #[test]
 fn cst_view_traversal_visits_every_node_and_token() {
-    let result = parse_message("Hello, {$name}!");
+    let result = parse_message("Hello, {$name}!").expect("parse succeeds");
     let sources = SourceStore::new();
     let view = CstView::new(&sources, result.source, &result.cst);
     let mut visited_nodes = 0usize;
@@ -167,7 +169,7 @@ fn recovery_does_not_cascade() {
             source: input,
             ..Default::default()
         });
-        let result = parse_source(&sources, id, ParseOptions::default());
+        let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
         assert!(
             result.diagnostics.len() <= max_diagnostics,
             "case `{input}` cascaded: {:?}",

@@ -250,7 +250,7 @@ enum LayoutVariantKey {
 }
 ```
 
-`LayoutMatcherTable` follows matcher grammar invariants. It has at least one selector and at least one row. Each row has exactly one key per selector. Before normalization, `column_widths` is empty. After normalization, `column_widths.len()` equals `selectors.len()`. Like the `LayoutInputDeclaration` invariant, these matcher invariants assume the parser grammar-conformance prerequisite defined in the Phase 3B formatter design.
+`LayoutMatcherTable` follows matcher syntax invariants: it has at least one selector and at least one row. Variant-key arity is a semantic constraint, so a grammar-valid row may contain fewer or more keys than there are selectors. The IR preserves every source key in order and never synthesizes missing keys. Before normalization, `column_widths` is empty. After normalization, its length is `max(selectors.len(), maximum row key count)`. Rows with fewer keys receive layout padding for absent columns so value patterns align; rows with extra keys retain those keys as additional columns. Semantic validation reports `variant-key-arity-mismatch` independently of formatting.
 
 Leaf tokens that must preserve source spelling are source-backed. `LayoutVariable` stores the full `$name` span. `LayoutIdentifier` stores the full identifier spelling, including any namespace separator such as `namespace:name`. Keywords such as `.input`, `.local`, and `.match`, as well as formatter-controlled delimiters and punctuation such as `{`, `}`, `{{`, `}}`, `=`, function-prefix `:`, `@`, `#`, and `/`, are generated formatter text rather than source-backed leaves. Punctuation that is part of a source-backed identifier, variable, literal, or pattern text remains inside that source slice.
 
@@ -530,7 +530,7 @@ Runtime invariant violations include:
 - message/body combinations that do not match MF2 grammar, such as `Pattern` with declarations
 - an invalid `SourceSlice(SourceSpan)` inside the IR, such as `start > end`, `end > source.len()`, or non-UTF-8 character boundaries
 - formatter-computed source spans that were not derived from verified token/source ranges or that cross unverified source boundaries
-- matcher table state where selectors or rows are empty, row key counts are inconsistent with selector count, `column_widths` does not match selector/key columns, or uncomputed columns reach lowering
+- matcher table state where selectors or rows are empty, `column_widths` does not match the computed maximum of selector/key columns, or uncomputed columns reach lowering
 - Document IR lowering/rendering state that violates renderer assumptions, such as invalid source slices, missing source context for `SourceSlice`, or unsupported line/group structure
 
 `formatSnapshot(snapshot, source, options)` and `checkSnapshot(snapshot, source, options)` have a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Phase 3B keeps this check best-effort when the snapshot does not carry source identity data or consistency metadata. Invalid snapshot bytes, unsupported snapshot versions, or missing formatter-required snapshot capabilities detected before IR construction return `invalid_snapshot`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.

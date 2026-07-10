@@ -21,7 +21,12 @@ use crate::{
 /// [`FormatFailure`] with diagnostics and never exposes partially formatted
 /// output.
 pub fn format_message(source: &str, options: FormatOptions) -> FormatResult {
-    let parse = parse_message(source);
+    let parse = parse_message(source).map_err(|error| {
+        FormatFailure::from_error(
+            OperationalError::internal(format!("MF2 parser failed: {error}"))
+                .with_detail("parser_code", error.code().name()),
+        )
+    })?;
     if !parse.diagnostics.is_empty() {
         return Err(FormatFailure::from_diagnostics(parse.diagnostics));
     }

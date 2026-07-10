@@ -34,9 +34,10 @@
 //! ```
 //! use ox_mf2_parser::parse_message;
 //!
-//! let result = parse_message("Hello, {$name}!");
+//! let result = parse_message("Hello, {$name}!")?;
 //! assert!(result.diagnostics.is_empty());
 //! assert!(result.cst.node_count() > 0);
+//! # Ok::<(), ox_mf2_parser::ParseError>(())
 //! ```
 //!
 //! [message-format-wg]: https://github.com/unicode-org/message-format-wg
@@ -66,12 +67,13 @@ pub use diagnostic::{
     DiagnosticView,
 };
 pub use error::{
-    ox_mf2_error_code_name, ox_mf2_error_domain, BindingValidationErrorCode,
-    InitializationErrorCode, OxMf2ErrorCode, OxMf2ErrorDomain, SourceTextErrorCode,
-    OX_MF2_API_ERROR_MIN, OX_MF2_BINDING_VALIDATION_ERROR_MAX, OX_MF2_BINDING_VALIDATION_ERROR_MIN,
-    OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN, OX_MF2_INITIALIZATION_ERROR_MAX,
-    OX_MF2_INITIALIZATION_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX,
-    OX_MF2_SNAPSHOT_WRITE_ERROR_MIN, OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
+    ox_mf2_error_code_name, ox_mf2_error_domain, BatchParseError, BindingValidationErrorCode,
+    InitializationErrorCode, OxMf2ErrorCode, OxMf2ErrorDomain, ParseError, ParseErrorCode,
+    ParseResource, SourceTextErrorCode, OX_MF2_API_ERROR_MIN, OX_MF2_BINDING_VALIDATION_ERROR_MAX,
+    OX_MF2_BINDING_VALIDATION_ERROR_MIN, OX_MF2_DECODE_ERROR_MAX, OX_MF2_DECODE_ERROR_MIN,
+    OX_MF2_INITIALIZATION_ERROR_MAX, OX_MF2_INITIALIZATION_ERROR_MIN, OX_MF2_PARSE_ERROR_MAX,
+    OX_MF2_PARSE_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX, OX_MF2_SNAPSHOT_WRITE_ERROR_MIN,
+    OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
 };
 pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
 pub use snapshot::{

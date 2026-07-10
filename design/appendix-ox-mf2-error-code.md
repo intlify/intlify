@@ -4,7 +4,7 @@
 
 This appendix defines the numeric range policy for ox-mf2 API error codes.
 
-The range policy applies only to errors that represent API failure boundaries, such as snapshot decode failures, snapshot write failures, source text failures, initialization failures, and binding validation failures.
+The range policy applies only to errors that represent API failure boundaries, such as snapshot decode failures, snapshot write failures, source text failures, fatal parse failures, initialization failures, and binding validation failures.
 
 The range policy does not apply to parser or snapshot classification enums, or to CLI JSON operational error string codes.
 
@@ -39,7 +39,8 @@ The public API error code namespace starts at `1000`. Values below `1000` are re
 | `1000..1999` | `DecodeErrorCode` | Snapshot byte validation and decode failures. |
 | `2000..2999` | `SnapshotWriteErrorCode` | Snapshot encode failures from parser output, source metadata, or snapshot options. |
 | `3000..3999` | `SourceTextErrorCode` | Source text attachment, lookup, and source slicing failures. |
-| `4000..9999` | Reserved Rust crate API range | Reserved for future Rust crate API error domains. |
+| `4000..4999` | `ParseErrorCode` | Fatal parser API failures that cannot return a trustworthy parse result. |
+| `5000..9999` | Reserved Rust crate API range | Reserved for future Rust crate API error domains. |
 | `10000..10999` | `InitializationErrorCode` | Binding runtime initialization failures, especially WASM init failures. |
 | `11000..11999` | `BindingValidationErrorCode` | Binding input validation failures that are not better represented by built-in `TypeError` or `RangeError`. |
 | `12000+` | Reserved binding range | Reserved for future binding and host-runtime error domains. |
@@ -60,7 +61,7 @@ It covers invalid or unsupported Binary AST snapshot bytes, including invalid ma
 
 `SnapshotWriteErrorCode` uses `2000..2999`.
 
-It covers failures where trusted parser output, source metadata, or snapshot options cannot be encoded into a valid v0.1 Binary AST snapshot. Examples include source size overflow, too many records, missing root, invalid source id, inconsistent batch source id, and section size overflow.
+It covers failures where trusted parser output, source metadata, parse capabilities, or snapshot options cannot be encoded into a valid v0.1 Binary AST snapshot. Examples include source size overflow, too many records, missing root, invalid source id, inconsistent batch source id, requested-but-uncollected trivia, and section size overflow.
 
 Recoverable parser diagnostics are not snapshot write errors. A snapshot may encode diagnostics and still be successfully written.
 
@@ -68,7 +69,15 @@ Recoverable parser diagnostics are not snapshot write errors. A snapshot may enc
 
 `SourceTextErrorCode` uses `3000..3999`.
 
-It covers failures related to external source text access after parsing or decoding, such as unavailable source text, source count mismatch during source attachment, unpaired surrogate rejection at the binding boundary, and out-of-bounds source slicing.
+It covers failures related to external source text access after parsing or decoding, such as unavailable source text, source count mismatch during source attachment, and out-of-bounds source slicing.
+
+`SourceTextUnpairedSurrogate = 3004` is reserved and must not be reused, but Phase 2 bindings do not emit it. They reject unpaired surrogates during raw JavaScript input validation with built-in `TypeError`, before parsing, source attachment, or source slicing. A future input model that accepts WTF-8 or UTF-16 may assign semantics to the reserved code only through an explicit contract revision.
+
+### ParseErrorCode
+
+`ParseErrorCode` uses `4000..4999`.
+
+It covers fatal parser API failures: an oversized source, an invalid source id, exhaustion of a `u32`-indexed parser resource, or a missing CST root. Recoverable MF2 syntax errors remain successful parse results with diagnostics and never use this range. `parse_batch` reports the input index together with the underlying `ParseError` and fails the whole call rather than returning a partial batch.
 
 ## Binding Error Domains
 

@@ -327,10 +327,12 @@ Standardized `details` fields:
   ```json
   {
     "reason": "unsupported_version",
-    "version": 3,
-    "supportedVersions": [1, 2]
+    "version": { "major": 0, "minor": 3 },
+    "supportedVersions": [{ "major": 0, "minor": 1 }]
   }
   ```
+
+  `version` is the exact major/minor pair decoded from the snapshot header. `supportedVersions` contains the exact wire versions accepted by the decoder; entries use the same object shape and are not package release versions.
 
   Initial reason values are `corrupt`, `unsupported_version`, `missing_capability`, and `unknown`.
 
@@ -838,6 +840,7 @@ Rules:
 - multi-selector matchers use table-like variant rows
 - single-selector matchers also align variant rows
 - variant keys align by each key column's maximum width
+- grammar-valid rows with semantic key-arity mismatches preserve every source key; missing columns contribute padding only, and extra keys extend the alignment table
 - `.match` selector variables are not aligned to variant key columns
 - key columns have at least 2 spaces between them
 - the final key column and the variant value pattern start have at least 2 spaces between them
@@ -880,6 +883,8 @@ Initial core style rules:
 - declaration, option, attribute, selector, variant row, variant key, and pattern chunk order is preserved
 - quoted literal spelling, unquoted literal spelling, and escape spelling are preserved
 
+Formatting does not run semantic validation and does not convert MF2 Data Model Errors into formatter operational errors. In particular, `variant-key-arity-mismatch` input is grammar-valid and remains formattable: the formatter preserves its ragged key rows safely, while the independent semantic validation layer owns reporting the mismatch.
+
 Examples:
 
 ```mf2
@@ -902,7 +907,7 @@ Initial required helper semantics:
 
 - node children are traversed in source order
 - token traversal is available in source order
-- public node and token kind accessors expose stable symbolic names; numeric discriminants are internal
+- public node and token `kind()` accessors return the numeric `SyntaxKind` union values used by snapshot records and the shared `SyntaxKind` const object; callers use `syntaxKindName(kind)` when they need a stable symbolic display name and must not infer semantics from numeric ordering
 - node and token spans are UTF-8 byte spans using half-open ranges `[start, end)`
 - source slicing is available through a `slice(span)`-style helper after available source/snapshot consistency checks have passed
 - delimiter spans are exposed through delimiter token kind and span access; dedicated delimiter-specific accessors are not required

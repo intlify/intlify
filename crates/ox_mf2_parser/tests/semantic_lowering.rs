@@ -9,6 +9,7 @@
 #![allow(clippy::field_reassign_with_default, clippy::doc_markdown)]
 //!
 //! - `parse_semantic = false` does not grow semantic tables.
+//! - Parser diagnostics suppress SemanticModel construction.
 //! - Every semantic record links back to a NodeId + Span.
 //! - Simple message → `SemanticMessageKind::Pattern`.
 //! - Complex quoted pattern → `SemanticMessageKind::Pattern`.
@@ -26,12 +27,19 @@ fn parse(source: &str, parse_semantic: bool) -> ox_mf2_parser::ParseResult {
     });
     let mut options = ParseOptions::default();
     options.parse_semantic = parse_semantic;
-    parse_source(&sources, id, options)
+    parse_source(&sources, id, options).expect("parse succeeds")
 }
 
 #[test]
 fn parse_semantic_false_omits_model() {
     let result = parse("Hello", false);
+    assert!(result.semantic.is_none());
+}
+
+#[test]
+fn parser_diagnostics_suppress_semantic_model() {
+    let result = parse("Hello, {$name", true);
+    assert!(!result.diagnostics.is_empty());
     assert!(result.semantic.is_none());
 }
 

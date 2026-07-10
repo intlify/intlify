@@ -249,6 +249,8 @@ Bindings map `messageId` to Rust/snapshot `message_id`, and `baseOffset` to `bas
 
 Phase 2 bindings reject JavaScript strings that contain unpaired surrogates with `TypeError`. The Rust parser path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
 
+`SourceTextErrorCode.SourceTextUnpairedSurrogate` (`3004`) remains reserved for numeric compatibility but is not emitted by Phase 2 bindings. Unpaired-surrogate rejection happens during raw JavaScript input validation, before an `OxMf2SourceTextError` boundary exists.
+
 ## Result Object Boundary
 
 Single-message result shape:
@@ -531,10 +533,13 @@ Binding error class mapping:
 | `DecodeErrorCode`            | `OxMf2SnapshotError`       |
 | `SnapshotWriteErrorCode`     | `OxMf2SnapshotError`       |
 | `SourceTextErrorCode`        | `OxMf2SourceTextError`     |
+| `ParseErrorCode`             | `OxMf2ParseError`          |
 | `InitializationErrorCode`    | `OxMf2InitializationError` |
 | `BindingValidationErrorCode` | `OxMf2ParseError`          |
 
 Wrong input types, invalid numeric ranges, and indexed accessor misuse still use built-in `TypeError` or `RangeError` when those built-ins express the failure clearly. `BindingValidationErrorCode` is reserved for ox-mf2-specific validation failures that need a stable numeric code.
+
+Unpaired surrogates are one such built-in validation case: parser input and `withSources()` reject them with `TypeError`. The reserved `SourceTextUnpairedSurrogate` numeric constant is not mapped to or emitted as `OxMf2SourceTextError` in Phase 2.
 
 `OxMf2ErrorCode` exposes detailed numeric constants that are close to the Rust error domains, while error classes provide coarse JS exception grouping. Example constant names:
 

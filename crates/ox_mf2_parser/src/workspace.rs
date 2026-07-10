@@ -134,7 +134,6 @@ impl SemanticWorkspace {
             model.attributes.clear();
             model.selectors.clear();
             model.variants.clear();
-            model.diagnostics.clear();
         }
     }
 }

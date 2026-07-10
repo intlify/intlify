@@ -3,22 +3,24 @@
 
 //! Optional `SemanticModel` lowered from `CstTables`.
 //!
-//! Only built when [`crate::ParseOptions::parse_semantic`] is `true`. The
-//! lowering walks the CST through [`crate::CstView`] and emits per-record
-//! [`SemanticRef`]s back to source `NodeId` + `Span` so consumers can jump
-//! between the semantic model and the CST without copying source text.
+//! Only built when [`crate::ParseOptions::parse_semantic`] is `true` and the
+//! parse produced no parser diagnostics. The lowering walks the CST through
+//! [`crate::CstView`] and emits per-record [`SemanticRef`]s back to source
+//! `NodeId` + `Span` so consumers can jump between the semantic model and the
+//! CST without copying source text.
 //!
 //! Phase 1 deliberately keeps the model thin:
 //!
 //! - Raw spans only — cooked values / NFC comparison keys belong to the
 //!   semantic validation path, not parse hot paths.
-//! - No selector coverage analysis, no duplicate-name policy, no runtime
-//!   fallback resolution.
+//! - Facts only: semantic diagnostics belong to the separate semantic
+//!   validation boundary.
+//! - No selector coverage analysis, duplicate-name policy, or runtime fallback
+//!   resolution during construction.
 //!
 //! See `design/002-ox-mf2-phase-1-rust-parser-design.md` §"`SemanticModel`
 //! Design" for the longer-form rationale.
 
-use crate::diagnostic::Diagnostic;
 use crate::source::SourceStore;
 use crate::span::{NodeId, SourceId, Span};
 use crate::syntax_kind::SyntaxKind;
@@ -153,7 +155,6 @@ pub struct SemanticModel {
     pub attributes: Vec<AttributeRecord>,
     pub selectors: Vec<SelectorRecord>,
     pub variants: Vec<VariantRecord>,
-    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Borrowed view onto a [`SemanticModel`].
@@ -268,7 +269,6 @@ fn reset_model(model: &mut SemanticModel) {
     model.attributes.clear();
     model.selectors.clear();
     model.variants.clear();
-    model.diagnostics.clear();
 }
 
 // ─────────────────────────── raw table walkers ───────────────────────────

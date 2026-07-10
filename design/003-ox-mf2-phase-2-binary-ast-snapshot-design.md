@@ -153,9 +153,9 @@ Defaults:
 
 `include_source_text = true` is used when the snapshot alone must resolve `source_slice(source_id, span)`. Main uses are debug dump, persistence, worker transfer, fixture snapshots, and transport to external processes.
 
-Whether whitespace / bidi trivia is collected by the parser is controlled by Phase 1 `ParseOptions.collect_trivia`. `SnapshotOptions.include_trivia` only controls whether already-produced trivia records are encoded into the snapshot. If a snapshot is built from a parse result produced with `collect_trivia = false`, there is no trivia to encode even when `include_trivia = true`.
+Whether whitespace / bidi trivia is collected by the parser is controlled by Phase 1 `ParseOptions.collect_trivia`. `ParseResult.trivia_collected` and `ParseSessionResult.trivia_collected` preserve that capability independently of the trivia record count. `SnapshotOptions.include_trivia` only controls whether already-produced trivia records are encoded into the snapshot.
 
-When `include_trivia = true` but the parse result was produced with `collect_trivia = false`, SnapshotWriter encodes no trivia records. TokenRecord trivia starts and counts are written as `0`, and the optional trivia section is still emitted with `count = 0` as a capability marker. SnapshotWriter must not rescan source text to reconstruct trivia.
+When `include_trivia = true` but the parse result was produced with `collect_trivia = false`, SnapshotWriter returns `SnapshotWriteError::TriviaNotCollected`. It must not emit an empty Trivia section as a capability marker and must not rescan source text to reconstruct trivia. `include_trivia = false` remains valid for either parser setting and omits the Trivia section.
 
 ### Result Types
 
@@ -236,10 +236,11 @@ pub enum SnapshotWriteError {
   MissingRoot,
   InvalidSourceId,
   InconsistentSourceId,
+  TriviaNotCollected,
 }
 ```
 
-`SnapshotWriteError` is separate from `DecodeError`. `DecodeError` is for validating untrusted snapshot bytes. `SnapshotWriteError` is for cases where trusted parser output, source metadata, or snapshot options cannot be encoded into the v0.1 format.
+`SnapshotWriteError` is separate from `DecodeError`. `DecodeError` is for validating untrusted snapshot bytes. `SnapshotWriteError` is for cases where trusted parser output, source metadata, parse capabilities, or snapshot options cannot be encoded into the v0.1 format. `TriviaNotCollected` prevents an empty section from falsely advertising trivia capability.
 
 The public numeric range for `SnapshotWriteErrorCode` is defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). `SnapshotWriteErrorCode` is an API failure code namespace; it is separate from parser diagnostics and from snapshot classification enums.
 
@@ -280,11 +281,11 @@ Section kind entries must be unique. If the section table contains the same `Sec
 
 Optional sections are usually omitted when empty, except when an enabled snapshot option needs section presence as a capability proof.
 
-Required core sections are always emitted, even when their count or byte length is zero where the format permits it. Optional sections such as trivia, diagnostics, diagnostic labels, source text data, and extended data are emitted only when they contain data or when an enabled writer option explicitly requires their presence. The v0.1 default writer emits empty `Trivia` when `include_trivia = true`, empty `Diagnostics` when `include_diagnostics = true`, and empty `SourceTextData` when `include_source_text = true`.
+Required core sections are always emitted, even when their count or byte length is zero where the format permits it. Optional sections such as trivia, diagnostics, diagnostic labels, source text data, and extended data are emitted only when they contain data or when an enabled writer option explicitly requires their presence. For a parse result that proves trivia collection, the v0.1 default writer emits empty `Trivia` when `include_trivia = true`; it also emits empty `Diagnostics` when `include_diagnostics = true` and empty `SourceTextData` when `include_source_text = true`.
 
 Decoders treat a missing optional section as an empty section for traversal counts. Capability-sensitive consumers must use section presence, not only a zero count, to distinguish an empty enabled section from data that was intentionally omitted. This keeps `include_trivia = false`, `include_diagnostics = false`, and `include_source_text = false` compact in the binary layout while preserving a simple read contract.
 
-Section presence for empty `Trivia` and `Diagnostics` is the v0.1 capability proof required by the Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)). A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot.
+Section presence for empty `Trivia` and `Diagnostics` is the v0.1 capability proof required by the Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)). An empty Trivia section is emitted only when parser trivia collection was enabled, so it proves that the source contained no collected trivia rather than that collection was skipped. A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot.
 
 Future snapshot-backed linting also requires verifiable parser diagnostic capability. It additionally requires a parser-owned snapshot-to-`SemanticModel` path before `lintSnapshot` can be supported. Per the changelog update rule, any new snapshot capability required for linting must land together with snapshot versioning, writer, decoder, and fixture updates in the PR that introduces snapshot-backed linter behavior.
 
@@ -690,7 +691,7 @@ NodeRecord {
 }
 ```
 
-`kind` stores the numeric value of the Phase 1 parser `SyntaxKind` directly. SnapshotWriter does not remap NodeRecord.kind through a snapshot-specific kind table. `SyntaxKind` numeric values are snapshot-visible draft data in v0.x. Changing them requires binary fixture updates, decoded fixture updates, and a format changelog entry. After a future v1.0 format freeze, published `SyntaxKind` values must not be reordered, reused, or changed incompatibly without a snapshot major version bump. A decoder rejects unknown `SyntaxKind` numeric values.
+`kind` stores the numeric value of the Phase 1 parser `SyntaxKind` directly. SnapshotWriter does not remap NodeRecord.kind through a snapshot-specific kind table. `SyntaxKind` numeric values are snapshot-visible draft data in v0.x. Adding a core kind during v0.x requires the next `0.N` draft version, coordinated writer/decoder/accessor updates, binary and decoded fixture updates, and a format changelog entry; exact version matching means an older v0.x decoder rejects the new draft. Published numeric values are not reordered or reused even during v0.x. After a future v1.0 format freeze, emitting a new core kind that an existing decoder cannot interpret requires a snapshot major version bump. A decoder rejects unknown `SyntaxKind` numeric values.
 
 `flags` is reserved in v0.1. SnapshotWriter writes `0`, and decoders reject non-zero flags.
 
@@ -771,7 +772,7 @@ The internal Phase 1 `TokenRecord` may use a compact layout with `first_trivia` 
 
 Formatters, especially preserve mode, use token and trivia sections to reconstruct source faithfully without relying on a nested object tree.
 
-When `include_trivia = false`, TokenRecord layout does not change. `leading_trivia_count` and `trailing_trivia_count` are `0`, and `leading_trivia_start` and `trailing_trivia_start` are also `0`. The trivia section is absent. When `include_trivia = true`, the trivia section is present even when its count is `0`. Decoders must not vary TokenRecord record_size by option.
+When `include_trivia = false`, TokenRecord layout does not change. `leading_trivia_count` and `trailing_trivia_count` are `0`, and `leading_trivia_start` and `trailing_trivia_start` are also `0`. The trivia section is absent. When `include_trivia = true` and the parse result proves trivia collection, the trivia section is present even when its count is `0`; otherwise the writer returns `TriviaNotCollected`. Decoders must not vary TokenRecord record_size by option.
 
 v0.1 TokenRecord / TriviaRecord has no `text_ref`. Original token / trivia text is referenced by `source_id + span_start/span_end`. With `include_source_text = false`, external source text is used. With `include_source_text = true`, `SourceRecord.text` points to the source text data section. If normalized text, cooked text, or debug text becomes necessary and cannot be represented only by source spans, add extended data or an optional token-text section instead of growing TokenRecord / TriviaRecord.
 

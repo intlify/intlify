@@ -85,7 +85,7 @@ fn wg_message_format_tests_match_parser_syntax_boundary() {
                 parse_semantic: false,
                 ..Default::default()
             };
-            let result = parse_source(&sources, id, options);
+            let result = parse_source(&sources, id, options).expect("parse succeeds");
             let wants_syntax_error = expects_syntax_error(test, defaults);
             let has_parser_error = !result.diagnostics.is_empty();
 

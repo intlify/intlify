@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
   <title id="title">ox-mf2 Phase 1 SemanticModel design</title>
-  <desc id="desc">Phase 1 SemanticModel is optionally constructed from CstTables and CstView into side-table records that keep SemanticRef links back to NodeId and UTF-8 byte spans.</desc>
+  <desc id="desc">After a diagnostic-free parse, Phase 1 SemanticModel is optionally constructed from CstTables and CstView as fact-only side tables. Semantic diagnostics are produced separately by semantic validation.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -92,11 +92,12 @@
 
   <rect class="boundary" x="84" y="480" width="244" height="58" rx="6" />
   <text class="small" x="106" y="504">parse_semantic = false</text>
-  <text class="tiny" x="106" y="522">semantic: None, no construction cost</text>
+  <text class="tiny" x="106" y="522">or parser diagnostics: semantic is None</text>
 
   <rect class="construction" x="410" y="92" width="300" height="488" rx="8" />
   <text class="label" x="560" y="128" text-anchor="middle">SemanticModelBuilder</text>
-  <text class="caption" x="560" y="150" text-anchor="middle">Runs only when parse_semantic = true.</text>
+  <text class="caption" x="560" y="150" text-anchor="middle">Runs only after a diagnostic-free parse</text>
+  <text class="caption" x="560" y="166" text-anchor="middle">when parse_semantic = true.</text>
 
   <rect class="construction-item" x="438" y="184" width="244" height="46" rx="6" />
   <text class="small" x="560" y="204" text-anchor="middle">read message mode</text>
@@ -114,9 +115,9 @@
   <text class="small" x="560" y="396" text-anchor="middle">collect matcher facts</text>
   <text class="tiny" x="560" y="412" text-anchor="middle">selectors, variants, fallback</text>
 
-  <rect class="diagnostic-item" x="438" y="440" width="244" height="46" rx="6" />
-  <text class="small" x="560" y="460" text-anchor="middle">syntax-adjacent checks</text>
-  <text class="tiny" x="560" y="476" text-anchor="middle">duplicates, missing anchors</text>
+  <rect class="boundary" x="438" y="440" width="244" height="46" rx="6" />
+  <text class="small" x="560" y="460" text-anchor="middle">fact collection only</text>
+  <text class="tiny" x="560" y="476" text-anchor="middle">does not produce diagnostics</text>
 
   <rect class="boundary" x="438" y="510" width="244" height="44" rx="6" />
   <text class="tiny" x="560" y="529" text-anchor="middle">No complete coverage, locale,</text>
@@ -154,9 +155,9 @@
   <text class="tiny" x="980" y="383" text-anchor="middle">selectors</text>
   <text class="tiny" x="980" y="398" text-anchor="middle">variants</text>
 
-  <rect class="diagnostic-item" x="798" y="424" width="236" height="42" rx="6" />
-  <text class="tiny" x="916" y="443" text-anchor="middle">diagnostics</text>
-  <text class="tiny" x="916" y="458" text-anchor="middle">semantic-adjacent, source-linked</text>
+  <rect class="boundary" x="798" y="424" width="236" height="42" rx="6" />
+  <text class="tiny" x="916" y="443" text-anchor="middle">no diagnostics stored</text>
+  <text class="tiny" x="916" y="458" text-anchor="middle">validation returns them separately</text>
 
   <rect class="boundary" x="798" y="494" width="236" height="44" rx="6" />
   <text class="tiny" x="916" y="513" text-anchor="middle">Every semantic record stores</text>
@@ -165,8 +166,8 @@
   <path class="arrow" d="M 356 336 L 408 336" />
   <path class="semantic-arrow" d="M 710 336 L 766 336" />
 
-  <rect class="boundary" x="84" y="630" width="952" height="66" rx="8" />
-  <text class="label" x="112" y="660">Phase 1 boundary</text>
-  <text class="caption" x="112" y="684">Parser syntax correctness is measured separately from SemanticModel construction throughput.</text>
-  <text class="caption" x="654" y="684">Full data-model validation remains a later validation layer.</text>
+  <rect class="boundary" x="84" y="620" width="952" height="90" rx="8" />
+  <text class="label" x="112" y="650">Phase 1 boundary</text>
+  <text class="caption" x="112" y="676">Parser syntax correctness and SemanticModel construction remain separately measurable.</text>
+  <text class="caption" x="112" y="696">Parser-owned semantic validation runs as a separate layer after fact construction.</text>
 </svg>

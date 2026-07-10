@@ -110,6 +110,26 @@ fn format_snapshot_formats_valid_preserve_snapshot() {
 }
 
 #[test]
+fn format_snapshot_preserves_semantically_ragged_matcher_rows() {
+    let source =
+        ".match   $count  $gender\n0 {{One key}}\n10 female extra {{Three keys}}\n* * {{Two keys}}";
+    let expected = ".match $count $gender\n0                  {{One key}}\n10  female  extra  {{Three keys}}\n*   *              {{Two keys}}";
+    let snapshot = parse_message_to_snapshot(
+        source,
+        None,
+        ParseOptions::default(),
+        SnapshotOptions::default(),
+    )
+    .expect("snapshot writes");
+    let view = decode_snapshot(&snapshot.bytes).expect("snapshot decodes");
+
+    let result = format_snapshot(source, view, FormatOptions::default())
+        .expect("semantic key arity does not block formatting");
+
+    assert_eq!(result.code, expected);
+}
+
+#[test]
 fn check_snapshot_accepts_trivia_less_standard_snapshot() {
     let source = ".input   {$count   :number}\n{{Value {$count   :number}}}";
     let snapshot = parse_message_to_snapshot(
@@ -153,8 +173,8 @@ fn snapshot_without_diagnostic_capability_is_rejected() {
     assert!(failure.diagnostics.is_empty());
     assert_eq!(failure.errors[0].code, FormatErrorCode::InvalidSnapshot);
     assert_eq!(
-        failure.errors[0].details.get("reason").map(String::as_str),
-        Some("missing_capability")
+        failure.errors[0].details.get("reason"),
+        Some(&serde_json::json!("missing_capability"))
     );
 }
 
@@ -188,8 +208,8 @@ fn preserve_snapshot_requires_trivia_capability() {
     assert!(failure.diagnostics.is_empty());
     assert_eq!(failure.errors[0].code, FormatErrorCode::InvalidSnapshot);
     assert_eq!(
-        failure.errors[0].details.get("reason").map(String::as_str),
-        Some("missing_capability")
+        failure.errors[0].details.get("reason"),
+        Some(&serde_json::json!("missing_capability"))
     );
 }
 

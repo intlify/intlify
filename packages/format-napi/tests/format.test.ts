@@ -60,6 +60,19 @@ test.runIf(hasNativeBinding)('corrupt snapshot bytes return invalid_snapshot', (
   expect(failure.errors[0]?.details?.reason).toBe('corrupt')
 })
 
+test.runIf(hasNativeBinding)('unsupported snapshot version reports wire versions', () => {
+  const snapshot = formatSnapshotBytes()
+  snapshot[10] = 3
+  snapshot[11] = 0
+  const failure = expectFormatFailure(formatSnapshot(snapshot, FORMAT_SNAPSHOT_SOURCE))
+
+  expect(failure.errors[0]?.details).toMatchObject({
+    reason: 'unsupported_version',
+    version: { major: 0, minor: 3 },
+    supportedVersions: [{ major: 0, minor: 1 }]
+  })
+})
+
 test.runIf(hasNativeBinding)('checkSnapshot validates corrupt snapshot bytes', () => {
   const result = checkSnapshot(new Uint8Array([0, 1, 2]), 'Hello')
   const failure = expectFormatFailure(result)

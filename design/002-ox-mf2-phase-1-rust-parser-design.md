@@ -47,7 +47,7 @@ source
   -> lexer / scanner helpers
   -> recovering CST parser
   -> diagnostics
-  -> optional SemanticModel construction
+  -> when parser diagnostics are empty: optional SemanticModel construction
   -> later formatter / linter / compiler
 ```
 
@@ -62,7 +62,7 @@ Parser responsibilities:
 Parser non-responsibilities:
 
 - final selector coverage analysis
-- duplicate declaration policy beyond syntax-adjacent cases
+- duplicate declaration and other data-model validation
 - runtime message resolution
 - locale-aware behavior
 - formatter style decisions
@@ -125,7 +125,7 @@ Design policy:
 - Node kinds, token kinds, trivia kinds, error kinds, and missing kinds live in the same enum family.
 - In Phase 2 Binary AST snapshots, the numeric `SyntaxKind` value is encoded directly as `kind: u16` in NodeRecord / TokenRecord / TriviaRecord.
 - Once published, numeric values are part of the snapshot compatibility contract. Do not reorder, reuse, or change their meaning incompatibly. Add new kinds with new values.
-- Snapshot decoders reject unknown `SyntaxKind` numeric values. Emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord affects compatibility and requires a major version change plus decoder/accessor updates. If backward compatibility is required, represent the case with an existing `Unknown` / `Error` / `Missing` kind or an optional section.
+- Snapshot decoders reject unknown `SyntaxKind` numeric values. While the snapshot format is draft v0.x, emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord requires the next `0.N` draft version plus coordinated writer, decoder, accessor, changelog, and fixture updates; v0.x decoders continue to use exact version matching. After the v1.0 format freeze, the same compatibility-breaking core-kind addition requires a snapshot major version bump. If backward compatibility is required after v1.0, represent the case with an existing `Unknown` / `Error` / `Missing` kind or backward-compatible optional data.
 - Rust public APIs should not give semantic meaning to enum ordering, and consumer code should not rely on numeric comparison.
 - Manage kinds by grammar category so spec changes are easy to track.
 - Provide helper predicates so formatters and linters can test kind categories efficiently.
@@ -305,7 +305,8 @@ Phase 1 SemanticModel construction records:
 - collect literals, functions, options, and attributes
 - collect matcher selectors
 - collect variants and fallback/default markers
-- detect syntax-adjacent duplicates or missing semantic anchors
+
+Construction records facts only and does not emit or retain diagnostics. Parser-owned semantic diagnostics are returned separately by `validate_semantics(model)` after diagnostic-free parsing and successful model construction.
 
 Phase 1 does not perform:
 
@@ -512,16 +513,16 @@ Ambiguous or malformed input makes mode detection part of recovery. For example,
 The primary parser API uses SourceStore and SourceId for caller-managed and batch parsing. The `parse_message` convenience API keeps the same `ParseResult` shape but may bypass SourceStore registration on the successful one-shot path.
 
 ```rust
-parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> ParseResult
-parse_message(source: &str) -> ParseResult
-parse_batch(inputs: &[ParseInput], options: BatchParseOptions) -> BatchParseResult
+parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> Result<ParseResult, ParseError>
+parse_message(source: &str) -> Result<ParseResult, ParseError>
+parse_batch(inputs: &[ParseInput], options: BatchParseOptions) -> Result<BatchParseResult, BatchParseError>
 
 parse_source_session<'a>(
   sources: &'a SourceStore,
   source_id: SourceId,
   workspace: &'a mut ParseWorkspace,
   options: ParseOptions,
-) -> ParseSessionResult<'a>
+) -> Result<ParseSessionResult<'a>, ParseError>
 ```
 
 API roles:
@@ -531,7 +532,7 @@ API roles:
 - `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
 - `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.
 
-Default APIs return owned `ParseResult`. Advanced APIs return `ParseSessionResult` tied to the workspace lifetime. Public API exposes a single `ParseWorkspace`, while internally separating parser workspace and semantic workspace.
+Default APIs return owned `ParseResult` inside `Result`. Advanced APIs return `ParseSessionResult` tied to the workspace lifetime. Recoverable syntax errors return `Ok` with diagnostics; only failures that prevent a trustworthy result return `ParseError` (`SourceTooLarge`, `InvalidSourceId`, `ResourceLimit`, or `MissingRoot`). `BatchParseError` carries the failing `input_index` and underlying `ParseError`; batch failure is atomic and does not expose partial results. Public API exposes a single `ParseWorkspace`, while internally separating parser workspace and semantic workspace.
 
 ```rust
 pub struct ParseWorkspace {
@@ -579,7 +580,7 @@ let source_id = sources.add(SourceFileInput {
 });
 
 let options = ParseOptions::default();
-let result = parse_source(&sources, source_id, options);
+let result = parse_source(&sources, source_id, options)?;
 
 for diagnostic in &result.diagnostics {
   let location = sources.location(diagnostic.source, diagnostic.span);
@@ -612,7 +613,7 @@ let root = session.cst.root();
 `parse_message` example:
 
 ```rust
-let result = parse_message("Hello, {$name}!");
+let result = parse_message("Hello, {$name}!")?;
 
 assert!(result.diagnostics.is_empty());
 let root = result.cst.root_id();
@@ -638,7 +639,7 @@ let inputs = vec![
   },
 ];
 
-let result = parse_batch(&inputs, BatchParseOptions::default());
+let result = parse_batch(&inputs, BatchParseOptions::default())?;
 
 for item in result.items {
   println!("source={:?}, diagnostics={}", item.source, item.result.diagnostics.len());
@@ -685,6 +686,7 @@ ParseResult {
   cst: CstTables,
   semantic: Option<SemanticModel>,
   diagnostics: Vec<Diagnostic>,
+  trivia_collected: bool,
 }
 
 ParseSessionResult<'a> {
@@ -692,10 +694,11 @@ ParseSessionResult<'a> {
   cst: CstView<'a>,
   semantic: Option<SemanticView<'a>>,
   diagnostics: DiagnosticView<'a>,
+  trivia_collected: bool,
 }
 ```
 
-`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
+`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. `trivia_collected` records whether `collect_trivia` was enabled; a zero-length trivia table alone cannot distinguish a source with no trivia from a parse that intentionally skipped trivia. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
 `SemanticView<'a>` in `ParseSessionResult` is a Rust-internal borrowed view over semantic facts. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
 
@@ -807,7 +810,7 @@ SourceFile {
 }
 ```
 
-If source length does not fit in `u32`, `SourceStore::add` panics and `SourceStore::try_add` returns the `SourceTooLarge` API error before parsing starts. The parser itself does not emit a `SpanOverflow` diagnostic on this path; the code remains reserved.
+If source length does not fit in `u32`, `SourceStore::add` panics and `SourceStore::try_add` returns `SourceStoreError::SourceTooLarge`. Fallible parser entry points return `ParseError::SourceTooLarge` before parsing starts. The parser does not emit a grammar diagnostic on this path.
 
 ### Source Encoding Policy
 

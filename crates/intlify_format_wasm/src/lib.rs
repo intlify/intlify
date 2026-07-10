@@ -16,6 +16,7 @@ use intlify_format::{check_format as core_check_format, check_snapshot as core_c
 use intlify_format::{
     format_message as core_format_message, format_snapshot as core_format_snapshot,
 };
+use ox_mf2_parser::snapshot::{SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION};
 use ox_mf2_parser::{decode_snapshot_owned, DecodeError, DecodeErrorCode};
 use wasm_bindgen::prelude::*;
 
@@ -80,14 +81,21 @@ pub fn check_snapshot_js(
 }
 
 fn decode_error_to_invalid_snapshot(error: DecodeError) -> OperationalError {
-    let reason = match error.code {
+    let operational_error = match error.code {
         DecodeErrorCode::UnsupportedMajorVersion | DecodeErrorCode::UnsupportedMinorVersion => {
-            "unsupported_version"
+            let version = error
+                .version
+                .expect("unsupported version errors carry the decoded header version");
+            OperationalError::unsupported_snapshot_version(
+                error.to_string(),
+                version.major,
+                version.minor,
+                &[(SNAPSHOT_MAJOR_VERSION, SNAPSHOT_MINOR_VERSION)],
+            )
         }
-        _ => "corrupt",
+        _ => OperationalError::invalid_snapshot(error.to_string(), "corrupt"),
     };
-    OperationalError::invalid_snapshot(error.to_string(), reason)
-        .with_detail("decodeCode", error.code.name())
+    operational_error.with_detail("decodeCode", error.code.name())
 }
 
 fn from_js_value<T>(value: JsValue) -> Result<T, JsValue>

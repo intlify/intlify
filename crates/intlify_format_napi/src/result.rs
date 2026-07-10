@@ -39,7 +39,7 @@ pub struct JsDiagnostic {
 #[napi(object)]
 pub struct JsOperationalErrorDetail {
     pub key: String,
-    pub value: String,
+    pub value_json: String,
 }
 
 #[napi(object)]
@@ -167,7 +167,10 @@ fn error_to_js(error: OperationalError) -> JsOperationalError {
         details: error
             .details
             .into_iter()
-            .map(|(key, value)| JsOperationalErrorDetail { key, value })
+            .map(|(key, value)| JsOperationalErrorDetail {
+                key,
+                value_json: value.to_string(),
+            })
             .collect(),
     }
 }

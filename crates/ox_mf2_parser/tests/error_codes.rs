@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 
 use ox_mf2_parser::{
     ox_mf2_error_code_name, ox_mf2_error_domain, BindingValidationErrorCode, DecodeError,
-    DecodeErrorCode, DiagnosticCode, InitializationErrorCode, OxMf2ErrorDomain, SnapshotWriteError,
-    SnapshotWriteErrorCode, SourceStoreError, SourceTextErrorCode, SourceTextUnavailable,
-    OX_MF2_API_ERROR_MIN,
+    DecodeErrorCode, DiagnosticCode, InitializationErrorCode, OxMf2ErrorDomain, ParseError,
+    ParseErrorCode, ParseResource, SnapshotWriteError, SnapshotWriteErrorCode, SourceStoreError,
+    SourceTextErrorCode, SourceTextUnavailable, OX_MF2_API_ERROR_MIN,
 };
 
 const TS_MIRROR: &str = include_str!("../../../packages/ox-mf2-shared/src/error-codes.ts");
@@ -74,6 +74,7 @@ fn rust_api_error_code_table() -> BTreeMap<String, u32> {
         SnapshotWriteErrorCode::MissingRoot,
         SnapshotWriteErrorCode::InvalidSourceId,
         SnapshotWriteErrorCode::InconsistentSourceId,
+        SnapshotWriteErrorCode::TriviaNotCollected,
     ];
     for code in write {
         table.insert(code.name().to_string(), code.as_u32());
@@ -87,6 +88,21 @@ fn rust_api_error_code_table() -> BTreeMap<String, u32> {
         SourceTextErrorCode::SourceTextUnpairedSurrogate,
     ];
     for code in source_text {
+        table.insert(code.name().to_string(), code.as_u32());
+    }
+
+    let parse = [
+        ParseErrorCode::SourceTooLarge,
+        ParseErrorCode::InvalidSourceId,
+        ParseErrorCode::TooManySources,
+        ParseErrorCode::TooManyNodes,
+        ParseErrorCode::TooManyEdges,
+        ParseErrorCode::TooManyTokens,
+        ParseErrorCode::TooManyTrivia,
+        ParseErrorCode::TooManyDiagnostics,
+        ParseErrorCode::MissingRoot,
+    ];
+    for code in parse {
         table.insert(code.name().to_string(), code.as_u32());
     }
 
@@ -269,6 +285,22 @@ fn source_text_errors_use_3000_plus_range() {
     assert_eq!(
         ox_mf2_error_domain(SourceTextErrorCode::SourceTextTooLarge.as_ox_mf2_error_code()),
         OxMf2ErrorDomain::SourceText
+    );
+}
+
+#[test]
+fn parse_errors_use_4000_plus_range() {
+    let err = ParseError::ResourceLimit {
+        resource: ParseResource::Tokens,
+    };
+    assert_eq!(err.as_ox_mf2_error_code(), 4005);
+    assert_eq!(
+        ox_mf2_error_domain(err.as_ox_mf2_error_code()),
+        OxMf2ErrorDomain::Parse
+    );
+    assert_eq!(
+        ox_mf2_error_code_name(err.as_ox_mf2_error_code()),
+        "ParseTooManyTokens"
     );
 }
 

@@ -55,9 +55,9 @@ Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at 
 
 Formatter core APIs return formatted message text, not LSP `TextEdit` objects.
 
-Editor adapters should find the containing MF2 message or resource entry, call whole-message formatting, and create editor edits at the adapter boundary. For standalone `.mf2` files, the edit may replace the whole document. For JSON/YAML resources, the edit should target the containing message value range.
+Editor adapters should find the containing MF2 message or resource entry, call whole-message formatting, and create editor edits at the adapter boundary. The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` files, that range is the whole document. For JSON/YAML resources, it is the containing message value range after the adapter has performed the required host-string re-escaping.
 
-Adapters should only return edits when the document version and message mapping used to create the edit still match the current document. If mapping is stale or the containing message can no longer be identified, the adapter should no-op.
+Adapters should only return edits when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message can no longer be identified, the adapter silently returns no edits. This expected concurrency outcome is a no-op, not an operational editor error. The exact protocol-specific version comparison remains an implementation-design question.
 
 True range-only formatting and minimal-diff formatting are deferred. A selection inside an MF2 message should initially format the containing message rather than requiring range-local formatting from the formatter core.
 
@@ -92,8 +92,6 @@ Future editor features should build on stable core concepts rather than adding L
 - Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
 - What stable key should identify diagnostics across document updates: source span, diagnostic code, resource key, or a combined identity?
 - What exact document version checks are required before returning formatting `TextEdit` values?
-- When a format request uses stale parse artifacts or stale message mapping, should the adapter silently no-op or report an operational editor error?
-- Should editor formatting initially replace the whole containing message range, or should the adapter compute the smallest practical `TextEdit` even though minimal-diff formatting is outside the formatter core?
 - Which configuration sources should editor adapters support, such as project config, VS Code workspace settings, user settings, and LSP initialization options?
 - What precedence should apply when project config and editor-specific settings provide overlapping formatter or linter options?
 - How should config reloads invalidate editor-side formatter, linter, and parse artifacts?

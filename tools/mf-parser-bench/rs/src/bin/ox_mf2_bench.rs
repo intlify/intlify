@@ -362,7 +362,7 @@ fn run_parse_message_owned(args: &Args) -> Result<PhaseSummary, String> {
     let iters = args.iterations.max(1);
     let mut count = 0usize;
     for _ in 0..iters {
-        let r = parse_message(&input);
+        let r = parse_message(&input).map_err(|error| format!("parse failed: {error}"))?;
         count += r.cst.node_count();
     }
     Ok(PhaseSummary {
@@ -405,7 +405,8 @@ fn run_parse_cst(args: &Args, default_trivia: bool) -> Result<PhaseSummary, Stri
                 workspace.reserve_for_source_len(input.len());
             }
         }
-        let session = parse_source_session(&sources, id, &mut workspace, options);
+        let session = parse_source_session(&sources, id, &mut workspace, options)
+            .map_err(|error| format!("parse failed: {error}"))?;
         total_nodes += session.cst.tables().node_count();
     }
     Ok(PhaseSummary {
@@ -429,7 +430,8 @@ fn run_lower_semantic(args: &Args) -> Result<PhaseSummary, String> {
     }
     let mut units = 0usize;
     for _ in 0..iters {
-        let session = parse_source_session(&sources, id, &mut workspace, options);
+        let session = parse_source_session(&sources, id, &mut workspace, options)
+            .map_err(|error| format!("parse failed: {error}"))?;
         if let Some(s) = session.semantic {
             units += s.references().len() + s.expressions().len();
         }
@@ -460,7 +462,8 @@ fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
     if args.reserve {
         workspace.reserve_for_source_len(input.len());
     }
-    let session = parse_source_session(&sources, id, &mut workspace, options);
+    let session = parse_source_session(&sources, id, &mut workspace, options)
+        .map_err(|error| format!("parse failed: {error}"))?;
     // Clone what the reusable-workspace owned path materialises into a
     // `ParseResult` once, outside the measured loop.
     let baseline_cst = session.cst.tables().clone();
@@ -489,7 +492,8 @@ fn run_cst_view_traversal(args: &Args) -> Result<PhaseSummary, String> {
         source: &input,
         ..Default::default()
     });
-    let result = parse_source(&sources, id, options);
+    let result =
+        parse_source(&sources, id, options).map_err(|error| format!("parse failed: {error}"))?;
     let view = CstView::new(&sources, id, &result.cst);
     let mut nodes = 0usize;
     for _ in 0..iters {
@@ -525,7 +529,8 @@ fn run_diagnostics(args: &Args) -> Result<PhaseSummary, String> {
     // view across iterations.
     let mut workspace = ParseWorkspace::new();
     workspace.reserve_for_source_len(input.len());
-    let session = parse_source_session(&sources, id, &mut workspace, ParseOptions::default());
+    let session = parse_source_session(&sources, id, &mut workspace, ParseOptions::default())
+        .map_err(|error| format!("parse failed: {error}"))?;
     if session.diagnostics.is_empty() {
         return Err("diagnostics phase requires an input that produces \
                     at least one diagnostic; pass a malformed --input-text \
@@ -559,7 +564,8 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
         source: &input,
         ..Default::default()
     });
-    let result = parse_source(&sources, id, ParseOptions::default());
+    let result = parse_source(&sources, id, ParseOptions::default())
+        .map_err(|error| format!("parse failed: {error}"))?;
     // The phase measures `SourceStore::location` on diagnostic spans. A valid
     // input has no diagnostics, so the inner loop would do zero work and the
     // hyperfine number would be meaningless — refuse the run instead.
@@ -616,12 +622,14 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     }
     // Warm the workspace so the first iteration's lazy growth is not
     // attributed to the steady state.
-    let _ = parse_source_session(&sources, id, &mut workspace, options);
+    let _ = parse_source_session(&sources, id, &mut workspace, options)
+        .map_err(|error| format!("parse failed: {error}"))?;
 
     let region = Region::new(GLOBAL);
     let mut total_nodes = 0usize;
     for _ in 0..iters {
-        let session = parse_source_session(&sources, id, &mut workspace, options);
+        let session = parse_source_session(&sources, id, &mut workspace, options)
+            .map_err(|error| format!("parse failed: {error}"))?;
         total_nodes += session.cst.tables().node_count();
     }
     let stats = region.change();
@@ -698,7 +706,8 @@ fn run_parse_batch_session(args: &Args) -> Result<PhaseSummary, String> {
     let mut units = 0usize;
     for _ in 0..iters {
         for &id in &ids {
-            let session = parse_source_session(&sources, id, &mut workspace, options);
+            let session = parse_source_session(&sources, id, &mut workspace, options)
+                .map_err(|error| format!("parse failed: {error}"))?;
             units += session.cst.tables().node_count();
         }
     }
@@ -725,7 +734,8 @@ fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
         .collect();
     let mut units = 0usize;
     for _ in 0..iters {
-        let result = parse_batch(&inputs, BatchParseOptions::default());
+        let result = parse_batch(&inputs, BatchParseOptions::default())
+            .map_err(|error| format!("batch parse failed: {error}"))?;
         units += result
             .items
             .iter()
@@ -754,7 +764,8 @@ fn parse_for_snapshot(args: &Args) -> Result<(SourceStore, ox_mf2_parser::ParseR
         ..Default::default()
     });
     let options = options_for(args, true, false);
-    let result = parse_source(&sources, id, options);
+    let result =
+        parse_source(&sources, id, options).map_err(|error| format!("parse failed: {error}"))?;
     Ok((sources, result))
 }
 
@@ -786,7 +797,8 @@ fn run_parse_cst_and_encode_snapshot(args: &Args) -> Result<PhaseSummary, String
             source: &input,
             ..Default::default()
         });
-        let result = parse_source(&sources, id, parse_opts);
+        let result = parse_source(&sources, id, parse_opts)
+            .map_err(|error| format!("parse failed: {error}"))?;
         let snap = parse_result_to_snapshot(&sources, &result, snap_opts)
             .map_err(|e| format!("snapshot encode failed: {e}"))?;
         bytes_total += snap.bytes.len();
@@ -958,7 +970,8 @@ fn run_parse_batch_result_to_snapshot(args: &Args) -> Result<PhaseSummary, Strin
             ..Default::default()
         })
         .collect();
-    let batch = parse_batch(&inputs, batch_opts);
+    let batch = parse_batch(&inputs, batch_opts)
+        .map_err(|error| format!("batch parse failed: {error}"))?;
     let iters = args.iterations.max(1);
     let mut bytes_total = 0usize;
     for _ in 0..iters {
