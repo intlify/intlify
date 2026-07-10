@@ -214,7 +214,7 @@ The final assemble phase owns these responsibilities:
 
 SnapshotWriter may pre-size section builders from `CstTables` counts and SourceStore metadata. It should avoid recursive AST conversion and should encode from table-oriented records in linear passes.
 
-SnapshotWriter maintains a temporary Phase 1 SourceId to snapshot-local SourceId map while building roots, sources, tokens, trivia, and diagnostics. The map is not encoded as a snapshot section. It exists only to keep the snapshot compact and to avoid requiring SourceStore SourceId numeric values to be dense from zero for every emitted snapshot.
+SnapshotWriter maintains a temporary root-occurrence source allocation table while building roots, sources, tokens, trivia, and diagnostics. Each `add_root` occurrence appends a fresh entry containing its Phase 1 SourceId and receives the entry index as its snapshot-local SourceId, even when another root uses the same Phase 1 SourceId. All source-bearing records encoded for that root use the allocated local id. The temporary table is not encoded as a separate snapshot section; its entries are materialized as the root-ordered v0.1 SourceRecord array. This avoids requiring SourceStore SourceId values to be dense while preserving the v0.1 one-root-to-one-SourceRecord policy. Source deduplication remains a future writer policy that requires an explicit identity key.
 
 ### Encode-Time Errors
 

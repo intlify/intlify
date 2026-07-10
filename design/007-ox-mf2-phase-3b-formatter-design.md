@@ -479,7 +479,7 @@ Invalid `fmt.ignorePatterns` entries are config validation errors and exit with 
 
 Missing `--ignore-path` files are operational errors and exit with `2`.
 
-Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, normal stdin formatting writes the original stdin source to stdout and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
+Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, UTF-8 validation still runs but read/write framing and message formatting do not. For valid UTF-8, normal text stdin formatting writes the original pre-framing bytes to stdout byte-equivalently—including a leading BOM and final `LF` or `CRLF`—and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Invalid UTF-8 still returns `input_read_failed` with `details.reason: "invalid_utf8"` instead of applying lossy replacement. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
 
 ### Exit Codes
 
@@ -775,6 +775,8 @@ Concrete Rust type names and implementation organization may still change during
 - `@intlify/format-napi-linux-x64-musl`
 - `@intlify/format-napi-linux-arm64-gnu`
 - `@intlify/format-napi-win32-x64-msvc`
+
+These six packages are the initial formatter N-API support matrix and match the checked-in package target configuration. The shared normalized label style does not require every ox-mf2 product to support every representable triple. Additional targets, including Linux arm64 musl, require product-specific CI build, loading, packaging, and publish smoke-test coverage before entering this matrix.
 
 The N-API package uses lazy native loading. Importing the package should not eagerly load the native binary; API calls load the binding as needed.
 

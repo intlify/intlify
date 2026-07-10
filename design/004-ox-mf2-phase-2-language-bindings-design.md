@@ -38,8 +38,9 @@ Generated platform package names use the host package name plus platform / archi
 - `@intlify/ox-mf2-napi-linux-x64-gnu`
 - `@intlify/ox-mf2-napi-linux-x64-musl`
 - `@intlify/ox-mf2-napi-linux-arm64-gnu`
-- `@intlify/ox-mf2-napi-linux-arm64-musl`
 - `@intlify/ox-mf2-napi-win32-x64-msvc`
+
+This is the initial parser N-API support matrix and matches the checked-in package target configuration. The normalized package-label model can represent additional triples, but a label example does not itself promise build or release support. Linux arm64 musl remains a future target until CI cross-build, native loading, packaging, and publish smoke tests are verified.
 
 Both packages are ESM-only packages. Their package `exports` map exposes only `.` as the public entry point in Phase 2. Additional subpath exports such as `./debug`, `./types`, or `./package.json` are not part of the v0.1 public compatibility surface.
 
@@ -641,7 +642,6 @@ Generated package names:
 - `@intlify/ox-mf2-napi-linux-x64-gnu`
 - `@intlify/ox-mf2-napi-linux-x64-musl`
 - `@intlify/ox-mf2-napi-linux-arm64-gnu`
-- `@intlify/ox-mf2-napi-linux-arm64-musl`
 - `@intlify/ox-mf2-napi-win32-x64-msvc`
 
 Prebuild targets:
@@ -651,8 +651,9 @@ Prebuild targets:
 - Linux x64 GNU
 - Linux x64 musl
 - Linux arm64 GNU
-- Linux arm64 musl
 - Windows x64 MSVC
+
+Linux arm64 musl may be added to both lists only after its release pipeline and runtime smoke tests are supported; it is not part of the initial matrix.
 
 If no platform optional package exists for the current environment, the N-API package reports a native binding load failure through the host package loader. Phase 2 does not require a source build fallback and does not automatically fall back to the WASM package. Consumers that need a portable runtime should import `@intlify/ox-mf2-wasm` explicitly.
 

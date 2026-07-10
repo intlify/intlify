@@ -62,9 +62,11 @@ Earlier phases should keep later consumers in mind when shaping public contracts
 
 ## SnapshotView
 
-Phase 3 does not introduce a second public AST view. The existing Binary AST `SnapshotView` / binding-side snapshot accessor remains the common syntax input for formatter, linter, LSP/editor, and transport consumers.
+Phase 3 does not introduce a second public AST view. The existing Binary AST `SnapshotView` / binding-side snapshot accessor remains the common public serialized syntax foundation for formatter, linter, LSP/editor, and transport consumers; this does not require every initial product entry point to accept a snapshot directly.
 
 `SnapshotView` is already defined by the Phase 2 Binary AST snapshot design as a lazy decoder/accessor over versioned snapshot bytes. Phase 3 extends that contract at the consumer-requirements level rather than replacing it with a recursive object AST.
+
+The Phase 3C initial linter is the explicit source-backed exception: `lintMessage(source)` parses into construction-time `CstView` plus parser-owned `SemanticModel` facts and does not expose `lintSnapshot`. Snapshot-backed linting remains deferred until the parser owns a snapshot-to-`SemanticModel` path that preserves semantic validation behavior. Formatter snapshot APIs and future snapshot-backed linter/editor optimizations continue to use `SnapshotView` as the public serialized syntax boundary.
 
 Core `SnapshotView` requirements:
 
@@ -144,7 +146,7 @@ The formatter should support at least two modes. Detailed formatter rules, API s
 
 Standard mode is a deterministic pretty-printer over the public syntax view.
 
-Preserve mode is source-shape-sensitive pretty formatting. It may preserve single-line / multi-line choices, blank-line grouping, quote or literal spelling, and comment/trivia placement when those choices are recoverable from tokens, trivia, delimiter spans, and source slices. It should still normalize local spacing, indentation, and other standard formatting rules.
+Preserve mode is source-shape-sensitive pretty formatting. It may preserve single-line / multi-line choices, blank-line grouping, and whitespace trivia placement when those choices are recoverable from tokens, trivia, delimiter spans, and source slices. It should still normalize local spacing, indentation, and other standard formatting rules. In Phase 3B, both standard and preserve modes preserve translatable pattern text, quoted and unquoted literal spelling, and escape spelling through verified source slices. MF2 defines no line-comment or block-comment syntax, so comment placement is not a formatter mode capability.
 
 ### Message-Level Formatting
 
@@ -180,7 +182,7 @@ Formatter configuration should support `ignorePatterns` but not file-specific `o
 
 ### EditorConfig
 
-The formatter should read `.editorconfig` as formatter-only fallback input for unset formatting options. The linter should not read `.editorconfig`.
+The Phase 3B initial formatter does not read `.editorconfig` because `mode` is the only supported formatting option. Once formatter options with corresponding EditorConfig properties, such as line width, indent width, line ending, or final newline, are explicitly supported, the formatter should read `.editorconfig` as formatter-only fallback input for those options when they remain unset by higher-precedence sources. The linter should not read `.editorconfig`.
 
 ### Invalid Syntax
 
@@ -286,7 +288,17 @@ CLI JSON output, Rust results, N-API results, WASM results, and LSP bridges shou
 - a single JSON-visible `code` field across parser, semantic, and lint diagnostics
 - UTF-8 byte span as the canonical location
 - optional derived line/column or UTF-16 positions for CLI/editor consumers
-- summary counts such as `errorCount` and `warningCount`
+- surface-specific diagnostic and operational counts as defined below
+
+Count field names are intentionally surface-specific:
+
+| Surface | Diagnostic counts | Operational error count |
+| --- | --- | --- |
+| CLI JSON `summary` | `diagnosticErrorCount` and `diagnosticWarningCount` | `errorCount`, counting top-level `errors` plus all target-local `results[].errors` |
+| Programmatic lint `ok: true` | `errorCount` and `warningCount`, derived from the returned diagnostics | none; this branch has no operational errors |
+| Programmatic lint `ok: false` | none; incomplete/partial diagnostics are not returned | represented by `errors[]`, without a numeric count field |
+
+The programmatic success branch can use plain `errorCount` for diagnostic errors because no operational error count coexists on that surface. CLI summaries reserve plain `errorCount` for operational errors and use the `diagnostic*` prefix for diagnostic counts, following the shared [Phase 3A machine-readable output](./006-ox-mf2-phase-3a-tooling-foundation-design.md#machine-readable-output) rule for command-specific counts.
 
 ### Stable Identifiers and Rule Metadata
 

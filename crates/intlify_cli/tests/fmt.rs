@@ -291,13 +291,14 @@ fn stdin_ignore_uses_passthrough_or_zero_target_json() {
         r#"{"fmt":{"ignorePatterns":["virtual/**"]}}"#,
     );
 
+    let original = format!("\u{feff}{}\r\n", unformatted_message());
     let text = run_stdin(
         &["fmt", "--stdin-filepath", "virtual/count.mf2"],
         &root,
-        unformatted_message(),
+        &original,
     );
     assert_eq!(text.exit_code, 0);
-    assert_eq!(text.stdout, unformatted_message());
+    assert_eq!(text.stdout.as_bytes(), original.as_bytes());
     assert!(text.stderr.is_empty());
 
     let json = run_stdin(
@@ -309,13 +310,38 @@ fn stdin_ignore_uses_passthrough_or_zero_target_json() {
             "--reporter=json",
         ],
         &root,
-        unformatted_message(),
+        &original,
     );
     let output = json_stdout(&json);
     assert_eq!(json.exit_code, 0);
     assert_eq!(output["summary"]["operation"], "stdin-check");
     assert_eq!(output["summary"]["matchedFiles"], 0);
     assert!(output["results"].as_array().expect("results").is_empty());
+}
+
+#[test]
+fn ignored_stdin_still_rejects_invalid_utf8() {
+    let root = temp_project_root("stdin-ignore-invalid-utf8");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{"fmt":{"ignorePatterns":["virtual/**"]}}"#,
+    );
+
+    let result = intlify_cli::run_with_stdin(
+        [
+            "fmt",
+            "--stdin-filepath",
+            "virtual/count.mf2",
+            "--reporter=json",
+        ],
+        &*root,
+        [0xff],
+    );
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(output["errors"][0]["code"], "input_read_failed");
+    assert_eq!(output["errors"][0]["details"]["reason"], "invalid_utf8");
 }
 
 #[test]
