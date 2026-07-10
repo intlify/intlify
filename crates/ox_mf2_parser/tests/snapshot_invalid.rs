@@ -64,6 +64,8 @@ fn unsupported_major_version_is_rejected() {
     bytes[8] = 0x99;
     let err = decode_snapshot(&bytes).unwrap_err();
     assert_eq!(err.code, DecodeErrorCode::UnsupportedMajorVersion);
+    assert_eq!(err.version.expect("version context").major, 0x99);
+    assert_eq!(err.version.expect("version context").minor, 1);
 }
 
 #[test]
@@ -72,6 +74,8 @@ fn unsupported_minor_version_is_rejected() {
     bytes[10] = 0x99;
     let err = decode_snapshot(&bytes).unwrap_err();
     assert_eq!(err.code, DecodeErrorCode::UnsupportedMinorVersion);
+    assert_eq!(err.version.expect("version context").major, 0);
+    assert_eq!(err.version.expect("version context").minor, 0x99);
 }
 
 #[test]

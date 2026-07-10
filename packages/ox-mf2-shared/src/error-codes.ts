@@ -65,13 +65,26 @@ export const OxMf2ErrorCode = {
   SnapshotWriteMissingRoot: 2011,
   SnapshotWriteInvalidSourceId: 2012,
   SnapshotWriteInconsistentSourceId: 2013,
+  SnapshotWriteTriviaNotCollected: 2014,
 
   // Source text (3000..3999)
   SourceTextNotIncluded: 3000,
   SourceTextSpanOutOfBounds: 3001,
   SourceTextTooLarge: 3002,
   SourceTextCountMismatch: 3003,
+  // Reserved; Phase 2 input validation throws TypeError instead.
   SourceTextUnpairedSurrogate: 3004,
+
+  // Parse (4000..4999)
+  ParseSourceTooLarge: 4000,
+  ParseInvalidSourceId: 4001,
+  ParseTooManySources: 4002,
+  ParseTooManyNodes: 4003,
+  ParseTooManyEdges: 4004,
+  ParseTooManyTokens: 4005,
+  ParseTooManyTrivia: 4006,
+  ParseTooManyDiagnostics: 4007,
+  ParseMissingRoot: 4008,
 
   // Initialization (10000..10999)
   InitializationWasmNotInitialized: 10_000,

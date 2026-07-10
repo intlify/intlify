@@ -34,7 +34,7 @@ type WasmDiagnostic = {
 
 type WasmOperationalErrorDetail = {
   readonly key: string
-  readonly value: string
+  readonly valueJson: string
 }
 
 type WasmOperationalError = {

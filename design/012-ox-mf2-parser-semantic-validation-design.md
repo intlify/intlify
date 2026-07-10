@@ -336,12 +336,15 @@ The primary span is the `.match` selector variable occurrence. If the selector i
 Reports a matcher variant whose key count does not match the selector count. The parser accepts arbitrary key counts syntactically, so this is a semantic diagnostic. The primary span is the offending variant's key list, with a label on the selector list.
 
 ```mf2
+.input {$gender :string}
+.input {$count :number}
 .match $gender $count
 male {{He has items.}}
 * * {{Fallback}}
 ```
 
 ```mf2
+.input {$count :number}
 .match $count
 one few {{Items}}
 * {{Fallback}}
@@ -356,12 +359,15 @@ Reports a matcher without a fallback variant. Per the MF2 rule, at least one var
 The primary span is the `.match` keyword span, because no fallback token exists. For diagnostic-free parses, the `.match` keyword span should be available. If the implementation cannot derive it, semantic validation uses the current-offset empty span only as a defensive last resort. Labels may point at the matcher body or variant list for human-readable output, but labels are not fixture-locked.
 
 ```mf2
+.input {$count :number}
 .match $count
 0 {{No items}}
 1 {{One item}}
 ```
 
 ```mf2
+.input {$gender :string}
+.input {$count :number}
 .match $gender $count
 male 1 {{He has one item}}
 female 1 {{She has one item}}
@@ -374,6 +380,7 @@ Reports duplicate variant key tuples. Literal keys are compared by their cooked 
 Arity-invalid variants do not participate in duplicate tuple comparison, because their tuple cannot be evaluated against the selector list. They also do not count as fallback candidates for `missing-fallback-variant`. An arity-invalid catch-all such as `* *` in a single-selector matcher therefore reports `variant-key-arity-mismatch` and still allows `missing-fallback-variant` to report independently.
 
 ```mf2
+.input {$count :number}
 .match $count
 1 {{One item}}
 |1| {{Single item}}

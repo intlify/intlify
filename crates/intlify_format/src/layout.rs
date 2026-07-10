@@ -429,13 +429,19 @@ impl Formatter<'_> {
         }
 
         let selector_count = selector_docs.len();
-        let mut column_widths = vec![0usize; selector_count];
+        // Variant-key arity is a semantic constraint, not an MF2 grammar
+        // invariant. Grammar-valid input may therefore contain fewer or more
+        // keys than selectors. Preserve every key and size enough columns for
+        // both the selector shape and the widest row; missing row columns are
+        // rendered as padding without synthesising source keys.
+        let column_count = rows
+            .iter()
+            .map(|row| row.keys.len())
+            .max()
+            .unwrap_or(0)
+            .max(selector_count);
+        let mut column_widths = vec![0usize; column_count];
         for row in &rows {
-            if row.keys.len() != selector_count {
-                return Err(internal_error(
-                    "matcher row key count does not match selectors",
-                ));
-            }
             for (index, key) in row.keys.iter().enumerate() {
                 column_widths[index] = column_widths[index].max(key.width);
             }
@@ -497,10 +503,14 @@ impl Formatter<'_> {
     #[allow(clippy::unused_self)]
     fn render_matcher_row(&self, row: MatcherRow, column_widths: &[usize]) -> Document {
         let mut parts = Vec::new();
+        let key_count = row.keys.len();
         for (index, key) in row.keys.into_iter().enumerate() {
             let padding = column_widths[index].saturating_sub(key.width) + 2;
             parts.push(key.document);
             parts.push(Document::owned_text(" ".repeat(padding)));
+        }
+        for width in &column_widths[key_count..] {
+            parts.push(Document::owned_text(" ".repeat(width + 2)));
         }
         parts.push(row.value);
         Document::concat(parts)

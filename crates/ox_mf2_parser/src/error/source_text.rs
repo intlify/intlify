@@ -14,7 +14,8 @@ pub enum SourceTextErrorCode {
     SourceTextTooLarge = 3002,
     /// Reserved: batch source attachment count mismatch.
     SourceTextCountMismatch = 3003,
-    /// Reserved: UTF-16 unpaired surrogate rejection at binding boundary.
+    /// Reserved for numeric compatibility; Phase 2 bindings reject unpaired
+    /// surrogates with built-in `TypeError` and do not emit this code.
     SourceTextUnpairedSurrogate = 3004,
 }
 

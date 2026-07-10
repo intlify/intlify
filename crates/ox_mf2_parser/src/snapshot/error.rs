@@ -13,6 +13,13 @@
 use crate::error::OxMf2ErrorCode;
 use crate::snapshot::format::SectionKind;
 
+/// Major/minor version read from a snapshot wire header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnapshotVersion {
+    pub major: u16,
+    pub minor: u16,
+}
+
 /// Snapshot encode failure code (`2000..2999`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -31,6 +38,7 @@ pub enum SnapshotWriteErrorCode {
     MissingRoot = 2011,
     InvalidSourceId = 2012,
     InconsistentSourceId = 2013,
+    TriviaNotCollected = 2014,
 }
 
 impl SnapshotWriteErrorCode {
@@ -60,6 +68,7 @@ impl SnapshotWriteErrorCode {
             Self::MissingRoot => "SnapshotWriteMissingRoot",
             Self::InvalidSourceId => "SnapshotWriteInvalidSourceId",
             Self::InconsistentSourceId => "SnapshotWriteInconsistentSourceId",
+            Self::TriviaNotCollected => "SnapshotWriteTriviaNotCollected",
         }
     }
 }
@@ -109,6 +118,9 @@ pub enum SnapshotWriteError {
     /// different source (the spans would no longer match the
     /// `SourceRecord`'s source text or metadata).
     InconsistentSourceId,
+    /// Trivia encoding was requested for a parse result produced with
+    /// `collect_trivia = false`.
+    TriviaNotCollected,
 }
 
 impl SnapshotWriteError {
@@ -130,6 +142,7 @@ impl SnapshotWriteError {
             Self::MissingRoot => SnapshotWriteErrorCode::MissingRoot,
             Self::InvalidSourceId => SnapshotWriteErrorCode::InvalidSourceId,
             Self::InconsistentSourceId => SnapshotWriteErrorCode::InconsistentSourceId,
+            Self::TriviaNotCollected => SnapshotWriteErrorCode::TriviaNotCollected,
         }
     }
 
@@ -156,6 +169,9 @@ impl core::fmt::Display for SnapshotWriteError {
             Self::MissingRoot => "parse result has no root node",
             Self::InvalidSourceId => "record references a SourceId that is not in SourceStore",
             Self::InconsistentSourceId => "batch item source does not match item.result.source",
+            Self::TriviaNotCollected => {
+                "snapshot trivia was requested but parser trivia was not collected"
+            }
         })
     }
 }
@@ -335,6 +351,7 @@ pub struct DecodeError {
     pub section: Option<SectionKind>,
     pub offset: Option<u32>,
     pub index: Option<u32>,
+    pub version: Option<SnapshotVersion>,
 }
 
 impl DecodeError {
@@ -345,6 +362,7 @@ impl DecodeError {
             section: None,
             offset: None,
             index: None,
+            version: None,
         }
     }
 
@@ -373,6 +391,13 @@ impl DecodeError {
         self.index = Some(index);
         self
     }
+
+    /// Attach the major/minor version read from the snapshot header.
+    #[must_use]
+    pub const fn with_version(mut self, major: u16, minor: u16) -> Self {
+        self.version = Some(SnapshotVersion { major, minor });
+        self
+    }
 }
 
 impl core::fmt::Display for DecodeError {
@@ -386,6 +411,9 @@ impl core::fmt::Display for DecodeError {
         }
         if let Some(index) = self.index {
             write!(f, " at index {index}")?;
+        }
+        if let Some(version) = self.version {
+            write!(f, " (version {}.{})", version.major, version.minor)?;
         }
         Ok(())
     }
@@ -407,7 +435,15 @@ mod tests {
         assert_eq!(err.section, Some(SectionKind::StringOffsets));
         assert_eq!(err.offset, Some(64));
         assert_eq!(err.index, Some(3));
+        assert_eq!(err.version, None);
         assert_eq!(err.as_ox_mf2_error_code(), 1020);
+    }
+
+    #[test]
+    fn decode_error_carries_snapshot_version() {
+        let err = DecodeError::new(DecodeErrorCode::UnsupportedMinorVersion).with_version(0, 3);
+        assert_eq!(err.version, Some(SnapshotVersion { major: 0, minor: 3 }));
+        assert!(err.to_string().contains("version 0.3"));
     }
 
     #[test]
@@ -428,6 +464,7 @@ mod tests {
             MissingRoot,
             InvalidSourceId,
             InconsistentSourceId,
+            TriviaNotCollected,
         ];
         let mut seen = std::collections::HashSet::new();
         for code in codes {
@@ -456,6 +493,7 @@ mod tests {
             MissingRoot,
             InvalidSourceId,
             InconsistentSourceId,
+            TriviaNotCollected,
         ];
         let mut seen = std::collections::HashSet::new();
         for err in variants {

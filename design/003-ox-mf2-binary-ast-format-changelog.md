@@ -30,7 +30,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - Optional sections: trivia, diagnostics, diagnostic labels, source text data, extended data.
 - Snapshot SourceId values are snapshot-local indexes into the sources section; SnapshotWriter remaps Phase 1 SourceId values during encoding.
 - Required core sections are emitted even when the format permits an empty count or byte length.
-- Empty optional sections are usually omitted, but the v0.1 default writer emits empty `Trivia` when `SnapshotOptions.include_trivia = true`, empty `Diagnostics` when `SnapshotOptions.include_diagnostics = true`, and empty `SourceTextData` when `SnapshotOptions.include_source_text = true`.
+- Empty optional sections are usually omitted, but the v0.1 default writer emits empty `Trivia` when `SnapshotOptions.include_trivia = true` and the parse result proves trivia collection, empty `Diagnostics` when `SnapshotOptions.include_diagnostics = true`, and empty `SourceTextData` when `SnapshotOptions.include_source_text = true`.
 - v0.1 writer does not emit extended data.
 - v0.1 writer does not deduplicate SourceRecord entries or source text bytes.
 - String table deduplicates metadata and diagnostics strings only.
@@ -84,7 +84,7 @@ The compatibility guard tests under `crates/ox_mf2_parser/tests/snapshot_compat.
 
 Use this checklist when intentionally changing the snapshot wire format:
 
-1. Decide whether the change is a minor (additive) or major (incompatible) bump. While `major_version = 0`, every change is treated as draft and decoders use exact version matching, so any change inside v0.x is effectively a draft bump that requires updating both the writer and the v0.x decoder.
+1. Decide whether the change is a draft, minor, or major bump. While `major_version = 0`, a wire-visible change uses the next `0.N` draft version and decoders use exact version matching, so the writer and v0.x decoder must be updated together. This includes emitting a newly assigned core `SyntaxKind`; published kind numbers are still never reordered or reused. After v1.0, backward-compatible optional additions may use a minor bump, while a new core kind or other change an existing decoder cannot interpret requires a major bump.
 2. Update the v0.1 section above (or open a new `v0.N` / `vM.0` heading) with one bullet per intentional change.
 3. Update `design/003-ox-mf2-phase-2-binary-ast-snapshot-design.md` to describe the new format.
 4. Update the Rust constants in `crates/ox_mf2_parser/src/snapshot/format.rs` and any matching decoder validation in `crates/ox_mf2_parser/src/snapshot/decoder.rs`.

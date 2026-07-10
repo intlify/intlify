@@ -47,10 +47,14 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
     let major = read_u16_le(bytes, 8);
     let minor = read_u16_le(bytes, 10);
     if major != SNAPSHOT_MAJOR_VERSION {
-        return Err(DecodeError::new(DecodeErrorCode::UnsupportedMajorVersion));
+        return Err(
+            DecodeError::new(DecodeErrorCode::UnsupportedMajorVersion).with_version(major, minor)
+        );
     }
     if minor != SNAPSHOT_MINOR_VERSION {
-        return Err(DecodeError::new(DecodeErrorCode::UnsupportedMinorVersion));
+        return Err(
+            DecodeError::new(DecodeErrorCode::UnsupportedMinorVersion).with_version(major, minor)
+        );
     }
     let feature_flags = read_u32_le(bytes, 12);
     if feature_flags != SNAPSHOT_FEATURE_FLAGS {

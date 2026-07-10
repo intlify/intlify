@@ -8,9 +8,9 @@
 
 use ox_mf2_parser::{
     ox_mf2_error_code_name, parse_batch, parse_message, parse_source, parse_source_session,
-    BatchParseOptions, DecodeError, DecodeErrorCode, OxMf2ErrorCode, ParseCapacity, ParseInput,
-    ParseOptions, ParseWorkspace, SnapshotWriteError, SourceFileInput, SourceStore,
-    SourceTextUnavailable,
+    BatchParseOptions, DecodeError, DecodeErrorCode, OxMf2ErrorCode, ParseCapacity, ParseError,
+    ParseInput, ParseOptions, ParseWorkspace, SnapshotWriteError, SourceFileInput, SourceId,
+    SourceStore, SourceTextUnavailable,
 };
 
 #[test]
@@ -31,7 +31,7 @@ fn error_code_exports_are_available_from_crate_root() {
 
 #[test]
 fn parse_message_returns_owned_result() {
-    let result = parse_message("Hello");
+    let result = parse_message("Hello").expect("parse succeeds");
     assert!(
         result.diagnostics.is_empty(),
         "unexpected diagnostics: {:?}",
@@ -49,8 +49,21 @@ fn parse_source_uses_caller_owned_source_store() {
         path: Some("greeting.mf2"),
         ..Default::default()
     });
-    let result = parse_source(&sources, id, ParseOptions::default());
+    let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
     assert_eq!(result.source, id);
+}
+
+#[test]
+fn parse_source_rejects_unknown_source_id() {
+    let sources = SourceStore::new();
+    let error = parse_source(&sources, SourceId::new(7), ParseOptions::default())
+        .expect_err("unknown source id must fail");
+    assert_eq!(
+        error,
+        ParseError::InvalidSourceId {
+            source_id: SourceId::new(7)
+        }
+    );
 }
 
 #[test]
@@ -67,9 +80,11 @@ fn parse_source_session_reuses_workspace_capacity() {
 
     let mut workspace = ParseWorkspace::with_capacity(ParseCapacity::new(8, 8, 8, 8, 4));
     let cap_before = workspace.node_capacity();
-    let _ = parse_source_session(&sources, id_a, &mut workspace, ParseOptions::default());
+    let _ = parse_source_session(&sources, id_a, &mut workspace, ParseOptions::default())
+        .expect("parse succeeds");
     let cap_after_a = workspace.node_capacity();
-    let _ = parse_source_session(&sources, id_b, &mut workspace, ParseOptions::default());
+    let _ = parse_source_session(&sources, id_b, &mut workspace, ParseOptions::default())
+        .expect("parse succeeds");
     let cap_after_b = workspace.node_capacity();
 
     assert!(cap_after_a >= cap_before);
@@ -95,7 +110,7 @@ fn parse_batch_preserves_input_order() {
             ..Default::default()
         },
     ];
-    let result = parse_batch(&inputs, BatchParseOptions::default());
+    let result = parse_batch(&inputs, BatchParseOptions::default()).expect("batch parse succeeds");
     assert_eq!(result.items.len(), 3);
     assert_eq!(result.items[0].source.raw(), 0);
     assert_eq!(result.items[1].source.raw(), 1);

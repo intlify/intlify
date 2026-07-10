@@ -40,7 +40,7 @@ type NativeDiagnostic = {
 
 type NativeOperationalErrorDetail = {
   readonly key: string
-  readonly value: string
+  readonly valueJson: string
 }
 
 type NativeOperationalError = {

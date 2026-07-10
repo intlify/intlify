@@ -111,7 +111,7 @@ impl From<intlify_format::OperationalError> for OperationalError {
         let details = if error.details.is_empty() {
             None
         } else {
-            Some(json!(error.details))
+            Some(Value::Object(error.details.into_iter().collect()))
         };
 
         Self {

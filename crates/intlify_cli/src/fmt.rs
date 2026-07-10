@@ -570,10 +570,24 @@ fn run_stdin(
     }
 
     if ignore_matcher.is_ignored(&path_label) {
+        let original = match str::from_utf8(stdin) {
+            Ok(source) => source,
+            Err(error) => {
+                return render_fmt_report(
+                    reporter,
+                    &loaded.project_root,
+                    FmtReport::empty(
+                        execution.operation,
+                        Some(execution.mode),
+                        vec![input_decode_error(&path_label, error)],
+                    ),
+                );
+            }
+        };
         if reporter == Reporter::Text && !execution.operation.is_check() {
             return CliRunResult {
                 exit_code: 0,
-                stdout: String::from_utf8_lossy(stdin).into_owned(),
+                stdout: original.to_owned(),
                 stderr: String::new(),
             };
         }

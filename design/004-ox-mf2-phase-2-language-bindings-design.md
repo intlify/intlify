@@ -38,8 +38,9 @@ Generated platform package names use the host package name plus platform / archi
 - `@intlify/ox-mf2-napi-linux-x64-gnu`
 - `@intlify/ox-mf2-napi-linux-x64-musl`
 - `@intlify/ox-mf2-napi-linux-arm64-gnu`
-- `@intlify/ox-mf2-napi-linux-arm64-musl`
 - `@intlify/ox-mf2-napi-win32-x64-msvc`
+
+This is the initial parser N-API support matrix and matches the checked-in package target configuration. The normalized package-label model can represent additional triples, but a label example does not itself promise build or release support. Linux arm64 musl remains a future target until CI cross-build, native loading, packaging, and publish smoke tests are verified.
 
 Both packages are ESM-only packages. Their package `exports` map exposes only `.` as the public entry point in Phase 2. Additional subpath exports such as `./debug`, `./types`, or `./package.json` are not part of the v0.1 public compatibility surface.
 
@@ -248,6 +249,8 @@ Input type and range errors use built-in JS errors:
 Bindings map `messageId` to Rust/snapshot `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset. JavaScript string UTF-16 position conversion is a binding/editor adapter responsibility and is not stored in snapshot node fields.
 
 Phase 2 bindings reject JavaScript strings that contain unpaired surrogates with `TypeError`. The Rust parser path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
+
+`SourceTextErrorCode.SourceTextUnpairedSurrogate` (`3004`) remains reserved for numeric compatibility but is not emitted by Phase 2 bindings. Unpaired-surrogate rejection happens during raw JavaScript input validation, before an `OxMf2SourceTextError` boundary exists.
 
 ## Result Object Boundary
 
@@ -531,10 +534,13 @@ Binding error class mapping:
 | `DecodeErrorCode`            | `OxMf2SnapshotError`       |
 | `SnapshotWriteErrorCode`     | `OxMf2SnapshotError`       |
 | `SourceTextErrorCode`        | `OxMf2SourceTextError`     |
+| `ParseErrorCode`             | `OxMf2ParseError`          |
 | `InitializationErrorCode`    | `OxMf2InitializationError` |
 | `BindingValidationErrorCode` | `OxMf2ParseError`          |
 
 Wrong input types, invalid numeric ranges, and indexed accessor misuse still use built-in `TypeError` or `RangeError` when those built-ins express the failure clearly. `BindingValidationErrorCode` is reserved for ox-mf2-specific validation failures that need a stable numeric code.
+
+Unpaired surrogates are one such built-in validation case: parser input and `withSources()` reject them with `TypeError`. The reserved `SourceTextUnpairedSurrogate` numeric constant is not mapped to or emitted as `OxMf2SourceTextError` in Phase 2.
 
 `OxMf2ErrorCode` exposes detailed numeric constants that are close to the Rust error domains, while error classes provide coarse JS exception grouping. Example constant names:
 
@@ -636,7 +642,6 @@ Generated package names:
 - `@intlify/ox-mf2-napi-linux-x64-gnu`
 - `@intlify/ox-mf2-napi-linux-x64-musl`
 - `@intlify/ox-mf2-napi-linux-arm64-gnu`
-- `@intlify/ox-mf2-napi-linux-arm64-musl`
 - `@intlify/ox-mf2-napi-win32-x64-msvc`
 
 Prebuild targets:
@@ -646,8 +651,9 @@ Prebuild targets:
 - Linux x64 GNU
 - Linux x64 musl
 - Linux arm64 GNU
-- Linux arm64 musl
 - Windows x64 MSVC
+
+Linux arm64 musl may be added to both lists only after its release pipeline and runtime smoke tests are supported; it is not part of the initial matrix.
 
 If no platform optional package exists for the current environment, the N-API package reports a native binding load failure through the host package loader. Phase 2 does not require a source build fallback and does not automatically fall back to the WASM package. Consumers that need a portable runtime should import `@intlify/ox-mf2-wasm` explicitly.
 

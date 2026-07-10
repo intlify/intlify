@@ -35,7 +35,9 @@ Machine-readable output should be stable enough for agents to identify affected 
 
 Lint result contracts, diagnostic codes, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
 
-Agent integrations should use [linter-rules/index.md](./linter-rules/index.md) as the rule documentation entry point when they need rule descriptions, docs slugs, or user-facing remediation context. They may summarize or link those docs for a specific environment, but they should not invent a separate rule catalog.
+Agent integrations should use stable diagnostic codes and configurable rule ids as their machine-facing keys. During repository development, [linter-rules/index.md](./linter-rules/index.md) is the design-time entry point for reader-facing descriptions and remediation context; integrations may summarize that material for a specific environment but should not invent a separate rule catalog.
+
+Initial agent integrations must not depend on a docs slug, public documentation URL, diagnostic `help` field, or runtime rule-metadata API. The linter's generated docs slug is internal metadata and the design-time pages are not a public runtime lookup contract. Exposing any of those values later requires the explicit public metadata/help contract owned by the linter design.
 
 ## Integration Shapes
 

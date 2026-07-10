@@ -13,6 +13,7 @@ use crate::api::{
     BatchParseResult, ParseInput, ParseOptions, ParseResult, ParseSessionResult,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticCode, MESSAGE_REF_CATALOG};
+use crate::error::{BatchParseError, ParseError, ParseResource};
 use crate::snapshot::error::SnapshotWriteError;
 use crate::snapshot::format::{
     checked_u32, write_u16_le, write_u32_le, write_u8, RootId, SectionKind, StringId,
@@ -105,6 +106,7 @@ pub fn parse_result_to_snapshot(
     result: &ParseResult,
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
+    require_collected_trivia(result.trivia_collected, options)?;
     // The owned-result path clones once, here, so the encoder body
     // can move the `Vec` straight into `SnapshotResult.diagnostics`
     // instead of doing a second `.to_vec()` inside `encode_single`.
@@ -167,7 +169,7 @@ pub fn parse_message_to_snapshot(
     let id = sources
         .try_add(input)
         .map_err(|_| SnapshotWriteError::SourceTooLarge)?;
-    let result = run_parse_source(&sources, id, parse_options);
+    let result = run_parse_source(&sources, id, parse_options).map_err(snapshot_parse_error)?;
     parse_result_to_snapshot(&sources, &result, snapshot_options)
 }
 
@@ -179,7 +181,8 @@ pub fn parse_source_to_snapshot(
     parse_options: ParseOptions,
     snapshot_options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
-    let result = run_parse_source(sources, source_id, parse_options);
+    let result =
+        run_parse_source(sources, source_id, parse_options).map_err(snapshot_parse_error)?;
     parse_result_to_snapshot(sources, &result, snapshot_options)
 }
 
@@ -192,6 +195,7 @@ pub fn parse_session_to_snapshot(
     session: &ParseSessionResult<'_>,
     options: SnapshotOptions,
 ) -> Result<SnapshotResult, SnapshotWriteError> {
+    require_collected_trivia(session.trivia_collected, options)?;
     // Materialise diagnostics into owned values exactly once. The
     // owned `Vec` is moved into both the writer (as a borrow) and the
     // returned `SnapshotResult.diagnostics`, so workspace-reuse / LSP
@@ -213,18 +217,28 @@ pub fn parse_batch_to_snapshot(
     batch_options: BatchParseOptions,
     snapshot_options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError> {
-    // Phase 1's `parse_batch` registers each input through
-    // `SourceStore::add`, which panics on `source.len() > u32::MAX`.
-    // The public snapshot API returns `Result<_, SnapshotWriteError>`,
-    // so pre-validate every input here and convert oversized inputs
-    // to `SnapshotWriteError::SourceTooLarge` before parse runs.
-    for input in inputs {
-        if u32::try_from(input.source.len()).is_err() {
-            return Err(SnapshotWriteError::SourceTooLarge);
-        }
-    }
-    let batch = run_parse_batch(inputs, batch_options);
+    let batch = run_parse_batch(inputs, batch_options).map_err(snapshot_batch_parse_error)?;
     parse_batch_result_to_snapshot(&batch, snapshot_options)
+}
+
+fn snapshot_batch_parse_error(error: BatchParseError) -> SnapshotWriteError {
+    snapshot_parse_error(error.error)
+}
+
+fn snapshot_parse_error(error: ParseError) -> SnapshotWriteError {
+    match error {
+        ParseError::SourceTooLarge => SnapshotWriteError::SourceTooLarge,
+        ParseError::InvalidSourceId { .. } => SnapshotWriteError::InvalidSourceId,
+        ParseError::MissingRoot => SnapshotWriteError::MissingRoot,
+        ParseError::ResourceLimit { resource } => match resource {
+            ParseResource::Sources => SnapshotWriteError::TooManySources,
+            ParseResource::Nodes => SnapshotWriteError::TooManyNodes,
+            ParseResource::Edges => SnapshotWriteError::TooManyEdges,
+            ParseResource::Tokens => SnapshotWriteError::TooManyTokens,
+            ParseResource::Trivia => SnapshotWriteError::TooManyTrivia,
+            ParseResource::Diagnostics => SnapshotWriteError::TooManyDiagnostics,
+        },
+    }
 }
 
 /// Encode an already-produced [`BatchParseResult`] into a shared
@@ -233,6 +247,9 @@ pub fn parse_batch_result_to_snapshot(
     result: &BatchParseResult,
     options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError> {
+    for item in &result.items {
+        require_collected_trivia(item.result.trivia_collected, options)?;
+    }
     // Phase 1 `parse_batch` guarantees `item.source ==
     // item.result.source`, but `BatchParseResult` / `BatchParseItem`
     // are public + `Clone` + struct-literal-constructible, so a
@@ -287,6 +304,16 @@ pub fn parse_batch_result_to_snapshot(
         execution: result.execution,
         degraded: result.degraded,
     })
+}
+
+fn require_collected_trivia(
+    trivia_collected: bool,
+    options: SnapshotOptions,
+) -> Result<(), SnapshotWriteError> {
+    if options.include_trivia && !trivia_collected {
+        return Err(SnapshotWriteError::TriviaNotCollected);
+    }
+    Ok(())
 }
 
 fn encode_single(

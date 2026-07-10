@@ -44,7 +44,7 @@ pub(crate) struct WasmDiagnostic {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WasmOperationalErrorDetail {
     key: String,
-    value: String,
+    value_json: String,
 }
 
 #[derive(Serialize)]
@@ -175,7 +175,10 @@ fn error_to_wasm(error: OperationalError) -> WasmOperationalError {
         details: error
             .details
             .into_iter()
-            .map(|(key, value)| WasmOperationalErrorDetail { key, value })
+            .map(|(key, value)| WasmOperationalErrorDetail {
+                key,
+                value_json: value.to_string(),
+            })
             .collect(),
     }
 }

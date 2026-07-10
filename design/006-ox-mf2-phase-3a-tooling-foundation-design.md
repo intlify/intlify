@@ -272,16 +272,18 @@ The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the o
 - `version`: CLI/package version
 - `projectRoot`: discovered project root
 - `summary`: command-level aggregate status and optional command-specific counts
-- `results`: command-specific file, message, diagnostic, or formatting results
-- `errors`: operational errors separated from parser, formatter, and linter diagnostics
+- `results`: command-specific file, message, diagnostic, or formatting results; a command-specific result may define a target-local `errors` array
+- `errors`: global operational errors that are not owned by one command target, separated from parser, formatter, and linter diagnostics
 
-Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope.
+Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope. They may add `results[].errors` for failures tied to one selected file, message, or other target. Such target-local errors use the same operational error shape and code namespace as top-level errors; they are not diagnostics.
 
 The shared `summary.status` values are:
 
 - `success`: successful execution, corresponding to exit code `0`
 - `failure`: command executed successfully but reported a check, lint, or formatting failure, corresponding to exit code `1`
 - `error`: operational error, corresponding to exit code `2`
+
+Once a command defines target-local errors, any non-empty top-level `errors` or `results[].errors` makes `summary.status` equal to `error`. A command-specific `errorCount`, when present, counts both locations. Parser, formatter, semantic, and linter diagnostics do not enter either operational error array.
 
 In Phase 3A, only `summary.status` is required in the shared envelope. Command-specific count fields are not defined until formatter, linter, or combined check result schemas are defined in Phase 3B or Phase 3C.
 
@@ -319,9 +321,13 @@ Reserved command placeholder JSON output uses the same envelope. For example, `i
 
 For `lint`, `details.requiredPhase` is `"3C"`. For `check`, `details.requiredPhase` is `"3B+3C"` and `details.requires` is `["fmt", "lint"]`. For `init`, `details.requiredPhase` is `"3B+3C"` and `details.requires` is `["fmt", "lint"]` because config scaffolding should wait until formatter and linter config fields are stable enough to write.
 
-Operational errors are represented only in the top-level `errors` array. They are CLI execution failures rather than parser, formatter, or linter diagnostics.
+Global operational errors are represented in the top-level `errors` array. Examples include invalid CLI arguments, configuration failures, input-selection failures, reporter setup failures, and pathless internal failures that occur before or outside processing one target.
 
-CLI operational error codes are stable string identifiers scoped to the CLI JSON output contract. They are intentionally separate from the numeric `OxMf2ErrorCode` API namespace defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). CLI operational failures may wrap lower-level API errors later, but the top-level CLI `errors[].code` field remains a string.
+Command-specific result schemas may represent target-local operational errors in `results[].errors`. Examples include reading, decoding, formatting, linting, or writing one selected file when other targets can still be processed. The result entry identifies the affected target and normally uses `status: "error"`. A target-local error must not be duplicated in the top-level array.
+
+Phase 3A reserved-command placeholders have no selected targets and therefore use only top-level `errors`. Phase 3B/3C formatter and linter result schemas extend the same envelope with target-local errors; this is an allowed command-specific extension, not a different envelope contract.
+
+CLI operational error codes are stable string identifiers scoped to the CLI JSON output contract. They are intentionally separate from the numeric `OxMf2ErrorCode` API namespace defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). CLI operational failures may wrap lower-level API errors later, but both top-level `errors[].code` and target-local `results[].errors[].code` remain in the same string namespace.
 
 Each operational error contains:
 

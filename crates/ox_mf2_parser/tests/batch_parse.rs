@@ -53,7 +53,7 @@ fn batch_preserves_input_order_and_metadata() {
         },
     ];
 
-    let result = parse_batch(&inputs, BatchParseOptions::default());
+    let result = parse_batch(&inputs, BatchParseOptions::default()).expect("batch parse succeeds");
     assert_eq!(result.items.len(), 3);
     for (i, item) in result.items.iter().enumerate() {
         let file = result.sources.get(item.source).expect("source registered");
@@ -96,7 +96,7 @@ fn batch_each_result_has_independent_cst_state() {
             ..Default::default()
         },
     ];
-    let result = parse_batch(&inputs, BatchParseOptions::default());
+    let result = parse_batch(&inputs, BatchParseOptions::default()).expect("batch parse succeeds");
     let count_a = result.items[0].result.cst.node_count();
     let count_b = result.items[1].result.cst.node_count();
     assert!(count_a > 0);
@@ -110,7 +110,7 @@ fn batch_default_runs_sequentially_and_is_not_degraded() {
         source: "Hi",
         ..Default::default()
     }];
-    let result = parse_batch(&inputs, BatchParseOptions::default());
+    let result = parse_batch(&inputs, BatchParseOptions::default()).expect("batch parse succeeds");
     assert_eq!(result.execution, BatchExecution::Sequential);
     assert!(!result.degraded);
 }
@@ -131,7 +131,7 @@ fn batch_parallel_request_falls_back_to_sequential_and_is_marked_degraded() {
     options.execution = BatchExecution::Parallel;
     options.max_threads = Some(4);
     options.preserve_order = false;
-    let result = parse_batch(&inputs, options);
+    let result = parse_batch(&inputs, options).expect("batch parse succeeds");
     assert_eq!(
         result.execution,
         BatchExecution::Sequential,
@@ -158,7 +158,7 @@ fn batch_handles_malformed_input_without_aborting_subsequent_items() {
             ..Default::default()
         },
     ];
-    let result = parse_batch(&inputs, BatchParseOptions::default());
+    let result = parse_batch(&inputs, BatchParseOptions::default()).expect("batch parse succeeds");
     assert!(!result.items[0].result.diagnostics.is_empty());
     assert!(result.items[1].result.diagnostics.is_empty());
 }

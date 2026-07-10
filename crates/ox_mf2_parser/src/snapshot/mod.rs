@@ -48,7 +48,9 @@ mod view;
 mod writer;
 
 pub use decoder::{decode_snapshot, decode_snapshot_owned};
-pub use error::{DecodeError, DecodeErrorCode, SnapshotWriteError, SnapshotWriteErrorCode};
+pub use error::{
+    DecodeError, DecodeErrorCode, SnapshotVersion, SnapshotWriteError, SnapshotWriteErrorCode,
+};
 pub use format::{
     RootId, SectionKind, StringId, DIAGNOSTIC_LABEL_RECORD_SIZE, DIAGNOSTIC_RECORD_SIZE,
     EDGE_KIND_NODE, EDGE_KIND_TOKEN, EDGE_RECORD_SIZE, EXTENDED_DATA_HEADER_SIZE, HEADER_SIZE,

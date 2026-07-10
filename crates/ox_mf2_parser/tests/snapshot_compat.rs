@@ -220,6 +220,11 @@ fn snapshot_write_error_code_numeric_values_are_locked() {
             SnapshotWriteErrorCode::InconsistentSourceId,
             2013,
         ),
+        (
+            SnapshotWriteError::TriviaNotCollected,
+            SnapshotWriteErrorCode::TriviaNotCollected,
+            2014,
+        ),
     ];
     for (err, code, expected_value) in expected {
         assert_eq!(err.code(), *code);

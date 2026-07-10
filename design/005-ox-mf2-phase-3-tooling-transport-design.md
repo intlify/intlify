@@ -62,9 +62,11 @@ Earlier phases should keep later consumers in mind when shaping public contracts
 
 ## SnapshotView
 
-Phase 3 does not introduce a second public AST view. The existing Binary AST `SnapshotView` / binding-side snapshot accessor remains the common syntax input for formatter, linter, LSP/editor, and transport consumers.
+Phase 3 does not introduce a second public AST view. The existing Binary AST `SnapshotView` / binding-side snapshot accessor remains the common public serialized syntax foundation for formatter, linter, LSP/editor, and transport consumers; this does not require every initial product entry point to accept a snapshot directly.
 
 `SnapshotView` is already defined by the Phase 2 Binary AST snapshot design as a lazy decoder/accessor over versioned snapshot bytes. Phase 3 extends that contract at the consumer-requirements level rather than replacing it with a recursive object AST.
+
+The Phase 3C initial linter is the explicit source-backed exception: `lintMessage(source)` parses into construction-time `CstView` plus parser-owned `SemanticModel` facts and does not expose `lintSnapshot`. Snapshot-backed linting remains deferred until the parser owns a snapshot-to-`SemanticModel` path that preserves semantic validation behavior. Formatter snapshot APIs and future snapshot-backed linter/editor optimizations continue to use `SnapshotView` as the public serialized syntax boundary.
 
 Core `SnapshotView` requirements:
 
@@ -133,7 +135,7 @@ From Phase 2 onward, public AST input for formatter APIs is the Binary AST decod
 
 Formatter implementation may have Rust-internal fast paths over construction-time tables when formatting immediately after parse. However, stable public formatter input is the Binary AST view shared by Rust, N-API, WASM, and later consumers.
 
-The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. A snapshot-based entry point such as `formatSnapshot(snapshot, source?, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. Source text is still needed for preserve mode, source slicing, parser diagnostics, and editor position conversion. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
+The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. `formatSnapshot(snapshot, source, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The complete source string is required in every formatter mode for source slicing, parser diagnostic materialization, output comparison, and available snapshot/source consistency checks; preserve mode additionally uses it for source-shape decisions. The Phase 3 formatter does not expose a source-free snapshot mode. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
 
 ### Formatting Modes
 
@@ -144,7 +146,7 @@ The formatter should support at least two modes. Detailed formatter rules, API s
 
 Standard mode is a deterministic pretty-printer over the public syntax view.
 
-Preserve mode is source-shape-sensitive pretty formatting. It may preserve single-line / multi-line choices, blank-line grouping, quote or literal spelling, and comment/trivia placement when those choices are recoverable from tokens, trivia, delimiter spans, and source slices. It should still normalize local spacing, indentation, and other standard formatting rules.
+Preserve mode is source-shape-sensitive pretty formatting. It may preserve single-line / multi-line choices, blank-line grouping, and whitespace trivia placement when those choices are recoverable from tokens, trivia, delimiter spans, and source slices. It should still normalize local spacing, indentation, and other standard formatting rules. In Phase 3B, both standard and preserve modes preserve translatable pattern text, quoted and unquoted literal spelling, and escape spelling through verified source slices. MF2 defines no line-comment or block-comment syntax, so comment placement is not a formatter mode capability.
 
 ### Message-Level Formatting
 
@@ -180,7 +182,7 @@ Formatter configuration should support `ignorePatterns` but not file-specific `o
 
 ### EditorConfig
 
-The formatter should read `.editorconfig` as formatter-only fallback input for unset formatting options. The linter should not read `.editorconfig`.
+The Phase 3B initial formatter does not read `.editorconfig` because `mode` is the only supported formatting option. Once formatter options with corresponding EditorConfig properties, such as line width, indent width, line ending, or final newline, are explicitly supported, the formatter should read `.editorconfig` as formatter-only fallback input for those options when they remain unset by higher-precedence sources. The linter should not read `.editorconfig`.
 
 ### Invalid Syntax
 
@@ -250,9 +252,9 @@ The JSON configuration surface should be part of the unified config JSON Schema 
 
 ### Presets
 
-The initial linter preset should be a `recommended`-style preset focused on broadly useful correctness diagnostics. Stricter, nursery, experimental, and resource/catalog-oriented presets are future or linter-specific design details rather than Phase 3 core requirements.
+The initial linter preset should be a `recommended`-style preset focused on broadly useful, low-noise message-level diagnostics. Rule category alone does not determine preset membership: the initial recommended rules are best-practice warnings, while a context-dependent correctness rule may remain opt-in. Parser and semantic correctness diagnostics are independent of configurable presets and remain enabled by their pipeline contract. Stricter, nursery, experimental, and resource/catalog-oriented presets are future or linter-specific design details rather than Phase 3 core requirements.
 
-While the linter remains in 0.x, the `recommended` preset may evolve by adding broadly useful correctness diagnostics as needed. Preset stability policy should be finalized before a 1.0 release.
+While the linter remains in 0.x, the `recommended` preset may evolve by adding broadly useful, low-noise configurable diagnostics from suitable categories. Preset stability policy should be finalized before a 1.0 release.
 
 ### CLI Output and Exit Behavior
 
@@ -286,7 +288,17 @@ CLI JSON output, Rust results, N-API results, WASM results, and LSP bridges shou
 - a single JSON-visible `code` field across parser, semantic, and lint diagnostics
 - UTF-8 byte span as the canonical location
 - optional derived line/column or UTF-16 positions for CLI/editor consumers
-- summary counts such as `errorCount` and `warningCount`
+- surface-specific diagnostic and operational counts as defined below
+
+Count field names are intentionally surface-specific:
+
+| Surface | Diagnostic counts | Operational error count |
+| --- | --- | --- |
+| CLI JSON `summary` | `diagnosticErrorCount` and `diagnosticWarningCount` | `errorCount`, counting top-level `errors` plus all target-local `results[].errors` |
+| Programmatic lint `ok: true` | `errorCount` and `warningCount`, derived from the returned diagnostics | none; this branch has no operational errors |
+| Programmatic lint `ok: false` | none; incomplete/partial diagnostics are not returned | represented by `errors[]`, without a numeric count field |
+
+The programmatic success branch can use plain `errorCount` for diagnostic errors because no operational error count coexists on that surface. CLI summaries reserve plain `errorCount` for operational errors and use the `diagnostic*` prefix for diagnostic counts, following the shared [Phase 3A machine-readable output](./006-ox-mf2-phase-3a-tooling-foundation-design.md#machine-readable-output) rule for command-specific counts.
 
 ### Stable Identifiers and Rule Metadata
 
@@ -486,11 +498,11 @@ Editor adapters should:
 3. compare the original and formatted message text
 4. create editor `TextEdit` values at the adapter boundary
 
-For standalone `.mf2` documents, the resulting edit may replace the whole document. For JSON/YAML resources, the edit should replace only the containing message value range.
+The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document. For JSON/YAML resources, it is only the containing message value range after required host-string re-escaping.
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 
-Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the mapping is stale or the containing message range can no longer be identified, the adapter should no-op. Exact version checks and edit conflict behavior belong in the dedicated LSP/editor design.
+Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message range can no longer be identified, the adapter silently returns no edits rather than an operational editor error. Exact protocol-specific version comparisons belong in the dedicated LSP/editor implementation design.
 
 ### Configuration
 

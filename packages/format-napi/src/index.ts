@@ -237,7 +237,9 @@ function createDiagnosticLabel(label: NativeDiagnosticLabel): DiagnosticView['la
 }
 
 function createOperationalError(error: NativeOperationalError): FormatterOperationalError {
-  const details = Object.fromEntries(error.details.map(detail => [detail.key, detail.value]))
+  const details = Object.fromEntries(
+    error.details.map(detail => [detail.key, JSON.parse(detail.valueJson) as unknown])
+  )
   return {
     kind: error.kind,
     code: error.code,

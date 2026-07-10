@@ -35,7 +35,7 @@ N-API and WASM linter bindings are distributed as linter-specific packages backe
 - `@intlify/lint-napi`
 - `@intlify/lint-wasm`
 
-These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. Platform native package names use the same normalized triple package model used by formatter N-API packages: `@intlify/lint-napi-<platform-triple>`, for example `@intlify/lint-napi-linux-x64-gnu`, `@intlify/lint-napi-linux-x64-musl`, `@intlify/lint-napi-linux-arm64-gnu`, `@intlify/lint-napi-darwin-x64`, `@intlify/lint-napi-darwin-arm64`, and `@intlify/lint-napi-win32-x64-msvc`. These examples are non-exhaustive; the normalized triple rule is the package naming contract. Optional dependency wiring, package files, and lazy native loading follow the formatter N-API package model. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
+These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. Platform native package names use the same normalized triple package model used by formatter N-API packages: `@intlify/lint-napi-<platform-triple>`, for example `@intlify/lint-napi-linux-x64-gnu`, `@intlify/lint-napi-linux-x64-musl`, `@intlify/lint-napi-linux-arm64-gnu`, `@intlify/lint-napi-darwin-x64`, `@intlify/lint-napi-darwin-arm64`, and `@intlify/lint-napi-win32-x64-msvc`. These examples describe naming only and do not promise support for an exhaustive target set. The initial linter support matrix must be fixed by its implementation/release plan and backed by CI build, loading, packaging, and publish smoke tests for every listed target. Optional dependency wiring, package files, and lazy native loading follow the formatter N-API package model. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
 
 Binding packages expose direct programmatic lint APIs. They do not host plugins and do not need a CLI callback bridge.
 
@@ -151,7 +151,7 @@ Semantic invariant failures are intentionally absent from the diagnostic classif
 
 ## Diagnostic Shape
 
-Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte span, and a message. The JSON representation is shared by the fmt and lint reporters and by the binding result objects:
+Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte span, and a message. The JSON representation is shared by the fmt and lint CLI JSON reporters and by the linter N-API/WASM binding result objects:
 
 ```json
 {
@@ -164,6 +164,8 @@ Every diagnostic carries a category, a stable code, a severity, a UTF-8 byte spa
   "labels": [{ "span": { "start": 8, "end": 14 }, "message": "first declared here" }]
 }
 ```
+
+Formatter N-API/WASM programmatic results are outside this linter binding-shape statement. They retain the parser `DiagnosticView` JavaScript shape specified by the formatter design; only formatter CLI JSON reporting uses the shared reporter representation below.
 
 - `category` is `"parser"`, `"semantic"`, or `"lint"`.
 - `code` is a single field across all categories. Parser diagnostics, semantic diagnostics, and lint rule diagnostics all use JSON-visible kebab-case stable strings. Rust enum names such as `MissingRequiredWhitespace` are internal; lint JSON emits `"missing-required-whitespace"`. There is no separate `ruleId` field.
@@ -536,7 +538,7 @@ Text reporter line and column are human-facing: line is one-based, column is one
 
 ```text
 x semantic(duplicate-declaration): variable $count is already declared
-  [messages/foo.mf2:2:8]
+  [messages/foo.mf2:2:9]
 
   1 | .input {$count :number}
   2 | .input {$count :number}
@@ -632,7 +634,7 @@ When any file-specific operational error is present, the process exit code is `2
 - `problemFiles`: targets with `status: "problems"`, including targets whose only diagnostics are warnings hidden by `--quiet`
 - `diagnosticErrorCount`: total `error`-severity diagnostics across all targets
 - `diagnosticWarningCount`: total diagnostics whose severity is `"warn"` across all targets, including warnings hidden by `--quiet`
-- `errorCount`: operational errors, counting top-level `errors` plus all `results[].errors`, matching the Phase 3A meaning of `errorCount`
+- `errorCount`: operational errors, counting top-level `errors` plus all `results[].errors`, matching the command-specific count rule in [Phase 3A Machine-Readable Output](./006-ox-mf2-phase-3a-tooling-foundation-design.md#machine-readable-output)
 
 Diagnostic counts deliberately use the `diagnostic*` prefix so they cannot be confused with the Phase 3A operational `errorCount`. Zero-target execution uses a zero-count summary with `status: "success"`, mirroring the fmt zero-target contract. Stdin mode reports `matchedFiles: 1` with the `--stdin-filepath` virtual path unless ignore rules skip it, in which case the zero-target summary keeps `operation: "stdin"`.
 

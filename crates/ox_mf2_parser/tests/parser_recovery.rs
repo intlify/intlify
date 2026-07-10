@@ -24,7 +24,7 @@ fn parse(source: &str) -> (SourceStore, ox_mf2_parser::ParseResult) {
         source,
         ..Default::default()
     });
-    let result = parse_source(&sources, id, ParseOptions::default());
+    let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
     (sources, result)
 }
 

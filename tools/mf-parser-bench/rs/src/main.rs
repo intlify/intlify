@@ -254,7 +254,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
         "ox-mf2-parse" => {
             // Phase 1 parser entry point equivalent to mf2-tools-parse — no
             // semantic lowering, default options.
-            let result = ox_mf2_parser::parse_message(black_box(source));
+            let result = ox_mf2_parser::parse_message(black_box(source))
+                .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
             Ok(TargetResult {
                 checksum: (size_of_val(black_box(&result.cst))
                     + result.cst.node_count() as usize
@@ -275,7 +276,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
                 id,
                 &mut workspace,
                 ox_mf2_parser::ParseOptions::default(),
-            );
+            )
+            .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
             let tables = black_box(result.cst.tables());
             Ok(TargetResult {
                 checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
@@ -293,7 +295,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
             });
             let mut workspace = ox_mf2_parser::ParseWorkspace::new();
             workspace.reserve_for_source_len(source.len());
-            let result = ox_mf2_parser::parse_source_session(&sources, id, &mut workspace, options);
+            let result = ox_mf2_parser::parse_source_session(&sources, id, &mut workspace, options)
+                .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
             let tables = black_box(result.cst.tables());
             Ok(TargetResult {
                 checksum: (tables.node_count() + tables.token_count() + tables.trivia_count())
@@ -309,7 +312,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
                 source: black_box(source),
                 ..Default::default()
             });
-            let result = ox_mf2_parser::parse_source(&sources, id, options);
+            let result = ox_mf2_parser::parse_source(&sources, id, options)
+                .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
             let semantic_size = result
                 .semantic
                 .as_ref()
@@ -385,7 +389,8 @@ fn run_ox_mf2_parse_session(
     for _ in 0..iterations {
         for &(source_id, source_len) in source_ids {
             let result =
-                ox_mf2_parser::parse_source_session(sources, source_id, &mut workspace, options);
+                ox_mf2_parser::parse_source_session(sources, source_id, &mut workspace, options)
+                    .expect("benchmark source parses");
             let tables = black_box(result.cst.tables());
             checksum = checksum
                 .wrapping_add(

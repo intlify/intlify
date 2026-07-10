@@ -63,3 +63,4 @@ packages/format-wasm/.wasm-build.lock
 .plans
 .notes
 .reviews
+.reports

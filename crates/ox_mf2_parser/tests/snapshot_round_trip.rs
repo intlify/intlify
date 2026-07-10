@@ -24,7 +24,7 @@ fn simple_message_round_trips_through_snapshot() {
         source: "Hello",
         ..Default::default()
     });
-    let result = parse_source(&sources, id, ParseOptions::default());
+    let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
     let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default())
         .expect("snapshot encode succeeds");
     assert!(!snap.bytes.is_empty(), "snapshot bytes are non-empty");
@@ -52,7 +52,7 @@ fn snapshot_preserves_token_text_via_source_id_plus_span() {
         source: "Hello",
         ..Default::default()
     });
-    let result = parse_source(&sources, id, ParseOptions::default());
+    let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
     let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
     let view = decode_snapshot(&snap.bytes).unwrap();
 
@@ -199,6 +199,33 @@ fn snapshot_omits_optional_sections_when_disabled() {
     assert!(view.section(SectionKind::Tokens).is_some());
     assert!(view.section(SectionKind::StringOffsets).is_some());
     assert!(view.section(SectionKind::StringData).is_some());
+}
+
+#[test]
+fn snapshot_rejects_requested_trivia_when_parser_did_not_collect_it() {
+    let mut sources = SourceStore::new();
+    let id = sources.add(SourceFileInput {
+        source: "Hello world",
+        ..Default::default()
+    });
+    let parse_options = ParseOptions {
+        collect_trivia: false,
+        ..ParseOptions::default()
+    };
+    let snapshot_options = SnapshotOptions {
+        include_trivia: true,
+        ..SnapshotOptions::default()
+    };
+    let result = parse_source(&sources, id, parse_options).expect("parse succeeds");
+    assert!(!result.trivia_collected);
+    let error = parse_result_to_snapshot(&sources, &result, snapshot_options)
+        .expect_err("owned result must retain the missing trivia capability");
+    assert_eq!(error, ox_mf2_parser::SnapshotWriteError::TriviaNotCollected);
+    assert_eq!(error.as_ox_mf2_error_code(), 2014);
+
+    let error = parse_source_to_snapshot(&sources, id, parse_options, snapshot_options)
+        .expect_err("uncollected trivia cannot be advertised as a capability");
+    assert_eq!(error, ox_mf2_parser::SnapshotWriteError::TriviaNotCollected);
 }
 
 #[test]
@@ -578,7 +605,8 @@ fn diagnostic_source_is_collapsed_to_root_source_per_v01_policy() {
         path: Some("b.mf2"),
         ..Default::default()
     });
-    let mut result = parse_source(&sources, source_a, ParseOptions::default());
+    let mut result =
+        parse_source(&sources, source_a, ParseOptions::default()).expect("parse succeeds");
     // Inject a hand-crafted diagnostic whose source + label source
     // both reference source B (not the root's source A).
     result.diagnostics.push(ox_mf2_parser::Diagnostic {
@@ -641,7 +669,8 @@ fn batch_result_to_snapshot_rejects_item_source_result_source_mismatch() {
         ..Default::default()
     });
     // Parse against source A but tag the batch item with source B.
-    let result_for_a = parse_source(&sources, source_a, ParseOptions::default());
+    let result_for_a =
+        parse_source(&sources, source_a, ParseOptions::default()).expect("parse succeeds");
     let batch = ox_mf2_parser::BatchParseResult {
         sources,
         items: vec![ox_mf2_parser::BatchParseItem {
@@ -670,8 +699,8 @@ fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one
         path: Some("greeting.mf2"),
         ..Default::default()
     });
-    let first = parse_source(&sources, id, ParseOptions::default());
-    let second = parse_source(&sources, id, ParseOptions::default());
+    let first = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
+    let second = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
     let batch = ox_mf2_parser::BatchParseResult {
         sources,
         items: vec![

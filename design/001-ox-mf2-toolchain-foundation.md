@@ -70,8 +70,9 @@ Adopt `Lossless CST + SemanticModel`.
 source
   -> lexer / token stream + trivia
   -> lossless CST
-  -> SemanticModel / SemanticView
-  -> linter / formatter / compiler
+       -> formatter
+       -> SemanticModel / SemanticView
+            -> linter / compiler
 ```
 
 The formatter primarily uses CST, tokens, and trivia. The linter and compiler primarily use the semantic model.
@@ -102,15 +103,15 @@ The Phase 1 table contract, identifier model, and source/span rules are defined 
 
 ### Formatter
 
-Adopt `format-preserving first`.
+Adopt a `preserve-capable formatter foundation`.
 
-The formatter itself does not need to be part of the initial MVP. However, the parser/table layer keeps tokens, trivia, original lexemes, delimiter spans, recovery nodes, and source-map-like information so that a formatter can be built later.
+The formatter itself does not need to be part of the initial MVP. However, the parser/table layer prioritizes retaining tokens, trivia, original lexemes, delimiter spans, recovery nodes, and source-map-like information so that a preserve mode can be built later. This is a source-fidelity capability requirement for the syntax foundation, not the product's default formatting mode.
 
 From Phase 2 onward, the formatter's public AST input is the Binary AST decoder/accessor view. The Rust implementation may have an internal fast path over construction-time tables when needed, but the stable public formatter surface is aligned with the Binary AST view shared by Rust, N-API, and WASM consumers.
 
-A future formatter should support at least two modes.
+A future formatter should support at least two modes. `standard` is the product default.
 
-- preserve mode: preserve the original representation as much as possible.
+- preserve mode: preserve meaningful source shape where recoverable while still applying standard local spacing and normalization rules; it does not promise byte-identical output.
 - standard mode: format to the standard ox-mf2 style.
 
 ### Linter
@@ -233,6 +234,8 @@ Target phases:
 
 `lower_semantic` is kept as a compatibility benchmark phase name and means SemanticModel construction, not parser-owned semantic validation. `e2e_lint` is kept as a broad legacy benchmark alias. Canonical Phase 3 linter benchmark names are defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md) and [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
+`snapshot_accessor_traversal` and `binding_call` are aggregate reporting families, not required standalone result series. The snapshot traversal family maps to the canonical `traverse_nodes`, `traverse_tokens`, and `traverse_diagnostics` series defined by the Binary AST design. The binding call family maps to `parse_message_binding`, `parse_batch_binding`, `decode_snapshot_binding`, and `snapshot_to_bytes_copy_binding` from the language bindings design. Reports use the detailed names for measurements and may group them under the aggregate family labels in summaries.
+
 The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
 ### Crate Structure
@@ -348,7 +351,7 @@ The second phase adds the cross-language product boundary.
 
 - versioned Binary AST snapshot
 - SnapshotWriter
-- lossless CST snapshot sections for roots, sources, nodes, edges, tokens, optional trivia, diagnostics, diagnostic labels, string table, optional source text data, and optional extended data
+- lossless CST snapshot sections with required core sections for roots, sources, nodes, edges, tokens, string offsets, and string data, plus optional sections for trivia, diagnostics, diagnostic labels, source text data, and extended data
 - spans are stored inline in NodeRecord, TokenRecord, TriviaRecord, and DiagnosticRecord, not in a separate section
 - Rust Binary AST decoder / accessor API
 - N-API binding with lazy decoder/accessor API
