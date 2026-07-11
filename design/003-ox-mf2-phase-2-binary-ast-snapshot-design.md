@@ -275,17 +275,23 @@ source_text_data
 extended_data
 ```
 
-The section table remains the source of truth for decoders; decoders must not rely only on physical order. However, the writer uses deterministic SectionKind order so binary fixtures, layout diagrams, and byte-level diffs remain stable and reviewable. Optional sections may be absent or empty depending on options and content, but any emitted section uses the same order.
+The section table remains the source of truth for decoders; decoders must not rely only on physical order. However, the writer uses deterministic SectionKind order so binary fixtures, layout diagrams, and byte-level diffs remain stable and reviewable. Any emitted section uses the same order.
 
 Section kind entries must be unique. If the section table contains the same `SectionKind` more than once, the decoder rejects the snapshot. The decoder reads sections through the section table and does not require physical section order to match SectionKind order. The v0.1 writer still emits sections in SectionKind order for deterministic output.
 
-Optional sections are usually omitted when empty, except when an enabled snapshot option needs section presence as a capability proof.
+Required core sections are always emitted, even when their count or byte length is zero where the format permits it. The v0.1 writer uses the following exact presence rules for option-controlled sections:
 
-Required core sections are always emitted, even when their count or byte length is zero where the format permits it. Optional sections such as trivia, diagnostics, diagnostic labels, source text data, and extended data are emitted only when they contain data or when an enabled writer option explicitly requires their presence. For a parse result that proves trivia collection, the v0.1 default writer emits empty `Trivia` when `include_trivia = true`; it also emits empty `Diagnostics` when `include_diagnostics = true` and empty `SourceTextData` when `include_source_text = true`.
+| Capability | Disabled | Enabled |
+| --- | --- | --- |
+| Trivia | `Trivia` is absent. | `Trivia` is present even when its count is `0`; the parse result must prove trivia collection. |
+| Diagnostics | `Diagnostics` and `DiagnosticLabels` are absent. | `Diagnostics` is present even when its count is `0`; `DiagnosticLabels` is present only when at least one label is encoded. |
+| Source text | `SourceTextData` is absent and every `SourceRecord.text` uses the none sentinel. | `SourceTextData` is present even when its byte length is `0`, and every `SourceRecord.text` references it. |
+
+`ExtendedData` is content-driven rather than option-controlled and is always absent in v0.1 writer output.
 
 Decoders treat a missing optional section as an empty section for traversal counts. Capability-sensitive consumers must use section presence, not only a zero count, to distinguish an empty enabled section from data that was intentionally omitted. This keeps `include_trivia = false`, `include_diagnostics = false`, and `include_source_text = false` compact in the binary layout while preserving a simple read contract.
 
-Section presence for empty `Trivia` and `Diagnostics` is the v0.1 capability proof required by the Phase 3B formatter design ([007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md)). An empty Trivia section is emitted only when parser trivia collection was enabled, so it proves that the source contained no collected trivia rather than that collection was skipped. A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot.
+Section presence for empty `Trivia`, `Diagnostics`, and `SourceTextData` is a v0.1 capability proof. An empty Trivia section is emitted only when parser trivia collection was enabled, so it proves that the source contained no collected trivia rather than that collection was skipped. A missing `Diagnostics` section means diagnostics were not encoded and therefore cannot prove a diagnostic-free parse. A missing `Trivia` section means token-level trivia was not encoded and preserve-mode formatting must reject the snapshot. A missing `SourceTextData` section means source slices require explicitly attached external source text.
 
 Future snapshot-backed linting also requires verifiable parser diagnostic capability. It additionally requires a parser-owned snapshot-to-`SemanticModel` path before `lintSnapshot` can be supported. Per the changelog update rule, any new snapshot capability required for linting must land together with snapshot versioning, writer, decoder, and fixture updates in the PR that introduces snapshot-backed linter behavior.
 
@@ -428,15 +434,19 @@ In v0.1, the section table starts immediately after the fixed 32-byte header. `s
 
 `section_count` is the number of emitted `SectionRecord` entries. It must be greater than zero, and the section table byte length is `section_count * 20`. The section table must fit in the buffer before the first emitted section offset. Because core sections are required, valid v0.1 snapshots have at least the core section count.
 
-`SectionRecord.kind` is a stable numeric enum. Once assigned, a SectionKind number is not reused. Changing the meaning of a section incompatibly requires a major version bump.
+`SectionRecord.kind` is a stable numeric enum. Once assigned, a SectionKind number is not reused. During the mutable WIP v0.1 period, changing a section meaning requires coordinated writer, decoder, accessor, fixture, and changelog updates but does not require changing the v0.1 header. After the first snapshot compatibility point is declared, an incompatible meaning change requires a format version bump; after v1.0 it requires a major version bump.
 
 The snapshot header has only `major_version` and `minor_version` for wire format compatibility. Patch version is not stored in the snapshot header; it is managed by the crate / npm package / WASM package release version.
 
-While `major_version = 0`, the format is draft and decoders use exact version matching. A v0.1 decoder accepts only `major_version = 0` and `minor_version = 1`. It rejects `major_version = 0` with a higher minor version, because 0.x record layouts and section semantics may still change.
+The repository README currently marks the project as WIP, so v0.1 is a mutable draft. Wire-visible changes may retain `major_version = 0` and `minor_version = 1` when the writer, decoder, accessors, fixtures, tests, and changelog are updated together. Compatibility between snapshots and decoders from different v0.1 repository/package revisions is not guaranteed. Removing the README WIP marker must be accompanied by a changelog entry that declares the first snapshot compatibility point.
+
+The current v0.1 decoder accepts only `major_version = 0` and `minor_version = 1` and rejects higher minor versions. This exact header check distinguishes v0.1 from other header versions; it does not distinguish incompatible revisions within the mutable WIP v0.1 format.
+
+After that first compatibility point, if the format is still pre-1.0, each wire-visible change uses the next `0.N` draft version and decoders use exact version matching.
 
 After a future v1.0 format freeze, `major_version` represents incompatible format changes, while `minor_version` can represent backward-compatible additions to sections, flags, or metadata.
 
-In v0.1, unknown section kinds are rejected even when `SectionFlags.required = false`. Since v0.x uses exact version matching, unknown sections indicate either a corrupted snapshot or a snapshot from a different draft format.
+In v0.1, unknown section kinds are rejected even when `SectionFlags.required = false`. During the mutable WIP period, an unknown section can indicate either a corrupted snapshot or a snapshot produced by a different v0.1 revision; rejection is expected because cross-revision compatibility is not promised.
 
 After v1.0, adding a new optional section is allowed in a minor version. Existing decoders can skip unknown sections with `SectionFlags.required = false` after validation, so optional metadata, debug data, and future semantic data that do not change existing semantics can be minor additions. A new required section that is necessary to interpret the snapshot correctly requires a major version bump.
 
@@ -480,7 +490,7 @@ nodes, edges, tokens, roots, sources, string offsets, and string data are core s
 
 Minimum counts for core sections are `roots.count >= 1`, `sources.count >= 1`, and `nodes.count >= 1`. `edges.count` and `tokens.count` may be `0`. string offsets may have `count = 0` when there are no strings, and string data may have `byte_len = 0`.
 
-source text data, trivia, diagnostics, diagnostic labels, and extended data are optional sections. Optional sections normally use `SectionFlags.required = false`. They may be empty depending on options or content. A missing optional section is equivalent to `count = 0` for traversal, but not for capability checks that depend on section presence.
+source text data, trivia, diagnostics, diagnostic labels, and extended data are optional sections. Optional sections normally use `SectionFlags.required = false`. Their v0.1 writer presence follows the exact matrix in [Writer Section Order](#writer-section-order). A missing optional section is equivalent to `count = 0` for traversal, but not for capability checks that depend on section presence.
 
 In v0.1, section flags are strict:
 
@@ -491,7 +501,8 @@ In v0.1, section flags are strict:
 
 Decoder rules:
 
-- for `major_version = 0`, accept only the exact supported draft version
+- during the mutable WIP v0.1 period, accept only the `0.1` header but do not promise compatibility across repository/package revisions
+- after the first compatibility point and while `major_version = 0`, accept only the exact supported draft version
 - after v1.0, reject incompatible major versions
 - after v1.0, accept minor version differences only when backward compatible
 - do not use the snapshot header to distinguish patch-level implementation differences
@@ -530,7 +541,7 @@ If the parser result has no root node, SnapshotWriter returns a snapshot API err
 
 `diagnostic_start` and `diagnostic_count` point to a contiguous range in the diagnostics section. Diagnostics are grouped by root order. This allows decoders to slice diagnostics from `roots[i]` in O(1).
 
-When `include_diagnostics = false`, RootRecord layout does not change. `diagnostic_count = 0` and `diagnostic_start = 0`. The diagnostics section and diagnostic labels section may be empty or absent optional sections. Decoders must not vary RootRecord record_size by option.
+When `include_diagnostics = false`, RootRecord layout does not change. `diagnostic_count = 0` and `diagnostic_start = 0`. The diagnostics section and diagnostic labels section are absent. Decoders must not vary RootRecord record_size by option.
 
 ### String Table
 
@@ -593,9 +604,9 @@ Decoders materialize UTF-8 strings lazily, only when a consumer reads them.
 
 ![ox-mf2 source text data section](./assets/003-ox-mf2-source-text-data-section.svg)
 
-The source text data section is an optional raw byte section. When `include_source_text = true`, each emitted SourceRecord's original MF2 source text is stored in this section as UTF-8 bytes. When `include_source_text = false`, this section is absent or empty.
+The source text data section is an optional raw byte section. When `include_source_text = true`, the section is present even when its byte length is `0`, and each emitted SourceRecord's original MF2 source text is stored in it as UTF-8 bytes. When `include_source_text = false`, the section is absent.
 
-v0.1 snapshot source text data covers only UTF-8-valid source text. If an input with unpaired surrogates must be handled for ECMAScript String compatibility, the source/language boundary keeps it as external source text and combines it with a snapshot using `include_source_text = false`. If storing WTF-8 or UTF-16 source text in snapshots becomes necessary, it should be designed as a future optional section or format change.
+v0.1 snapshot source text data and external source attachment cover only UTF-8-valid source text. Phase 2 N-API and WASM bindings reject every JavaScript source string containing an unpaired surrogate with `TypeError` before parsing or source attachment, regardless of `include_source_text`; that option controls snapshot encoding only. If WTF-8 or UTF-16 input becomes necessary, it requires an explicit future source-boundary and format design.
 
 When `include_source_text = true`, source text bytes are stored as one concatenated byte buffer.
 
@@ -691,7 +702,7 @@ NodeRecord {
 }
 ```
 
-`kind` stores the numeric value of the Phase 1 parser `SyntaxKind` directly. SnapshotWriter does not remap NodeRecord.kind through a snapshot-specific kind table. `SyntaxKind` numeric values are snapshot-visible draft data in v0.x. Adding a core kind during v0.x requires the next `0.N` draft version, coordinated writer/decoder/accessor updates, binary and decoded fixture updates, and a format changelog entry; exact version matching means an older v0.x decoder rejects the new draft. Published numeric values are not reordered or reused even during v0.x. After a future v1.0 format freeze, emitting a new core kind that an existing decoder cannot interpret requires a snapshot major version bump. A decoder rejects unknown `SyntaxKind` numeric values.
+`kind` stores the numeric value of the Phase 1 parser `SyntaxKind` directly. SnapshotWriter does not remap NodeRecord.kind through a snapshot-specific kind table. `SyntaxKind` numeric values are snapshot-visible draft data in v0.x. During the mutable WIP v0.1 period, adding a core kind may retain the v0.1 header but requires coordinated writer/decoder/accessor updates, binary and decoded fixture updates, and a format changelog entry; compatibility with an older v0.1 revision is not guaranteed. Published numeric values are not reordered or reused even during v0.x. After the first snapshot compatibility point, adding a core kind while `major_version = 0` requires the next `0.N` draft version and exact version matching. After a future v1.0 format freeze, emitting a new core kind that an existing decoder cannot interpret requires a snapshot major version bump. A decoder rejects unknown `SyntaxKind` numeric values.
 
 `flags` is reserved in v0.1. SnapshotWriter writes `0`, and decoders reject non-zero flags.
 

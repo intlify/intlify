@@ -31,6 +31,8 @@ Agents can run:
 - `intlify fmt` to apply formatting when the task explicitly allows edits
 - future `intlify` check commands when formatter and linter workflows are composed
 
+The v0.1 workflow requires agents to coordinate `intlify lint` and `intlify fmt --check`; it does not provide a combined `intlify check` command. The `check` name remains reserved, and a dedicated post-v0.1 addendum may define it after the formatter and linter reporters and exit behavior are implemented contracts.
+
 Machine-readable output should be stable enough for agents to identify affected files, source spans, diagnostic `category`, diagnostic `code`, and `severity`. For configurable lint diagnostics, `code` is the rule id. Suggested follow-up actions are agent-derived helper output built from diagnostics, rule documentation, and workflow context; the initial formatter and linter core contracts do not expose a fix or suggestion API.
 
 Lint result contracts, diagnostic codes, reporter behavior, and operational error separation are owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md). Parser-owned semantic diagnostic behavior is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md). Agent integrations should consume those contracts instead of inferring lint or semantic behavior from human-readable output.
@@ -55,7 +57,6 @@ These integration shapes should call shared CLI, Rust, N-API, WASM, or future MC
 ## Open Questions
 
 - Which CLI JSON output fields are required for reliable agent consumption across lint, format-check, and combined check workflows?
-- Should `intlify` provide a single `check` command that agents can call instead of coordinating formatter and linter commands themselves?
 - Which integration shape should be implemented first after the CLI: repo instructions, agent skill, MCP server, or plugin bundle?
 - Should an MCP server expose high-level tools such as `lint_file` and `format_file`, or lower-level tools such as `parse_message`, `lint_message`, and `format_message`?
 - How should agent integrations summarize and present existing JSON envelope `errors[]` separately from parser, semantic, formatter, and linter diagnostics without redefining their schemas?

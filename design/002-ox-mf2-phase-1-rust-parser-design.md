@@ -124,8 +124,8 @@ Design policy:
 - `SyntaxKind` has a compact integer representation.
 - Node kinds, token kinds, trivia kinds, error kinds, and missing kinds live in the same enum family.
 - In Phase 2 Binary AST snapshots, the numeric `SyntaxKind` value is encoded directly as `kind: u16` in NodeRecord / TokenRecord / TriviaRecord.
-- Once published, numeric values are part of the snapshot compatibility contract. Do not reorder, reuse, or change their meaning incompatibly. Add new kinds with new values.
-- Snapshot decoders reject unknown `SyntaxKind` numeric values. While the snapshot format is draft v0.x, emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord requires the next `0.N` draft version plus coordinated writer, decoder, accessor, changelog, and fixture updates; v0.x decoders continue to use exact version matching. After the v1.0 format freeze, the same compatibility-breaking core-kind addition requires a snapshot major version bump. If backward compatibility is required after v1.0, represent the case with an existing `Unknown` / `Error` / `Missing` kind or backward-compatible optional data.
+- Assigned numeric values are not reordered or reused even during the mutable WIP period, which keeps fixtures and reviews stable. Once the first snapshot compatibility point is declared, they are part of the compatibility contract. Add new kinds with new values.
+- Snapshot decoders reject unknown `SyntaxKind` numeric values. While the repository README marks the project as WIP, the v0.1 snapshot is a mutable draft: emitting a new kind in a core NodeRecord / TokenRecord / TriviaRecord may keep the v0.1 header, but requires coordinated writer, decoder, accessor, changelog, and fixture updates, and compatibility between different v0.1 repository/package revisions is not guaranteed. After the WIP marker is lifted and the first snapshot compatibility point is declared, a wire-visible core-kind addition while `major_version = 0` requires the next `0.N` draft version and exact version matching. After the v1.0 format freeze, the same compatibility-breaking core-kind addition requires a snapshot major version bump. If backward compatibility is required after v1.0, represent the case with an existing `Unknown` / `Error` / `Missing` kind or backward-compatible optional data.
 - Rust public APIs should not give semantic meaning to enum ordering, and consumer code should not rely on numeric comparison.
 - Manage kinds by grammar category so spec changes are easy to track.
 - Provide helper predicates so formatters and linters can test kind categories efficiently.
@@ -388,7 +388,7 @@ LiteralValue {
 }
 ```
 
-`StringRef` is an abstract name for an interned string table or owned string pool in Phase 1. In Phase 2 it maps to the indexed StringRef of the Binary AST snapshot, that is, a StringId into the string offsets section.
+`StringRef` is an abstract name for an interned string table or owned string pool in Phase 1. The v0.1 Binary AST snapshot does not serialize `NameValue.value`, `NameValue.comparison_key`, or `LiteralValue.value`; their corresponding syntax remains available through CST source spans. The v0.1 snapshot string table is limited to the metadata and diagnostic strings defined by the Phase 2 snapshot design. If cooked or normalized semantic text needs a cross-language representation later, a future `SemanticView` or semantic snapshot may define its own indexed string mapping.
 
 ## Grammar / Spec Tracking Design
 

@@ -42,7 +42,7 @@ Generated platform package names use the host package name plus platform / archi
 
 This is the initial parser N-API support matrix and matches the checked-in package target configuration. The normalized package-label model can represent additional triples, but a label example does not itself promise build or release support. Linux arm64 musl remains a future target until CI cross-build, native loading, packaging, and publish smoke tests are verified.
 
-Both packages are ESM-only packages. Their package `exports` map exposes only `.` as the public entry point in Phase 2. Additional subpath exports such as `./debug`, `./types`, or `./package.json` are not part of the v0.1 public compatibility surface.
+Both packages are ESM-only packages. Their package `exports` map exposes `.` as the only runtime module entry point and `./package.json` as an intentional metadata-only subpath. The metadata subpath does not expose another executable binding API. Additional subpath exports such as `./debug` or `./types` are not part of the v0.1 public compatibility surface.
 
 Runtime support:
 
@@ -248,7 +248,7 @@ Input type and range errors use built-in JS errors:
 
 Bindings map `messageId` to Rust/snapshot `message_id`, and `baseOffset` to `base_offset`. `baseOffset` is a UTF-8 byte offset. JavaScript string UTF-16 position conversion is a binding/editor adapter responsibility and is not stored in snapshot node fields.
 
-Phase 2 bindings reject JavaScript strings that contain unpaired surrogates with `TypeError`. The Rust parser path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
+Phase 2 N-API and WASM bindings reject every MF2 source string that contains an unpaired surrogate with `TypeError` before UTF-8 conversion or parsing. This applies to single-message, batch, and source-backed convenience entry points regardless of `includeSourceText`; that option controls snapshot encoding only. The Rust parser path remains UTF-8-only in Phase 2. WTF-8 or UTF-16 ingestion for full ECMAScript String compatibility is deferred to a separate measured design.
 
 `SourceTextErrorCode.SourceTextUnpairedSurrogate` (`3004`) remains reserved for numeric compatibility but is not emitted by Phase 2 bindings. Unpaired-surrogate rejection happens during raw JavaScript input validation, before an `OxMf2SourceTextError` boundary exists.
 
