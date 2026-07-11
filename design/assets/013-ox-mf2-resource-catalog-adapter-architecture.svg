@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 640" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">ox-mf2 resource catalog adapter architecture</title>
+<desc id="desc">The CLI fmt workflow, the CLI lint workflow, and editor adapters all consume one shared resource adapter layer for extraction and write-back encoding, and separately call the applicable LSP-agnostic message-level core API per entry. The resource layer contains the host format registry driven by project resources configuration and an optional editor-only overlay, host format adapters, and the message entry model. The resource layer does not depend on the message-level cores.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .adapter-boundary { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .entry { fill:#334155; }
+    .lint { fill:#0f766e; }
+    .parser { fill:#1d4ed8; }
+    .rule { fill:#7c3aed; }
+    .output { fill:#475569; }
+    .entrymodel { fill:#b45309; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .dashed { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .adapter-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1240" height="640" fill="none"/>
+
+<text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">ox-mf2 resource catalog adapter architecture</text>
+<text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">One shared extraction and write-back layer serves CLI and editor consumers over the same message entry model.</text>
+
+<!-- Consumers -->
+<rect x="90" y="140" width="260" height="70" rx="10" class="entry"/>
+<text x="220" y="170" font-size="13.5" font-weight="700" text-anchor="middle" class="white">CLI fmt workflow</text>
+<text x="220" y="190" font-size="11" text-anchor="middle" class="soft-white">per-entry format · one file write/check</text>
+
+<rect x="490" y="140" width="260" height="70" rx="10" class="entry"/>
+<text x="620" y="170" font-size="13.5" font-weight="700" text-anchor="middle" class="white">CLI lint workflow</text>
+<text x="620" y="190" font-size="11" text-anchor="middle" class="soft-white">catalog diagnostics per entry</text>
+
+<rect x="890" y="140" width="260" height="70" rx="10" class="entry"/>
+<text x="1020" y="170" font-size="13.5" font-weight="700" text-anchor="middle" class="white">Editor adapter (009)</text>
+<text x="1020" y="190" font-size="11" text-anchor="middle" class="soft-white">publishDiagnostics / TextEdit</text>
+
+<!-- Consumer bus -->
+<path d="M 220 210 L 220 232" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 620 210 L 620 232" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 1020 210 L 1020 232" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 220 232 L 1020 232" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 335 232 L 335 300" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="347" y="272" font-size="10.8" text-anchor="start" class="muted">extract / encode</text>
+<path d="M 905 232 L 905 300" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="917" y="272" font-size="10.8" text-anchor="start" class="muted">per entry: lintMessage / formatMessage as applicable</text>
+
+<!-- Shared resource adapter layer -->
+<rect x="90" y="300" width="490" height="260" rx="14" class="adapter-boundary" stroke-width="2"/>
+<text x="335" y="326" font-size="13" font-weight="700" text-anchor="middle" class="muted">shared resource adapter layer — crates/intlify_resource</text>
+
+<rect x="120" y="344" width="200" height="56" rx="8" class="output"/>
+<text x="220" y="366" font-size="12" font-weight="700" text-anchor="middle" class="white">host format registry</text>
+<text x="220" y="384" font-size="10.4" text-anchor="middle" class="soft-white">catalogs are opt-in</text>
+
+<rect x="346" y="344" width="204" height="56" rx="8" class="note" stroke-width="1.5"/>
+<text x="448" y="366" font-size="12" font-weight="700" text-anchor="middle" class="note-text">resolved catalog config</text>
+<text x="448" y="384" font-size="10.4" text-anchor="middle" class="note-text">project resources · editor overlay</text>
+
+<rect x="120" y="436" width="200" height="76" rx="8" class="output"/>
+<text x="220" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">host format adapters</text>
+<text x="220" y="478" font-size="10.4" text-anchor="middle" class="soft-white">extract() / encode()</text>
+<text x="220" y="494" font-size="10.4" text-anchor="middle" class="soft-white">JSON · YAML · later tiers</text>
+
+<rect x="346" y="436" width="204" height="76" rx="8" class="entrymodel"/>
+<text x="448" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">message entries</text>
+<text x="448" y="478" font-size="10.4" text-anchor="middle" class="soft-white">key · raw span · decoded text</text>
+<text x="448" y="494" font-size="10.4" text-anchor="middle" class="soft-white">offset map · read-only marker</text>
+
+<path d="M 346 372 L 320 372" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 220 400 L 220 436" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 320 474 L 346 474" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+<!-- Message-level core -->
+<rect x="660" y="300" width="490" height="260" rx="14" class="panel" stroke-width="2"/>
+<text x="905" y="326" font-size="13" font-weight="700" text-anchor="middle" class="label">message-level core — LSP-agnostic</text>
+
+<rect x="690" y="344" width="200" height="56" rx="8" class="lint"/>
+<text x="790" y="366" font-size="12" font-weight="700" text-anchor="middle" class="white">lintMessage(source)</text>
+<text x="790" y="384" font-size="10.4" text-anchor="middle" class="soft-white">parser → semantic → rules</text>
+
+<rect x="916" y="344" width="204" height="56" rx="8" class="rule"/>
+<text x="1018" y="366" font-size="12" font-weight="700" text-anchor="middle" class="white">formatMessage(source)</text>
+<text x="1018" y="384" font-size="10.4" text-anchor="middle" class="soft-white">whole-message formatted text</text>
+
+<rect x="690" y="436" width="430" height="56" rx="8" class="parser"/>
+<text x="905" y="460" font-size="11.5" font-weight="700" text-anchor="middle" class="white">ox_mf2_parser · intlify_format · intlify_lint</text>
+<text x="905" y="478" font-size="10.4" text-anchor="middle" class="soft-white">UTF-8 byte spans, no LSP protocol types</text>
+
+<path d="M 790 400 L 790 436" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 1018 400 L 1018 436" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+<text x="620" y="602" font-size="11.5" text-anchor="middle" class="muted">The resource layer does not depend on the message-level cores; each consumer composes extraction with per-entry core calls.</text>
+</svg>

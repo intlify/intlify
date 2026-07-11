@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 770" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Phase 3D LSP and editor architecture</title>
+<desc id="desc">Standalone mf2 files and opt-in catalog formats are classified by a host format registry; future catalog formats join the same registry. The editor-owned standalone adapter applies CLI-equivalent file framing, while catalog adapters in the shared resource layer extract and encode catalog values. Both produce message entries with entry keys, raw value spans, decoded text, and offset maps. Each entry is processed by the LSP-agnostic message-level core through lintMessage and formatMessage. Results are mapped back through span and position mapping into publishDiagnostics, and through framing or write-back encoding into TextEdit values. Future editor-owned caches store versioned extraction artifacts and exact-source message artifacts outside the core.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .adapter-boundary { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .cache-boundary { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .entry { fill:#334155; }
+    .lint { fill:#0f766e; }
+    .parser { fill:#1d4ed8; }
+    .rule { fill:#7c3aed; }
+    .output { fill:#475569; }
+    .future { fill:#64748b; }
+    .entrymodel { fill:#b45309; }
+    .note { fill:#e2e8f0; stroke:#cbd5e1; }
+    .arrow { stroke:#64748b; }
+    .dashed { stroke:#64748b; stroke-dasharray:8 7; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .note-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .adapter-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .cache-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .note { fill:#1e293b; stroke:#475569; }
+      .arrow { stroke:#cbd5e1; }
+      .dashed { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+      .note-text { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1240" height="770" fill="none"/>
+
+<text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Phase 3D LSP and editor architecture</text>
+<text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">Entry adapters map standalone files and catalogs onto message entries; diagnostics and formatting run per entry on the LSP-agnostic core.</text>
+
+<!-- Host documents -->
+<rect x="46" y="120" width="222" height="350" rx="12" class="panel" stroke-width="2"/>
+<text x="157" y="150" font-size="16" font-weight="700" text-anchor="middle" class="label">Host documents</text>
+<rect x="70" y="170" width="178" height="40" rx="7" class="entry"/>
+<text x="159" y="195" font-size="11.5" font-weight="700" text-anchor="middle" class="white">.mf2 standalone</text>
+<rect x="70" y="222" width="178" height="40" rx="7" class="entry"/>
+<text x="159" y="247" font-size="10.5" font-weight="700" text-anchor="middle" class="white">JSON / YAML catalogs (Tier 1)</text>
+<rect x="70" y="274" width="178" height="34" rx="7" class="future"/>
+<text x="159" y="296" font-size="11" font-weight="700" text-anchor="middle" class="white">JSONC / JSON5 (Tier 2)</text>
+<rect x="70" y="318" width="178" height="34" rx="7" class="future"/>
+<text x="159" y="340" font-size="11" font-weight="700" text-anchor="middle" class="white">Vue SFC &lt;i18n&gt; (Tier 3)</text>
+<rect x="70" y="362" width="178" height="34" rx="7" class="future"/>
+<text x="159" y="384" font-size="11" font-weight="700" text-anchor="middle" class="white">XLIFF 1.2 / 2.x (Tier 3)</text>
+<text x="157" y="424" font-size="10.8" text-anchor="middle" class="muted">catalog formats are opt-in;</text>
+<text x="157" y="442" font-size="10.8" text-anchor="middle" class="muted">plain files are never assumed</text>
+
+<!-- Host tooling note -->
+<rect x="46" y="530" width="222" height="130" rx="12" class="note" stroke-width="2"/>
+<text x="157" y="560" font-size="12.5" font-weight="700" text-anchor="middle" class="note-text">Host tooling boundary</text>
+<text x="157" y="584" font-size="10.8" text-anchor="middle" class="note-text">host syntax errors and host</text>
+<text x="157" y="602" font-size="10.8" text-anchor="middle" class="note-text">layout stay with JSON/YAML/XML</text>
+<text x="157" y="620" font-size="10.8" text-anchor="middle" class="note-text">language tools and formatters</text>
+
+<!-- Editor adapter group -->
+<rect x="300" y="120" width="570" height="600" rx="14" class="group" stroke-width="2"/>
+<text x="585" y="150" font-size="17" font-weight="700" text-anchor="middle" class="label">Editor adapter — LSP server / extension</text>
+<text x="585" y="172" font-size="12" text-anchor="middle" class="muted">owns URI, version, extraction, mapping, and protocol result shapes</text>
+
+<rect x="330" y="190" width="250" height="60" rx="8" class="entry"/>
+<text x="455" y="214" font-size="12.5" font-weight="700" text-anchor="middle" class="white">host format registry</text>
+<text x="455" y="233" font-size="10.6" text-anchor="middle" class="soft-white">.mf2 always · catalogs opt-in</text>
+
+<rect x="612" y="190" width="228" height="60" rx="8" class="note" stroke-width="1.5"/>
+<text x="726" y="214" font-size="12" font-weight="700" text-anchor="middle" class="note-text">resolved configuration</text>
+<text x="726" y="233" font-size="10.6" text-anchor="middle" class="note-text">project config + editor settings</text>
+
+<!-- Message-entry adapter boundary -->
+<rect x="330" y="282" width="510" height="210" rx="12" class="adapter-boundary" stroke-width="2"/>
+<text x="585" y="304" font-size="11.5" font-weight="700" text-anchor="middle" class="muted">standalone editor adapter + resource catalog adapters shared with CLI</text>
+
+<rect x="356" y="320" width="200" height="76" rx="8" class="output"/>
+<text x="456" y="344" font-size="12.5" font-weight="700" text-anchor="middle" class="white">message-entry adapters</text>
+<text x="456" y="362" font-size="10.6" text-anchor="middle" class="soft-white">.mf2: read / write framing</text>
+<text x="456" y="378" font-size="10.6" text-anchor="middle" class="soft-white">catalog: extract() / encode()</text>
+
+<text x="456" y="428" font-size="10.6" text-anchor="middle" class="muted">catalog parse failure: no new MF2</text>
+<text x="456" y="444" font-size="10.6" text-anchor="middle" class="muted">diagnostics and no edits —</text>
+<text x="456" y="460" font-size="10.6" text-anchor="middle" class="muted">host tooling owns host errors</text>
+
+<rect x="596" y="310" width="220" height="150" rx="8" class="entrymodel"/>
+<text x="706" y="336" font-size="13.5" font-weight="700" text-anchor="middle" class="white">Message entry</text>
+<text x="706" y="360" font-size="10.6" text-anchor="middle" class="soft-white">entry key (structural path)</text>
+<text x="706" y="378" font-size="10.6" text-anchor="middle" class="soft-white">raw value span</text>
+<text x="706" y="396" font-size="10.6" text-anchor="middle" class="soft-white">decoded MF2 message text</text>
+<text x="706" y="414" font-size="10.6" text-anchor="middle" class="soft-white">decoded → raw offset map</text>
+<text x="706" y="432" font-size="10.6" text-anchor="middle" class="soft-white">read-only marker</text>
+
+<!-- Mapping and outputs -->
+<rect x="600" y="530" width="245" height="76" rx="8" class="output"/>
+<text x="722" y="554" font-size="12.5" font-weight="700" text-anchor="middle" class="white">span &amp; position mapping</text>
+<text x="722" y="572" font-size="10.4" text-anchor="middle" class="soft-white">message-local UTF-8 → offset map</text>
+<text x="722" y="588" font-size="10.4" text-anchor="middle" class="soft-white">→ host UTF-8 → UTF-16 positions</text>
+
+<rect x="600" y="620" width="245" height="76" rx="8" class="output"/>
+<text x="722" y="644" font-size="12.5" font-weight="700" text-anchor="middle" class="white">framing / write-back encoding</text>
+<text x="722" y="662" font-size="10.4" text-anchor="middle" class="soft-white">.mf2: one final LF, no BOM</text>
+<text x="722" y="678" font-size="10.4" text-anchor="middle" class="soft-white">catalog: value-identical re-encode</text>
+
+<rect x="330" y="530" width="245" height="76" rx="8" class="entry"/>
+<text x="452" y="554" font-size="12.5" font-weight="700" text-anchor="middle" class="white">publishDiagnostics</text>
+<text x="452" y="572" font-size="10.4" text-anchor="middle" class="soft-white">entries merged in raw-span order</text>
+<text x="452" y="588" font-size="10.4" text-anchor="middle" class="soft-white">identity: entry key + code + span</text>
+
+<rect x="330" y="620" width="245" height="76" rx="8" class="entry"/>
+<text x="452" y="644" font-size="12.5" font-weight="700" text-anchor="middle" class="white">TextEdit per changed entry</text>
+<text x="452" y="662" font-size="10.4" text-anchor="middle" class="soft-white">whole .mf2 / catalog value span</text>
+<text x="452" y="678" font-size="10.4" text-anchor="middle" class="soft-white">stale version → no edits</text>
+
+<!-- Message-level core -->
+<rect x="900" y="120" width="294" height="360" rx="12" class="panel" stroke-width="2"/>
+<text x="1047" y="150" font-size="16" font-weight="700" text-anchor="middle" class="label">Message-level core</text>
+<text x="1047" y="172" font-size="12" text-anchor="middle" class="muted">LSP-agnostic, called per message entry</text>
+
+<rect x="930" y="192" width="234" height="72" rx="8" class="lint"/>
+<text x="1047" y="216" font-size="12.5" font-weight="700" text-anchor="middle" class="white">lintMessage(source)</text>
+<text x="1047" y="234" font-size="10.6" text-anchor="middle" class="soft-white">parser → semantic → rules</text>
+<text x="1047" y="250" font-size="10.6" text-anchor="middle" class="soft-white">strict per-entry pipeline</text>
+
+<rect x="930" y="282" width="234" height="58" rx="8" class="rule"/>
+<text x="1047" y="306" font-size="12" font-weight="700" text-anchor="middle" class="white">formatMessage(source, options)</text>
+<text x="1047" y="324" font-size="10.6" text-anchor="middle" class="soft-white">whole-message formatted text</text>
+
+<rect x="930" y="358" width="234" height="64" rx="8" class="parser"/>
+<text x="1047" y="378" font-size="12" font-weight="700" text-anchor="middle" class="white">core crates</text>
+<text x="1047" y="396" font-size="10.6" text-anchor="middle" class="soft-white">ox_mf2_parser · intlify_format · intlify_lint</text>
+<text x="1047" y="412" font-size="10.6" text-anchor="middle" class="soft-white">UTF-8 byte spans, no LSP types</text>
+
+<!-- Artifact caches -->
+<rect x="900" y="560" width="294" height="130" rx="12" class="cache-boundary" stroke-width="2"/>
+<text x="1047" y="590" font-size="13" font-weight="700" text-anchor="middle" class="muted">future editor-owned artifact caches</text>
+<text x="1047" y="614" font-size="10.8" text-anchor="middle" class="muted">extraction: URI + document version</text>
+<text x="1047" y="632" font-size="10.8" text-anchor="middle" class="muted">message: URI + entry key +</text>
+<text x="1047" y="650" font-size="10.8" text-anchor="middle" class="muted">parser/options/version + exact source</text>
+
+<!-- Arrows: host documents to registry -->
+<path d="M 268 190 L 299 190 L 299 206 L 330 206" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 268 242 L 299 242 L 299 226 L 330 226" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 268 291 L 292 291" fill="none" class="dashed" stroke-width="2.1"/>
+<path d="M 268 335 L 292 335" fill="none" class="dashed" stroke-width="2.1"/>
+<path d="M 268 379 L 292 379" fill="none" class="dashed" stroke-width="2.1"/>
+<path d="M 292 379 L 292 266 L 310 266 L 310 244 L 330 244" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<!-- Arrows: config to registry, registry to adapters -->
+<path d="M 612 220 L 580 220" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 455 250 L 455 320" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<!-- Arrows: adapters to entry, entry to core -->
+<path d="M 556 358 L 596 358" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 816 385 L 900 385" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<!-- Arrows: entry offset map feeds mapping -->
+<path d="M 706 460 L 706 530" fill="none" class="dashed" stroke-width="2.1" marker-end="url(#arrow)"/>
+
+<!-- Arrows: core results back to adapter -->
+<path d="M 900 450 L 862 450 L 862 566 L 845 566" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="896" y="444" font-size="10.5" text-anchor="end" class="muted">diagnostics</text>
+<path d="M 900 468 L 876 468 L 876 658 L 845 658" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="990" y="472" font-size="10.5" text-anchor="middle" class="muted">formatted text</text>
+
+<!-- Arrows: mapping to outputs -->
+<path d="M 600 568 L 575 568" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 600 658 L 575 658" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+</svg>
