@@ -100,7 +100,7 @@
 <text x="912.0" y="407" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">source 1 bytes</text>
 <text x="912.0" y="425" font-size="8" fill="#e5e7eb" text-anchor="middle">&quot;.match {$count}&quot;</text>
 <rect x="562" y="458" width="410" height="34" rx="4" class="pad" opacity="0.48"/>
-<text x="767" y="480" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">section may be absent or empty</text>
+<text x="767" y="480" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">enabled section is present even when byte_len = 0</text>
 <rect x="44" y="540" width="992" height="144" rx="6" class="panel" opacity="1"/>
 <text x="62" y="570" font-size="13" class="label" font-weight="700">Source slice resolution</text>
 <text x="62" y="592" font-size="11" class="muted">Resolve SourceRecord.text first; if source bytes are absent, bindings may use external source text.</text>
@@ -118,7 +118,7 @@
 <rect x="44" y="710" width="992" height="106" rx="6" class="surface" opacity="1"/>
 <text x="62" y="740" font-size="13" class="label" font-weight="700">Alignment / decoder rules</text>
 <rect x="78" y="769" width="206" height="34" rx="4" class="pad" opacity="0.72"/>
-<text x="181" y="791" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">include_source_text=false</text>
+<text x="181" y="791" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">false -&gt; section absent</text>
 <rect x="316" y="769" width="206" height="34" rx="4" class="raw" opacity="0.72"/>
 <text x="419" y="791" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">source bytes not string_data</text>
 <rect x="554" y="769" width="206" height="34" rx="4" class="node" opacity="0.72"/>

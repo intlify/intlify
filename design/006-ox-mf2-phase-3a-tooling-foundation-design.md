@@ -87,7 +87,7 @@ intlify check
 intlify init
 ```
 
-Phase 3A reserves the `fmt`, `lint`, `check`, and `init` command names but keeps them out of normal `intlify --help` output until the required product behavior is ready. If any reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. `intlify check` requires both formatter and linter products, so its placeholder error uses `details.requiredPhase: "3B+3C"`. `intlify init` is reserved for future config scaffolding.
+Phase 3A reserves the `fmt`, `lint`, `check`, and `init` command names but keeps them out of normal `intlify --help` output until the required product behavior is ready. Reserving `check` prevents a command-name conflict; it does not commit the v0.1 product to providing a combined command. If any reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. The `intlify check` placeholder records formatter and linter as prerequisites with `details.requiredPhase: "3B+3C"`, but remains a placeholder until a dedicated post-v0.1 addendum defines the command. `intlify init` is reserved for future config scaffolding.
 
 The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Phase 3A global options are:
 
@@ -610,10 +610,10 @@ The following items are intentionally not delivered in Phase 3A, but should rema
 
 - Formatter and linter engines remain follow-up products. Phase 3A only reserves `intlify fmt`, `intlify lint`, `intlify check`, and `intlify init` and returns placeholder operational errors for those commands.
 - User-visible `intlify init` config scaffolding is deferred until Phase 3B formatter and Phase 3C linter config fields are stable enough to write. Its future default output should be `intlify.config.json`; JSONC remains supported for users who want comments, but the scaffolded default should be strict JSON.
-- User-visible `intlify check` behavior is deferred until both Phase 3B formatter and Phase 3C linter products exist.
+- User-visible `intlify check` is not part of the v0.1 product. After both Phase 3B formatter and Phase 3C linter products exist, a dedicated addendum may define its behavior.
 - Formatter-specific option names, defaults, layout rules, ignore behavior, and formatter result schemas belong to [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 - Linter-specific rule semantics, presets, include/exclude behavior, ignore behavior, severity policy details, and diagnostic result schemas belong to [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
-- Command-specific JSON result schemas for `fmt --check`, `lint`, and combined `check` are deferred to the product phases. Phase 3A owns only the shared envelope and operational error shape.
+- Command-specific JSON result schemas for `fmt --check` and `lint` are deferred to their product phases. A future combined `check` schema belongs to its dedicated addendum. Phase 3A owns only the shared envelope and operational error shape.
 - Formatter and linter N-API/WASM packages are deferred to their product phases. Phase 3A only records package boundaries and keeps parser binding packages focused on parser-level APIs.
 - Resource/catalog parsing, host-file escaping, outer document edits, and resource-level linting or formatting remain layered workflows outside the Phase 3A CLI foundation.
 - LSP/editor adapters, agent integrations, and MessagePack or daemon transport remain later consumers of this foundation.

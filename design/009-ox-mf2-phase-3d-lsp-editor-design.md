@@ -30,7 +30,7 @@ Adapters extract MF2 message text from the host document, call core APIs, and ma
 
 Editor adapters should treat standalone `.mf2` files and JSON/YAML resource files as different host document shapes over the same message-level core.
 
-For standalone `.mf2` files, the document maps directly to one MF2 message. For JSON/YAML resource files, the adapter extracts embedded MF2 message text from the relevant resource or catalog entry and keeps enough mapping data to translate message-local results back to the host document.
+For standalone `.mf2` files, the adapter first applies the formatter's CLI [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) contract: remove at most one leading UTF-8 BOM and then exactly one trailing `LF` or `CRLF`. The remaining text maps to one MF2 message. The mapping retains the removed BOM and trailing newline information so message-local UTF-8 byte spans can be converted to original-document UTF-16 positions. For JSON/YAML resource files, the adapter does not apply file framing; it extracts embedded MF2 message text from the relevant resource or catalog entry and keeps enough mapping data to translate message-local results back to the host document.
 
 Host document parsing, string escaping, decoded-to-raw offset mapping, and outer document edits remain adapter responsibilities. The parser, formatter, and linter cores receive extracted message text and return message-local results.
 
@@ -55,7 +55,7 @@ Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at 
 
 Formatter core APIs return formatted message text, not LSP `TextEdit` objects.
 
-Editor adapters should find the containing MF2 message or resource entry, call whole-message formatting, and create editor edits at the adapter boundary. The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` files, that range is the whole document. For JSON/YAML resources, it is the containing message value range after the adapter has performed the required host-string re-escaping.
+Editor adapters should find the containing MF2 message or resource entry, call whole-message formatting, and create editor edits at the adapter boundary. The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` files, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM. This matches CLI write framing, including BOM removal and final-line-ending normalization. For JSON/YAML resources, the range is the containing message value after the adapter has performed the required host-string re-escaping; the adapter does not add file framing to the embedded message.
 
 Adapters should only return edits when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message can no longer be identified, the adapter silently returns no edits. This expected concurrency outcome is a no-op, not an operational editor error. The exact protocol-specific version comparison remains an implementation-design question.
 

@@ -97,6 +97,8 @@ SemanticView is separate from the lossless Binary AST snapshot.
 
 Binary AST handles CST, tokens, trivia, and source spans. SemanticView handles semantic facts and source links derived from `ox_mf2_parser`-owned `SemanticModel` data.
 
+The v0.1 Binary AST does not serialize Phase 1 semantic `StringRef` values. A future public SemanticView that exposes cooked or normalized text must define explicit view-owned or future-snapshot string storage instead of treating the v0.1 metadata/diagnostic string table as semantic storage.
+
 - declarations
 - references
 - selectors
@@ -435,7 +437,7 @@ Code actions, quick fixes, hover, completion, go-to-definition, rename, true ran
 
 Editor adapters should support both standalone `.mf2` documents and MF2 messages embedded in JSON/YAML resource or catalog files.
 
-For `.mf2` files, the adapter may treat the whole document as one MF2 message. For JSON/YAML resources, the adapter extracts each embedded MF2 message from the relevant resource or catalog key/value entry and tracks the relationship between:
+For standalone `.mf2` files, the adapter applies the formatter's CLI [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) contract before treating the document as one MF2 message: remove at most one leading UTF-8 BOM and then exactly one trailing `LF` or `CRLF`. The adapter retains the removed framing in its document mapping so message-local spans can be translated back to the original document. For JSON/YAML resources, the adapter does not apply file framing; it extracts each embedded MF2 message from the relevant resource or catalog key/value entry and tracks the relationship between:
 
 - document URI and version
 - resource or catalog key
@@ -498,7 +500,7 @@ Editor adapters should:
 3. compare the original and formatted message text
 4. create editor `TextEdit` values at the adapter boundary
 
-The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document. For JSON/YAML resources, it is only the containing message value range after required host-string re-escaping.
+The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM. This intentionally applies the same BOM removal and final-line-ending normalization as the CLI. For JSON/YAML resources, the replacement is only the containing message value range after required host-string re-escaping; no file framing is added to the embedded message.
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 

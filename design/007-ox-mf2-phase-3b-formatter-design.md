@@ -196,6 +196,8 @@ Parser diagnostics and operational errors are separated:
 
 If parsing produces any parser diagnostic, all formatter APIs return `ok: false` and no formatted output. Invalid N-API/WASM options also return `ok: false` with `errors`; the public formatter APIs should not throw for normal validation failures.
 
+Unpaired-surrogate source text is a binding-representation exception rather than a normal formatter validation failure. Every N-API and WASM formatter entry point that accepts an MF2 source string throws `TypeError` before UTF-8 conversion, parsing, snapshot attachment, or `FormatResult` construction. Bindings never replace an unpaired surrogate with U+FFFD. Other raw input-shape failures, such as a non-string `source`, continue to return `ok: false` with `invalid_input`.
+
 Programmatic formatter API results do not use the CLI JSON envelope. They do not include `schemaVersion`, `version`, `projectRoot`, `summary`, or `results`. N-API and WASM reuse the same parser diagnostic JavaScript shape as the parser packages, but they do not define a new diagnostic object format.
 
 The advanced snapshot APIs accept an already-created Binary AST snapshot. These APIs are for playgrounds, workers, and language-service caches that already hold parse artifacts.
@@ -405,7 +407,8 @@ Framing consequences:
 - An empty file and a file containing only one `LF` both represent the empty message. Write mode produces a single `LF` for both; the former reports `changed: true` and the latter is already formatted.
 - Only one trailing newline sequence is framing. A simple-message file that ends with two newlines keeps the first newline as pattern text; the content round-trips unchanged.
 - Message-level APIs such as `formatMessage` receive and return unframed message text. They never strip or append newlines and never remove a BOM; callers that need file framing apply it themselves.
-- Resource/catalog adapters and LSP/editor adapters pass extracted message text to message-level APIs and never receive an injected final newline or lose message-leading content.
+- Standalone `.mf2` LSP/editor adapters apply the same read framing as the CLI before calling message-level APIs and apply the same write framing when replacing the whole document.
+- Resource/catalog adapters do not apply file framing to embedded messages. They pass extracted message text to message-level APIs and never receive an injected final newline or lose message-leading content.
 - Parser diagnostics and spans are message-local, relative to the unframed message text. When read framing removed a BOM, file-level byte positions shift by the BOM length; the CLI accounts for that shift when rendering diagnostics against the original file.
 
 ### Input Discovery
@@ -977,8 +980,8 @@ Behavior coverage:
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
 | unsupported file, unmatched input, glob-with-no-mf2-target zero-target success, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
 | ignore source precedence across root `.gitignore`, `--ignore-path`, and `fmt.ignorePatterns` | CLI formatter PR | `MUST` |
-| N-API `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | N-API binding PR | `MUST` |
-| WASM `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract | WASM binding PR | `MUST` |
+| N-API `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract, including unpaired-surrogate `TypeError` behavior | N-API binding PR | `MUST` |
+| WASM `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract, including unpaired-surrogate `TypeError` behavior | WASM binding PR | `MUST` |
 | local benchmark command execution and result schema validation | Benchmark PR | `MUST` |
 
 Core fixtures live under `crates/intlify_format/fixtures`.
