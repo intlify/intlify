@@ -2,16 +2,27 @@
 
 ## Purpose
 
-This document tracks the detailed design of the shared resource catalog adapter layer for ox-mf2: extraction of MF2 message entries from multi-entry host files such as JSON and YAML catalogs, mapping between decoded message text and raw host documents, write-back encoding, and the CLI resource workflows that formatting and linting build on that layer.
+This document tracks the detailed design of the shared resource catalog adapter layer for ox-mf2: extraction of MF2 message entries from multi-entry host files such as JSON catalogs, mapping between message text and raw host documents, write-back re-escaping, and the CLI resource workflows that formatting and linting build on that layer.
 
 The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md). That document treats resource files, framework-specific i18n files, and multi-locale catalogs as layered consumers of the message-level formatter and linter. The formatter-side expectations are recorded in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md#resource-and-catalog-formatting), the linter-side expectations in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md#resource-and-catalog-linting), and the editor-side consumption in [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md). This document is the dedicated resource adapter design those documents defer to.
 
 The message entry model and the host format adapter contract were first drafted from the editor perspective. This document owns them as consumer-neutral contracts; [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md) retains only editor-specific behavior over the same contracts. Resource catalog support is a layered milestone on top of the Phase 3 products, not itself a numbered Phase 3 product phase.
 
+## Terminology
+
+ox-mf2 documents reserve encode and decode for Binary AST snapshot encoding and decoding, defined by [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). To keep those words unambiguous, this layer names its string conversions differently:
+
+- **raw text**: bytes as they appear in the host file, addressed by raw host value spans.
+- **message text**: the exact MF2 message string that an i18n runtime would receive from the host format; the input to message-level core APIs.
+- **unescaping**: the host-format-specific conversion from raw text to message text. It covers string escapes, quoting and scalar styles, XML entities, and CDATA sections.
+- **re-escaping**: the write-back conversion from formatted message text to replacement raw text.
+
+LSP position encodings in [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md) are protocol terminology, unrelated to either conversion.
+
 ## Goals
 
 - Define one consumer-neutral message entry model and host format adapter contract shared by CLI formatting, CLI linting, and editor adapters.
-- Fix one shared implementation home for host format classification, span-preserving parsing, extraction, offset mapping, and write-back encoding.
+- Fix one shared implementation home for host format classification, span-preserving parsing, extraction, offset mapping, and write-back re-escaping.
 - Define catalog opt-in configuration as part of the unified project config so CLI and editor surfaces resolve identical project-configured catalog membership, while allowing an editor to add an explicitly editor-only ad-hoc overlay.
 - Define the CLI resource workflows: input selection, per-entry formatting and linting, result reporting, write-back composition, and check semantics.
 - Keep the message-level parser, formatter, and linter cores unchanged; the resource layer and its consumers compose them.
@@ -39,25 +50,25 @@ A message entry is the unit that connects one host document region to one MF2 me
 
 - a stable entry key
 - a raw host value span, as a host-document UTF-8 byte range
-- decoded MF2 message text
-- a decoded-to-raw offset map
-- a read-only marker for values that cannot be safely re-encoded
+- MF2 message text
+- a message-to-raw offset map
+- a read-only marker for values that cannot be safely re-escaped
 
 Consumer-neutral invariants:
 
 - Extraction returns entries ordered by raw span start. Raw value spans of different entries must not overlap.
-- Decoded message text must be the exact string value that an i18n runtime would receive from the host format. Adapters must not trim, normalize, or append to decoded text; per the [Phase 3B file framing contract](./007-ox-mf2-phase-3b-formatter-design.md#file-framing), message-level core APIs never receive an injected final newline or lose message-leading content.
-- Host constructs whose decoded value cannot be represented as well-formed UTF-8, such as JSON escape sequences encoding unpaired surrogates, are excluded from extraction until the parser-level source-text direction noted in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) supports them.
+- Message text must be the exact string value that an i18n runtime would receive from the host format. Adapters must not trim, normalize, or append to message text; per the [Phase 3B file framing contract](./007-ox-mf2-phase-3b-formatter-design.md#file-framing), message-level core APIs never receive an injected final newline or lose message-leading content.
+- Host constructs whose unescaped value cannot be represented as well-formed UTF-8, such as JSON escape sequences that denote unpaired surrogates, are excluded from extraction until the parser-level source-text direction noted in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) supports them.
 
 Standalone `.mf2` files can reuse this model's shape as a degenerate single-entry host document, but their map is not unconditionally the identity: the editor adapter applies the Phase 3B [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) read contract and retains any removed BOM and trailing newline in a framing-aware document map. That uniformity is an editor-workflow concern owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md). CLI formatting and linting keep their existing direct `.mf2` file paths unchanged; resource workflows neither apply standalone file framing to embedded messages nor reroute standalone message files through catalog extraction.
 
 ## Host Format Adapter Contract
 
-A host format adapter is the format-specific component that classifies one host format, parses it, maps it into message entries, and re-encodes formatted message text back into host raw text.
+A host format adapter is the format-specific component that classifies one host format, parses it, maps it into message entries, and re-escapes formatted message text back into host raw text.
 
 ### Extraction
 
-- Host parsing must be span-preserving. Extraction needs the raw source span of every message value, so value-only deserialization such as plain `serde`-style decoding is not sufficient.
+- Host parsing must be span-preserving. Extraction needs the raw source span of every message value, so value-only deserialization in the plain `serde` style is not sufficient.
 - Extraction produces the ordered entry list defined by the message entry model.
 
 ### Entry Identity
@@ -66,20 +77,20 @@ A host format adapter is the format-specific component that classifies one host 
 - The entry key is an identity, not a display string. Adapters may additionally expose a runtime-style display key, such as dot-joined nesting, for UI and reporting purposes, but identity comparisons use the structural key.
 - When a host document contains duplicate keys, each raw occurrence is a separate entry and the entry key carries an occurrence discriminator. Reporting duplicate catalog keys as a problem is future catalog-level linting, not an extraction failure.
 
-### Decoded-to-Raw Offset Mapping
+### Message-to-Raw Offset Mapping
 
-Each entry carries a monotonic offset map that aligns decoded message-local UTF-8 byte ranges with raw host UTF-8 byte ranges inside the raw value span.
+Each entry carries a monotonic offset map that aligns message-local UTF-8 byte ranges of the message text with raw host UTF-8 byte ranges inside the raw value span.
 
-- Runs where decoded bytes equal raw bytes share one identity segment.
-- Each atomic decoding unit — a single host escape, multiple escapes that jointly decode one scalar such as a JSON UTF-16 surrogate pair, or an XML entity — is one segment mapping the decoded bytes to the full raw encoded range.
-- Raw-only syntax such as string quotes and CDATA delimiters remains inside the raw value span used for replacement but consumes no decoded bytes. Offset maps retain these boundary gaps so diagnostic ranges do not consume delimiters. When the entry shape is reused by the standalone editor adapter, removed file framing is represented by the same kind of raw-only boundary gap.
-- A message-local position inside a decoded escape maps to the raw escape start when it is a range start and to the raw escape end when it is a range end, so mapped ranges never split a host escape sequence.
+- Runs where message text bytes equal raw bytes share one identity segment.
+- Each atomic unescaping unit — a single host escape, multiple escapes that jointly unescape to one scalar such as a JSON UTF-16 surrogate pair, or an XML entity — is one segment mapping the message text bytes to the full raw escape range.
+- Raw-only syntax such as string quotes and CDATA delimiters remains inside the raw value span used for replacement but consumes no message text bytes. Offset maps retain these boundary gaps so diagnostic ranges do not consume delimiters. When the entry shape is reused by the standalone editor adapter, removed file framing is represented by the same kind of raw-only boundary gap.
+- A message-local position that falls inside the output of one escape maps to the raw escape start when it is a range start and to the raw escape end when it is a range end, so mapped ranges never split a host escape sequence.
 
-### Write-Back Encoding
+### Write-Back Re-Escaping
 
-- Re-encoding must be value-identical: decoding the re-encoded text must produce exactly the formatted message text.
-- Re-encoding should preserve the host value style, such as quoting or scalar style, when that style can represent the formatted text. Otherwise the adapter may switch to a style that can, while keeping the host document semantically identical outside the message value.
-- When the adapter cannot guarantee value-identical re-encoding for a host construct, extraction marks the entry read-only. Read-only entries still produce diagnostics; formatting skips them.
+- Re-escaping must be value-identical: unescaping the re-escaped text must produce exactly the formatted message text.
+- Re-escaping should preserve the host value style, such as quoting or scalar style, when that style can represent the formatted text. Otherwise the adapter may switch to a style that can, while keeping the host document semantically identical outside the message value.
+- When the adapter cannot guarantee value-identical re-escaping for a host construct, extraction marks the entry read-only. Read-only entries still produce diagnostics; formatting skips them.
 
 ### Host Parse Failures
 
@@ -94,7 +105,7 @@ Consumers resolve each input file or document to at most one host format adapter
 - CLI resource workflows and editor adapters must resolve project-configured membership and host format identically. An editor-only ad-hoc entry is intentionally absent from CLI and CI processing until it is persisted in project configuration; editor integrations should distinguish that state rather than presenting it as CI coverage.
 - If overlapping catalog configuration maps one file to multiple host formats, that is a configuration validation failure and therefore an operational error, not silent precedence.
 
-Within an opted-in catalog document, the default extraction scope is every string leaf value, including string elements of arrays, whose path and decoded value satisfy the message-entry representability invariants above. String leaves excluded by those invariants, such as values below an initially unsupported YAML complex-key path or values that cannot be represented as well-formed UTF-8, are not entries. Non-string scalars are never message entries. Narrowing extraction with key selectors, such as include/exclude paths, is future configuration detail; the entry model does not change when selectors arrive.
+Within an opted-in catalog document, the default extraction scope is every string leaf value, including string elements of arrays, whose path and unescaped value satisfy the message-entry representability invariants above. String leaves excluded by those invariants, such as values below an initially unsupported YAML complex-key path or values that cannot be represented as well-formed UTF-8, are not entries. Non-string scalars are never message entries. Narrowing extraction with key selectors, such as include/exclude paths, is future configuration detail; the entry model does not change when selectors arrive.
 
 Locale identity is not required by per-entry formatting and linting, because parsing, formatting, and linting one MF2 message do not depend on locale. Catalog configuration may later bind locale metadata, for example through `locales/{locale}.json` path patterns, to entries for future catalog-level and cross-locale checks.
 
@@ -104,31 +115,35 @@ Host formats are introduced in tiers behind the same adapter contract. Tiers ord
 
 | Tier | Host formats | Status |
 | --- | --- | --- |
-| 1 | JSON catalogs (`.json`); YAML catalogs (`.yaml`, `.yml`) | initial resource milestone |
-| 2 | JSONC and JSON5 catalogs | planned extension |
-| 3 | Vue SFC `<i18n>` custom blocks through adapter composition; XLIFF 1.2 / 2.x; other interchange formats such as ARB, gettext PO, and Java properties | candidates, demand-driven |
+| 1 | JSON catalogs (`.json`) | initial resource milestone |
+| 2 | Vue SFC `<i18n>` custom blocks through adapter composition | deferred follow-up |
+| 3 | YAML catalogs (`.yaml`, `.yml`); JSONC and JSON5 catalogs; XLIFF 1.2 / 2.x; other interchange formats such as ARB, gettext PO, and Java properties | deferred follow-up, demand-driven |
+
+Only Tier 1 is implemented in the initial resource milestone. Tier 2 and Tier 3 formats are deferred and tracked in [Deferred Follow-Up Notes](#deferred-follow-up-notes). Their subsections below record contract-level design notes so the shared contracts stay tier-proof; they are not initial implementation commitments.
 
 ### JSON Catalogs
 
-JSON catalogs decode RFC 8259 string escapes. The JSON Pointer entry identity rules and the unpaired-surrogate exclusion above apply. Formatted multi-line MF2 output, such as a formatted matcher, re-encodes line breaks as `\n` escapes inside the single-line JSON string value.
-
-### YAML Catalogs
-
-YAML catalogs resolve entries from tag-resolved string scalars. Plain, single-quoted, and double-quoted scalars are read-write in the initial tier. Literal and folded block scalars must still produce correct offset maps for diagnostics but are read-only for formatting initially, because value-identical re-encoding across block scalar indentation and folding rules needs its own design. Anchored values produce one entry at the anchor definition site; alias nodes and merge-key expansions do not produce additional entries.
-
-### JSONC and JSON5 Catalogs
-
-JSONC adds comments and trailing commas over the JSON adapter. JSON5 adds further string syntax, such as single-quoted strings and line continuations, that changes decoding and re-encoding but not the entry model. These are ecosystem-relevant catalog syntaxes and should reuse the JSON adapter structure.
+JSON catalogs unescape RFC 8259 string escapes. The JSON Pointer entry identity rules and the unpaired-surrogate exclusion above apply. Formatted multi-line MF2 output, such as a formatted matcher, re-escapes line breaks as `\n` escapes inside the single-line JSON string value.
 
 ### Vue SFC `<i18n>` Custom Blocks
 
-Single-file-component `<i18n>` blocks embed a JSON/JSON5/YAML catalog region inside a `.vue` host document. This is adapter composition: an outer adapter locates the block region and its declared language, an inner catalog adapter runs over the region text, and the offset maps compose into document coordinates. The entry model is closed under this composition; no new consumer-facing behavior is required.
+Single-file-component `<i18n>` blocks embed a catalog region inside a `.vue` host document. This is adapter composition: an outer adapter locates the block region and its declared language, an inner catalog adapter runs over the region text, and the offset maps compose into document coordinates. The entry model is closed under this composition; no new consumer-facing behavior is required.
+
+Composition consumes only the inner adapters that have shipped when this tier lands: blocks whose language is JSON, the `<i18n>` block default, compose the Tier 1 JSON adapter, while `lang="yaml"` or `lang="json5"` blocks require their Tier 3 adapters and stay out of extraction until those land.
+
+### YAML Catalogs
+
+YAML catalogs resolve entries from tag-resolved string scalars. Plain, single-quoted, and double-quoted scalars are read-write when this tier lands. Literal and folded block scalars must still produce correct offset maps for diagnostics but start read-only for formatting, because value-identical re-escaping across block scalar indentation and folding rules needs its own design. Anchored values produce one entry at the anchor definition site; alias nodes and merge-key expansions do not produce additional entries.
+
+### JSONC and JSON5 Catalogs
+
+JSONC adds comments and trailing commas over the JSON adapter. JSON5 adds further string syntax, such as single-quoted strings and line continuations, that changes unescaping and re-escaping but not the entry model. These are ecosystem-relevant catalog syntaxes and should reuse the JSON adapter structure.
 
 ### XLIFF
 
-XLIFF is an XML host format: XLIFF 1.2 stores message text in `<trans-unit>` `<source>`/`<target>` elements and XLIFF 2.x in `<unit>`/`<segment>` `<source>`/`<target>` elements. Entry keys serialize the file/group/unit and, where present, segment identity path. Decoding covers XML entities and CDATA sections and must respect `xml:space` handling.
+XLIFF is an XML host format: XLIFF 1.2 stores message text in `<trans-unit>` `<source>`/`<target>` elements and XLIFF 2.x in `<unit>`/`<segment>` `<source>`/`<target>` elements. Entry keys serialize the file/group/unit and, where present, segment identity path. Unescaping covers XML entities and CDATA sections and must respect `xml:space` handling.
 
-Segments that contain inline elements such as `<ph>`, `<pc>`, `<g>`, or `<x>` are not extracted as MF2 entries initially, because their decoded text interleaves markup and would require a placeholder-protection design. Whether MF2 message text is carried inside XLIFF at all is a project or TMS convention; the adapter processes only catalogs that configuration explicitly opts in.
+Segments that contain inline elements such as `<ph>`, `<pc>`, `<g>`, or `<x>` are not extracted as MF2 entries initially, because their message text would interleave markup and would require a placeholder-protection design. Whether MF2 message text is carried inside XLIFF at all is a project or TMS convention; the adapter processes only catalogs that configuration explicitly opts in.
 
 ## Catalog Configuration
 
@@ -145,7 +160,8 @@ The initial section shape direction:
         "include": ["locales/**/*.json"],
         // Optional. Excluded files within include.
         "exclude": ["locales/**/generated.*.json"],
-        // Optional. Host format override; defaults from the file extension.
+        // Optional. Single per-file classification override; when omitted,
+        // each matched file's format defaults from its own extension.
         "format": "json"
       }
     ]
@@ -153,8 +169,30 @@ The initial section shape direction:
 }
 ```
 
+A project that manages MF2 messages in several host formats opts them all in at once; classification is per file, so no `format` field is needed for mixed sets:
+
+```jsonc
+{
+  "resources": {
+    "catalogs": [
+      // Mixed-format catalogs: format omitted, classified per file extension.
+      { "include": ["locales/**/*.json", "locales/**/*.yaml"] },
+      // SFC catalogs: the file classifies as the SFC host format; embedded
+      // block languages come from each <i18n> block's lang attribute.
+      { "include": ["src/**/*.vue"] }
+    ]
+  }
+}
+```
+
+Opted-in files whose format tier has not shipped yet follow the `resource_format_unsupported` rule below, so a project widens its include globs as deferred tiers land.
+
 - `include` globs are required per catalog definition; `exclude` is optional. Glob semantics follow the shared CLI discovery contract in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract).
-- `format` defaults from the file extension and exists for extension-ambiguous cases. A file assigned to different formats by overlapping definitions is a `config_validation_failed` error with a JSON pointer to the conflicting entry.
+- `format` is a single-valued, per-file classification override, because the registry resolves every file to exactly one host format adapter. It is not a list of enabled formats: list-like values such as `"json,yaml"` or arrays are invalid.
+- One catalog definition may cover files of multiple host formats. When `format` is omitted, each matched file's format defaults from its own extension, so a mixed include set needs no `format` field at all. An explicit `format` override applies to every file its definition matches and exists for extension-ambiguous cases; a heterogeneous file set that needs different overrides is expressed as multiple `catalogs` definitions. Content sniffing is never used for classification.
+- For Vue SFC catalogs, `format` identifies only the outer SFC host format. The embedded block language comes from each `<i18n>` block's `lang` attribute inside the file, not from configuration.
+- A file assigned to different formats by overlapping definitions is a `config_validation_failed` error with a JSON pointer to the conflicting entry.
+- Explicit `format` values are schema-validated against the host formats shipped in the current release. Opted-in files whose derived format has no shipped adapter, such as `.yaml` catalogs before their tier lands, are reported by the CLI as target-local operational errors with `kind: "input"` and `code: "resource_format_unsupported"` rather than being silently skipped; editor adapters do not process such documents.
 - Key selectors and locale binding placeholders are future fields of the catalog definition; they must extend this shape without breaking existing configs.
 - Exact field naming is fixed together with the config-model and schema change when implementation starts; this document fixes the semantics.
 
@@ -164,10 +202,10 @@ An empty or absent `resources` section means no catalog files are processed. Sta
 
 The shared layer lives in a workspace-internal `crates/intlify_resource` crate, following the crate conventions of the formatter and linter products: not a crates.io deliverable, `publish = false`, consumed by `crates/intlify_cli`.
 
-- `crates/intlify_resource` owns the host format registry, span-preserving host parsers, extraction, entry identity, offset mapping, write-back encoding, and the resolved catalog configuration model for the `resources` section.
+- `crates/intlify_resource` owns the host format registry, span-preserving host parsers, extraction, entry identity, offset mapping, write-back re-escaping, and the resolved catalog configuration model for the `resources` section.
 - The crate does not depend on `ox_mf2_parser`, `intlify_format`, or `intlify_lint`. Consumers compose extraction with message-level core calls. This keeps the dependency direction acyclic and the layer reusable by any consumer.
-- Concrete host parser dependencies are implementation choices, constrained by the contract: raw value spans, byte-exact decoding, and value-identical re-encoding, all locked by fixtures.
-- Binding packages such as `@intlify/resource-napi` and `@intlify/resource-wasm` mirror the formatter and linter packaging structure and are published only when editor or binding consumers materialize. Parser, formatter, and linter binding packages do not absorb resource APIs.
+- Concrete host parser dependencies are implementation choices, constrained by the contract: raw value spans, byte-exact unescaping, and value-identical re-escaping, all locked by fixtures.
+- The crate is the only planned deliverable for this layer. No resource N-API or WASM binding packages are planned at this time; reconsidering package distribution is a deferred follow-up that requires a concrete non-Rust consumer. Parser, formatter, and linter binding packages do not absorb resource APIs.
 
 ## CLI Resource Workflow
 
@@ -185,13 +223,13 @@ When a catalog file cannot be parsed as its host format, the CLI reports a targe
 
 ### Determinism and Parallelism
 
-File results are reported in stable normalized path order; entries within a file are reported in raw span order. The CLI may parallelize across files and may parallelize entries within a file, but observable output order must remain deterministic. Benchmarks report extraction, encoding, core calls, and file I/O as separate phases.
+File results are reported in stable normalized path order; entries within a file are reported in raw span order. The CLI may parallelize across files and may parallelize entries within a file, but observable output order must remain deterministic. Benchmarks report extraction, re-escaping, core calls, and file I/O as separate phases.
 
 ## Catalog Linting
 
 Catalog linting runs the message-level linter per entry and aggregates per file.
 
-- Each entry's decoded text goes through `lintMessage(source, options)` with the same resolved lint configuration used for `.mf2` files. The strict `parser -> semantic -> rules` pipeline applies per entry.
+- Each entry's message text goes through `lintMessage(source, options)` with the same resolved lint configuration used for `.mf2` files. The strict `parser -> semantic -> rules` pipeline applies per entry.
 - Entries are independent: parser diagnostics in one entry never suppress semantic validation, linting, or reporting for other entries.
 - Entry diagnostics are reported with host-file coordinates as the primary location: the mapped host UTF-8 byte span and derived line/column, produced through the entry offset map. Each entry-level result carries its entry key; a display key may accompany it for human-readable output.
 - If any per-entry linter call returns an operational error instead of a complete diagnostic result, the catalog target follows the existing target-level linter error contract: it reports `status: "error"`, an empty `diagnostics` array, and the error in `results[].errors`, with `details.entryKey` when the entry is known. Diagnostics already collected from other entries in that catalog are discarded because the target result is incomplete; other selected files still continue.
@@ -202,13 +240,13 @@ Catalog linting runs the message-level linter per entry and aggregates per file.
 
 Catalog formatting runs the message-level formatter per entry and composes write-back edits per file.
 
-- Each writable entry's decoded text goes through `formatMessage(source, options?)` with the same resolved fmt configuration used for `.mf2` files.
-- Write mode: for every writable, syntactically valid entry whose formatted output differs, the adapter re-encodes the formatted text and replaces the entry's raw value span. Edits are applied in descending raw-span offset order and the file is written once, using the Phase 3B CLI's file-I/O and operational-error conventions but not its standalone `.mf2` file framing. All bytes outside replaced value spans remain byte-identical, including any host-file BOM and trailing line ending: no key reordering, no indentation or quoting changes outside message values, and no host layout normalization.
+- Each writable entry's message text goes through `formatMessage(source, options?)` with the same resolved fmt configuration used for `.mf2` files.
+- Write mode: for every writable, syntactically valid entry whose formatted output differs, the adapter re-escapes the formatted text and replaces the entry's raw value span. Edits are applied in descending raw-span offset order and the file is written once, using the Phase 3B CLI's file-I/O and operational-error conventions but not its standalone `.mf2` file framing. All bytes outside replaced value spans remain byte-identical, including any host-file BOM and trailing line ending: no key reordering, no indentation or quoting changes outside message values, and no host layout normalization.
 - Entries whose extracted text has parser diagnostics are skipped per entry and reported with the same strict invalid-syntax semantics that [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md) fixes for invalid standalone files, scoped to the entry. Other entries still format. One broken message must not block formatting of a large catalog; this mirrors the editor behavior in [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md).
 - For catalog targets, the formatting unit affected by parser diagnostics is the entry, not the whole host file. A diagnostic-bearing entry is never replaced, but the same catalog file may still be written once when other entries produce valid changes. This is the resource-layer specialization of Phase 3B's rule that parser diagnostics do not modify the affected formatting unit.
 - Read-only entries are excluded from formatting by definition: write mode skips them and `--check` does not count them as changed. Whether check output should mention skipped read-only entries informationally is an open question.
 - `--check` and `--list-different` report a catalog file as different when at least one writable, syntactically valid entry differs after formatting.
-- If a per-entry formatter call or writable-entry encoding step returns an operational error, the catalog produces no write and no partial formatting result. Its file result uses `status: "error"`, `changed: false`, an empty `diagnostics` array, and the operational error in `results[].errors`, with `details.entryKey` when known. An encoding failure for an entry previously classified as writable is an `internal_error` with `details.reason: "resource_encode_failed"`. Other selected files still continue.
+- If a per-entry formatter call or writable-entry re-escaping step returns an operational error, the catalog produces no write and no partial formatting result. Its file result uses `status: "error"`, `changed: false`, an empty `diagnostics` array, and the operational error in `results[].errors`, with `details.entryKey` when known. A re-escaping failure for an entry previously classified as writable is an `internal_error` with `details.reason: "resource_write_back_failed"`. Other selected files still continue.
 - Idempotency: the write-back round-trip law plus message-level formatter idempotency imply that formatting an already formatted catalog produces no writes. Fixtures lock this.
 
 A catalog may contain both valid changed entries and parser-diagnostic entries. The file-level JSON result keeps the Phase 3B status enum and applies this precedence after successful, non-operational processing:
@@ -222,7 +260,7 @@ Accordingly, `formattedFiles` or `differentFiles` and `diagnosticFiles` may coun
 
 ## Editor Consumption
 
-For project-configured catalog documents, editor adapters consume the same registry, extraction, offset maps, and write-back encoding through this shared layer, so membership, host format classification, and mapping are identical in CI and in the editor. An editor-only ad-hoc opt-in still uses the same host adapter contract, but its membership is intentionally editor-local until persisted in project configuration. Standalone `.mf2` documents continue through the editor-owned adapter defined by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md), not catalog extraction. Surface behavior stays intentionally different: editors convert mapped spans to editor position encodings, publish per document, retain previous diagnostics across transient host parse failures, and no-op on stale document versions, while the CLI reports host parse failures as target-local operational errors and writes files directly.
+For project-configured catalog documents, editor adapters consume the same registry, extraction, offset maps, and write-back re-escaping through this shared layer, so membership, host format classification, and mapping are identical in CI and in the editor. An editor-only ad-hoc opt-in still uses the same host adapter contract, but its membership is intentionally editor-local until persisted in project configuration. Standalone `.mf2` documents continue through the editor-owned adapter defined by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md), not catalog extraction. Surface behavior stays intentionally different: editors convert mapped spans to editor position encodings, publish per document, retain previous diagnostics across transient host parse failures, and no-op on stale document versions, while the CLI reports host parse failures as target-local operational errors and writes files directly.
 
 ## Catalog-Level Checks
 
@@ -233,20 +271,20 @@ Catalog-level and cross-locale checks — duplicate catalog keys, key parity acr
 Resource benchmarks are phase-separated, following the Phase 3 benchmark conventions:
 
 - `resource_extract`: host parse and entry extraction per format
-- `resource_encode`: write-back encoding and edit composition
+- `resource_write_back`: write-back re-escaping and edit composition
 - `fmt_catalog_check_e2e` and `fmt_catalog_write_e2e`
 - `lint_catalog_e2e`
-- catalog-shaped cache scenarios from [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md), such as unchanged decoded entries across host file edits
+- catalog-shaped cache scenarios from [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md), such as entries with unchanged message text across host file edits
 
-Extraction and encoding costs must be reported separately from parser, semantic, rule, formatter, and file I/O costs.
+Extraction and re-escaping costs must be reported separately from parser, semantic, rule, formatter, and file I/O costs.
 
 ## Validation
 
-- Extraction fixtures per host format: escape decoding, JSON Pointer identity including `"a.b"` versus nested `a` → `b`, typed YAML path identity including string-key/integer-key/sequence-index collisions, duplicate-key occurrence discriminators, array elements, YAML scalar styles, anchors and aliases, block scalar read-only marking, complex-key exclusion, and unpaired-surrogate exclusion.
-- Round-trip tests: for writable constructs, extracting the re-encoded output yields exactly the formatted message text.
+- Extraction fixtures per host format, landing with each format's tier. The Tier 1 JSON set covers string unescaping, JSON Pointer identity including `"a.b"` versus nested `a` → `b`, duplicate-key occurrence discriminators, array elements, and unpaired-surrogate exclusion. Deferred tiers add their own sets when they land, such as typed YAML path identity including string-key/integer-key/sequence-index collisions, YAML scalar styles, anchors and aliases, block scalar read-only marking, and complex-key exclusion.
+- Round-trip tests: for writable constructs, extracting the re-escaped output yields exactly the formatted message text.
 - Offset map fixtures: message-local spans map to expected host spans across single escapes, compound surrogate-pair escapes, and raw-only delimiters, including the escape-boundary rule.
 - CLI end-to-end fixtures: lint and fmt write/check over catalog fixtures, including broken-entry and broken-host-file cases, mixed changed-plus-diagnostic formatter results and overlapping summary counts, per-entry operational failures with no partial file write, deterministic ordering, and JSON envelope shapes.
-- Configuration fixtures: `resources` section validation, overlapping-definition conflicts, and empty-section behavior.
+- Configuration fixtures: `resources` section validation, rejection of list-like `format` values, unshipped `format` values and `resource_format_unsupported` targets, overlapping-definition conflicts, and empty-section behavior.
 - Determinism tests for parallel runs.
 
 ## Relationship to Other Documents
@@ -261,10 +299,22 @@ Extraction and encoding costs must be reported separately from parser, semantic,
 | [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md) | per-entry parse artifact reuse |
 | this document | message entry model, host format adapter contract, registry and catalog configuration, `crates/intlify_resource` boundary, CLI resource workflows |
 
+## Deferred Follow-Up Notes
+
+The following items are intentionally not part of the initial resource milestone, but should remain visible for later work:
+
+- Tier 2 Vue SFC `<i18n>` custom block support: outer block extraction and adapter composition over the block region, per the tier notes above. Blocks whose declared language has no shipped inner adapter stay out of extraction, and the composition-ownership open question below must be resolved before this tier lands.
+- Tier 3 YAML catalog support (`.yaml`, `.yml`): typed structural path identity, scalar-style handling, anchors and aliases, and block scalar read-only handling per the tier notes above.
+- Tier 3 JSONC and JSON5 catalog support, reusing the JSON adapter structure.
+- Tier 3 XLIFF 1.2 / 2.x support: XML entity and CDATA unescaping, `xml:space` handling, and inline-element exclusion until a placeholder-protection design exists.
+- Other Tier 3 interchange formats such as ARB, gettext PO, and Java properties remain demand-driven candidates.
+- Resource N-API and WASM binding packages are not planned at this time. Distribution stays the workspace-internal `crates/intlify_resource` crate; package distribution is reconsidered only if a concrete non-Rust consumer needs direct access to this layer.
+- Key selectors, locale binding, catalog-level checks, and filename-convention defaults remain future configuration and linting work tracked in the sections and open questions of this document.
+
 ## Open Questions
 
 - What exact Rust and binding-facing type shapes should represent the message entry model and offset map?
-- What exact `resources` config field names and shapes should ship: key selectors, locale binding placeholders, per-catalog `format` defaulting rules, and interaction with `--config`?
+- What exact `resources` config field names and shapes should ship: key selectors, locale binding placeholders, and interaction with `--config`?
 - Should filename conventions such as `*.mf2.json` become default opt-in in a later tier, and if so with what override semantics?
 - When should YAML block scalars graduate from read-only to writable entries, and what style-switch policy applies when a formatted message no longer fits the original scalar style?
 - How should XLIFF inline elements be represented if XLIFF entries need more than plain-text segments: placeholder protection, or continued exclusion?

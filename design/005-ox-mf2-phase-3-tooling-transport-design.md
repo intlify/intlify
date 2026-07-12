@@ -447,7 +447,7 @@ For standalone `.mf2` files, the adapter applies the formatter's CLI [File Frami
 
 Parser, formatter, and linter core APIs operate on the extracted message text. Adapters map message-local results back to the containing document.
 
-Host document parsing, string escaping, decoded-to-raw offset mapping, and outer document edit ownership are adapter concerns. Their exact contracts should be specified in a dedicated LSP/editor or resource adapter design.
+Host document parsing, string escaping, message-to-raw offset mapping, and outer document edit ownership are adapter concerns. Their exact contracts should be specified in a dedicated LSP/editor or resource adapter design.
 
 ### Span and Position Conversion
 

@@ -1170,7 +1170,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 ## Deferred Follow-Up Notes
 
-- Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, decoded-to-raw mapping, and outer document edits.
+- Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, message-to-raw mapping, and outer document edits.
 - Formatter ignore or suppression mechanisms that are compatible with MF2 syntax.
 - Future formatter IR changes beyond the Phase 3B design in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md), such as width-aware wrapping or additional document primitives.
 - `.editorconfig` loading once formatter options exist that can consume it.

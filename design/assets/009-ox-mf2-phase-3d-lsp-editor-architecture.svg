@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 770" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">Phase 3D LSP and editor architecture</title>
-<desc id="desc">Standalone mf2 files and opt-in catalog formats are classified by a host format registry; future catalog formats join the same registry. The editor-owned standalone adapter applies CLI-equivalent file framing, while catalog adapters in the shared resource layer extract and encode catalog values. Both produce message entries with entry keys, raw value spans, decoded text, and offset maps. Each entry is processed by the LSP-agnostic message-level core through lintMessage and formatMessage. Results are mapped back through span and position mapping into publishDiagnostics, and through framing or write-back encoding into TextEdit values. Future editor-owned caches store versioned extraction artifacts and exact-source message artifacts outside the core.</desc>
+<desc id="desc">Standalone mf2 files and opt-in catalog formats are classified by a host format registry; future catalog formats join the same registry. The editor-owned standalone adapter applies CLI-equivalent file framing, while catalog adapters in the shared resource layer extract and re-escape catalog values. Both produce message entries with entry keys, raw value spans, message text, and offset maps. Each entry is processed by the LSP-agnostic message-level core through lintMessage and formatMessage. Results are mapped back through span and position mapping into publishDiagnostics, and through framing or write-back re-escaping into TextEdit values. Future editor-owned caches store versioned extraction artifacts and exact-source message artifacts outside the core.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -94,7 +94,7 @@
 <rect x="356" y="320" width="200" height="76" rx="8" class="output"/>
 <text x="456" y="344" font-size="12.5" font-weight="700" text-anchor="middle" class="white">message-entry adapters</text>
 <text x="456" y="362" font-size="10.6" text-anchor="middle" class="soft-white">.mf2: read / write framing</text>
-<text x="456" y="378" font-size="10.6" text-anchor="middle" class="soft-white">catalog: extract() / encode()</text>
+<text x="456" y="378" font-size="10.6" text-anchor="middle" class="soft-white">catalog: extract() / re-escape()</text>
 
 <text x="456" y="428" font-size="10.6" text-anchor="middle" class="muted">catalog parse failure: no new MF2</text>
 <text x="456" y="444" font-size="10.6" text-anchor="middle" class="muted">diagnostics and no edits —</text>
@@ -104,8 +104,8 @@
 <text x="706" y="336" font-size="13.5" font-weight="700" text-anchor="middle" class="white">Message entry</text>
 <text x="706" y="360" font-size="10.6" text-anchor="middle" class="soft-white">entry key (structural path)</text>
 <text x="706" y="378" font-size="10.6" text-anchor="middle" class="soft-white">raw value span</text>
-<text x="706" y="396" font-size="10.6" text-anchor="middle" class="soft-white">decoded MF2 message text</text>
-<text x="706" y="414" font-size="10.6" text-anchor="middle" class="soft-white">decoded → raw offset map</text>
+<text x="706" y="396" font-size="10.6" text-anchor="middle" class="soft-white">MF2 message text</text>
+<text x="706" y="414" font-size="10.6" text-anchor="middle" class="soft-white">message → raw offset map</text>
 <text x="706" y="432" font-size="10.6" text-anchor="middle" class="soft-white">read-only marker</text>
 
 <!-- Mapping and outputs -->
@@ -115,9 +115,9 @@
 <text x="722" y="588" font-size="10.4" text-anchor="middle" class="soft-white">→ host UTF-8 → UTF-16 positions</text>
 
 <rect x="600" y="620" width="245" height="76" rx="8" class="output"/>
-<text x="722" y="644" font-size="12.5" font-weight="700" text-anchor="middle" class="white">framing / write-back encoding</text>
+<text x="722" y="644" font-size="12.5" font-weight="700" text-anchor="middle" class="white">framing / write-back re-escaping</text>
 <text x="722" y="662" font-size="10.4" text-anchor="middle" class="soft-white">.mf2: one final LF, no BOM</text>
-<text x="722" y="678" font-size="10.4" text-anchor="middle" class="soft-white">catalog: value-identical re-encode</text>
+<text x="722" y="678" font-size="10.4" text-anchor="middle" class="soft-white">catalog: value-identical re-escape</text>
 
 <rect x="330" y="530" width="245" height="76" rx="8" class="entry"/>
 <text x="452" y="554" font-size="12.5" font-weight="700" text-anchor="middle" class="white">publishDiagnostics</text>
