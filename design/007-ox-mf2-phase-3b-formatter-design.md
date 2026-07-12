@@ -552,7 +552,7 @@ JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON 
 
 `schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
 
-The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics`; there is no top-level `diagnostics` field. Diagnostic entries use the shared diagnostic JSON shape defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
+The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics` for standalone message targets or `results[].entries[].diagnostics` for catalog targets; there is no top-level `diagnostics` field. Diagnostic entries use the shared diagnostic JSON shape defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 `summary.status` follows the Phase 3A status contract:
 
@@ -618,7 +618,7 @@ Ignored stdin JSON output in normal stdin mode uses:
 
 Ignored stdin JSON output in stdin check mode uses the same zero-target counters with `"operation": "stdin-check"`. It does not add `differentFiles`, because the ignored stdin source is not checked as a formatter target.
 
-Each `results[]` entry uses this shape:
+Each standalone message `results[]` entry uses this shape:
 
 ```json
 {
@@ -653,6 +653,8 @@ Per-file input read failures and output write failures create `results[]` entrie
 Write mode generates the full formatted output in memory before writing. Phase 3B writes directly to the target file and does not guarantee rollback or atomic replacement if the filesystem write fails.
 
 Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
+
+Catalog targets use the mutually exclusive nested `entries[]` result variant defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-json-result-layout). The file result retains the formatter aggregate `status`, `changed`, and `errors` fields, while each complete entry result carries its entry identity, status, changed state, and mapped diagnostics.
 
 ## Configuration
 

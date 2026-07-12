@@ -553,7 +553,7 @@ JSON output uses the Phase 3A envelope with `command: "lint"`. `schemaVersion`, 
 
 Global operational errors that occur before target selection or before any target can be linted, such as `config_validation_failed`, are reported in the top-level `errors` array with `results: []`, `summary.status: "error"`, and exit code `2`. Their `summary.operation` is `"lint"` unless the failure is specific to stdin mode before target execution.
 
-Each `results[]` entry uses this shape:
+Each standalone message `results[]` entry uses this shape:
 
 ```json
 {
@@ -563,6 +563,8 @@ Each `results[]` entry uses this shape:
   "errors": []
 }
 ```
+
+Catalog targets instead use the mutually exclusive nested `entries[]` result variant defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-json-result-layout). The file result retains the linter aggregate `status` and `errors` fields, while every successfully processed entry carries its identity, status, and mapped diagnostics. Summary counts, `--max-warnings`, and `--quiet` apply to the complete diagnostic set across those entry arrays.
 
 `status` is one of:
 
