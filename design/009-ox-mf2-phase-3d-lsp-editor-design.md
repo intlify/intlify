@@ -39,7 +39,7 @@ Adapters extract MF2 message entries from the host document, call core APIs per 
 Editor adapters should treat every supported document as a host document that yields zero or more message entries over the same message-level core.
 
 - A **host document** is one editor document: a standalone `.mf2` file or an opted-in message catalog file, beginning with JSON catalogs.
-- A **message entry** is the unit that connects one host document region to one MF2 message: a stable entry key, a raw host value span, MF2 message text, a message-to-raw offset map, and a read-only marker. The canonical entry model definition and its invariants are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
+- A **message entry** is the unit that connects one host document region to one MF2 message: a stable concrete entry key, a logical catalog key for future cross-locale grouping, a raw host value span, MF2 message text, a message-to-raw offset map, and a read-only marker. The canonical entry model definition and its invariants are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 - A **host format adapter** is the format-specific component that classifies, parses, maps, and re-escapes one host format, per the adapter contract in the same document.
 
 Standalone `.mf2` files are the degenerate host format in the editor workflow. Before producing the single message entry, the standalone adapter applies the Phase 3B [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) read contract: it removes at most one leading UTF-8 BOM and then one trailing `LF` or `CRLF`, when present. The entry's message text is that unframed text, its raw value span is the whole document, and its document map retains the removed framing so message-local positions map back to the original bytes. Standalone documents take the same downstream path as catalog entries after extraction; they are not a separate diagnostics or formatting workflow.
@@ -59,7 +59,8 @@ Editor adapters consume catalog classification, extraction, offset mapping, and 
 Editor-side registry behavior on top of those guarantees:
 
 - documents with the `.mf2` extension or the MF2 language id always resolve to the standalone adapter
-- editor-specific settings may add editor-only ad-hoc catalog opt-in on top of the project configuration; this additive overlay does not change CI catalog membership, and the precedence for overlaps is an open question below
+- project catalog configuration resolves first and is authoritative; editor-specific settings may add editor-only ad-hoc catalog opt-in only for documents left unmatched by that resolved project configuration
+- a same-format project/ad-hoc overlap is de-duplicated as project-owned, while a different-format overlap is an editor configuration error and never reclassifies the project target; ad-hoc/ad-hoc overlaps use the same same-format de-duplication and different-format error rule
 - a host document resolves to at most one host format adapter
 
 ## Diagnostics Publication
@@ -82,9 +83,15 @@ Multi-entry host documents add document-level publication rules on top of the pe
 - Entries are independent. Parser diagnostics in one entry never suppress semantic validation, linting, or publication for other entries; the strict pipeline is per entry, not per document.
 - Published document diagnostics are the union of all entries' mapped diagnostics. Entries appear in raw span order; within one entry, the core result order is preserved verbatim. Because entry spans do not overlap, this ordering is deterministic.
 - Diagnostic identity across document updates should combine the entry key, the stable diagnostic code, and the message-local span. Entry keys survive unrelated edits elsewhere in the catalog, so this identity is more stable than document-level spans alone.
-- Catalog-level diagnostics such as duplicate catalog keys or cross-locale checks are future catalog-level linting. When they arrive they flow through the same entry mapping and must not be reimplemented in editor layers.
+- Catalog-level findings such as duplicate catalog keys or cross-locale checks are future catalog-level linting. They use the dedicated catalog finding contract owned by the linter design rather than being attached to an arbitrary entry. Concrete related-entry spans still use the shared entry mapping, while a missing-locale finding has no synthetic owner entry or host span. Editor layers present that future result contract and must not reimplement the rules or duplicate one finding across related entries.
 
-When host document extraction fails because the host document cannot be parsed, the adapter publishes no new MF2 diagnostics and returns no formatting edits. Previously published diagnostics should be retained rather than cleared, because host syntax breakage is usually a transient typing state; the retained set is replaced on the next successful extraction, and exact retention tuning is an implementation detail. Host syntax errors are never translated into MF2 diagnostics, and extraction failure is an expected editing state, not an operational editor error. The CLI presents the same extraction failure as a target-local operational error instead; that surface behavior is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
+Extraction failure presentation depends on the failure class, and every class returns no formatting edits.
+
+- `resource_parse_failed` publishes no new MF2 or resource diagnostic and retains the last successfully published MF2 diagnostic set for that document. Host syntax breakage is usually a transient typing state and host-format tooling owns its syntax diagnostic. If no successful set exists, the document has no ox-mf2 diagnostics. The retained set is replaced on the next successful extraction.
+- `resource_format_unsupported`, `resource_entry_unsupported`, `resource_document_unsupported`, and `resource_limit_exceeded` replace the previous ox-mf2 state: stale MF2 diagnostics are cleared and exactly one error-severity editor diagnostic is published with source `ox-mf2-resource` and the corresponding stable resource code. The adapter uses the precise host span carried by the typed resource error; when a document-wide failure has no narrower position, it uses an empty range at document start. These resource diagnostics are not parser, semantic, or lint diagnostics and do not participate in rule configuration or `--max-warnings`.
+- Configuration and internal failures publish neither MF2 nor resource diagnostics. They use the editor integration's operational error channel and leave the last successfully applied configuration and diagnostic publication unchanged; no partial configuration, extraction artifact, or new diagnostic set is installed. While that failure is active, formatting requests return no edits. Recovery atomically replaces the retained state after a successful reload and extraction.
+
+The CLI presents resource failures through its target-local operational error contract instead; that surface behavior is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 
 Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at the adapter boundary; adapters convert `"warn"` to the editor's warning severity. Editor layers may add protocol-specific advice later, but the core linter does not emit `info` or `hint` diagnostics initially.
 
@@ -92,16 +99,18 @@ Core `"error"` and `"warn"` severities map to editor/LSP diagnostic severity at 
 
 Formatter core APIs return formatted message text, not LSP `TextEdit` objects.
 
-Editor adapters should find the containing message entry, call whole-message formatting, and create editor edits at the adapter boundary. The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` files, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM, matching the Phase 3B [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) write contract. The adapter compares those framed replacement bytes with the original document, so a leading BOM, a missing final newline, or a final `CRLF` produces an edit even when the unframed message text is already formatted. For catalog host documents, the range is the raw value span of the containing entry, replaced with the re-escaped formatted text produced by the shared write-back re-escaping contract in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md); catalog entries never receive standalone file framing.
+Editor adapters should find the containing message entry and call whole-message formatting. The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` files, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM, matching the Phase 3B [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) write contract. The adapter compares those framed replacement bytes with the original document, so a leading BOM, a missing final newline, or a final `CRLF` produces an edit even when the unframed message text is already formatted.
+
+For a catalog host document, each changed entry first produces an artifact-bound `RawReplacement` through the shared re-escaping contract in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md); catalog entries never receive standalone file framing. Before returning any editor edits, the adapter passes the complete replacement set once to `apply_and_validate`, which reparses and re-extracts the full candidate document and verifies entry identity and values. On failure it returns no edits. On success it discards the candidate string and converts only those already validated replacements into non-overlapping protocol edits over their raw value spans.
 
 Document formatting for a catalog host document formats every writable message entry independently:
 
 - Entries whose extracted text has parser diagnostics are skipped as per-entry no-ops, matching the strict invalid-syntax contract in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md). Other entries still format.
 - Read-only entries are skipped silently.
-- Each changed entry produces one edit replacing its raw value span with the re-escaped formatted text. Unchanged entries produce no edit.
+- Each changed entry produces one replacement candidate. Only after complete candidate validation does it become one edit replacing its raw value span with the re-escaped formatted text; unchanged entries produce no replacement or edit.
 - Formatting edits never touch host syntax outside raw value spans: no key reordering, no indentation or quoting changes outside the message value, and no host layout normalization. Host-format styling belongs to host formatters, so keeping MF2 edits inside value spans lets an MF2 formatter and a host-format formatter coexist on one document without conflicting edits.
 
-A range formatting request formats the writable entries whose raw value spans intersect the requested range, using whole-entry formatting.
+A range formatting request formats selected writable entries using whole-entry formatting and validates that replacement set against the complete candidate host document before returning any edit. A non-empty raw value span uses normal half-open intersection with the requested range. A zero-length span at host position `p`, such as an explicitly paired empty XLIFF element content span, is treated as a point and is selected when `range.start <= p <= range.end`; an empty caret range at exactly `p` therefore selects it. This point rule does not expand the replacement span into surrounding host syntax.
 
 Adapters should only return edits when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message entry can no longer be identified, the adapter silently returns no edits. This expected concurrency outcome is a no-op, not an operational editor error. The exact protocol-specific version comparison remains an implementation-design question.
 
@@ -121,11 +130,13 @@ For standalone `.mf2` documents, step 2 uses the file-framing-aware document map
 
 Editor adapters should normalize project configuration and editor-specific settings into the same resolved formatter and linter configuration models used by CLI workflows.
 
-Possible editor-specific sources include workspace settings, user settings, and LSP initialization options. The exact source list, precedence, reload behavior, and failure presentation are still open.
+Possible editor-specific sources include workspace settings, user settings, and LSP initialization options. The exact source list and precedence for formatter, linter, and other non-membership settings remain open. Reload application is transactional under the failure-class rules above: an invalid or internally failed reload does not partially replace the last successful state.
 
-Catalog opt-in and extraction scope configuration are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) as the `resources` section of the unified project config. Editor adapters resolve that section into the same project-configured catalog membership as CLI workflows and may layer explicitly editor-only ad-hoc opt-in settings on top. Changing either source re-runs editor document classification and extraction, with the invalidation consequences described below; editor-only membership is not implied to exist in CI.
+Catalog opt-in and extraction scope configuration are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) as the `resources` section of the unified project config. Editor adapters resolve that section into the same project-configured catalog membership as CLI workflows before considering editor-only settings. A project match is authoritative. The ad-hoc layer may opt in an unmatched document, including one excluded from every project catalog definition, but cannot override a project-selected format. A same-format overlap de-duplicates to the project result; a different-format overlap is an editor configuration error. Multiple ad-hoc matches likewise de-duplicate only when they resolve to one format and otherwise fail configuration. Invalid project configuration is reported before overlay application and cannot be bypassed by editor settings.
 
-Configuration loading failures are operational editor errors. They should not be mixed into parser, semantic, formatter, or linter diagnostics.
+Changing either source re-runs editor document classification and extraction, with the invalidation consequences described below. The integration should identify an ad-hoc-only document as editor-local rather than CI-covered; once an equivalent project match appears, the classification becomes project-owned without running extraction twice. Editor-only membership is never implied to exist in CLI or CI.
+
+Configuration loading failures are operational editor errors. They are not mixed into parser, semantic, formatter, linter, or resource input diagnostics and follow the last-successful-state transaction above.
 
 ## Artifact Cache and Invalidation
 
@@ -156,7 +167,6 @@ Cross-locale editor features — missing-translation indicators, catalog key com
 
 ## Open Questions
 
-- What precedence applies between the project catalog configuration owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) and editor-specific ad-hoc opt-in settings?
 - Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
 - Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
 - What exact document version checks are required before returning formatting `TextEdit` values?

@@ -383,7 +383,7 @@ Stdin formatting is supported only through explicit stdin mode. `--stdin-filepat
 
 Stdin mode cannot be combined with file, directory, or glob operands. Any operand together with `--stdin-filepath` is an `invalid_cli_argument` error.
 
-Stdin with `--check` is allowed. It exits with `1` when the stdin source would change. If stdin has parser diagnostics, human-readable mode writes no formatted code to stdout, writes diagnostics to stderr, and exits with `1`. JSON reporter mode writes the JSON envelope to stdout.
+Stdin with `--check` is allowed. It exits with `1` when the stdin source would change. For standalone `.mf2` stdin, parser diagnostics make human-readable mode write no formatted code to stdout, write diagnostics to stderr, and exit with `1`. Opted-in catalog stdin follows the entry-scoped processing and complete-host stdout contract in the resource design. JSON reporter mode writes the JSON envelope rather than formatted source to stdout in either case.
 
 When no file, directory, or glob operands are provided and stdin mode is not selected, `intlify fmt` behaves as `intlify fmt .`. Help and version options keep the Phase 3A precedence and do not trigger config loading, input discovery, or formatting.
 
@@ -399,7 +399,7 @@ In a simple message, all bytes including the trailing newline are pattern text. 
 
 - Read framing: if the input starts with a UTF-8 BOM (`EF BB BF`), exactly one BOM is removed. If the remaining content then ends with one `LF` or one `CRLF`, exactly that one trailing newline sequence is removed. The result is the MF2 message text passed to the message-level formatter.
 - Write framing: the output file is the message-level formatter output followed by exactly one final `LF`. A BOM is never re-emitted.
-- Stdin framing: stdin mode applies the same read framing to stdin bytes, and stdout output is the formatted message followed by exactly one final `LF`.
+- Standalone stdin framing: `.mf2` stdin mode applies the same read framing to stdin bytes, and stdout output is the formatted message followed by exactly one final `LF`. Opted-in catalog stdin follows the resource adapter contract instead: it applies no standalone framing and returns the complete validated host document.
 - Check modes compare the framed output bytes with the original input bytes, so a missing final newline, a `CRLF` final newline, or a leading BOM reports a difference even when the message text itself is already formatted.
 
 Framing consequences:
@@ -482,7 +482,7 @@ Invalid `fmt.ignorePatterns` entries are config validation errors and exit with 
 
 Missing `--ignore-path` files are operational errors and exit with `2`.
 
-Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, UTF-8 validation still runs but read/write framing and message formatting do not. For valid UTF-8, normal text stdin formatting writes the original pre-framing bytes to stdout byte-equivalently—including a leading BOM and final `LF` or `CRLF`—and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Invalid UTF-8 still returns `input_read_failed` with `details.reason: "invalid_utf8"` instead of applying lossy replacement. Unsupported `--stdin-filepath` extensions are checked before ignore rules, so `--stdin-filepath ignored/file.json` is still `unsupported_input_file`.
+Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, UTF-8 validation still runs but read/write framing, catalog extraction, and message formatting do not. For valid UTF-8, normal text stdin formatting writes the original pre-framing bytes to stdout byte-equivalently—including a leading BOM and final `LF` or `CRLF`—and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Invalid UTF-8 still returns `input_read_failed` with `details.reason: "invalid_utf8"` instead of applying lossy replacement. Supported-input classification precedes ignore rules: `--stdin-filepath ignored/file.json` remains `unsupported_input_file` unless that virtual path is an opted-in catalog under [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#stdin-selection).
 
 ### Exit Codes
 
@@ -526,7 +526,7 @@ Stdin human output:
 - normal stdin formatting writes formatted code to stdout, writes nothing to stderr on success, and exits with `0`
 - stdin `--check` with a difference prints the `--stdin-filepath` virtual path, writes nothing to stderr, and exits with `1`
 - stdin `--check` without a difference writes nothing to stdout or stderr and exits with `0`
-- stdin parser diagnostics write no formatted code to stdout, render diagnostics to stderr, and exit with `1`
+- standalone `.mf2` stdin parser diagnostics write no formatted code to stdout, render diagnostics to stderr, and exit with `1`; catalog stdin with entry diagnostics follows the resource design's complete-host output rule
 
 When the final selected target set is empty, human output writes nothing to stdout or stderr and exits with `0`.
 
@@ -655,6 +655,8 @@ Write mode generates the full formatted output in memory before writing. Phase 3
 Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
 
 Catalog targets use the mutually exclusive nested `entries[]` result variant defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-json-result-layout). The file result retains the formatter aggregate `status`, `changed`, and `errors` fields, while each complete entry result carries its entry identity, status, changed state, and mapped diagnostics.
+
+Opted-in catalog stdin uses the same adapter and nested result variant, selected through the virtual-path rules in the resource design. It does not apply standalone file framing and never writes the virtual path.
 
 ## Configuration
 
