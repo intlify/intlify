@@ -44,7 +44,7 @@ Implementation should be split by consumer-facing product surface:
 
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
-   - `.mf2` and JSON/YAML resource message mapping
+   - `.mf2` and opted-in catalog resource message mapping
    - UTF-8 byte span to editor position conversion
    - editor-specific configuration source handling
 
@@ -435,9 +435,9 @@ Code actions, quick fixes, hover, completion, go-to-definition, rename, true ran
 
 ### Document and Message Mapping
 
-Editor adapters should support both standalone `.mf2` documents and MF2 messages embedded in JSON/YAML resource or catalog files.
+Editor adapters should support both standalone `.mf2` documents and MF2 messages embedded in opted-in resource or catalog files. The concrete host format rollout is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), beginning with JSON catalogs.
 
-For standalone `.mf2` files, the adapter applies the formatter's CLI [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) contract before treating the document as one MF2 message: remove at most one leading UTF-8 BOM and then exactly one trailing `LF` or `CRLF`. The adapter retains the removed framing in its document mapping so message-local spans can be translated back to the original document. For JSON/YAML resources, the adapter does not apply file framing; it extracts each embedded MF2 message from the relevant resource or catalog key/value entry and tracks the relationship between:
+For standalone `.mf2` files, the adapter applies the formatter's CLI [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) contract before treating the document as one MF2 message: remove at most one leading UTF-8 BOM and then exactly one trailing `LF` or `CRLF`. The adapter retains the removed framing in its document mapping so message-local spans can be translated back to the original document. For catalog resources, the adapter does not apply file framing; it extracts each embedded MF2 message from the relevant resource or catalog key/value entry and tracks the relationship between:
 
 - document URI and version
 - resource or catalog key
@@ -459,7 +459,7 @@ LSP and editor adapters are responsible for:
 - converting document-level UTF-8 spans to editor-facing UTF-16 positions
 - preserving source identity through `SourceStore` / `SourceView` or equivalent adapter state
 
-This keeps JSON/YAML parsing, document URI handling, and LSP position encoding outside the core crates and bindings.
+This keeps host-format parsing, document URI handling, and LSP position encoding outside the core crates and bindings.
 
 ### Artifact Reuse
 
@@ -500,7 +500,7 @@ Editor adapters should:
 3. compare the original and formatted message text
 4. create editor `TextEdit` values at the adapter boundary
 
-The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM. This intentionally applies the same BOM removal and final-line-ending normalization as the CLI. For JSON/YAML resources, the replacement is only the containing message value range after required host-string re-escaping; no file framing is added to the embedded message.
+The initial adapter replaces the whole containing message range rather than computing a minimal diff. For standalone `.mf2` documents, that range is the whole document and the replacement is the formatted unframed message followed by exactly one `LF`, with no BOM. This intentionally applies the same BOM removal and final-line-ending normalization as the CLI. For catalog resources, the replacement is only the containing message value range after required host-string re-escaping; no file framing is added to the embedded message.
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 

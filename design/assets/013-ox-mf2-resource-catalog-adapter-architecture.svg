@@ -84,7 +84,7 @@
 <rect x="120" y="436" width="200" height="76" rx="8" class="output"/>
 <text x="220" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">host format adapters</text>
 <text x="220" y="478" font-size="10.4" text-anchor="middle" class="soft-white">extract() / re-escape()</text>
-<text x="220" y="494" font-size="10.4" text-anchor="middle" class="soft-white">JSON · YAML · later tiers</text>
+<text x="220" y="494" font-size="10.4" text-anchor="middle" class="soft-white">JSON (Tier 1) · deferred tiers</text>
 
 <rect x="346" y="436" width="204" height="76" rx="8" class="entrymodel"/>
 <text x="448" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">message entries</text>

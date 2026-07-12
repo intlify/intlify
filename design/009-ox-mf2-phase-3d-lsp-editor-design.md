@@ -4,13 +4,13 @@ This document tracks the detailed LSP and editor integration design for ox-mf2.
 
 The Phase 3 tooling boundary is defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md). That document fixes the high-level adapter workflow. This document is the implementation-facing place to refine host document mapping, diagnostic publication, formatting edits, configuration reload behavior, and future editor features.
 
-Where the Phase 3 boundary document describes JSON/YAML resource files, the editor workflow is specified against the host-format-agnostic message entry model. Localizable MF2 messages are managed in message catalogs with many different host formats — JSON, YAML, JSON5, XLIFF, framework-specific single-file-component blocks, and other localization interchange formats — so this document specifies editor behavior against extracted message entries rather than against any concrete host format. The message entry model, the host format adapter contract, the host format registry, catalog configuration, and the host format tier roadmap are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md); this document owns the editor-facing behavior built on those shared contracts.
+Where the Phase 3 boundary document describes resource and catalog files, the editor workflow is specified against the host-format-agnostic message entry model. Localizable MF2 messages are managed in message catalogs with many different host formats — JSON, YAML, JSON5, XLIFF, framework-specific single-file-component blocks, and other localization interchange formats — so this document specifies editor behavior against extracted message entries rather than against any concrete host format. The message entry model, the host format adapter contract, the host format registry, catalog configuration, and the host format tier roadmap are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md); this document owns the editor-facing behavior built on those shared contracts.
 
 ## Goals
 
 - Reuse the parser, formatter, linter, `SnapshotView`, and future `SemanticView` without making the core crates depend on LSP protocol types.
 - Support diagnostics and formatting for standalone `.mf2` files.
-- Support diagnostics and formatting for MF2 messages embedded in message catalog host files through adapter-owned extraction and mapping, starting with JSON and YAML catalogs.
+- Support diagnostics and formatting for MF2 messages embedded in message catalog host files through adapter-owned extraction and mapping, starting with JSON catalogs; later host formats follow the tier roadmap owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 - Build the editor workflow on the consumer-neutral message entry contract owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), so additional catalog formats extend the shared registry without changing diagnostics publication, formatting edits, caching, or position conversion behavior.
 - Convert core UTF-8 byte spans into editor-facing positions, UTF-16 by default, at the adapter boundary.
 - Keep LSP/editor artifact caches, document version checks, and host-file edit ownership outside of the parser, formatter, and linter cores.
@@ -38,7 +38,7 @@ Adapters extract MF2 message entries from the host document, call core APIs per 
 
 Editor adapters should treat every supported document as a host document that yields zero or more message entries over the same message-level core.
 
-- A **host document** is one editor document: a standalone `.mf2` file or a message catalog file such as a JSON/YAML resource file.
+- A **host document** is one editor document: a standalone `.mf2` file or an opted-in message catalog file, beginning with JSON catalogs.
 - A **message entry** is the unit that connects one host document region to one MF2 message: a stable entry key, a raw host value span, MF2 message text, a message-to-raw offset map, and a read-only marker. The canonical entry model definition and its invariants are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 - A **host format adapter** is the format-specific component that classifies, parses, maps, and re-escapes one host format, per the adapter contract in the same document.
 
@@ -99,7 +99,7 @@ Document formatting for a catalog host document formats every writable message e
 - Entries whose extracted text has parser diagnostics are skipped as per-entry no-ops, matching the strict invalid-syntax contract in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md). Other entries still format.
 - Read-only entries are skipped silently.
 - Each changed entry produces one edit replacing its raw value span with the re-escaped formatted text. Unchanged entries produce no edit.
-- Formatting edits never touch host syntax outside raw value spans: no key reordering, no indentation or quoting changes outside the message value, and no host layout normalization. Host-format styling belongs to host formatters, so keeping MF2 edits inside value spans lets an MF2 formatter and a JSON/YAML formatter coexist on one document without conflicting edits.
+- Formatting edits never touch host syntax outside raw value spans: no key reordering, no indentation or quoting changes outside the message value, and no host layout normalization. Host-format styling belongs to host formatters, so keeping MF2 edits inside value spans lets an MF2 formatter and a host-format formatter coexist on one document without conflicting edits.
 
 A range formatting request formats the writable entries whose raw value spans intersect the requested range, using whole-entry formatting.
 
