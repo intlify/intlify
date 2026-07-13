@@ -24,7 +24,7 @@ LSP position encodings in [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf
 - Define one consumer-neutral message entry model and host format adapter contract shared by CLI formatting, CLI linting, and editor adapters.
 - Fix one shared implementation home for host format classification, span-preserving parsing, extraction, offset mapping, and write-back re-escaping.
 - Define catalog opt-in configuration as part of the unified project config so CLI and editor surfaces resolve identical project-configured catalog membership, while allowing an editor to add an explicitly editor-only ad-hoc overlay.
-- Define the CLI resource workflows: input selection, per-entry formatting and linting, result reporting, write-back composition, and check semantics.
+- Define the CLI resource workflows: input selection, per-entry formatting and linting, result reporting, write-back composition, and `fmt --check` semantics.
 - Keep the message-level parser, formatter, and linter cores unchanged; the resource layer and its consumers compose them.
 - Keep observable CLI output deterministic, following the shared Phase 3A output conventions.
 
@@ -36,6 +36,7 @@ LSP position encodings in [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf
 - Extracting MF2 messages from executable JS/TS catalog modules. Extraction from code requires host-language semantic analysis that this layer does not own; bundler and build tooling own that surface.
 - A third-party host format adapter plugin API. The host format registry is a built-in, per-release set.
 - Editor-specific behavior. Document lifecycle, versions, position encodings, publish timing, staleness handling, and editor edits remain owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md).
+- Defining combined `intlify check` behavior. As specified by [006-ox-mf2-phase-3a-tooling-foundation-design.md](./006-ox-mf2-phase-3a-tooling-foundation-design.md), that command remains outside v0.1 and belongs to a dedicated post-v0.1 addendum, including extraction sharing, the combined result schema, summary aggregation, and exit-code composition.
 - Nested config discovery, nearest-config-wins behavior, and per-catalog formatter or linter option overrides.
 
 ## Architecture
@@ -60,6 +61,8 @@ Consumer-neutral invariants:
 - Extraction returns entries ordered by raw span start. Raw value spans of different entries must not overlap.
 - Message text must be the exact string value that an i18n runtime would receive from the host format. Adapters must not trim, normalize, or append to message text; per the [Phase 3B file framing contract](./007-ox-mf2-phase-3b-formatter-design.md#file-framing), message-level core APIs never receive an injected final newline or lose message-leading content.
 - A candidate host string whose unescaped value or structural identity cannot satisfy these invariants fails complete extraction with `resource_entry_unsupported`; it is never silently omitted. This includes JSON escape sequences that denote unpaired surrogates until the parser-level source-text direction noted in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) supports them.
+
+This fail-complete rule is intentional even for a large catalog with only one unsupported candidate. `readOnly` is not an escape hatch for an entry whose `message_text`, structural identity, or offset map cannot be constructed: it represents an otherwise complete entry that can be analyzed but not safely re-escaped. Returning only the representable entries would make lint output look complete while silently omitting part of the opted-in catalog. Supporting partial analysis would require a separately designed rejected-entry result model and incomplete-result semantics; the initial artifact therefore returns neither a partial entry list nor a partial lint or format result.
 
 Standalone `.mf2` files can reuse this model's shape as a degenerate single-entry host document. That entry uses the empty `StructuralPathKey`, `occurrence: 0`, and the empty `CatalogKey`; its document URI remains the external namespace for cache and diagnostic identity, and it never participates in catalog-level grouping. Its map is not unconditionally the identity: the editor adapter applies the Phase 3B [File Framing](./007-ox-mf2-phase-3b-formatter-design.md#file-framing) read contract and retains any removed BOM and trailing newline in a framing-aware document map. That uniformity is an editor-workflow concern owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md). CLI formatting and linting keep their existing direct `.mf2` file paths unchanged; resource workflows neither apply standalone file framing to embedded messages nor reroute standalone message files through catalog extraction.
 
@@ -169,6 +172,8 @@ Artifact construction validates all entry spans before `extract` returns: every 
 
 Candidate validation requires both the re-extracted `EntryKey` sequence and `CatalogKey` sequence to equal their original sequences exactly. Each replaced entry's message text must equal its replacement's private expected message, while every unreplaced entry's message text must remain byte-identical to the original. Any parse, extraction, identity, or value mismatch fails the whole operation; no candidate source or partial replacement set is returned. A successful call returns the complete validated host source. CLI consumers write only that returned string. Editor consumers validate the full candidate for their one or more replacements, discard the candidate string, and then convert the already validated replacements into protocol edits.
 
+Full-candidate validation is mandatory for CLI and editor consumers even when an editor changes only one entry. No size threshold, editor setting, or fast path may return unvalidated edits. Implementations may reuse immutable parse state or introduce incremental validation only when the optimized path establishes every invariant above and remains fixture-equivalent to complete reparse and re-extraction; this is an internal optimization, not a weaker API mode. Interactive cost is measured separately by the editor single-entry benchmark below rather than hidden inside aggregate write-back timing.
+
 The artifact and every adapter state reachable from it must be `Send + Sync`. Extraction completes all mutable host parsing before publishing the artifact; concurrent read access, offset mapping, and `reescape` calls do not mutate it. The source ownership and owned message strings make the artifact cacheable without self-referential borrows. `EntryHandle` has meaning only within its originating artifact, while stable cache and reporting identity continues to use `EntryKey`.
 
 The exact `ResourceError` variants and their CLI operational-error mapping follow the resource error model below; this API does not expose CLI JSON error objects from the resource crate.
@@ -184,7 +189,7 @@ The exact `ResourceError` variants and their CLI operational-error mapping follo
 - `EntryKey` is the unique occurrence identity, not a display string. For every set of extracted entries with the same structural path, adapters assign `occurrence` in raw source order starting at `0`. An entry whose path appears only once still carries `occurrence: 0`; the field is never omitted or inferred from duplication discovered later.
 - When a host document contains duplicate keys or duplicate ancestor paths, each raw leaf occurrence is a separate entry. Numbering is over entries with the same complete structural path, so nested duplicates remain unambiguous without including byte offsets in identity. Reporting duplicate catalog keys as a problem is future catalog-level linting, not an extraction failure.
 - `CatalogKey` represents the runtime-style logical message independently of a concrete host role. JSON and YAML set it to the same serialized value as `StructuralPathKey`; formats whose host identity contains locale-role syntax may derive a different value under an explicit format contract. Future cross-locale grouping uses `CatalogKey` together with comparison scope and locale. A host duplicate-key rule instead groups by `StructuralPathKey` without occurrence, so distinct XLIFF source and target roles are never duplicates merely because they share a catalog key. Occurrence and concrete evidence always use `EntryKey`.
-- Adapters may additionally expose a human-oriented display key, such as dot-joined nesting, for UI and reporting purposes. Reporting, editor diagnostic identity, and message cache identity use the complete `EntryKey`; display identity never replaces either stable key type.
+- Adapters may additionally expose a human-oriented display key for UI and reporting purposes, but omission is the default. Before an adapter emits one, its format-specific contract must define a deterministic derivation and collision behavior; an implementation-only convention is not sufficient. The Tier 1 JSON adapter does not emit `displayKey`, because its JSON Pointer structural path is already suitable for display. Consumers use that path when a JSON entry needs a human-readable label. Reporting, editor diagnostic identity, and message cache identity use the complete `EntryKey`; display identity never replaces either stable key type.
 
 YAML serializes its typed structural path as a pointer whose root is the empty string. Each path step appends `/` followed by one typed segment, with `~` encoded as `~0` and `/` as `~1` inside the complete segment, matching RFC 6901 escaping. No percent encoding, Unicode normalization, or display-key flattening is applied. Initial segment forms are:
 
@@ -228,7 +233,7 @@ Consumers resolve each input file or document to at most one host format adapter
 
 - Standalone MF2 classification runs before catalog membership. A `.mf2` file, or an editor document explicitly classified by the MF2 language id, always uses the standalone workflow even when a broad project or ad-hoc catalog pattern also matches its path. That catalog match is inapplicable to the reserved standalone target rather than a format conflict; it never reroutes the file through resource extraction.
 - Catalog host formats are strictly opt-in. Arbitrary JSON, YAML, or XML files must not be assumed to contain MF2 messages; a false positive reports wrong diagnostics on unrelated files and, worse, exposes them to formatting write-back. That is worse than requiring configuration.
-- Project-configured catalog opt-in comes from the `resources` section of the unified project config defined below. Editor adapters may additionally layer explicitly editor-only ad-hoc settings over that result under the fixed precedence below. Filename conventions never imply catalog membership: names such as `*.mf2.json` may be documented as recommended `include` patterns, but they are not automatic opt-in defaults in any tier.
+- Project-configured catalog opt-in comes from the `resources` section of the unified project config defined below. Editor adapters may additionally layer the explicitly editor-only normalized ad-hoc catalog settings defined by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md#configuration-sources) over that result under the fixed precedence below. Filename conventions never imply catalog membership: names such as `*.mf2.json` may be documented as recommended `include` patterns, but they are not automatic opt-in defaults in any tier.
 - CLI resource workflows and editor adapters first resolve project-configured membership and host format identically. A project match is authoritative and cannot be reclassified by an editor setting. An overlapping ad-hoc match resolving to the same format is de-duplicated as the project-owned target; one resolving to a different format is an editor configuration error and never overrides or masks the project result.
 - The ad-hoc layer may opt in only a document left unmatched by the resolved project configuration, including a path removed by a project catalog's `exclude`. Overlapping ad-hoc entries use the same rule: same-format matches de-duplicate and different-format matches are an editor configuration error. An invalid project configuration is reported before applying the overlay rather than being bypassed by it.
 - An editor-only ad-hoc target is intentionally absent from CLI and CI processing until persisted in project configuration; editor integrations distinguish that state rather than presenting it as CI coverage.
@@ -246,6 +251,31 @@ Registry ids are canonical lowercase ASCII strings. Extension-derived classifica
 | `jsonc`     | `.jsonc`                    | 3    |
 | `json5`     | `.json5`                    | 3    |
 | `xliff`     | `.xlf`, `.xliff`            | 3    |
+
+Classification keeps the fixed known-id vocabulary separate from adapters shipped in the current release:
+
+```rust
+pub enum KnownHostFormatId {
+    Json,
+    Vue,
+    Yaml,
+    Jsonc,
+    Json5,
+    Xliff,
+}
+
+pub enum HostFormat {
+    Json,
+}
+
+pub enum HostFormatClassification {
+    Shipped(HostFormat),
+    KnownButUnshipped(KnownHostFormatId),
+    UnrecognizedExtension,
+}
+```
+
+`KnownHostFormatId` contains every canonical id fixed by this design, independent of release tier. `HostFormat` contains only adapters shipped in the current release and expands as tiers land. Extension classification returns `HostFormatClassification`; its input context retains the original extension spelling for error details. `KnownButUnshipped` and `UnrecognizedExtension` become `resource_format_unsupported` before extraction, while only `Shipped(HostFormat)` may reach `HostFormatRegistry::extract`. An explicit config `format` deserializes directly to the shipped-only `HostFormat` and therefore fails schema validation rather than producing a deferred runtime classification.
 
 For example, `.YML` derives canonical `yaml` on Linux, macOS, and Windows alike, while error details still preserve `.YML`. An explicit catalog `format` is schema-validated as an exact canonical id: aliases such as `yml` and `xlf`, uppercase values such as `JSON`, surrounding whitespace, and comma-joined values are invalid rather than normalized. `HostFormat`, the generated config schema, and `supportedFormats` expose only adapters shipped in that release, while extension classification may recognize a deferred id and report `resource_format_unsupported` until its adapter ships.
 
@@ -273,6 +303,8 @@ Only Tier 1 is implemented in the initial resource milestone. Tier 2 and Tier 3 
 
 JSON catalogs unescape RFC 8259 string escapes. The JSON Pointer entry identity rules above apply. A string escape sequence that denotes an unpaired surrogate fails extraction with `resource_entry_unsupported` and `details.reason: "message_text_unrepresentable"`. Formatted multi-line MF2 output, such as a formatted matcher, re-escapes line breaks as `\n` escapes inside the single-line JSON string value.
 
+The JSON adapter leaves `displayKey` absent for every entry. Human-readable output uses the entry's JSON Pointer `StructuralPathKey`; it does not invent dot-joined or array-index display syntax.
+
 A JSON catalog may begin with exactly one UTF-8 BOM. The adapter retains its bytes at host span `0..3`, passes only the source after that BOM to the JSON syntax parser, and adds the three-byte base offset back to every parser span and error offset. The BOM is outside every entry and offset map, and write-back preserves it byte-for-byte. A second leading BOM or a BOM code point outside a JSON string is ordinary invalid JSON and produces `resource_parse_failed`; `U+FEFF` inside a string remains message data. A JSON catalog does not use standalone `.mf2` file framing: trailing `LF` or `CRLF`, missing final newline, and all other bytes outside replaced value spans remain unchanged.
 
 For a JSON entry, `raw_value_span` includes both surrounding double quotes. The quotes are `RawOnly` offset-map segments, while the content between them maps through identity and unescape segments. JSON has no alternate writable quote style in this adapter.
@@ -298,11 +330,15 @@ Single-file-component `<i18n>` blocks embed a catalog region inside a `.vue` hos
 
 The initial Vue adapter extracts inline `<i18n>` blocks only. A block with a `src` attribute is an external-resource reference and contributes no entries to the `.vue` extraction artifact; the resource layer does not resolve its path, read it transitively, validate that it exists, or write through the SFC. The referenced file must independently match `resources.catalogs` and is then processed as its own catalog target by CLI and editor consumers. This explicit external-resource boundary prevents duplicate diagnostics and gives reads, errors, cache identity, and edits to the file that actually owns the message bytes. A `src` block is therefore intentionally outside the inline candidate set and is not `resource_entry_unsupported`.
 
+A `src` block may have an empty content span or contain only HTML whitespace characters (`U+0009`, `U+000A`, `U+000C`, `U+000D`, and `U+0020`); that content is ignored as layout around the external reference. If any other character occurs between the block tags, extraction of the complete `.vue` target fails with `resource_document_unsupported`, `details.feature: "vue_src_with_inline_content"`, and a span covering the first non-whitespace character. The adapter never silently discards inline catalog data merely because `src` is present, and it never chooses inline content over the external-resource boundary.
+
 Composition consumes only the inner adapters that have shipped when this tier lands: blocks whose language is JSON, the `<i18n>` block default, compose the Tier 1 JSON adapter, while `lang="yaml"` or `lang="json5"` blocks require their Tier 3 adapters. If an inline block declares an inner format whose adapter has not shipped, extraction of the complete `.vue` target fails with `resource_format_unsupported`; supported blocks in the same SFC are not returned as a partial artifact. When more than one inline block is unsupported, the error for the lowest block source offset is selected. A `src` block is filtered as an external-resource reference before inner-format dispatch, so its `lang` does not trigger this error in the `.vue` target.
 
 An inline block with no `lang` attribute selects `json`. A present attribute is matched exactly without trimming or case folding: the recognized declarations are `json`, `json5`, `yaml`, and `yml`, with only `yml` normalized to the `yaml` registry id. A valueless or empty attribute, surrounding whitespace, values such as `JSON`, and unknown values do not fall back to JSON and do not trigger content sniffing; they produce `resource_format_unsupported`. Whether a recognized id is usable still depends on its inner adapter having shipped. These rules consume the static attribute value returned by the SFC syntax parser and never interpret Vue expressions as language declarations.
 
 `jsonc` is intentionally not a Vue embedded-language declaration, even after the top-level JSONC adapter ships. An inline `lang="jsonc"` block therefore produces embedded `resource_format_unsupported`; a `.jsonc` file referenced through `src` may still be processed independently when that external path is opted into `resources.catalogs`. The Vue adapter never treats `lang="json"` as permissive JSONC.
+
+A static `locale` attribute on an inline `<i18n>` block is the Vue adapter's documented provider for the future `locale: { "from": "host" }` binding. Once a catalog-level locale consumer enables that binding, every entry lifted from the block receives the attribute's exact static string as its host-provided locale. The value is not trimmed, canonicalized, or validated as BCP 47. An absent, valueless, or empty `locale` attribute leaves those entries without a host locale and follows the future missing-provider error contract rather than excluding them silently. Initial Tier 2 extraction, message-level linting, and formatting do not attach this value to `MessageEntry` or change behavior based on it. A `locale` attribute on a `src` block never propagates to the independently processed referenced catalog.
 
 `crates/intlify_resource` owns the built-in Vue SFC outer adapter and the composition with inner catalog adapters. Consumers pass the complete `.vue` host document to the shared registry and must not locate `<i18n>` blocks independently. The outer adapter preserves the block content spans and declared languages, selects a shipped inner adapter, and lifts the inner entries, offset maps, and write-back replacements into absolute `.vue` document coordinates. This keeps classification, extraction, and write-back identical across CLI and editor consumers.
 
@@ -401,7 +437,7 @@ For an explicitly opted-in XLIFF catalog, every supported primary plain-text `<s
 
 `<source>` or `<target>` elements inside XLIFF 1.2 `<alt-trans>`, XLIFF 2.x `<ignorable>`, metadata, extension elements, or any other non-primary context are intentionally outside the candidate set. They produce neither entries nor unsupported-entry errors, even when their content is plain text. This is a semantic scope boundary rather than an adapter coverage gap: the initial adapter processes only the primary translation values that represent the catalog's active messages.
 
-XLIFF also defines the first concrete intrinsic-locale source for the future `locale: { "from": "host" }` binding. For XLIFF 1.2, a primary source entry uses its effective `xml:lang` when present, otherwise its enclosing `<file source-language>`; a target uses effective `xml:lang`, otherwise `<file target-language>`. For XLIFF 2.x, the corresponding fallbacks are the root `<xliff srcLang>` and `<xliff trgLang>`. Effective `xml:lang` follows normal XML ancestor inheritance. The resolved string is preserved exactly without BCP 47 validation, case folding, or canonicalization. This metadata does not affect entry-level extraction, linting, or formatting and is consumed only when the future catalog linter explicitly enables host locale binding.
+XLIFF also defines an intrinsic-locale source for the future `locale: { "from": "host" }` binding. For XLIFF 1.2, a primary source entry uses its effective `xml:lang` when present, otherwise its enclosing `<file source-language>`; a target uses effective `xml:lang`, otherwise `<file target-language>`. For XLIFF 2.x, the corresponding fallbacks are the root `<xliff srcLang>` and `<xliff trgLang>`. Effective `xml:lang` follows normal XML ancestor inheritance. The resolved string is preserved exactly without BCP 47 validation, case folding, or canonicalization. This metadata does not affect entry-level extraction, linting, or formatting and is consumed only when the future catalog linter explicitly enables host locale binding.
 
 XLIFF workflow metadata such as `translate`, `state`, approval, or review attributes does not alter extraction or writeability. The resource layer is not a TMS state machine: it neither interprets version-specific inheritance as an edit lock nor changes status, timestamps, provenance, or approval after formatting. Those attributes remain outside the raw message span and are preserved byte-for-byte. An entry is read-only only when its host representation cannot satisfy value-identical re-escaping; explicitly opting the XLIFF file into formatter processing authorizes syntax-only formatting of otherwise writable primary source and target values.
 
@@ -413,7 +449,9 @@ The XLIFF `CatalogKey` is that same serialized hierarchy with the final `side:so
 
 DTD processing is disabled before any entity resolution or external access. A well-formed `DOCTYPE` declaration fails complete extraction with `resource_document_unsupported` and `details.feature: "xml_dtd"` at `<!DOCTYPE`; the adapter never reads a system identifier, performs a network request, or expands an internal entity declaration. Malformed XML, including an incomplete declaration, remains `resource_parse_failed`. Text and identity attributes may use only the five predefined XML entities and decimal or hexadecimal numeric character references. Each reference is one `Unescape` offset-map segment; an undeclared named entity is invalid XML and produces `resource_parse_failed`. The byte sequence `<!DOCTYPE` inside a comment, CDATA section, or ordinary escaped character data is data rather than a declaration.
 
-XLIFF input remains subject to the shared UTF-8 host-source contract and XML 1.0 processing rules. An absent XML declaration selects XML 1.0. A declaration must contain exact `version="1.0"`; any other syntactically valid version fails complete extraction with `resource_document_unsupported` and `details.feature: "xml_version"` at the version value. The adapter does not apply XML 1.1 character or line-ending rules.
+XLIFF input remains subject to the shared UTF-8 host-source contract and XML 1.0 processing rules. When Tier 3 XLIFF support lands, the CLI input layer checks a classified XLIFF target's raw prefix before generic UTF-8 decoding. A UTF-16 little-endian BOM (`FF FE`) or big-endian BOM (`FE FF`) produces `input_read_failed` with `details.reason: "unsupported_encoding"` and `details.detectedEncoding: "utf-16le"` or `"utf-16be"`; the target is not transcoded or passed to the adapter. BOM-less UTF-16 is not guessed and remains the normal `invalid_utf8` input failure. This preflight improves the error for common TMS output without introducing encoding-dependent span mapping or write-back.
+
+After successful UTF-8 decoding, an absent XML declaration selects XML 1.0. A declaration must contain exact `version="1.0"`; any other syntactically valid version fails complete extraction with `resource_document_unsupported` and `details.feature: "xml_version"` at the version value. The adapter does not apply XML 1.1 character or line-ending rules.
 
 The declaration may omit `encoding`; when present, the encoding name must equal `UTF-8` under XML's ASCII case-insensitive comparison. Any other syntactically valid encoding declaration fails complete extraction with `resource_document_unsupported` and `details.feature: "xml_encoding"` at the encoding value; the adapter does not transcode or ignore it. A malformed declaration, including one without its XML-required version, is `resource_parse_failed`.
 
@@ -482,14 +520,9 @@ pub struct CatalogConfig {
     pub exclude: Vec<String>,
     pub format: Option<HostFormat>,
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HostFormat {
-    Json,
-}
 ```
 
-The root `resources` section and its `catalogs` field are optional and normalize to `ResourcesConfig { catalogs: [] }` when absent. Each catalog definition requires a non-empty `include` array. `exclude` is optional and defaults to an empty array; `format` is optional and defaults to extension-based classification. The initial `HostFormat` schema accepts only `"json"` and expands as deferred adapters ship.
+`HostFormat` is the shipped-only enum defined under [Format IDs and Extension Classification](#format-ids-and-extension-classification). The root `resources` section and its `catalogs` field are optional and normalize to `ResourcesConfig { catalogs: [] }` when absent. Each catalog definition requires a non-empty `include` array. `exclude` is optional and defaults to an empty array; `format` is optional and defaults to extension-based classification. The initial `HostFormat` schema accepts only `"json"` and expands as deferred adapters ship.
 
 A project that manages MF2 messages in several host formats opts them all in at once; classification is per file, so no `format` field is needed for mixed sets:
 
@@ -541,6 +574,8 @@ A file enters resource processing only when it is both selected by CLI operands 
 - Glob expansion intersects the supported input set: `.mf2` files plus opted-in catalog files. Non-opted-in JSON, YAML, Vue, XLIFF, or other host-format files matched by a glob are not resource inputs and are skipped by discovery.
 - An explicit file operand that is neither a `.mf2` file nor an opted-in catalog follows the existing unsupported-input handling of the shared discovery contract.
 
+After supported-input membership and catalog format classification, file-mode targets pass through the invoking command's existing ordered ignore contract: root `.gitignore`, then `--ignore-path` files in CLI argument order, then `fmt.ignorePatterns` or `lint.ignorePatterns`. Ignore rules apply to explicit file operands as well as discovered targets. An ignored catalog is not extracted, and an empty target set after ignore filtering retains the existing zero-target success behavior. Formatter and linter ignore lists are intentionally independent, so the same opted-in catalog may be skipped by `fmt` and processed by `lint`, or vice versa.
+
 ### Stdin Selection
 
 Explicit stdin mode supports catalogs through the existing `--stdin-filepath <path>` option. The virtual path does not need to exist. A relative value resolves from the process working directory and is then slash-normalized relative to `projectRoot` when representable, using the same path identity as file-mode configuration matching and reporting.
@@ -583,7 +618,7 @@ The resource workflow reuses existing shared codes instead of adding aliases:
 | Code | Kind | Exit | Resource workflow use |
 | --- | --- | --- | --- |
 | `config_validation_failed` | `config` | `2` | Invalid `resources` shape, unknown fields, invalid glob or format values, and conflicting catalog assignments. |
-| `input_read_failed` | `io` | `2` | Input file read failure or non-UTF-8 host bytes before adapter extraction. |
+| `input_read_failed` | `io` | `2` | Input file read failure or non-UTF-8 host bytes before adapter extraction, including the XLIFF UTF-16 BOM preflight. |
 | `output_write_failed` | `io` | `2` | A validated formatted host source cannot be written. |
 | `internal_error` | `internal` | `2` | A supposedly valid adapter artifact, core span, replacement, or write-back result violates an implementation invariant. |
 
@@ -598,6 +633,8 @@ Initial stable `internal_error.details.reason` values owned by this layer are:
 Expected host syntax failures never use `internal_error`, while adapter-generated invalid state never uses `resource_parse_failed` merely because validation reparses host text. The CLI attaches the selected target path and, when known, the structured `{ path, occurrence }` entry key. Any non-empty resource operational-error array produces `summary.status: "error"` and exit code `2`, following the shared `2 > 1 > 0` priority.
 
 Stable reason-specific `details` are part of the resource CLI JSON contract.
+
+For a classified XLIFF target whose raw bytes begin with a UTF-16 BOM, `input_read_failed.details` uses `reason: "unsupported_encoding"` and requires `detectedEncoding` as exactly `"utf-16le"` or `"utf-16be"`. Other non-UTF-8 input retains the shared `reason: "invalid_utf8"` shape and does not guess an encoding.
 
 `resource_format_unsupported` uses:
 
@@ -754,7 +791,6 @@ On successful extraction and complete per-entry processing, `entries` contains e
         "path": "/greeting",
         "occurrence": 0
       },
-      "displayKey": "greeting",
       "status": "problems",
       "diagnostics": []
     }
@@ -776,7 +812,6 @@ Lint entry `status` is `"clean"` or `"problems"` and is computed from the full e
         "path": "/greeting",
         "occurrence": 0
       },
-      "displayKey": "greeting",
       "status": "formatted",
       "changed": true,
       "readOnly": false,
@@ -880,7 +915,7 @@ pub enum LocaleBindingConfig {
 
 `locale` remains absent from the initial resource schema and Rust `CatalogConfig`; the field and enum land together with their first catalog-level consumer. Once present, strict unknown-field validation rejects unknown binding variants, a string `locale` value, and variant-inappropriate fields.
 
-When XLIFF host-locale catalog checks land, the schema and enum add a fieldless `Host` variant in that same milestone:
+When the first catalog-level consumer of an intrinsic-locale provider lands, the schema and enum add a fieldless `Host` variant in that same milestone. For example, an XLIFF definition uses:
 
 ```jsonc
 {
@@ -897,7 +932,7 @@ pub enum LocaleBindingConfig {
 }
 ```
 
-`from: "host"` resolves locale per entry rather than once per file, using the XLIFF source/target rules above. It is not accepted as a placeholder before both the XLIFF metadata provider and its first catalog-level consumer ship. A catalog definition using it may match only adapters with a documented intrinsic-locale provider; matching another format is `config_validation_failed` at that definition rather than a fallback to path inference. If an XLIFF entry has no non-empty locale after its profile-specific inheritance, the future catalog workflow reports an explicit target-local operational error and does not silently exclude that entry; the linter design must add that error contract when the consumer lands.
+`from: "host"` resolves locale per entry rather than once per file, using the selected adapter's documented provider: the static inline-block `locale` for Vue entries or the XLIFF source/target rules above. It is not accepted as a placeholder before at least one intrinsic provider and its first catalog-level consumer ship. A catalog definition using it may match only adapters with a documented intrinsic-locale provider; matching another format is `config_validation_failed` at that definition rather than a fallback to path inference. If any selected entry has no non-empty locale under its provider's rules, the future catalog workflow reports an explicit target-local operational error and does not silently exclude that entry; the linter design must add that error contract when the consumer lands.
 
 For `from: "path"`, `pattern` is matched against the slash-normalized, `projectRoot`-relative file path and must contain exactly one literal `{locale}` capture token. The token captures one or more characters without crossing a `/` boundary; it may have literal prefix or suffix text in the same segment, as in `{locale}.json`. To keep capture identity unambiguous, the segment containing `{locale}` cannot contain another variable-width glob construct. Other path segments may use the shared glob syntax. Invalid capture-pattern structure is a configuration validation failure, and a selected catalog path must have exactly one full-pattern match when a locale-aware workflow resolves it.
 
@@ -950,6 +985,7 @@ Resource benchmarks are phase-separated, following the Phase 3 benchmark convent
 
 - `resource_extract`: host parse and entry extraction per format
 - `resource_write_back`: write-back re-escaping, edit composition, and full candidate reparse/re-extraction validation
+- `editor_catalog_single_entry_format`: one changed entry followed by mandatory full-candidate validation across representative catalog sizes, with re-escaping and validation reported separately
 - `fmt_catalog_check_e2e` and `fmt_catalog_write_e2e`
 - `lint_catalog_e2e`
 - large single-catalog sequential and candidate chunked execution, including scheduling and ordered-aggregation overhead before intra-file parallelism may graduate
@@ -959,17 +995,17 @@ Extraction and re-escaping costs must be reported separately from parser, semant
 
 ## Validation
 
-- Extraction fixtures per host format, landing with each format's tier. The Tier 1 JSON set covers string unescaping, JSON Pointer identity including `"a.b"` versus nested `a` → `b`, `{ path, occurrence }` identity for unique and duplicate keys including duplicate ancestors, array elements, optional single-BOM acceptance and absolute span adjustment, repeated/out-of-place BOM rejection, trailing-line-ending preservation, quote-inclusive raw value spans, unchanged raw-spelling preservation, every canonical changed-value escape branch, direct non-ASCII plus `U+2028`/`U+2029` output, and deterministic `resource_entry_unsupported` reporting for an unpaired surrogate. Deferred tiers add their own sets when they land, such as typed YAML path identity including string-key/integer-key/sequence-index collisions, YAML scalar styles, anchors and aliases, block scalar read-only marking, complex-key unsupported-entry reporting, and XLIFF inline-content unsupported-entry reporting.
-- Tier 2 Vue composition fixtures cover inline JSON with a missing `lang`, exact language-id and `yml` alias handling, permanent `jsonc` inner-language rejection even after the top-level adapter ships, external `src` blocks producing no SFC entries, unsupported inner formats failing without partial extraction, multiple-block document-wide occurrence numbering, outer and inner parse, entry-unsupported, and document-unsupported attribution with absolute SFC coordinates, composed offset maps, and validated write-back that changes only inner value spans.
+- Extraction fixtures per host format, landing with each format's tier. The Tier 1 JSON set covers string unescaping, JSON Pointer identity including `"a.b"` versus nested `a` → `b`, `{ path, occurrence }` identity for unique and duplicate keys including duplicate ancestors, array elements, absent `displayKey`, optional single-BOM acceptance and absolute span adjustment, repeated/out-of-place BOM rejection, trailing-line-ending preservation, quote-inclusive raw value spans, unchanged raw-spelling preservation, every canonical changed-value escape branch, direct non-ASCII plus `U+2028`/`U+2029` output, and deterministic fail-complete `resource_entry_unsupported` reporting for an unpaired surrogate. Deferred tiers add their own sets when they land, such as typed YAML path identity including string-key/integer-key/sequence-index collisions, YAML scalar styles, anchors and aliases, block scalar read-only marking, complex-key unsupported-entry reporting, and XLIFF inline-content unsupported-entry reporting.
+- Tier 2 Vue composition fixtures cover inline JSON with a missing `lang`, exact language-id and `yml` alias handling, permanent `jsonc` inner-language rejection even after the top-level adapter ships, external `src` blocks with empty or HTML-whitespace-only content producing no SFC entries, non-whitespace `src` content producing `vue_src_with_inline_content` at the first such character, unsupported inner formats failing without partial extraction, multiple-block document-wide occurrence numbering, outer and inner parse, entry-unsupported, and document-unsupported attribution with absolute SFC coordinates, composed offset maps, and validated write-back that changes only inner value spans. When host locale binding lands, the set also covers exact static inline `locale` values, absent/empty values, and no propagation from a `src` block to its referenced catalog.
 - Tier 3 JSONC and JSON5 fixtures cover the exact accepted and rejected grammar differences, JSONC comments and trailing commas with otherwise strict JSON syntax, preservation of all comment and comma bytes, Standard JSON5 1.0.0 identifiers and resolved key collisions, comments, trailing commas, expanded numbers as non-entries, arbitrary-position `U+FEFF` whitespace, single- and double-quoted values, every escape and line-terminator continuation map, unpaired-surrogate unsupported-entry reporting, unchanged raw spelling, both quote-preserving canonical serializer branches, and full candidate reparse/value verification.
 - Tier 3 YAML fixtures cover fixed 1.2 Core resolution and explicit tags, accepted and unsupported version directives, optional single-BOM lifting and preservation, empty and single-document streams, multi-document rejection, custom tags, aliases and merge keys, typed-pointer escaping and numeric canonicalization, duplicate paths and ancestors, every scalar style, `LF`/`CRLF`/`CR` folding and continuation maps, block indentation and chomping maps, read-only block reporting, original-style changed-value attempts, every canonical double-quoted escape branch, and full candidate reparse/value verification.
-- Tier 3 XLIFF fixtures cover every exact version/namespace profile and mismatch, namespace-prefix independence, primary-context selection, source/target concrete role identity with a shared side-free catalog key, attribute and ordinal path segments, duplicate identities, per-entry host locale inheritance, XML 1.0 and UTF-8 declarations, one retained BOM, DTD rejection without I/O or expansion, predefined and numeric references, invalid named entities, exact whitespace and line-ending maps, mixed text and CDATA, canonical changed XML text including `]]>` and `CR`, self-closing expansion, comments and processing instructions as read-only raw gaps, inline-element unsupported-entry errors, workflow-metadata preservation, and full-document reparse/value verification.
+- Tier 3 XLIFF fixtures cover every exact version/namespace profile and mismatch, namespace-prefix independence, primary-context selection, source/target concrete role identity with a shared side-free catalog key, attribute and ordinal path segments, duplicate identities, per-entry host locale inheritance, XML 1.0 and UTF-8 declarations, one retained UTF-8 BOM, dedicated UTF-16 LE/BE BOM rejection without transcoding, BOM-less non-UTF-8 fallback, DTD rejection without I/O or expansion, predefined and numeric references, invalid named entities, exact whitespace and line-ending maps, mixed text and CDATA, canonical changed XML text including `]]>` and `CR`, self-closing expansion, comments and processing instructions as read-only raw gaps, inline-element unsupported-entry errors, workflow-metadata preservation, and full-document reparse/value verification.
 - Round-trip tests: for writable constructs, extracting the re-escaped output yields exactly the formatted message text.
-- Extraction-artifact tests: source ownership, read-only entry access, structural and catalog key access and invariants, artifact-local handle validation, immutable `Send + Sync` state, concurrent deterministic re-escaping, rejection of read-only re-escape calls, foreign/duplicate/overlapping replacement rejection, complete candidate reparse and re-extraction, exact entry-key and catalog-key sequence preservation, replaced-value equality, and unreplaced-value preservation.
+- Extraction-artifact tests: source ownership, read-only entry access, structural and catalog key access and invariants, artifact-local handle validation, immutable `Send + Sync` state, concurrent deterministic re-escaping, rejection of read-only re-escape calls, foreign/duplicate/overlapping replacement rejection, complete candidate reparse and re-extraction, exact entry-key and catalog-key sequence preservation, replaced-value equality, unreplaced-value preservation, and fixture equivalence for any optimized or incremental validation path.
 - Offset map fixtures: message-local spans map to expected host spans across single escapes, compound surrogate-pair escapes, and raw-only delimiters, including the escape-boundary rule.
-- CLI end-to-end fixtures: lint and fmt write/check over catalog fixtures, including broken-entry and broken-host-file cases, every resource-specific public error code and internal reason, shared I/O/config code reuse, mixed changed-plus-diagnostic formatter results and overlapping summary counts, per-entry operational failures with no partial file write, deterministic ordering, complete nested entry arrays, host-coordinate-only diagnostic JSON shapes, and JSON-only read-only skip reporting.
-- Configuration fixtures: `resources` section validation, exact canonical format ids, rejection of alias, uppercase, whitespace-padded, and list-like `format` values, OS-independent case-insensitive extension mapping and alias pairs, preserved extension spelling in errors, unshipped `format` values and `resource_format_unsupported` targets, overlapping-definition conflicts, and empty-section behavior. When locale-aware catalog linting lands, its fixtures additionally cover the tagged binding variants, capture-pattern validation, path matches, exact locale identity, rejection of string shorthand, implicit definition scopes, explicit group joining, overlap conflicts across locale or scope assignments, concrete-path duplicate subjects, catalog-key cross-locale subjects, and XLIFF source/target non-duplication with shared cross-locale identity.
-- Editor classification, range, and failure fixtures: standalone `.mf2` or MF2-language-id precedence over catalog matches, project-authoritative matches, ad-hoc opt-in for unmatched and project-excluded paths, same-format de-duplication, different-format project/ad-hoc and ad-hoc/ad-hoc errors, invalid project configuration preventing overlay fallback, editor-local coverage labeling, transition to project ownership without duplicate extraction, half-open non-empty range intersection, zero-length entry point and caret selection, parse-failure diagnostic retention, actionable resource diagnostic replacement, transactional config/internal failure retention, and recovery without formatting edits from a failed state.
+- CLI end-to-end fixtures: lint and fmt write/check over catalog fixtures, including broken-entry and broken-host-file cases, every resource-specific public error code and internal reason, shared I/O/config code reuse, opt-in classification before command-specific ignore filtering, ignored explicit catalog operands, intentional fmt/lint ignore asymmetry, mixed changed-plus-diagnostic formatter results and overlapping summary counts, per-entry operational failures with no partial file write, deterministic ordering, complete nested entry arrays, host-coordinate-only diagnostic JSON shapes, and JSON-only read-only skip reporting.
+- Configuration fixtures: `resources` section validation, exact canonical format ids, rejection of alias, uppercase, whitespace-padded, list-like, and known-but-unshipped explicit `format` values, OS-independent case-insensitive extension mapping and alias pairs, all three `HostFormatClassification` variants, preserved extension spelling in errors, known-but-unshipped and unrecognized extension `resource_format_unsupported` targets, overlapping-definition conflicts, and empty-section behavior. When locale-aware catalog linting lands, its fixtures additionally cover the tagged binding variants, capture-pattern validation, path matches, exact locale identity, rejection of string shorthand, implicit definition scopes, explicit group joining, overlap conflicts across locale or scope assignments, concrete-path duplicate subjects, catalog-key cross-locale subjects, Vue inline-block locale assignment, and XLIFF source/target non-duplication with shared cross-locale identity.
+- Editor classification, range, and failure fixtures: standalone `.mf2` or MF2-language-id precedence over catalog matches, normalized ad-hoc overlay shape validation, project-root-relative glob and exact-path matches, extension-derived and explicit-format overlay classification, non-file URI rejection, project-authoritative matches, ad-hoc opt-in for unmatched and project-excluded paths, same-format de-duplication, different-format project/ad-hoc and ad-hoc/ad-hoc errors, invalid project configuration preventing overlay fallback, editor-local coverage labeling, transition to project ownership without duplicate extraction, half-open non-empty range intersection, zero-length entry point and caret selection, parse-failure diagnostic retention, actionable resource diagnostic replacement, transactional config/internal failure retention, and recovery without formatting edits from a failed state.
 - Determinism tests for parallel runs, including stable entry ordering and lowest-raw-order operational-error selection when future chunked execution is enabled.
 
 ## Relationship to Other Documents

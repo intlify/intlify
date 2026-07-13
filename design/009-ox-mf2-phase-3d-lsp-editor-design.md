@@ -103,6 +103,8 @@ Editor adapters should find the containing message entry and call whole-message 
 
 For a catalog host document, each changed entry first produces an artifact-bound `RawReplacement` through the shared re-escaping contract in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md); catalog entries never receive standalone file framing. Before returning any editor edits, the adapter passes the complete replacement set once to `apply_and_validate`, which reparses and re-extracts the full candidate document and verifies entry identity and values. On failure it returns no edits. On success it discards the candidate string and converts only those already validated replacements into non-overlapping protocol edits over their raw value spans.
 
+This full-candidate validation remains mandatory for a single-entry format request and for large catalogs. Editor settings and size thresholds cannot disable it. A future parse-state reuse or incremental implementation is valid only when it proves the same complete identity and value invariants and passes the shared equivalence fixtures; editor latency is tracked by the dedicated single-entry catalog benchmark in the resource design.
+
 Document formatting for a catalog host document formats every writable message entry independently:
 
 - Entries whose extracted text has parser diagnostics are skipped as per-entry no-ops, matching the strict invalid-syntax contract in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md). Other entries still format.
@@ -131,6 +133,24 @@ For standalone `.mf2` documents, step 2 uses the file-framing-aware document map
 Editor adapters should normalize project configuration and editor-specific settings into the same resolved formatter and linter configuration models used by CLI workflows.
 
 Possible editor-specific sources include workspace settings, user settings, and LSP initialization options. The exact source list and precedence for formatter, linter, and other non-membership settings remain open. Reload application is transactional under the failure-class rules above: an invalid or internally failed reload does not partially replace the last successful state.
+
+Every integration maps its product-specific editor setting into this common normalized ad-hoc catalog overlay shape before classification:
+
+```jsonc
+{
+  "catalogs": [
+    {
+      "include": ["locales/**/*.json"],
+      "exclude": ["locales/generated/**"],
+      "format": "json"
+    }
+  ]
+}
+```
+
+`catalogs` defaults to an empty array. Each entry requires a non-empty string `include` array; `exclude` is optional and defaults to an empty array. Patterns use the same project-root-relative, slash-normalized glob semantics as project `resources.catalogs`. A path without glob metacharacters is an exact document-path match, so the model does not need a second per-document URI variant. `format` is optional and accepts only a canonical id for an adapter shipped in the current release. When omitted, classification uses the matched document's extension; an extension-ambiguous document therefore requires an explicit `format`. The initial overlay applies only to `file` URI documents whose paths are representable relative to `projectRoot`; untitled and other non-file documents are not catalog targets.
+
+This is a normalized cross-editor contract, not a mandated product-facing setting key. VS Code extensions, LSP initialization options, or other integrations may expose an idiomatic outer key, but must validate and resolve the same inner shape before applying the precedence rules below.
 
 Catalog opt-in and extraction scope configuration are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) as the `resources` section of the unified project config. Editor adapters resolve that section into the same project-configured catalog membership as CLI workflows before considering editor-only settings. A project match is authoritative. The ad-hoc layer may opt in an unmatched document, including one excluded from every project catalog definition, but cannot override a project-selected format. A same-format overlap de-duplicates to the project result; a different-format overlap is an editor configuration error. Multiple ad-hoc matches likewise de-duplicate only when they resolve to one format and otherwise fail configuration. Invalid project configuration is reported before overlay application and cannot be bypassed by editor settings.
 
