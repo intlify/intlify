@@ -257,7 +257,7 @@ Standardized `details` fields:
   }
   ```
 
-  `path` is carried by the top-level error. Files without an extension use `""`.
+  `path` is carried by the top-level error. Files without an extension use `""`. `supportedExtensions` lists only extensions that select a direct workflow without project resource opt-in, in ASCII ascending order; it is initially always `[".mf2"]`. It does not list extensions of potentially configurable catalog formats, because an extension alone never makes such a file a supported input and an explicit catalog `format` may support an extensionless or arbitrary filename. Once a path is opted into a catalog, unsupported adapter classification uses `resource_format_unsupported.supportedFormats` instead of `unsupported_input_file`.
 
 - `invalid_ignore_pattern`:
 
@@ -280,7 +280,7 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the ignore file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `invalid_utf8`, and `unknown`.
+  The top-level `path` is the ignore file path. Stable reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. `invalid_utf8` requires `details.validUpTo` as the non-negative longest-valid-prefix byte count and prevents pattern parsing.
 
 - `unmatched_input`:
 
@@ -291,7 +291,7 @@ Standardized `details` fields:
   }
   ```
 
-  `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file or matched entry. A glob that matches filesystem entries but selects no `.mf2` formatter targets is not `unmatched_input`.
+  `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file or matched entry. A glob that matches filesystem entries but selects no supported standalone or catalog targets is not `unmatched_input`.
 
 - `input_path_unrepresentable`:
 
@@ -355,7 +355,7 @@ Standardized `details` fields:
 
   `invalid_snapshot` is used after the public binding argument shape has been accepted as snapshot bytes. Non-`Uint8Array` snapshot arguments use the shared `invalid_input` code.
 
-- `input_read_failed` and `output_write_failed`:
+- `input_read_failed`:
 
   ```json
   {
@@ -363,7 +363,21 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the input or output file path. Initial reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. `invalid_utf8` reports input bytes that are not valid UTF-8; the file is not parsed and the target is reported as a file-specific operational error.
+  The top-level `path` is the input file path. Phase 3B reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. The resource workflow adds `metadata_failed` when physical-file identity inspection fails before reading a selected target. Tier 3 XLIFF adds `unsupported_encoding` for its explicitly recognized UTF-16 BOM cases when that adapter ships; the value is not emitted before then. `invalid_utf8` reports input bytes that are not valid UTF-8 and requires `details.validUpTo` as a non-negative JSON integer equal to the byte length of the longest valid UTF-8 prefix. This shape is shared by file and stdin inputs; the source is not parsed and the target is reported as a file-specific operational error. The resource design owns the additional reason-specific fields and their release timing while preserving this shared code and target-local result placement.
+
+- `output_write_failed`:
+
+  ```json
+  {
+    "reason": "permission_denied"
+  }
+  ```
+
+  The top-level `path` is the output file path. Stable reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, and `unknown`. Input-only reasons such as `invalid_utf8`, `metadata_failed`, and `unsupported_encoding` never apply to this code.
+
+  For `ignore_file_read_failed`, `input_read_failed`, and `output_write_failed`, an underlying operating-system I/O error adds `details.rawOsError` only when the OS exposes a raw error code; it is serialized unchanged as a signed JSON integer. Synthetic decoding or classification reasons such as `invalid_utf8` and `unsupported_encoding` do not carry `rawOsError`. Portable behavior must branch on `reason`, never on the platform-specific number.
+
+  These normalized reason shapes are the v0.1 implementation target and supersede provisional output that exposed Rust `ErrorKind` debug names through `ioKind`. Implementation code and exact fixtures migrate together; consumers are not expected to accept both shapes during a compatibility window while the project remains WIP.
 
 - `internal_error`:
 
@@ -412,8 +426,8 @@ Path-valued CLI arguments are retained as OS-native values during command argume
 
 In a simple message, all bytes including the trailing newline are pattern text. To keep formatting semantics-preserving while still producing conventional files, the CLI treats a small amount of file framing as outside the MF2 message:
 
-- Read framing: if the input starts with a UTF-8 BOM (`EF BB BF`), exactly one BOM is removed. If the remaining content then ends with one `LF` or one `CRLF`, exactly that one trailing newline sequence is removed. The result is the MF2 message text passed to the message-level formatter.
-- Write framing: the output file is the message-level formatter output followed by exactly one final `LF`. A BOM is never re-emitted.
+- Standalone read framing: if a standalone `.mf2` input starts with a UTF-8 BOM (`EF BB BF`), exactly one BOM is removed. If the remaining content then ends with one `LF` or one `CRLF`, exactly that one trailing newline sequence is removed. The result is the MF2 message text passed to the message-level formatter. Catalog adapters instead receive the exact host-document bytes and apply their own decoding contract.
+- Standalone write framing: the output `.mf2` file is the message-level formatter output followed by exactly one final `LF`. A BOM is never re-emitted. Catalog write-back serializes or patches the complete host document under the selected adapter contract and does not apply standalone framing.
 - Standalone stdin framing: `.mf2` stdin mode applies the same read framing to stdin bytes, and stdout output is the formatted message followed by exactly one final `LF`. Opted-in catalog stdin follows the resource adapter contract instead: it applies no standalone framing and returns the complete validated host document.
 - Check modes compare the framed output bytes with the original input bytes, so a missing final newline, a `CRLF` final newline, or a leading BOM reports a difference even when the message text itself is already formatted.
 
@@ -428,35 +442,41 @@ Framing consequences:
 
 ### Input Discovery
 
-The primary input unit is `1 file = 1 MF2 message`. Phase 3B initially supports only direct `.mf2` message files.
+The standalone primary input unit is `1 file = 1 MF2 message`. Phase 3B initially classifies only direct `.mf2` message files by itself; the resource design extends the same discovery pipeline with explicitly opted-in catalog targets.
+
+Discovery has two semantic stages. Filesystem enumeration first produces concrete candidate file paths without filtering them by filename extension. It applies operand existence, glob expansion, hidden and excluded directory traversal, symlink, native ordering, Unicode representability, and unmatched-input rules. Supported-input classification then turns candidates into final selected targets: standalone `.mf2` first, followed by resource membership and format resolution when the resource workflow is available. This split is required because a catalog may use an explicit format override on an extensionless or otherwise arbitrary filename. An implementation may classify each representable candidate as it is enumerated and need not retain every candidate simultaneously, but its observable errors, ordering, and stage precedence must equal this two-stage model.
 
 Input rules:
 
 - in file mode, no operands are equivalent to an explicit directory operand `.`
 - explicit `.mf2` file paths are accepted
-- explicit non-`.mf2` file paths are unsupported input errors and exit with `2`
-- directory inputs are searched recursively for `.mf2` files
-- glob inputs may be broad, but only matched `.mf2` files are selected
+- an explicit non-`.mf2` file path is offered to resource membership; when no catalog definition opts it in, it is an unsupported input error and exits with `2`
+- directory inputs recursively enumerate eligible files; classification selects `.mf2` files plus opted-in catalog files
+- glob inputs may be broad; classification selects only matched `.mf2` files and opted-in catalog files
 - unmatched paths or globs that match no filesystem entries are input errors and exit with `2`
-- glob inputs that match filesystem entries but select no `.mf2` formatter targets are zero-target successes and exit with `0`
+- directory or glob inputs that match filesystem entries but select no supported targets are zero-target successes and exit with `0`
 - invalid glob syntax is an `invalid_cli_argument` error
 - if the final selected target set is empty, the command exits with `0`
-- duplicate matches are de-duplicated by absolute path
+- every representable concrete file candidate is de-duplicated by slash-normalized absolute path before supported-input classification; this applies whether the path came from an explicit operand, directory, or glob, so one unsupported candidate produces at most one `unsupported_input_file`
 - processing and output use stable slash-normalized path order
 
-Path representability is checked before supported-extension or resource-membership classification and before ignore matching. Every explicit operand and `--stdin-filepath` must be exactly representable as Unicode. Directory and glob discovery performs the same check for every encountered filesystem entry; an unrepresentable entry emits `input_path_unrepresentable`, is not selected, and, when it is a directory, is not traversed. Other operands and representable entries continue through normal discovery, and the retained error makes the final exit code `2`. Implementations must not silently skip or lossily convert such entries.
+Errors that cannot produce a concrete representable candidate are not covered by candidate de-duplication. Each unmatched path or glob and each syntactically invalid glob remains an error for its own CLI operand occurrence. Candidate de-duplication does not canonicalize symlink targets, so distinct logical symlink and target paths remain separate candidates and later follow the physical-identity rules when the resource workflow is active.
+
+Path representability is checked before supported-input classification and before ignore matching. Every explicit operand and `--stdin-filepath` must be exactly representable as Unicode. Directory and glob discovery performs the same check for every encountered filesystem entry; an unrepresentable entry emits `input_path_unrepresentable`, is not selected, and, when it is a directory, is not traversed. Other operands and representable entries continue through normal discovery, and the retained error makes the final exit code `2`. Implementations must not silently skip or lossily convert such entries.
 
 Representability errors retain deterministic discovery ordering. Explicit operands are considered in operand order. Within each representable directory, native entry names are sorted lexicographically by unsigned native path units before entries are inspected: bytes on POSIX and UTF-16 code units on Windows. This native ordering is used only to select and order unrepresentable-entry errors; representable targets continue to use their normalized Unicode path order. A platform that uses another native path representation must define an equivalent total order before enabling file discovery.
 
-Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an explicit hidden path with an unsupported extension is `unsupported_input_file`.
+When several top-level discovery and input-selection errors coexist, `errors[]` follows semantic pipeline order rather than implementation encounter order. Filesystem enumeration errors come first: explicit operands are considered in CLI order, and errors reached within one directory or glob follow the same stable native-path ordering used for representability checks. Supported-input classification errors follow in ascending slash-normalized candidate-path order. The resource workflow then appends at most one selected catalog-assignment conflict; when no such aborting conflict exists, physical-classification conflicts follow in physical-group first-path order. Setup failures such as invalid config or ignore-path setup still abort before this aggregation. An implementation may stream work internally only if it buffers or merges errors to preserve this public order.
+
+Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an explicit hidden file that is neither standalone `.mf2` nor an opted-in catalog is `unsupported_input_file`.
 
 Directory and glob discovery also excludes common VCS, dependency, and output directories by default, including `.git`, `.hg`, `.svn`, `node_modules`, `vendor`, `target`, `dist`, and `coverage`. Explicit file paths can still target files under those directories, subject to ignore rules.
 
 File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
 
-The resource workflow preserves those separate logical results but additionally groups final catalog-capable write targets by physical file identity to prevent alias write races and conflicting host classification. That specialization is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
+The resource workflow preserves those separate logical results but additionally groups every final standalone or catalog file-mode target by physical file identity to prevent alias write races and conflicting classifications. That specialization is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
 
-Directory inputs such as `.` that contain no selected `.mf2` files after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
+Directory inputs such as `.` that contain no selected standalone or resource targets after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
 
 Phase 3B initially processes selected files sequentially after discovery, de-duplication, and sorting. Future parallel execution may be added without changing observable stdout, JSON result ordering, or write target selection.
 
@@ -530,7 +550,7 @@ Write mode:
 - changed files are printed to stdout, one path per line
 - already formatted files produce no stdout
 - parser diagnostics and operational errors are rendered to stderr
-- files with parser diagnostics are not modified
+- formatting units with parser diagnostics are not modified: the complete file for standalone `.mf2`, or the affected extracted entry for a catalog target
 - if valid targets are changed before or alongside diagnostics/errors, those changed paths are still printed to stdout
 
 Check mode:
@@ -552,7 +572,7 @@ Stdin human output:
 
 When the final selected target set is empty, human output writes nothing to stdout or stderr and exits with `0`.
 
-For invalid or mixed input, valid selected `.mf2` targets are processed where possible. Write mode prints changed valid targets to stdout, check/list-different prints would-format valid targets to stdout, and operational errors are rendered to stderr. The final exit code still follows `2 > 1 > 0`.
+For invalid or mixed input, valid selected standalone and catalog targets are processed where possible. Write mode prints changed valid targets to stdout, check/list-different prints would-format valid targets to stdout, and operational errors are rendered to stderr. The final exit code still follows `2 > 1 > 0`.
 
 Formatter-specific human stderr wording is not fixed in this document. Parser diagnostics and operational errors use the Phase 3A diagnostic/error renderer contract.
 
@@ -664,13 +684,13 @@ Each standalone message `results[]` entry uses this shape:
 
 Ignored files are not included in `results[]`; `results[]` represents only the final selected formatter target set. Invalid input and unmatched input errors, including `unsupported_input_file` and `unmatched_input`, are top-level operational errors and do not create result entries.
 
-Mixed outcomes continue processing valid selected `.mf2` targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"error"`, and exits with `2`.
+Mixed outcomes continue processing valid selected standalone and catalog targets where possible. For example, `intlify fmt valid.mf2 messages.txt --reporter json` reports `messages.txt` as a top-level `unsupported_input_file` error, still processes `valid.mf2`, sets `summary.status` to `"error"`, and exits with `2`.
 
 For stdin JSON output, `matchedFiles` is `1` unless stdin is skipped by ignore rules through `--stdin-filepath`. `results[0].path` is the `--stdin-filepath` virtual path. Normal stdin formatting uses `"formatted"` when the output differs and `"unchanged"` when it does not. Stdin with `--check` uses `"would_format"` when the input would change. Stdin parser diagnostics use `"diagnostic"` with `changed: false`.
 
 If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "error"` and a top-level `invalid_cli_argument` error.
 
-Per-file input read failures and output write failures create `results[]` entries with `status: "error"` and continue processing other selected targets where possible. The final exit code is `2` and `summary.status` is `"error"`. Human text output may still include changed or would-format paths for successful targets, while operational errors are rendered to stderr.
+Per-file input read failures and output write failures create `results[]` entries with `status: "error"` and continue processing other selected targets where possible. In resource file write mode, a successful or pre-write-failed alias allows the next alias in the same physical group to proceed, while an `output_write_failed` blocks later aliases in that group without affecting unrelated groups, as defined by the resource design. The final exit code is `2` and `summary.status` is `"error"`. Human text output may still include changed or would-format paths for successful targets, while operational errors are rendered to stderr.
 
 Write mode generates the full formatted output in memory before writing. Phase 3B writes directly to the target file and does not guarantee rollback or atomic replacement if the filesystem write fails.
 
@@ -682,7 +702,7 @@ Opted-in catalog stdin uses the same adapter and nested result variant, selected
 
 ## Configuration
 
-Formatter configuration lives in the `fmt` section of one ox-mf2 tooling config shared with lint configuration. The config format is JSON or JSONC as defined by the Phase 3A CLI foundation, and the Rust config model remains the source of truth for generated JSON Schema.
+Formatter configuration lives in the `fmt` section of the unified ox-mf2 tooling config shared with lint configuration and resource membership. The config format is JSON or JSONC as defined by the Phase 3A CLI foundation, and the Rust config model remains the source of truth for generated JSON Schema.
 
 Initial config discovery is root-only and follows the Phase 3A CLI foundation contract. Nearest-config-wins and nested config discovery are not part of the initial design.
 
@@ -709,11 +729,21 @@ Schema-level formatter config rules:
 - `fmt.ignorePatterns` must be an array of strings
 - each `fmt.ignorePatterns` entry is validated during config validation against the formatter ignore pattern subset
 
+Formatter-section validation is deterministic and reports only the first failure in this order:
+
+1. `fmt` section shape: `fmt` must be an object when present
+2. unknown `fmt` fields in ASCII ascending order
+3. `fmt.mode` type and value
+4. `fmt.ignorePatterns` shape: the value must be an array when present
+5. `fmt.ignorePatterns` entries in array order: each entry must be a string accepted by the formatter ignore pattern subset
+
+This section-local order is the formatter config validation order referenced by the shared command-independent config contract. It does not depend on JSON object insertion order.
+
 `fmt.mode` is an enum with `"standard"` and `"preserve"`. The default is `"standard"`.
 
 `fmt.ignorePatterns` participates in CLI file discovery only. It is not part of `FormatOptions`, and message-level APIs do not perform file selection.
 
-Formatter configuration does not support file-specific `overrides` in the initial design. The first formatter target is a narrow direct `.mf2` message-file workflow, so per-file option overrides are unnecessary until resource/catalog requirements prove otherwise.
+Formatter configuration does not support file-specific `overrides` in the initial design. Resource/catalog support likewise starts with one resolved formatter configuration applied uniformly to all entries and does not add per-catalog overrides; the resource design records the evidence-gated conditions for reconsidering that boundary.
 
 The formatter does not read `.editorconfig` in the initial implementation because `mode` is the only supported formatting option. `.editorconfig` fallback becomes active only when formatter options such as line width, indent width, line ending, or final newline are explicitly supported.
 
@@ -727,7 +757,7 @@ Config files are validated as a whole before CLI overrides are applied. For exam
 
 Formatter-specific config schema definitions live under the unified project config schema, for example `definitions.fmt`, and are published through `@intlify/cli/schema/config.schema.json`. Phase 3B does not publish generated TypeScript config types.
 
-Config validation errors use the Phase 3A `config_validation_failed` operational error, with JSON pointers such as `/fmt/mode` or `/fmt/ignorePatterns`. Invalid CLI values such as `--mode compact` use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
+Config validation errors use the Phase 3A `config_validation_failed` operational error. A non-object `fmt` section uses `details.reason: "invalid_section_shape"` with `details.pointer: "/fmt"`; an unknown formatter field uses `"unknown_field"` at its exact pointer and includes `details.field`. A non-string or unsupported `fmt.mode` uses `"invalid_format_mode"` with `details.pointer: "/fmt/mode"` and `details.allowedValues: ["standard", "preserve"]`; `details.value` is included only when the provided value is scalar. A non-array `fmt.ignorePatterns` uses `"invalid_ignore_patterns_shape"` with `details.pointer: "/fmt/ignorePatterns"`, and an invalid entry uses `"invalid_ignore_pattern"` at its indexed pointer. Invalid CLI values such as `--mode compact` instead use `invalid_cli_argument` with details such as the option name, provided value, and allowed values.
 
 `fmt.ignorePatterns` uses the same gitignore-compatible subset described in [Ignore Sources](#ignore-sources). Invalid entries are rejected during config validation with pointers such as `/fmt/ignorePatterns/0`.
 
@@ -1220,7 +1250,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 No formatter-specific open questions remain. The previously tracked questions were resolved as follows and folded into the sections above:
 
-1. **Final LF / line-ending normalization scope**: resolved as a CLI file-framing rule. The CLI removes one leading BOM and one trailing newline sequence on read and appends exactly one final LF on write; message-level APIs never append a final newline and never rewrite pattern text line endings. See [File Framing](#file-framing) and [Core Style Rules](#core-style-rules).
+1. **Final LF / line-ending normalization scope**: resolved as a standalone `.mf2` CLI file-framing rule. For standalone inputs, the CLI removes one leading BOM and one trailing newline sequence on read and appends exactly one final LF on write; catalog adapters preserve and rewrite complete host documents under their own contracts. Message-level APIs never append a final newline and never rewrite pattern text line endings. See [File Framing](#file-framing) and [Core Style Rules](#core-style-rules).
 2. **Bidi trivia policy**: resolved as removal in both modes. Formatter-generated spacing does not re-emit whitespace-trivia bidi marks; bidi marks inside token spans are preserved through source slices. See [Core Style Rules](#core-style-rules).
 3. **Snapshot capability requirements per mode**: resolved as preserve-only rejection. Trivia-less snapshots are accepted in standard mode and rejected with `invalid_snapshot` / `missing_capability` in preserve mode; source/token gap derivation remains a future optimization. See [SnapshotView Requirements](#snapshotview-requirements).
-4. **CLI input encoding**: resolved. Non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`, and a single leading UTF-8 BOM is removed as file framing and never re-emitted. See [File Framing](#file-framing) and [Operational Error Codes](#operational-error-codes).
+4. **CLI input encoding**: resolved. Non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`. A standalone `.mf2` input removes a single leading UTF-8 BOM as file framing and never re-emits it; catalog adapters instead apply their format-specific BOM and encoding contracts while preserving the complete host document. See [File Framing](#file-framing) and [Operational Error Codes](#operational-error-codes).

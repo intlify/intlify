@@ -99,7 +99,7 @@ The zero-diagnostic guarantee in [002-ox-mf2-phase-1-rust-parser-design.md](./00
 
 ### Lint Execution Workflow
 
-The CLI and binding entry points share the same message-level lint workflow. `intlify lint` adds file discovery, ignore handling, and file framing before entering the core linter; bindings call the same source-backed core directly.
+The CLI and binding entry points share the same message-level lint workflow. For standalone `.mf2`, `intlify lint` adds file discovery, ignore handling, and file framing before entering the core linter; opted-in catalogs add resource extraction and host-coordinate mapping without standalone framing. Bindings call the same source-backed message core directly.
 
 ![Phase 3C lint execution workflow](./assets/008-ox-mf2-phase-3c-lint-execution-workflow.svg)
 
@@ -432,16 +432,21 @@ Resolution starts from the implicit `recommended` defaults and overlays `lint.ru
 
 `intlify lint` validates the shared project config as a whole. Invalid `fmt` configuration in the same file still produces `config_validation_failed` during a lint command, and invalid `lint` configuration likewise fails formatter commands. Command-specific CLI overrides are applied only for the active command after the shared config has validated. When no config file is discovered and no explicit `--config` is provided, the implicit default project config is used.
 
-CLI config validation reports the first deterministic `config_validation_failed` error. Validation order is:
+Structural CLI config validation reports the first deterministic `config_validation_failed` error before discovery. Validation order is:
 
-1. top-level config shape: root must be an object, then unknown top-level fields in ASCII ascending order
-2. `fmt` section validation, using the formatter config validation order from the Phase 3B formatter design
-3. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
-4. `lint.rules` shape: `rules` must be an object when present
-5. `lint.rules` entries: rule ids are processed in ASCII ascending order; for each entry, parser or semantic diagnostic codes are reported before unknown rule ids, and unknown rule ids are reported before invalid severity values for known configurable rule ids
-6. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
+1. top-level config shape: root must be an object
+2. unknown top-level fields in ASCII ascending order
+3. `$schema` metadata shape: the value must be a string when present
+4. `fmt` section validation, using the formatter config validation order from the Phase 3B formatter design
+5. `lint` section shape: `lint` must be an object when present, then unknown `lint` fields in ASCII ascending order
+6. `lint.rules` shape: `rules` must be an object when present
+7. `lint.rules` entries: rule ids are processed in ASCII ascending order; for each entry, parser or semantic diagnostic codes are reported before unknown rule ids, and unknown rule ids are reported before invalid severity values for known configurable rule ids
+8. `lint.ignorePatterns` shape: value must be an array, then entries are validated in array order and the first non-string or invalid pattern entry is reported
+9. `resources` section validation, using the section-local deterministic order defined by the resource catalog adapter design
 
-This order is command-independent. If both `fmt` and `lint` sections are invalid, `fmt` validation reports first even during `intlify lint`, because the shared project config has one deterministic first-error contract.
+This order is command-independent. If more than one of `fmt`, `lint`, and `resources` is invalid, `fmt` reports before `lint`, and `lint` reports before `resources`, regardless of the invoked command. Appending `resources` preserves the established `fmt`-before-`lint` compatibility while keeping one deterministic first-error contract for the shared project config.
+
+The resource workflow has one deliberate assignment-time use of the same config code. `catalog_format_conflict` depends on a concrete selected path and therefore runs after discovery rather than as part of the structural order above. It follows retained discovery/input errors, aborts the complete target set with `results: []`, and uses the deterministic path and catalog-definition ordering fixed by the resource catalog adapter design. This staged error does not weaken the rule that every structurally invalid config aborts before ignore setup or discovery.
 
 Object-map validation uses ASCII ascending order. Array validation uses source order. This keeps validation independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
 
@@ -479,7 +484,9 @@ It reports:
 }
 ```
 
-`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_section_shape"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, or `"invalid_ignore_pattern"`. `details.pointer` is a JSON Pointer to the invalid location because CLI config errors point into a JSON/JSONC document: `""` for the root, `/<field>` for top-level fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, and `/lint/ignorePatterns/<index>` for ignore pattern entries. Binding option validation uses dot paths instead because it points into JavaScript object input rather than a config document. Shared semantic reason names such as `"non_configurable_diagnostic"`, `"unknown_rule"`, and `"invalid_rule_severity"` are intentionally reused across CLI config validation and binding option validation, but the operational error code and path format remain boundary-specific: CLI config errors use `config_validation_failed` with JSON Pointer paths, while bindings use `invalid_options` with dot paths. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values.
+`details.reason` is one of `"invalid_config_shape"`, `"unknown_field"`, `"invalid_schema_metadata"`, `"invalid_section_shape"`, `"invalid_format_mode"`, `"invalid_rules_shape"`, `"non_configurable_diagnostic"`, `"unknown_rule"`, `"invalid_rule_severity"`, `"invalid_ignore_patterns_shape"`, `"invalid_ignore_pattern"`, `"invalid_catalogs_shape"`, `"invalid_catalog_definition_shape"`, `"invalid_catalog_include_shape"`, `"invalid_catalog_exclude_shape"`, `"invalid_catalog_glob"`, `"invalid_catalog_format"`, or `"catalog_format_conflict"`. `details.pointer` is a JSON Pointer to the invalid location because CLI config errors point into a JSON/JSONC document: `""` for the root, `/<field>` for top-level fields, `/fmt/<field>` for formatter fields, `/lint/<field>` for lint fields, `/lint/rules/<rule-id>` for rule entries, `/lint/ignorePatterns/<index>` for ignore pattern entries, and the exact `/resources/...` locations defined by the resource catalog adapter design. Binding option validation uses dot paths instead because it points into JavaScript object input rather than a config document. Shared semantic reason names such as `"non_configurable_diagnostic"`, `"unknown_rule"`, and `"invalid_rule_severity"` are intentionally reused across CLI config validation and binding option validation, but the operational error code and path format remain boundary-specific: CLI config errors use `config_validation_failed` with JSON Pointer paths, while bindings use `invalid_options` with dot paths. `details.ruleId` is included for both unknown rules and non-configurable diagnostic codes. `details.field` is included for unknown fields, `details.index` for ignore pattern entry failures, and `details.value` only for scalar JSON values. `invalid_schema_metadata` always uses `details.pointer: "/$schema"`. `invalid_format_mode` additionally requires `details.allowedValues: ["standard", "preserve"]`.
+
+This exact reason vocabulary and the fixed section-local ordering are the v0.1 implementation target. They supersede provisional Phase 3A/3B implementation and fixture values such as `expected_object`, `expected_string`, `expected_array`, `invalid_value`, and `model_validation_failed`, as well as validation driven by JSON object insertion order. Because the project is still WIP, implementation code and exact fixtures migrate atomically to this contract without a dual-reason compatibility period.
 
 The lint schema definitions live under the unified project config schema published through `@intlify/cli/schema/config.schema.json`.
 
@@ -487,18 +494,18 @@ The lint schema definitions live under the unified project config schema publish
 
 `intlify lint` shares the `intlify fmt` contract for everything that is not lint-specific:
 
-- the primary input unit is `1 file = 1 MF2 message`; the supported-extension list is initially `.mf2` only
+- the standalone primary input unit is `1 file = 1 MF2 message`; direct config-free classification initially supports `.mf2` only, while the resource workflow adds explicitly opted-in catalog targets
 - input rules, hidden-file and VCS/dependency-directory exclusion, symlink behavior, duplicate de-duplication, stable slash-normalized ordering, unmatched-input errors, zero-target success, and invalid-glob handling follow the `intlify fmt` Input Discovery contract
 - non-Unicode project roots, explicit config paths, repeated ignore paths, operands, stdin virtual paths, and discovered entries follow the formatter's `input_path_unrepresentable` contract and are never lossily converted; lint reuses the same `source`, `ignorePathIndex`, omitted-`path`, and setup-abort shapes
 - setup precedence is shared exactly with `intlify fmt`: CLI option shape, project-root representability, explicit-config representability, config load/validation, ignore-path representability in CLI order, then ignore read/pattern errors and discovery
 - ignore sources are one ordered pattern list: root `.gitignore`, then `--ignore-path` files in CLI argument order, then `lint.ignorePatterns`, with later patterns overriding earlier ones
-- read framing follows the `intlify fmt` File Framing contract: one leading UTF-8 BOM and then one trailing `LF` or `CRLF` are removed before parsing, so lint spans match fmt spans for the same file; lint never writes files, so write framing does not apply
-- non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`
+- standalone `.mf2` read framing follows the `intlify fmt` File Framing contract: one leading UTF-8 BOM and then one trailing `LF` or `CRLF` are removed before parsing, so lint spans match fmt spans for the same standalone file; catalog targets instead preserve exact host-document bytes and use the selected adapter's decoding and span-mapping contract; lint never writes files, so write framing does not apply
+- non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`; the resource workflow additionally uses the shared code's staged `metadata_failed` reason, and Tier 3 XLIFF adds `unsupported_encoding`, under the reason-specific contracts in the resource design
 - Phase 3C processes selected files sequentially; future parallel execution must not change observable output ordering
 - exit codes and the JSON envelope follow Phase 3A
 - the discovery, ignore, and input operational error codes defined in the formatter design (`unsupported_input_file`, `unmatched_input`, `input_path_unrepresentable`, `invalid_ignore_pattern`, `ignore_file_read_failed`, `input_read_failed`) are shared CLI codes, not formatter-only codes; `intlify lint` reuses them with the same `kind`, exit code, and `details` shapes
 
-Resource/catalog input such as JSON and YAML i18n files is planned as a layered adapter workflow. When resource/catalog adapters arrive, they extend the supported-extension list and own host-file parsing, message extraction, and span mapping; the message-level linter core and this shared discovery contract do not change.
+Resource/catalog input is a layered adapter workflow owned by the resource design. It extends supported-input classification through explicit project or editor opt-in rather than extending the direct `supportedExtensions` list, and therefore supports explicit format assignments for arbitrary or extensionless filenames. Resource adapters own host-file parsing, message extraction, and span mapping; the message-level linter core and the extension-neutral enumeration contract do not change.
 
 ## CLI Detailed Behavior
 
@@ -824,7 +831,7 @@ Rule categories are documentation and grouping metadata. They are not the diagno
 
 ## Resource and Catalog Linting
 
-Message-level linting is the core. Resource/catalog linting for host formats such as JSON and YAML i18n files is planned as a layer above message-level linting that extracts message entries and reuses `lintMessage(source)` per entry.
+Message-level linting remains the core. The resource design defines catalog linting as a layer above it: the initially shipped JSON adapter, followed by later format tiers such as YAML, extracts message entries and reuses `lintMessage(source)` per entry.
 
 Future resource/catalog examples:
 
