@@ -489,12 +489,14 @@ The lint schema definitions live under the unified project config schema publish
 
 - the primary input unit is `1 file = 1 MF2 message`; the supported-extension list is initially `.mf2` only
 - input rules, hidden-file and VCS/dependency-directory exclusion, symlink behavior, duplicate de-duplication, stable slash-normalized ordering, unmatched-input errors, zero-target success, and invalid-glob handling follow the `intlify fmt` Input Discovery contract
+- non-Unicode project roots, explicit config paths, repeated ignore paths, operands, stdin virtual paths, and discovered entries follow the formatter's `input_path_unrepresentable` contract and are never lossily converted; lint reuses the same `source`, `ignorePathIndex`, omitted-`path`, and setup-abort shapes
+- setup precedence is shared exactly with `intlify fmt`: CLI option shape, project-root representability, explicit-config representability, config load/validation, ignore-path representability in CLI order, then ignore read/pattern errors and discovery
 - ignore sources are one ordered pattern list: root `.gitignore`, then `--ignore-path` files in CLI argument order, then `lint.ignorePatterns`, with later patterns overriding earlier ones
 - read framing follows the `intlify fmt` File Framing contract: one leading UTF-8 BOM and then one trailing `LF` or `CRLF` are removed before parsing, so lint spans match fmt spans for the same file; lint never writes files, so write framing does not apply
 - non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`
 - Phase 3C processes selected files sequentially; future parallel execution must not change observable output ordering
 - exit codes and the JSON envelope follow Phase 3A
-- the discovery, ignore, and input operational error codes defined in the formatter design (`unsupported_input_file`, `unmatched_input`, `invalid_ignore_pattern`, `ignore_file_read_failed`, `input_read_failed`) are shared CLI codes, not formatter-only codes; `intlify lint` reuses them with the same `kind`, exit code, and `details` shapes
+- the discovery, ignore, and input operational error codes defined in the formatter design (`unsupported_input_file`, `unmatched_input`, `input_path_unrepresentable`, `invalid_ignore_pattern`, `ignore_file_read_failed`, `input_read_failed`) are shared CLI codes, not formatter-only codes; `intlify lint` reuses them with the same `kind`, exit code, and `details` shapes
 
 Resource/catalog input such as JSON and YAML i18n files is planned as a layered adapter workflow. When resource/catalog adapters arrive, they extend the supported-extension list and own host-file parsing, message extraction, and span mapping; the message-level linter core and this shared discovery contract do not change.
 

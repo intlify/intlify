@@ -239,6 +239,7 @@ Formatter also reuses Phase 3A common codes:
 | `invalid_input` | `input` | `2` | Raw external binding or programmatic API input shape is invalid before typed formatter input can be constructed, such as a non-string `source` or non-`Uint8Array` snapshot argument. |
 | `missing_cli_option_value` | `input` | `2` | A value-taking CLI option such as `--mode`, `--stdin-filepath`, `--ignore-path`, or `--reporter` is missing its value. |
 | `duplicate_cli_option` | `input` | `2` | A non-repeatable CLI option is provided more than once. |
+| `input_path_unrepresentable` | `input` | `2` | The project root, explicit `--config`, a `--ignore-path`, an input operand, `--stdin-filepath`, or an encountered filesystem entry is not exactly representable as Unicode. |
 | `reporter_not_supported` | `reporter` | `2` | `--reporter` is provided with a value outside `text` or `json`. |
 | `config_read_failed` | `config` | `2` | The shared tooling config file cannot be read. |
 | `config_parse_failed` | `config` | `2` | The shared tooling config file is not valid JSON or JSONC. |
@@ -291,6 +292,20 @@ Standardized `details` fields:
   ```
 
   `kind` is `"path"` or `"glob"`. Top-level `path` is not used because the input does not resolve to an existing file or matched entry. A glob that matches filesystem entries but selects no `.mf2` formatter targets is not `unmatched_input`.
+
+- `input_path_unrepresentable`:
+
+  ```json
+  {
+    "reason": "non_unicode_path",
+    "source": "discovery",
+    "parentPath": "messages"
+  }
+  ```
+
+  `source` is `"project-root"`, `"config"`, `"ignore-path"`, `"operand"`, `"stdin-filepath"`, or `"discovery"`. The project-root case is the pre-config shared failure and nullable-envelope shape defined by Phase 3A. `"config"` identifies only an explicit `--config`; it has no index because that option is not repeatable. `"ignore-path"` requires `ignorePathIndex`, the zero-based index among `--ignore-path` occurrences in CLI order, distinct from the pattern `index` used by `invalid_ignore_pattern`. An explicit operand requires `operandIndex`, the zero-based index among file, directory, and glob operands. A discovered entry requires `parentPath`, identifying the representable directory in which the entry was observed and following the shared project-relative-or-absolute machine path rule. No other source carries these source-specific fields.
+
+  The operational error's `path` field is always omitted: the CLI does not serialize raw platform path units and never substitutes `U+FFFD` or another lossy spelling. The project-root, config, and ignore-path cases abort setup with `results: []` and omit command-specific target counters. Their text errors identify the root or option, and an ignore-path occurrence when useful, without printing a lossy path. Operand, stdin-filepath, and discovery failures retain the existing input-selection behavior. All variants are top-level errors rather than target-local results because the CLI cannot construct the path's public identity.
 
 - `invalid_options`:
 
@@ -391,7 +406,7 @@ When no file, directory, or glob operands are provided and stdin mode is not sel
 
 `--ignore-path` may be provided multiple times. `--mode`, `--stdin-filepath`, `--check`, `--list-different`, and `--reporter` are not repeatable; duplicates are `duplicate_cli_option` errors.
 
-After help/version precedence and command argument shape validation, `intlify fmt` loads and validates config before file discovery or formatting. If `--reporter json` can be parsed before a config error, the config error is emitted as a JSON envelope. Missing root config uses defaults.
+Path-valued CLI arguments are retained as OS-native values during command argument-shape validation; recognizing an option, a missing value, or a duplicate does not require a Unicode conversion. After help/version precedence and command argument-shape validation, `intlify fmt` discovers and validates the project root, checks an explicit `--config` path for exact Unicode representability, and then loads and validates config. It next resolves all `--ignore-path` values and checks their representability in CLI occurrence order before reading any ignore source or starting input discovery. Thus the setup precedence is: CLI option shape, project-root representability, explicit-config representability, config load/validation, ignore-path representability, then ignore read/pattern errors and discovery. If `--reporter json` can be parsed before a setup error, the error is emitted as a JSON envelope. Missing root config uses defaults.
 
 ### File Framing
 
@@ -429,11 +444,17 @@ Input rules:
 - duplicate matches are de-duplicated by absolute path
 - processing and output use stable slash-normalized path order
 
+Path representability is checked before supported-extension or resource-membership classification and before ignore matching. Every explicit operand and `--stdin-filepath` must be exactly representable as Unicode. Directory and glob discovery performs the same check for every encountered filesystem entry; an unrepresentable entry emits `input_path_unrepresentable`, is not selected, and, when it is a directory, is not traversed. Other operands and representable entries continue through normal discovery, and the retained error makes the final exit code `2`. Implementations must not silently skip or lossily convert such entries.
+
+Representability errors retain deterministic discovery ordering. Explicit operands are considered in operand order. Within each representable directory, native entry names are sorted lexicographically by unsigned native path units before entries are inspected: bytes on POSIX and UTF-16 code units on Windows. This native ordering is used only to select and order unrepresentable-entry errors; representable targets continue to use their normalized Unicode path order. A platform that uses another native path representation must define an equivalent total order before enabling file discovery.
+
 Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an explicit hidden path with an unsupported extension is `unsupported_input_file`.
 
 Directory and glob discovery also excludes common VCS, dependency, and output directories by default, including `.git`, `.hg`, `.svn`, `node_modules`, `vendor`, `target`, `dist`, and `coverage`. Explicit file paths can still target files under those directories, subject to ignore rules.
 
 File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
+
+The resource workflow preserves those separate logical results but additionally groups final catalog-capable write targets by physical file identity to prevent alias write races and conflicting host classification. That specialization is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
 
 Directory inputs such as `.` that contain no selected `.mf2` files after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
 
@@ -476,7 +497,7 @@ The initial `.gitignore` behavior reads only the Phase 3A discovered project roo
 
 All ignore patterns are evaluated relative to the Phase 3A discovered project root, including patterns loaded from `--ignore-path`.
 
-`--ignore-path <path>` itself is resolved after config loading. Absolute ignore file paths are used as-is. Relative ignore file paths are resolved from the Phase 3A discovered project root. This differs from `--config <path>`, which is resolved from the process `cwd` because it is part of the config loading boundary.
+`--ignore-path <path>` itself is an OS-native path resolved after successful config loading. Absolute ignore file paths are used as-is. Relative ignore file paths are resolved from the Phase 3A discovered project root. This differs from `--config <path>`, which is resolved from the process `cwd` because it is part of the config loading boundary. Before the root `.gitignore` or any explicit ignore file is read and before discovery begins, every resolved `--ignore-path` is checked for exact Unicode representability in CLI occurrence order. The first failure aborts setup with `input_path_unrepresentable`, `details.source: "ignore-path"`, and the corresponding `details.ignorePathIndex`; no ignore source is read and no input is discovered.
 
 Invalid `fmt.ignorePatterns` entries are config validation errors and exit with `2` using `config_validation_failed`. Invalid patterns in `--ignore-path` files are operational errors and exit with `2`. Unsupported or unrecognized patterns in root `.gitignore` are ignored as non-fatal compatibility behavior.
 
@@ -494,7 +515,7 @@ Exit code classification:
 
 When multiple outcomes occur, final exit code priority is `2 > 1 > 0`.
 
-Parser diagnostics never cause write mode to modify the affected file.
+Parser diagnostics never cause write mode to modify the affected formatting unit. The unit is the complete file for a standalone `.mf2` target and one extracted message entry for an opted-in catalog target. A catalog may therefore write validated changes from other entries while leaving the diagnostic-bearing entry byte-identical, under the specialization owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-formatting).
 
 In write mode, successfully written files are not failures. If files are formatted and no diagnostics or operational errors occur, the command exits with `0`. If parser diagnostics occur without operational errors, the command exits with `1`. If any operational error occurs, the command exits with `2`.
 
@@ -517,9 +538,10 @@ Check mode:
 - files that would be formatted are printed to stdout, one path per line
 - already formatted files produce no stdout
 - parser diagnostics and operational errors are rendered to stderr
-- files with parser diagnostics are not included in stdout because stdout means "would-format targets"
+- a standalone `.mf2` file with parser diagnostics is not included in stdout because it has no formatted output
+- an opted-in catalog with diagnostics in one entry is still included when another writable entry has a fully validated difference; the diagnostic is rendered to stderr and the command exits with `1`
 
-`--list-different` is allowed together with `--check` and uses the same path-only human output. In Phase 3B, it is a path-only output guarantee rather than a separate result model.
+`--list-different` is allowed together with `--check` and uses the same path-only human output, including that catalog specialization. In Phase 3B, it is a path-only output guarantee rather than a separate result model.
 
 Stdin human output:
 
@@ -550,7 +572,7 @@ JSON reporter output uses the shared Phase 3A envelope. Formatter-specific JSON 
 }
 ```
 
-`schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
+`schemaVersion`, `version`, and `projectRoot` follow the Phase 3A shared envelope contract. `command` is always `"fmt"`. `projectRoot` is an absolute slash-normalized path for normal execution and is `null` only for the shared pre-project representability error. File result paths and error paths are project-root-relative slash-normalized paths when representable, including on Windows.
 
 The top-level `errors` array contains global operational errors only, such as invalid CLI arguments, config errors, input selection errors, ignore file read failures, invalid ignore patterns from setup, and pathless internal errors. File-specific operational errors live in `results[].errors`. Parser diagnostics live only in `results[].diagnostics` for standalone message targets or `results[].entries[].diagnostics` for catalog targets; there is no top-level `diagnostics` field. Diagnostic entries use the shared diagnostic JSON shape defined in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
@@ -746,8 +768,8 @@ If parsing produces any parser diagnostic:
 
 - the formatter does not produce public formatted output
 - API consumers receive `ok: false` with parser diagnostics and no formatted output
-- CLI write mode does not modify the file
-- CLI check/list-different modes treat the file as a formatting failure and exit with `1`
+- CLI write mode does not modify the affected formatting unit; for a standalone target that is the complete file, while a catalog workflow may still write validated changes for other entries
+- CLI check/list-different modes treat the affected unit as a formatting failure and exit with `1`; a catalog path may simultaneously be reported as different because of another writable entry
 - LSP/editor adapters treat the request as a no-op
 
 Recovery-aware formatting is future editor-specific scope.
@@ -982,6 +1004,9 @@ Behavior coverage:
 | stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
 | JSON reporter success, difference, diagnostic, and operational-error output | CLI formatter PR | `MUST` |
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
+| non-Unicode operand, stdin virtual path, and discovered entry rejection without lossy path output | CLI formatter PR | `MUST` |
+| non-Unicode project root pre-config rejection with the nullable-root JSON envelope | CLI formatter PR | `MUST` |
+| non-Unicode explicit config and repeated ignore-path rejection at their fixed setup precedence, with `ignorePathIndex`, empty results, and no lossy path output | CLI formatter PR | `MUST` |
 | unsupported file, unmatched input, glob-with-no-mf2-target zero-target success, all ignored, and no selected file behavior | CLI formatter PR | `MUST` |
 | ignore source precedence across root `.gitignore`, `--ignore-path`, and `fmt.ignorePatterns` | CLI formatter PR | `MUST` |
 | N-API `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot` contract, including unpaired-surrogate `TypeError` behavior | N-API binding PR | `MUST` |

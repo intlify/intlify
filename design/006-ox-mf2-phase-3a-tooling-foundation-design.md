@@ -104,6 +104,8 @@ The default reporter is `text`. Machine-readable JSON output is selected with `-
 
 Value-taking long options accept both separated and equals forms. `--reporter json` and `--reporter=json` are equivalent. `--config path` and `--config=path` are equivalent. Phase 3A does not define `-r` or `-c`; the only short options are `-h` and `-V`. Clustered short options such as `-hV` are not supported and are treated as invalid or unknown options rather than as multiple short flags. The `--` end-of-options marker is not special in Phase 3A and is treated as invalid or unknown input; file operand handling should be reconsidered in formatter and linter product phases.
 
+Path-valued arguments are retained as OS-native path values during argument-shape validation. In particular, parsing `--config` does not require a Unicode conversion merely to recognize the option, its value, or a duplicate occurrence. Exact Unicode representability is checked at the path-processing boundary defined below.
+
 `intlify --version` reports the public `@intlify/cli` package version as the version number only, for example `0.14.0-alpha.0` for the initial CLI prerelease. The JSON envelope `version` field uses the same value. The wrapper package, `@intlify/cli-native` native package source, Rust binary, and CLI crate should be released with matching versions; version mismatches should be caught by build, validation, or publish workflows instead of being surfaced as a normal runtime mode.
 
 The first monorepo-managed `@intlify/cli` release line is `0.14.0`, but the first npm publish target is the prerelease `0.14.0-alpha.0`. The monorepo version policy remains unified: ox-mf2 npm packages, ox-mf2 crates, `@intlify/cli`, `@intlify/cli-native`, and the Rust CLI crate should all release with the same exact version for that release. Stable `0.14.0` follows after alpha validation. This keeps the existing standalone `@intlify/cli` npm version history, which has already reached `0.13.1`, compatible with the unified monorepo version policy.
@@ -127,7 +129,9 @@ Operational error precedence:
 1. Help and version flags return help/version output and exit with `0`.
 2. CLI argument shape errors are reported next, including unknown options, missing option values, duplicate options, and unsupported reporters.
 3. Command routing errors are reported next, including unknown commands and reserved commands that return `command_not_ready`.
-4. Config discovery, loading, and validation errors are reported only after the command is known to require config.
+4. For a routed command that requires project context, project-root discovery and exact Unicode representability are checked before config discovery.
+5. When an explicit `--config` is present, its resolved OS-native path is checked for exact Unicode representability.
+6. Config discovery, loading, and validation errors are reported only after the command is known to require config.
 
 Because help and version flags have highest precedence, examples such as `intlify fmt --help --config missing.json` return help output and exit with `0` without loading config. Help and version also win over invalid argument shape; for example, `intlify --help --unknown` returns help output and exits with `0`, and `intlify --version --unknown` returns version output and exits with `0`. If help and version are both present, help wins.
 
@@ -141,6 +145,7 @@ Phase 3A input and routing error codes:
 - `unknown_cli_option`: unknown option, with `kind: "input"`
 - `missing_cli_option_value`: missing value for a value-taking option, with `kind: "input"`
 - `duplicate_cli_option`: duplicate global option, with `kind: "input"`
+- `input_path_unrepresentable`: an OS-native path required by shared CLI processing cannot be represented exactly as Unicode, with `kind: "input"`
 - `reporter_not_supported`: unsupported reporter value, with `kind: "reporter"`
 - `unknown_command`: unknown subcommand, with `kind: "unsupported"`
 - `command_not_ready`: reserved command without an implementation in the current phase, with `kind: "unsupported"`
@@ -157,6 +162,7 @@ Input and routing errors use small structured `details` payloads when the reject
 - `missing_cli_option_value`: `details.option`
 - `duplicate_cli_option`: `details.option`
 - `invalid_cli_argument`: `details.argument`, when a single rejected argument can be identified
+- `input_path_unrepresentable`: `details.reason: "non_unicode_path"` and a `details.source` owned by the failing path boundary; Phase 3A emits `"project-root"` or `"config"`, while later shared discovery adds `"ignore-path"`, `"operand"`, `"stdin-filepath"`, and `"discovery"`
 - `unknown_command`: `details.command`
 
 For `unknown_command`, the top-level envelope `command` remains `"intlify"` and the unknown subcommand is reported in `errors[].details.command`. For example, `intlify foo --reporter json` reports `details: { "command": "foo" }`.
@@ -174,9 +180,9 @@ The initial config discovery model is root-only. Root means the git repository r
 
 Git root discovery uses filesystem walking rather than invoking the `git` executable. Starting from `cwd`, the CLI walks upward and treats the first directory containing a `.git` directory or `.git` file as the project root. This covers normal repositories, worktrees, and submodules without depending on an external Git command. If no `.git` marker is found, the project root is `cwd`.
 
-The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root-discovered config. Relative `--config` paths are resolved from the process `cwd`; absolute paths are used as-is. `--config` replaces config discovery, so root config conflicts are ignored when an explicit config file is provided. It does not change `projectRoot`. Explicit config paths must use a supported `.json` or `.jsonc` extension.
+The CLI supports an explicit `--config <path>` option in Phase 3A. This is an escape hatch for CI, fixtures, and integrations, not nested discovery. When `--config` is provided, the CLI loads that exact file instead of the root-discovered config. The argument remains an OS-native path: relative values are resolved from the process `cwd` and absolute values are used as-is before an exact Unicode representability check. `--config` replaces config discovery, so root config conflicts are ignored when an explicit config file is provided. It does not change `projectRoot`. Explicit config paths must use a supported `.json` or `.jsonc` extension.
 
-Explicit config validation order is: path existence, file readability, supported extension, parse, then config-model validation. For example, a missing `foo.json5` reports `config_not_found`, while an existing `foo.json5` file reports `config_extension_unsupported`.
+Explicit config validation order is: resolved-path Unicode representability, path existence, file readability, supported extension, parse, then config-model validation. For example, a missing representable `foo.json5` reports `config_not_found`, while an existing representable `foo.json5` file reports `config_extension_unsupported`. A non-Unicode path reports `input_path_unrepresentable` before any existence, type, permission, extension, or content observation.
 
 When root discovery does not find any supported config file, the CLI continues with the default project config without emitting a warning or error. The default normalized project config is:
 
@@ -270,7 +276,7 @@ The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the o
 - `schemaVersion`: output contract version
 - `command`: command that produced the result, such as `fmt`, `lint`, `check`, or `init`
 - `version`: CLI/package version
-- `projectRoot`: discovered project root
+- `projectRoot`: discovered project root, or `null` only when a pre-project operational error prevents an exact Unicode root identity
 - `summary`: command-level aggregate status and optional command-specific counts
 - `results`: command-specific file, message, diagnostic, or formatting results; a command-specific result may define a target-local `errors` array
 - `errors`: global operational errors that are not owned by one command target, separated from parser, formatter, and linter diagnostics
@@ -287,9 +293,39 @@ Once a command defines target-local errors, any non-empty top-level `errors` or 
 
 In Phase 3A, only `summary.status` is required in the shared envelope. Command-specific count fields are not defined until formatter, linter, or combined check result schemas are defined in Phase 3B or Phase 3C.
 
-The `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute path and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
+The normal `projectRoot` field is the discovered project root: the git repository root when available, otherwise the process `cwd`. It is an absolute Unicode string and is slash-normalized in machine-readable output. File paths inside command results or operational errors are relative to `projectRoot` and also use `/` separators on every platform. The `results` and `errors` fields are always arrays, even when empty.
 
-If a path cannot be represented relative to `projectRoot`, such as an explicit `--config` path outside the project root, machine-readable output may use an absolute slash-normalized path for that field. No extra boolean is added to distinguish relative and absolute paths; consumers can determine that from the path string.
+If the discovered native project-root path is not exactly representable as Unicode, a command that requires project context aborts before config discovery, input discovery, or target processing with top-level `input_path_unrepresentable`, `details.reason: "non_unicode_path"`, and `details.source: "project-root"`. Its operational error omits `path`, `results` is empty, and command-specific target counters are omitted. For this pre-project error only, the JSON envelope uses `projectRoot: null`; the text reporter emits the error to stderr and exits with `2`. No lossy root spelling, cwd substitution, or canonical-path fallback is used. Higher-precedence help, version, argument, and routing outcomes remain unchanged and do not perform project processing merely to discover this secondary failure.
+
+After a representable project root is established, an explicit `--config` path that is not exactly representable as Unicode aborts config setup with top-level `input_path_unrepresentable`, `details.reason: "non_unicode_path"`, and `details.source: "config"`. The operational error omits `path`, `projectRoot` remains the normal non-null discovered root, `results` is empty, and command-specific target counters are omitted. The text reporter identifies the `--config` option without printing a lossy path spelling. No config file is inspected and no root config fallback is attempted.
+
+Once a path is exactly representable as Unicode, if it cannot be represented relative to `projectRoot`, such as an explicit `--config` path outside the project root, machine-readable output may use an absolute slash-normalized path for that field. No extra boolean is added to distinguish relative and absolute paths; consumers can determine that from the path string.
+
+Every path string that crosses the machine-readable output, configuration-matching, ignore-matching, or target-ordering boundary must be exactly representable as Unicode. Implementations must not use a lossy filesystem-path conversion that inserts replacement characters. The project-root and explicit-config cases follow the setup rules above. The shared file-discovery contract reports an explicit ignore path, selected operand, virtual stdin path, or encountered directory entry that fails this requirement with the same `input_path_unrepresentable` code; because no truthful JSON path string exists, that error omits the operational error's `path` field.
+
+For example, a known `fmt` command whose discovered root is not representable uses:
+
+```json
+{
+  "schemaVersion": "0",
+  "command": "fmt",
+  "version": "0.14.0-alpha.0",
+  "projectRoot": null,
+  "summary": { "status": "error" },
+  "results": [],
+  "errors": [
+    {
+      "kind": "input",
+      "code": "input_path_unrepresentable",
+      "message": "The project root cannot be represented as Unicode.",
+      "details": {
+        "reason": "non_unicode_path",
+        "source": "project-root"
+      }
+    }
+  ]
+}
+```
 
 The envelope `command` field is the resolved command name when a subcommand is known: `fmt`, `lint`, `check`, or `init`. If no subcommand is resolved, if an invalid top-level argument prevents command resolution, or if a wrapper-level native resolution error occurs before the Rust CLI starts, `command` is `"intlify"`. Unknown command tokens are reported in `errors[].details` while keeping `command: "intlify"`. The envelope does not use `null` or `"unknown"` for the command field.
 
@@ -585,6 +621,7 @@ Phase 3A validation should focus on foundation behavior:
 - JSON5-only syntax rejection in JSONC config through crate-level unit/integration tests
 - default config behavior when no root config exists through crate-level unit/integration tests
 - explicit `--config` missing-file errors through crate-level unit/integration tests
+- explicit non-Unicode `--config` rejection before filesystem metadata, extension, or config-content errors, without lossy path output
 - config error code fixtures through crate-level unit/integration tests
 - unknown-field validation through crate-level unit/integration tests
 - config schema generation through crate-level unit/integration tests
@@ -594,7 +631,7 @@ Phase 3A validation should focus on foundation behavior:
 - release-time installed-package smoke tests for CLI wrapper/native resolution
 - native package resolution error handling
 - output envelope fixtures
-- slash-normalized `projectRoot` and result paths
+- slash-normalized string `projectRoot` and result paths, plus the non-Unicode-root `projectRoot: null` error envelope
 - stdout/stderr behavior
 - deterministic JSON ordering
 - operational error shape
