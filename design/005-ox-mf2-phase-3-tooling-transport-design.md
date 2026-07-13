@@ -306,6 +306,8 @@ The programmatic success branch can use plain `errorCount` for diagnostic errors
 
 Parser diagnostic codes, semantic diagnostic codes, and configurable lint rule ids share one JSON-visible diagnostic `code` namespace and are public stable identifiers because configs, suppressions, JSON output, editor integrations, and external tooling may depend on them. Human-readable diagnostic message text is not a stable compatibility surface and may change for clarity.
 
+The separation between this diagnostic namespace, numeric parser API errors, and Phase 3 operational string errors is indexed in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md).
+
 The lint crate should own rule metadata used by config validation, JSON Schema generation, generated artifacts, documentation pipelines, and internal runtime behavior. Metadata includes at least rule id, category, default/recommended status, default severity, fix capability, docs slug, and rule option schema when a rule accepts options. The docs slug is internal generated metadata unless the linter-specific design defines a public documentation URL, JSON `help`, or CLI display contract. Exact metadata fields are linter-specific design details. Runtime rule listing or introspection APIs for CLI, N-API, or WASM are deferred from the initial linter product.
 
 ### Operational Errors

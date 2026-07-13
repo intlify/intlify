@@ -792,6 +792,8 @@ When a catalog file cannot be parsed as its host format, the CLI reports a targe
 
 `crates/intlify_resource` returns a typed `ResourceError` whose variants may remain more precise than the CLI surface. The CLI consumer performs one centralized conversion into the shared Phase 3A operational-error type; resource APIs do not construct CLI JSON values and resource failures are never parser, semantic, or lint diagnostics.
 
+The top-level resource codes, shared-code reuse, and editor diagnostic projection are indexed in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). This section remains authoritative for typed variants, detail schemas, precedence, and recovery behavior.
+
 The initial implementation enforces fixed, inclusive resource limits. They are compile-time product constants shared by CLI and editor consumers, not config fields or CLI options:
 
 | Resource                                    |             Initial maximum |

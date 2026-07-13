@@ -521,7 +521,9 @@ Update mode may rewrite existing declared layout dump pairs, but it does not aut
 
 ## Invariant and Error Boundaries
 
-Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for normal formatter execution. Runtime invariant violations in the formatter pipeline are converted into the shared formatter operational error code `internal_error`.
+Formatter public APIs, CLI, N-API, and WASM bindings must not expose panics for normal formatter execution. Runtime invariant violations in the formatter pipeline are converted into the shared formatter operational error code `internal_error` with `details.reason: "formatter_invariant_failed"`.
+
+The top-level operational code registry is indexed in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md); this section owns the formatter IR invariant boundary and its public pipeline phases.
 
 `internal_error` is for internal formatter state that should have been impossible after validation. It is not used for user input validation, parser diagnostics, unsupported input files, or fixture authoring mistakes.
 
@@ -562,15 +564,16 @@ Test helpers and fixture loaders may use assertions, but fixture authoring failu
 
 `debug_assert!` may be used as an additional development aid inside IR construction, normalization, lowering, or rendering. It must not be the only correctness check. Release/public API execution still needs `Result`-based validation that can become `internal_error`.
 
-Public `internal_error.details` should be minimal and must not expose IR dumps, source text, node spans, or parser internals. It may include a stable pipeline phase:
+Public `internal_error.details` must contain the stable reason `formatter_invariant_failed` and one stable pipeline phase. It remains minimal and must not expose IR dumps, source text, node spans, or parser internals:
 
-```text
-snapshot_traversal
-layout_ir_construction
-layout_ir_normalize
-document_ir_lowering
-document_ir_render
+```json
+{
+  "reason": "formatter_invariant_failed",
+  "phase": "document_ir_render"
+}
 ```
+
+The required `phase` is one of `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, or `document_ir_render`. Consumers select the shared `internal_error` variant by `reason` before interpreting this formatter-owned phase.
 
 ## Benchmarks
 

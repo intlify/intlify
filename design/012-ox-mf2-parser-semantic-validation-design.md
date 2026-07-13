@@ -188,6 +188,8 @@ All semantic diagnostics are emitted as `error`. Message wording and label wordi
 
 The parser crate exposes JSON-visible diagnostic code catalogs through enum-owned iterator APIs rather than generated string-only tables:
 
+The relationship between these string catalogs, compact numeric parser classifications, numeric API errors, and Phase 3 operational errors is indexed in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md).
+
 ```rust
 impl DiagnosticCode {
     pub fn all() -> &'static [DiagnosticCode];

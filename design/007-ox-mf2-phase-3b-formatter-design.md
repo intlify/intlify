@@ -214,6 +214,8 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 Formatter operational errors use the shared Phase 3A error code namespace. Formatter APIs, CLI JSON output, N-API, and WASM should use the same code strings.
 
+The cross-phase string-code registry and its separation from numeric `OxMf2ErrorCode` values and diagnostic codes are defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). This section remains authoritative for formatter-specific detail schemas and behavior.
+
 Parser diagnostics are not represented as operational errors. If parsing produces diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and `errors` empty unless an independent operational error also occurred.
 
 Formatter-specific codes:
@@ -247,7 +249,16 @@ Formatter also reuses Phase 3A common codes:
 
 Standardized `details` fields:
 
-- `source_snapshot_mismatch`: implementation-defined. The code is stable; the exact details schema is not fixed in Phase 3B.
+- `source_snapshot_mismatch`:
+
+  ```json
+  {
+    "reason": "embedded_source_text_mismatch"
+  }
+  ```
+
+  `details.reason` is required and initially has only `"embedded_source_text_mismatch"`. It means the snapshot carries embedded source text and that text is not byte-identical to the source supplied to `formatSnapshot` or `checkSnapshot`. The error does not expose either source text, a hash, byte lengths, or the first differing offset. If a future snapshot revision adds another consistency mechanism such as a source hash or source length, the design that exposes that mechanism must add a distinct stable reason before emitting this code for it.
+
 - `unsupported_input_file`:
 
   ```json
@@ -307,17 +318,47 @@ Standardized `details` fields:
 
   The operational error's `path` field is always omitted: the CLI does not serialize raw platform path units and never substitutes `U+FFFD` or another lossy spelling. The project-root, config, and ignore-path cases abort setup with `results: []` and omit command-specific target counters. Their text errors identify the root or option, and an ignore-path occurrence when useful, without printing a lossy path. Operand, stdin-filepath, and discovery failures retain the existing input-selection behavior. All variants are top-level errors rather than target-local results because the CLI cannot construct the path's public identity.
 
+- `invalid_input`:
+
+  ```json
+  {
+    "reason": "invalid_snapshot_type",
+    "path": "snapshot"
+  }
+  ```
+
+  `details.reason` and `details.path` are required. `"invalid_source_type"` uses `path: "source"` when a formatter source argument is not a JavaScript string. `"invalid_snapshot_type"` uses `path: "snapshot"` when a snapshot argument is not a `Uint8Array`. `"snapshot_bytes_unavailable"` also uses `path: "snapshot"` when an intrinsically branded `Uint8Array` has a detached backing buffer or otherwise cannot supply bytes for the mandatory defensive copy. For the two invalid-type reasons, `details.value` is included only when the rejected value is a string, number, boolean, or `null`; objects, arrays, typed arrays of another kind, `undefined`, functions, and symbols omit it. `"snapshot_bytes_unavailable"` never includes `value`. `expectedType` and `actualType` are not public fields. A source string containing an unpaired surrogate throws `TypeError` before UTF-8 conversion or result construction and never becomes `invalid_input`.
+
+  Snapshot type recognition uses the intrinsic `Uint8Array` brand and is independent of the value's JavaScript realm; it is not implemented as a current-realm `instanceof` check. Cross-realm `Uint8Array` values and Node.js `Buffer` values are accepted. `Uint8ClampedArray`, every other typed-array kind, `DataView`, and bare `ArrayBuffer` or `SharedArrayBuffer` values use `"invalid_snapshot_type"`. Before native or WASM invocation, the wrapper copies accepted bytes into a new current-realm `Uint8Array` and retains neither the caller's view nor its backing buffer. A detached buffer or another byte-copy failure uses `"snapshot_bytes_unavailable"` rather than leaking a JavaScript exception. Resizable or shared backing buffers are accepted when their currently visible bytes can be copied; snapshot decode and formatting observe only that fixed copy, so later caller mutation, resize, and realm-specific native conversion cannot change the operation.
+
+  Raw binding arguments are validated in public signature order. `formatMessage` and `checkFormat` validate `source` and then `options`; `formatSnapshot` and `checkSnapshot` validate `snapshot`, then `source`, then `options`. The first failure wins. All raw argument shape and representation checks complete before snapshot decode or formatter execution, so an invalid option is reported before corrupt but correctly typed snapshot bytes are decoded. N-API and WASM parity tests cover simultaneous failures and this precedence, including the unpaired-surrogate `TypeError` boundary.
+
 - `invalid_options`:
 
   ```json
   {
-    "pointer": "/mode",
+    "reason": "invalid_format_mode",
+    "path": "options.mode",
     "value": "compact",
     "allowedValues": ["standard", "preserve"]
   }
   ```
 
-  JavaScript binding calls use `invalid_options` for invalid formatter option shape or option values, including `null` options, unknown option fields, and invalid `mode`. The typed Rust `FormatOptions` API should not allow invalid option states; raw external option input is validated before constructing typed options. Raw binding input shape that is not formatter options, such as non-string `source` or non-`Uint8Array` snapshot arguments, uses the shared `invalid_input` code.
+  JavaScript binding calls use `invalid_options` for invalid formatter option shape or option values, including `null` options, unknown option fields, and invalid `mode`. `details.reason` is required and is one of `"invalid_options_shape"`, `"unknown_field"`, or `"invalid_format_mode"`. Root shape failures use `"invalid_options_shape"`, unknown option fields use `"unknown_field"`, and a `mode` value outside `"standard"` or `"preserve"` uses `"invalid_format_mode"`.
+
+  `options === undefined` is treated as omitted. Otherwise `options` must be a strict plain object from the current JavaScript realm: its prototype is the current realm's `Object.prototype` or `null`. `Object.create(null)` is accepted. `null`, arrays, primitives, functions, symbols, class instances, `Map`, `Date`, and cross-realm objects use `"invalid_options_shape"`. N-API and WASM wrappers apply the same JavaScript-shape gate and parity tests lock equivalent outcomes.
+
+  `details.path` is required and uses a dot path rooted at `options`: `"invalid_options_shape"` and `"unknown_field"` use `"options"`, while `"invalid_format_mode"` uses `"options.mode"`. An unknown field's exact name is carried separately in required `details.field`; arbitrary unknown keys are never interpolated into the dot path, so keys containing `.` or other punctuation require no path escaping policy. `details.allowedFields` is also required for `"unknown_field"` and initially equals `["mode"]` in ASCII ascending order. JSON Pointer is reserved for locations in JSON or JSONC configuration documents and is not used for JavaScript binding input. The typed Rust `FormatOptions` API should not allow invalid option states; raw external option input is validated before constructing typed options. Raw binding input shape that is not formatter options, such as non-string `source` or non-`Uint8Array` snapshot arguments, uses the shared `invalid_input` code.
+
+  Reason-specific additional fields are fixed as follows:
+
+  | Reason | Additional fields |
+  | --- | --- |
+  | `invalid_options_shape` | `details.value` is included only when the rejected `options` value is a string, number, boolean, or `null`. |
+  | `unknown_field` | `details.field` and `details.allowedFields` are required. The unknown field's value is not exposed. |
+  | `invalid_format_mode` | `details.allowedValues` is required and equals `["standard", "preserve"]`; `details.value` is included only when the rejected value is a string, number, boolean, or `null`. |
+
+  `expectedType` and `actualType` are not public fields. Validation reports the first failure in this fixed order: `options` shape, unknown fields, then `mode`. Unknown own enumerable string fields are sorted with ECMAScript's default string sort, equivalent to `Object.keys(options).sort()`, and the first one is reported. This makes selection independent of property insertion order while defining behavior for arbitrary JavaScript property names. N-API and WASM parity fixtures lock every reason, scalar-value inclusion and omission, unknown-field selection, and validation precedence.
 
 - `invalid_cli_argument` for `--list-different --reporter json`:
 
@@ -383,11 +424,12 @@ Standardized `details` fields:
 
   ```json
   {
+    "reason": "formatter_invariant_failed",
     "phase": "document_ir_render"
   }
   ```
 
-  Initial phase values are `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, and `document_ir_render`. Formatter internals such as IR node kinds, source text, and source spans are not exposed in public `internal_error.details`.
+  `details.reason` and `details.phase` are required. The initial formatter-owned reason is only `"formatter_invariant_failed"`. Initial phase values are `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, and `document_ir_render`. Consumers first select the shared `internal_error` variant by `reason` and then interpret the formatter-owned `phase`. Formatter internals such as IR node kinds, source text, and source spans are not exposed in public `internal_error.details`.
 
 ## CLI Workflow
 
@@ -987,7 +1029,7 @@ If the existing Binary AST snapshot format or `SnapshotView` accessor surface ca
 
 `formatMessage(source)` parses the same source it formats, so a public source/snapshot mismatch cannot occur. Span and UTF-8 boundary validation still happens as internal formatter validation.
 
-`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source consistency when the snapshot carries source identity data or consistency metadata, such as a source hash or source length. A mismatch returns `source_snapshot_mismatch`. Phase 3B does not require snapshots to carry source identity data or consistency metadata. If the snapshot has no such data, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
+`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source consistency when the snapshot carries source identity data or consistency metadata. The initial embedded-source comparison reports `source_snapshot_mismatch` with `details.reason: "embedded_source_text_mismatch"`. A future source-hash, source-length, or other comparison mechanism must define its own stable reason before use. Phase 3B does not require snapshots to carry source identity data or consistency metadata. If the snapshot has no such data, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
 
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
