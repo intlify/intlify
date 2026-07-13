@@ -479,7 +479,7 @@ Framing consequences:
 - Only one trailing newline sequence is framing. A simple-message file that ends with two newlines keeps the first newline as pattern text; the content round-trips unchanged.
 - Message-level APIs such as `formatMessage` receive and return unframed message text. They never strip or append newlines and never remove a BOM; callers that need file framing apply it themselves.
 - Standalone `.mf2` LSP/editor adapters apply the same read framing as the CLI before calling message-level APIs and apply the same write framing when replacing the whole document.
-- Resource/catalog adapters do not apply file framing to embedded messages. They pass extracted message text to message-level APIs and never receive an injected final newline or lose message-leading content.
+- Resource/catalog workflows do not apply standalone file framing to embedded messages. The resource layer extracts exact message text, and the consumer passes that text to message-level APIs without injecting a final newline or removing message-leading content.
 - Parser diagnostics and spans are message-local, relative to the unframed message text. When read framing removed a BOM, file-level byte positions shift by the BOM length; the CLI accounts for that shift when rendering diagnostics against the original file.
 
 ### Input Discovery
@@ -736,7 +736,7 @@ Per-file input read failures and output write failures create `results[]` entrie
 
 Write mode generates the full formatted output in memory before writing. Phase 3B writes directly to the target file and does not guarantee rollback or atomic replacement if the filesystem write fails.
 
-Resource files and catalogs that contain multiple messages are layered workflows. A resource/catalog adapter should parse the host file, extract message entries, call the message-level formatter core, and own host-file string escaping and outer document edits.
+Resource files and catalogs that contain multiple messages use the layered workflow summarized in [Resource and Catalog Formatting](#resource-and-catalog-formatting). The CLI consumer composes resource-owned host parsing and entry extraction with per-entry message-level formatter calls; the resource layer retains host-file escaping and outer-document write-back ownership.
 
 Catalog targets use the mutually exclusive nested `entries[]` result variant defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-json-result-layout). The file result retains the formatter aggregate `status`, `changed`, and `errors` fields, while each complete entry result carries its entry identity, status, changed state, and mapped diagnostics.
 
@@ -899,19 +899,11 @@ Formatter binding packages do not have runtime dependencies on parser binding pa
 
 ## Resource and Catalog Formatting
 
-The formatter core formats one MF2 message. Resource/catalog formatting is layered above it.
+The formatter core formats one complete MF2 message and does not recognize resource host formats. Resource-aware `intlify fmt` behavior is a downstream composition defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-formatting).
 
-Phase 3B does not implement JSON, YAML, framework-specific resource files, multi-message catalogs, host-file parsing, host-file escaping, or outer document edits.
+At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, invokes the existing message-level formatter for each entry, and asks the resource layer to validate and compose host-document write-back. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both.
 
-A future resource/catalog adapter is responsible for:
-
-- parsing JSON, YAML, or framework-specific resource files
-- locating message entries
-- converting entry spans and text into message-level formatter input
-- preserving or re-emitting host-file string escaping
-- creating outer document edits
-
-This keeps the first formatter core focused while still allowing the same formatter engine to support i18n resources later.
+This document remains authoritative for message-level formatting and the standalone `.mf2` formatter contract. The resource design is authoritative for catalog membership, host-format parsing, entry mapping, read-only handling, aggregation, validated write-back, resource failures, and the catalog result extension. Those details are not duplicated here.
 
 ## LSP and Editor Workflow
 
@@ -1271,7 +1263,6 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 
 ## Deferred Follow-Up Notes
 
-- Resource/catalog adapters for JSON, YAML, framework-specific resource files, string escaping, message-to-raw mapping, and outer document edits.
 - Formatter ignore or suppression mechanisms that are compatible with MF2 syntax.
 - Future formatter IR changes beyond the Phase 3B design in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md), such as width-aware wrapping or additional document primitives.
 - `.editorconfig` loading once formatter options exist that can consume it.

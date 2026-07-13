@@ -10,7 +10,7 @@ This document captures the detailed design for the ox-mf2 linter. The Phase 3 to
 - Keep initial configurable lint rules implemented in the Rust linter crate.
 - Expose stable linter results through Rust, N-API, and WASM bindings for playgrounds, editor integrations, and Node-based tools.
 - Share the file discovery, ignore, file framing, exit code, and JSON envelope contracts with `intlify fmt`.
-- Leave resource/catalog linting as a layer above message-level linting.
+- Leave resource/catalog linting as the integration layer defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-linting), above message-level linting.
 
 ## Deliverables
 
@@ -60,7 +60,7 @@ At the npm package level, `@intlify/cli` owns the `intlify lint` command and lin
 
 Existing parser binding packages remain focused on parser-level APIs. Linter APIs are not added to `@intlify/ox-mf2-napi` or `@intlify/ox-mf2-wasm`, and linter binding packages do not have runtime dependencies on parser binding packages.
 
-The linter binding packages call the same source-backed `lintMessage(source, options)` flow as the CLI. Resource/catalog adapters remain outside the linter core: they extract message-level source text, call the linter product, and map diagnostics back to host-file ranges.
+The linter binding packages call the same source-backed `lintMessage(source, options)` flow as the CLI. Resource/catalog handling remains outside the linter core. The CLI integration uses the resource layer for extraction and mapping and calls the linter product per message entry, following the overview and ownership boundary in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#architecture).
 
 ## Non-Goals
 
@@ -833,15 +833,11 @@ Rule categories are documentation and grouping metadata. They are not the diagno
 
 ## Resource and Catalog Linting
 
-Message-level linting remains the core. The resource design defines catalog linting as a layer above it: the initially shipped JSON adapter, followed by later format tiers such as YAML, extracts message entries and reuses `lintMessage(source)` per entry.
+The linter core analyzes one complete MF2 message and does not recognize resource host formats. Resource-aware `intlify lint` behavior is a downstream composition defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-linting).
 
-Future resource/catalog examples:
+At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, invokes the existing `lintMessage(source, options)` flow for each entry, and uses resource-owned mappings to present host-document diagnostics and aggregate the catalog result. Neither the linter core nor the resource crate calls or depends on the other; the CLI integration composes both.
 
-- missing translation keys across locales
-- placeholder mismatch across locales
-- variant coverage mismatch across locales
-- duplicate message ids
-- unused messages
+This document remains authoritative for the message-level lint pipeline, diagnostic and rule contracts, severity, configuration, and standalone `.mf2` result behavior. The resource design is authoritative for catalog membership, host-format parsing, entry mapping, per-file aggregation, resource failures, and the catalog result extension. Future catalog-level and cross-locale checks are tracked by the resource design's [Catalog-Level Checks](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-level-checks) boundary and require a linter design addition when concrete rules are introduced; their integration details are not duplicated here.
 
 ## Formatter Interaction
 
@@ -949,7 +945,7 @@ Parser-owned deferred items remain specified by the semantic validation design; 
 - `preset` config field or preset composition, once presets beyond `recommended` exist.
 - `unreachable-variant` selection-semantics modeling.
 - Additional body-owned reference kinds that extend the parser-owned `output_references()` fact surface and affect configurable rule reachability.
-- Resource/catalog adapters for JSON/YAML host files and resource-level rules.
+- Concrete catalog-level and cross-locale linter rules beyond the message-level core, under the integration boundary in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-level-checks).
 - Parallel file linting with deterministic output, and concurrency controls.
 - Snapshot-backed linting (`lintSnapshot`), including how the linter consumes the parser-owned snapshot-to-`SemanticModel` path and applies snapshot capability checks after that parser path exists.
 - Linter npm release flow details: trusted publishing setup, dist-tag policy, native package publish order, published-artifact smoke tests, and any bootstrap-token migration for first-time native package publication.

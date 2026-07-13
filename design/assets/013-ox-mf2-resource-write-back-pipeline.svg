@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+  <title id="title">ox-mf2 resource validated write-back pipeline</title>
+  <desc id="desc">An extracted catalog and selected formatted entries pass through handle validation and a raw-order measurement and re-escaping plan. Byte-identical input returns Unchanged. Changed input passes exact host-size projection, raw replacement materialization, descending-span edit application, complete candidate reparse and re-extraction, and identity and value verification before returning one Changed result. Any failure returns no partial write-back result.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill" />
+    </marker>
+    <style>
+      .title { fill:#111827; }
+      .subtitle { fill:#4b5563; }
+      .input { fill:#334155; }
+      .validate { fill:#475569; }
+      .measure { fill:#b45309; }
+      .decision { fill:#f8fafc; stroke:#64748b; }
+      .decision-text { fill:#334155; }
+      .project { fill:#7c3aed; }
+      .materialize { fill:#0f766e; }
+      .apply { fill:#475569; }
+      .reextract { fill:#1d4ed8; }
+      .verify { fill:#7c3aed; }
+      .output { fill:#334155; }
+      .unchanged { fill:#0f766e; }
+      .note { fill:#fff7ed; stroke:#ea580c; }
+      .note-title { fill:#9a3412; }
+      .note-text { fill:#7c2d12; }
+      .arrow { stroke:#64748b; }
+      .arrow-fill { fill:#64748b; }
+      .white { fill:#ffffff; }
+      .soft-white { fill:#e5e7eb; }
+      .muted { fill:#4b5563; }
+      @media (prefers-color-scheme: dark) {
+        .title { fill:#f8fafc; }
+        .subtitle { fill:#cbd5e1; }
+        .decision { fill:#0f172a; stroke:#94a3b8; }
+        .decision-text { fill:#e2e8f0; }
+        .note { fill:#431407; stroke:#fb923c; }
+        .note-title { fill:#fdba74; }
+        .note-text { fill:#fed7aa; }
+        .arrow { stroke:#cbd5e1; }
+        .arrow-fill { fill:#cbd5e1; }
+        .muted { fill:#cbd5e1; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1240" height="720" fill="none" />
+
+  <text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">validated write-back pipeline</text>
+  <text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">Re-escaping is private planning and materialization inside one all-or-nothing write-back boundary.</text>
+
+  <rect x="40" y="130" width="190" height="100" rx="10" class="input" />
+  <text x="135" y="158" font-size="14" font-weight="700" text-anchor="middle" class="white">Input</text>
+  <text x="135" y="182" font-size="11.2" text-anchor="middle" class="soft-white">ExtractedCatalog</text>
+  <text x="135" y="202" font-size="11.2" text-anchor="middle" class="soft-white">FormattedEntry[]</text>
+
+  <rect x="270" y="130" width="190" height="100" rx="10" class="validate" />
+  <text x="365" y="158" font-size="13.5" font-weight="700" text-anchor="middle" class="white">1 · Validate inputs</text>
+  <text x="365" y="182" font-size="11.2" text-anchor="middle" class="soft-white">artifact-local handles</text>
+  <text x="365" y="202" font-size="11.2" text-anchor="middle" class="soft-white">unique · writable · existent</text>
+
+  <rect x="500" y="130" width="250" height="100" rx="10" class="measure" />
+  <text x="625" y="158" font-size="13.5" font-weight="700" text-anchor="middle" class="white">2 · Measure in raw order</text>
+  <text x="625" y="182" font-size="11.2" text-anchor="middle" class="soft-white">effective messages · limits</text>
+  <text x="625" y="202" font-size="11.2" text-anchor="middle" class="soft-white">deterministic re-escape plans</text>
+
+  <path d="M 795 180 L 885 120 L 975 180 L 885 240 z" class="decision" stroke-width="1.8" />
+  <text x="885" y="174" font-size="12" font-weight="700" text-anchor="middle" class="decision-text">Any message</text>
+  <text x="885" y="194" font-size="12" font-weight="700" text-anchor="middle" class="decision-text">byte-different?</text>
+
+  <rect x="1030" y="130" width="170" height="100" rx="10" class="unchanged" />
+  <text x="1115" y="166" font-size="14" font-weight="700" text-anchor="middle" class="white">Unchanged</text>
+  <text x="1115" y="190" font-size="10.8" text-anchor="middle" class="soft-white">no replacement text</text>
+  <text x="1115" y="208" font-size="10.8" text-anchor="middle" class="soft-white">no candidate artifact</text>
+
+  <path d="M 230 180 L 270 180" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 460 180 L 500 180" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 750 180 L 795 180" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 975 180 L 1030 180" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <text x="1002" y="166" font-size="10.5" text-anchor="middle" class="muted">no</text>
+
+  <rect x="930" y="330" width="270" height="100" rx="10" class="project" />
+  <text x="1065" y="358" font-size="13.5" font-weight="700" text-anchor="middle" class="white">3 · Project host size</text>
+  <text x="1065" y="382" font-size="11.2" text-anchor="middle" class="soft-white">exact complete u128 calculation</text>
+  <text x="1065" y="402" font-size="11.2" text-anchor="middle" class="soft-white">validate before output allocation</text>
+
+  <rect x="620" y="330" width="270" height="100" rx="10" class="materialize" />
+  <text x="755" y="358" font-size="13.5" font-weight="700" text-anchor="middle" class="white">4 · Materialize plans</text>
+  <text x="755" y="382" font-size="11.2" text-anchor="middle" class="soft-white">emit exact raw replacements</text>
+  <text x="755" y="402" font-size="11.2" text-anchor="middle" class="soft-white">verify measured byte lengths</text>
+
+  <rect x="330" y="330" width="250" height="100" rx="10" class="apply" />
+  <text x="455" y="358" font-size="13.5" font-weight="700" text-anchor="middle" class="white">5 · Apply replacements</text>
+  <text x="455" y="382" font-size="11.2" text-anchor="middle" class="soft-white">descending raw-span order</text>
+  <text x="455" y="402" font-size="11.2" text-anchor="middle" class="soft-white">build complete candidate source</text>
+
+  <rect x="40" y="330" width="250" height="100" rx="10" class="reextract" />
+  <text x="165" y="358" font-size="13.5" font-weight="700" text-anchor="middle" class="white">6 · Reparse &amp; re-extract</text>
+  <text x="165" y="382" font-size="11.2" text-anchor="middle" class="soft-white">same adapter and extraction rules</text>
+  <text x="165" y="402" font-size="11.2" text-anchor="middle" class="soft-white">fresh artifact · all limits</text>
+
+  <path d="M 885 240 L 885 275 L 1065 275 L 1065 330" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <text x="902" y="264" font-size="10.5" class="muted">yes</text>
+  <path d="M 930 380 L 890 380" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 620 380 L 580 380" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 330 380 L 290 380" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+
+  <rect x="40" y="500" width="280" height="100" rx="10" class="verify" />
+  <text x="180" y="528" font-size="13.5" font-weight="700" text-anchor="middle" class="white">7 · Verify candidate</text>
+  <text x="180" y="552" font-size="11.2" text-anchor="middle" class="soft-white">identity · metadata · read-only</text>
+  <text x="180" y="572" font-size="11.2" text-anchor="middle" class="soft-white">effective message equality</text>
+
+  <rect x="360" y="500" width="290" height="100" rx="10" class="output" />
+  <text x="505" y="528" font-size="14" font-weight="700" text-anchor="middle" class="white">Changed</text>
+  <text x="505" y="552" font-size="11.2" text-anchor="middle" class="soft-white">raw-ordered replacements</text>
+  <text x="505" y="572" font-size="11.2" text-anchor="middle" class="soft-white">validated candidate artifact</text>
+
+  <path d="M 165 430 L 165 500" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+  <path d="M 320 550 L 360 550" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)" />
+
+  <rect x="700" y="500" width="500" height="120" rx="12" class="note" stroke-width="1.8" />
+  <text x="730" y="532" font-size="13.5" font-weight="700" class="note-title">All-or-nothing failure boundary</text>
+  <text x="730" y="558" font-size="11.2" class="note-text">Invalid input, limits, planning, materialization, parsing, extraction,</text>
+  <text x="730" y="580" font-size="11.2" class="note-text">identity, metadata, or value mismatch returns no WriteBackOutcome,</text>
+  <text x="730" y="602" font-size="11.2" class="note-text">candidate artifact, partial replacement set, or consumer-visible edit.</text>
+</svg>
