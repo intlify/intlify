@@ -35,7 +35,18 @@ N-API and WASM linter bindings are distributed as linter-specific packages backe
 - `@intlify/lint-napi`
 - `@intlify/lint-wasm`
 
-These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. Platform native package names use the same normalized triple package model used by formatter N-API packages: `@intlify/lint-napi-<platform-triple>`, for example `@intlify/lint-napi-linux-x64-gnu`, `@intlify/lint-napi-linux-x64-musl`, `@intlify/lint-napi-linux-arm64-gnu`, `@intlify/lint-napi-darwin-x64`, `@intlify/lint-napi-darwin-arm64`, and `@intlify/lint-napi-win32-x64-msvc`. These examples describe naming only and do not promise support for an exhaustive target set. The initial linter support matrix must be fixed by its implementation/release plan and backed by CI build, loading, packaging, and publish smoke tests for every listed target. Optional dependency wiring, package files, and lazy native loading follow the formatter N-API package model. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
+These names are symmetric with `@intlify/format-napi` and `@intlify/format-wasm`. `@intlify/lint-napi` follows the same wrapper-plus-platform-native-package model and lazy native loading as the formatter N-API package. The initial linter N-API support matrix is exactly:
+
+- `@intlify/lint-napi-darwin-arm64`
+- `@intlify/lint-napi-darwin-x64`
+- `@intlify/lint-napi-linux-x64-gnu`
+- `@intlify/lint-napi-linux-x64-musl`
+- `@intlify/lint-napi-linux-arm64-gnu`
+- `@intlify/lint-napi-win32-x64-msvc`
+
+The JavaScript wrapper and every native package support Node.js `>=22.12.0`. This target matrix and minimum runtime match the parser and formatter bindings so that the three surfaces have one initial release contract. A listed target is releasable only after CI verifies its native build, native loading, package contents and `optionalDependencies` wiring, and publish smoke. The wrapper must not advertise a target until all of those checks pass.
+
+Linux arm64 musl remains deferred until its CI toolchain can pass the same build, loading, packaging, and publish-smoke gates. Additional targets require an explicit support-matrix update and the same release validation; they are not implicitly supported merely because Rust can compile for them. Optional dependency wiring, package files, and lazy native loading follow the formatter N-API package model. `@intlify/lint-wasm` follows the same explicit `init()` contract as `@intlify/ox-mf2-wasm` and `@intlify/format-wasm`. Existing parser binding packages remain focused on parsing, snapshots, and parser-level APIs, and linter binding packages do not have runtime dependencies on parser or formatter binding packages.
 
 Binding packages expose direct programmatic lint APIs. They do not host plugins and do not need a CLI callback bridge.
 
@@ -48,6 +59,12 @@ Phase 3C introduces the linter product behind the Phase 3A CLI shell while keepi
 ![Phase 3C linter architecture](./assets/008-ox-mf2-phase-3c-linter-architecture.svg)
 
 `crates/intlify_lint` owns rule execution, presets, lint configuration, and linter result shaping. Parser diagnostics and core semantic diagnostics remain parser-owned, so CLI, binding, editor, and future resource/catalog consumers see one consistent diagnostic model without duplicating parser or semantic behavior.
+
+The source-backed message-level lint entry point is synchronous and safe to invoke concurrently for independent inputs. `intlify_lint` keeps rule contexts, reports, and parser/semantic scratch state within each call, exposes no process-wide mutable lint execution state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
+
+The Rust concurrency contract is verified at the actual CLI transfer and sharing boundaries. Owned `LintOptions`, `LintResult`, diagnostics, and operational-error data returned from a worker must satisfy `Send`. `ResolvedLintConfig` and any immutable rule registry or rule implementation deliberately shared by concurrent calls must satisfy `Send + Sync`; mutable `RuleContext`, report buffers, parser views, `SemanticModel`, and other per-call scratch state remain isolated in one invocation and do not acquire a blanket sharing requirement. Rule registration is complete before concurrent lint execution begins, and the initial built-in registry is not mutated while calls are running.
+
+Compile-time assertions lock those concrete traits. Behavioral tests invoke the same immutable resolved configuration and registry concurrently over independent sources, compare complete diagnostic and error results with serial baselines, and repeat clean calls after an injected returned rule error and a worker-boundary-contained panic. A failed invocation must not poison registry/config state, retain partial reports for another call, or affect diagnostic order, severity, counts, or later-call behavior. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than linter-core scheduling responsibilities.
 
 At the npm package level, `@intlify/cli` owns the `intlify lint` command and links `crates/intlify_lint` through the native CLI binary distributed by `@intlify/cli-native`. Programmatic linter APIs are distributed separately:
 
@@ -503,11 +520,19 @@ The lint schema definitions live under the unified project config schema publish
 - ignore sources are one ordered pattern list: root `.gitignore`, then `--ignore-path` files in CLI argument order, then `lint.ignorePatterns`, with later patterns overriding earlier ones
 - standalone `.mf2` read framing follows the `intlify fmt` File Framing contract: one leading UTF-8 BOM and then one trailing `LF` or `CRLF` are removed before parsing, so lint spans match fmt spans for the same standalone file; catalog targets instead preserve exact host-document bytes and use the selected adapter's decoding and span-mapping contract; lint never writes files, so write framing does not apply
 - non-UTF-8 input reports `input_read_failed` with `details.reason: "invalid_utf8"`; the resource workflow additionally uses the shared code's staged `metadata_failed` reason, and Tier 3 XLIFF adds `unsupported_encoding`, under the reason-specific contracts in the resource design
-- Phase 3C processes selected files sequentially; future parallel execution must not change observable output ordering
+- file mode processes different physical file groups concurrently through the shared bounded CLI worker pool; logical aliases within one physical group remain serial, and worker completion order never changes observable output ordering
 - exit codes and the JSON envelope follow Phase 3A
 - the discovery, ignore, and input operational error codes defined in the formatter design (`unsupported_input_file`, `unmatched_input`, `input_path_unrepresentable`, `invalid_ignore_pattern`, `ignore_file_read_failed`, `input_read_failed`) are shared CLI codes, not formatter-only codes; `intlify lint` reuses them with the same `kind`, exit code, and `details` shapes
 
 Resource/catalog input is a layered adapter workflow owned by the resource design. It extends supported-input classification through explicit project or editor opt-in rather than extending the direct `supportedExtensions` list, and therefore supports explicit format assignments for arbitrary or extensionless filenames. Resource adapters own host-file parsing, message extraction, and span mapping; the message-level linter core and the extension-neutral enumeration contract do not change.
+
+### Parallel File Execution
+
+After discovery, ignore filtering, supported-input classification, and physical grouping complete, `crates/intlify_cli` submits one work item per physical file group to the bounded, command-scoped worker-thread pool defined by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). A worker processes each logical alias in its group serially through the complete read, framing or extraction, lint, diagnostic mapping, and result-construction pipeline. Different groups may run concurrently. Stdin remains one caller-thread workflow.
+
+Workers return structured results and never render text or JSON directly. The coordinator restores stable normalized logical-path order, then calculates diagnostic and operational-error counts, applies `--quiet` and `--max-warnings`, selects the exit status, and renders the reporter. Runs at worker width one and at any larger supported width therefore have identical observable results. Initial lint parallelism is file-group only; neither `intlify_lint` nor `intlify_resource` creates nested entry or rule tasks.
+
+Pool initialization, dispatch, escaped worker panic, and join failures use the command-fatal `cli_worker_runtime_failed` contract in the shared parallel execution boundary. Lint file mode does not retry them serially or retain partial target and diagnostic results; it emits the deterministic top-level internal-error envelope and exits with `2`.
 
 ## CLI Detailed Behavior
 
@@ -675,7 +700,7 @@ When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, bu
 }
 ```
 
-Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), and concurrency controls such as `--threads`.
+Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), and public concurrency controls such as `--threads`. File-group parallel execution itself uses the initial automatic bounded width.
 
 ## Programmatic API Shape
 
@@ -769,9 +794,9 @@ Reason-specific `invalid_options` details:
 
 The first validation failure is deterministic. Validation checks `options` shape first, then `rules` shape, then `rules` entries by rule id in ascending order. For each rule entry, parser or semantic diagnostic codes are reported before unknown rule ids; unknown rule ids are reported before invalid severity values; known configurable rule ids then validate that the value is `"off"`, `"warn"`, or `"error"`.
 
-Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Linting requires `SemanticModel` construction and parser-owned semantic validation, and no path currently exists from decoded snapshot bytes to the parser's `SemanticModel`. A snapshot-backed entry point would either reimplement parser-owned semantic behavior over snapshot traversal or silently reparse the supplied source. The parser semantic validation design owns the future snapshot-to-`SemanticModel` path; this linter design owns only the future `lintSnapshot` API and consumer contract once that parser path exists. A future `lintSnapshot` must define how it consumes that parser-owned path and adopt the formatter's snapshot input constraints, including verifiable diagnostic capability. Until then, parse-artifact reuse callers lint from source text.
+Snapshot-backed linting (`lintSnapshot`) is deferred from Phase 3C. Both its detailed consumer API design and its implementation wait until the parser-owned snapshot-to-`SemanticModel` path exists. Linting requires `SemanticModel` construction and parser-owned semantic validation, and no path currently exists from decoded snapshot bytes to the parser's `SemanticModel`. A snapshot-backed entry point would otherwise either reimplement parser-owned semantic behavior over snapshot traversal or silently reparse the supplied source. The parser semantic validation design owns the future snapshot-to-`SemanticModel` path; after that path lands, a separate linter design follow-up owns the `lintSnapshot` consumer API and may promote it into a later implementation phase. Until then, parse-artifact reuse callers lint from source text.
 
-A future `lintSnapshot` requires, at minimum: a parser-owned path from snapshot bytes to `SemanticModel`; verifiable parser diagnostic capability so diagnostic absence can be trusted; snapshot schema/version support for all semantic facts needed by linting; source/span consistency guarantees equivalent to source-backed linting; fixtures proving that snapshot-backed and source-backed semantic validation produce the same diagnostic codes, order, and spans; and a contract that the API does not silently reparse source text behind a snapshot entry point.
+The following items are promotion gates for that later design, not a current `lintSnapshot` API contract: a parser-owned path from snapshot bytes to `SemanticModel`; verifiable parser diagnostic capability so diagnostic absence can be trusted; snapshot schema/version support for all semantic facts needed by linting; source/span consistency guarantees equivalent to source-backed linting; fixtures proving that snapshot-backed and source-backed semantic validation produce the same diagnostic codes, order, and spans; and a contract that the API does not silently reparse source text behind a snapshot entry point.
 
 `@intlify/lint-wasm` follows the `@intlify/ox-mf2-wasm` initialization contract as specified for `@intlify/format-wasm` in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 
@@ -903,13 +928,13 @@ CLI fixtures for `intlify lint` follow the `packages/cli` fixture conventions es
 
 Reporter contract tests should make the JSON reporter the strict contract surface. `--reporter json` fixtures validate structure, counts, diagnostics, and operational errors exactly. Text reporter tests are smoke or snapshot-lite tests: clean runs and `--quiet` warning-only runs assert no output, and problem runs with reporter-visible diagnostics assert that stderr contains the essential path, severity, `category(code)`, primary message fragment, and source line presence. Source line presence is required for source-available single-line primary spans. Multi-line primary spans require only the primary start line; full range rendering is not fixture-locked. Source-unavailable cases assert the compact fallback form instead. Tests may also assert that a primary underline marker is present, but not its exact glyph or spacing. Colors, box drawing, underline glyphs, spacing, and exact prose are not fixture-locked. CI and non-TTY runs are expected to be uncolored; TTY color rendering can be covered by lightweight unit or smoke tests rather than full output snapshots.
 
-Minimum coverage includes: every core semantic diagnostic with positive and negative parser-side cases, every core semantic diagnostic flowing through linter results and reporters, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-declaration-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, and binding parity for `lintMessage`. Linter flow-through smoke tests cover all core semantic diagnostic codes without re-locking parser-owned semantic span, ordering, or cascade behavior. Binding parity fixtures must include `invalid_source_type`, unpaired-surrogate `TypeError`, `invalid_options_shape`, `invalid_rules_shape`, cross-realm `options` and `rules` rejection, `non_configurable_diagnostic`, `unknown_rule`, and `invalid_rule_severity`.
+Minimum coverage includes: every core semantic diagnostic with positive and negative parser-side cases, every core semantic diagnostic flowing through linter results and reporters, every configurable rule in `off` / `warn` / `error` states, preset default behavior, parser-diagnostic short-circuiting, source-order diagnostic reporting, the `duplicate-declaration` / `invalid-declaration-dependency` partition, `--max-warnings` valid and invalid numeric forms, `--quiet` behavior, stdin mode, ignore precedence, JSON reporter output, mixed file operational errors plus diagnostics, compile-time `Send` assertions for worker-boundary options/results, `Send + Sync` assertions for shared resolved config and rule registry state, concurrent core calls matching serial result baselines, returned-error and contained-panic fault isolation, worker width one versus multiple equivalence, forced out-of-order physical-group completion with stable text and JSON order, bounded active-group execution, physical-alias serialization, injected worker-runtime initialization/dispatch/execute/join failures with no serial fallback or retained partial results, and binding parity for `lintMessage`. Linter flow-through smoke tests cover all core semantic diagnostic codes without re-locking parser-owned semantic span, ordering, or cascade behavior. Binding parity fixtures must include `invalid_source_type`, unpaired-surrogate `TypeError`, `invalid_options_shape`, `invalid_rules_shape`, cross-realm `options` and `rules` rejection, `non_configurable_diagnostic`, `unknown_rule`, and `invalid_rule_severity`. N-API release validation must also lock the six-package support matrix, Node.js `>=22.12.0`, wrapper `optionalDependencies`, lazy loader routing, unsupported-target behavior, package contents, native loading, and publish smoke for every advertised target.
 
 Internal implementation failures such as `semantic_invariant_failed`, `lint_rule_invariant_failed`, and `semantic_api_misuse` are not normal `.mf2` fixture cases because user input should not trigger them. They should be covered by unit or synthetic tests across the owning boundaries: parser tests cover the semantic model boundary rejecting diagnostic-bearing parse results and returning `Err` for construction or validation invariant failures; linter tests cover target-level `internal_error` shaping; CLI JSON tests cover `results[].errors`, `status: "error"`, `errorCount`, and exit code `2`; and binding tests cover the equivalent `ok: false` result. A test-only rule that returns `Err(LintRuleInvariantError)` is the preferred way to exercise rule invariant shaping.
 
 ## Benchmarks
 
-Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, `SemanticModel` construction cost, parser-owned semantic validation cost, rule execution cost (per rule where practical), binding call cost, and CLI end-to-end cost, matching the Phase 3 benchmark names `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. `lint_snapshot_core` becomes relevant when snapshot-backed linting lands. Benchmark commands must be executable and testable, but timings are not CI gates.
+Linter benchmarks are local-first tooling under `tools/`, following the parser and formatter benchmark patterns. They should separate parse cost, `SemanticModel` construction cost, parser-owned semantic validation cost, rule execution cost (per rule where practical), binding call cost, CLI end-to-end cost, worker scheduling, and ordered aggregation, matching the Phase 3 benchmark names `lint_message_core`, `lint_cli_e2e`, `lint_json`, `lint_binding_napi`, and `lint_binding_wasm`. File-mode benchmarks report worker width one and the default automatic width separately. `lint_snapshot_core` becomes relevant when snapshot-backed linting lands. Benchmark commands must be executable and testable, but timings are not CI gates.
 
 ## Implementation Phasing
 
@@ -918,8 +943,8 @@ Phase 3C linter implementation should be split into reviewable PRs:
 1. `ox_mf2_parser` semantic validation layer emitting the core semantic diagnostics (parser-side prerequisite PR, specified by `design/012-ox-mf2-parser-semantic-validation-design.md`, including the semantic diagnostic code catalog and fixtures)
 2. `intlify_lint` crate scaffold, result/options/config model, rule registry, fixture harness, and core semantic diagnostic integration
 3. configurable rules and the `recommended` preset
-4. `intlify lint` CLI integration, shared discovery/ignore/framing reuse, and JSON reporter
-5. `@intlify/lint-napi` wrapper and platform native packages
+4. `intlify lint` CLI integration, shared discovery/ignore/framing and bounded worker scheduler reuse, physical file grouping, and JSON reporter
+5. `@intlify/lint-napi` wrapper and the six initial platform native packages, with Node.js `>=22.12.0` and per-target release gates
 6. `@intlify/lint-wasm`
 7. local-first linter benchmarks under `tools/`
 
@@ -946,9 +971,10 @@ Parser-owned deferred items remain specified by the semantic validation design; 
 - `unreachable-variant` selection-semantics modeling.
 - Additional body-owned reference kinds that extend the parser-owned `output_references()` fact surface and affect configurable rule reachability.
 - Concrete catalog-level and cross-locale linter rules beyond the message-level core, under the integration boundary in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-level-checks).
-- Parallel file linting with deterministic output, and concurrency controls.
-- Snapshot-backed linting (`lintSnapshot`), including how the linter consumes the parser-owned snapshot-to-`SemanticModel` path and applies snapshot capability checks after that parser path exists.
+- Public concurrency controls such as `--threads`; file-group parallelism and deterministic ordered aggregation are part of the initial CLI execution model.
+- Snapshot-backed linting (`lintSnapshot`): both detailed API design and implementation wait until the parser-owned snapshot-to-`SemanticModel` path exists; the current checklist only gates that later design.
 - Linter npm release flow details: trusted publishing setup, dist-tag policy, native package publish order, published-artifact smoke tests, and any bootstrap-token migration for first-time native package publication.
+- Linux arm64 musl N-API support, after its build, native-loading, packaging, and publish-smoke toolchain can satisfy the same gates as the initial six targets.
 - The combined `intlify check` command is not part of v0.1. It may be designed in a short dedicated addendum after both the formatter and linter products ship, once their JSON reporters and exit behavior exist as implemented contracts.
 
 ## Open Questions

@@ -46,7 +46,7 @@ Both packages are ESM-only packages. Their package `exports` map exposes `.` as 
 
 Runtime support:
 
-- N-API package: Node.js 22 or later
+- N-API package: Node.js `>=22.12.0`
 - WASM package: browser, bundler, and edge runtime
 
 Node.js should use the N-API package as the primary path. WASM is the portable path for browser, playground, editor extension, and edge runtime environments where native addons are unavailable.

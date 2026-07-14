@@ -157,6 +157,8 @@ Intentional reuse keeps the same top-level code rather than adding a product-pre
 
 The formatter also reuses the applicable shared Phase 3A codes. [Formatter IR](./011-ox-mf2-formatter-ir-design.md#invariant-and-error-boundaries) owns the pipeline phases and invariant boundary that become formatter `internal_error` failures.
 
+The shared CLI scheduler also reuses `internal_error` for a command-fatal worker-runtime failure. [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) owns its initialization, dispatch, execution, join, placement, deterministic selection, cancellation, result-discard, write-side-effect, and exit contracts.
+
 ### Linter and Semantic Validation
 
 [Phase 3C](./008-ox-mf2-phase-3c-linter-design.md#failure-model) introduces no additional top-level operational code. It reuses `invalid_input`, `invalid_options`, `internal_error`, the shared configuration codes, and the shared file-processing codes. Phase 3C owns the linter-specific reason and detail variants for source validation, lint options, semantic invariant failures, semantic API misuse, and lint-rule invariant failures. [Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) owns the underlying semantic invariant boundary and semantic diagnostic catalog.
@@ -184,6 +186,7 @@ The registry assigns top-level code ownership. Stable subordinate schemas remain
 | Detail family | Owning design |
 | --- | --- |
 | CLI routing, config loading, config parsing, native wrapper, and shared envelope | [Phase 3A](./006-ox-mf2-phase-3a-tooling-foundation-design.md) |
+| Shared CLI worker scheduling | [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) |
 | Formatter options, snapshots, discovery, ignore files, target I/O, and formatter invariant phases | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md) and [Formatter IR](./011-ox-mf2-formatter-ir-design.md) |
 | Linter binding input/options and semantic or rule invariant reasons | [Phase 3C](./008-ox-mf2-phase-3c-linter-design.md) and [Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) |
 | Resource config, classification, parsing, representability, limits, alias scheduling, and adapter invariant reasons | [Resource catalog adapter](./013-ox-mf2-resource-catalog-adapter-design.md) |
@@ -194,6 +197,7 @@ When two products reuse a top-level code, their detail variants are a union only
 
 | Owner | Registered `internal_error` reasons | Reason-specific fields |
 | --- | --- | --- |
+| Shared CLI scheduler | `cli_worker_runtime_failed` | required `phase`: `initialize`, `dispatch`, `execute`, or `join`; optional top-level `path` when the active logical target is known exactly |
 | Formatter | `formatter_invariant_failed` | required formatter `phase` |
 | Linter and parser semantic validation | `semantic_invariant_failed`, `semantic_api_misuse`, `lint_rule_invariant_failed` | reason-specific `stage` or `ruleId` |
 | Resource catalog adapter | `resource_invalid_entry_handle`, `resource_artifact_identity_exhausted`, `resource_offset_map_invariant_failed`, `resource_offset_map_failed`, `resource_write_back_failed`, `resource_adapter_invariant_failed` | required resource `phase`; optional `entryKey` when one entry is known |

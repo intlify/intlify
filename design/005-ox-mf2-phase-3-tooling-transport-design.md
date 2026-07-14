@@ -31,6 +31,7 @@ Implementation should be split by consumer-facing product surface:
 2. **Phase 3B: Formatter Product**
    - workspace-internal `crates/intlify_format`
    - `intlify fmt`
+   - bounded file-work scheduling in `crates/intlify_cli`, reused by later file-oriented commands
    - `fmt --check` and formatter check result contract
    - standard and preserve formatting modes
    - `@intlify/format-napi` and `@intlify/format-wasm`
@@ -38,6 +39,7 @@ Implementation should be split by consumer-facing product surface:
 3. **Phase 3C: Linter Product**
    - `crates/intlify_lint`
    - `intlify lint`
+   - reuse of the shared CLI file-work scheduler
    - parser, semantic, and lint diagnostic result contract
    - recommended preset, core semantic diagnostics, and initial configurable lint rules
    - `@intlify/lint-napi` and `@intlify/lint-wasm`
@@ -48,10 +50,11 @@ Implementation should be split by consumer-facing product surface:
    - UTF-8 byte span to editor position conversion
    - editor-specific configuration source handling
 
-5. **Phase 3E: Agent Coding Integration**
+5. **Phase 3E: Agent Coding Integration (pending design follow-up)**
    - agent workflows over stable CLI JSON output
    - repo instructions, skills, plugins, hooks, or MCP wrappers as needed
    - no vendor-specific agent protocol as the core contract
+   - no implementation or product-shape selection until the deferred design work in 010 resumes
 
 6. **Phase 3F or Later: Long-lived Transport**
    - JSON-RPC baseline measurement
@@ -59,6 +62,26 @@ Implementation should be split by consumer-facing product surface:
    - daemon/session/cache optimization for repeated language-service queries
 
 Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts.
+
+## CLI Parallel Execution Boundary
+
+`crates/intlify_cli` owns batch scheduling for the native `intlify fmt` and `intlify lint` file workflows. Parser, formatter, linter, and resource crates expose synchronous operations that are safe to invoke concurrently with independent per-call state; they do not create worker threads, select a concurrency width, own an async runtime, or aggregate CLI output. In particular, `crates/intlify_resource` guarantees concurrent use of its registry and immutable extraction artifacts while leaving all decisions about whether and where to run calls concurrently to its consumer.
+
+Concurrent-use safety is an explicit core acceptance boundary, not an incidental consequence of the first implementation. Owned work descriptions and structured results transferred between the CLI coordinator and workers must be `Send`; any resolved configuration, registry, or other immutable core state intentionally shared by multiple workers must be `Send + Sync`. Per-call parser, semantic, rule, layout, and rendering scratch types that never cross or share across the worker boundary do not acquire a blanket `Send + Sync` requirement. Formatter, linter, and resource crates expose no process-wide mutable execution state, and thread-local caches or dependency internals must not change results, ordering, diagnostics, errors, or later-call behavior.
+
+Each owning crate provides compile-time trait assertions for the concrete types that cross or are shared across this boundary and concurrent-invocation tests that compare complete results with a serial baseline. Fault-isolation tests prove that a returned operational failure in one call cannot affect independent calls and that an escaped panic contained by the CLI worker boundary does not poison reusable immutable state used by later calls. These requirements govern Rust core and CLI composition; they do not promise that a JavaScript N-API isolate or a single-threaded WASM instance may itself be called from arbitrary operating-system threads.
+
+After argument validation, configuration, discovery, ignore filtering, supported-input classification, and physical identity inspection have completed, the CLI groups selected logical targets by physical file identity. One work item is one physical file group, not one logical path. Different groups may execute concurrently, while normalized logical aliases within one group execute their complete read and core-processing pipelines serially. This prevents symbolic-link and hard-link aliases from racing in formatter write mode and gives formatter and linter commands one execution model. The exact grouping and alias fail-stop contract is defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
+
+Each file-mode command creates at most one bounded, command-scoped worker-thread pool after the runnable groups are known. No pool is created when there are no runnable groups. Otherwise, the default width is the smaller of the runnable physical-group count and the operating system's available parallelism, with a minimum of one. Parser, formatter, linter, and resource work uses that same pool rather than creating nested or crate-specific pools. Stdin mode is one caller-thread workflow and does not construct a file worker pool. An async runtime is not required solely for these CPU-heavy synchronous pipelines. The concrete pool dependency and scheduling algorithm are implementation details as long as the boundedness and observable contracts hold.
+
+Every worker-runtime infrastructure failure is command-fatal. Failure to obtain the operating system's available parallelism, construct the pool, spawn a worker, dispatch work, contain a worker panic, or join and tear down the pool does not fall back to caller-thread or partially available serial execution. The command emits exactly one top-level `internal_error` with `details.reason: "cli_worker_runtime_failed"` and `details.phase` equal to `"initialize"`, `"dispatch"`, `"execute"`, or `"join"`. The normal top-level `path` is included only when the scheduler can identify the active normalized logical target exactly; dependency error names, panic payloads, backtraces, and Rust debug text are not exposed.
+
+After a post-initialization failure is detected, the coordinator stops dispatching new physical groups, cancels queued work where the chosen runtime supports cancellation, and waits for already running work only as required for safe teardown. Normal target results from that failed run are discarded: JSON uses `summary.status: "error"`, an empty `results` array, the one top-level error, and omits command-specific target and diagnostic counters; the process exits with `2`. Formatter writes that completed before detection or during unavoidable in-flight teardown are not rolled back, and no atomic whole-command write guarantee is implied. If teardown observes multiple runtime failures, the one public error is selected by phase order `initialize`, `dispatch`, `execute`, then `join`; within one phase a pathless failure sorts first, followed by normalized logical path order. These rules keep the failure envelope deterministic without treating a compromised runtime as a target-local recoverable error.
+
+Workers never write reporter output directly. They return structured target results tagged with their stable logical identities; the coordinating thread orders results by the command's normalized-path and within-file rules, computes summaries, and renders text or JSON only after ordered aggregation. Completion order therefore cannot affect stdout, stderr, JSON arrays, selected errors, or exit status. Formatter writes to different physical groups may complete in any order, but a write failure affects only the remaining aliases in its own group. The scheduler uses backpressure and does not eagerly retain every file's source or parse artifacts merely because every path has already been discovered.
+
+The initial scheduler parallelizes only across physical file groups. It does not split one standalone message or catalog into nested worker tasks. Public concurrency controls such as `--threads` remain a later CLI surface; tests and benchmarks may inject a worker width through an internal scheduler construction boundary without exposing it as configuration.
 
 ## SnapshotView
 
@@ -156,11 +179,11 @@ The formatter core formats one whole MF2 message at a time. Range-only formattin
 
 ### Layout Architecture
 
-The formatter should separate syntax traversal from rendering. Internally, it should have a layout model capable of delayed line/group/indent decisions so line width, standard mode, preserve mode, and future resource/catalog adapters can reuse one message-level formatter core. The concrete IR/document implementation is a formatter-specific design detail.
+The formatter should separate syntax traversal from rendering. Internally, it should have a layout model capable of delayed line/group/indent decisions so line width, standard mode, preserve mode, and resource/catalog adapters can reuse one message-level formatter core. The concrete IR/document implementation is a formatter-specific design detail.
 
 ### CLI Input Model
 
-The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `intlify fmt "locales/**/*.mf2"` or `intlify fmt messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Resource files containing multiple messages, framework-specific i18n files, and multi-locale catalogs are layered consumers that extract message entries and reuse the message-level formatter; their host-file parsing, string escaping, and outer document edits are not fixed by the Phase 3 core formatter contract.
+The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `intlify fmt "locales/**/*.mf2"` or `intlify fmt messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Opted-in resource files containing multiple messages are an initial layered CLI workflow that extracts message entries and reuses the message-level formatter. Host-format selection, parsing, string escaping, outer-document edits, and rollout tiers are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), not by the Phase 3 core formatter contract.
 
 ### CLI Write and Check Workflows
 
@@ -168,9 +191,9 @@ The CLI accepts file path and glob inputs so users can format MF2 files directly
 
 ### Formatter Parallelism
 
-The CLI may format multiple files in parallel, but observable behavior must remain deterministic. File discovery should normalize and de-duplicate paths before formatting so write mode never races on the same file when overlapping globs or repeated paths are provided.
+The CLI formats physical file groups in parallel through the shared bounded worker runtime above. File discovery normalizes and de-duplicates logical paths, and physical grouping additionally prevents symbolic-link or hard-link aliases from racing on the same file. Logical aliases within one group remain serial and re-read the file after each earlier alias completes.
 
-Text output, `--check`, and `--list-different` results should be reported in stable normalized path order, independent of worker scheduling. Programmatic APIs such as `formatMessage(source, options?)` remain single-message operations; resource/catalog adapters and CLI workflows decide whether to parallelize multiple message entries.
+Text output, `--check`, and `--list-different` results should be reported in stable normalized path order, independent of worker scheduling. Programmatic APIs such as `formatMessage(source, options?)` remain single-message operations. The CLI consumer owns any future decision to parallelize entries within one catalog; resource/catalog adapters remain scheduler-neutral.
 
 Benchmarks should report formatter concurrency settings separately from parser, syntax traversal, layout construction, rendering, binding, and file I/O costs.
 
@@ -274,7 +297,7 @@ The initial public linter API is source-backed: `lintMessage(source, options?)` 
 
 The initial linter rule API is Rust-internal. Built-in rules receive a `RuleContext` that can expose CST access, parser-owned `SemanticModel` facts, source links, and resolved lint configuration without making public bindings depend on a fixed `SemanticView` API. The Binary AST decoder/accessor view remains the shared syntax foundation. Future SemanticView exposure remains the semantic foundation for bindings, editors, and future snapshot-backed linting, but Phase 3C rules do not require SemanticView to be a public N-API/WASM contract.
 
-For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; it is deferred from the initial linter product because linting requires `SemanticModel` construction and parser-owned semantic validation, and no snapshot-to-`SemanticModel` path exists yet, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
+For N-API and WASM consumers, the primary public entry point is `lintMessage(source, options?)`. A snapshot-based entry point such as `lintSnapshot(snapshot, source?, options?)` is a future advanced parse-artifact reuse path; both its detailed API design and implementation are deferred until the parser owns a snapshot-to-`SemanticModel` path, as recorded in the detailed linter design. The source text or SourceStore-equivalent context is still needed whenever consumers require line/column, UTF-16 positions, or source-slice-aware diagnostics. Binding packages should expose direct programmatic lint APIs rather than a CLI callback bridge or plugin host.
 
 ### Location Model
 
@@ -316,17 +339,17 @@ The linter distinguishes lint diagnostics from operational errors. Parser, seman
 
 ### Parallelism
 
-The CLI may lint multiple files in parallel, but output must be deterministic. Text and JSON output should order file results by a stable normalized path order, independent of worker scheduling. Benchmarks should report concurrency settings separately from parser, semantic, rule, binding, and serialization costs.
+The CLI lints physical file groups in parallel through the same bounded worker runtime as `intlify fmt`. Logical aliases within a group remain serial even though lint does not write, so both commands share physical-identity, failure-containment, and result-ordering semantics. Text and JSON output order file results by stable normalized path, independent of worker scheduling. Programmatic `lintMessage` remains a synchronous single-message operation and does not own a worker pool. Benchmarks report concurrency settings separately from parser, semantic, rule, binding, and serialization costs.
 
 ### Message and Catalog Scope
 
-The linter should support message-level linting first and allow resource/catalog-level linting to be layered on top. Catalog-level linting represents i18n resource validation across a locale/message collection, while the message-level core remains reusable by bindings and tools.
+The linter supports message-level linting as its reusable core. The initial layered resource workflow defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) extracts each opted-in resource entry and applies that same message-level pipeline. Catalog-wide linting across multiple entries, locales, or files is a separate future linter layer and does not change the message-level core.
 
 ### File Discovery
 
 CLI file discovery should use an explicit supported-extension list owned by the linter/CLI crates. The initial linter CLI supports direct `.mf2` message files. Unsupported files and unmatched patterns are CLI input conditions rather than parser diagnostics.
 
-The detailed discovery, ignore, file framing, unmatched-pattern, invalid-glob, and shared input error semantics are fixed by the linter-specific [File Discovery and Shared CLI Contract](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract). Resource/catalog input remains a future layered adapter workflow that can extend the supported-extension list without changing the message-level linter core.
+The standalone-message discovery, ignore, file framing, unmatched-pattern, invalid-glob, and shared input error semantics are fixed by the linter-specific [File Discovery and Shared CLI Contract](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract). The initial opted-in resource workflow extends classification and supported inputs through the adapter contract in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) without changing the message-level linter core.
 
 ### Lint Pipeline
 
@@ -402,7 +425,7 @@ Phase 3 linter core scope:
 
 Future or layered linter scope:
 
-- resource/catalog linting
+- catalog-wide and cross-locale lint rules and presets
 - nested config discovery
 - recovery-aware editor linting
 - spec-compatible suppression model
@@ -472,7 +495,7 @@ Long-lived language-service workflows may reuse parse artifacts per document ver
 - future `SemanticView` for semantic queries once semantic APIs are exposed
 - diagnostics store for parser, semantic, and linter diagnostics
 
-Cached artifacts must be invalidated when the document version changes. Cache ownership and eviction are adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
+Document-version changes invalidate extraction, mapping, and mapped-result state tied to that version. Message-level parse artifacts may survive a host-document version change only when their complete cache key, including exact message bytes, remains equal; this permits unchanged catalog entries to reuse parse work after an unrelated host edit. Successful editor configuration reloads use the dependency-specific invalidation matrix and root config-generation checks in the dedicated LSP/editor design rather than flushing all artifact classes indiscriminately. Cache ownership and eviction remain adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
 
 ### Diagnostics Workflow
 
@@ -506,13 +529,13 @@ The initial adapter replaces the whole containing message range rather than comp
 
 If a format request contains a selected range, the initial workflow formats the containing MF2 message rather than performing true range-only formatting. When the message has parse errors, editor formatting should no-op instead of returning partially formatted output.
 
-Editor adapters should only return `TextEdit` values when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message range can no longer be identified, the adapter silently returns no edits rather than an operational editor error. Exact protocol-specific version comparisons belong in the dedicated LSP/editor implementation design.
+Editor adapters should only return `TextEdit` values when the exact protocol document version, non-reused mapping-generation token, and root config-generation token captured at request start still match the current open-document state. If any differs, the document was closed or reopened, or the containing message range can no longer be identified in the captured artifact, the adapter returns an empty edit array rather than an operational editor error or automatic retry. The dedicated LSP/editor design owns the final-check timing, same-bytes version changes, configuration-driven mapping replacement, formatter-only configuration changes, and standard-LSP response limitations.
 
 ### Configuration
 
-Editor adapters should normalize their settings into the same resolved formatter and linter configuration models used by CLI workflows. They may combine project configuration with editor-specific settings such as workspace settings, user settings, or LSP initialization options before passing options to core APIs.
+Editor adapters normalize their settings into the same resolved formatter and linter configuration models used by CLI workflows. The initial editor source set and field-level precedence are fixed by the dedicated LSP/editor design: dynamic effective editor settings override initialization options, which override unified project configuration and then built-in defaults. The client, not the server, resolves vendor-specific user/workspace/workspace-folder scopes before supplying dynamic settings. Project resource membership remains authoritative under its separate additive editor-overlay rule.
 
-Configuration loading failures are operational editor errors, not parser, semantic, formatter, or linter diagnostics. Exact config sources, precedence, reload behavior, fallback behavior, and editor error presentation belong in dedicated formatter, linter, or LSP/editor design documents.
+Configuration loading failures are root-scoped operational editor errors, not parser, semantic, formatter, linter, or resource diagnostics. The dedicated LSP/editor design retains the last successful state, suppresses formatting edits while a failure is active, de-duplicates one `window/showMessage` error per failure episode, records safe detail and recovery through `window/logMessage`, and applies selective invalidation only after a successful transactional reload.
 
 ### Out-of-Scope Editor Features
 
@@ -545,7 +568,7 @@ The initial Phase 3 agent-facing surface should be the `intlify` CLI and stable 
 
 Agent integrations may later provide MCP servers, agent plugins, skills, or commands, but those should remain distribution and workflow wrappers. They should not become the source of truth for formatting rules, lint diagnostics, configuration semantics, AST structure, parser-owned semantic validation, or linter result contracts.
 
-Detailed agent integration choices are tracked in [010-ox-mf2-phase-3e-agent-integration-design.md](./010-ox-mf2-phase-3e-agent-integration-design.md).
+Detailed agent integration choices are tracked in [010-ox-mf2-phase-3e-agent-integration-design.md](./010-ox-mf2-phase-3e-agent-integration-design.md). Phase 3E implementation and its remaining product-shape decisions are pending; the document's Deferred Follow-Up Notes are not current implementation requirements.
 
 ## MessagePack Transport
 

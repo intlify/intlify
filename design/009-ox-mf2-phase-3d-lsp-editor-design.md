@@ -88,6 +88,8 @@ Multi-entry host documents add document-level publication rules on top of the pe
 - Diagnostic identity across document updates should combine the entry key, the stable diagnostic code, and the message-local span. Entry keys survive unrelated edits elsewhere in the catalog, so this identity is more stable than document-level spans alone.
 - Catalog-level findings such as duplicate catalog keys or cross-locale checks are future catalog-level linting. They use the dedicated catalog finding contract owned by the linter design rather than being attached to an arbitrary entry. Concrete related-entry spans still use the shared entry mapping, while a missing-locale finding has no synthetic owner entry or host span. Editor layers present that future result contract and must not reimplement the rules or duplicate one finding across related entries.
 
+Every diagnostic job captures the exact document version, mapping-generation token, and root config-generation token used for extraction, linting, and span conversion. Immediately before publication, all three must still match the installed state. A stale job is discarded without publishing or clearing diagnostics; the document-change or successful-config-reload event that advanced a token owns scheduling its replacement. A membership or mapping change clears the prior mapped publication before rebuilding because its host ranges are no longer trustworthy. A lint-option-only change may retain the last complete publication until the replacement job succeeds, then replaces the complete set atomically; results from the old config generation can never overwrite the new set.
+
 Extraction failure presentation depends on the failure class, and every class returns no formatting edits.
 
 The special projection of selected resource operational codes into editor diagnostics, without admitting them to the parser/semantic/lint diagnostic namespace, is indexed in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). The behavior below remains authoritative for editor publication and retained state.
@@ -119,7 +121,13 @@ Document formatting for a catalog host document formats every writable message e
 
 A range formatting request first resolves both protocol positions against the current document version using the negotiated position encoding and converts them to one ordered host-document UTF-8 byte range. A position outside the document, a reversed range, or a UTF-8/UTF-16 position that splits a Unicode scalar is rejected as a protocol-level invalid-params failure before entry selection; the adapter does not clamp, swap, return a successful empty edit merely for malformed input, or call parser, formatter, or resource APIs. A valid request formats selected writable entries using whole-entry formatting and passes only their successful outputs to `build_and_validate_write_back`, which validates the resulting complete candidate host document before returning any edit. Unselected entries retain their original messages during candidate total calculation and validation. A non-empty raw value span uses normal half-open intersection with the converted host UTF-8 range. A zero-length span at host position `p`, such as an explicitly paired empty XLIFF element content span, is treated as a point and is selected when `range.start <= p <= range.end`; an empty caret range at exactly `p` therefore selects it. This point rule does not expand the replacement span into surrounding host syntax.
 
-Adapters should only return edits when the document version and message mapping used to create the edit still match the current document. If the document version or mapping is stale, or the containing message entry can no longer be identified, the adapter silently returns no edits. This expected concurrency outcome is a no-op, not an operational editor error. The exact protocol-specific version comparison remains an implementation-design question.
+At request start, the adapter captures one immutable request snapshot containing the document URI, the exact client-supplied protocol version currently installed for that URI, the source text, the active classification/extraction artifact, an opaque mapping-generation token, and the applicable root config-generation token. Both tokens are server-local and never reused for a later installed state during the server process. The mapping token changes whenever the URI is opened or reopened, closed, reclassified, re-extracted, or receives a replacement mapping because of a document or membership change. The config token changes after any semantically different resolved configuration is installed for the root. A source hash or byte comparison is not a substitute for the protocol version or either generation token.
+
+Immediately before returning a successful standard document- or range-formatting response, the adapter looks up the URI again and requires exact equality of the installed protocol version, mapping-generation token, and root config-generation token. It also verifies that every selected entry handle still belongs to the captured artifact. A closed document, an incremented version, a same-bytes edit that nevertheless changed the version, a classification or mapping replacement, a formatter-option change, or a missing entry makes the request stale. The adapter then returns an empty `TextEdit[]`, publishes no operational editor error, and does not retry formatting automatically. Position conversion, entry selection, formatting, and candidate validation always use the captured request snapshot rather than mixing old and current document or configuration state.
+
+The final state comparison and response construction occur under one consistent document-state read boundary. A standard LSP formatting response cannot carry a document version, so this server-side check cannot prevent a client-side edit made after the response leaves the server; client document lifecycle and application ordering remain the protocol integration's responsibility. Future operations that return `WorkspaceEdit` may use versioned `TextDocumentEdit`, but the initial standard formatting handlers do not replace themselves with a custom command solely to obtain that guard.
+
+Editor integration tests must cover unchanged version and generations returning edits; a changed version with identical bytes returning `[]`; close and reopen with a reused client version returning `[]` because the mapping generation differs; configuration-driven reclassification or re-extraction at the same client version returning `[]`; a formatter-only config change returning `[]` because the config generation differs even when the mapping does not; a selected entry disappearing before return; and no automatic core re-invocation after any stale outcome.
 
 True range-only formatting and minimal-diff formatting are deferred. A selection inside an MF2 message should initially format the containing message rather than requiring range-local formatting from the formatter core.
 
@@ -137,7 +145,29 @@ For standalone `.mf2` documents, step 2 uses the file-framing-aware document map
 
 Editor adapters should normalize project configuration and editor-specific settings into the same resolved formatter and linter configuration models used by CLI workflows.
 
-Possible editor-specific sources include workspace settings, user settings, and LSP initialization options. The exact source list and precedence for formatter, linter, and other non-membership settings remain open. Reload application is transactional under the failure-class rules above: an invalid or internally failed reload does not partially replace the last successful state.
+The initial cross-editor configuration model accepts exactly four source classes:
+
+1. built-in formatter, linter, and editor integration defaults
+2. the unified project configuration discovered and validated through the Phase 3A project-config contract
+3. optional editor settings normalized from LSP `initializationOptions` during server initialization
+4. optional effective dynamic editor settings delivered through `workspace/configuration` or `workspace/didChangeConfiguration`
+
+An editor client may derive the fourth source from product-specific user, workspace, or workspace-folder scopes, but it resolves those scopes before the settings cross the integration boundary. The server consumes one normalized effective settings object for the applicable project/workspace root and does not model VS Code, another editor's preference hierarchy, or a vendor-specific settings-file format as separate configuration sources. A client without dynamic-configuration support may use initialization options for the lifetime of the server session.
+
+Per-document option overrides, CLI flags, environment variables, editor-specific files read directly by the server, and direct reuse of a client's raw user/workspace settings objects are outside the initial model. `.editorconfig` remains governed by the formatter design and is not an editor-integration configuration source in the initial formatter surface. Editor-only catalog membership uses the normalized ad-hoc overlay below rather than introducing another source class. Source precedence for overlapping non-membership formatter, linter, and editor options is defined separately below; reload application is transactional under the failure-class rules above, so an invalid or internally failed dynamic update does not partially replace the last successful state.
+
+For non-membership formatter, linter, and editor-integration options, resolution is field-by-field in this highest-to-lowest precedence order:
+
+1. effective dynamic editor settings
+2. LSP `initializationOptions`
+3. unified project configuration
+4. built-in defaults
+
+An absent field falls through to the next source. JSON `null` is not an unset or inheritance marker and is rejected unless a future individual option explicitly defines `null` as a value. Each dynamic notification or `workspace/configuration` response replaces the complete previous dynamic layer for its applicable root; it is not a merge patch. An empty normalized object therefore clears all dynamic overrides and reveals initialization, project, or default values. The server resolves a fresh immutable formatter/linter configuration from all four layers and installs it atomically only after complete validation.
+
+Every lower-precedence source is still validated even when a higher-precedence source supplies the same field. In particular, an invalid project configuration cannot be hidden by initialization or dynamic editor settings. The adapter may retain internal field provenance for logging or debugging, but provenance is not passed into formatter or linter core option types and is not a diagnostic category.
+
+Catalog membership and host-format classification are the deliberate exception to ordinary field precedence. Project `resources` membership remains authoritative; the editor overlay can only add an otherwise unmatched document and cannot override a project-selected format. The overlap, conflict, and editor-local coverage rules below apply after both source shapes have been validated.
 
 Every integration maps its product-specific editor setting into this common normalized ad-hoc catalog overlay shape before classification:
 
@@ -161,7 +191,15 @@ Catalog opt-in and extraction scope configuration are owned by [013-ox-mf2-resou
 
 Changing either source re-runs editor document classification and extraction, with the invalidation consequences described below. The integration should identify an ad-hoc-only document as editor-local rather than CI-covered; once an equivalent project match appears, the classification becomes project-owned without running extraction twice. Editor-only membership is never implied to exist in CLI or CI.
 
-Configuration loading failures are operational editor errors. They are not mixed into parser, semantic, formatter, linter, or resource input diagnostics and follow the last-successful-state transaction above.
+Configuration loading, validation, and internal reload failures are root-scoped operational editor errors. They are not mixed into parser, semantic, formatter, linter, resource input, or future catalog diagnostics and follow the last-successful-state transaction above.
+
+For each project/workspace root, the integration retains at most one active structured configuration error and its notification fingerprint. The fingerprint is the stable operational `code`, normalized optional `path`, and canonical stable `details` value; human-readable `message`, dependency text, timestamps, and backtraces do not participate. The first failure in an episode, or a later failure with a different fingerprint, sends one LSP `window/showMessage` notification of type `Error` with concise actionable prose. Repeated reloads, document requests, and open documents that observe the same active fingerprint do not send another popup.
+
+Every observed configuration failure also emits one `window/logMessage` error entry containing its stable code and safe path/reason context. The log message does not expose source contents, arbitrary dependency debug output, panic payloads, or a backtrace. If the server discovers the failure before the protocol lifecycle permits window notifications, it queues the one popup and log entry until after initialization rather than converting the condition into an initialize-response schema or document diagnostic.
+
+An active failure installs no configuration, advances no config or mapping generation, invalidates no artifact, and starts no replacement diagnostic job. The last successfully installed configuration, artifacts, and diagnostic publication remain visible; when no successful publication exists, none is synthesized. Formatting requests for an affected root return an empty `TextEdit[]` while the failure is active, even though the retained state remains available for recovery and comparison.
+
+The next successful validated reload atomically installs its resolved state, clears the active error, applies the normal selective invalidation matrix, and records one informational recovery entry through `window/logMessage`. It does not show a success popup. A later recurrence, including the same fingerprint after recovery, begins a new failure episode and may notify once again. Roots maintain independent error episodes, so one broken workspace root does not suppress or duplicate another root's notification.
 
 ## Artifact Cache and Invalidation
 
@@ -172,9 +210,17 @@ Editor adapters may cache two artifact classes per document version once semanti
 
 Message-level artifacts should follow the cache-key discipline in [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md), using the entry key as the message id and the document URI as part of the namespace. Because that cache key includes the exact source bytes, entries whose message text is unchanged across host document versions can hit the cache even when unrelated parts of a large catalog changed. Extraction artifacts remain version-specific.
 
-Cached artifacts must be invalidated when the document changes. Configuration changes may also invalidate classification, extraction, formatter, linter, semantic, or diagnostic artifacts depending on which options changed.
+Each project/workspace root owns an immutable resolved configuration plus an opaque, process-local config-generation token. A validated reload first resolves all source layers, then compares the complete result semantically with the installed configuration. An equal result performs no cache work and does not advance the token. A different result is installed atomically with a fresh non-reused token, after which affected open documents are processed according to this dependency matrix:
 
-Detailed cache ownership, eviction, and invalidation policy belongs to the LSP/editor implementation design and the parse artifact cache design.
+- A `resources` membership, host-format assignment, or normalized editor catalog-overlay change reclassifies every potentially affected open document in the root. It discards version-specific extraction artifacts, offset maps, mapped diagnostics, and pending formatting candidates and advances the document mapping generation when a classification or installed mapping changes. If a document is no longer an MF2 or catalog target, the adapter publishes an empty diagnostic set. Exact-source message parse or semantic artifacts remain eligible for reuse only through their complete cache keys; no cached host mapping survives.
+- A formatter-option change invalidates cached formatter output or candidate state and makes in-flight formatting requests stale through the root config generation. It does not discard classification, extraction, offset maps, parser artifacts, semantic artifacts, or lint diagnostics.
+- A linter-option change invalidates resolved lint-result caches and schedules one new diagnostic job for each affected open target. Parser, extraction, offset-map, and parser-owned `SemanticModel` artifacts remain reusable when their own keys still match. The last complete lint publication may remain until the new generation publishes atomically, as defined above.
+- A future parser- or semantic-result-affecting option must participate in the parse artifact `CacheKey`; changing it causes natural misses or explicit removal for the affected namespace. Formatter- or linter-only settings must not be added to the parse key merely to force broad invalidation.
+- Editor scheduling or presentation settings that do not affect extraction, core results, mapping, or protocol positions update their owner without evicting core artifacts. The root config generation still prevents an already running request from installing state computed from a superseded resolved configuration.
+
+A document text/version change always drops its version-specific extraction and mapping state, advances its mapping generation, and schedules new diagnostics. Message-level parse artifacts for entries whose exact message bytes and complete cache keys remain equal may survive and be reused across host-document versions. A failed configuration load, validation, or internal reload installs nothing, advances neither generation, invalidates no cache, and leaves the last successful configuration and publication in force.
+
+Tests must cover each matrix row independently, a mixed reload that takes the union of affected artifacts, semantically equal reloads with no generation change, stale formatting and diagnostic jobs losing the final-generation check, exact-source parse reuse across unrelated host edits, and failed reloads preserving every installed token and artifact. Cache eviction, hashing, and persistence policy remain owned by the parse artifact cache design.
 
 ## Shared Resource Adapter Ownership
 
@@ -194,9 +240,4 @@ Cross-locale editor features — missing-translation indicators, catalog key com
 
 - Once snapshot-to-`SemanticModel` exists, when should editor adapters switch from source-backed `lintMessage` to future `lintSnapshot` for parse-artifact reuse?
 - Should a future recovery-aware editor mode provide partial semantic or lint diagnostics for incomplete buffers, and how would it avoid conflicting with the strict CLI and binding pipeline?
-- What exact document version checks are required before returning formatting `TextEdit` values?
-- Which configuration sources should editor adapters support, such as project config, VS Code workspace settings, user settings, and LSP initialization options?
-- What precedence should apply when project config and editor-specific settings provide overlapping formatter or linter options?
-- How should config reloads invalidate editor-side classification, extraction, formatter, linter, and parse artifacts?
-- How should config loading failures be surfaced in editor integrations without mixing them into parser, semantic, formatter, or linter diagnostics?
 - Which future editor features should be designed first after diagnostics and formatting: quick fixes, hover, completion, go-to-definition, or rename?

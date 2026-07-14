@@ -516,11 +516,19 @@ Directory and glob discovery also excludes common VCS, dependency, and output di
 
 File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
 
-The resource workflow preserves those separate logical results but additionally groups every final standalone or catalog file-mode target by physical file identity to prevent alias write races and conflicting classifications. That specialization is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
+Before parallel file execution, the shared CLI groups every final standalone or catalog file-mode target by physical file identity while preserving separate logical results. This applies even when no catalog target is selected, so symbolic-link and hard-link aliases of a standalone `.mf2` file cannot race in write mode. The exact physical identity, conflicting-classification, alias ordering, and write-failure rules are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
 
 Directory inputs such as `.` that contain no selected standalone or resource targets after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
 
-Phase 3B initially processes selected files sequentially after discovery, de-duplication, and sorting. Future parallel execution may be added without changing observable stdout, JSON result ordering, or write target selection.
+### Parallel File Execution
+
+After discovery, de-duplication, ignore filtering, classification, and physical grouping finish, `crates/intlify_cli` processes different physical file groups concurrently using the bounded, command-scoped worker-thread pool defined by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). One scheduler work item is one physical file group. Logical aliases within that group execute the complete read, framing, format/check, result construction, and optional write pipeline serially in normalized logical-path order; different groups may run concurrently.
+
+The initial implementation uses automatic bounded concurrency and exposes no `--threads` option. Stdin mode remains one caller-thread operation. Workers return structured results and never render directly to stdout or stderr. The coordinator restores stable normalized-path order before text or JSON rendering, summary calculation, and exit-status selection, so observable behavior is identical at worker width one and at any larger supported width. Formatter writes to unrelated physical groups may complete in any order, while the physical-group failure rules contain a write failure to the affected group.
+
+Pool initialization, dispatch, escaped worker panic, and join failures use the command-fatal `cli_worker_runtime_failed` contract in the shared parallel execution boundary. Formatter file mode does not retry them serially, does not return partial target results, and does not roll back writes that completed before safe worker teardown.
+
+This is file-level parallelism only. One standalone MF2 message and the entries of one catalog remain sequential within their group unless the separately benchmark-gated intra-file policy in the resource design is enabled later.
 
 ### Ignore Sources
 
@@ -859,6 +867,12 @@ The formatter separates syntax traversal from rendering.
 
 The message-level core lives in a workspace-internal Rust crate named `intlify_format`. This crate is not published to crates.io in Phase 3B. It should still expose a clear workspace API for the CLI, N-API binding, WASM binding, and tests.
 
+The source-backed and snapshot-backed message-level entry points are synchronous and safe to invoke concurrently for independent inputs. `intlify_format` keeps parser and rendering scratch state within each call, exposes no process-wide mutable formatting state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
+
+The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, parser views, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
+
+Compile-time assertions lock the required owned traits. Behavioral tests run independent source-backed and snapshot-backed calls concurrently, compare the complete success or failure values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
+
 The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
 
 Concrete Rust type names and implementation organization may still change during implementation, but the formatter pipeline and IR responsibilities follow the Phase 3B IR design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
@@ -878,6 +892,8 @@ Concrete Rust type names and implementation organization may still change during
 - `@intlify/format-napi-win32-x64-msvc`
 
 These six packages are the initial formatter N-API support matrix and match the checked-in package target configuration. The shared normalized label style does not require every ox-mf2 product to support every representable triple. Additional targets, including Linux arm64 musl, require product-specific CI build, loading, packaging, and publish smoke-test coverage before entering this matrix.
+
+The `@intlify/format-napi` wrapper and every platform native package support Node.js `>=22.12.0`, matching the parser N-API package and the repository package-engine contract.
 
 The N-API package uses lazy native loading. Importing the package should not eagerly load the native binary; API calls load the binding as needed.
 
@@ -1063,11 +1079,13 @@ Behavior coverage:
 | idempotency of formatted output | Core formatter PRs | `MUST` |
 | formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
 | parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
+| compile-time `Send` assertions for worker-boundary options/results, concurrent source/snapshot calls matching serial baselines, and error/panic fault isolation without reusable-state poisoning | Core formatter PRs / CLI formatter PR | `MUST` |
 | `intlify fmt` write mode | CLI formatter PR | `MUST` |
 | `intlify fmt --check` and `--list-different` | CLI formatter PR | `MUST` |
 | stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
 | JSON reporter success, difference, diagnostic, and operational-error output | CLI formatter PR | `MUST` |
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
+| worker width one versus multiple equivalence, forced out-of-order group completion, bounded active groups, physical-alias serialization, stable text/JSON ordering, and injected worker-runtime initialization/dispatch/execute/join failures with no serial fallback or partial result envelope | CLI formatter PR | `MUST` |
 | non-Unicode operand, stdin virtual path, and discovered entry rejection without lossy path output | CLI formatter PR | `MUST` |
 | non-Unicode project root pre-config rejection with the nullable-root JSON envelope | CLI formatter PR | `MUST` |
 | non-Unicode explicit config and repeated ignore-path rejection at their fixed setup precedence, with `ignorePathIndex`, empty results, and no lossy path output | CLI formatter PR | `MUST` |
@@ -1229,6 +1247,7 @@ Formatter benchmarks should separate:
 - WASM binding call cost
 - CLI end-to-end format cost
 - CLI JSON reporter cost
+- CLI worker scheduling and ordered-aggregation cost at worker width one and the default automatic width
 
 Phase 3 benchmark names:
 
@@ -1254,7 +1273,7 @@ Prerequisite (landed): the `ox_mf2_parser` grammar-conformance work required by 
 
 1. `intlify_format` crate scaffold, result/options/config model, and fixture harness
 2. standard/preserve core formatter rules for direct `.mf2` messages
-3. `intlify fmt` CLI integration, file discovery, check/write mode, and JSON reporter
+3. `intlify fmt` CLI integration, file discovery, shared bounded worker scheduler, physical file grouping, check/write mode, and JSON reporter
 4. `@intlify/format-napi` wrapper and platform native packages
 5. `@intlify/format-wasm`
 6. local-first formatter benchmarks under `tools/`
@@ -1272,7 +1291,7 @@ Each PR should be cut from `main`, keep formatter work separated from Phase 3C l
 - Generated TypeScript config type distribution.
 - Nested config discovery, nearest-config-wins behavior, file-specific overrides, `--cwd`, and `--root`.
 - `--no-error-on-unmatched-pattern` if users need a relaxed unmatched-input mode.
-- Runtime controls such as `--threads`.
+- Public runtime controls such as `--threads`; initial file parallelism uses the automatic bounded width and an internal test/benchmark override only.
 - `intlify init` config scaffolding once formatter and linter config fields are stable enough to write.
 - GitHub Actions benchmark jobs and issue-comment benchmark reporting for parser and formatter trends.
 - WASM artifact size and JavaScript glue size reporting for both `@intlify/format-wasm` and `@intlify/ox-mf2-wasm`; these measurements should remain observational until a future design sets an explicit budget.
