@@ -210,6 +210,36 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `changed` is computed by byte equality between the message-level formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Message-level APIs treat the supplied source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
+### Bounded Rust Rendering for Resource Consumers
+
+The workspace Rust crate additionally exposes source-backed and snapshot-backed bounded rendering entry points for catalog consumers. They reuse the same parser, Layout IR, Document IR, formatting rules, and byte-equality semantics as the ordinary entry points, but cap the materialized UTF-8 output:
+
+```rust
+format_message_bounded(
+    source: &str,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
+format_snapshot_bounded(
+    snapshot: SnapshotView<'_>,
+    source: &str,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
+enum BoundedFormatResult {
+    Complete(FormatResult),
+    OutputLimitExceeded { limit: u64, actual: u64 },
+}
+```
+
+`Complete` is byte-for-byte and field-for-field equivalent to calling the corresponding ordinary formatting API. Parser diagnostics, invalid options or snapshots, source mismatch, and other failures established before successful rendering remain the ordinary `FormatResult::Err`; the bounded path does not translate them into a size result.
+
+The renderer writes directly into a capped sink and must not first construct the complete output or any other output-sized string. The sink admits at most `max_output_bytes`, stops before storing the first byte beyond that limit, discards its partial buffer, and returns `OutputLimitExceeded` with `limit` equal to the supplied cap and `actual` equal to `limit + 1`. No code, `changed` value, or partial formatter result accompanies that outcome. The initial resource consumer supplies its fixed one-message maximum, which is well below `u64::MAX`; accepting `u64::MAX` as a generic cap is not required by this milestone.
+
+`OutputLimitExceeded` is a formatter-internal capacity signal, not a formatter operational error and not a new public error code. The catalog integration asks the resource layer to convert it into the resource-owned candidate admission result. The ordinary Rust APIs and the N-API and WASM `formatMessage`/`formatSnapshot` contracts remain unchanged and do not expose a caller-configurable output limit.
+
 ## Operational Error Codes
 
 Formatter operational errors use the shared Phase 3A error code namespace. Formatter APIs, CLI JSON output, N-API, and WASM should use the same code strings.
@@ -231,6 +261,7 @@ Formatter-specific codes:
 | `invalid_snapshot` | `input` | `2` | Snapshot input is corrupt, unsupported, or missing required formatter capabilities, excluding source/snapshot mismatch. |
 | `input_read_failed` | `io` | `2` | An input file or discovered directory entry cannot be read. |
 | `output_write_failed` | `io` | `2` | Write mode cannot write formatted output. |
+| `alias_processing_blocked` | `io` | `2` | A prior logical alias in the same physical group returned `output_write_failed`, leaving the shared file state indeterminate. |
 | `internal_error` | `internal` | `2` | The formatter hits an implementation invariant or unexpected internal failure. |
 
 Formatter also reuses Phase 3A common codes:
@@ -404,7 +435,7 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the input file path. Phase 3B reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. The resource workflow adds `metadata_failed` when physical-file identity inspection fails before reading a selected target. Tier 3 XLIFF adds `unsupported_encoding` for its explicitly recognized UTF-16 BOM cases when that adapter ships; the value is not emitted before then. `invalid_utf8` reports input bytes that are not valid UTF-8 and requires `details.validUpTo` as a non-negative JSON integer equal to the byte length of the longest valid UTF-8 prefix. This shape is shared by file and stdin inputs; the source is not parsed and the target is reported as a file-specific operational error. The resource design owns the additional reason-specific fields and their release timing while preserving this shared code and target-local result placement.
+  The top-level `path` is the input file path. Phase 3B reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. The shared CLI physical-grouping boundary adds `metadata_failed` when physical-file identity inspection fails before reading a selected target; its required `ioKind` and optional `rawOsError` fields are owned by [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). Tier 3 XLIFF adds `unsupported_encoding` for its explicitly recognized UTF-16 BOM cases when that adapter ships; the value is not emitted before then. `invalid_utf8` reports input bytes that are not valid UTF-8 and requires `details.validUpTo` as a non-negative JSON integer equal to the byte length of the longest valid UTF-8 prefix. This shape is shared by file and stdin inputs; the source is not parsed and the target is reported as a file-specific operational error.
 
 - `output_write_failed`:
 
@@ -516,19 +547,40 @@ Directory and glob discovery also excludes common VCS, dependency, and output di
 
 File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
 
-Before parallel file execution, the shared CLI groups every final standalone or catalog file-mode target by physical file identity while preserving separate logical results. This applies even when no catalog target is selected, so symbolic-link and hard-link aliases of a standalone `.mf2` file cannot race in write mode. The exact physical identity, conflicting-classification, alias ordering, and write-failure rules are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection).
+Before parallel file execution, the shared CLI groups every final standalone or catalog file-mode target by physical file identity while preserving separate logical results. This applies even when no catalog target is selected, so symbolic-link and hard-link aliases of a standalone `.mf2` file cannot race in write mode. Physical identity, alias ordering, and the common fail-stop boundary are owned by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). The resource design owns the additional error contract for aliases whose standalone/catalog classifications conflict.
 
 Directory inputs such as `.` that contain no selected standalone or resource targets after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
 
 ### Parallel File Execution
 
-After discovery, de-duplication, ignore filtering, classification, and physical grouping finish, `crates/intlify_cli` processes different physical file groups concurrently using the bounded, command-scoped worker-thread pool defined by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). One scheduler work item is one physical file group. Logical aliases within that group execute the complete read, framing, format/check, result construction, and optional write pipeline serially in normalized logical-path order; different groups may run concurrently.
+After discovery, de-duplication, supported-input classification, ignore filtering, and physical grouping finish, `crates/intlify_cli` processes different physical file groups concurrently using the bounded, command-scoped worker-thread pool defined by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). Ignore sources are loaded and validated during setup, but matching occurs only after classification. One scheduler work item is one physical file group. Logical aliases within that group execute the complete read, framing, format/check, result construction, and optional write pipeline serially in normalized logical-path order; different groups may run concurrently.
 
 The initial implementation uses automatic bounded concurrency and exposes no `--threads` option. Stdin mode remains one caller-thread operation. Workers return structured results and never render directly to stdout or stderr. The coordinator restores stable normalized-path order before text or JSON rendering, summary calculation, and exit-status selection, so observable behavior is identical at worker width one and at any larger supported width. Formatter writes to unrelated physical groups may complete in any order, while the physical-group failure rules contain a write failure to the affected group.
 
 Pool initialization, dispatch, escaped worker panic, and join failures use the command-fatal `cli_worker_runtime_failed` contract in the shared parallel execution boundary. Formatter file mode does not retry them serially, does not return partial target results, and does not roll back writes that completed before safe worker teardown.
 
 This is file-level parallelism only. One standalone MF2 message and the entries of one catalog remain sequential within their group unless the separately benchmark-gated intra-file policy in the resource design is enabled later.
+
+### Physical Alias Write Failure
+
+Logical aliases within one physical group execute serially. A successful write is followed by a fresh open and read through the next alias. A target-local failure before a write attempt does not stop the group; the next alias remains processable. `output_write_failed` is the one fail-stop result because the direct-write boundary cannot certify whether the shared physical file is unchanged, partially written, or otherwise indeterminate.
+
+The alias whose write fails reports `status: "error"`, `changed: false`, and only the `output_write_failed` error in `results[].errors`. Its successful pre-write formatting result and mapped diagnostics are discarded. A standalone result retains `diagnostics: []` and omits `entries`; a catalog result retains `entries: []` and omits file-level `diagnostics`. It contributes to `matchedFiles` and `errorCount`, but not to `formattedFiles`, `differentFiles`, `unchangedFiles`, `diagnosticFiles`, or `diagnosticCount`.
+
+The CLI then performs no further stat, open, read, parse, extract, format, lint, candidate validation, result construction, or write for any later logical alias in that physical group. Each later alias receives one target-local `alias_processing_blocked` error with these stable details:
+
+```json
+{
+  "reason": "prior_alias_write_failed",
+  "predecessorPath": "locales/en.json"
+}
+```
+
+The operational error's top-level `path` is the blocked alias. `reason` is required and initially has only `"prior_alias_write_failed"`. `predecessorPath` is required and identifies the normalized logical path whose `output_write_failed` stopped the group; it follows the shared project-relative-or-absolute machine path rule and is not a physical identifier. The predecessor's underlying write-error details are not copied into blocked results.
+
+Each blocked result uses `status: "error"` and `changed: false`, contains only this error, and uses the same mutually exclusive empty payload as the failed predecessor: `diagnostics: []` for standalone or `entries: []` for a catalog. Each remains a selected target and therefore contributes to `matchedFiles` and `errorCount`, but to no success, difference, unchanged, or diagnostic count. Human output identifies both logical paths without exposing device, inode, volume, or file IDs. Unrelated physical groups continue.
+
+The implementation applies this rule even when a particular operating-system error appears to have occurred before the first output byte, because the shared write API does not certify an unchanged file state. Check modes, stdin, and lint perform no file write and never emit `alias_processing_blocked`.
 
 ### Ignore Sources
 
@@ -740,7 +792,7 @@ For stdin JSON output, `matchedFiles` is `1` unless stdin is skipped by ignore r
 
 If `--reporter json` can be parsed, invalid CLI combinations such as `--list-different --reporter json` still return the JSON envelope on stdout with `summary.status: "error"` and a top-level `invalid_cli_argument` error.
 
-Per-file input read failures and output write failures create `results[]` entries with `status: "error"` and continue processing other selected targets where possible. In resource file write mode, a successful or pre-write-failed alias allows the next alias in the same physical group to proceed, while an `output_write_failed` blocks later aliases in that group without affecting unrelated groups, as defined by the resource design. The final exit code is `2` and `summary.status` is `"error"`. Human text output may still include changed or would-format paths for successful targets, while operational errors are rendered to stderr.
+Per-file input read failures and output write failures create `results[]` entries with `status: "error"` and continue processing other selected targets where possible. Within one physical group, a successful or pre-write-failed alias allows the next alias to proceed, while an `output_write_failed` applies the [Physical Alias Write Failure](#physical-alias-write-failure) contract without affecting unrelated groups. The final exit code is `2` and `summary.status` is `"error"`. Human text output may still include changed or would-format paths for successful targets, while operational errors are rendered to stderr.
 
 Write mode generates the full formatted output in memory before writing. Phase 3B writes directly to the target file and does not guarantee rollback or atomic replacement if the filesystem write fails.
 
@@ -869,11 +921,11 @@ The message-level core lives in a workspace-internal Rust crate named `intlify_f
 
 The source-backed and snapshot-backed message-level entry points are synchronous and safe to invoke concurrently for independent inputs. `intlify_format` keeps parser and rendering scratch state within each call, exposes no process-wide mutable formatting state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
 
-The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, parser views, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
+The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, `BoundedFormatResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, parser views, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
 
-Compile-time assertions lock the required owned traits. Behavioral tests run independent source-backed and snapshot-backed calls concurrently, compare the complete success or failure values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
+Compile-time assertions lock the required owned traits. Behavioral tests run independent ordinary and bounded source-backed and snapshot-backed calls concurrently, compare the complete success, failure, or capacity values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, output caps, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
 
-The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
+The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. The renderer targets a sink abstraction rather than requiring one preallocated complete output string: ordinary formatting uses the normal string sink, while resource-aware bounded formatting uses the capped sink above. Neither path may materialize a second complete output before its selected sink. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
 
 Concrete Rust type names and implementation organization may still change during implementation, but the formatter pipeline and IR responsibilities follow the Phase 3B IR design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
 
@@ -917,7 +969,7 @@ Formatter binding packages do not have runtime dependencies on parser binding pa
 
 The formatter core formats one complete MF2 message and does not recognize resource host formats. Resource-aware `intlify fmt` behavior is a downstream composition defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-formatting).
 
-At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, invokes the existing message-level formatter for each entry, and asks the resource layer to validate and compose host-document write-back. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both.
+At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, invokes the bounded Rust message formatter for each entry, admits completed writable outputs through the resource-owned raw-order candidate-message budget before retaining them, and asks the resource layer to validate and compose host-document write-back. A clean read-only result is discarded and its original message remains the effective candidate value; a bounded-output signal for such a discarded result is not a candidate resource failure. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both and translates the formatter-owned capacity signal through the resource-owned admission contract.
 
 This document remains authoritative for message-level formatting and the standalone `.mf2` formatter contract. The resource design is authoritative for catalog membership, host-format parsing, entry mapping, read-only handling, aggregation, validated write-back, resource failures, and the catalog result extension. Those details are not duplicated here.
 
@@ -1079,6 +1131,7 @@ Behavior coverage:
 | idempotency of formatted output | Core formatter PRs | `MUST` |
 | formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
 | parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
+| bounded source/snapshot rendering at the exact byte boundary and first byte over, no partial result, ordinary-result equivalence below the cap, and no complete-output allocation before the capped sink | Core formatter PRs / resource formatter integration PR | `MUST` |
 | compile-time `Send` assertions for worker-boundary options/results, concurrent source/snapshot calls matching serial baselines, and error/panic fault isolation without reusable-state poisoning | Core formatter PRs / CLI formatter PR | `MUST` |
 | `intlify fmt` write mode | CLI formatter PR | `MUST` |
 | `intlify fmt --check` and `--list-different` | CLI formatter PR | `MUST` |
@@ -1243,6 +1296,7 @@ Formatter benchmarks should separate:
 - syntax traversal cost
 - layout construction cost
 - rendering cost
+- bounded rendering cost at completion and first-byte-over termination
 - N-API binding call cost
 - WASM binding call cost
 - CLI end-to-end format cost
@@ -1253,6 +1307,7 @@ Phase 3 benchmark names:
 
 - `format_standard`
 - `format_preserve`
+- `format_bounded_output`
 - `format_check_cli_e2e`
 - `format_check_json`
 - `e2e_format`

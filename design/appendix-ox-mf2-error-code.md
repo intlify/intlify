@@ -152,7 +152,7 @@ Intentional reuse keeps the same top-level code rather than adding a product-pre
 | --- | --- |
 | Formatter input and snapshot | `source_snapshot_mismatch`, `unsupported_input_file`, `invalid_options`, `invalid_snapshot` |
 | Discovery and ignore processing | `invalid_ignore_pattern`, `ignore_file_read_failed`, `unmatched_input` |
-| Target I/O | `input_read_failed`, `output_write_failed` |
+| Target I/O and physical-alias write containment | `input_read_failed`, `output_write_failed`, `alias_processing_blocked` |
 | Formatter invariant | `internal_error` |
 
 The formatter also reuses the applicable shared Phase 3A codes. [Formatter IR](./011-ox-mf2-formatter-ir-design.md#invariant-and-error-boundaries) owns the pipeline phases and invariant boundary that become formatter `internal_error` failures.
@@ -175,9 +175,9 @@ Parser, semantic, and lint findings remain in the separate JSON-visible diagnost
 - `resource_document_unsupported`
 - `resource_limit_exceeded`
 
-It reuses `config_validation_failed`, `input_path_unrepresentable`, `input_read_failed`, `output_write_failed`, and `internal_error`. The CLI scheduler additionally owns `alias_processing_blocked` for physical-alias fail-stop behavior and `input_target_conflict` for conflicting classifications of one physical input.
+It reuses `config_validation_failed`, `input_path_unrepresentable`, `input_read_failed`, `output_write_failed`, and `internal_error`. The formatter/shared CLI contract owns `alias_processing_blocked` for physical-alias write-failure containment. The resource workflow owns `input_target_conflict` for conflicting standalone/catalog classifications of one physical input.
 
-The editor design intentionally projects `resource_format_unsupported`, `resource_entry_unsupported`, `resource_document_unsupported`, and `resource_limit_exceeded` into error-severity editor diagnostics with source `ox-mf2-resource`. This is a defined cross-surface projection, not admission into the parser/semantic/lint diagnostic namespace. `resource_parse_failed` remains an operational extraction outcome and does not produce a new ox-mf2 editor diagnostic; the exact retention behavior is owned by [Diagnostics Publication](./009-ox-mf2-phase-3d-lsp-editor-design.md#diagnostics-publication).
+The editor design intentionally projects original-extraction `resource_format_unsupported`, `resource_entry_unsupported`, `resource_document_unsupported`, and `resource_limit_exceeded` into error-severity editor diagnostics with source `ox-mf2-resource`. A `resource_limit_exceeded` with `phase: "validate_write_back"` is instead a request-scoped formatting failure: it returns no edits and does not change document diagnostics or installed state. This is a defined cross-surface projection, not admission into the parser/semantic/lint diagnostic namespace. `resource_parse_failed` remains an operational extraction outcome and does not produce a new ox-mf2 editor diagnostic; the exact publication and retention behavior is owned by [Diagnostics Publication](./009-ox-mf2-phase-3d-lsp-editor-design.md#diagnostics-publication).
 
 ### Detail Schema Ownership
 
@@ -186,10 +186,10 @@ The registry assigns top-level code ownership. Stable subordinate schemas remain
 | Detail family | Owning design |
 | --- | --- |
 | CLI routing, config loading, config parsing, native wrapper, and shared envelope | [Phase 3A](./006-ox-mf2-phase-3a-tooling-foundation-design.md) |
-| Shared CLI worker scheduling | [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) |
-| Formatter options, snapshots, discovery, ignore files, target I/O, and formatter invariant phases | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md) and [Formatter IR](./011-ox-mf2-formatter-ir-design.md) |
+| Shared CLI worker scheduling, physical identity/grouping, metadata inspection, alias ordering, and common fail-stop boundary | [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) |
+| Formatter options, snapshots, discovery, ignore files, target I/O, exact alias-blocked results, and formatter invariant phases | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md) and [Formatter IR](./011-ox-mf2-formatter-ir-design.md) |
 | Linter binding input/options and semantic or rule invariant reasons | [Phase 3C](./008-ox-mf2-phase-3c-linter-design.md) and [Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) |
-| Resource config, classification, parsing, representability, limits, alias scheduling, and adapter invariant reasons | [Resource catalog adapter](./013-ox-mf2-resource-catalog-adapter-design.md) |
+| Resource config, catalog classification conflicts, parsing, representability, limits, catalog result specializations, and adapter invariant reasons | [Resource catalog adapter](./013-ox-mf2-resource-catalog-adapter-design.md) |
 
 When two products reuse a top-level code, their detail variants are a union only after the owning documents define how a consumer distinguishes and validates every variant. This appendix indexes the current ownership but does not silently normalize incompatible `details` fields.
 
