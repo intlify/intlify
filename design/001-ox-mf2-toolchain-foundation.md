@@ -19,6 +19,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 - The implementation-oriented details for Phase 2 Binary AST snapshots live in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md).
 - The implementation-oriented details for Phase 2 language bindings live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 - The implementation-oriented details for Phase 3 tooling and transport live in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md).
+- The unnumbered resource catalog milestone that follows Phase 3C and precedes Phase 3D lives in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 
 ## Design Philosophy
 
@@ -242,7 +243,7 @@ The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1
 
 Adopt `parser core plus product crates`.
 
-The parser crate is the MF2 foundation crate. Formatter, linter, and CLI behavior live in separate workspace-internal product crates so each product can own its configuration, result shaping, fixtures, and release boundary without duplicating parser behavior.
+The parser crate is the MF2 foundation crate. Formatter, linter, CLI, and resource catalog behavior live in separate workspace-internal crates so each layer can own its configuration, result shaping, fixtures, and release boundary without duplicating parser or host-adapter behavior.
 
 ```text
 crates/
@@ -252,9 +253,11 @@ crates/
   intlify_format    # formatter engine, formatter config, layout, and rendering
   intlify_lint      # linter engine, configurable rule execution, presets,
                     # lint config, rule registry, and result shaping
+  intlify_resource  # host-format registry, catalog config, extraction, mapping,
+                    # resource limits, and validated write-back re-escaping
 ```
 
-The product crates depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal product crates do not imply crates.io publishing.
+`intlify_format` and `intlify_lint` depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. `intlify_resource` remains independent of the parser, formatter, and linter cores; `intlify_cli` composes its extracted entries with those message-level products. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal crates do not imply crates.io publishing.
 
 ### Spec Tracking
 

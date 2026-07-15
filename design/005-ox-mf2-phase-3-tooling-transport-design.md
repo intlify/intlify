@@ -44,6 +44,16 @@ Implementation should be split by consumer-facing product surface:
    - recommended preset, core semantic diagnostics, and initial configurable lint rules
    - `@intlify/lint-napi` and `@intlify/lint-wasm`
 
+**Unnumbered layered milestone after Phase 3C and before Phase 3D: Resource Catalog Support**
+
+- workspace-internal `crates/intlify_resource` and the consumer-neutral extraction/write-back contract
+- Tier 1 JSON catalog adapter
+- additive `resources` project config, unified schema update, catalog membership, and format resolution
+- catalog-aware `intlify fmt` and `intlify lint` composition over the completed message-level products
+- resource validation, deterministic reporter, concurrency, and release-gate coverage required before editor consumption
+
+This milestone deliberately has no Phase 3 number: it composes the completed 3A–3C products rather than defining another standalone product surface. It must nevertheless finish before Phase 3D starts its opted-in catalog path, so editor integration consumes one implemented resource layer instead of creating a provisional duplicate. The complete Tier 1 milestone is part of the initial tooling v0.1 feature scope. In Phase 3 documents, that label describes the tooling product feature set; it is independent of the Binary AST snapshot header version and the existing `@intlify/cli` npm package version.
+
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
    - `.mf2` and opted-in catalog resource message mapping
@@ -61,11 +71,11 @@ Implementation should be split by consumer-facing product surface:
    - MessagePack transport evaluation
    - daemon/session/cache optimization for repeated language-service queries
 
-Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts.
+Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. The unnumbered resource milestone does not retroactively add resource implementation work to the Phase 3B or Phase 3C product PR sequences.
 
 ## CLI Parallel Execution Boundary
 
-`crates/intlify_cli` owns batch scheduling for the native `intlify fmt` and `intlify lint` file workflows. Parser, formatter, linter, and resource crates expose synchronous operations that are safe to invoke concurrently with independent per-call state; they do not create worker threads, select a concurrency width, own an async runtime, or aggregate CLI output. In particular, `crates/intlify_resource` guarantees concurrent use of its registry and immutable extraction artifacts while leaving all decisions about whether and where to run calls concurrently to its consumer.
+`crates/intlify_cli` owns batch scheduling for the native `intlify fmt` and `intlify lint` file workflows. Parser, formatter, linter, and resource crates expose synchronous operations that are safe to invoke concurrently with independent per-call state; they do not create worker threads, select a concurrency width, own an async runtime, or aggregate CLI output. The parser's `parse_batch` is a sequential convenience operation rather than an exception to this rule; consumers that need parallel parsing schedule independent synchronous calls at their own boundary. In particular, `crates/intlify_resource` guarantees concurrent use of its registry and immutable extraction artifacts while leaving all decisions about whether and where to run calls concurrently to its consumer.
 
 Concurrent-use safety is an explicit core acceptance boundary, not an incidental consequence of the first implementation. Owned work descriptions and structured results transferred between the CLI coordinator and workers must be `Send`; any resolved configuration, registry, or other immutable core state intentionally shared by multiple workers must be `Send + Sync`. Per-call parser, semantic, rule, layout, and rendering scratch types that never cross or share across the worker boundary do not acquire a blanket `Send + Sync` requirement. Formatter, linter, and resource crates expose no process-wide mutable execution state, and thread-local caches or dependency internals must not change results, ordering, diagnostics, errors, or later-call behavior.
 
@@ -81,9 +91,9 @@ Every runnable physical group has one workflow classification. Products that add
 
 A target-local failure before a filesystem write attempt does not stop later aliases in its physical group. This includes read, parse, extraction, formatter, linter, candidate-validation, diagnostic-mapping, and result-construction failures. An `output_write_failed` result in formatter write mode is the sole fail-stop case because direct writes provide no rollback guarantee and may leave the physical file indeterminate. The CLI performs no further stat, open, read, parse, format, lint, or write for later aliases in that group; unrelated groups continue. The exact current-target result, synthesized `alias_processing_blocked` results, details, and summary accounting are owned by [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md#physical-alias-write-failure). Check modes and lint never cross this write-failure boundary and therefore always continue after a target-local failure.
 
-Each file-mode command creates at most one bounded, command-scoped worker-thread pool after the runnable groups are known. No pool is created when there are no runnable groups. Otherwise, the initial default width is `max(1, min(runnable_physical_groups, available_parallelism, MAX_CLI_WORKERS))`, with the internal product constant `MAX_CLI_WORKERS` initially fixed at `4`. This hard ceiling bounds simultaneous source, parser, extraction-artifact, formatted-message, replacement, and candidate-artifact retention when several large catalogs are selected. Parser, formatter, linter, and resource work uses that same pool rather than creating nested or crate-specific pools. Stdin mode is one caller-thread workflow and does not construct a file worker pool. An async runtime is not required solely for these CPU-heavy synchronous pipelines.
+Each file-mode command creates at most one bounded, command-scoped worker-thread pool after the runnable groups are known. No pool is created when there are no runnable groups. Otherwise, the initial default width is `max(1, min(runnable_physical_groups, available_parallelism, MAX_CLI_WORKERS))`, with `4` as the provisional implementation value of the internal product constant `MAX_CLI_WORKERS`. This hard ceiling bounds simultaneous source, parser, extraction-artifact, formatted-message, replacement, and candidate-artifact retention when several large catalogs are selected. Parser, formatter, linter, and resource work uses that same pool rather than creating nested or crate-specific pools. Stdin mode is one caller-thread workflow and does not construct a file worker pool. An async runtime is not required solely for these CPU-heavy synchronous pipelines.
 
-`MAX_CLI_WORKERS` is not a public CLI option, config field, environment variable, or machine-readable output field. It may be tuned in a later release from representative scheduling, memory, and end-to-end benchmarks without a compatibility change, provided the pool remains bounded and every observable ordering, error, result, and exit contract stays identical. Tests inject widths independently of this production default and include runnable group counts below, at, and above the ceiling. The concrete pool dependency and scheduling algorithm are implementation details within those constraints.
+`MAX_CLI_WORKERS` is not a public CLI option, config field, environment variable, or machine-readable output field. Before the first resource-catalog release adopts a production value, the resource benchmark gate compares worker width one with the provisional width four over near-limit message-dense, structure-dense, lint, and changed-format/write-back workloads and records peak live allocation or peak RSS under one documented measurement setup. Width four must be explicitly accepted from that measured memory envelope; if the result is not accepted or no reliable measurement is available, the production constant is reduced to two or one and the gate is rerun. This is a release decision over an internal bound, not a new runtime resource error, dynamic memory scheduler, or compatibility surface. Afterward the constant may still be tuned in a later release from representative scheduling, memory, and end-to-end benchmarks without a compatibility change, provided the pool remains bounded and every observable ordering, error, result, and exit contract stays identical. Tests inject widths independently of this production default and include runnable group counts below, at, and above the active ceiling. The concrete pool dependency and scheduling algorithm are implementation details within those constraints.
 
 Every worker-runtime infrastructure failure is command-fatal. Failure to obtain the operating system's available parallelism, construct the pool, spawn a worker, dispatch work, contain a worker panic, or join and tear down the pool does not fall back to caller-thread or partially available serial execution. The command emits exactly one top-level `internal_error` with `details.reason: "cli_worker_runtime_failed"` and `details.phase` equal to `"initialize"`, `"dispatch"`, `"execute"`, or `"join"`. The normal top-level `path` is included only when the scheduler can identify the active normalized logical target exactly; dependency error names, panic payloads, backtraces, and Rust debug text are not exposed.
 
@@ -168,7 +178,9 @@ The Phase 3 formatter deliverables are the Rust formatter engine, CLI command, N
 
 From Phase 2 onward, public AST input for formatter APIs is the Binary AST decoder/accessor view.
 
-Formatter implementation may have Rust-internal fast paths over construction-time tables when formatting immediately after parse. However, stable public formatter input is the Binary AST view shared by Rust, N-API, WASM, and later consumers.
+Formatter implementation has a workspace-internal parsed-artifact path for callers that already own a paired `SourceStore` and `ParseResult`. `intlify_format` constructs a private, validated formatter input view over that pair and traverses the existing CST tables directly. This path must not call the parser again, encode a Binary AST snapshot, or decode a snapshot. It also must not depend on the higher-level `CachedParse` type: cache consumers pass references to the owner/result pair that the cache keeps together. Detectable owner, source-id, table-reference, span, UTF-8-boundary, diagnostic, and mode-capability inconsistencies fail before Layout IR construction. The original owner/result pairing remains a caller invariant because coincidentally equal numeric `SourceId` values do not prove store identity.
+
+This parsed-artifact path is a Rust workspace integration boundary, not a crates.io, N-API, WASM, or serialized compatibility surface. Stable public formatter input remains the Binary AST view shared by Rust, N-API, WASM, and later consumers. Source-backed, parsed-artifact-backed, and snapshot-backed calls converge on one formatter syntax-view abstraction before Layout IR construction so formatting behavior does not vary by artifact transport.
 
 The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. `formatSnapshot(snapshot, source, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The complete source string is required in every formatter mode for source slicing, parser diagnostic materialization, output comparison, and available snapshot/source consistency checks; preserve mode additionally uses it for source-shape decisions. The Phase 3 formatter does not expose a source-free snapshot mode. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
 
@@ -251,7 +263,7 @@ Formatter detail notes to resolve in the dedicated formatter design:
 
 ### Formatter Benchmarks
 
-Formatter output should measure parser, snapshot encode/decode/access, syntax traversal, layout construction, rendering, binding calls, and CLI end-to-end cost separately.
+Formatter output should measure parser, parsed-artifact attachment/direct CST access, snapshot encode/decode/access, shared syntax traversal, layout construction, rendering, binding calls, and CLI end-to-end cost separately. Parsed-artifact benchmarks must keep snapshot encoder/decoder counters at zero so an accidental serialization detour is visible.
 
 ## Linter Input
 
@@ -505,7 +517,7 @@ Long-lived language-service workflows may reuse parse artifacts per document ver
 - future `SemanticView` for semantic queries once semantic APIs are exposed
 - diagnostics store for parser, semantic, and linter diagnostics
 
-Document-version changes invalidate extraction, mapping, and mapped-result state tied to that version. Message-level parse artifacts may survive a host-document version change only when their complete cache key, including exact message bytes, remains equal; this permits unchanged catalog entries to reuse parse work after an unrelated host edit. Successful editor configuration reloads use the dependency-specific invalidation matrix and root config-generation checks in the dedicated LSP/editor design rather than flushing all artifact classes indiscriminately. Cache ownership and eviction remain adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
+Document-version changes invalidate extraction, mapping, and mapped-result state tied to that version. Message-level parse artifacts may survive a host-document version change only when their complete cache key, including exact message bytes, remains equal; this permits unchanged catalog entries to reuse parse work after an unrelated host edit. Formatter consumers reuse such an artifact through the workspace-internal paired `SourceStore` / `ParseResult` path rather than reparsing or converting it to a snapshot. Successful editor configuration reloads use the dependency-specific invalidation matrix and root config-generation checks in the dedicated LSP/editor design rather than flushing all artifact classes indiscriminately. Cache ownership and eviction remain adapter concerns, not parser, formatter, or linter core responsibilities. Detailed parse artifact cache policy belongs in `design/ox-mf2-parse-artifact-cache.md`.
 
 ### Diagnostics Workflow
 
@@ -612,13 +624,18 @@ Initial Phase 3 benchmark phases:
 - lint_json
 - lint_binding_napi
 - lint_binding_wasm
-- check_cli_e2e
-- check_json
-- agent_cli_json
 - cache_miss_parse
 - e2e_format
 
 The CLI startup benchmarks are Phase 3A foundation baselines. They should measure a direct native binary invocation, the npm wrapper invoking the native binary from the source tree, and an installed `node_modules/.bin/intlify` invocation separately. These measurements isolate Node.js wrapper startup, native package resolution, and native process spawn overhead from formatter, linter, parser, and transport work. They are baseline measurements rather than blocking performance gates.
+
+Deferred product and integration benchmark phases:
+
+- check_cli_e2e
+- check_json
+- agent_cli_json
+
+`check_cli_e2e` and `check_json` activate only after the post-v0.1 addendum defines and schedules the combined `intlify check` command. They are distinct from `format_check_cli_e2e` and `format_check_json`, which measure the initial `intlify fmt --check` workflow and remain in the initial list. `agent_cli_json` activates only when Phase 3E resumes and selects a concrete agent-facing deliverable; the accepted CLI JSON consumption profile alone does not schedule that benchmark.
 
 Future transport benchmark phases:
 

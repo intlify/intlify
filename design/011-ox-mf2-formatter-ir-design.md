@@ -12,7 +12,7 @@ The formatter IR should provide a stable implementation boundary between syntax 
 
 Primary goals:
 
-- avoid direct string concatenation during `SnapshotView` traversal
+- avoid direct string concatenation during formatter syntax-view traversal
 - represent formatter output as a structured document or layout tree before rendering
 - support standard and preserve formatting modes through one formatter pipeline
 - keep line, group, and indent decisions explicit enough for future line wrapping
@@ -42,13 +42,14 @@ Range-only and minimal-diff editing remain LSP/editor integration concerns. Reso
 
 The IR is an internal implementation detail of `intlify_format`.
 
-The public formatter API accepts source text or a `SnapshotView`, then returns formatted text or diagnostics/errors. Callers do not construct or inspect formatter IR nodes.
+The public formatter API accepts source text or a `SnapshotView`, then returns formatted text or diagnostics/errors. A separate workspace-internal path accepts an original `SourceStore` / `ParseResult` pair and constructs a private validated `ParsedFormatInput<'_>`. Callers do not construct or inspect formatter IR nodes, and the parsed-artifact path does not serialize its input into a snapshot.
 
 The intended pipeline is:
 
 ```text
-source text
-  -> parser / SnapshotView
+source text -> parser-owned result --+
+paired SourceStore + ParseResult -----+-> formatter syntax view
+Binary AST SnapshotView + source ----+
   -> formatter syntax traversal
   -> MF2 Layout IR construction
   -> MF2 Layout IR normalize pass
@@ -62,9 +63,21 @@ The formatter uses a two-layer IR:
 1. **MF2 Layout IR**: an ox-mf2-specific layout model that captures message structure and formatter intent.
 2. **Document IR**: a small Prettier-style document model that captures text rendering primitives.
 
-The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from `SnapshotView` spans and trivia during MF2 Layout IR construction.
+The MF2 Layout IR carries enough structure for MF2-specific rendering decisions without duplicating the full parser artifact or snapshot. Source-sensitive decisions, such as preserve-mode source shape and blank-line grouping, are derived from the common formatter syntax view's spans and trivia during MF2 Layout IR construction.
 
 The Document IR is independent of MF2 semantics. It should not know about matcher tables, declarations, selectors, or pattern semantics. Its job is to render an already-decided document layout deterministically.
+
+### Formatter Syntax Input Boundary
+
+`intlify_format` normalizes each accepted transport into one private read-only syntax-view contract before constructing Layout IR:
+
+- source-backed calls parse once, retain the parser-created owner/result pair for the duration of the call, and attach that pair directly
+- workspace parsed-artifact calls borrow the caller's original `SourceStore` / `ParseResult` pair through `ParsedFormatInput<'_>`
+- snapshot-backed calls borrow a validated `SnapshotView<'_>` together with the supplied source text
+
+The common contract supplies source-ordered roots, nodes, tokens, trivia capability, parser diagnostics, UTF-8 byte spans, and verified source slicing. Layout IR construction does not branch on whether those facts came from parser tables or snapshot tables. Transport-specific validation finishes before traversal: parsed-artifact attachment follows the [Phase 3B parsed artifact requirements](./007-ox-mf2-phase-3b-formatter-design.md#parsed-artifact-requirements), while snapshot validation follows its separate public input/error contract.
+
+`ParsedFormatInput<'_>` is deliberately sealed inside `intlify_format`. The workspace functions take `&SourceStore` and `&ParseResult`, validate and create the view, run the request, and drop the view before returning. The type does not own source text, CST tables, or diagnostics, cannot outlive either borrow, and has no constructor that accepts a `CachedParse`. This keeps the formatter below cache policy while allowing `ParseCache`, resource formatting, and editor consumers to reuse the same parse without reparsing or snapshot encode/decode.
 
 ## MF2 Layout IR
 
@@ -312,7 +325,7 @@ struct LayoutNodeMeta {
 
 `blank_lines_before` is computed from the major node's leading trivia or previous-token gap and then normalized to `0` or `1`. Preserve mode uses blank-line grouping only at major syntax boundaries such as top-level declarations, message body, matcher rows, and major pattern or markup chunks. Standard mode treats `blank_lines_before` as `0`. Leading blank lines before the message are not emitted, the final file LF is applied by CLI file framing rather than by message-level output, and blank lines inside pattern text are preserved as semantically significant source slices rather than normalized as grouping metadata.
 
-Standard-mode IR construction does not use trivia for layout decisions, so trivia-less snapshots are accepted in standard mode. Preserve-mode IR construction requires token-level leading/trailing trivia records. A snapshot-backed preserve-mode request on a snapshot without trivia records fails before MF2 Layout IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`. Deriving equivalent whitespace information from verified source/token gaps is a possible future optimization, not part of the Phase 3B contract.
+Standard-mode IR construction does not use trivia for layout decisions, so trivia-less snapshots and parsed artifacts with `trivia_collected: false` are accepted in standard mode. Preserve-mode IR construction requires token-level leading/trailing trivia records. A snapshot-backed preserve-mode request on a snapshot without trivia records fails before MF2 Layout IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`; a workspace parsed-artifact request with `trivia_collected: false` is a caller contract violation and fails at `parsed_artifact_attachment`. Deriving equivalent whitespace information from verified source/token gaps is a possible future optimization, not part of the Phase 3B contract.
 
 MF2 does not define line comments or block comments. The formatter IR does not model comments, and Phase 3B does not support syntax-local formatter ignore directives. Attribute syntax remains part of expressions and markup, but attributes are not treated as formatter comments or suppression directives.
 
@@ -537,9 +550,11 @@ Runtime invariant violations include:
 
 `formatSnapshot(snapshot, source, options)` and `checkSnapshot(snapshot, source, options)` have a separate boundary before IR construction. Snapshot/source mismatches detected during that input consistency check return `source_snapshot_mismatch`. Phase 3B keeps this check best-effort when the snapshot does not carry source identity data or consistency metadata. Invalid snapshot bytes, unsupported snapshot versions, or missing formatter-required snapshot capabilities detected before IR construction return `invalid_snapshot`. Once the formatter has built IR from supposedly consistent input, later source/span contradictions are `internal_error`.
 
+`format_parsed`, `check_parsed`, and `format_parsed_bounded` instead validate the borrowed `SourceStore` / `ParseResult` attachment before IR construction. Detectable source-owner, source-id, table-reference, span, UTF-8-boundary, or required-trivia contradictions return `internal_error` with phase `parsed_artifact_attachment`; they are workspace integration failures rather than `invalid_snapshot` or `source_snapshot_mismatch`. This validation neither reparses the source nor serializes the artifact.
+
 A snapshot-backed request without verifiable diagnostic capability fails before IR construction with `invalid_snapshot` and `details.reason: "missing_capability"`. Formatter IR is only built after the formatter can verify the supplied snapshot represents a diagnostic-free parse. IR construction must not treat a zero diagnostic count as sufficient proof if the snapshot format cannot distinguish "no diagnostics" from "diagnostics were intentionally omitted."
 
-Parser diagnostics are not internal errors. If source text or a supplied snapshot contains parser diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and do not start IR construction. `errors` remains empty unless an independent operational error also occurred.
+Parser diagnostics are not internal errors. If source text, a parsed result, or a supplied snapshot contains parser diagnostics, formatter APIs return `ok: false` with `diagnostics` populated and do not start IR construction. `errors` remains empty unless an independent operational error also occurred.
 
 Invalid options are rejected before IR construction:
 
@@ -573,13 +588,14 @@ Public `internal_error.details` must contain the stable reason `formatter_invari
 }
 ```
 
-The required `phase` is one of `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, or `document_ir_render`. Consumers select the shared `internal_error` variant by `reason` before interpreting this formatter-owned phase.
+The required `phase` is one of `parsed_artifact_attachment`, `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, or `document_ir_render`. Consumers select the shared `internal_error` variant by `reason` before interpreting this formatter-owned phase.
 
 ## Benchmarks
 
 Formatter IR benchmark stages should align with the pipeline:
 
-- `SnapshotView` traversal
+- parsed-artifact attachment
+- formatter syntax-view traversal, split by parsed-artifact and `SnapshotView` input
 - MF2 Layout IR construction
 - MF2 Layout IR normalize pass
 - Document IR lowering

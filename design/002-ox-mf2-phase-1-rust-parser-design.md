@@ -515,7 +515,7 @@ The primary parser API uses SourceStore and SourceId for caller-managed and batc
 ```rust
 parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> Result<ParseResult, ParseError>
 parse_message(source: &str) -> Result<ParseResult, ParseError>
-parse_batch(inputs: &[ParseInput], options: BatchParseOptions) -> Result<BatchParseResult, BatchParseError>
+parse_batch(inputs: &[ParseInput], options: ParseOptions) -> Result<BatchParseResult, BatchParseError>
 
 parse_source_session<'a>(
   sources: &'a SourceStore,
@@ -639,7 +639,7 @@ let inputs = vec![
   },
 ];
 
-let result = parse_batch(&inputs, BatchParseOptions::default())?;
+let result = parse_batch(&inputs, ParseOptions::default())?;
 
 for item in result.items {
   println!("source={:?}, diagnostics={}", item.source, item.result.diagnostics.len());
@@ -702,37 +702,14 @@ ParseSessionResult<'a> {
 
 `SemanticView<'a>` in `ParseSessionResult` is a Rust-internal borrowed view over semantic facts. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
 
-Batch parsing uses a separate option type so execution strategy can evolve without changing parse semantics.
+Batch parsing uses the same `ParseOptions` as single-message parsing. `parse_batch` is a synchronous, sequential convenience API; it does not accept an execution strategy, thread count, or result-order option. Parallel scheduling is a consumer responsibility rather than a parser API concern.
 
-```rust
-BatchParseOptions {
-  execution: BatchExecution,
-  max_threads: Option<usize>,
-  preserve_order: bool,
-  parse: ParseOptions,
-}
-
-enum BatchExecution {
-  Sequential,
-  Parallel,
-}
-```
-
-Defaults:
-
-- `execution = BatchExecution::Sequential`
-- `max_threads = None`
-- `preserve_order = true`
-- `parse = ParseOptions::default()`
-
-Batch results must preserve the mapping from each ParseInput to SourceId and ParseResult.
+Batch results preserve the mapping from each `ParseInput` to `SourceId` and `ParseResult` in input order.
 
 ```rust
 BatchParseResult {
   sources: SourceStore,
   items: Vec<BatchParseItem>,
-  execution: BatchExecution,
-  degraded: bool,
 }
 
 BatchParseItem {
@@ -741,49 +718,30 @@ BatchParseItem {
 }
 ```
 
-The returned `sources` store owns the batch source text and metadata used by diagnostics and result mapping. `execution` reports the mode that actually ran. `degraded` is `true` when the requested execution mode was not honoured.
-
-Phase 1 implements `BatchExecution::Sequential`. Requesting `BatchExecution::Parallel` falls back to sequential execution, returns `execution = BatchExecution::Sequential`, and sets `degraded = true`. `max_threads` and `preserve_order` are reserved for the future parallel implementation; the current sequential implementation always preserves input order.
+The returned `sources` store owns the batch source text and metadata used by diagnostics and result mapping. The item sequence always matches the input sequence.
 
 The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
 
 `parse_semantic` defaults to `false` so parser throughput and SemanticModel construction throughput can be measured separately.
 
-## Parallel Parsing Design
+## Caller-Owned Parallel Parsing
 
-ox-mf2 considers multi-threaded parsing, but Phase 1 does not implement parallel execution. MF2 messages are usually small compared with source files, so future parallelism should be message-level parallelism across project / locale files / benchmark corpora, not internal splitting of a single message.
+All `ox_mf2_parser` entry points are synchronous and scheduler-neutral. `parse_message`, `parse_source`, and `parse_source_session` parse one message, while `parse_batch` processes its inputs sequentially and always returns items in input order. None of them creates worker threads, owns a thread pool or async runtime, accepts a concurrency width, or changes behavior according to target thread support.
 
-Current Phase 1 behavior:
+Consumers that need project-scale parallelism schedule independent parser calls through their own bounded execution layer. CLI formatting and linting use the command-scoped file-worker boundary defined by Phase 3; a future asynchronous binding API may own binding workers while continuing to call the same synchronous parser operations. A consumer must not create nested parser work beneath an already scheduled file task merely because it invokes `parse_batch`.
 
-- `parse_message`, `parse_source`, and `parse_source_session` are deterministic single-message parsers.
-- `parse_batch` always runs sequentially.
-- Requesting `BatchExecution::Parallel` does not fail; it degrades to sequential execution.
-- A degraded batch result returns `execution = BatchExecution::Sequential` and `degraded = true`.
-- Result order is always input order.
-
-Future parallel implementation policy:
-
-- `parse_batch` may use message-level parallelism.
-- Each worker owns a thread-local `ParseWorkspace` and does not share parser state, CstTables, diagnostic buffers, or temporary allocation.
-- SourceStore assigns SourceId before parsing and is read immutably during parsing.
-- BatchParseResult preserves input-order mapping and does not depend on parallel completion order.
-- Diagnostics carry `SourceId + Span`, so source identity can be shared across workers.
-- The accessor surface used by formatter/linter/compiler is the same regardless of parallel parsing.
-
-`parse_batch` parallelism must not change parser semantics. The only difference between parallel and sequential execution is strategy; CST, SemanticModel, diagnostics, and result ordering should be the same.
-
-Implementation constraints:
+Concurrent-use constraints:
 
 - The parser has no shared mutable global state.
-- If string interning or cooked value caches are introduced, keep them worker-local on the parse hot path; global table merging happens after the batch.
-- SourceStore should use immutable data layout that can be `Sync`.
-- CstTables and ParseResult should be `Send` so workers can move results to the main thread.
-- Executors such as Rayon are implementation details; the public API does not depend on a specific executor.
-- WASM and embedded targets may not support threads, so sequential fallback is mandatory.
+- Each concurrent call owns its `ParseWorkspace`, CstTables, diagnostic buffers, and temporary allocation.
+- Immutable source or configuration state intentionally shared by consumers must satisfy the applicable `Sync` boundary; owned results transferred out of a worker must be `Send`.
+- If string interning or cooked-value caches are introduced, they remain call-local or otherwise preserve identical results and failure isolation under concurrent invocation.
+- Diagnostics retain `SourceId + Span`, and concurrent scheduling never changes CST, SemanticModel, diagnostic, or result semantics.
+- The parser crate does not depend on an executor such as Rayon solely to provide batch scheduling.
 
-Benchmarks must not report a parallel number until a real parallel implementation exists. Phase 1 reports `parse_batch_session` and `parse_batch_sequential`. Future parallel benchmarks should be added as separate phase names, such as `parse_batch_parallel` and `parse_batch_parallel_with_semantic`.
+Phase 1 reports `parse_batch_session` and `parse_batch_sequential` as parser-owned benchmark phases. A consumer-owned parallel benchmark must be named and measured at that consumer boundary, including its scheduler and aggregation costs; it is not reported as parser-core parallel throughput.
 
-External parser comparison uses parser-core single-message phases, primarily `parse_cst_no_trivia` and `parse_cst`, rather than degraded batch execution. `parse_batch_session` and future parallel phases are reported separately as project-scale ox-mf2 throughput.
+External parser comparison uses parser-core single-message phases, primarily `parse_cst_no_trivia` and `parse_cst`. `parse_batch_session` remains a separate project-shaped sequential throughput measurement.
 
 ## Source and Span Contract
 
@@ -1162,9 +1120,8 @@ Test categories:
 - SemanticModel construction tests: declarations, references, selectors, and variants link correctly to NodeId / Span
 - data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
 - source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
-- batch parse tests: ParseInput metadata, SourceId, and diagnostic mapping remain stable
-- batch execution fallback tests: requesting `BatchExecution::Parallel` in Phase 1 returns sequential results with `degraded = true`
-- future parallel batch tests: once parallel execution is implemented, sequential and parallel modes produce the same CST, SemanticModel, diagnostics, and result ordering
+- batch parse tests: `ParseInput` metadata, `SourceId`, diagnostic mapping, and input-order results remain stable
+- concurrent invocation tests: caller-scheduled independent parser calls produce the same CST, SemanticModel, diagnostics, and failures as serial calls without shared-state contamination
 - benchmark smoke tests: benchmark corpus and CLI commands are runnable
 
 CST snapshots are not themselves the public compatibility contract. They are used to detect unintended parser implementation changes. When spec changes intentionally alter snapshots, fixtures and changelog are updated together.

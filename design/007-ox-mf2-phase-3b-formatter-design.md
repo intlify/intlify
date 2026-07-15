@@ -136,6 +136,24 @@ format_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions
 check_snapshot(snapshot: SnapshotView<'_>, source: &str, options: FormatOptions) -> FormatCheckResult
 ```
 
+The workspace Rust crate also exposes an in-memory parsed-artifact path:
+
+```rust
+format_parsed(
+    sources: &SourceStore,
+    result: &ParseResult,
+    options: FormatOptions,
+) -> FormatResult
+
+check_parsed(
+    sources: &SourceStore,
+    result: &ParseResult,
+    options: FormatOptions,
+) -> FormatCheckResult
+```
+
+`format_parsed` and `check_parsed` are workspace-internal integration APIs, not crates.io or binding APIs. They construct a private `ParsedFormatInput<'_>` view that binds the `ParseResult` to its original `SourceStore`, then enter the same syntax traversal and IR pipeline as the source-backed and snapshot-backed APIs. They never invoke `parse_source`, encode a Binary AST snapshot, or decode a snapshot. The formatter crate does not depend on the parse-cache layer or its `CachedParse` type; a cache consumer passes `cached.sources.as_ref()` and `&cached.result` as the pair already preserved by that layer.
+
 The conceptual Rust result shape is a success/failure split:
 
 ```rust
@@ -200,7 +218,7 @@ Unpaired-surrogate source text is a binding-representation exception rather than
 
 Programmatic formatter API results do not use the CLI JSON envelope. They do not include `schemaVersion`, `version`, `projectRoot`, `summary`, or `results`. N-API and WASM reuse the same parser diagnostic JavaScript shape as the parser packages, but they do not define a new diagnostic object format.
 
-The advanced snapshot APIs accept an already-created Binary AST snapshot. These APIs are for playgrounds, workers, and language-service caches that already hold parse artifacts.
+The advanced snapshot APIs accept an already-created Binary AST snapshot. These APIs are for playgrounds, workers, cross-process exchange, and language-service caches that already hold serialized parse artifacts. A Rust caller that already owns an in-memory `SourceStore` / `ParseResult` pair uses the parsed-artifact path instead; it does not serialize that pair merely to call the formatter.
 
 Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serialized snapshot bytes as `Uint8Array`; formatter binding packages do not exchange parser-package native objects or WASM objects across package boundaries.
 
@@ -208,11 +226,11 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. Snapshot-backed formatting requires verifiable diagnostic capability in all modes; if diagnostics may have been omitted from the supplied snapshot, the formatter cannot prove that the parse was diagnostic-free and returns `invalid_snapshot` with `details.reason: "missing_capability"`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source consistency validation best-effort and does not require snapshots to carry source identity data or consistency metadata, such as a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
 
-`changed` is computed by byte equality between the message-level formatter output and the supplied source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, and `checkSnapshot`. Message-level APIs treat the supplied source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
+`changed` is computed by byte equality between the message-level formatter output and its input source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, `checkSnapshot`, `format_parsed`, and `check_parsed`. Parsed-artifact calls obtain that source from `sources.get(result.source)`; callers do not supply a second source string. Message-level APIs treat the source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
 
 ### Bounded Rust Rendering for Resource Consumers
 
-The workspace Rust crate additionally exposes source-backed and snapshot-backed bounded rendering entry points for catalog consumers. They reuse the same parser, Layout IR, Document IR, formatting rules, and byte-equality semantics as the ordinary entry points, but cap the materialized UTF-8 output:
+The workspace Rust crate additionally exposes source-backed, parsed-artifact-backed, and snapshot-backed bounded rendering entry points for catalog consumers. They reuse the same parser syntax model, Layout IR, Document IR, formatting rules, and byte-equality semantics as the ordinary entry points, but cap the materialized UTF-8 output:
 
 ```rust
 format_message_bounded(
@@ -228,13 +246,20 @@ format_snapshot_bounded(
     max_output_bytes: u64,
 ) -> BoundedFormatResult
 
+format_parsed_bounded(
+    sources: &SourceStore,
+    result: &ParseResult,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
 enum BoundedFormatResult {
     Complete(FormatResult),
     OutputLimitExceeded { limit: u64, actual: u64 },
 }
 ```
 
-`Complete` is byte-for-byte and field-for-field equivalent to calling the corresponding ordinary formatting API. Parser diagnostics, invalid options or snapshots, source mismatch, and other failures established before successful rendering remain the ordinary `FormatResult::Err`; the bounded path does not translate them into a size result.
+`Complete` is byte-for-byte and field-for-field equivalent to calling the corresponding ordinary formatting API. Parser diagnostics, invalid options or snapshots, source mismatch, parsed-artifact attachment failure, and other failures established before successful rendering remain the ordinary `FormatResult::Err`; the bounded path does not translate them into a size result.
 
 The renderer writes directly into a capped sink and must not first construct the complete output or any other output-sized string. The sink admits at most `max_output_bytes`, stops before storing the first byte beyond that limit, discards its partial buffer, and returns `OutputLimitExceeded` with `limit` equal to the supplied cap and `actual` equal to `limit + 1`. No code, `changed` value, or partial formatter result accompanies that outcome. The initial resource consumer supplies its fixed one-message maximum, which is well below `u64::MAX`; accepting `u64::MAX` as a generic cap is not required by this milestone.
 
@@ -460,7 +485,7 @@ Standardized `details` fields:
   }
   ```
 
-  `details.reason` and `details.phase` are required. The initial formatter-owned reason is only `"formatter_invariant_failed"`. Initial phase values are `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, and `document_ir_render`. Consumers first select the shared `internal_error` variant by `reason` and then interpret the formatter-owned `phase`. Formatter internals such as IR node kinds, source text, and source spans are not exposed in public `internal_error.details`.
+  `details.reason` and `details.phase` are required. The initial formatter-owned reason is only `"formatter_invariant_failed"`. Initial phase values are `parsed_artifact_attachment`, `snapshot_traversal`, `layout_ir_construction`, `layout_ir_normalize`, `document_ir_lowering`, and `document_ir_render`. Consumers first select the shared `internal_error` variant by `reason` and then interpret the formatter-owned `phase`. Formatter internals such as IR node kinds, source text, and source spans are not exposed in public `internal_error.details`.
 
 ## CLI Workflow
 
@@ -919,13 +944,13 @@ The formatter separates syntax traversal from rendering.
 
 The message-level core lives in a workspace-internal Rust crate named `intlify_format`. This crate is not published to crates.io in Phase 3B. It should still expose a clear workspace API for the CLI, N-API binding, WASM binding, and tests.
 
-The source-backed and snapshot-backed message-level entry points are synchronous and safe to invoke concurrently for independent inputs. `intlify_format` keeps parser and rendering scratch state within each call, exposes no process-wide mutable formatting state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
+The source-backed, parsed-artifact-backed, and snapshot-backed message-level entry points are synchronous and safe to invoke concurrently for independent inputs. Parsed-artifact calls may also borrow the same immutable owner/result pair concurrently when the parser types satisfy the cache design's `Send + Sync` contract. `intlify_format` keeps attachment, parser, traversal, and rendering scratch state within each call, exposes no process-wide mutable formatting state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
 
-The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, `BoundedFormatResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, parser views, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
+The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, `BoundedFormatResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, the ephemeral `ParsedFormatInput<'_>`, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
 
-Compile-time assertions lock the required owned traits. Behavioral tests run independent ordinary and bounded source-backed and snapshot-backed calls concurrently, compare the complete success, failure, or capacity values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, output caps, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
+Compile-time assertions lock the required owned traits. Behavioral tests run independent ordinary and bounded source-backed, parsed-artifact-backed, and snapshot-backed calls concurrently, compare the complete success, failure, or capacity values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, output caps, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
 
-The message-level core must not format by directly concatenating strings during SnapshotView traversal. It should build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. The renderer targets a sink abstraction rather than requiring one preallocated complete output string: ordinary formatting uses the normal string sink, while resource-aware bounded formatting uses the capped sink above. Neither path may materialize a second complete output before its selected sink. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
+The message-level core must not format by directly concatenating strings during parsed-table or `SnapshotView` traversal. All input paths adapt to one formatter syntax view and build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. The renderer targets a sink abstraction rather than requiring one preallocated complete output string: ordinary formatting uses the normal string sink, while resource-aware bounded formatting uses the capped sink above. Neither path may materialize a second complete output before its selected sink. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
 
 Concrete Rust type names and implementation organization may still change during implementation, but the formatter pipeline and IR responsibilities follow the Phase 3B IR design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
 
@@ -969,7 +994,7 @@ Formatter binding packages do not have runtime dependencies on parser binding pa
 
 The formatter core formats one complete MF2 message and does not recognize resource host formats. Resource-aware `intlify fmt` behavior is a downstream composition defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-formatting).
 
-At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, invokes the bounded Rust message formatter for each entry, admits completed writable outputs through the resource-owned raw-order candidate-message budget before retaining them, and asks the resource layer to validate and compose host-document write-back. A clean read-only result is discarded and its original message remains the effective candidate value; a bounded-output signal for such a discarded result is not a candidate resource failure. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both and translates the formatter-owned capacity signal through the resource-owned admission contract.
+At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, obtains one paired parser artifact for each message, invokes `format_parsed_bounded` for each entry, admits completed writable outputs through the resource-owned raw-order candidate-message budget before retaining them, and asks the resource layer to validate and compose host-document write-back. A clean read-only result is discarded and its original message remains the effective candidate value; a bounded-output signal for such a discarded result is not a candidate resource failure. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both and translates the formatter-owned capacity signal through the resource-owned admission contract. An optional parse-cache layer preserves the pair for reuse but is not a formatter dependency.
 
 This document remains authoritative for message-level formatting and the standalone `.mf2` formatter contract. The resource design is authoritative for catalog membership, host-format parsing, entry mapping, read-only handling, aggregation, validated write-back, resource failures, and the catalog result extension. Those details are not duplicated here.
 
@@ -980,7 +1005,7 @@ The formatter core does not implement range-only or minimal-diff formatting init
 Editor integrations should:
 
 1. identify the message range to format
-2. call whole-message formatting
+2. look up or create the message's paired parser artifact and call `format_parsed` or `format_parsed_bounded` as appropriate
 3. compare original and formatted message text
 4. produce the smallest practical editor `TextEdit` at the integration boundary
 
@@ -1062,6 +1087,22 @@ one  {{One item}}
 {$value :number minimumFractionDigits=2 maximumFractionDigits=4 @foo=|bar|}
 ```
 
+## Parsed Artifact Requirements
+
+`format_parsed`, `check_parsed`, and `format_parsed_bounded` accept only the original `SourceStore` / `ParseResult` owner pair produced by one parse. A cache satisfies this contract by retaining the pair in one `CachedParse`; a non-cache caller keeps the same pair directly. Moving a result away from its owner, rebuilding a store from the same source text, or relying on coincidentally equal numeric `SourceId` values violates the contract.
+
+Before Layout IR construction, `intlify_format` creates a private `ParsedFormatInput<'_>` and validates every formatter-observable attachment invariant:
+
+- `result.source` resolves through the supplied store and provides the sole source string used for slicing and `changed` comparison
+- CST roots, nodes, tokens, trivia, diagnostics, table references, source ids, and spans needed by formatter traversal resolve consistently against that source
+- every observed span is ordered, in bounds, and on UTF-8 boundaries
+- materialized diagnostics are available directly from `ParseResult`; any non-empty diagnostic set returns the ordinary diagnostic failure without constructing formatter IR
+- standard mode accepts `trivia_collected: false`, while preserve mode requires `trivia_collected: true`
+
+The formatter does not copy CST tables or source text into this view. It also does not claim that a numeric id lookup can prove historical store identity: the original owner/result pairing is a Rust caller invariant, and the validation rejects every inconsistency the retained data makes observable. A detectable attachment inconsistency or a preserve-mode call with a trivia-less result is a workspace integration invariant failure, not malformed public snapshot input. It returns `internal_error` with `details.reason: "formatter_invariant_failed"` and `details.phase: "parsed_artifact_attachment"` before IR construction.
+
+The parsed-artifact path and the snapshot path adapt into one private formatter syntax-view interface. Given equivalent syntax, diagnostic capability, trivia capability, source text, and options, they must construct equivalent Layout IR and return byte-identical output and `changed` values. Binary AST snapshots remain the versioned transport for persistence, bindings, and cross-process exchange; they are never an intermediate representation for this in-memory path.
+
 ## SnapshotView Requirements
 
 The formatter first consumes the existing Binary AST `SnapshotView` / binding-side accessor model. Rust, N-API, and WASM SnapshotView surfaces should provide the same logical accessor contract even if their concrete implementations differ.
@@ -1099,7 +1140,7 @@ If the formatter requires a Binary AST snapshot format change, the formatter PR 
 
 Formatter fixtures should be reviewable and stable.
 
-Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` source-backed and snapshot-backed APIs, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
+Core formatter fixtures and CLI fixtures are separate. Core fixtures test the `intlify_format` source-backed, parsed-artifact-backed, and snapshot-backed APIs, parser diagnostics policy, idempotency, reparsing, and future SemanticView preservation. CLI fixtures test stdout, stderr, exit codes, JSON reporter output, discovery, ignore behavior, stdin, and file mutation behavior.
 
 ### Minimum Coverage Matrix
 
@@ -1127,12 +1168,14 @@ Behavior coverage:
 | Coverage area | Required by | Requirement |
 | --- | --- | --- |
 | `format_message` output and `check_format` changed/unchanged behavior | Core formatter PRs | `MUST` |
+| `format_parsed`, `check_parsed`, and `format_parsed_bounded` reuse one paired `SourceStore` / `ParseResult` without another parse or snapshot encode/decode; output, diagnostics, and `changed` match the source-backed baseline | Core formatter PRs / parse-cache integration PR | `MUST` |
+| parsed-artifact attachment rejects detectable owner/source/table/span inconsistency and preserve mode rejects `trivia_collected: false` at the `parsed_artifact_attachment` invariant boundary | Core formatter PRs / parse-cache integration PR | `MUST` |
 | `format_snapshot` and `check_snapshot` source consistency, invalid snapshot, missing verifiable diagnostic capability, and missing preserve-mode trivia data behavior | Core formatter PRs | `MUST` |
 | idempotency of formatted output | Core formatter PRs | `MUST` |
 | formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
 | parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
-| bounded source/snapshot rendering at the exact byte boundary and first byte over, no partial result, ordinary-result equivalence below the cap, and no complete-output allocation before the capped sink | Core formatter PRs / resource formatter integration PR | `MUST` |
-| compile-time `Send` assertions for worker-boundary options/results, concurrent source/snapshot calls matching serial baselines, and error/panic fault isolation without reusable-state poisoning | Core formatter PRs / CLI formatter PR | `MUST` |
+| bounded source/parsed-artifact/snapshot rendering at the exact byte boundary and first byte over, no partial result, ordinary-result equivalence below the cap, and no complete-output allocation before the capped sink | Core formatter PRs / resource formatter integration PR | `MUST` |
+| compile-time `Send` assertions for worker-boundary options/results, concurrent source/parsed-artifact/snapshot calls matching serial baselines, and error/panic fault isolation without reusable-state poisoning | Core formatter PRs / CLI formatter PR | `MUST` |
 | `intlify fmt` write mode | CLI formatter PR | `MUST` |
 | `intlify fmt --check` and `--list-different` | CLI formatter PR | `MUST` |
 | stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
@@ -1291,6 +1334,7 @@ Formatter benchmarks are local-first tooling under `tools/`, following the parse
 Formatter benchmarks should separate:
 
 - parse cost
+- parsed-artifact attachment and direct CST traversal cost
 - snapshot encode cost
 - snapshot decode/access cost
 - syntax traversal cost
@@ -1334,6 +1378,8 @@ Prerequisite (landed): the `ox_mf2_parser` grammar-conformance work required by 
 6. local-first formatter benchmarks under `tools/`
 
 Each PR should be cut from `main`, keep formatter work separated from Phase 3C linter work, and maintain the existing Phase 3A CLI contract unless the PR explicitly extends it for `intlify fmt`.
+
+Resource catalog implementation is not added to this Phase 3B PR sequence. After Phase 3C is complete, the unnumbered resource milestone in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) composes the finished formatter through its bounded Rust path and extends the CLI with catalog-aware formatting before Phase 3D begins.
 
 ## Deferred Follow-Up Notes
 

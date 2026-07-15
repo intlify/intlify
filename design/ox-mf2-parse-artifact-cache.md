@@ -76,7 +76,7 @@ struct CachedParse {
 ## Invariants enforced by the cache layer (not the parser)
 
 1. **One active parse flight per complete `CacheKey` and residency epoch.** Parser version, result-affecting options, source hash, and exact source bytes are already part of the key. The first miss becomes the producer; concurrent equal-key callers wait for that flight and receive the same `Arc<CachedParse>`. A successful value remains one shared ready entry until explicit invalidation or eviction. Re-parsing after eviction, invalidation, or an unsuccessful producer attempt begins a new residency epoch and is allowed.
-2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
+2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves. The formatter receives `cached.sources.as_ref()` and `&cached.result` through its workspace-internal parsed-artifact API; it neither depends on `CachedParse` nor converts the entry to a Binary AST snapshot. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
 3. **Cache invalidation is explicit at file/dictionary update boundaries.** Either the dictionary layer removes entries for the changed namespace/message on write, or a lookup naturally misses when parser version, parse options, or exact source bytes differ. In an editor catalog, a host-document version or resource mapping change invalidates extraction and mapped-result state but does not by itself evict an unchanged entry's message-level parse artifact. Formatter- and linter-only configuration changes likewise do not alter this parse key. The selective editor invalidation and generation-check contract is owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md#artifact-cache-and-invalidation).
 4. **Normal parser diagnostics are cacheable success data.** A diagnostic-bearing `ParseResult` is a completed parse artifact and becomes `Ready` exactly like a clean result. `ParseError`, source-store construction failure, producer cancellation/drop, and panic are unsuccessful attempts: current waiters receive one cache-layer failure, no ready value is retained, and a later lookup may retry.
 5. **Single-flight coordination is per key, not one global parse lock.** Different complete keys may parse concurrently. No map shard, entry-table mutex, or flight-state mutex is held while source storage, parsing, semantic construction, or diagnostic materialization runs.
@@ -224,9 +224,17 @@ let view = CstView::new(
     cached.result.source,
     &cached.result.cst,
 );
+
+let formatted = format_parsed(
+    cached.sources.as_ref(),
+    &cached.result,
+    format_options,
+);
 ```
 
-Moving only `cached.result`, persisting only its numeric `SourceId`, or attaching it to a newly-created `SourceStore` violates the cache contract. If a future cache combines multiple entries into one shared store, it must explicitly remap every SourceId-bearing record; coincidental numeric id reuse is never sufficient.
+`format_parsed`, `check_parsed`, and `format_parsed_bounded` create the formatter-owned validated input view from these two references. They do not reparse `file`, copy the CST, or encode/decode a snapshot. A diagnostic-bearing cached result is passed through unchanged so the formatter can apply its normal strict diagnostic policy.
+
+Moving only `cached.result`, persisting only its numeric `SourceId`, or attaching it to a newly-created `SourceStore` violates both the cache and parsed-formatter contracts. The formatter rejects inconsistencies that the retained data makes observable, but coincidentally equal numeric ids are not proof of ownership. If a future cache combines multiple entries into one shared store, it must explicitly remap every SourceId-bearing record; numeric id reuse is never sufficient.
 
 The cache deliberately does NOT live inside `ParseWorkspace`. `ParseWorkspace` is a per-thread scratchpad whose lifetime is one or a few `parse_*` calls; the cache spans many parses with long-lived owned results.
 
@@ -234,7 +242,7 @@ The cache deliberately does NOT live inside `ParseWorkspace`. `ParseWorkspace` i
 
 `ParseCache` is an in-memory, process-local component. An LSP/editor integration may retain it for the server process lifetime; a dictionary checker, batch workflow, or CLI command retains it only for that invocation. Dropping or explicitly clearing the cache releases its resident map ownership, and a later process or cache instance reparses on demand. The cache performs no filesystem reads or writes and defines no cache directory, cleanup command, environment variable, project setting, editor setting, or public CLI persistence option.
 
-Binary AST snapshots are the separate versioned representation for a consumer that deliberately needs artifact exchange across processes. Producing or loading such a snapshot is an explicit consumer workflow governed by [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md); it is not an automatic backing store or second lookup tier for `ParseCache`. Snapshot schema compatibility, source consistency, corruption handling, and future snapshot-to-`SemanticModel` reconstruction remain outside this cache.
+Binary AST snapshots are the separate versioned representation for a consumer that deliberately needs artifact exchange across processes. Producing or loading such a snapshot is an explicit consumer workflow governed by [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md); it is not an automatic backing store, second lookup tier for `ParseCache`, or intermediate formatter input for an in-memory cache hit. Snapshot schema compatibility, source consistency, corruption handling, and future snapshot-to-`SemanticModel` reconstruction remain outside this cache.
 
 In-memory `CacheKey` instances, the seeded XXH3 value and seed, single-flight state, access stamps, LRU order, estimated weights, and namespace invalidation metadata are never serialized. A future request for automatic disk caching requires a new design rather than a storage-backend trait reserved in the initial API. The initial implementation therefore stays free to shape its concurrency and eviction internals around process memory without treating them as a durable compatibility surface.
 
@@ -275,6 +283,8 @@ Captured as `.reviews/005-ox-mf2-ox-content-mf2-parser-optimization-notes.md` Re
 - Capacity tests independently cross the entry and estimated-byte limits, refresh recency on hit, evict the least-recently-used ready entry, and verify accounting after explicit invalidation and `clear`.
 - A single overweight artifact is returned to every current flight participant but is not retained; a later lookup parses again. Estimates at the exact byte limit remain resident, while saturating overflow is treated as over-limit.
 - An externally held `Arc<CachedParse>` remains usable after eviction, and its continued lifetime does not block new cache admission. Equivalent parse content is observed with large, tiny, and churn-heavy limits.
+- A cache miss followed by `format_parsed` increments an injected parser counter once; a cache hit followed by `format_parsed` leaves it unchanged. Parsed-artifact formatting matches `format_message` output, diagnostics, and `changed`, while injected snapshot encoder/decoder counters remain zero.
+- Parsed-artifact formatter tests cover clean and diagnostic-bearing results, standard mode without trivia, preserve mode with trivia, and the `parsed_artifact_attachment` failure boundary for detectable owner/source/span inconsistency.
 
 ## Open Questions
 

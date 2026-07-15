@@ -451,6 +451,8 @@ Resolution starts from the implicit `recommended` defaults and overlays `lint.ru
 
 `intlify lint` validates the shared project config as a whole. Invalid `fmt` configuration in the same file still produces `config_validation_failed` during a lint command, and invalid `lint` configuration likewise fails formatter commands. Command-specific CLI overrides are applied only for the active command after the shared config has validated. When no config file is discovered and no explicit `--config` is provided, the implicit default project config is used.
 
+The shared config parser rejects duplicate object members as `config_parse_failed` before constructing this validation input. The ordering below therefore operates only on objects with unique decoded member names and never inherits first-wins or last-wins behavior from a JSON or JSONC dependency.
+
 Structural CLI config validation reports the first deterministic `config_validation_failed` error before discovery. Validation order is:
 
 1. top-level config shape: root must be an object
@@ -949,6 +951,8 @@ Phase 3C linter implementation should be split into reviewable PRs:
 7. local-first linter benchmarks under `tools/`
 
 Each PR should be cut from `main` and keep linter work separated from formatter work. Shared CLI infrastructure (discovery, ignore, framing, envelope) introduced by the fmt CLI PR should be reused, not duplicated.
+
+Resource catalog implementation is not folded into the Phase 3C product PRs. Once this sequence is complete, the unnumbered resource milestone in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) adds the shared resource crate, Tier 1 adapter, configuration/schema extension, and catalog composition for both completed CLI products before Phase 3D editor integration.
 
 The parser-side implementation steps listed in the semantic validation design describe the internal scope of the first prerequisite PR; this section owns the product-level milestone order for the linter as a whole.
 

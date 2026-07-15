@@ -148,7 +148,7 @@ After initialization, the public parser and decoder APIs are synchronous in both
 - `parseBatch`
 - `decodeSnapshot`
 
-Async parsing can be added later as a separate worker/thread-pool API. It is not part of the Phase 2 standard binding surface.
+Async parsing can be added later as a separate binding- or consumer-owned worker API that invokes the synchronous parser operations. It is not part of the Phase 2 standard binding surface, and it does not add a parser-owned thread pool.
 
 ## Parser And Decoder API
 
@@ -216,12 +216,10 @@ type ParseMessageOptions = {
   includeSourceText?: boolean // default: false
 }
 
-type ParseBatchOptions = ParseMessageOptions & {
-  batchExecution?: 'sequential' | 'parallel'
-}
+type ParseBatchOptions = ParseMessageOptions
 ```
 
-`batchExecution` applies only to `parseBatch`. If `batchExecution: 'parallel'` is requested before parallel execution is implemented, the binding degrades to sequential execution and reports that in the batch result. It does not add a parser diagnostic and does not throw.
+`parseBatch` is synchronous and processes items sequentially. Its separate type alias documents the batch entry point without reserving an execution-strategy or thread-count option.
 
 `parseSemantic` is not part of the Phase 2 binding API. SemanticView / semantic snapshot exposure is a future design topic. Phase 2 bindings expose syntax snapshot accessors and diagnostics only.
 
@@ -231,7 +229,7 @@ When `includeDiagnostics = false`, diagnostics are not encoded into the snapshot
 
 When `includeTrivia = false`, trivia is not encoded into the snapshot. `token.leadingTrivia()` and `token.trailingTrivia()` return empty arrays. Formatter or linter entry points that require trivia should validate options before calling the parser.
 
-Unknown options throw `TypeError`. This catches option typos early and keeps the public compatibility surface explicit. Since `batchExecution` is accepted only by `parseBatch`, passing it to `parseMessage` is also a `TypeError`.
+Unknown options throw `TypeError`. This catches option typos early and keeps the public compatibility surface explicit. Execution-strategy and thread-count fields are unknown options for both `parseMessage` and `parseBatch`; parallel scheduling belongs to the caller rather than this parser binding contract.
 
 ## Input Validation
 
@@ -275,8 +273,6 @@ type ParseBatchResult = {
   roots: RootHandle[]
   sources: SourceView[]
   diagnostics: DiagnosticView[]
-  execution: 'sequential' | 'parallel'
-  degraded: boolean
 }
 ```
 
@@ -292,7 +288,7 @@ type DecodedSnapshotResult = {
 }
 ```
 
-`parseMessage` result does not include `execution` or `degraded` because single-message parsing has no batch execution strategy.
+Neither parse result includes `execution`, `degraded`, or worker-count metadata. The synchronous binding contract has no execution-strategy negotiation.
 
 `result.roots[i]` always corresponds to the batch input item at `items[i]`. The snapshot format allows multiple roots to point to the same SourceRecord, but the v0.1 default writer does not deduplicate SourceRecord entries. Batch result root order does not change from input order.
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">MF2 Layout IR structure</title>
-<desc id="desc">MF2 Layout IR is built from SnapshotView, source trivia, and formatter options. It combines syntax-oriented nodes with formatter-specific layout nodes and source-shape metadata before normalization and Document IR lowering.</desc>
+<desc id="desc">MF2 Layout IR is built from the formatter's common validated syntax view, source slices and trivia, and formatter options. The syntax view may wrap parser tables or a SnapshotView. Layout IR combines syntax-oriented nodes with formatter-specific layout nodes and source-shape metadata before normalization and Document IR lowering.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -51,9 +51,10 @@
 <rect x="50" y="138" width="232" height="312" rx="12" class="panel" stroke-width="2"/>
 <text x="166" y="176" font-size="16" font-weight="700" text-anchor="middle" class="label">Construction input</text>
 <rect x="82" y="206" width="168" height="44" rx="8" class="input"/>
-<text x="166" y="233" font-size="12.2" font-weight="700" text-anchor="middle" class="white">SnapshotView</text>
+<text x="166" y="225" font-size="11.6" font-weight="700" text-anchor="middle" class="white">formatter syntax view</text>
+<text x="166" y="241" font-size="9.8" text-anchor="middle" class="soft-white">parsed or snapshot-backed</text>
 <rect x="82" y="274" width="168" height="44" rx="8" class="input"/>
-<text x="166" y="301" font-size="12.2" font-weight="700" text-anchor="middle" class="white">source trivia</text>
+<text x="166" y="301" font-size="12.2" font-weight="700" text-anchor="middle" class="white">source slices + trivia</text>
 <rect x="82" y="342" width="168" height="44" rx="8" class="input"/>
 <text x="166" y="369" font-size="12.2" font-weight="700" text-anchor="middle" class="white">FormatOptions</text>
 <rect x="82" y="408" width="168" height="26" rx="6" class="note"/>

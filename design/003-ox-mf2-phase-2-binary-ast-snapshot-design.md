@@ -95,7 +95,7 @@ parse_session_to_snapshot(
 
 parse_batch_to_snapshot(
   inputs: &[ParseInput],
-  batch_options: BatchParseOptions,
+  parse_options: ParseOptions,
   snapshot_options: SnapshotOptions,
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
 
@@ -105,7 +105,7 @@ parse_batch_result_to_snapshot(
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `BatchParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
 `parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
 
@@ -119,11 +119,11 @@ parse_batch_result_to_snapshot(
 
 `parse_batch_to_snapshot` is a convenience API equivalent to `parse_batch` followed by `parse_batch_result_to_snapshot`.
 
-`parse_batch_result_to_snapshot` encodes an already produced `BatchParseResult` without reparsing. It uses `BatchParseResult.sources` for SourceRecord metadata and encodes `BatchParseResult.items` in input order as RootRecord entries. This preserves the original batch `execution` / `degraded` values and keeps parse cost separate from snapshot encode cost.
+`parse_batch_result_to_snapshot` encodes an already produced `BatchParseResult` without reparsing. It uses `BatchParseResult.sources` for SourceRecord metadata and encodes `BatchParseResult.items` in input order as RootRecord entries, keeping parse cost separate from snapshot encode cost.
 
 `parse_batch_result_to_snapshot` requires `BatchParseItem.source == BatchParseItem.result.source` for every item. The Phase 1 `parse_batch` API preserves this invariant, but `BatchParseResult` / `BatchParseItem` are public, `Clone`, and constructible with struct literals, so a hand-crafted batch can break it. Encoding a mismatched item would attach the `BatchParseItem.source` metadata (path / locale / message_id / optional source text) to a CST whose spans were produced against `BatchParseItem.result.source`, silently emitting an incoherent snapshot. The writer rejects such inputs with `SnapshotWriteError::InconsistentSourceId` before any string interning or section emission runs.
 
-`parse_batch_to_snapshot` accepts the same `BatchParseOptions` as the Phase 1 `parse_batch` API. If `BatchExecution::Parallel` is requested before real parallel execution exists, parsing downgrades to sequential execution and the result exposes that through `execution` / `degraded`. Snapshot encoding must not hide degraded fallback behavior.
+`parse_batch_to_snapshot` accepts the same `ParseOptions` as the Phase 1 `parse_batch` API. It is synchronous and sequential; callers that need parallel snapshot production schedule independent calls outside the parser and snapshot crates.
 
 `parse_session_to_snapshot` uses the `SourceStore` and Phase 1 SourceId reachable from `ParseSessionResult` / `CstView` as the only source metadata. It does not accept a second metadata argument. Passing independent metadata would create two sources of truth for path, locale, message_id, base_offset, and source text availability.
 
@@ -172,12 +172,10 @@ BatchSnapshotResult {
   bytes: Vec<u8>,
   roots: Vec<RootId>,
   diagnostics: Vec<Diagnostic>,
-  execution: BatchExecution,
-  degraded: bool,
 }
 ```
 
-`SnapshotResult.root` is the RootId for a single input. `BatchSnapshotResult.bytes` is a shared snapshot buffer. `roots` is a RootId array corresponding to input order. `execution` is the batch strategy that actually ran, and `degraded` reports whether the requested strategy was downgraded. Each root has only root node, source_id, and diagnostic range through RootRecord. Path, locale, message_id, base_offset, and optional source text live in SourceRecord. This lets batch parsing share string tables and snapshot sections across many messages.
+`SnapshotResult.root` is the RootId for a single input. `BatchSnapshotResult.bytes` is a shared snapshot buffer. `roots` is a RootId array corresponding to input order. Each root has only root node, source_id, and diagnostic range through RootRecord. Path, locale, message_id, base_offset, and optional source text live in SourceRecord. This lets batch parsing share string tables and snapshot sections across many messages.
 
 `BatchSnapshotResult.roots` remains a thin `Vec<RootId>`. It does not wrap roots into per-item result structs. `roots[i]` corresponds to `inputs[i]`; source id and diagnostic range are read through RootRecord in the decoded snapshot view. Rich per-item objects belong to higher-level result layers, not the Rust snapshot-producing result.
 
