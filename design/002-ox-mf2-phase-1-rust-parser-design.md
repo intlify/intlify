@@ -47,7 +47,7 @@ source
   -> lexer / scanner helpers
   -> recovering CST parser
   -> diagnostics
-  -> when parser diagnostics are empty: optional SemanticModel construction
+  -> when parser diagnostics are empty: explicit SemanticModel construction
   -> later formatter / linter / compiler
 ```
 
@@ -84,7 +84,7 @@ Phase 1 deliverables:
 - `SyntaxKind`: stable compact kind enum for message modes, nodes, tokens, trivia, errors, and missing nodes.
 - `CstTables`: flat indexed tables containing nodes, edges, tokens, and trivia. Spans are stored inline in records.
 - `CstView`: accessor surface for reading CST from NodeId / TokenId / Span.
-- `SemanticModel`: optional semantic fact model shared by linter/compiler/validation.
+- `SemanticModel`: semantic fact model constructed explicitly from a diagnostic-free `SourceStore` / `ParseResult` pair and shared by linter/compiler/validation.
 - `Diagnostic`: shared location model for parser diagnostics and future lint diagnostics.
 - `Fixture runner`: test harness for spec fixtures, implementation fixtures, and recovery fixtures.
 - `Benchmark harness`: phase-separated benchmarks and hyperfine CLI benchmarks.
@@ -102,7 +102,7 @@ CST and AST have different purposes.
 
 MF2 requires good formatting, diagnostics, recovery, and preserve-mode formatting. Therefore the Phase 1 base representation is CST. Linters, compilers, and validation also need AST-like semantic information, so a `SemanticModel` is constructed from the CST.
 
-`CstTables + CstView + optional SemanticModel` is conceptually a tree, but physically represented as flat indexed tables and side tables.
+`CstTables + CstView`, plus a separately constructed `SemanticModel` when a consumer needs semantic facts, is conceptually a tree but physically represented as flat indexed tables and side tables.
 
 ![ox-mf2 CST tables and view](./assets/002-ox-mf2-cst-tables-view.svg)
 
@@ -113,7 +113,7 @@ This document uses the following terms.
 - Binary AST snapshot: the Phase 2 cross-language public CST/AST view. It is not the normal Phase 1 parse output.
 - typed AST object graph: a recursive Rust struct tree. It is not adopted as the Phase 1 public API.
 
-Therefore, the answer to "does Phase 1 need an AST?" is: it needs `CstTables + CstView + optional SemanticModel`, not a recursive typed AST.
+Therefore, the answer to "does Phase 1 need an AST?" is: it needs `CstTables + CstView` and an explicit CST-to-`SemanticModel` construction boundary, not a recursive typed AST or semantic state embedded in every parse result.
 
 ## SyntaxKind Design
 
@@ -255,7 +255,18 @@ Phase 1 does not require parent pointers in node records. Tools that need parent
 
 ![ox-mf2 Phase 1 SemanticModel design](./assets/002-ox-mf2-semantic-model-design.svg)
 
-When `parse_semantic = true`, a lightweight SemanticModel is produced from the CST.
+`ParseResult` is always a syntax artifact. A lightweight `SemanticModel` is produced only through the parser-owned semantic construction API after parsing has completed without parser diagnostics:
+
+```rust
+pub fn build_semantic_model(
+  sources: &SourceStore,
+  result: &ParseResult,
+) -> Result<SemanticModel, SemanticInvariantError>
+```
+
+The caller passes the same `SourceStore` that assigned every `SourceId` in `result`. Semantic construction needs that owner to read source slices and derive cooked or normalized values; a `ParseResult` alone is not a complete semantic-construction input. The function does not mutate `result`, insert a hidden semantic cache, or perform semantic validation. A consumer that wants to retain or cache the returned `SemanticModel` owns it separately from the parse artifact.
+
+Calling this boundary with parser diagnostics or a detectably inconsistent source-owner/result pair returns `SemanticInvariantError` rather than constructing facts from a recovery CST. The exact misuse and invariant mapping is owned by [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md).
 
 SemanticModel is not a runtime execution IR. It is shared semantic information for linter, compiler, and validation.
 
@@ -510,11 +521,11 @@ Ambiguous or malformed input makes mode detection part of recovery. For example,
 
 ## Parser API Contract
 
-The primary parser API uses SourceStore and SourceId for caller-managed and batch parsing. The `parse_message` convenience API keeps the same `ParseResult` shape but may bypass SourceStore registration on the successful one-shot path.
+The primary parser API uses SourceStore and SourceId for caller-managed and batch parsing. Every owned result that leaves the parser remains associated with the `SourceStore` that assigned its ids: caller-managed `parse_source` borrows that owner, `parse_batch` returns it, and the `parse_message` convenience API retains a private one-entry owner in `StandaloneParseResult`.
 
 ```rust
 parse_source(sources: &SourceStore, source_id: SourceId, options: ParseOptions) -> Result<ParseResult, ParseError>
-parse_message(source: &str) -> Result<ParseResult, ParseError>
+parse_message(source: &str) -> Result<StandaloneParseResult, ParseError>
 parse_batch(inputs: &[ParseInput], options: ParseOptions) -> Result<BatchParseResult, BatchParseError>
 
 parse_source_session<'a>(
@@ -525,20 +536,35 @@ parse_source_session<'a>(
 ) -> Result<ParseSessionResult<'a>, ParseError>
 ```
 
+The standalone owner/result wrapper has private fields and exposes only immutable paired access:
+
+```rust
+pub struct StandaloneParseResult {
+  sources: SourceStore,
+  result: ParseResult,
+}
+
+impl StandaloneParseResult {
+  pub fn sources(&self) -> &SourceStore;
+  pub fn result(&self) -> &ParseResult;
+}
+```
+
+It does not implement `Deref<Target = ParseResult>`, expose a mutable source store, or provide an owner-dropping conversion in the initial API. Callers pass `parsed.sources()` and `parsed.result()` together to source-backed consumers such as `build_semantic_model` or `parse_result_to_snapshot`. This keeps the convenience path self-contained without introducing a second ownerless `ParseResult` provenance.
+
 API roles:
 
 - `parse_source`: normal `ox_mf2_parser` API for users who manage SourceStore explicitly. Useful for diagnostics, line/column conversion, batch preprocessing, and editor integration.
-- `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests. The valid-input hot path parses directly from the borrowed `&str`; malformed inputs may build a temporary SourceStore only to materialize diagnostic locations.
+- `parse_message`: one-shot convenience API. Useful for tests, REPLs, small utilities, and benchmark smoke tests. It registers the input in a private one-entry `SourceStore` through the fallible source-add path, parses that entry, and returns the owner and syntax result together.
 - `parse_batch`: API for parsing multiple messages at once. Useful for locale files, project-wide analysis, benchmark corpora, and future shared snapshot buffers.
 - `parse_source_session`: advanced API for repeated parse, benchmarks, LSP, and batch workers that reuse allocation and return a result view borrowed from the workspace.
 
-Default APIs return owned `ParseResult` inside `Result`. Advanced APIs return `ParseSessionResult` tied to the workspace lifetime. Recoverable syntax errors return `Ok` with diagnostics; only failures that prevent a trustworthy result return `ParseError` (`SourceTooLarge`, `InvalidSourceId`, `ResourceLimit`, or `MissingRoot`). `BatchParseError` carries the failing `input_index` and underlying `ParseError`; batch failure is atomic and does not expose partial results. Public API exposes a single `ParseWorkspace`, while internally separating parser workspace and semantic workspace.
+`parse_source` returns an owned `ParseResult`, `parse_message` returns an owned `StandaloneParseResult`, and `parse_batch` returns an owned `BatchParseResult`. Advanced APIs return `ParseSessionResult` tied to the workspace lifetime. Recoverable syntax errors return `Ok` with diagnostics; only failures that prevent a trustworthy result return `ParseError` (`SourceTooLarge`, `InvalidSourceId`, `ResourceLimit`, or `MissingRoot`). `BatchParseError` carries the failing `input_index` and underlying `ParseError`; batch failure is atomic and does not expose partial results. Public API exposes one parser-only `ParseWorkspace`; semantic construction does not share or hide scratch state inside it.
 
 ```rust
 pub struct ParseWorkspace {
   // private implementation detail
   parser: ParserWorkspace,
-  semantic: SemanticWorkspace,
 }
 
 pub struct ParseCapacity {
@@ -563,7 +589,7 @@ impl ParseWorkspace {
 
 `clear()` and `reset()` keep capacity and clear only contents. Memory is released explicitly through `shrink_to_fit()` or `drop(ParseWorkspace)`. This reduces allocation variance in benchmarks and batch parsing.
 
-The `semantic` component is used only when `parse_semantic = true`. When `parse_semantic = false`, the parser-only hot path does not grow semantic tables or allocate semantic strings.
+`ParseWorkspace` contains parser scratch state only. Semantic construction happens through `build_semantic_model` after the parse result exists, so parsing never grows semantic tables or allocates semantic strings. A future reusable semantic-construction workspace, if benchmarks justify one, is a separate type and must not make `ParseWorkspace` or `ParseResult` own semantic state.
 
 Owned `ParseResult` is a materialized result that the caller can keep; it is not the zero-copy reuse path. Use `ParseSessionResult` when allocation reuse is the main goal. Benchmarks report owned materialization and borrowed session paths separately.
 
@@ -595,7 +621,7 @@ let mut workspace = ParseWorkspace::new();
 
 for source_id in source_ids {
   workspace.clear();
-  let session = parse_source_session(&sources, source_id, &mut workspace, options);
+  let session = parse_source_session(&sources, source_id, &mut workspace, options)?;
   consume(session);
 }
 ```
@@ -606,17 +632,18 @@ Borrowed session API example:
 let mut workspace = ParseWorkspace::with_capacity(ParseCapacity::default());
 workspace.reserve_for_source_len(source.len());
 
-let session = parse_source_session(&sources, source_id, &mut workspace, options);
+let session = parse_source_session(&sources, source_id, &mut workspace, options)?;
 let root = session.cst.root();
 ```
 
 `parse_message` example:
 
 ```rust
-let result = parse_message("Hello, {$name}!")?;
+let parsed = parse_message("Hello, {$name}!")?;
 
-assert!(result.diagnostics.is_empty());
-let root = result.cst.root_id();
+assert!(parsed.result().diagnostics.is_empty());
+let root = parsed.result().cst.root_id();
+let model = build_semantic_model(parsed.sources(), parsed.result())?;
 ```
 
 `parse_batch` example:
@@ -646,7 +673,7 @@ for item in result.items {
 }
 ```
 
-`parse_message(source)` is a convenience API. It parses with `SourceId(0)` and does not need to retain a SourceStore on the successful path because `ParseResult` owns CST tables and diagnostics. If diagnostics are emitted, the implementation may register a temporary SourceFile in SourceStore to resolve line/column information before returning owned diagnostics.
+`parse_message(source)` is a convenience API with default source metadata (`path`, `locale`, and `message_id` absent; `base_offset = 0`). It creates a private one-entry `SourceStore` with `try_add`, parses the assigned `SourceId` through the same parser path as `parse_source`, and retains that store for both successful and diagnostic-bearing results. It never manufactures a hard-coded id or returns a result whose source text exists only in the caller's borrowed `&str`. The one-entry owner allocation and retention are deliberate convenience-API costs; parser-core throughput uses the caller-owned `parse_source_session` baselines.
 
 MF2 workloads often contain many messages in one file, locale set, or project. Therefore batch parsing is a first-class API from Phase 1.
 
@@ -667,7 +694,6 @@ Only `source` determines parser semantics. `path`, `locale`, `message_id`, and `
 ```rust
 ParseOptions {
   recovery: bool,
-  parse_semantic: bool,
   collect_trivia: bool,
 }
 ```
@@ -675,7 +701,6 @@ ParseOptions {
 Defaults:
 
 - `recovery = true`
-- `parse_semantic = false`
 - `collect_trivia = true`
 
 Phase 1 `ParseResult` does not contain snapshot bytes.
@@ -684,7 +709,6 @@ Phase 1 `ParseResult` does not contain snapshot bytes.
 ParseResult {
   source: SourceId,
   cst: CstTables,
-  semantic: Option<SemanticModel>,
   diagnostics: Vec<Diagnostic>,
   trivia_collected: bool,
 }
@@ -692,15 +716,14 @@ ParseResult {
 ParseSessionResult<'a> {
   source: SourceId,
   cst: CstView<'a>,
-  semantic: Option<SemanticView<'a>>,
   diagnostics: DiagnosticView<'a>,
   trivia_collected: bool,
 }
 ```
 
-`ParseResult` is an owned result detached from the workspace. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. `trivia_collected` records whether `collect_trivia` was enabled; a zero-length trivia table alone cannot distinguish a source with no trivia from a parse that intentionally skipped trivia. Normal APIs return `ParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
+`ParseResult` is an owned result detached from the workspace, but source-dependent access still requires the original `SourceStore`; owning CST tables does not make numeric `SourceId` values self-resolving. `ParseSessionResult` is a borrowed result that references tables and diagnostic buffers inside the workspace, and is valid only until the next `workspace.clear()` / `workspace.reset()`. Both result types carry the `SourceId` that was parsed. `trivia_collected` records whether `collect_trivia` was enabled; a zero-length trivia table alone cannot distinguish a source with no trivia from a parse that intentionally skipped trivia. `parse_source` callers retain that owner themselves, `parse_message` retains it in `StandaloneParseResult`, and `parse_batch` retains it in `BatchParseResult`; performance-sensitive repeated parsing uses `ParseSessionResult`.
 
-`SemanticView<'a>` in `ParseSessionResult` is a Rust-internal borrowed view over semantic facts. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
+`SemanticView<'a>` is created from a separately owned `SemanticModel`; it is not part of `ParseSessionResult`. It is not the Phase 2 binding public API and it is not the Phase 3C built-in lint rule API; those rules receive the linter-owned `RuleContext` described in the Phase 3C design.
 
 Batch parsing uses the same `ParseOptions` as single-message parsing. `parse_batch` is a synchronous, sequential convenience API; it does not accept an execution strategy, thread count, or result-order option. Parallel scheduling is a consumer responsibility rather than a parser API concern.
 
@@ -722,7 +745,7 @@ The returned `sources` store owns the batch source text and metadata used by dia
 
 The facade may expose aggregate diagnostics for convenience. The canonical mapping remains per source. This preserves identity semantics while allowing batch results to later map to snapshot roots entries.
 
-`parse_semantic` defaults to `false` so parser throughput and SemanticModel construction throughput can be measured separately.
+Parser throughput and SemanticModel construction throughput are measured separately because every parse API returns syntax-only artifacts and semantic construction is a distinct call.
 
 ## Caller-Owned Parallel Parsing
 
@@ -736,7 +759,7 @@ Concurrent-use constraints:
 - Each concurrent call owns its `ParseWorkspace`, CstTables, diagnostic buffers, and temporary allocation.
 - Immutable source or configuration state intentionally shared by consumers must satisfy the applicable `Sync` boundary; owned results transferred out of a worker must be `Send`.
 - If string interning or cooked-value caches are introduced, they remain call-local or otherwise preserve identical results and failure isolation under concurrent invocation.
-- Diagnostics retain `SourceId + Span`, and concurrent scheduling never changes CST, SemanticModel, diagnostic, or result semantics.
+- Diagnostics retain `SourceId + Span`, and concurrent scheduling never changes CST, diagnostic, or result semantics. Independent `build_semantic_model` calls over valid immutable owner/result pairs likewise produce identical semantic facts.
 - The parser crate does not depend on an executor such as Rayon solely to provide batch scheduling.
 
 Phase 1 reports `parse_batch_session` and `parse_batch_sequential` as parser-owned benchmark phases. A consumer-owned parallel benchmark must be named and measured at that consumer boundary, including its scheduler and aggregation costs; it is not reported as parser-core parallel throughput.
@@ -1120,8 +1143,9 @@ Test categories:
 - SemanticModel construction tests: declarations, references, selectors, and variants link correctly to NodeId / Span
 - data model validation tests: distinguish Variant Key Mismatch, Missing Fallback Variant, Duplicate Declaration, and similar cases from parser syntax errors
 - source mapping tests: conversion from UTF-8 byte span to line/column and UTF-16 boundaries
+- standalone result tests: `parse_message` retains the exact one-entry source owner for CST source slicing, diagnostics, SemanticModel construction, and snapshot encoding on both clean and recovery parses
 - batch parse tests: `ParseInput` metadata, `SourceId`, diagnostic mapping, and input-order results remain stable
-- concurrent invocation tests: caller-scheduled independent parser calls produce the same CST, SemanticModel, diagnostics, and failures as serial calls without shared-state contamination
+- concurrent invocation tests: caller-scheduled independent parser calls produce the same CST, diagnostics, and failures as serial calls, and subsequent independent `build_semantic_model` calls produce the same semantic facts without shared-state contamination
 - benchmark smoke tests: benchmark corpus and CLI commands are runnable
 
 CST snapshots are not themselves the public compatibility contract. They are used to detect unintended parser implementation changes. When spec changes intentionally alter snapshots, fixtures and changelog are updated together.
@@ -1171,13 +1195,12 @@ Do not collapse the benchmark matrix into one number.
 
 Reproducibility policy:
 
-- separate `parse_message` with and without SourceStore registration
+- report private one-entry `SourceStore` construction and retention as part of `parse_message_owned`
 - separate `ParseWorkspace` reuse and no reuse
 - separate capacity pre-reserve and no pre-reserve
 - separate owned `ParseResult` materialization and borrowed `ParseSessionResult`
 - separate valid corpus, invalid corpus, and recovery-heavy corpus
 - separate `collect_trivia = true` and `collect_trivia = false`
-- separate `parse_semantic = false` and `parse_semantic = true`
 - separate `lower_semantic` from `semantic_validation`
 - state allocator conditions in benchmark reports
 - fix hyperfine warmup, minimum runs, setup command, working directory, and whether CLI startup is included
@@ -1208,10 +1231,10 @@ e2e_lint
 
 Phase meanings:
 
-- `parse_message_owned`: convenience `parse_message` path with fresh workspace setup and owned result construction. This is useful for API ergonomics and smoke comparisons, but it is not the pure parser-core baseline.
+- `parse_message_owned`: convenience `parse_message` path with private one-entry `SourceStore` construction and retention, fresh workspace setup, and owned `ParseResult` construction inside `StandaloneParseResult`. This is useful for API ergonomics and smoke comparisons, but it is not the pure parser-core baseline.
 - `parse_cst`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = true`.
 - `parse_cst_no_trivia`: parser-core path using `parse_source_session`, borrowed result, workspace reuse, and `collect_trivia = false`.
-- `lower_semantic`: parser-core plus `SemanticModel` construction. This benchmark name is kept for compatibility with existing harnesses, but it does not include parser-owned semantic validation diagnostics.
+- `lower_semantic`: `build_semantic_model` cost over an already produced diagnostic-free `SourceStore` / `ParseResult` pair. This benchmark name is kept for compatibility with existing harnesses; it excludes parsing and parser-owned semantic validation diagnostics.
 - `semantic_validation`: `validate_semantics(model)` cost over an already-constructed `SemanticModel`.
 - `owned_materialize`: cost of converting the session/table output into an owned `ParseResult`.
 - `parse_batch_session`: one `SourceStore` and one reused `ParseWorkspace` over a corpus, returning borrowed session results.

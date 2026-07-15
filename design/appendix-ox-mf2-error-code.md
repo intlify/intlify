@@ -64,18 +64,18 @@ The gap between Rust crate API ranges and binding ranges is intentional. It leav
 
 ### Current Defined Allocations
 
-The range table reserves domains; it does not imply that every integer in a domain is already assigned. The implementation currently defines these contiguous allocations:
+The range table reserves domains; it does not imply that every integer in a domain is already assigned. The current v0.1 contract assigns these contiguous allocations, which the owning implementation enums must match before their public boundary ships:
 
 | Domain | Currently defined values | Status note |
 | --- | --- | --- |
-| `DecodeErrorCode` | `1000..1035` | Emitted by snapshot validation and decode. |
+| `DecodeErrorCode` | `1000..1036` | Emitted by snapshot validation and decode. |
 | `SnapshotWriteErrorCode` | `2000..2014` | Emitted by snapshot encoding. |
-| `SourceTextErrorCode` | `3000..3004` | `3000..3003` have public source-access paths; `3004` remains reserved and is not emitted. |
+| `SourceTextErrorCode` | `3000..3007` | `3000..3003` and `3005..3007` have public source-access or attachment paths; `3004` remains reserved and is not emitted. |
 | `ParseErrorCode` | `4000..4008` | Emitted by fatal parser API failures. |
-| `InitializationErrorCode` | `10000..10001` | Emitted by WASM initialization guards and native binding loading. |
+| `InitializationErrorCode` | `10000..10003` | Emitted by WASM initialization guards/attempts and native binding loading. |
 | `BindingValidationErrorCode` | `11000` | Defined ahead of binding use for validation that is not better represented by a built-in exception. |
 
-The explicit Rust enum discriminants and their compatibility guard tests are the executable source of truth. Adding a value updates the owning enum, its name mapping, binding exposure where applicable, guard tests, and this status table in the same change.
+Once implemented, the explicit Rust enum discriminants and their compatibility guard tests are the executable source of truth. Adding a value updates the owning enum, its name mapping, binding exposure where applicable, guard tests, and this status table in the same change.
 
 ## Rust Crate API Error Domains
 
@@ -85,7 +85,7 @@ Rust crate API error domains are errors produced by Rust crates such as the pars
 
 `DecodeErrorCode` uses `1000..1999`.
 
-It covers invalid or unsupported Binary AST snapshot bytes, including invalid magic, unsupported version, malformed section table, invalid record sizes, invalid references, invalid UTF-8, unknown required sections, unknown syntax kind values, invalid diagnostic ranges, invalid source text ranges, invalid extended data, invalid edge kinds, and invalid spans.
+It covers invalid or unsupported Binary AST snapshot bytes, including invalid magic, unsupported version, malformed section table, invalid record sizes, invalid references, invalid UTF-8, unknown required sections, unknown syntax kind values, invalid diagnostic ranges, invalid source text ranges or identity, invalid extended data, invalid edge kinds, and invalid spans. `DecodeInvalidSourceIdentity = 1036` means embedded source text does not match its SourceRecord byte length or full SHA-256 digest.
 
 ### SnapshotWriteErrorCode
 
@@ -99,7 +99,22 @@ Recoverable parser diagnostics are not snapshot write errors. A snapshot may enc
 
 `SourceTextErrorCode` uses `3000..3999`.
 
-It covers failures related to external source text access after parsing or decoding, such as unavailable source text, source count mismatch during source attachment, and out-of-bounds source slicing.
+It covers failures related to external source text access after parsing or decoding, such as unavailable source text, source count or keyed-id conflicts during source attachment, source identity mismatch, and out-of-bounds source slicing.
+
+The current allocation is:
+
+| Value | Name | Meaning |
+| --: | --- | --- |
+| `3000` | `SourceTextNotIncluded` | A source slice requires text that is neither embedded nor attached. |
+| `3001` | `SourceTextSpanOutOfBounds` | A requested source slice is outside the verified text or splits a UTF-8 scalar boundary. |
+| `3002` | `SourceTextTooLarge` | Source text cannot be represented by the `u32`-bounded source model. |
+| `3003` | `SourceTextCountMismatch` | A keyed attachment array does not contain exactly `snapshot.sourceCount()` entries. |
+| `3004` | `SourceTextUnpairedSurrogate` | Reserved; Phase 2 JavaScript bindings use built-in `TypeError` instead. |
+| `3005` | `SourceTextAlreadyIncluded` | `withSources()` was called for a snapshot that already embeds source text. |
+| `3006` | `SourceTextDuplicateSourceId` | A keyed attachment array repeats a valid snapshot-local SourceId. |
+| `3007` | `SourceTextIdentityMismatch` | Attached UTF-8 bytes do not match the SourceRecord byte length or full SHA-256 digest. |
+
+`SourceTextDuplicateSourceId` and `SourceTextIdentityMismatch` expose the offending snapshot-local id as `OxMf2ErrorShape.sourceId`. Invalid non-integer or out-of-range attachment ids use built-in `RangeError` and do not consume a numeric code.
 
 `SourceTextUnpairedSurrogate = 3004` is reserved and must not be reused, but Phase 2 bindings do not emit it. They reject unpaired surrogates during raw JavaScript input validation with built-in `TypeError`, before parsing, source attachment, or source slicing. A future input model that accepts WTF-8 or UTF-16 may assign semantics to the reserved code only through an explicit contract revision.
 
@@ -107,7 +122,7 @@ It covers failures related to external source text access after parsing or decod
 
 `ParseErrorCode` uses `4000..4999`.
 
-It covers fatal parser API failures: an oversized source, an invalid source id, exhaustion of a `u32`-indexed parser resource, or a missing CST root. Recoverable MF2 syntax errors remain successful parse results with diagnostics and never use this range. `parse_batch` reports the input index together with the underlying `ParseError` and fails the whole call rather than returning a partial batch.
+It covers fatal parser API failures: an oversized source, an invalid source id, exhaustion of a `u32`-indexed parser resource, or a missing CST root. Recoverable MF2 syntax errors remain successful parse results with diagnostics and never use this range. `parse_batch` reports the zero-based input index together with the underlying `ParseError` and fails the whole call rather than returning a partial batch. N-API and WASM `parseBatch` preserve the underlying `ParseErrorCode` and expose that position as optional `OxMf2ErrorShape.inputIndex`; other error paths omit the property.
 
 ## Binding Error Domains
 
@@ -117,7 +132,16 @@ Binding error domains are produced by N-API or WASM wrapper code rather than the
 
 `InitializationErrorCode` uses `10000..10999`.
 
-It covers runtime setup failures, primarily WASM initialization before using sync APIs or invalid WASM initialization input.
+It covers binding runtime setup failures. The initial allocation is:
+
+| Value | Name | Meaning |
+| --- | --- | --- |
+| `10000` | `InitializationWasmNotInitialized` | A synchronous WASM API was called before any initialization attempt completed successfully. |
+| `10001` | `InitializationNativeBindingUnavailable` | The N-API host package could not load a supported native binding. |
+| `10002` | `InitializationWasmInputConflict` | Explicit WASM input was supplied after an initialization attempt had started or after initialization had succeeded. |
+| `10003` | `InitializationWasmInitializationFailed` | An accepted WASM initialization attempt failed while importing, resolving/reading/fetching input, compiling, instantiating, or installing the generated binding. |
+
+`InitializationWasmInputConflict` does not cancel or replace the active/installed runtime. `InitializationWasmInitializationFailed` installs no usable binding, clears the in-flight attempt, and permits a later default-input or explicit-input retry. Its optional host `cause` and human-readable message are diagnostic aids rather than stable discriminators. Values outside the declared `WasmInitInput` runtime boundary use built-in `TypeError` when rejected during binding input validation; they do not consume another initialization code.
 
 ### BindingValidationErrorCode
 
@@ -157,7 +181,7 @@ Intentional reuse keeps the same top-level code rather than adding a product-pre
 
 The formatter also reuses the applicable shared Phase 3A codes. [Formatter IR](./011-ox-mf2-formatter-ir-design.md#invariant-and-error-boundaries) owns the pipeline phases and invariant boundary that become formatter `internal_error` failures.
 
-The shared CLI scheduler also reuses `internal_error` for a command-fatal worker-runtime failure. [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) owns its initialization, dispatch, execution, join, placement, deterministic selection, cancellation, result-discard, write-side-effect, and exit contracts.
+The deferred shared CLI scheduler will reuse `internal_error` for a command-fatal worker-runtime failure when that follow-up is implemented. [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) retains its initialization, dispatch, execution, join, placement, deterministic selection, cancellation, result-discard, write-side-effect, and exit contracts. Initial sequential CLI execution cannot emit this reason.
 
 ### Linter and Semantic Validation
 
@@ -186,18 +210,19 @@ The registry assigns top-level code ownership. Stable subordinate schemas remain
 | Detail family | Owning design |
 | --- | --- |
 | CLI routing, config loading, config parsing, native wrapper, and shared envelope | [Phase 3A](./006-ox-mf2-phase-3a-tooling-foundation-design.md) |
-| Shared CLI worker scheduling, physical identity/grouping, metadata inspection, alias ordering, and common fail-stop boundary | [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) |
+| Physical identity/grouping, metadata inspection, alias ordering, and common fail-stop boundary | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md#cli-workflow) and [Phase 3 transport](./005-ox-mf2-phase-3-tooling-transport-design.md) |
+| Deferred shared CLI worker scheduling | [Phase 3 transport deferred follow-up](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) |
 | Formatter options, snapshots, discovery, ignore files, target I/O, exact alias-blocked results, and formatter invariant phases | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md) and [Formatter IR](./011-ox-mf2-formatter-ir-design.md) |
 | Linter binding input/options and semantic or rule invariant reasons | [Phase 3C](./008-ox-mf2-phase-3c-linter-design.md) and [Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) |
 | Resource config, catalog classification conflicts, parsing, representability, limits, catalog result specializations, and adapter invariant reasons | [Resource catalog adapter](./013-ox-mf2-resource-catalog-adapter-design.md) |
 
 When two products reuse a top-level code, their detail variants are a union only after the owning documents define how a consumer distinguishes and validates every variant. This appendix indexes the current ownership but does not silently normalize incompatible `details` fields.
 
-`internal_error` has one cross-product requirement: `details.reason` is always present and is the first variant discriminator. Consumers select the reason variant before reading owner-specific fields. The initial registry is:
+`internal_error` has one cross-product requirement: `details.reason` is always present and is the first variant discriminator. Consumers select the reason variant before reading owner-specific fields. The registry includes active reasons plus explicitly reserved deferred reasons:
 
 | Owner | Registered `internal_error` reasons | Reason-specific fields |
 | --- | --- | --- |
-| Shared CLI scheduler | `cli_worker_runtime_failed` | required `phase`: `initialize`, `dispatch`, `execute`, or `join`; optional top-level `path` when the active logical target is known exactly |
+| Shared CLI scheduler (deferred; not emitted by initial sequential execution) | `cli_worker_runtime_failed` | required `phase`: `initialize`, `dispatch`, `execute`, or `join`; optional top-level `path` when the active logical target is known exactly |
 | Formatter | `formatter_invariant_failed` | required formatter `phase` |
 | Linter and parser semantic validation | `semantic_invariant_failed`, `semantic_api_misuse`, `lint_rule_invariant_failed` | reason-specific `stage` or `ruleId` |
 | Resource catalog adapter | `resource_invalid_entry_handle`, `resource_artifact_identity_exhausted`, `resource_offset_map_invariant_failed`, `resource_offset_map_failed`, `resource_write_back_failed`, `resource_adapter_invariant_failed` | required resource `phase`; optional `entryKey` when one entry is known |
@@ -244,7 +269,11 @@ type OxMf2ErrorShape = {
   sectionKind?: SectionKind
   offset?: number
   recordIndex?: number
+  inputIndex?: number
+  sourceId?: number
 }
 ```
+
+`sourceId` is a snapshot-local SourceId and is present only when a source-text attachment error identifies one source. It is omitted for source count mismatch, slice errors, parser batch errors, and unrelated domains.
 
 `DiagnosticCode` remains a separate numeric const object for parser diagnostics.

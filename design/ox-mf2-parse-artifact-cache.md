@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Phase 1 ships a parser core that parses one caller-owned `SourceStore` entry identified by `SourceId` into an owned `ParseResult` (CST tables + diagnostics + optional `SemanticModel`). Dictionary-shaped tooling — i18n checkers, LSPs, batch linters, codegen — works at a different granularity: many `(locale, message_id, source_text)` entries, frequently revisited as files change.
+Phase 1 ships a parser core that parses one caller-owned `SourceStore` entry identified by `SourceId` into an owned syntax-only `ParseResult` (CST tables + diagnostics). Dictionary-shaped tooling — i18n checkers, LSPs, batch linters, codegen — works at a different granularity: many `(locale, message_id, source_text)` entries, frequently revisited as files change.
 
 The `ox-content` MF2 checker (see `refers/ox-content/crates/ox_content_i18n/src/checker.rs`) re-parses the same dictionary value across `check_type_mismatch`, `check_syntax_errors`, and `check_all`, multiplied across locale/key loops. Anti-pattern reference captured in `.reviews/005-ox-mf2-ox-content-mf2-parser-optimization-notes.md`, Point 5.
 
@@ -31,7 +31,6 @@ struct CacheKey {
 
 struct ParseOptionsKey {
     recovery: bool,
-    parse_semantic: bool,
     collect_trivia: bool,
 }
 
@@ -44,7 +43,7 @@ struct SourceFingerprint {
 - `source_id_namespace` — usually `(project_root, locale)` so the same message id in different locales / dictionaries does not collide.
 - `message_id` — translation key. Stable identifier from the dictionary layer; the parser itself only sees source text and never depends on it.
 - `parser_version` — exact parser compatibility identity. A result produced by a different parser version is never a hit.
-- `parse_options` — normalized values for every option that changes `ParseResult`: `recovery`, `parse_semantic`, and `collect_trivia`. Metadata that does not affect parser output is excluded.
+- `parse_options` — normalized values for every option that changes the syntax-only `ParseResult`: `recovery` and `collect_trivia`. Metadata that does not affect parser output is excluded.
 - `source.hash` — seeded XXH3-64 of the message source bytes, used only to accelerate this cache instance's map lookup.
 - `source.bytes` — exact source bytes used for equality. Any byte-level edit invalidates the entry even if its hash collides.
 
@@ -68,18 +67,33 @@ struct CachedParse {
 ```
 
 - `SourceStore` is the owner that assigned every `SourceId` referenced by the result, CST token/trivia records, and diagnostics. Keeping it in the same cached value makes those ids valid for the full artifact lifetime.
-- `ParseResult` already owns `CstTables`, materialized parser diagnostics, optional `SemanticModel`, and the `trivia_collected` capability. Keeping the complete result avoids losing fields when the parser API evolves.
+- `ParseResult` already owns `CstTables`, materialized parser diagnostics, and the `trivia_collected` capability. Keeping the complete syntax result avoids losing fields when the parser API evolves.
 - `Arc<SourceStore>` and the owned result make the entry shareable across readers. Source slices and line/column lookup always use `cached.sources` together with ids from `cached.result`; consumers never recreate a store and assume the same numeric ids will be assigned.
 - The `Arc<str>` in `CacheKey.source` exists for exact cache-key equality. It is not a replacement owner for parser `SourceId` resolution; that role belongs exclusively to `CachedParse.sources`.
 - The cache milestone requires `CachedParse` and every owned parser artifact reachable through it to satisfy `Send + Sync`. Per-parse `ParseWorkspace` scratch state is not stored and does not acquire that requirement. `ParseCache` itself is `Send + Sync`, while a lookup result remains immutable through `Arc<CachedParse>`.
 
+## Semantic Artifact Separation
+
+`ParseCache` never stores a `SemanticModel`, a lazy semantic once-cell, or a semantic-construction failure inside `CachedParse`. Syntax reuse and semantic reuse have different lifecycles: formatting needs the former, while linting or validation may additionally need the latter only after a diagnostic-free parse.
+
+A future cache-backed semantic consumer may layer a separately owned value over the immutable parse artifact:
+
+```rust
+struct CachedSemantic {
+    parse: Arc<CachedParse>,
+    model: SemanticModel,
+}
+```
+
+This is a consumer-layer shape, not an initial `ParseCache` API or Phase 3C linter requirement. Its key must include the complete parse-artifact identity, the exact semantic-construction compatibility version, and every future option that changes semantic facts. Such options never enter `ParseOptionsKey` merely to reuse the same map. A diagnostic-bearing parse has no semantic artifact. Construction misuse or invariant failure is not cached as a successful semantic value. Any semantic cache owns its own capacity, single-flight, invalidation, and weight accounting rather than silently consuming the parse cache's limits.
+
 ## Invariants enforced by the cache layer (not the parser)
 
 1. **One active parse flight per complete `CacheKey` and residency epoch.** Parser version, result-affecting options, source hash, and exact source bytes are already part of the key. The first miss becomes the producer; concurrent equal-key callers wait for that flight and receive the same `Arc<CachedParse>`. A successful value remains one shared ready entry until explicit invalidation or eviction. Re-parsing after eviction, invalidation, or an unsuccessful producer attempt begins a new residency epoch and is allowed.
-2. **All downstream checks read from the cache.** Variable extraction, syntax diagnostics, semantic validation, formatter, linter rules, LSP requests — all consume `CachedParse`, never call `parse_source` themselves. The formatter receives `cached.sources.as_ref()` and `&cached.result` through its workspace-internal parsed-artifact API; it neither depends on `CachedParse` nor converts the entry to a Binary AST snapshot. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
+2. **All downstream syntax consumers read from the cache.** Variable extraction, syntax diagnostics, formatter, future cache-backed linter flows, and LSP requests consume `CachedParse` and never call `parse_source` themselves. A semantic consumer calls parser-owned `build_semantic_model(cached.sources.as_ref(), &cached.result)` after confirming parser diagnostics are empty; the resulting `SemanticModel` is a separate artifact and is never inserted into `ParseResult`. The formatter receives the same pair through its workspace-internal parsed-artifact API; it neither depends on `CachedParse` nor converts the entry to a Binary AST snapshot. For linter rules, this describes a future dictionary/LSP/cache-backed adapter workflow; it is not the initial Phase 3C `lintMessage(source, options)` or rule API input contract.
 3. **Cache invalidation is explicit at file/dictionary update boundaries.** Either the dictionary layer removes entries for the changed namespace/message on write, or a lookup naturally misses when parser version, parse options, or exact source bytes differ. In an editor catalog, a host-document version or resource mapping change invalidates extraction and mapped-result state but does not by itself evict an unchanged entry's message-level parse artifact. Formatter- and linter-only configuration changes likewise do not alter this parse key. The selective editor invalidation and generation-check contract is owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md#artifact-cache-and-invalidation).
 4. **Normal parser diagnostics are cacheable success data.** A diagnostic-bearing `ParseResult` is a completed parse artifact and becomes `Ready` exactly like a clean result. `ParseError`, source-store construction failure, producer cancellation/drop, and panic are unsuccessful attempts: current waiters receive one cache-layer failure, no ready value is retained, and a later lookup may retry.
-5. **Single-flight coordination is per key, not one global parse lock.** Different complete keys may parse concurrently. No map shard, entry-table mutex, or flight-state mutex is held while source storage, parsing, semantic construction, or diagnostic materialization runs.
+5. **Single-flight coordination is per key, not one global parse lock.** Different complete keys may parse concurrently. No map shard, entry-table mutex, or flight-state mutex is held while source storage, parsing, or diagnostic materialization runs. Semantic construction is outside this parse flight.
 
 ## Concurrent Entry Lifecycle
 
@@ -130,7 +144,7 @@ struct CacheLimits {
 
 There is no implicit unbounded mode in the reusable cache. A long-lived LSP, one-shot dictionary checker, or other consumer selects limits appropriate to its own process budget when constructing the cache; the initial values are internal integration and benchmark choices, not project configuration, editor settings, or a public CLI option.
 
-Only resident `Ready` entries count toward both limits. After a successful producer completes, the cache computes one immutable `estimated_bytes` weight for the key, coordination entry, and retained artifact. The estimate includes conservatively retained key/namespace/message strings, exact source fingerprint bytes, `SourceStore` text and line indexes, CST/token/trivia table capacities, diagnostics, optional `SemanticModel`, and fixed map/`Arc` bookkeeping. Shared allocations are counted at least once for each cache entry that keeps them alive; the estimator does not reduce the weight merely because another external `Arc` currently exists. Saturating `u64` arithmetic turns an unrepresentable estimate into an over-limit weight rather than wrapping.
+Only resident `Ready` entries count toward both limits. After a successful producer completes, the cache computes one immutable `estimated_bytes` weight for the key, coordination entry, and retained artifact. The estimate includes conservatively retained key/namespace/message strings, exact source fingerprint bytes, `SourceStore` text and line indexes, CST/token/trivia table capacities, diagnostics, and fixed map/`Arc` bookkeeping. A separately retained `SemanticModel` is not owned or counted by `ParseCache`. Shared allocations are counted at least once for each cache entry that keeps them alive; the estimator does not reduce the weight merely because another external `Arc` currently exists. Saturating `u64` arithmetic turns an unrepresentable estimate into an over-limit weight rather than wrapping.
 
 The byte limit is deliberately an estimated cache-residency budget, not an allocator-exact whole-process memory promise. Per-call parser scratch memory and externally retained `Arc<CachedParse>` clones are outside the resident-cache total. Bounded caller-owned concurrency and the parser/resource input limits bound active parse work; the cache records in-flight counts and weights for metrics but does not evict or synchronously cancel an `InFlight` producer to enforce the ready-entry LRU.
 
@@ -232,7 +246,7 @@ let formatted = format_parsed(
 );
 ```
 
-`format_parsed`, `check_parsed`, and `format_parsed_bounded` create the formatter-owned validated input view from these two references. They do not reparse `file`, copy the CST, or encode/decode a snapshot. A diagnostic-bearing cached result is passed through unchanged so the formatter can apply its normal strict diagnostic policy.
+`format_parsed` and `check_parsed` create the formatter-owned validated input view from these two references. They do not reparse `file`, copy the CST, or encode/decode a snapshot. A diagnostic-bearing cached result is passed through unchanged so the formatter can apply its normal strict diagnostic policy. The deferred bounded parsed-artifact API will reuse this same owner-pair contract when implemented.
 
 Moving only `cached.result`, persisting only its numeric `SourceId`, or attaching it to a newly-created `SourceStore` violates both the cache and parsed-formatter contracts. The formatter rejects inconsistencies that the retained data makes observable, but coincidentally equal numeric ids are not proof of ownership. If a future cache combines multiple entries into one shared store, it must explicitly remap every SourceId-bearing record; numeric id reuse is never sufficient.
 
@@ -254,7 +268,7 @@ Nothing in Phase 1 changes:
 - `parse_source_session` continues to return `Result<ParseSessionResult, ParseError>` with a borrowed result tied to a `ParseWorkspace`.
 - `parse_batch` continues to return `Result<BatchParseResult, BatchParseError>` with ordered `BatchParseItem`s.
 
-The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst` / `lower_semantic`) still describe the cost the cache pays on a miss. Here `lower_semantic` means SemanticModel construction only; parser-owned `semantic_validation` is a separate benchmark phase.
+The cache layer composes these primitives. Parser-core benchmarks (`parse_cst_no_trivia` / `parse_cst`) describe the parse cost the cache pays on a miss. `lower_semantic` separately measures `build_semantic_model` over an already available owner/result pair, and parser-owned `semantic_validation` is a third benchmark phase.
 
 ## What the cache layer should also measure
 

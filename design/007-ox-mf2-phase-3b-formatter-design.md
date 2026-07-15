@@ -224,46 +224,9 @@ Rust uses `SnapshotView<'_>` internally. N-API and WASM bindings accept serializ
 
 `source` is required for snapshot-backed formatting because preserve mode, source slicing, parser diagnostics, and editor position conversion depend on source text. Snapshot-backed formatting is parse-artifact reuse, not a source-free formatting mode.
 
-`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. Snapshot-backed formatting requires verifiable diagnostic capability in all modes; if diagnostics may have been omitted from the supplied snapshot, the formatter cannot prove that the parse was diagnostic-free and returns `invalid_snapshot` with `details.reason: "missing_capability"`. The implementation must also verify snapshot/source consistency where the snapshot format makes that possible. Phase 3B keeps source consistency validation best-effort and does not require snapshots to carry source identity data or consistency metadata, such as a source hash or source length. A detected mismatch returns `ok: false` with an operational error.
+`formatSnapshot` and `checkSnapshot` follow the same strict diagnostics policy as `formatMessage`: if the snapshot contains parser diagnostics, they return `ok: false`. Snapshot-backed formatting requires verifiable diagnostic capability in all modes; if diagnostics may have been omitted from the supplied snapshot, the formatter cannot prove that the parse was diagnostic-free and returns `invalid_snapshot` with `details.reason: "missing_capability"`. Every v0.1 SourceRecord carries exact source byte length plus a full SHA-256 digest, so the implementation must verify the supplied source against the SourceRecord referenced by the formatted root before IR construction. A detected mismatch returns `ok: false` with an operational error.
 
-`changed` is computed by byte equality between the message-level formatter output and its input source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, `checkSnapshot`, `format_parsed`, and `check_parsed`. Parsed-artifact calls obtain that source from `sources.get(result.source)`; callers do not supply a second source string. Message-level APIs treat the source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if embedded source identity data or consistency metadata differs from the supplied source, the API returns a mismatch failure instead of a changed result.
-
-### Bounded Rust Rendering for Resource Consumers
-
-The workspace Rust crate additionally exposes source-backed, parsed-artifact-backed, and snapshot-backed bounded rendering entry points for catalog consumers. They reuse the same parser syntax model, Layout IR, Document IR, formatting rules, and byte-equality semantics as the ordinary entry points, but cap the materialized UTF-8 output:
-
-```rust
-format_message_bounded(
-    source: &str,
-    options: FormatOptions,
-    max_output_bytes: u64,
-) -> BoundedFormatResult
-
-format_snapshot_bounded(
-    snapshot: SnapshotView<'_>,
-    source: &str,
-    options: FormatOptions,
-    max_output_bytes: u64,
-) -> BoundedFormatResult
-
-format_parsed_bounded(
-    sources: &SourceStore,
-    result: &ParseResult,
-    options: FormatOptions,
-    max_output_bytes: u64,
-) -> BoundedFormatResult
-
-enum BoundedFormatResult {
-    Complete(FormatResult),
-    OutputLimitExceeded { limit: u64, actual: u64 },
-}
-```
-
-`Complete` is byte-for-byte and field-for-field equivalent to calling the corresponding ordinary formatting API. Parser diagnostics, invalid options or snapshots, source mismatch, parsed-artifact attachment failure, and other failures established before successful rendering remain the ordinary `FormatResult::Err`; the bounded path does not translate them into a size result.
-
-The renderer writes directly into a capped sink and must not first construct the complete output or any other output-sized string. The sink admits at most `max_output_bytes`, stops before storing the first byte beyond that limit, discards its partial buffer, and returns `OutputLimitExceeded` with `limit` equal to the supplied cap and `actual` equal to `limit + 1`. No code, `changed` value, or partial formatter result accompanies that outcome. The initial resource consumer supplies its fixed one-message maximum, which is well below `u64::MAX`; accepting `u64::MAX` as a generic cap is not required by this milestone.
-
-`OutputLimitExceeded` is a formatter-internal capacity signal, not a formatter operational error and not a new public error code. The catalog integration asks the resource layer to convert it into the resource-owned candidate admission result. The ordinary Rust APIs and the N-API and WASM `formatMessage`/`formatSnapshot` contracts remain unchanged and do not expose a caller-configurable output limit.
+`changed` is computed by byte equality between the message-level formatter output and its input source string. This applies to `formatMessage`, `checkFormat`, `formatSnapshot`, `checkSnapshot`, `format_parsed`, and `check_parsed`. Parsed-artifact calls obtain that source from `sources.get(result.source)`; callers do not supply a second source string. Message-level APIs treat the source as the whole message: they never strip or append a final newline and never rewrite line endings inside pattern text, so an already formatted simple message reports `changed: false` even when it has no trailing newline. CRLF that sits in formatter-controlled trivia positions of a complex message is normalized to LF and reports `changed: true`. Final-newline and BOM handling is CLI file framing applied outside these APIs; see [File Framing](#file-framing). Snapshot-backed APIs compare against the supplied `source`; if its exact UTF-8 byte length or SHA-256 differs from the formatted root's SourceRecord, the API returns a mismatch failure instead of a changed result.
 
 ## Operational Error Codes
 
@@ -277,7 +240,7 @@ Formatter-specific codes:
 
 | Code | Kind | Exit | When |
 | --- | --- | --- | --- |
-| `source_snapshot_mismatch` | `input` | `2` | `formatSnapshot` or `checkSnapshot` receives source text that does not match the snapshot where consistency can be verified. |
+| `source_snapshot_mismatch` | `input` | `2` | `formatSnapshot` or `checkSnapshot` receives source text whose exact UTF-8 byte length or SHA-256 does not match the formatted root's SourceRecord. |
 | `unsupported_input_file` | `input` | `2` | CLI explicit file input or `--stdin-filepath` uses an unsupported extension or unsupported direct file form. |
 | `invalid_ignore_pattern` | `input` | `2` | A `--ignore-path` file contains a pattern outside the formatter gitignore-compatible subset. Invalid `fmt.ignorePatterns` entries use `config_validation_failed`. |
 | `ignore_file_read_failed` | `io` | `2` | A `--ignore-path` file cannot be read. |
@@ -309,22 +272,22 @@ Standardized `details` fields:
 
   ```json
   {
-    "reason": "embedded_source_text_mismatch"
+    "reason": "source_identity_mismatch"
   }
   ```
 
-  `details.reason` is required and initially has only `"embedded_source_text_mismatch"`. It means the snapshot carries embedded source text and that text is not byte-identical to the source supplied to `formatSnapshot` or `checkSnapshot`. The error does not expose either source text, a hash, byte lengths, or the first differing offset. If a future snapshot revision adds another consistency mechanism such as a source hash or source length, the design that exposes that mechanism must add a distinct stable reason before emitting this code for it.
+  `details.reason` is required and initially has only `"source_identity_mismatch"`. It means the exact UTF-8 byte length or full SHA-256 digest in the formatted root's SourceRecord does not match the source supplied to `formatSnapshot` or `checkSnapshot`. This check applies whether source text is embedded or omitted. The error does not expose either source text, expected or actual digests, byte lengths, or the first differing offset.
 
 - `unsupported_input_file`:
 
   ```json
   {
     "extension": ".json",
-    "supportedExtensions": [".mf2"]
+    "supportedExtensions": [".json", ".mf2"]
   }
   ```
 
-  `path` is carried by the top-level error. Files without an extension use `""`. `supportedExtensions` lists only extensions that select a direct workflow without project resource opt-in, in ASCII ascending order; it is initially always `[".mf2"]`. It does not list extensions of potentially configurable catalog formats, because an extension alone never makes such a file a supported input and an explicit catalog `format` may support an extensionless or arbitrary filename. Once a path is opted into a catalog, unsupported adapter classification uses `resource_format_unsupported.supportedFormats` instead of `unsupported_input_file`.
+  `path` is carried by the top-level error. Files without an extension use `""`. `supportedExtensions` lists canonical lowercase extensions that select a config-free direct workflow, in ASCII ascending order. Tier 1 combines the resource registry's shipped direct `[".json"]` with standalone `[".mf2"]`, producing `[".json", ".mf2"]`; lookup accepts ASCII case variants without duplicating them in this list. Directory and CLI-native glob discovery do not use the catalog portion of this direct list. An explicit catalog `format` may support an extensionless or arbitrary filename. Once a path is matched by project catalog policy, unsupported adapter classification uses `resource_format_unsupported.supportedFormats` instead of `unsupported_input_file`.
 
 - `invalid_ignore_pattern`:
 
@@ -460,7 +423,7 @@ Standardized `details` fields:
   }
   ```
 
-  The top-level `path` is the input file path. Phase 3B reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. The shared CLI physical-grouping boundary adds `metadata_failed` when physical-file identity inspection fails before reading a selected target; its required `ioKind` and optional `rawOsError` fields are owned by [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). Tier 3 XLIFF adds `unsupported_encoding` for its explicitly recognized UTF-16 BOM cases when that adapter ships; the value is not emitted before then. `invalid_utf8` reports input bytes that are not valid UTF-8 and requires `details.validUpTo` as a non-negative JSON integer equal to the byte length of the longest valid UTF-8 prefix. This shape is shared by file and stdin inputs; the source is not parsed and the target is reported as a file-specific operational error.
+  The top-level `path` is the input file path. Phase 3B reason values are `not_found`, `permission_denied`, `not_file`, `not_directory`, `invalid_utf8`, and `unknown`. The shared CLI physical-grouping boundary adds `metadata_failed` when physical-file identity inspection fails before reading a selected target; its required `ioKind` and optional `rawOsError` fields are owned by [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-file-execution-boundary). Tier 3 XLIFF adds `unsupported_encoding` for its explicitly recognized UTF-16 BOM cases when that adapter ships; the value is not emitted before then. `invalid_utf8` reports input bytes that are not valid UTF-8 and requires `details.validUpTo` as a non-negative JSON integer equal to the byte length of the longest valid UTF-8 prefix. This shape is shared by file and stdin inputs; the source is not parsed and the target is reported as a file-specific operational error.
 
 - `output_write_failed`:
 
@@ -514,6 +477,8 @@ Stdin with `--check` is allowed. It exits with `1` when the stdin source would c
 
 When no file, directory, or glob operands are provided and stdin mode is not selected, `intlify fmt` behaves as `intlify fmt .`. Help and version options keep the Phase 3A precedence and do not trigger config loading, input discovery, or formatting.
 
+The implicit `.` remains a directory operand after the resource milestone. It selects standalone `.mf2` files and project-matched catalogs, but it never receives the config-free direct-file exception. Thus `intlify fmt messages.json` may process Tier 1 JSON under absent catalog policy while bare `intlify fmt` skips that same JSON unless `resources.catalogs` matches it.
+
 `intlify fmt` supports `--` as an end-of-options marker. Tokens after `--` are treated as input path or glob operands even if they start with `-` or `--`. If `--` is present with no operands after it and stdin mode is not selected, the command follows the no-operand rule and formats `.`. Global options such as `--reporter json` and formatter options such as `--mode preserve` are recognized only before `--`.
 
 `--ignore-path` may be provided multiple times. `--mode`, `--stdin-filepath`, `--check`, `--list-different`, and `--reporter` are not repeatable; duplicates are `duplicate_cli_option` errors.
@@ -540,7 +505,7 @@ Framing consequences:
 
 ### Input Discovery
 
-The standalone primary input unit is `1 file = 1 MF2 message`. Phase 3B initially classifies only direct `.mf2` message files by itself; the resource design extends the same discovery pipeline with explicitly opted-in catalog targets.
+The standalone primary input unit is `1 file = 1 MF2 message`. Phase 3B initially classifies `.mf2` message files by itself; the resource design extends the same discovery pipeline with project-matched catalog targets and a narrow config-free direct-file/stdin exception for shipped resource extensions.
 
 Discovery has two semantic stages. Filesystem enumeration first produces concrete candidate file paths without filtering them by filename extension. It applies operand existence, glob expansion, hidden and excluded directory traversal, symlink, native ordering, Unicode representability, and unmatched-input rules. Supported-input classification then turns candidates into final selected targets: standalone `.mf2` first, followed by resource membership and format resolution when the resource workflow is available. This split is required because a catalog may use an explicit format override on an extensionless or otherwise arbitrary filename. An implementation may classify each representable candidate as it is enumerated and need not retain every candidate simultaneously, but its observable errors, ordering, and stage precedence must equal this two-stage model.
 
@@ -548,17 +513,17 @@ Input rules:
 
 - in file mode, no operands are equivalent to an explicit directory operand `.`
 - explicit `.mf2` file paths are accepted
-- an explicit non-`.mf2` file path is offered to resource membership; when no catalog definition opts it in, it is an unsupported input error and exits with `2`
-- directory inputs recursively enumerate eligible files; classification selects `.mf2` files plus opted-in catalog files
-- glob inputs may be broad; classification selects only matched `.mf2` files and opted-in catalog files
+- an explicit non-`.mf2` file path is offered to resource policy first; absent policy permits config-free shipped-extension classification, a non-empty unmatched policy is an unsupported input error, and explicit empty or excluded policy is an ignore-like skip
+- directory inputs recursively enumerate eligible files; classification selects `.mf2` files plus only project-matched catalog files
+- CLI-native glob inputs may be broad; classification selects only matched `.mf2` files and project-matched catalog files, without config-free catalog extension fallback
 - unmatched paths or globs that match no filesystem entries are input errors and exit with `2`
 - directory or glob inputs that match filesystem entries but select no supported targets are zero-target successes and exit with `0`
 - invalid glob syntax is an `invalid_cli_argument` error
 - if the final selected target set is empty, the command exits with `0`
-- every representable concrete file candidate is de-duplicated by slash-normalized absolute path before supported-input classification; this applies whether the path came from an explicit operand, directory, or glob, so one unsupported candidate produces at most one `unsupported_input_file`
+- every representable concrete file candidate is de-duplicated by slash-normalized absolute path before supported-input classification; this applies whether the path came from an explicit operand, directory, or glob, so one unsupported candidate produces at most one `unsupported_input_file`; de-duplication retains the candidate's complete origin set, and any explicit direct-file origin makes the one merged candidate direct for resource classification
 - processing and output use stable slash-normalized path order
 
-Errors that cannot produce a concrete representable candidate are not covered by candidate de-duplication. Each unmatched path or glob and each syntactically invalid glob remains an error for its own CLI operand occurrence. Candidate de-duplication does not canonicalize symlink targets, so distinct logical symlink and target paths remain separate candidates and later follow the physical-identity rules when the resource workflow is active.
+Errors that cannot produce a concrete representable candidate are not covered by candidate de-duplication. Each unmatched path or glob and each syntactically invalid glob remains an error for its own CLI operand occurrence. Candidate de-duplication does not canonicalize symlink targets, so distinct logical symlink and target paths remain separate candidates and later follow the physical-identity rules when the resource workflow is active. When the same normalized path is reached through both a direct file operand and a directory or CLI-native glob, direct origin wins only for the merged candidate's supported-input classification; the file is still processed once, and the broader origin does not revoke config-free direct opt-in or create a second result.
 
 Path representability is checked before supported-input classification and before ignore matching. Every explicit operand and `--stdin-filepath` must be exactly representable as Unicode. Directory and glob discovery performs the same check for every encountered filesystem entry; an unrepresentable entry emits `input_path_unrepresentable`, is not selected, and, when it is a directory, is not traversed. Other operands and representable entries continue through normal discovery, and the retained error makes the final exit code `2`. Implementations must not silently skip or lossily convert such entries.
 
@@ -566,25 +531,23 @@ Representability errors retain deterministic discovery ordering. Explicit operan
 
 When several top-level discovery and input-selection errors coexist, `errors[]` follows semantic pipeline order rather than implementation encounter order. Filesystem enumeration errors come first: explicit operands are considered in CLI order, and errors reached within one directory or glob follow the same stable native-path ordering used for representability checks. Supported-input classification errors follow in ascending slash-normalized candidate-path order. The resource workflow then appends at most one selected catalog-assignment conflict; when no such aborting conflict exists, physical-classification conflicts follow in physical-group first-path order. Setup failures such as invalid config or ignore-path setup still abort before this aggregation. An implementation may stream work internally only if it buffers or merges errors to preserve this public order.
 
-Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an explicit hidden file that is neither standalone `.mf2` nor an opted-in catalog is `unsupported_input_file`.
+Directory and glob discovery excludes hidden files and hidden directories by default. Explicit file paths can still refer to hidden files, subject to resource policy and ignore rules. An explicit hidden path that does not exist is `unmatched_input`; an existing hidden file follows the same standalone, project-policy, config-free direct-extension, skip, or unsupported classification as any other direct file.
 
 Directory and glob discovery also excludes common VCS, dependency, and output directories by default, including `.git`, `.hg`, `.svn`, `node_modules`, `vendor`, `target`, `dist`, and `coverage`. Explicit file paths can still target files under those directories, subject to ignore rules.
 
 File symlinks are followed. Directory symlinks are not followed. Duplicate detection uses slash-normalized absolute paths and does not canonicalize symlink targets, so a file symlink and its target path are treated as separate targets when both paths are provided.
 
-Before parallel file execution, the shared CLI groups every final standalone or catalog file-mode target by physical file identity while preserving separate logical results. This applies even when no catalog target is selected, so symbolic-link and hard-link aliases of a standalone `.mf2` file cannot race in write mode. Physical identity, alias ordering, and the common fail-stop boundary are owned by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). The resource design owns the additional error contract for aliases whose standalone/catalog classifications conflict.
+Before file execution, the shared CLI groups every final standalone or catalog file-mode target by physical file identity while preserving separate logical results. This applies even when no catalog target is selected, so symbolic-link and hard-link aliases of a standalone `.mf2` file share one serial processing boundary. Physical identity, alias ordering, and the common fail-stop boundary remain shared CLI behavior. The resource design owns the additional error contract for aliases whose standalone/catalog classifications conflict.
 
-Directory inputs such as `.` that contain no selected standalone or resource targets after discovery and filtering exit with `0`. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
+Directory inputs such as `.` that contain no selected standalone or resource targets after discovery and filtering exit with `0`. A CLI-native glob that resolves to concrete JSON files but has no project-matched catalogs likewise exits with `0`; those candidates are not classified through the direct-file exception. Operand kind is determined from the tokens received by the CLI, so shell-expanded individual paths are direct file operands and the CLI does not infer their shell origin. Explicit unmatched inputs such as `intlify fmt missing/**/*.mf2` remain `unmatched_input` errors.
 
-### Parallel File Execution
+### Sequential File Execution
 
-After discovery, de-duplication, supported-input classification, ignore filtering, and physical grouping finish, `crates/intlify_cli` processes different physical file groups concurrently using the bounded, command-scoped worker-thread pool defined by the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). Ignore sources are loaded and validated during setup, but matching occurs only after classification. One scheduler work item is one physical file group. Logical aliases within that group execute the complete read, framing, format/check, result construction, and optional write pipeline serially in normalized logical-path order; different groups may run concurrently.
+After discovery, de-duplication, supported-input classification, ignore filtering, and physical grouping finish, `crates/intlify_cli` processes physical file groups sequentially on the caller thread in stable first-logical-path order. Ignore sources are loaded and validated during setup, but matching occurs only after classification. Logical aliases within each group execute the complete read, framing, format/check, result construction, and optional write pipeline serially in normalized logical-path order.
 
-The initial implementation uses automatic bounded concurrency and exposes no `--threads` option. Stdin mode remains one caller-thread operation. Workers return structured results and never render directly to stdout or stderr. The coordinator restores stable normalized-path order before text or JSON rendering, summary calculation, and exit-status selection, so observable behavior is identical at worker width one and at any larger supported width. Formatter writes to unrelated physical groups may complete in any order, while the physical-group failure rules contain a write failure to the affected group.
+Stdin mode is likewise one caller-thread operation. Target processing produces structured results, and the coordinator preserves stable normalized-path order for text or JSON rendering, summary calculation, and exit-status selection. The physical-group failure rules contain a write failure to the affected group without requiring a worker runtime.
 
-Pool initialization, dispatch, escaped worker panic, and join failures use the command-fatal `cli_worker_runtime_failed` contract in the shared parallel execution boundary. Formatter file mode does not retry them serially, does not return partial target results, and does not roll back writes that completed before safe worker teardown.
-
-This is file-level parallelism only. One standalone MF2 message and the entries of one catalog remain sequential within their group unless the separately benchmark-gated intra-file policy in the resource design is enabled later.
+The common worker scheduler and parallel execution across physical groups are deferred under the shared [CLI parallel execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary). One standalone MF2 message and the entries of one catalog also remain sequential.
 
 ### Physical Alias Write Failure
 
@@ -650,7 +613,9 @@ Invalid `fmt.ignorePatterns` entries are config validation errors and exit with 
 
 Missing `--ignore-path` files are operational errors and exit with `2`.
 
-Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, UTF-8 validation still runs but read/write framing, catalog extraction, and message formatting do not. For valid UTF-8, normal text stdin formatting writes the original pre-framing bytes to stdout byte-equivalently—including a leading BOM and final `LF` or `CRLF`—and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Invalid UTF-8 still returns `input_read_failed` with `details.reason: "invalid_utf8"` instead of applying lossy replacement. Supported-input classification precedes ignore rules: `--stdin-filepath ignored/file.json` remains `unsupported_input_file` unless that virtual path is an opted-in catalog under [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#stdin-selection).
+Supported-input and resource-policy classification precedes this ordinary ignore stack. Under a non-empty `resources.catalogs` policy, an explicit JSON file that is project `Unmatched` remains `unsupported_input_file` even when `.gitignore`, `--ignore-path`, or `fmt.ignorePatterns` would later match it. Ordinary ignore does not hide an explicitly named unsupported operand; a project `exclude` or explicit empty catalog policy provides the resource-policy-level normal skip when that behavior is intended.
+
+Stdin mode applies ignore rules to the `--stdin-filepath` virtual path. If the stdin filepath is ignored, UTF-8 validation still runs but read/write framing, catalog extraction, and message formatting do not. For valid UTF-8, normal text stdin formatting writes the original pre-framing bytes to stdout byte-equivalently—including a leading BOM and final `LF` or `CRLF`—and exits with `0`; stdin check mode writes nothing and exits with `0`; JSON reporter output uses a zero-target success summary with no results. Invalid UTF-8 still returns `input_read_failed` with `details.reason: "invalid_utf8"` instead of applying lossy replacement. Supported-input classification precedes ordinary ignore rules; resource policy and the config-free direct-extension exception determine whether a virtual catalog path is selected, policy-skipped, or unsupported under [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#stdin-selection).
 
 ### Exit Codes
 
@@ -946,11 +911,11 @@ The message-level core lives in a workspace-internal Rust crate named `intlify_f
 
 The source-backed, parsed-artifact-backed, and snapshot-backed message-level entry points are synchronous and safe to invoke concurrently for independent inputs. Parsed-artifact calls may also borrow the same immutable owner/result pair concurrently when the parser types satisfy the cache design's `Send + Sync` contract. `intlify_format` keeps attachment, parser, traversal, and rendering scratch state within each call, exposes no process-wide mutable formatting state, and does not create or own worker threads. CLI file scheduling belongs exclusively to `crates/intlify_cli`.
 
-The Rust concurrency contract is verified at the actual CLI transfer boundary. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, `BoundedFormatResult`, and the formatter-owned operational-error data returned from a worker must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, the ephemeral `ParsedFormatInput<'_>`, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
+The Rust concurrency contract is independent of whether the initial CLI schedules calls in parallel. Owned `FormatOptions`, `FormatResult`, `FormatCheckResult`, and formatter-owned operational-error data intended to cross a consumer thread boundary must satisfy `Send`; any future immutable formatter configuration or reusable formatter state deliberately shared between calls must satisfy `Send + Sync`. Internal layout/document IR, the ephemeral `ParsedFormatInput<'_>`, borrowed `SnapshotView<'_>` values, and rendering scratch objects that remain inside one call are not required to be shareable merely to satisfy this contract. Snapshot entry points are safe for concurrent calls over independent snapshot views; this does not promise concurrent access to one borrowed view when its parser-owned representation does not support it.
 
-Compile-time assertions lock the required owned traits. Behavioral tests run independent ordinary and bounded source-backed, parsed-artifact-backed, and snapshot-backed calls concurrently, compare the complete success, failure, or capacity values with serial baselines, and repeat a clean call after an injected returned error and a worker-boundary-contained panic. No call may alter formatting mode, source slicing, diagnostics, output bytes, output caps, or later-call behavior for another invocation. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
+Compile-time assertions lock the required owned traits. Behavioral tests run independent ordinary source-backed, parsed-artifact-backed, and snapshot-backed calls concurrently, compare complete success or failure values with serial baselines, and repeat a clean call after an injected returned error. No call may alter formatting mode, source slicing, diagnostics, output bytes, or later-call behavior for another invocation. The deferred bounded API and worker scheduler add their capacity and panic-containment cases when implemented. N-API isolate affinity and WASM instance threading remain binding-runtime constraints rather than formatter-core scheduling responsibilities.
 
-The message-level core must not format by directly concatenating strings during parsed-table or `SnapshotView` traversal. All input paths adapt to one formatter syntax view and build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. The renderer targets a sink abstraction rather than requiring one preallocated complete output string: ordinary formatting uses the normal string sink, while resource-aware bounded formatting uses the capped sink above. Neither path may materialize a second complete output before its selected sink. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
+The message-level core must not format by directly concatenating strings during parsed-table or `SnapshotView` traversal. All input paths adapt to one formatter syntax view and build the internal MF2 Layout IR and Document IR described in [011-ox-mf2-formatter-ir-design.md](./011-ox-mf2-formatter-ir-design.md) before rendering text. Ordinary formatting renders through the normal string sink and must not materialize a second complete output. The deferred bounded formatter follow-up adds a capped sink behind the same Document IR boundary. Phase 3B uses fixed group modes and deterministic rendering without `lineWidth`; future width-aware wrapping can extend the same IR boundary without changing the public formatter API.
 
 Concrete Rust type names and implementation organization may still change during implementation, but the formatter pipeline and IR responsibilities follow the Phase 3B IR design. The public contract is that callers format whole MF2 messages and receive either formatted source/check information or diagnostics/errors.
 
@@ -979,10 +944,13 @@ The N-API package uses lazy native loading. Importing the package should not eag
 The `@intlify/format-wasm` initialization contract follows the existing `@intlify/ox-mf2-wasm` package:
 
 - `init(input?)` accepts the same WASM initialization input shape as the parser WASM package.
-- Calling synchronous formatter APIs before initialization throws a WASM initialization error.
+- Calling synchronous formatter APIs before initialization throws `OxMf2InitializationError` with `InitializationWasmNotInitialized`.
 - Repeated `init()` calls with no input after successful initialization are idempotent.
-- Reinitializing an already initialized runtime with an explicit input is an initialization error.
-- While initialization is in flight, `init()` with no input returns the in-flight promise. Any later `init(input)` call with explicit input is an initialization error, even when the in-flight initialization started with default input.
+- Reinitializing an already initialized runtime with an explicit input throws `InitializationWasmInputConflict`.
+- While initialization is in flight, `init()` with no input returns the in-flight promise. Any later `init(input)` call with explicit input throws `InitializationWasmInputConflict`, even when the in-flight initialization started with default input, and does not cancel the active attempt.
+- Artifact import, input resolution/read/fetch, compile, instantiate, or generated-binding installation failure throws `InitializationWasmInitializationFailed`. It atomically installs nothing, clears the in-flight state, and permits a later retry with default or explicit input. Optional host `cause` data is diagnostic-only and not a stable discriminator.
+
+These are the same `OxMf2InitializationError` numeric codes and state transitions owned by the parser binding design and [error-code appendix](./appendix-ox-mf2-error-code.md#initializationerrorcode); formatter bindings do not define product-specific aliases. `@intlify/lint-wasm` inherits this shared state machine through the linter design's formatter/parser initialization reference.
 
 New `@intlify/format-*` npm packages may require token-based bootstrap publishing for the first release. After the packages exist on npm and trusted publisher settings are configured, normal releases should use npm trusted publishing.
 
@@ -994,7 +962,7 @@ Formatter binding packages do not have runtime dependencies on parser binding pa
 
 The formatter core formats one complete MF2 message and does not recognize resource host formats. Resource-aware `intlify fmt` behavior is a downstream composition defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-formatting).
 
-At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, obtains one paired parser artifact for each message, invokes `format_parsed_bounded` for each entry, admits completed writable outputs through the resource-owned raw-order candidate-message budget before retaining them, and asks the resource layer to validate and compose host-document write-back. A clean read-only result is discarded and its original message remains the effective candidate value; a bounded-output signal for such a discarded result is not a candidate resource failure. Neither the formatter core nor the resource crate calls or depends on the other; the CLI integration composes both and translates the formatter-owned capacity signal through the resource-owned admission contract. An optional parse-cache layer preserves the pair for reuse but is not a formatter dependency.
+At an overview level, the CLI consumer uses the resource layer to select and extract opted-in catalog entries, obtains one paired parser artifact for each message, invokes `format_parsed` for each entry, reports each completed writable output length through the resource-owned raw-order candidate-message admission boundary, and asks the resource layer to validate and compose host-document write-back. A clean read-only result is discarded and its original message remains the effective candidate value. Neither the formatter core nor the resource crate calls or depends on the other. An optional parse-cache layer preserves the pair for reuse but is not a formatter dependency. The bounded formatter path that would stop oversized output before materializing the complete string is deferred below.
 
 This document remains authoritative for message-level formatting and the standalone `.mf2` formatter contract. The resource design is authoritative for catalog membership, host-format parsing, entry mapping, read-only handling, aggregation, validated write-back, resource failures, and the catalog result extension. Those details are not duplicated here.
 
@@ -1005,7 +973,7 @@ The formatter core does not implement range-only or minimal-diff formatting init
 Editor integrations should:
 
 1. identify the message range to format
-2. look up or create the message's paired parser artifact and call `format_parsed` or `format_parsed_bounded` as appropriate
+2. look up or create the message's paired parser artifact and call `format_parsed`
 3. compare original and formatted message text
 4. produce the smallest practical editor `TextEdit` at the integration boundary
 
@@ -1089,7 +1057,7 @@ one  {{One item}}
 
 ## Parsed Artifact Requirements
 
-`format_parsed`, `check_parsed`, and `format_parsed_bounded` accept only the original `SourceStore` / `ParseResult` owner pair produced by one parse. A cache satisfies this contract by retaining the pair in one `CachedParse`; a non-cache caller keeps the same pair directly. Moving a result away from its owner, rebuilding a store from the same source text, or relying on coincidentally equal numeric `SourceId` values violates the contract.
+`format_parsed` and `check_parsed` accept only the original `SourceStore` / `ParseResult` owner pair produced by one parse. A cache satisfies this contract by retaining the pair in one `CachedParse`; a non-cache caller keeps the same pair directly. Moving a result away from its owner, rebuilding a store from the same source text, or relying on coincidentally equal numeric `SourceId` values violates the contract.
 
 Before Layout IR construction, `intlify_format` creates a private `ParsedFormatInput<'_>` and validates every formatter-observable attachment invariant:
 
@@ -1113,14 +1081,14 @@ Initial required helper semantics:
 - token traversal is available in source order
 - public node and token `kind()` accessors return the numeric `SyntaxKind` union values used by snapshot records and the shared `SyntaxKind` const object; callers use `syntaxKindName(kind)` when they need a stable symbolic display name and must not infer semantics from numeric ordering
 - node and token spans are UTF-8 byte spans using half-open ranges `[start, end)`
-- source slicing is available through a `slice(span)`-style helper after available source/snapshot consistency checks have passed
+- source slicing is available through a `slice(span)`-style helper after exact SourceRecord byte-length and SHA-256 verification has passed
 - delimiter spans are exposed through delimiter token kind and span access; dedicated delimiter-specific accessors are not required
 - token raw text is not duplicated in the snapshot; consumers use token spans with `slice(span)`
 - token-level leading and trailing whitespace trivia spans are available for preserve mode
 - derived trivia information such as line-break counts or blank-line counts is computed by the formatter from trivia spans and source slices
 - parser diagnostic access is required for all snapshot-backed formatter modes, including a verifiable indication that diagnostics were encoded even when the diagnostic count is zero
 - recovered or missing node/token flags are not formatter requirements because snapshots with parser diagnostics do not produce formatted output
-- source/snapshot consistency checks are required when the snapshot carries source identity data or consistency metadata, such as a source hash or source length; otherwise checks are best-effort
+- source/snapshot consistency is verified against the formatted root's required SourceRecord byte length and full SHA-256 digest before any source slice is trusted
 
 Trivia-less snapshots are rejected only for preserve mode. Snapshot-backed preserve mode requires source-shape and blank-line grouping inputs through token-level leading/trailing trivia spans; in Phase 3B, a preserve-mode `formatSnapshot` or `checkSnapshot` call on a snapshot without trivia records returns `invalid_snapshot` with `details.reason: "missing_capability"`. Standard mode does not use trivia for layout decisions, so standard-mode calls accept trivia-less snapshots. Deriving equivalent whitespace information from verified source/token gaps could lift the preserve-mode restriction later as an implementation optimization; it is not part of the Phase 3B contract.
 
@@ -1130,7 +1098,7 @@ If the existing Binary AST snapshot format or `SnapshotView` accessor surface ca
 
 `formatMessage(source)` parses the same source it formats, so a public source/snapshot mismatch cannot occur. Span and UTF-8 boundary validation still happens as internal formatter validation.
 
-`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify source consistency when the snapshot carries source identity data or consistency metadata. The initial embedded-source comparison reports `source_snapshot_mismatch` with `details.reason: "embedded_source_text_mismatch"`. A future source-hash, source-length, or other comparison mechanism must define its own stable reason before use. Phase 3B does not require snapshots to carry source identity data or consistency metadata. If the snapshot has no such data, validation is best-effort: corrupt bytes, unsupported versions, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected before IR construction return `invalid_snapshot`. Source/span contradictions discovered after IR construction has accepted supposedly consistent input become `internal_error`.
+`formatSnapshot(snapshot, source)` and `checkSnapshot(snapshot, source)` verify the supplied exact UTF-8 bytes against the formatted root's required SourceRecord byte length and full SHA-256 digest. A mismatch reports `source_snapshot_mismatch` with `details.reason: "source_identity_mismatch"` before IR construction, regardless of whether the snapshot embeds source text. Corrupt bytes, unsupported versions, embedded source identity failure, missing formatter capabilities, invalid spans, or non-UTF-8 boundaries detected while decoding return `invalid_snapshot`. Source/span contradictions discovered after the identity check and IR construction has accepted supposedly consistent input become `internal_error`.
 
 If formatter implementation needs additional public snapshot accessors, those accessors may be added in the formatter PR that needs them. Additions should be limited to the minimum formatter-required surface.
 
@@ -1168,20 +1136,18 @@ Behavior coverage:
 | Coverage area | Required by | Requirement |
 | --- | --- | --- |
 | `format_message` output and `check_format` changed/unchanged behavior | Core formatter PRs | `MUST` |
-| `format_parsed`, `check_parsed`, and `format_parsed_bounded` reuse one paired `SourceStore` / `ParseResult` without another parse or snapshot encode/decode; output, diagnostics, and `changed` match the source-backed baseline | Core formatter PRs / parse-cache integration PR | `MUST` |
+| `format_parsed` and `check_parsed` reuse one paired `SourceStore` / `ParseResult` without another parse or snapshot encode/decode; output, diagnostics, and `changed` match the source-backed baseline | Core formatter PRs / parse-cache integration PR | `MUST` |
 | parsed-artifact attachment rejects detectable owner/source/table/span inconsistency and preserve mode rejects `trivia_collected: false` at the `parsed_artifact_attachment` invariant boundary | Core formatter PRs / parse-cache integration PR | `MUST` |
 | `format_snapshot` and `check_snapshot` source consistency, invalid snapshot, missing verifiable diagnostic capability, and missing preserve-mode trivia data behavior | Core formatter PRs | `MUST` |
 | idempotency of formatted output | Core formatter PRs | `MUST` |
 | formatted output reparses with zero parser diagnostics | Core formatter PRs | `MUST` |
 | parser diagnostics return no public formatted output | Core formatter PRs | `MUST` |
-| bounded source/parsed-artifact/snapshot rendering at the exact byte boundary and first byte over, no partial result, ordinary-result equivalence below the cap, and no complete-output allocation before the capped sink | Core formatter PRs / resource formatter integration PR | `MUST` |
-| compile-time `Send` assertions for worker-boundary options/results, concurrent source/parsed-artifact/snapshot calls matching serial baselines, and error/panic fault isolation without reusable-state poisoning | Core formatter PRs / CLI formatter PR | `MUST` |
 | `intlify fmt` write mode | CLI formatter PR | `MUST` |
 | `intlify fmt --check` and `--list-different` | CLI formatter PR | `MUST` |
 | stdin formatting and stdin check mode | CLI formatter PR | `MUST` |
 | JSON reporter success, difference, diagnostic, and operational-error output | CLI formatter PR | `MUST` |
 | explicit file, directory, glob, duplicate, and stable path ordering behavior | CLI formatter PR | `MUST` |
-| worker width one versus multiple equivalence, forced out-of-order group completion, bounded active groups, physical-alias serialization, stable text/JSON ordering, and injected worker-runtime initialization/dispatch/execute/join failures with no serial fallback or partial result envelope | CLI formatter PR | `MUST` |
+| sequential physical-group and logical-alias processing with stable text/JSON ordering | CLI formatter PR | `MUST` |
 | non-Unicode operand, stdin virtual path, and discovered entry rejection without lossy path output | CLI formatter PR | `MUST` |
 | non-Unicode project root pre-config rejection with the nullable-root JSON envelope | CLI formatter PR | `MUST` |
 | non-Unicode explicit config and repeated ignore-path rejection at their fixed setup precedence, with `ignorePathIndex`, empty results, and no lossy path output | CLI formatter PR | `MUST` |
@@ -1340,18 +1306,15 @@ Formatter benchmarks should separate:
 - syntax traversal cost
 - layout construction cost
 - rendering cost
-- bounded rendering cost at completion and first-byte-over termination
 - N-API binding call cost
 - WASM binding call cost
 - CLI end-to-end format cost
 - CLI JSON reporter cost
-- CLI worker scheduling and ordered-aggregation cost at worker width one and the default automatic width
 
 Phase 3 benchmark names:
 
 - `format_standard`
 - `format_preserve`
-- `format_bounded_output`
 - `format_check_cli_e2e`
 - `format_check_json`
 - `e2e_format`
@@ -1372,14 +1335,14 @@ Prerequisite (landed): the `ox_mf2_parser` grammar-conformance work required by 
 
 1. `intlify_format` crate scaffold, result/options/config model, and fixture harness
 2. standard/preserve core formatter rules for direct `.mf2` messages
-3. `intlify fmt` CLI integration, file discovery, shared bounded worker scheduler, physical file grouping, check/write mode, and JSON reporter
+3. `intlify fmt` CLI integration, file discovery, deterministic sequential processing, physical file grouping, check/write mode, and JSON reporter
 4. `@intlify/format-napi` wrapper and platform native packages
 5. `@intlify/format-wasm`
 6. local-first formatter benchmarks under `tools/`
 
 Each PR should be cut from `main`, keep formatter work separated from Phase 3C linter work, and maintain the existing Phase 3A CLI contract unless the PR explicitly extends it for `intlify fmt`.
 
-Resource catalog implementation is not added to this Phase 3B PR sequence. After Phase 3C is complete, the unnumbered resource milestone in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) composes the finished formatter through its bounded Rust path and extends the CLI with catalog-aware formatting before Phase 3D begins.
+Resource catalog implementation is not added to this Phase 3B product PR sequence. The consumer-neutral resource crate, Tier 1 adapter, and configuration foundation may land in separate resource PRs without waiting for Phase 3C. Before catalog-aware formatting begins, the Phase 3B core must expose the ordinary Rust-only `format_parsed` and `check_parsed` APIs defined above, including paired-artifact validation and direct entry into the shared formatter pipeline without reparsing or snapshot conversion. This prerequisite does not block Tier 1 host extraction or the other consumer-neutral resource work. Catalog-aware formatting in the unnumbered resource milestone depends on this phase's completed message-level formatter but does not depend on the deferred bounded renderer, deferred common worker scheduler, or completion of the linter product. Catalog-aware linting separately waits for Phase 3C, and the complete resource milestone still finishes before Phase 3D begins.
 
 ## Deferred Follow-Up Notes
 
@@ -1392,12 +1355,51 @@ Resource catalog implementation is not added to this Phase 3B PR sequence. After
 - Generated TypeScript config type distribution.
 - Nested config discovery, nearest-config-wins behavior, file-specific overrides, `--cwd`, and `--root`.
 - `--no-error-on-unmatched-pattern` if users need a relaxed unmatched-input mode.
-- Public runtime controls such as `--threads`; initial file parallelism uses the automatic bounded width and an internal test/benchmark override only.
+- The common CLI worker scheduler, file-group parallelism, and public runtime controls such as `--threads`; the retained follow-up contract lives in [005](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary).
 - `intlify init` config scaffolding once formatter and linter config fields are stable enough to write.
 - GitHub Actions benchmark jobs and issue-comment benchmark reporting for parser and formatter trends.
 - WASM artifact size and JavaScript glue size reporting for both `@intlify/format-wasm` and `@intlify/ox-mf2-wasm`; these measurements should remain observational until a future design sets an explicit budget.
 - Publishing public command-specific output JSON Schemas after `schemaVersion` is stable enough.
 - LSP/editor configuration behavior, including explicit formatter config paths and config-load failure fallback/error policy, in the LSP/editor detailed design.
+
+### Bounded Rust Rendering for Resource Consumers
+
+Bounded formatter entry points are deferred. The initial catalog integration calls the ordinary Rust formatter APIs, then passes the materialized output length through the resource-owned candidate admission and validated write-back checks. This preserves correctness and fixed resource-error behavior, but it does not prevent a formatter output larger than the resource message limit from being materialized transiently. Implementing the capped sink below is a later memory-bound optimization and must not become a prerequisite for the initial `intlify_resource` crate or catalog integration.
+
+The planned workspace Rust API retains source-backed, parsed-artifact-backed, and snapshot-backed entry points:
+
+```rust
+format_message_bounded(
+    source: &str,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
+format_snapshot_bounded(
+    snapshot: SnapshotView<'_>,
+    source: &str,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
+format_parsed_bounded(
+    sources: &SourceStore,
+    result: &ParseResult,
+    options: FormatOptions,
+    max_output_bytes: u64,
+) -> BoundedFormatResult
+
+enum BoundedFormatResult {
+    Complete(FormatResult),
+    OutputLimitExceeded { limit: u64, actual: u64 },
+}
+```
+
+When implemented, `Complete` must be byte-for-byte and field-for-field equivalent to the corresponding ordinary formatting API. Parser diagnostics, invalid options or snapshots, source mismatch, parsed-artifact attachment failure, and other failures established before successful rendering remain the ordinary `FormatResult::Err`; the bounded path does not translate them into a size result.
+
+The future renderer writes directly into a capped sink and must not first construct the complete output or another output-sized string. The sink admits at most `max_output_bytes`, stops before storing the first byte beyond that limit, discards its partial buffer, and returns `OutputLimitExceeded { limit, actual: limit + 1 }` without code, `changed`, or partial formatter output. This remains a formatter-internal capacity signal, not a public formatter error code. Catalog consumers ask the resource layer to convert it into the existing resource-owned candidate-admission error.
+
+The follow-up implementation must add exact-boundary and first-byte-over fixtures for all three entry points, ordinary-result equivalence below the cap, proof that no complete output is allocated before the capped sink, parsed-artifact reuse coverage, and a `format_bounded_output` benchmark that separates capped rendering cost from ordinary rendering.
 
 ## Open Questions
 

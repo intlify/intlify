@@ -105,15 +105,15 @@ parse_batch_result_to_snapshot(
 ) -> Result<BatchSnapshotResult, SnapshotWriteError>
 ```
 
-`SourceStore`, `ParseInput`, `ParseOptions`, `ParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
+`SourceStore`, `ParseInput`, `ParseOptions`, `ParseResult`, `StandaloneParseResult`, `ParseSessionResult`, and `BatchParseResult` are defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). `SnapshotSourceMetadata` is the Phase 2-specific metadata carrier for `parse_message_to_snapshot`; it intentionally omits the `source` field that `SourceFileInput` carries so a single call can never disagree about what the parser and the snapshot point at. Snapshot generation is a separate Phase 2 responsibility so parse cost and snapshot encoding cost can be measured independently.
 
 `parse_source_to_snapshot` is a convenience API equivalent to `parse_source` followed by `parse_result_to_snapshot`. It exists for callers that want a single operation and do not need to inspect or reuse the owned `ParseResult`.
 
-`parse_message_to_snapshot` is the standalone counterpart for callers that do not own a `SourceStore`. It builds a private one-entry `SourceStore` from `source` plus the optional `SnapshotSourceMetadata`, then runs the same `parse_source` + `parse_result_to_snapshot` pipeline. This is the API to use when porting code that used `parse_message(source)` directly — pairing a `parse_message` `ParseResult` with an unrelated `SourceStore` is unsafe (see below).
+`parse_message_to_snapshot` is the direct standalone counterpart for callers that want snapshot bytes without retaining an intermediate parse artifact. It builds a private one-entry `SourceStore` from `source` plus the optional `SnapshotSourceMetadata`, then runs the same `parse_source` + `parse_result_to_snapshot` pipeline. Callers that already used Phase 1 `parse_message(source)` may instead reuse its `StandaloneParseResult` through `parse_result_to_snapshot(parsed.sources(), parsed.result(), snapshot_options)`. `parse_message_to_snapshot` remains the concise path when source metadata is required or no in-memory syntax result will be reused.
 
-`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources.get(result.source)`. The contract is that `sources` is the same `SourceStore` the result was parsed against — i.e. the result came from `parse_source(sources, ...)` or `parse_batch(...).items[i].result`. SnapshotWriter then maps the Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
+`parse_result_to_snapshot` encodes an already produced owned `ParseResult` without reparsing. It reads SourceRecord metadata and optional source text from `sources.get(result.source)`. The contract is that `sources` is the same `SourceStore` the result was parsed against — i.e. the pair comes from `parse_source(sources, ...)`, from `parsed.sources()` / `parsed.result()` on one `StandaloneParseResult`, or from `parse_batch(...).items[i].result` together with that batch's store. SnapshotWriter then maps the Phase 1 SourceId to a snapshot-local SourceId. This API is the standard path when a caller has already parsed with Phase 1 APIs and later decides to export a Binary AST snapshot.
 
-`parse_result_to_snapshot` MUST NOT be paired with a `ParseResult` produced by `parse_message(source)`: that path returns a hard-coded `SourceId::new(0)` without registering the source in any store, so a `sources.get(SourceId::new(0))` lookup against an unrelated store would silently encode the wrong source metadata or source text. Standalone callers should use `parse_message_to_snapshot` instead.
+`parse_message(source)` never exposes an ownerless `ParseResult`: its private `StandaloneParseResult` fields and immutable paired accessors preserve the one-entry store used for parsing. A caller must still pass both accessors from the same wrapper; rebuilding a different store from equal text or combining accessors from different standalone results violates the attachment contract and is rejected when the inconsistency is detectable.
 
 `parse_session_to_snapshot` encodes a snapshot from a borrowed parse result produced with `ParseWorkspace`; it is used by paths that want to reduce allocation variance, such as workspace reuse, benchmarks, and LSP. The snapshot builds SourceRecord and RootRecord from the `SourceStore` / Phase 1 SourceId reachable from the session, then emits snapshot-local SourceIds.
 
@@ -312,7 +312,7 @@ v0.1 fixed record sizes:
 | `RootRecord`            |  16 bytes |
 | `StringOffsetRecord`    |   8 bytes |
 | `SourceTextRef`         |  12 bytes |
-| `SourceRecord`          |  32 bytes |
+| `SourceRecord`          |  68 bytes |
 | `NodeRecord`            |  24 bytes |
 | `EdgeRecord`            |   8 bytes |
 | `TokenRecord`           |  36 bytes |
@@ -633,15 +633,17 @@ SourceTextRef {
 
 Normal SourceId has no none sentinel, but SourceTextRef is an optional field and therefore has one. Source text data is separated from the string table so metadata string deduplication, diagnostic strings, future derived text payloads, and original source text lifetime / transfer policy can evolve independently.
 
+Source text inclusion does not change source identity metadata. SnapshotWriter always records the exact UTF-8 byte length and SHA-256 digest in SourceRecord. When text is included, the decoder verifies the referenced bytes against both fields after range validation; when text is omitted, a later external attachment performs the same verification.
+
 ### Source Section
 
 ![ox-mf2 source section](./assets/003-ox-mf2-source-section.svg)
 
-The source section is a core section. Source records contain source identity and metadata, but not source text bytes.
+The source section is a core section. Source records contain source identity and metadata, but not source text bytes. Source text identity is always present even when the optional source text data section is absent.
 
 SourceRecord array order is not fixed to `parse_batch` input order. The sources section may deduplicate by source identity. Multiple RootRecords may point to the same snapshot-local `source_id`. Root-to-source mapping is always resolved through `RootRecord.source_id`.
 
-v0.1 snapshot format does not define a source dedup key. Identity rules such as `path + base_offset + source text` are not baked into the wire format. Phase 1 SourceId assigned by SourceStore or a higher-level source owner is the input-side source identity. SnapshotWriter encodes a compact snapshot-local SourceId mapping into SourceRecord and RootRecord fields.
+v0.1 snapshot format does not define a SourceRecord dedup key. Phase 1 SourceId assigned by SourceStore or a higher-level source owner is the input-side source identity. SnapshotWriter encodes a compact snapshot-local SourceId mapping into SourceRecord and RootRecord fields. The source byte length and SHA-256 digest defined below verify which text belongs to one emitted SourceRecord; they do not imply that two records with equal text are the same source and are not used for writer deduplication.
 
 The v0.1 writer does not deduplicate SourceRecord entries.
 
@@ -655,6 +657,8 @@ SourceRecord {
   message_id: StringRef,
   base_offset: u32,
   text: SourceTextRef,
+  source_byte_len: u32,
+  source_sha256: [u8; 32],
 }
 ```
 
@@ -664,11 +668,15 @@ Snapshot SourceId is a required index into the sources section. `SourceRecord.so
 
 `base_offset` is a UTF-8 byte offset. It is not optional; `0` is stored when unspecified. Absolute byte positions are computed as `base_offset + span_start/end`. UTF-16 code unit positions, line/column, and LSP positions are converted at the editor/language boundary and are not stored in snapshot node fields.
 
-When `include_source_text = false`, `text.source_id = 0xFFFF_FFFF`. SourceRecord layout does not change. Roots and diagnostics retain SourceId and Span, so an external source owner can resolve locations or source slices.
+`source_byte_len` is the exact byte length of the original UTF-8 source, independent of whether that text is embedded. It occupies wire bytes `32..36` and uses the format's normal little-endian `u32` encoding. `source_sha256` occupies bytes `36..68` and is the full 32-byte SHA-256 digest of those same bytes in conventional digest byte order; it is a raw byte array, so no word-level endianness conversion is applied. The digest input is the exact original UTF-8 byte sequence only: SnapshotWriter does not normalize Unicode, line endings, or a BOM, and it does not include path, locale, message id, base offset, a length prefix, or other metadata. An empty source therefore stores `source_byte_len = 0` and the standard SHA-256 digest of an empty byte sequence.
 
-When `include_source_text = true`, the snapshot stores source text in the dedicated source text data section. `SourceRecord.text.source_id` must equal the same record's `source_id`. In large batches, each SourceRecord has its own text range, and the roots section links source metadata to root nodes.
+SHA-256 is part of the v0.1 wire contract and has no per-record algorithm tag. Changing the algorithm, truncating the digest, or changing its input framing requires the snapshot format change process. The digest is a strong source-attachment integrity check, not an authenticity mechanism: a party that can replace snapshot bytes can also replace the recorded digest.
 
-Source slices are resolved with SourceId plus Span. `SourceView::source_slice(span)` resolves only snapshot-embedded source text. `SourceView::source_slice_with_external_text(span, external_source_text)` first uses snapshot-embedded source text when present, then falls back to caller-provided external source text. The external text is supplied explicitly by the source owner because snapshot-local SourceId values are not necessarily the same as Phase 1 SourceStore SourceId values, especially for batch snapshots that intentionally emit one SourceRecord per root. If neither embedded nor external source text is available, the decoder/accessor returns a source text unavailable error instead of silently returning an empty value.
+When `include_source_text = false`, `text.source_id = 0xFFFF_FFFF`. SourceRecord layout does not change, and `source_byte_len` plus `source_sha256` still describe the omitted bytes. Roots and diagnostics retain SourceId and Span, so an external source owner can reattach verified source text and then resolve locations or source slices.
+
+When `include_source_text = true`, the snapshot stores source text in the dedicated source text data section. `SourceRecord.text.source_id` must equal the same record's `source_id`, `SourceRecord.text.len` must equal `source_byte_len`, and SHA-256 over the referenced bytes must equal `source_sha256`. The decoder checks all three conditions before returning a view. In large batches, each SourceRecord has its own text range, and the roots section links source metadata to root nodes.
+
+Source slices are resolved with SourceId plus Span. `SourceView::source_slice(span)` resolves only snapshot-embedded source text. `SourceView::source_slice_with_external_text(span, external_source_text)` first uses snapshot-embedded source text when present, then verifies the external text's byte length and SHA-256 before slicing it. The external text is supplied explicitly by the source owner because snapshot-local SourceId values are not necessarily the same as Phase 1 SourceStore SourceId values, especially for batch snapshots that intentionally emit one SourceRecord per root. Repeated external access should use a higher-level validated attachment owner rather than rehashing the same text for every slice. If neither embedded nor verified external source text is available, the decoder/accessor returns a source text unavailable error instead of silently returning an empty value.
 
 Rust source slice accessors return an explicit error when source text is unavailable.
 
@@ -890,6 +898,7 @@ pub enum DecodeErrorCode {
   InvalidExtendedData,
   InvalidEdgeKind,
   InvalidSpan,
+  InvalidSourceIdentity,
 }
 ```
 
@@ -919,11 +928,11 @@ Decoder validation order:
 10. validate padding bytes are `0x00` and reject trailing padding after the last section
 11. validate core section minimum counts
 12. validate string table offsets and UTF-8
-13. validate source records
+13. validate source records, including source identity field shape
 14. validate root records
 15. validate node, edge, token, trivia indexes, and `SyntaxKind` numeric values
 16. validate diagnostics, diagnostic severity/code values, and diagnostic label ranges
-17. validate source text ranges
+17. validate source text ranges and, when text is embedded, its exact byte length and SHA-256 identity
 18. validate extended data, which is expected to be empty for v0.1 writer output
 
 String table validation happens before SourceRecord and DiagnosticRecord validation because those records contain StringRef fields. A decoder must know that string offsets and string data are valid before validating StringRef references from other records.
@@ -1081,7 +1090,9 @@ Binary golden fixtures:
 - validate snapshot header, section table, record layout, alignment, endianness, and required/optional section flags
 - detect accidental changes to the versioned wire format
 - include option combinations for `include_source_text`, `include_trivia`, and `include_diagnostics`
+- lock the full 32-byte SHA-256 field against standard vectors, including the empty source, and prove that hashing uses exact unnormalized UTF-8 bytes
 - include invalid snapshot fixtures and verify decoders reject them with `DecodeError`, not panic
+- reject embedded source text whose byte length or digest does not match its SourceRecord with `DecodeErrorCode::InvalidSourceIdentity`
 
 Decoded text fixtures:
 
@@ -1147,13 +1158,14 @@ Relevant benchmark phases:
 - snapshot_to_bytes_copy
 - parse_batch_to_snapshot
 - parse_batch_result_to_snapshot
+- source_identity_sha256
 
 Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot decoding, and snapshot accessor cost separately.
 
-- `parse_message_owned`: convenience `parse_message` path, including fresh workspace setup and owned `ParseResult` materialization.
+- `parse_message_owned`: convenience `parse_message` path, including private one-entry `SourceStore` construction and retention, fresh workspace setup, and owned `ParseResult` materialization inside `StandaloneParseResult`.
 - `parse_cst`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = true`.
 - `parse_cst_no_trivia`: cost for the Rust parser to build CstTables through `parse_source_session` with `collect_trivia = false`.
-- `lower_semantic`: parser-core cost plus `SemanticModel` construction. It does not include parser-owned semantic validation diagnostics.
+- `lower_semantic`: `build_semantic_model` cost over an already produced diagnostic-free `SourceStore` / `ParseResult` pair. It excludes parsing and parser-owned semantic validation diagnostics.
 - `semantic_validation`: `validate_semantics(model)` cost over an already-constructed `SemanticModel`.
 - `owned_materialize`: cost to create an owned `ParseResult` from borrowed session / table output.
 - `encode_snapshot`: cost to build Binary AST snapshot bytes from existing CstTables / diagnostics / source metadata.
@@ -1168,5 +1180,6 @@ Phase 2 snapshot benchmarks measure parser hot path, snapshot encoding, snapshot
 - `parse_batch_sequential`: public owned batch API cost, including owned `ParseResult` materialization per item.
 - `parse_batch_to_snapshot`: combined product path for batch parse plus shared snapshot encoding. Do not mix it with the single-message parser baseline.
 - `parse_batch_result_to_snapshot`: batch parse once, then measure shared snapshot encoding over the already produced BatchParseResult.
+- `source_identity_sha256`: SHA-256 over the source-size corpus without parsing or section emission, reported separately so the identity cost inside snapshot encoding and embedded-source decoding remains visible.
 
-Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst_and_encode_snapshot`, `decode_snapshot`, `traverse_nodes`, `traverse_tokens`, `traverse_diagnostics`, and `snapshot_to_bytes_copy`. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot numbers are reported separately as ox-mf2 product-boundary cost.
+Benchmark reports include at least separate series for `parse_cst_no_trivia`, `parse_cst`, `parse_cst_and_encode_snapshot`, `source_identity_sha256`, `decode_snapshot`, `traverse_nodes`, `traverse_tokens`, `traverse_diagnostics`, and `snapshot_to_bytes_copy`. Decode reports distinguish snapshots with omitted source text from snapshots whose embedded source text must be hashed and verified. For single-message comparison with external parsers, the primary baseline must match the closest parse-only equivalent exposed by the compared parser; ox-mf2 reports must clearly state whether they use `parse_cst_no_trivia`, `parse_cst`, or `parse_message_owned`. Snapshot numbers are reported separately as ox-mf2 product-boundary cost.

@@ -19,7 +19,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 - The implementation-oriented details for Phase 2 Binary AST snapshots live in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md).
 - The implementation-oriented details for Phase 2 language bindings live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 - The implementation-oriented details for Phase 3 tooling and transport live in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md).
-- The unnumbered resource catalog milestone that follows Phase 3C and precedes Phase 3D lives in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
+- The unnumbered resource catalog milestone whose consumer-neutral foundation may start independently of Phase 3C, and whose complete CLI integration precedes Phase 3D, lives in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
 
 ## Design Philosophy
 
@@ -195,7 +195,7 @@ The detailed design is split across [003-ox-mf2-phase-2-binary-ast-snapshot-desi
 
 Adopt `parse_source + SourceStore`.
 
-SourceStore is the common source ownership layer for `parse_source`, batch parse, diagnostics, editor boundaries, and future snapshot roots sections. The `parse_message` convenience API may parse directly from the borrowed `&str` on the successful one-shot path, while still using a temporary SourceStore when diagnostics need line/column materialization.
+SourceStore is the common source ownership layer for `parse_source`, batch parse, diagnostics, editor boundaries, and future snapshot roots sections. The `parse_message` convenience API creates a private one-entry `SourceStore` and returns it together with the syntax-only `ParseResult` as one `StandaloneParseResult`, so source slices, diagnostics, SemanticModel construction, and later snapshot encoding all retain the original source owner.
 
 MF2 workloads often contain many messages in one file, one locale set, or one project, so batch parsing is a first-class API. Batch metadata such as path, locale, message_id, and base_offset is used for identity, diagnostics, fixtures, benchmarks, and future snapshot root mapping. It must not change parser semantics.
 
@@ -233,7 +233,7 @@ Target phases:
 - e2e_parse
 - e2e_lint
 
-`lower_semantic` is kept as a compatibility benchmark phase name and means SemanticModel construction, not parser-owned semantic validation. `e2e_lint` is kept as a broad legacy benchmark alias. Canonical Phase 3 linter benchmark names are defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md) and [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
+`lower_semantic` is kept as a compatibility benchmark phase name and means explicit SemanticModel construction over an already produced diagnostic-free source/result pair; it excludes parsing and parser-owned semantic validation. `e2e_lint` is kept as a broad legacy benchmark alias. Canonical Phase 3 linter benchmark names are defined in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md) and [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
 
 `snapshot_accessor_traversal` and `binding_call` are aggregate reporting families, not required standalone result series. The snapshot traversal family maps to the canonical `traverse_nodes`, `traverse_tokens`, and `traverse_diagnostics` series defined by the Binary AST design. The binding call family maps to `parse_message_binding`, `parse_batch_binding`, `decode_snapshot_binding`, and `snapshot_to_bytes_copy_binding` from the language bindings design. Reports use the detailed names for measurements and may group them under the aggregate family labels in summaries.
 

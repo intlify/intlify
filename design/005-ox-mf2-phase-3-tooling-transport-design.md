@@ -31,7 +31,7 @@ Implementation should be split by consumer-facing product surface:
 2. **Phase 3B: Formatter Product**
    - workspace-internal `crates/intlify_format`
    - `intlify fmt`
-   - bounded file-work scheduling in `crates/intlify_cli`, reused by later file-oriented commands
+   - deterministic sequential file processing in `crates/intlify_cli`, reused by later file-oriented commands
    - `fmt --check` and formatter check result contract
    - standard and preserve formatting modes
    - `@intlify/format-napi` and `@intlify/format-wasm`
@@ -39,20 +39,20 @@ Implementation should be split by consumer-facing product surface:
 3. **Phase 3C: Linter Product**
    - `crates/intlify_lint`
    - `intlify lint`
-   - reuse of the shared CLI file-work scheduler
+   - reuse of shared CLI discovery, physical-file grouping, and deterministic sequential result aggregation
    - parser, semantic, and lint diagnostic result contract
    - recommended preset, core semantic diagnostics, and initial configurable lint rules
    - `@intlify/lint-napi` and `@intlify/lint-wasm`
 
-**Unnumbered layered milestone after Phase 3C and before Phase 3D: Resource Catalog Support**
+**Unnumbered layered milestone completed before Phase 3D: Resource Catalog Support**
 
 - workspace-internal `crates/intlify_resource` and the consumer-neutral extraction/write-back contract
 - Tier 1 JSON catalog adapter
 - additive `resources` project config, unified schema update, catalog membership, and format resolution
 - catalog-aware `intlify fmt` and `intlify lint` composition over the completed message-level products
-- resource validation, deterministic reporter, concurrency, and release-gate coverage required before editor consumption
+- resource validation, deterministic reporter, concurrent-use safety, and release-gate coverage required before editor consumption
 
-This milestone deliberately has no Phase 3 number: it composes the completed 3Aâ€“3C products rather than defining another standalone product surface. It must nevertheless finish before Phase 3D starts its opted-in catalog path, so editor integration consumes one implemented resource layer instead of creating a provisional duplicate. The complete Tier 1 milestone is part of the initial tooling v0.1 feature scope. In Phase 3 documents, that label describes the tooling product feature set; it is independent of the Binary AST snapshot header version and the existing `@intlify/cli` npm package version.
+This milestone deliberately has no Phase 3 number because it is a layered capability rather than another standalone product surface. Its consumer-neutral `intlify_resource` crate, Tier 1 adapter, and resource configuration foundation may start and land without waiting for the Phase 3C linter product; they do not depend on `intlify_lint`. Catalog-aware formatting depends on the completed Phase 3B message-level formatter, while catalog-aware linting separately depends on the Phase 3C message-level linter. The complete milestone must finish before Phase 3D starts its opted-in catalog path, so editor integration consumes one implemented resource layer instead of creating a provisional duplicate. The complete Tier 1 milestone is part of the initial tooling v0.1 feature scope. In Phase 3 documents, that label describes the tooling product feature set; it is independent of the Binary AST snapshot header version and the existing `@intlify/cli` npm package version.
 
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
@@ -71,17 +71,44 @@ This milestone deliberately has no Phase 3 number: it composes the completed 3Aâ
    - MessagePack transport evaluation
    - daemon/session/cache optimization for repeated language-service queries
 
-Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. The unnumbered resource milestone does not retroactively add resource implementation work to the Phase 3B or Phase 3C product PR sequences.
+Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. Consumer-neutral resource work may land in separate resource PRs while Phase 3C is still in progress; this does not retroactively add resource implementation work to the Phase 3B or Phase 3C product PR sequences.
 
-## CLI Parallel Execution Boundary
+## CLI File Execution Boundary
 
-`crates/intlify_cli` owns batch scheduling for the native `intlify fmt` and `intlify lint` file workflows. Parser, formatter, linter, and resource crates expose synchronous operations that are safe to invoke concurrently with independent per-call state; they do not create worker threads, select a concurrency width, own an async runtime, or aggregate CLI output. The parser's `parse_batch` is a sequential convenience operation rather than an exception to this rule; consumers that need parallel parsing schedule independent synchronous calls at their own boundary. In particular, `crates/intlify_resource` guarantees concurrent use of its registry and immutable extraction artifacts while leaving all decisions about whether and where to run calls concurrently to its consumer.
+Initial `intlify fmt` and `intlify lint` file mode processes physical file groups sequentially in deterministic order on the caller thread. Parser, formatter, linter, and resource crates remain synchronous and safe for concurrent consumer calls so a later optimization does not require moving scheduling into those crates or changing their APIs.
+
+`crates/intlify_cli` owns batch traversal for the native `intlify fmt` and `intlify lint` file workflows, initially as sequential coordination and later as the only owner of any common worker scheduler. Parser, formatter, linter, and resource crates expose synchronous operations that are safe to invoke concurrently with independent per-call state; they do not create worker threads, select a concurrency width, own an async runtime, or aggregate CLI output. The parser's `parse_batch` is a sequential convenience operation rather than an exception to this rule; consumers that need parallel parsing schedule independent synchronous calls at their own boundary. In particular, `crates/intlify_resource` guarantees concurrent use of its registry and immutable extraction artifacts while leaving all decisions about whether and where to run calls concurrently to its consumer.
+
+The same CLI owner uses an extension-neutral, crate-private discovery model before physical grouping. Its conceptual types are:
+
+```rust
+struct DiscoveredCandidate {
+    logical_path: PathBuf,
+    normalized_absolute_path: String,
+    origins: Vec<CandidateOrigin>,
+}
+
+enum CandidateOrigin {
+    DirectFile { operand_index: usize },
+    Directory { operand_index: usize },
+    CliGlob { operand_index: usize },
+}
+
+struct SelectedTarget {
+    candidate: DiscoveredCandidate,
+    classification: WorkflowClassification,
+}
+```
+
+These names and concrete containers are implementation guidance rather than a public Rust or JSON API, but the retained information is required. Filesystem enumeration produces concrete paths and origins without filtering by supported extension or the ordinary ignore stack. De-duplication uses the slash-normalized absolute path and merges every origin in stable operand order; the presence of any `DirectFile` origin gives that one candidate direct-input classification semantics. Supported-input classification then gives reserved standalone MF2 precedence, applies resource policy and the narrow config-free direct rule, and produces either `standalone:mf2` or a `catalog:<registry-id>` selected target. Catalog-assignment conflicts are resolved as the classification-wide gate before ordinary ignore matching. The command applies its ordinary ignore stack only to successfully classified targets, then inspects physical identity and groups aliases for execution.
+
+Enumeration errors retain their operand/discovery order separately from path-sorted supported-input classification errors. The coordinator combines those buffers only according to the command's published error precedence; streaming enumeration or classification must not make implementation encounter order observable. All discovery structs remain inside `intlify_cli` and are not exported by parser, formatter, linter, or resource crates.
 
 Concurrent-use safety is an explicit core acceptance boundary, not an incidental consequence of the first implementation. Owned work descriptions and structured results transferred between the CLI coordinator and workers must be `Send`; any resolved configuration, registry, or other immutable core state intentionally shared by multiple workers must be `Send + Sync`. Per-call parser, semantic, rule, layout, and rendering scratch types that never cross or share across the worker boundary do not acquire a blanket `Send + Sync` requirement. Formatter, linter, and resource crates expose no process-wide mutable execution state, and thread-local caches or dependency internals must not change results, ordering, diagnostics, errors, or later-call behavior.
 
-Each owning crate provides compile-time trait assertions for the concrete types that cross or are shared across this boundary and concurrent-invocation tests that compare complete results with a serial baseline. Fault-isolation tests prove that a returned operational failure in one call cannot affect independent calls and that an escaped panic contained by the CLI worker boundary does not poison reusable immutable state used by later calls. These requirements govern Rust core and CLI composition; they do not promise that a JavaScript N-API isolate or a single-threaded WASM instance may itself be called from arbitrary operating-system threads.
+Each owning crate provides compile-time trait assertions for the concrete types that may cross or be shared across this boundary and concurrent-invocation tests that compare complete results with a serial baseline. Fault-isolation tests prove that a returned operational failure in one call cannot affect independent calls. The deferred scheduler adds escaped-panic containment coverage before parallel CLI execution is enabled. These requirements govern Rust core and CLI composition; they do not promise that a JavaScript N-API isolate or a single-threaded WASM instance may itself be called from arbitrary operating-system threads.
 
-After argument validation, configuration, discovery, supported-input classification, and ignore filtering have completed, the CLI inspects physical identities and groups the remaining logical targets. Ignore sources are loaded and validated during setup, but matching them against concrete candidates occurs only after supported-input classification. One work item is one physical file group, not one logical path. Different groups may execute concurrently, while normalized logical aliases within one group execute their complete read and core-processing pipelines serially. This prevents symbolic-link and hard-link aliases from racing in formatter write mode and gives formatter and linter commands one execution model.
+After argument validation, configuration, discovery, supported-input classification, and ignore filtering have completed, the CLI inspects physical identities and groups the remaining logical targets. Ignore sources are loaded and validated during setup, but matching them against concrete candidates occurs only after supported-input classification. One execution unit is one physical file group, not one logical path. Initial execution visits groups sequentially, while normalized logical aliases within one group execute their complete read and core-processing pipelines serially. This gives formatter and linter commands one execution model and prepares the same grouping boundary for future parallel execution without allowing aliases to race in formatter write mode.
 
 Physical identity follows the selected target file and groups both symbolic-link and hard-link aliases. POSIX implementations use device ID plus inode; Windows implementations use volume ID plus file ID. Another supported native platform must provide an equivalent stable file identifier before enabling file-mode formatter or linter processing. Canonical or normalized path text is never a fallback identity because it cannot detect hard links reliably. Identity is captured once after ignore filtering and before target processing. It prevents this CLI process from scheduling aliases concurrently but does not add external mutation detection; rename, symlink retargeting, or file replacement after the snapshot follows the formatter's direct-write and no-stale-check contract.
 
@@ -91,9 +118,17 @@ Every runnable physical group has one workflow classification. Products that add
 
 A target-local failure before a filesystem write attempt does not stop later aliases in its physical group. This includes read, parse, extraction, formatter, linter, candidate-validation, diagnostic-mapping, and result-construction failures. An `output_write_failed` result in formatter write mode is the sole fail-stop case because direct writes provide no rollback guarantee and may leave the physical file indeterminate. The CLI performs no further stat, open, read, parse, format, lint, or write for later aliases in that group; unrelated groups continue. The exact current-target result, synthesized `alias_processing_blocked` results, details, and summary accounting are owned by [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md#physical-alias-write-failure). Check modes and lint never cross this write-failure boundary and therefore always continue after a target-local failure.
 
-Each file-mode command creates at most one bounded, command-scoped worker-thread pool after the runnable groups are known. No pool is created when there are no runnable groups. Otherwise, the initial default width is `max(1, min(runnable_physical_groups, available_parallelism, MAX_CLI_WORKERS))`, with `4` as the provisional implementation value of the internal product constant `MAX_CLI_WORKERS`. This hard ceiling bounds simultaneous source, parser, extraction-artifact, formatted-message, replacement, and candidate-artifact retention when several large catalogs are selected. Parser, formatter, linter, and resource work uses that same pool rather than creating nested or crate-specific pools. Stdin mode is one caller-thread workflow and does not construct a file worker pool. An async runtime is not required solely for these CPU-heavy synchronous pipelines.
+## Deferred Follow-Up Notes
 
-`MAX_CLI_WORKERS` is not a public CLI option, config field, environment variable, or machine-readable output field. Before the first resource-catalog release adopts a production value, the resource benchmark gate compares worker width one with the provisional width four over near-limit message-dense, structure-dense, lint, and changed-format/write-back workloads and records peak live allocation or peak RSS under one documented measurement setup. Width four must be explicitly accepted from that measured memory envelope; if the result is not accepted or no reliable measurement is available, the production constant is reduced to two or one and the gate is rerun. This is a release decision over an internal bound, not a new runtime resource error, dynamic memory scheduler, or compatibility surface. Afterward the constant may still be tuned in a later release from representative scheduling, memory, and end-to-end benchmarks without a compatibility change, provided the pool remains bounded and every observable ordering, error, result, and exit contract stays identical. Tests inject widths independently of this production default and include runnable group counts below, at, and above the active ceiling. The concrete pool dependency and scheduling algorithm are implementation details within those constraints.
+The following tooling work is intentionally deferred and is not required by the initial formatter, linter, or resource implementation.
+
+### CLI Parallel Execution Boundary
+
+The common CLI worker scheduler and parallel file execution described in this subsection are a future optimization. They extend the sequential physical-group boundary above without changing observable target ordering, alias behavior, or crate ownership.
+
+The first scheduler implementation creates at most one bounded, command-scoped worker-thread pool after the runnable groups are known. No pool is created when there are no runnable groups. Otherwise, its default width is `max(1, min(runnable_physical_groups, available_parallelism, MAX_CLI_WORKERS))`, with `4` as the provisional implementation value of the internal product constant `MAX_CLI_WORKERS`. This hard ceiling bounds simultaneous source, parser, extraction-artifact, formatted-message, replacement, and candidate-artifact retention when several large catalogs are selected. Parser, formatter, linter, and resource work uses that same pool rather than creating nested or crate-specific pools. Stdin mode is one caller-thread workflow and does not construct a file worker pool. An async runtime is not required solely for these CPU-heavy synchronous pipelines.
+
+`MAX_CLI_WORKERS` is not a public CLI option, config field, environment variable, or machine-readable output field. Before the first release that enables this deferred scheduler, the benchmark gate compares worker width one with the provisional width four over near-limit message-dense, structure-dense, lint, and changed-format/write-back workloads and records peak live allocation or peak RSS under one documented measurement setup. Width four must be explicitly accepted from that measured memory envelope; if the result is not accepted or no reliable measurement is available, the production constant is reduced to two or one and the gate is rerun. This is a release decision over an internal bound, not a new runtime resource error, dynamic memory scheduler, or compatibility surface. Afterward the constant may still be tuned in a later release from representative scheduling, memory, and end-to-end benchmarks without a compatibility change, provided the pool remains bounded and every observable ordering, error, result, and exit contract stays identical. Tests inject widths independently of this production default and include runnable group counts below, at, and above the active ceiling. The concrete pool dependency and scheduling algorithm are implementation details within those constraints.
 
 Every worker-runtime infrastructure failure is command-fatal. Failure to obtain the operating system's available parallelism, construct the pool, spawn a worker, dispatch work, contain a worker panic, or join and tear down the pool does not fall back to caller-thread or partially available serial execution. The command emits exactly one top-level `internal_error` with `details.reason: "cli_worker_runtime_failed"` and `details.phase` equal to `"initialize"`, `"dispatch"`, `"execute"`, or `"join"`. The normal top-level `path` is included only when the scheduler can identify the active normalized logical target exactly; dependency error names, panic payloads, backtraces, and Rust debug text are not exposed.
 
@@ -101,7 +136,7 @@ After a post-initialization failure is detected, the coordinator stops dispatchi
 
 Workers never write reporter output directly. They return structured target results tagged with their stable logical identities; the coordinating thread orders results by the command's normalized-path and within-file rules, computes summaries, and renders text or JSON only after ordered aggregation. Completion order therefore cannot affect stdout, stderr, JSON arrays, selected errors, or exit status. Formatter writes to different physical groups may complete in any order, but a write failure affects only the remaining aliases in its own group. The scheduler uses backpressure and does not eagerly retain every file's source or parse artifacts merely because every path has already been discovered.
 
-The initial scheduler parallelizes only across physical file groups. It does not split one standalone message or catalog into nested worker tasks. Public concurrency controls such as `--threads` remain a later CLI surface; tests and benchmarks may inject a worker width through an internal scheduler construction boundary without exposing it as configuration.
+The first scheduler implementation parallelizes only across physical file groups. It does not split one standalone message or catalog into nested worker tasks. Public concurrency controls such as `--threads` remain a later CLI surface; tests and benchmarks may inject a worker width through an internal scheduler construction boundary without exposing it as configuration.
 
 ## SnapshotView
 
@@ -182,7 +217,7 @@ Formatter implementation has a workspace-internal parsed-artifact path for calle
 
 This parsed-artifact path is a Rust workspace integration boundary, not a crates.io, N-API, WASM, or serialized compatibility surface. Stable public formatter input remains the Binary AST view shared by Rust, N-API, WASM, and later consumers. Source-backed, parsed-artifact-backed, and snapshot-backed calls converge on one formatter syntax-view abstraction before Layout IR construction so formatting behavior does not vary by artifact transport.
 
-The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. `formatSnapshot(snapshot, source, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The complete source string is required in every formatter mode for source slicing, parser diagnostic materialization, output comparison, and available snapshot/source consistency checks; preserve mode additionally uses it for source-shape decisions. The Phase 3 formatter does not expose a source-free snapshot mode. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
+The primary public API is `formatMessage(source, options?)`, which parses one MF2 message and returns a formatter result. `formatSnapshot(snapshot, source, options?)` is an advanced parse-artifact reuse path for playgrounds, workers, and language-service caches that already hold a Binary AST snapshot. The complete source string is required in every formatter mode for source slicing, parser diagnostic materialization, output comparison, and exact verification against the formatted root's SourceRecord byte length and SHA-256 digest; preserve mode additionally uses it for source-shape decisions. The Phase 3 formatter does not expose a source-free snapshot mode. Binding packages should expose direct programmatic formatter APIs rather than a CLI callback bridge.
 
 ### Formatting Modes
 
@@ -205,19 +240,19 @@ The formatter should separate syntax traversal from rendering. Internally, it sh
 
 ### CLI Input Model
 
-The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `intlify fmt "locales/**/*.mf2"` or `intlify fmt messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Opted-in resource files containing multiple messages are an initial layered CLI workflow that extracts message entries and reuses the message-level formatter. Host-format selection, parsing, string escaping, outer-document edits, and rollout tiers are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), not by the Phase 3 core formatter contract.
+The CLI accepts file path and glob inputs so users can format MF2 files directly, for example `intlify fmt "locales/**/*.mf2"` or `intlify fmt messages/en.mf2`. The primary CLI input unit is a single MF2 message file: one file contains one MF2 message that can be parsed and formatted directly. Selected resource files containing multiple messages are an initial layered CLI workflow that extracts message entries and reuses the message-level formatter. Project catalog policy owns bulk selection, while the resource design also permits a narrow config-free exception for individual file operands and stdin whose extension maps to a shipped adapter. Host-format selection, parsing, string escaping, outer-document edits, and rollout tiers are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), not by the Phase 3 core formatter contract.
 
 ### CLI Write and Check Workflows
 
 `intlify fmt` should default to write mode and modify files in place. It should also support check workflows such as `--check` and `--list-different` for CI and pre-commit usage. Stdin formatting should be supported through a file-aware option such as `--stdin-filepath`, allowing editors and scripts to pipe source while still giving the formatter enough context for extension checks and configuration.
 
-### Formatter Parallelism
+### Formatter File Execution
 
-The CLI formats physical file groups in parallel through the shared bounded worker runtime above. File discovery normalizes and de-duplicates logical paths, and physical grouping additionally prevents symbolic-link or hard-link aliases from racing on the same file. Logical aliases within one group remain serial and re-read the file after each earlier alias completes.
+The initial CLI formats physical file groups sequentially on the caller thread. File discovery normalizes and de-duplicates logical paths, and physical grouping keeps symbolic-link or hard-link aliases in one serial boundary. Logical aliases within one group re-read the file after each earlier alias completes.
 
-Text output, `--check`, and `--list-different` results should be reported in stable normalized path order, independent of worker scheduling. Programmatic APIs such as `formatMessage(source, options?)` remain single-message operations. The CLI consumer owns any future decision to parallelize entries within one catalog; resource/catalog adapters remain scheduler-neutral.
+Text output, `--check`, and `--list-different` results should be reported in stable normalized path order. Programmatic APIs such as `formatMessage(source, options?)` remain single-message operations. The common CLI worker scheduler and any decision to parallelize entries within one catalog are deferred; resource/catalog adapters remain scheduler-neutral.
 
-Benchmarks should report formatter concurrency settings separately from parser, syntax traversal, layout construction, rendering, binding, and file I/O costs.
+Initial benchmarks report sequential CLI execution separately from parser, syntax traversal, layout construction, rendering, binding, and file I/O costs. The deferred scheduler adds concurrency-specific benchmark dimensions before it is enabled.
 
 ### Configuration
 
@@ -361,17 +396,17 @@ The linter distinguishes lint diagnostics from operational errors. Parser, seman
 
 ### Parallelism
 
-The CLI lints physical file groups in parallel through the same bounded worker runtime as `intlify fmt`. Logical aliases within a group remain serial even though lint does not write, so both commands share physical-identity, failure-containment, and result-ordering semantics. Text and JSON output order file results by stable normalized path, independent of worker scheduling. Programmatic `lintMessage` remains a synchronous single-message operation and does not own a worker pool. Benchmarks report concurrency settings separately from parser, semantic, rule, binding, and serialization costs.
+The initial CLI lints physical file groups sequentially in stable normalized-path order, using the same physical-identity and result-ordering rules as `intlify fmt`. Logical aliases within a group remain serial even though lint does not write. Programmatic `lintMessage` remains a synchronous single-message operation and does not own a worker pool. When the deferred common scheduler is implemented, different physical groups may run concurrently under the retained boundary above without changing observable output.
 
 ### Message and Catalog Scope
 
-The linter supports message-level linting as its reusable core. The initial layered resource workflow defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) extracts each opted-in resource entry and applies that same message-level pipeline. Catalog-wide linting across multiple entries, locales, or files is a separate future linter layer and does not change the message-level core.
+The linter supports message-level linting as its reusable core. The initial layered resource workflow defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) extracts each selected resource entry and applies that same message-level pipeline. Catalog-wide linting across multiple entries, locales, or files is a separate future linter layer and does not change the message-level core.
 
 ### File Discovery
 
-CLI file discovery should use an explicit supported-extension list owned by the linter/CLI crates. The initial linter CLI supports direct `.mf2` message files. Unsupported files and unmatched patterns are CLI input conditions rather than parser diagnostics.
+CLI filesystem enumeration is extension-neutral and must not filter concrete candidates through a supported-extension list. At the later supported-input classification boundary, the CLI assembles an explicit direct-input extension list: standalone `.mf2` plus, after the resource milestone, registry-owned shipped extensions accepted for config-free individual-file and stdin classification. That list supplies direct lookup and `unsupported_input_file.details.supportedExtensions`; directory and CLI-native glob catalog selection instead requires project membership and may resolve an extensionless or otherwise arbitrary filename through an explicit catalog `format`. Unsupported direct files and unmatched patterns are CLI input conditions rather than parser diagnostics.
 
-The standalone-message discovery, ignore, file framing, unmatched-pattern, invalid-glob, and shared input error semantics are fixed by the linter-specific [File Discovery and Shared CLI Contract](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract). The initial opted-in resource workflow extends classification and supported inputs through the adapter contract in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) without changing the message-level linter core.
+The standalone-message discovery, ignore, file framing, unmatched-pattern, invalid-glob, and shared input error semantics are fixed by the linter-specific [File Discovery and Shared CLI Contract](./008-ox-mf2-phase-3c-linter-design.md#file-discovery-and-shared-cli-contract). The initial resource workflow extends classification through project-matched bulk targets and the config-free direct-input exception in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) without changing the message-level linter core.
 
 ### Lint Pipeline
 
@@ -555,7 +590,7 @@ Editor adapters should only return `TextEdit` values when the exact protocol doc
 
 ### Configuration
 
-Editor adapters normalize their settings into the same resolved formatter and linter configuration models used by CLI workflows. The initial editor source set and field-level precedence are fixed by the dedicated LSP/editor design: dynamic effective editor settings override initialization options, which override unified project configuration and then built-in defaults. The client, not the server, resolves vendor-specific user/workspace/workspace-folder scopes before supplying dynamic settings. Project resource membership remains authoritative under its separate additive editor-overlay rule.
+Editor adapters normalize their settings into the same resolved formatter and linter configuration models used by CLI workflows. The initial editor source set and field-level precedence are fixed by the dedicated LSP/editor design: dynamic effective editor settings override initialization options, which override unified project configuration and then built-in defaults. The client, not the server, resolves vendor-specific user/workspace/workspace-folder scopes before supplying dynamic settings. Project resource membership remains authoritative under its separate fallback-only editor-overlay rule: project `PolicyAbsent` or `Unmatched` permits overlay resolution, `PolicyEmpty` or `Excluded` blocks it, and project `Matched` returns its assignment without evaluating the overlay for that path.
 
 Configuration loading failures are root-scoped operational editor errors, not parser, semantic, formatter, linter, or resource diagnostics. The dedicated LSP/editor design retains the last successful state, suppresses formatting edits while a failure is active, de-duplicates one `window/showMessage` error per failure episode, records safe detail and recovery through `window/logMessage`, and applies selective invalidation only after a successful transactional reload.
 

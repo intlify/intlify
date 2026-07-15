@@ -26,6 +26,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - No trailing padding after the last emitted section.
 - Explicit little-endian field encoding.
 - Fixed v0.1 record sizes are defined by the snapshot design and are not derived from Rust struct layout.
+- `SourceRecord` is 68 bytes: the original 32-byte metadata/text-reference prefix is followed by `source_byte_len: u32` and the full 32-byte `source_sha256` digest.
 - SectionKind order for deterministic writer output.
 - Core sections: roots, sources, nodes, edges, tokens, string offsets, string data.
 - Optional sections: trivia, diagnostics, diagnostic labels, source text data, extended data.
@@ -37,6 +38,7 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - String table deduplicates metadata and diagnostics strings only.
 - Source-derived text is represented by source id plus UTF-8 byte spans, not by string table entries.
 - Source text data is one concatenated UTF-8 byte buffer without NUL terminators or per-entry padding.
+- Every SourceRecord carries the exact original UTF-8 byte length and full SHA-256 digest whether or not source text is embedded. The digest covers only the exact, unnormalized source bytes; its algorithm and framing are part of the v0.1 wire contract and are not used as the SourceRecord dedup key.
 - SourceTextRef none sentinel uses `source_id = 0xFFFF_FFFF`, `offset = 0`, and `len = 0`.
 - Writer output is canonical for the same parser output, input order, SourceStore metadata, and snapshot options, but not guaranteed stable across parser/package versions before a stable format freeze.
 - SyntaxKind numeric values are snapshot-visible draft data and require fixture/changelog updates when changed.
@@ -44,14 +46,15 @@ The current snapshot format design is defined in [003-ox-mf2-phase-2-binary-ast-
 - Diagnostic code numeric values are snapshot-visible draft data and require fixture/changelog updates when changed.
 - v0.1 decoder validates diagnostic severity and diagnostic code numeric values.
 - v0.1 decoder rejects inverted spans (`span_start > span_end`) in node, token, trivia, diagnostic, and diagnostic-label records as `DecodeErrorCode::InvalidSpan` (1035).
+- When source text is embedded, the v0.1 decoder requires `SourceTextRef.len` to equal `SourceRecord.source_byte_len` and the full SHA-256 digest of the referenced bytes to equal `SourceRecord.source_sha256`; a mismatch is `DecodeErrorCode::InvalidSourceIdentity` (1036).
 - v0.1 decoder validates each interned string slice against UTF-8 boundaries (catches offsets that split a multibyte scalar even when the concatenated string-data buffer is valid UTF-8).
 - v0.1 decoder normalises section-table read order so an empty section that shares an aligned offset with a non-empty section is never falsely rejected as overlapping.
 - `DecodeErrorCode` uses `#[repr(u32)]` with explicit discriminants in the `1000..1999` API error range; the numeric values are stable across the v0.1 surface for tests, fixture validators, and language bindings.
 - v0.1 writer emits the (possibly empty) `SourceTextData` section whenever `SnapshotOptions.include_source_text = true`, so empty source text round-trips back as `Some("")` instead of being lost.
 - v0.1 writer skips diagnostic / diagnostic-label record encoding entirely when `SnapshotOptions.include_diagnostics = false`. `SnapshotResult.diagnostics` is still populated for caller convenience, but the snapshot bytes no longer carry diagnostic data and the source map is not polluted with diagnostic-only sources.
-- v0.1 adds `parse_message_to_snapshot(source, metadata, parse_options, snapshot_options)` for the standalone (no caller `SourceStore`) path; `parse_result_to_snapshot` requires the caller to supply the same `SourceStore` the `ParseResult` was parsed against, so pairing it with a `parse_message`-derived result is no longer the documented pattern.
+- v0.1 adds `parse_message_to_snapshot(source, metadata, parse_options, snapshot_options)` for direct standalone snapshot creation. Phase 1 `parse_message` now returns a self-contained `StandaloneParseResult`, so callers that retain it may also safely call `parse_result_to_snapshot(parsed.sources(), parsed.result(), snapshot_options)` without rebuilding or guessing a source owner.
 - v0.1 adds `SnapshotSourceMetadata` as the metadata carrier for `parse_message_to_snapshot`. It carries `path` / `locale` / `message_id` / `base_offset` only — the `source` field that `SourceFileInput` exposes is omitted so the parsed bytes and the encoded `SourceRecord.text` can never disagree.
-- v0.1 routes oversized inputs through `SnapshotWriteError::SourceTooLarge` instead of letting `SourceStore::add`'s panic escape the snapshot API boundary. `parse_message_to_snapshot` uses `SourceStore::try_add`; `parse_batch_to_snapshot` pre-validates every `ParseInput.source.len()` before invoking the Phase 1 parser.
+- v0.1 routes oversized inputs through `SnapshotWriteError::SourceTooLarge` instead of letting `SourceStore::add`'s panic escape the snapshot API boundary. `parse_message_to_snapshot` uses `SourceStore::try_add`, matching Phase 1 `parse_message`'s fallible one-entry owner construction; `parse_batch_to_snapshot` pre-validates every `ParseInput.source.len()` before invoking the Phase 1 parser.
 - v0.1 adds `SourceView::source_slice(span) -> Result<&str, SourceTextUnavailable>` and the `SourceTextUnavailable { NotIncluded, SpanOutOfBounds }` error so accessors distinguish "snapshot encoded without source text" from "span is out of bounds / splits a UTF-8 scalar" — see the design's source slice accessor contract.
 - v0.1 writer pre-interns each batch root's source metadata before any `add_root`, so the string table emits `path` / `locale` / `message_id` strings strictly before diagnostic messages (matching the canonical writer order called out in `design/003` §"String Table").
 - v0.1 writer reserves the node / edge / token / trivia / diagnostic / diagnostic-label section byte buffers from the Phase 1 `CstTables` counts at the top of `add_root`, so the hot encode path does not grow the underlying `Vec`s mid-loop on large CSTs or recovery-heavy batches.
@@ -75,6 +78,7 @@ Any change to the following surface MUST add or amend a section in this changelo
 - decoder validation rules
 - canonical writer output rules
 - source text data layout
+- source identity length, digest algorithm, digest framing, or digest width
 - string table interning or deduplication policy
 - SourceRecord deduplication policy
 - extended data payload policy

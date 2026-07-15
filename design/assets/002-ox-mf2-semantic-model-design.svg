@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="760" viewBox="0 0 1120 760" role="img" aria-labelledby="title desc">
   <title id="title">ox-mf2 Phase 1 SemanticModel design</title>
-  <desc id="desc">After a diagnostic-free parse, Phase 1 SemanticModel is optionally constructed from CstTables and CstView as fact-only side tables. Semantic diagnostics are produced separately by semantic validation.</desc>
+  <desc id="desc">After a diagnostic-free parse, the explicit build_semantic_model API constructs Phase 1 SemanticModel from the original SourceStore and syntax-only ParseResult as fact-only side tables. Semantic diagnostics are produced separately by semantic validation.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
       <path class="arrow-fill" d="M 0 0 L 10 5 L 0 10 z" />
@@ -91,13 +91,13 @@
   <text class="tiny" x="106" y="426">available even on recovery</text>
 
   <rect class="boundary" x="84" y="480" width="244" height="58" rx="6" />
-  <text class="small" x="106" y="504">parse_semantic = false</text>
-  <text class="tiny" x="106" y="522">or parser diagnostics: semantic is None</text>
+  <text class="small" x="106" y="504">ParseResult is syntax-only</text>
+  <text class="tiny" x="106" y="522">SourceStore + result stay paired</text>
 
   <rect class="construction" x="410" y="92" width="300" height="488" rx="8" />
   <text class="label" x="560" y="128" text-anchor="middle">SemanticModelBuilder</text>
-  <text class="caption" x="560" y="150" text-anchor="middle">Runs only after a diagnostic-free parse</text>
-  <text class="caption" x="560" y="166" text-anchor="middle">when parse_semantic = true.</text>
+  <text class="caption" x="560" y="150" text-anchor="middle">build_semantic_model(sources, result)</text>
+  <text class="caption" x="560" y="166" text-anchor="middle">runs only after a diagnostic-free parse</text>
 
   <rect class="construction-item" x="438" y="184" width="244" height="46" rx="6" />
   <text class="small" x="560" y="204" text-anchor="middle">read message mode</text>

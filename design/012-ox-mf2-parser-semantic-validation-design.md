@@ -29,29 +29,32 @@ Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-
 
 ## SemanticModel and Validation API
 
-Semantic validation runs after parsing and `SemanticModel` construction. The zero diagnostic guarantee from [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. Semantic validation may therefore assume grammar-valid CST shapes.
+Semantic validation runs after parsing and explicit `SemanticModel` construction. The zero diagnostic guarantee from [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. Semantic validation may therefore assume grammar-valid CST shapes.
 
 The parser crate exposes semantic validation as an explicit API:
 
 ```rust
-fn validate_semantics(
+pub fn validate_semantics(
     model: &SemanticModel,
 ) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>
 ```
 
 `SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections. If semantic validation detects an invariant failure, it returns `Err(SemanticInvariantError)`; downstream host boundaries convert that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_validation"`.
 
-SemanticModel construction is also part of the parser-owned invariant boundary. If parser diagnostics exist, downstream tooling does not run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`. Construction failures use `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
+SemanticModel construction is also part of the parser-owned invariant boundary. `ParseResult` never owns an optional `SemanticModel`; parsing and semantic construction are separate phases. If parser diagnostics exist, downstream tooling does not construct a model or run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`. Construction failures use `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
 
-The implementation should expose an internal parser boundary equivalent to:
+The implementation exposes the following parser-owned Rust API boundary:
 
 ```rust
-fn semantic_model_from_parse_result(
-    parse: &ParseResult,
+pub fn build_semantic_model(
+    sources: &SourceStore,
+    result: &ParseResult,
 ) -> Result<SemanticModel, SemanticInvariantError>
 ```
 
-Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. Downstream host boundaries convert this misuse to `internal_error` with `details.reason: "semantic_api_misuse"` rather than panicking, because CLI, N-API, and WASM callers should receive structured operational errors for implementation bugs. If parser diagnostics are empty and construction still returns `Err`, the downstream host boundary converts that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
+`sources` must be the original owner that assigned every `SourceId` referenced by `result`; semantic construction reads source slices through that pair to derive cooked identifiers, literal values, and comparison keys. The function neither reparses nor mutates the syntax artifact and never stores the model back into `ParseResult`. Phase 1 `parse_message` satisfies this requirement by returning a `StandaloneParseResult`; standalone callers pass `parsed.sources()` and `parsed.result()` from that same wrapper.
+
+Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. A detectably inconsistent owner/result attachment is also misuse. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. Downstream host boundaries convert misuse to `internal_error` with `details.reason: "semantic_api_misuse"` rather than panicking, because CLI, N-API, and WASM callers should receive structured operational errors for implementation bugs. If the attachment is valid and parser diagnostics are empty but construction still returns `Err`, the downstream host boundary converts that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
 
 ## SemanticModel Fact Surface
 
@@ -484,15 +487,16 @@ The parser semantic validation implementation is a Phase 3C prerequisite for the
 
 Suggested implementation steps:
 
-1. define `SemanticDiagnosticCode` and `SemanticDiagnostic`
-2. expose `validate_semantics(model: &SemanticModel) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>`
-3. implement declaration dependency diagnostics
-4. implement selector annotation diagnostics
-5. implement matcher variant diagnostics
-6. implement duplicate option diagnostics
-7. add fixtures and ordering/cascade tests
-8. expose parser and semantic diagnostic code catalogs
-9. add the cross-catalog collision test in `intlify_lint` once the linter crate exists
+1. expose `build_semantic_model(sources, result) -> Result<SemanticModel, SemanticInvariantError>` as the only source-backed construction path, including the paired accessors on `StandaloneParseResult`
+2. define `SemanticDiagnosticCode` and `SemanticDiagnostic`
+3. expose `validate_semantics(model: &SemanticModel) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>`
+4. implement declaration dependency diagnostics
+5. implement selector annotation diagnostics
+6. implement matcher variant diagnostics
+7. implement duplicate option diagnostics
+8. add construction, attachment, ordering, and cascade tests
+9. expose parser and semantic diagnostic code catalogs
+10. add the cross-catalog collision test in `intlify_lint` once the linter crate exists
 
 ## Deferred Follow-Up Notes
 

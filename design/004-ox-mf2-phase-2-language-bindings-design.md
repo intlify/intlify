@@ -134,11 +134,15 @@ init(input?: WasmInitInput): Promise<void>
 
 When `input` is omitted, the package uses the bundler/default wasm-bindgen loading path. Explicit input supports browser, bundler, and edge runtime environments that need to supply a URL, request, compiled module, ArrayBuffer, or Uint8Array manually.
 
-Calling WASM APIs before `init()` throws `OxMf2InitializationError`. WASM does not switch to lazy initialization on first API call.
+Calling WASM APIs before `init()` throws `OxMf2InitializationError` with `OxMf2ErrorCode.InitializationWasmNotInitialized` (`10000`). WASM does not switch to lazy initialization on first API call.
 
-Only the first WASM `init()` call may provide explicit input. Calling `init()` after successful initialization with no arguments is a no-op. Calling `init(input)` with any explicit input after successful initialization throws `OxMf2InitializationError`, even if the caller believes the input is equivalent. This avoids defining equality for `URL`, `RequestInfo`, `WebAssembly.Module`, `ArrayBuffer`, and `Uint8Array`.
+An `init(input)` call may provide explicit input only while the runtime is uninitialized and no initialization attempt is in flight. Calling `init()` after successful initialization with no arguments is a no-op. Calling `init(input)` with any explicit input after successful initialization throws `OxMf2InitializationError` with `OxMf2ErrorCode.InitializationWasmInputConflict` (`10002`), even if the caller believes the input is equivalent. This avoids defining equality for `URL`, `RequestInfo`, `WebAssembly.Module`, `ArrayBuffer`, and `Uint8Array`.
 
-Concurrent `init()` calls share the same in-flight initialization promise only when the later call has no explicit input. A no-argument `init()` call is compatible with any in-flight initialization. If initialization is in flight and another call provides explicit input, the later call throws `OxMf2InitializationError`, even when the in-flight initialization started with default input. The runtime does not replace an already-started or already-initialized WASM module.
+Concurrent `init()` calls share the same in-flight initialization promise only when the later call has no explicit input. A no-argument `init()` call is compatible with any in-flight initialization. If initialization is in flight and another call provides explicit input, the later call throws `OxMf2InitializationError` with `InitializationWasmInputConflict`, even when the in-flight initialization started with default input. The conflict neither cancels nor replaces the in-flight attempt and does not alter an already-installed module.
+
+If an accepted initialization attempt cannot import the generated artifact, resolve or read its input, fetch bytes, compile or instantiate the module, or install the generated binding, its promise rejects with `OxMf2InitializationError` and `OxMf2ErrorCode.InitializationWasmInitializationFailed` (`10003`). The optional `cause` retains the host failure for debugging, but its type, message, stack, and serialization are not stable compatibility fields. The public error message is human-readable but is not a programmatic discriminator.
+
+Initialization success is atomic: the runtime becomes initialized only after the generated binding is ready. A failed attempt installs no usable binding, rejects every compatible no-argument waiter with the same failure outcome, clears the in-flight state, and returns the runtime to the uninitialized state. A later `init()` or `init(input)` may retry; a failed explicit-input attempt does not reserve that input or prevent a different retry input. `InitializationWasmNotInitialized` is reserved for synchronous API use before a successful initialization and is not reused for an initialization attempt that actually failed.
 
 Callers that must guarantee a specific WASM artifact should call `init(input)` first, before any other code path can trigger default initialization.
 
@@ -279,12 +283,17 @@ type ParseBatchResult = {
 Decoded result shape:
 
 ```ts
+type SourceTextAttachment = Readonly<{
+  sourceId: number
+  source: string
+}>
+
 type DecodedSnapshotResult = {
   snapshot: SnapshotAccessor
   roots: RootHandle[]
   sources: SourceView[]
   diagnostics: DiagnosticView[]
-  withSources(sources: string[]): DecodedSnapshotResult
+  withSources(sources: readonly SourceTextAttachment[]): DecodedSnapshotResult
 }
 ```
 
@@ -403,18 +412,26 @@ With `includeSourceText = false` in a batch result, each root has a `source_id`,
 
 ```ts
 const decoded = decodeSnapshot(bytes)
-const withText = decoded.withSources(['Hello {$name}'])
+const withText = decoded.withSources([{ sourceId: 0, source: 'Hello {$name}' }])
 ```
 
-`withSources(sources)` maps strings by snapshot SourceId order. It takes source text only and does not accept metadata. Metadata already lives in SourceRecord.
+Each attachment names its snapshot-local SourceId explicitly, so attachment array order is irrelevant. The array must cover every SourceRecord exactly once. It takes source text only and does not accept path, locale, message id, base offset, or other metadata because metadata already lives in SourceRecord. Equal source bytes for two different SourceIds are valid and still require two keyed attachments.
 
 Each source string passed to `withSources` follows the same Phase 2 UTF-8 source policy as parser input. Strings containing unpaired surrogates are rejected with `TypeError`, and accepted strings are stored as binding-owned UTF-8 bytes.
 
-`withSources(sources)` returns a new `DecodedSnapshotResult`. It does not mutate the original decoded result. Handles created from the original decoded result do not gain source text; only handles obtained from the returned decoded result can read the attached source text.
+For every SourceId, `withSources` requires the attached UTF-8 byte length to equal `SourceRecord.source_byte_len` and the full SHA-256 digest of the exact bytes to equal `SourceRecord.source_sha256`. It performs no Unicode, BOM, or newline normalization. Length or digest mismatch throws `OxMf2SourceTextError` with `SourceTextIdentityMismatch` and the offending snapshot-local `sourceId`; expected or actual bytes and digests are not exposed on the public error.
 
-If `sources.length !== snapshot.sourceCount()`, `withSources` throws `OxMf2SourceTextError`.
+`withSources` remains synchronous. N-API and WASM provide a synchronous SHA-256 path through their native/WASM implementation or an equivalent shared synchronous implementation; the API does not depend on asynchronous WebCrypto and does not return a Promise.
 
-`withSources()` is only for decoded snapshots that do not already carry source text. If the decoded snapshot already has source text data, `withSources()` throws `OxMf2SourceTextError` instead of replacing the embedded source text. This keeps `source.sourceSlice(span)` and diagnostic locations unambiguous.
+`withSources(sources)` validates the complete attachment set before constructing a new `DecodedSnapshotResult`. It does not mutate the original decoded result. A count, key, encoding, or identity failure attaches nothing. Handles created from the original decoded result do not gain source text; only handles obtained from the returned decoded result can read the attached source text.
+
+If `sources.length !== snapshot.sourceCount()`, `withSources` throws `OxMf2SourceTextError` with `SourceTextCountMismatch`.
+
+Every `sourceId` must be an integer in `0 <= sourceId < snapshot.sourceCount()`; non-integer or out-of-range values throw `RangeError`. Repeating an otherwise valid SourceId throws `OxMf2SourceTextError` with `SourceTextDuplicateSourceId` and that `sourceId`. Given the exact length requirement, valid in-range unique ids imply that no SourceId is missing. Wrong attachment shapes and non-string `source` values throw `TypeError`.
+
+`withSources()` is only for decoded snapshots that do not already carry source text. If the decoded snapshot already has source text data, `withSources()` throws `OxMf2SourceTextError` with `SourceTextAlreadyIncluded` instead of replacing the embedded source text. This keeps `source.sourceSlice(span)` and diagnostic locations unambiguous.
+
+After the top-level argument has been accepted as an array, validation precedence is deterministic: reject an already source-bearing snapshot; check attachment count; validate attachment shape, key range, and duplicate keys in array order; then validate UTF-8 representation and source identity in ascending SourceId order. N-API and WASM use the same precedence so the same invalid call reports the same class, code, and optional `sourceId`.
 
 ## Source Location Boundary
 
@@ -514,12 +531,18 @@ type OxMf2ErrorShape = {
   sectionKind?: SectionKind
   offset?: number
   recordIndex?: number
+  inputIndex?: number
+  sourceId?: number
 }
 ```
 
 Each dedicated error class sets `error.name` to the class name, such as `OxMf2SnapshotError`.
 
-The binding boundary preserves error code, message, optional section kind, optional offset, and optional record index. Human-readable messages may be returned for developer ergonomics, but compact error codes are the base for programmatic handling.
+The binding boundary preserves error code, message, optional section kind, optional offset, optional record index, optional batch input index, and optional snapshot-local source id. `sourceId` is present for keyed source attachment failures that identify one source, such as a duplicate id or source identity mismatch; unrelated errors omit it. Human-readable messages may be returned for developer ergonomics, but compact error codes are the base for programmatic handling.
+
+When `parseBatch(items, options)` fails with Rust `BatchParseError`, the binding throws `OxMf2ParseError` with the underlying `ParseErrorCode` in `code` and the Rust `input_index` in `inputIndex`. `inputIndex` is a zero-based index into the original JavaScript `items` array. The call remains atomic and returns no partial result. A single-message parse error, a snapshot decode/write error, an initialization error, or a source-text error omits `inputIndex`; it is not set to `-1`, `null`, or a sentinel. Built-in `TypeError` and `RangeError` validation failures remain built-in errors and are outside `OxMf2ErrorShape`.
+
+The `parseBatch` binding pipeline must map `BatchParseError` before any convenience-layer conversion to `SnapshotWriteError` can discard its input position. It may parse first and then call `parse_batch_result_to_snapshot`, or use an internal equivalent that preserves the parser error domain and `input_index`. Snapshot encoding failures after a successful batch parse remain `OxMf2SnapshotError` and do not inherit the parser's `inputIndex` field.
 
 `OxMf2ErrorCode` follows the range policy in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). Binding-owned errors start at `10000` so future Rust crate error domains can be added under `10000` without moving binding codes.
 
@@ -544,12 +567,18 @@ Unpaired surrogates are one such built-in validation case: parser input and `wit
 OxMf2ErrorCode.DecodeInvalidMagic
 OxMf2ErrorCode.DecodeUnsupportedMajorVersion
 OxMf2ErrorCode.DecodeInvalidSectionBounds
+OxMf2ErrorCode.DecodeInvalidSourceIdentity
 OxMf2ErrorCode.SnapshotWriteTooManyNodes
 OxMf2ErrorCode.SnapshotWriteInvalidSourceId
 OxMf2ErrorCode.SourceTextNotIncluded
 OxMf2ErrorCode.SourceTextSpanOutOfBounds
+OxMf2ErrorCode.SourceTextAlreadyIncluded
+OxMf2ErrorCode.SourceTextDuplicateSourceId
+OxMf2ErrorCode.SourceTextIdentityMismatch
 OxMf2ErrorCode.InitializationWasmNotInitialized
 OxMf2ErrorCode.InitializationNativeBindingUnavailable
+OxMf2ErrorCode.InitializationWasmInputConflict
+OxMf2ErrorCode.InitializationWasmInitializationFailed
 OxMf2ErrorCode.BindingValidationInvalidOptions
 ```
 
@@ -593,9 +622,13 @@ Parity tests cover:
 
 - function names and accepted options
 - error classes and error codes
+- WASM initialization tests distinguish pre-init API use, explicit-input conflict during and after initialization, and artifact/input/compile/instantiate failure by numeric code; failed attempts install nothing and a later retry may succeed
+- fatal `parseBatch` parser failures preserve the same zero-based `inputIndex` in N-API and WASM, return no partial result, and single-message errors omit the property
 - root/node/token/trivia/source/diagnostic accessor behavior
 - `Span` and `SourceLocation` values
-- `withSources()` behavior
+- `withSources()` keyed attachment, arbitrary input order, atomic failure, and error precedence
+- source attachment rejects duplicate or out-of-range SourceIds, omitted SourceIds, same-length different bytes, and swapped source text while allowing identical bytes for distinct SourceIds
+- source attachment and embedded-source decode use full SHA-256 over exact UTF-8 bytes, including empty, BOM, CRLF, and canonically equivalent but byte-distinct Unicode fixtures
 - `toBytes()` / `decodeSnapshot()` roundtrip behavior
 
 Binding fixtures reuse the Rust snapshot `.mf2` corpus. Binary golden bytes remain the Rust snapshot layer's responsibility. Binding tests compare decoded structural/accessor output and language-boundary behavior.
@@ -610,6 +643,7 @@ Relevant binding benchmark phases:
 - `parse_batch_binding`
 - `decode_snapshot_binding`
 - `snapshot_to_bytes_copy_binding`
+- `with_sources_binding`
 
 The runtime benchmark matrix includes:
 
@@ -620,6 +654,8 @@ The runtime benchmark matrix includes:
 Browser WASM benchmarks run through Playwright with a headless browser so browser runtime cost is measured automatically and reproducibly.
 
 `snapshot_to_bytes_copy_binding` is reported both from the snapshot perspective and binding perspective. The binding report includes language boundary allocation and copy cost.
+
+`with_sources_binding` reports validation, UTF-8 conversion, SHA-256 verification, and retained-byte ownership cost separately from snapshot decode. It includes both one-source and batch attachment sizes and does not hide attachment hashing inside `decode_snapshot_binding`.
 
 ## Build And Distribution
 

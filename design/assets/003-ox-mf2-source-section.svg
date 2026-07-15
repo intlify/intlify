@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 814" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" role="img" aria-labelledby="title desc">
-<title id="title">Source Section Memory Layout</title><desc id="desc">SourceRecord is a fixed 32-byte record with StringRef metadata and SourceTextRef fields.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/></marker><style>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 914" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" role="img" aria-labelledby="title desc">
+<title id="title">Source Section Memory Layout</title><desc id="desc">SourceRecord is a fixed 68-byte record with a 32-byte metadata and source-text-reference prefix followed by exact source byte length and a full SHA-256 digest.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/></marker><style>
       .title { fill:#111827; }.subtitle { fill:#4b5563; }.label { fill:#374151; }.muted { fill:#6b7280; }
       .panel { fill:#ffffff; stroke:#d1d5db; }.surface { fill:#f8fafc; stroke:#9ca3af; }
       .ruler { stroke:#9ca3af; }.ruler-text { fill:#64748b; }.arrow { stroke:#4b5563; }.arrow-fill { fill:#4b5563; }
@@ -13,9 +13,9 @@
         .ruler { stroke:#64748b; }.ruler-text { fill:#cbd5e1; }.arrow { stroke:#cbd5e1; }.arrow-fill { fill:#cbd5e1; }
       }
 </style></defs>
-<rect x="0" y="0" width="1080" height="814" fill="none"/>
+<rect x="0" y="0" width="1080" height="914" fill="none"/>
 <text x="540" y="34" font-size="19" class="title" text-anchor="middle" font-weight="700">Source Section Memory Layout</text>
-<text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">SourceRecord is a fixed 32-byte record with StringRef metadata and SourceTextRef fields.</text>
+<text x="540" y="57" font-size="12" class="subtitle" text-anchor="middle">SourceRecord is a fixed 68-byte record with exact UTF-8 length and SHA-256 identity.</text>
 <rect x="44" y="86" width="992" height="164" rx="6" class="surface" opacity="1"/>
 <text x="62" y="116" font-size="13" class="label" font-weight="700">SectionRecord memory layout</text>
 <text x="62" y="138" font-size="11" class="muted">20-byte section table record; payload offset is buffer-relative and payload starts 8-byte aligned.</text>
@@ -53,16 +53,16 @@
 <text x="684.0" y="219" font-size="8" fill="#e5e7eb" text-anchor="middle">u32 records</text>
 <rect x="770" y="180" width="86" height="50" rx="3" class="table" opacity="0.72"/>
 <text x="813.0" y="201" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">rec_size</text>
-<text x="813.0" y="219" font-size="8" fill="#e5e7eb" text-anchor="middle">32 bytes</text>
+<text x="813.0" y="219" font-size="8" fill="#e5e7eb" text-anchor="middle">68 bytes</text>
 <rect x="856" y="180" width="43" height="50" rx="3" class="table" opacity="0.58"/>
 <text x="877.5" y="201" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">align</text>
 <text x="877.5" y="219" font-size="8" fill="#e5e7eb" text-anchor="middle">8</text>
 <rect x="899" y="180" width="43" height="50" rx="3" class="pad" opacity="0.58"/>
 <text x="920.5" y="201" font-size="9" fill="#fff" text-anchor="middle" font-weight="700">res</text>
 <text x="920.5" y="219" font-size="8" fill="#e5e7eb" text-anchor="middle">0</text>
-<rect x="44" y="286" width="992" height="198" rx="6" class="panel" opacity="1"/>
+<rect x="44" y="286" width="992" height="310" rx="6" class="panel" opacity="1"/>
 <text x="62" y="316" font-size="13" class="label" font-weight="700">SourceRecord</text>
-<text x="62" y="338" font-size="11" class="muted">Fixed 32-byte source metadata record; SourceId is the array index.</text>
+<text x="62" y="338" font-size="11" class="muted">Fixed 68-byte record; SourceId is the array index. The first 32 bytes retain the metadata/text-ref prefix.</text>
 <path d="M 82 372 L 978 372" fill="none" class="arrow" stroke-width="1.5"/>
 <line x1="82" y1="365" x2="82" y2="381" class="ruler" stroke-width="1"/>
 <text x="82" y="360" font-size="8" class="ruler-text" text-anchor="middle">0</text>
@@ -106,23 +106,37 @@
 <rect x="866" y="386" width="112" height="58" rx="3" class="raw" opacity="0.74"/>
 <text x="922.0" y="407" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">text.len</text>
 <text x="922.0" y="425" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
-<rect x="44" y="530" width="992" height="132" rx="6" class="panel" opacity="1"/>
-<text x="62" y="560" font-size="13" class="label" font-weight="700">Source references</text>
-<text x="62" y="582" font-size="11" class="muted">StringRef fields point to string_offsets/string_data; SourceTextRef points to source_text_data.</text>
-<rect x="90" y="614" width="250" height="36" rx="4" class="string" opacity="0.72"/>
-<text x="215" y="637" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">metadata -&gt; string table</text>
-<rect x="382" y="614" width="250" height="36" rx="4" class="pad" opacity="0.72"/>
-<text x="507" y="637" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">text.source_id sentinel allowed</text>
-<rect x="674" y="614" width="250" height="36" rx="4" class="source" opacity="0.72"/>
-<text x="799" y="637" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">base_offset + span = absolute byte</text>
-<rect x="44" y="676" width="992" height="106" rx="6" class="surface" opacity="1"/>
-<text x="62" y="706" font-size="13" class="label" font-weight="700">Alignment / decoder rules</text>
-<rect x="78" y="735" width="206" height="34" rx="4" class="source" opacity="0.72"/>
-<text x="181" y="757" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">source_id == record index</text>
-<rect x="316" y="735" width="206" height="34" rx="4" class="string" opacity="0.72"/>
-<text x="419" y="757" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">metadata optional by sentinel</text>
-<rect x="554" y="735" width="206" height="34" rx="4" class="source" opacity="0.72"/>
-<text x="657" y="757" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">base_offset always present</text>
-<rect x="792" y="735" width="206" height="34" rx="4" class="table" opacity="0.72"/>
-<text x="895" y="757" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">fixed 32-byte layout</text>
+<text x="62" y="472" font-size="11" class="muted">Identity tail (wire offsets continue from the prefix above)</text>
+<path d="M 82 500 L 978 500" fill="none" class="arrow" stroke-width="1.5"/>
+<line x1="82" y1="493" x2="82" y2="509" class="ruler" stroke-width="1"/>
+<text x="82" y="488" font-size="8" class="ruler-text" text-anchor="middle">32</text>
+<line x1="182" y1="493" x2="182" y2="509" class="ruler" stroke-width="1"/>
+<text x="182" y="488" font-size="8" class="ruler-text" text-anchor="middle">36</text>
+<line x1="978" y1="493" x2="978" y2="509" class="ruler" stroke-width="1"/>
+<text x="978" y="488" font-size="8" class="ruler-text" text-anchor="middle">68</text>
+<rect x="82" y="514" width="100" height="58" rx="3" class="source" opacity="0.78"/>
+<text x="132" y="535" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">source_byte_len</text>
+<text x="132" y="553" font-size="8" fill="#e5e7eb" text-anchor="middle">u32</text>
+<rect x="182" y="514" width="796" height="58" rx="3" class="source" opacity="0.68"/>
+<text x="580" y="535" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">source_sha256</text>
+<text x="580" y="553" font-size="8" fill="#e5e7eb" text-anchor="middle">[u8; 32] — full SHA-256 of exact original UTF-8 bytes</text>
+<rect x="44" y="620" width="992" height="132" rx="6" class="panel" opacity="1"/>
+<text x="62" y="650" font-size="13" class="label" font-weight="700">Source references</text>
+<text x="62" y="672" font-size="11" class="muted">StringRef fields point to string data; SourceTextRef is optional; identity fields are always present.</text>
+<rect x="90" y="704" width="250" height="36" rx="4" class="string" opacity="0.72"/>
+<text x="215" y="727" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">metadata -&gt; string table</text>
+<rect x="382" y="704" width="250" height="36" rx="4" class="pad" opacity="0.72"/>
+<text x="507" y="727" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">text.source_id sentinel allowed</text>
+<rect x="674" y="704" width="250" height="36" rx="4" class="source" opacity="0.72"/>
+<text x="799" y="727" font-size="8.2" fill="#fff" text-anchor="middle" font-weight="700">identity -&gt; exact UTF-8 bytes</text>
+<rect x="44" y="776" width="992" height="106" rx="6" class="surface" opacity="1"/>
+<text x="62" y="806" font-size="13" class="label" font-weight="700">Alignment / decoder rules</text>
+<rect x="78" y="835" width="206" height="34" rx="4" class="source" opacity="0.72"/>
+<text x="181" y="857" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">source_id == record index</text>
+<rect x="316" y="835" width="206" height="34" rx="4" class="string" opacity="0.72"/>
+<text x="419" y="857" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">metadata optional by sentinel</text>
+<rect x="554" y="835" width="206" height="34" rx="4" class="source" opacity="0.72"/>
+<text x="657" y="857" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">embedded text verifies identity</text>
+<rect x="792" y="835" width="206" height="34" rx="4" class="table" opacity="0.72"/>
+<text x="895" y="857" font-size="8.5" fill="#fff" text-anchor="middle" font-weight="700">fixed 68-byte layout</text>
 </svg>
