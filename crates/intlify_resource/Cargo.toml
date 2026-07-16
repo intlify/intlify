@@ -1,0 +1,11 @@
+[package]
+name = "intlify_resource"
+version = "0.14.0-alpha.9"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true

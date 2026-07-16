@@ -37,7 +37,7 @@
     "dev": "vp run playground#dev",
     "dev:playground": "vp run playground#dev",
     "check": "vp run check:rust && vp check && vp run playground#vize:check",
-    "test": "cargo test -p ox_mf2_parser --all-targets --color always && cargo test -p intlify_cli --all-targets --color always && cargo test -p intlify_format --all-targets --color always && vp test",
+    "test": "cargo test -p ox_mf2_parser --all-targets --color always && cargo test -p intlify_cli --all-targets --color always && cargo test -p intlify_format --all-targets --color always && cargo test -p intlify_resource --all-targets --color always && vp test",
     "prepare": "vp config"
   },
   "devDependencies": {
