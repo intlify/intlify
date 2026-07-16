@@ -226,6 +226,11 @@ impl IdentityInterner {
     pub(crate) const fn distinct_bytes(&self) -> u128 {
         self.distinct_bytes
     }
+
+    #[cfg(test)]
+    pub(crate) fn set_distinct_bytes_for_test(&mut self, distinct_bytes: u128) {
+        self.distinct_bytes = distinct_bytes;
+    }
 }
 
 #[cfg(test)]

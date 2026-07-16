@@ -8,12 +8,19 @@
 //! formatter, linter, or CLI: consumers compose extracted message entries with
 //! those message-level cores.
 
+mod adapter;
+mod artifact;
 mod error;
 mod identity;
 mod limits;
 mod offset_map;
+mod registry;
 mod span;
 
+pub use artifact::{
+    CandidateMessageAdmission, ExtractedCatalog, FormattedEntry, MessageEntry, RawReplacement,
+    ValidatedWriteBack, WriteBackOutcome,
+};
 pub use error::{
     DeclaredFormat, DocumentUnsupportedFeature, EntryUnsupportedReason, FormatClassificationSource,
     InternalResourceErrorReason, ResourceError, ResourceErrorCode, ResourceErrorDetails,
@@ -25,13 +32,18 @@ pub use limits::{
     MAX_MESSAGE_BYTES, MAX_NESTING_DEPTH, MAX_OFFSET_MAP_SEGMENTS, MAX_TOTAL_MESSAGE_BYTES,
 };
 pub use offset_map::{MessageOffsetMap, OffsetMapError};
+pub use registry::{
+    HostFormat, HostFormatClassification, HostFormatRegistry, KnownHostFormatId,
+    ResolvedCatalogAssignment, ResolvedHostFormat,
+};
 pub use span::Utf8ByteSpan;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        CatalogKey, EntryHandle, EntryKey, MessageOffsetMap, ResourceError, ResourceErrorSite,
-        StructuralPathKey, Utf8ByteSpan,
+        CatalogKey, EntryHandle, EntryKey, ExtractedCatalog, HostFormatRegistry, MessageOffsetMap,
+        ResolvedHostFormat, ResourceError, ResourceErrorSite, StructuralPathKey, Utf8ByteSpan,
+        ValidatedWriteBack, WriteBackOutcome,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -46,5 +58,10 @@ mod tests {
         assert_send_sync::<MessageOffsetMap>();
         assert_send_sync::<ResourceErrorSite>();
         assert_send_sync::<ResourceError>();
+        assert_send_sync::<HostFormatRegistry>();
+        assert_send_sync::<ResolvedHostFormat>();
+        assert_send_sync::<ExtractedCatalog>();
+        assert_send_sync::<ValidatedWriteBack>();
+        assert_send_sync::<WriteBackOutcome>();
     }
 }
