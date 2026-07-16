@@ -180,6 +180,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_resource"
+version = "0.14.0-alpha.9"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
