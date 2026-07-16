@@ -204,6 +204,10 @@ pub(crate) struct IdentityInterner {
 
 #[allow(dead_code)]
 impl IdentityInterner {
+    pub(crate) fn contains(&self, value: &str) -> bool {
+        self.values.contains_key(value)
+    }
+
     pub(crate) fn intern(
         &mut self,
         value: &str,

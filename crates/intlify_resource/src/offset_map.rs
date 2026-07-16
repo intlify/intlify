@@ -236,6 +236,12 @@ pub(crate) struct MessageOffsetMapBuilder {
     duplicate_empty_message_anchor: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OffsetMapSegmentLimit {
+    pub(crate) raw_span: Utf8ByteSpan,
+    pub(crate) actual: usize,
+}
+
 #[allow(dead_code)]
 impl MessageOffsetMapBuilder {
     pub(crate) const fn new(raw_value_span: Utf8ByteSpan) -> Self {
@@ -248,9 +254,64 @@ impl MessageOffsetMapBuilder {
     }
 
     pub(crate) fn push_identity(&mut self, message_span: Utf8ByteSpan, raw_span: Utf8ByteSpan) {
-        let next = OffsetMapSegment::identity(message_span, raw_span);
+        self.try_push_identity(message_span, raw_span, usize::MAX)
+            .expect("an unbounded offset-map builder cannot exhaust segments");
+    }
+
+    pub(crate) fn try_push_identity(
+        &mut self,
+        message_span: Utf8ByteSpan,
+        raw_span: Utf8ByteSpan,
+        max_segments: usize,
+    ) -> Result<(), OffsetMapSegmentLimit> {
+        self.try_push_segment(
+            OffsetMapSegment::identity(message_span, raw_span),
+            max_segments,
+        )
+    }
+
+    pub(crate) fn push_unescape(&mut self, message_span: Utf8ByteSpan, raw_span: Utf8ByteSpan) {
+        self.try_push_unescape(message_span, raw_span, usize::MAX)
+            .expect("an unbounded offset-map builder cannot exhaust segments");
+    }
+
+    pub(crate) fn try_push_unescape(
+        &mut self,
+        message_span: Utf8ByteSpan,
+        raw_span: Utf8ByteSpan,
+        max_segments: usize,
+    ) -> Result<(), OffsetMapSegmentLimit> {
+        self.try_push_segment(
+            OffsetMapSegment::unescape(message_span, raw_span),
+            max_segments,
+        )
+    }
+
+    pub(crate) fn push_raw_only(&mut self, message_position: u32, raw_span: Utf8ByteSpan) {
+        self.try_push_raw_only(message_position, raw_span, usize::MAX)
+            .expect("an unbounded offset-map builder cannot exhaust segments");
+    }
+
+    pub(crate) fn try_push_raw_only(
+        &mut self,
+        message_position: u32,
+        raw_span: Utf8ByteSpan,
+        max_segments: usize,
+    ) -> Result<(), OffsetMapSegmentLimit> {
+        self.try_push_segment(
+            OffsetMapSegment::raw_only(message_position, raw_span),
+            max_segments,
+        )
+    }
+
+    fn try_push_segment(
+        &mut self,
+        next: OffsetMapSegment,
+        max_segments: usize,
+    ) -> Result<(), OffsetMapSegmentLimit> {
         if let Some(previous) = self.segments.last_mut() {
             if previous.kind == SegmentKind::Identity
+                && next.kind == SegmentKind::Identity
                 && previous.message_span.end() == next.message_span.start()
                 && previous.raw_span.end() == next.raw_span.start()
             {
@@ -258,30 +319,28 @@ impl MessageOffsetMapBuilder {
                     Utf8ByteSpan::new(previous.message_span.start(), next.message_span.end());
                 previous.raw_span =
                     Utf8ByteSpan::new(previous.raw_span.start(), next.raw_span.end());
-                return;
+                return Ok(());
             }
-        }
-        self.segments.push(next);
-    }
-
-    pub(crate) fn push_unescape(&mut self, message_span: Utf8ByteSpan, raw_span: Utf8ByteSpan) {
-        self.segments
-            .push(OffsetMapSegment::unescape(message_span, raw_span));
-    }
-
-    pub(crate) fn push_raw_only(&mut self, message_position: u32, raw_span: Utf8ByteSpan) {
-        let next = OffsetMapSegment::raw_only(message_position, raw_span);
-        if let Some(previous) = self.segments.last_mut() {
             if previous.kind == SegmentKind::RawOnly
-                && previous.message_span.start() == message_position
+                && next.kind == SegmentKind::RawOnly
+                && previous.message_span.start() == next.message_span.start()
                 && previous.raw_span.end() == next.raw_span.start()
             {
                 previous.raw_span =
                     Utf8ByteSpan::new(previous.raw_span.start(), next.raw_span.end());
-                return;
+                return Ok(());
             }
         }
+
+        let actual = self.segments.len() + 1;
+        if actual > max_segments {
+            return Err(OffsetMapSegmentLimit {
+                raw_span: next.raw_span,
+                actual,
+            });
+        }
         self.segments.push(next);
+        Ok(())
     }
 
     pub(crate) fn set_empty_message_anchor(

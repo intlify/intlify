@@ -4,9 +4,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::adapter::HostAdapter;
-#[cfg(test)]
-use crate::adapter::PendingJsonAdapter;
+use crate::adapter::{HostAdapter, JsonAdapter};
 use crate::artifact::{extract_resolved, ExtractedCatalog};
 use crate::{DeclaredFormat, FormatClassificationSource, ResourceError, ResourcePhase};
 
@@ -140,14 +138,11 @@ pub struct HostFormatRegistry {
 }
 
 impl HostFormatRegistry {
-    // Do not expose a production constructor until the concrete JSON adapter
-    // exists. This test-only scaffold keeps the extension and artifact
-    // foundation independently testable without advertising a registry whose
-    // only extraction path is guaranteed to fail.
-    #[cfg(test)]
-    fn with_pending_json_adapter() -> Self {
+    /// Construct the registry containing every adapter shipped in this release.
+    #[must_use]
+    pub fn new() -> Self {
         Self {
-            json: Arc::new(PendingJsonAdapter),
+            json: Arc::new(JsonAdapter),
         }
     }
 
@@ -230,6 +225,12 @@ impl HostFormatRegistry {
             ResourcePhase::Registry,
             None,
         )
+    }
+}
+
+impl Default for HostFormatRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -364,7 +365,7 @@ mod tests {
 
     #[test]
     fn direct_resolution_accepts_only_shipped_extension_and_retains_spelling() {
-        let registry = HostFormatRegistry::with_pending_json_adapter();
+        let registry = HostFormatRegistry::new();
         let resolved = registry.resolve_direct_extension(".JSON").unwrap();
 
         assert_eq!(resolved.format(), HostFormat::Json);
@@ -377,7 +378,7 @@ mod tests {
 
     #[test]
     fn assignment_resolution_owns_complete_unsupported_format_evidence() {
-        let registry = HostFormatRegistry::with_pending_json_adapter();
+        let registry = HostFormatRegistry::new();
         let assignment = ResolvedCatalogAssignment::new(
             HostFormatClassification::KnownButUnshipped(KnownHostFormatId::Yaml),
             Arc::from(".YML"),

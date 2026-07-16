@@ -15,8 +15,6 @@ use crate::{
     ResourcePhase, StructuralPathKey, Utf8ByteSpan,
 };
 
-// The production JSON adapter starts using this boundary in Milestone 6.
-#[allow(dead_code)]
 pub(crate) struct AdapterMessageEntry {
     structural_path: String,
     catalog_key_domain: CatalogKeyDomain,
@@ -28,7 +26,6 @@ pub(crate) struct AdapterMessageEntry {
     read_only: bool,
 }
 
-#[allow(dead_code)]
 impl AdapterMessageEntry {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
@@ -65,9 +62,6 @@ struct PendingMessageEntry {
     read_only: bool,
 }
 
-// Concrete adapters start populating this builder in Milestone 6. The
-// test-only adapter exercises the complete contract in this milestone.
-#[allow(dead_code)]
 pub(crate) struct ArtifactBuilder {
     source: Arc<str>,
     resolved: ResolvedHostFormat,
@@ -81,7 +75,6 @@ pub(crate) struct ArtifactBuilder {
     first_error: Option<ResourceError>,
 }
 
-#[allow(dead_code)]
 impl ArtifactBuilder {
     fn new(source: Arc<str>, resolved: ResolvedHostFormat, phase: ResourcePhase) -> Self {
         Self {
@@ -110,6 +103,67 @@ impl ArtifactBuilder {
                 Err(error)
             }
         }
+    }
+
+    pub(crate) fn preflight_entry(
+        &self,
+        structural_path: &str,
+        catalog_key: &str,
+        display_key: Option<&str>,
+        raw_value_span: Utf8ByteSpan,
+        message_bytes: u128,
+    ) -> Result<u32, ResourceError> {
+        if let Some(error) = &self.first_error {
+            return Err(error.clone());
+        }
+
+        let occurrence = self.occurrences.get(structural_path).copied().unwrap_or(0);
+        let check = |resource: ResourceLimit, actual: u128| {
+            if actual <= resource.limit() {
+                Ok(())
+            } else {
+                let key = EntryKey::new(
+                    StructuralPathKey::from_shared(Arc::from(structural_path)),
+                    occurrence,
+                );
+                Err(ResourceError::limit_exceeded(
+                    resource,
+                    actual,
+                    self.phase,
+                    Some(ResourceErrorSite::new(raw_value_span, Some(key))),
+                ))
+            }
+        };
+
+        check(ResourceLimit::Entries, self.entry_count + 1)?;
+        check(ResourceLimit::MessageBytes, message_bytes)?;
+        check(
+            ResourceLimit::TotalMessageBytes,
+            self.total_message_bytes + message_bytes,
+        )?;
+
+        let mut projected_identity_bytes = self.interner.distinct_bytes();
+        let mut new_values = [None; 3];
+        let mut new_value_count = 0;
+        for value in [Some(structural_path), Some(catalog_key), display_key]
+            .into_iter()
+            .flatten()
+        {
+            if self.interner.contains(value) || new_values[..new_value_count].contains(&Some(value))
+            {
+                continue;
+            }
+            projected_identity_bytes += value.len() as u128;
+            check(ResourceLimit::IdentityBytes, projected_identity_bytes)?;
+            new_values[new_value_count] = Some(value);
+            new_value_count += 1;
+        }
+
+        Ok(occurrence)
+    }
+
+    pub(crate) const fn offset_map_segment_count(&self) -> u128 {
+        self.offset_map_segments
     }
 
     fn try_push_entry(&mut self, entry: AdapterMessageEntry) -> Result<(), ResourceError> {
@@ -1402,6 +1456,77 @@ mod tests {
             assert_limit(&error, resource, actual);
             assert_eq!(error.phase(), ResourcePhase::Extract);
         }
+    }
+
+    #[test]
+    fn entry_preflight_preserves_limit_order_without_mutating_admission_state() {
+        let source = "x";
+        let raw_span = Utf8ByteSpan::new(0, 1);
+        let cases = [
+            (
+                (
+                    u128::from(MAX_ENTRIES),
+                    u128::from(MAX_TOTAL_MESSAGE_BYTES),
+                    u128::from(MAX_IDENTITY_BYTES),
+                    u128::from(MAX_MESSAGE_BYTES) + 1,
+                ),
+                ResourceLimit::Entries,
+                u128::from(MAX_ENTRIES) + 1,
+            ),
+            (
+                (
+                    0,
+                    u128::from(MAX_TOTAL_MESSAGE_BYTES),
+                    u128::from(MAX_IDENTITY_BYTES),
+                    u128::from(MAX_MESSAGE_BYTES) + 1,
+                ),
+                ResourceLimit::MessageBytes,
+                u128::from(MAX_MESSAGE_BYTES) + 1,
+            ),
+            (
+                (
+                    0,
+                    u128::from(MAX_TOTAL_MESSAGE_BYTES),
+                    u128::from(MAX_IDENTITY_BYTES),
+                    1,
+                ),
+                ResourceLimit::TotalMessageBytes,
+                u128::from(MAX_TOTAL_MESSAGE_BYTES) + 1,
+            ),
+            (
+                (0, 0, u128::from(MAX_IDENTITY_BYTES), 1),
+                ResourceLimit::IdentityBytes,
+                u128::from(MAX_IDENTITY_BYTES) + 1,
+            ),
+        ];
+
+        for ((entries, total, identity, message), resource, actual) in cases {
+            let mut builder = new_builder(source);
+            builder.set_counters_for_test(entries, total, identity, 0);
+            let error = builder
+                .preflight_entry("x", "x", None, raw_span, message)
+                .unwrap_err();
+            assert_limit(&error, resource, actual);
+            assert_eq!(error.site().unwrap().span(), raw_span);
+            assert_eq!(
+                error
+                    .site()
+                    .unwrap()
+                    .entry_key()
+                    .unwrap()
+                    .structural_path()
+                    .as_str(),
+                "x"
+            );
+        }
+
+        let mut builder = new_builder(source);
+        assert_eq!(builder.preflight_entry("x", "x", None, raw_span, 1), Ok(0));
+        assert_eq!(builder.preflight_entry("x", "x", None, raw_span, 1), Ok(0));
+        builder
+            .push_entry(test_entry(source, "x", raw_span))
+            .unwrap();
+        assert_eq!(builder.preflight_entry("x", "x", None, raw_span, 1), Ok(1));
     }
 
     #[test]
