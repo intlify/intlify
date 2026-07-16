@@ -603,6 +603,11 @@ Formatter IR benchmark stages should align with the pipeline:
 
 These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md). They should make traversal, IR construction, normalization, lowering, and rendering costs observable separately without adding CI timing thresholds.
 
+## Deferred Follow-Up Notes
+
+- After the Phase 3C message-level linter crate, `intlify lint` command, and diagnostic reporter contract have landed, create a dedicated implementation plan for `intlify lint` resource-catalog integration before starting that integration work. The follow-up must reuse the `intlify_resource` registry, resolved catalog configuration, CLI classification and physical-group path, extraction artifacts, and offset maps defined by [013](./013-ox-mf2-resource-catalog-adapter-design.md); it must not introduce a second host extraction path or config resolver. It must also cover `lint_catalog_e2e`, formatter/linter cross-command determinism, and the complete Tier 1 acceptance gate. This work is intentionally outside the active resource-plus-formatter PR sequence, but it must be complete before Phase 3D begins catalog editor integration.
+- Catalog-level and cross-locale rules, locale binding, and key selectors remain separate follow-ups under the deferred contract in [013](./013-ox-mf2-resource-catalog-adapter-design.md#deferred-follow-up-notes). They do not become part of the initial entry-level catalog lint integration merely because that integration starts.
+
 ## Open Questions
 
 The cross-document questions that affected IR construction inputs — the trivia-less snapshot capability policy and the final LF / line-ending normalization scope — have been resolved in the Phase 3B formatter design; see its [Open Questions](./007-ox-mf2-phase-3b-formatter-design.md#open-questions) section for the resolution record. No formatter IR design open questions remain; later implementation details should be handled in the Phase 3B formatter implementation work or in targeted follow-up design notes.
