@@ -290,6 +290,90 @@ pub struct ResourceError {
 }
 
 impl ResourceError {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn format_unsupported(
+        classification_source: FormatClassificationSource,
+        declared_format: DeclaredFormat,
+        format: Option<&'static str>,
+        extension: Arc<str>,
+        outer_format: Option<&'static str>,
+        supported_formats: Arc<[&'static str]>,
+        phase: ResourcePhase,
+        site: Option<ResourceErrorSite>,
+    ) -> Self {
+        Self {
+            code: ResourceErrorCode::FormatUnsupported,
+            phase,
+            details: Box::new(ResourceErrorDetails::FormatUnsupported {
+                classification_source,
+                declared_format,
+                format,
+                extension,
+                outer_format,
+                supported_formats,
+            }),
+            site,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn parse_failed(
+        format: &'static str,
+        outer_format: Option<&'static str>,
+        phase: ResourcePhase,
+        site: ResourceErrorSite,
+    ) -> Self {
+        Self {
+            code: ResourceErrorCode::ParseFailed,
+            phase,
+            details: Box::new(ResourceErrorDetails::ParseFailed {
+                format,
+                outer_format,
+            }),
+            site: Some(site),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn entry_unsupported(
+        format: &'static str,
+        outer_format: Option<&'static str>,
+        reason: EntryUnsupportedReason,
+        phase: ResourcePhase,
+        site: ResourceErrorSite,
+    ) -> Self {
+        Self {
+            code: ResourceErrorCode::EntryUnsupported,
+            phase,
+            details: Box::new(ResourceErrorDetails::EntryUnsupported {
+                format,
+                outer_format,
+                reason,
+            }),
+            site: Some(site),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn document_unsupported(
+        format: &'static str,
+        outer_format: Option<&'static str>,
+        feature: DocumentUnsupportedFeature,
+        phase: ResourcePhase,
+        site: ResourceErrorSite,
+    ) -> Self {
+        Self {
+            code: ResourceErrorCode::DocumentUnsupported,
+            phase,
+            details: Box::new(ResourceErrorDetails::DocumentUnsupported {
+                format,
+                outer_format,
+                feature,
+            }),
+            site: Some(site),
+        }
+    }
+
     pub(crate) fn limit_exceeded(
         resource: ResourceLimit,
         actual: u128,
@@ -319,6 +403,16 @@ impl ResourceError {
             details: Box::new(ResourceErrorDetails::Internal { reason }),
             site,
         }
+    }
+
+    pub(crate) fn with_phase_and_site(
+        mut self,
+        phase: ResourcePhase,
+        site: Option<ResourceErrorSite>,
+    ) -> Self {
+        self.phase = phase;
+        self.site = site;
+        self
     }
 
     /// Return the stable operational-error code.

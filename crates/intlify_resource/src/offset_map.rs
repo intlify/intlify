@@ -124,6 +124,11 @@ impl MessageOffsetMap {
         self.raw_value_span
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn segment_count(&self) -> usize {
+        self.segments.len()
+    }
+
     fn map_range_start(&self, position: u32) -> u32 {
         if let Some(segment) = self.segments.iter().find(|segment| {
             segment.kind != SegmentKind::RawOnly
