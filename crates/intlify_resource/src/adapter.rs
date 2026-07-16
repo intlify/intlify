@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use crate::artifact::{ArtifactBuilder, MessageEntry};
 use crate::registry::ResolvedHostFormat;
-use crate::{InternalResourceErrorReason, ResourceError, ResourcePhase};
+#[cfg(test)]
+use crate::InternalResourceErrorReason;
+use crate::{ResourceError, ResourcePhase};
 
 pub(crate) type AdapterArtifactState = Arc<dyn Any + Send + Sync>;
 
@@ -62,8 +64,13 @@ pub(crate) trait HostAdapter: Send + Sync {
     ) -> Result<String, ResourceError>;
 }
 
+// Milestones 4 and 5 validate registry and artifact behavior through injected
+// test adapters. The production JSON adapter becomes the public registry
+// default when the JSON frontend lands in Milestone 6.
+#[cfg(test)]
 pub(crate) struct PendingJsonAdapter;
 
+#[cfg(test)]
 impl HostAdapter for PendingJsonAdapter {
     fn extract(
         &self,

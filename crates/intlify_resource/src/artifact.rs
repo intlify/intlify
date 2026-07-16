@@ -403,9 +403,7 @@ impl ExtractedCatalog {
         &self,
         formatted_entries: &[FormattedEntry<'_>],
     ) -> Result<WriteBackOutcome, ResourceError> {
-        let mut counts = vec![0_usize; self.entries.len()];
-        let mut formatted_by_index = vec![None; self.entries.len()];
-
+        let mut has_changes = false;
         for formatted in formatted_entries {
             if formatted.entry.artifact_identity() != self.artifact_identity
                 || usize::try_from(formatted.entry.entry_index())
@@ -414,7 +412,24 @@ impl ExtractedCatalog {
             {
                 return Err(Self::invalid_handle_error(None));
             }
+
+            let index = usize::try_from(formatted.entry.entry_index())
+                .expect("validated u32 entry index fits usize");
+            has_changes |= formatted.formatted_message.as_bytes()
+                != self.entries[index].message_text.as_bytes();
         }
+
+        if formatted_entries.is_empty() {
+            return Ok(WriteBackOutcome::Unchanged);
+        }
+
+        if !has_changes {
+            self.validate_unchanged_formatted_entries(formatted_entries)?;
+            return Ok(WriteBackOutcome::Unchanged);
+        }
+
+        let mut counts = vec![0_usize; self.entries.len()];
+        let mut formatted_by_index = vec![None; self.entries.len()];
 
         for formatted in formatted_entries {
             let index = usize::try_from(formatted.entry.entry_index())
@@ -516,6 +531,47 @@ impl ExtractedCatalog {
             replacements,
             candidate,
         }))
+    }
+
+    fn validate_unchanged_formatted_entries(
+        &self,
+        formatted_entries: &[FormattedEntry<'_>],
+    ) -> Result<(), ResourceError> {
+        const WORD_BITS: usize = u64::BITS as usize;
+        const WORDS: usize = (crate::MAX_ENTRIES as usize).div_ceil(WORD_BITS);
+
+        let mut seen = [0_u64; WORDS];
+        let mut first_duplicate = None;
+        let mut first_read_only = None;
+
+        for formatted in formatted_entries {
+            let index = usize::try_from(formatted.entry.entry_index())
+                .expect("unchanged prepass receives a validated entry index");
+            let word = index / WORD_BITS;
+            let mask = 1_u64 << (index % WORD_BITS);
+            if seen[word] & mask != 0 {
+                first_duplicate =
+                    Some(first_duplicate.map_or(index, |first: usize| first.min(index)));
+            } else {
+                seen[word] |= mask;
+            }
+            if self.entries[index].read_only {
+                first_read_only =
+                    Some(first_read_only.map_or(index, |first: usize| first.min(index)));
+            }
+        }
+
+        let invalid_index = match (first_duplicate, first_read_only) {
+            (Some(duplicate), Some(read_only)) => Some(duplicate.min(read_only)),
+            (Some(duplicate), None) => Some(duplicate),
+            (None, Some(read_only)) => Some(read_only),
+            (None, None) => None,
+        };
+        if let Some(index) = invalid_index {
+            return Err(Self::invalid_handle_error(Some(&self.entries[index])));
+        }
+
+        Ok(())
     }
 
     fn projected_host_bytes(
@@ -904,6 +960,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread;
+
+    use allocation_counter::measure;
 
     use super::{
         project_final_host_bytes, AdapterMessageEntry, ArtifactBuilder, ExtractedCatalog,
@@ -1628,6 +1686,88 @@ mod tests {
         assert_eq!(calls.extracts.load(Ordering::Relaxed), 1);
         assert_eq!(calls.plans.load(Ordering::Relaxed), 0);
         assert_eq!(calls.materializations.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn empty_and_byte_identical_write_back_do_not_allocate() {
+        let (registry, _) = test_registry();
+        let catalog = extract(&registry, "a=one\nb=two\n");
+        let identical = [
+            FormattedEntry {
+                entry: catalog.entries()[1].handle(),
+                formatted_message: "two",
+            },
+            FormattedEntry {
+                entry: catalog.entries()[0].handle(),
+                formatted_message: "one",
+            },
+        ];
+
+        let empty_allocations = measure(|| {
+            assert!(matches!(
+                catalog.build_and_validate_write_back(&[]).unwrap(),
+                WriteBackOutcome::Unchanged
+            ));
+        });
+        let identical_allocations = measure(|| {
+            assert!(matches!(
+                catalog.build_and_validate_write_back(&identical).unwrap(),
+                WriteBackOutcome::Unchanged
+            ));
+        });
+
+        assert_eq!(empty_allocations.count_total, 0);
+        assert_eq!(identical_allocations.count_total, 0);
+    }
+
+    #[test]
+    fn byte_identical_fast_path_preserves_duplicate_and_read_only_validation() {
+        let (registry, _) = test_registry();
+        let catalog = extract(&registry, "!locked=stay\nb=two\n");
+        let locked = catalog.entries()[0].handle();
+        let writable = catalog.entries()[1].handle();
+
+        let duplicate = [
+            FormattedEntry {
+                entry: writable,
+                formatted_message: "two",
+            },
+            FormattedEntry {
+                entry: writable,
+                formatted_message: "two",
+            },
+        ];
+        let error = catalog
+            .build_and_validate_write_back(&duplicate)
+            .unwrap_err();
+        assert_internal(&error, InternalResourceErrorReason::InvalidEntryHandle);
+        assert_eq!(
+            error.site().unwrap().entry_key(),
+            Some(catalog.entries()[1].key())
+        );
+
+        let duplicate_and_read_only = [
+            FormattedEntry {
+                entry: writable,
+                formatted_message: "two",
+            },
+            FormattedEntry {
+                entry: writable,
+                formatted_message: "two",
+            },
+            FormattedEntry {
+                entry: locked,
+                formatted_message: "stay",
+            },
+        ];
+        let error = catalog
+            .build_and_validate_write_back(&duplicate_and_read_only)
+            .unwrap_err();
+        assert_internal(&error, InternalResourceErrorReason::InvalidEntryHandle);
+        assert_eq!(
+            error.site().unwrap().entry_key(),
+            Some(catalog.entries()[0].key())
+        );
     }
 
     #[test]
