@@ -296,11 +296,19 @@ fn discover_path(
         return;
     }
 
-    let Ok(metadata) = fs::symlink_metadata(&path) else {
-        discovery
-            .errors
-            .push(unmatched_input_error(operand, "path"));
-        return;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            discovery
+                .errors
+                .push(unmatched_input_error(operand, "path"));
+            return;
+        }
+        Err(error) => {
+            let label = exact_display_path(project_root, &path).expect("operand path is Unicode");
+            discovery.errors.push(input_read_error(&label, &error));
+            return;
+        }
     };
 
     if metadata.file_type().is_symlink() {
@@ -1714,6 +1722,24 @@ mod tests {
         assert_eq!(selection.errors[0].code, "unmatched_input");
         assert_eq!(selection.errors[1].path.as_deref(), Some("a.txt"));
         assert_eq!(selection.errors[2].path.as_deref(), Some("z.txt"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_operand_preserves_non_not_found_metadata_errors() {
+        let root = TempRoot::new("operand-metadata-error");
+        write(&root.join("not-a-directory"), "ordinary file");
+
+        let selection = disabled_selection(&root, &["not-a-directory/message.mf2"]);
+
+        assert!(selection.units.is_empty());
+        assert_eq!(selection.errors.len(), 1);
+        let error = &selection.errors[0];
+        assert_eq!(error.code, "input_read_failed");
+        assert_eq!(error.path.as_deref(), Some("not-a-directory/message.mf2"));
+        let details = error.details.as_ref().expect("details");
+        assert_eq!(details["ioKind"], "NotADirectory");
+        assert!(details["rawOsError"].is_number());
     }
 
     #[test]
