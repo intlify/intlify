@@ -15,6 +15,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+file-id = "0.2"
 glob = "0.3"
 intlify_format = { path = "../intlify_format" }
 intlify_resource = { path = "../intlify_resource" }

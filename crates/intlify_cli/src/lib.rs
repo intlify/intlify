@@ -6,6 +6,7 @@ mod command;
 pub mod config;
 mod error;
 mod fmt;
+mod input;
 mod output;
 pub mod schema;
 pub mod version;

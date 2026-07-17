@@ -1,13 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::str;
 
-use glob::{glob_with, MatchOptions, Pattern};
+use glob::{MatchOptions, Pattern};
 use intlify_format::{format_message, FormatOptions, FormatSuccess};
 use ox_mf2_parser::{Diagnostic, DiagnosticSeverity};
 use serde::Serialize;
@@ -15,21 +14,13 @@ use serde_json::{json, Value};
 
 use crate::config::{self, FormatterMode, LoadedProjectConfig};
 use crate::error::{CliError, OperationalError};
+use crate::input::{
+    self, CatalogSelection, ExecutionUnit, InputIgnore, StdinSelection, WorkflowClassification,
+};
 use crate::output::{render_operational_error, serialize_json_envelope, CliRunResult, Reporter};
 
 const COMMAND: &str = "fmt";
-const SUPPORTED_EXTENSIONS: [&str; 1] = [".mf2"];
 const DEFAULT_OPERAND: &str = ".";
-const DEFAULT_EXCLUDED_DIRS: [&str; 8] = [
-    ".git",
-    ".hg",
-    ".svn",
-    "node_modules",
-    "vendor",
-    "target",
-    "dist",
-    "coverage",
-];
 
 pub(crate) fn is_fmt_invocation(args: &[String]) -> bool {
     command_index(args).is_some()
@@ -121,6 +112,7 @@ pub(crate) fn run(raw_args: &[String], cwd: &Path, stdin: &[u8]) -> CliRunResult
 
     if let Some(stdin_filepath) = parsed.stdin_filepath.as_deref() {
         return run_stdin(
+            cwd,
             stdin_filepath,
             stdin,
             parsed.reporter,
@@ -551,6 +543,7 @@ fn scan_json_reporter(args: &[String]) -> Option<Reporter> {
 }
 
 fn run_stdin(
+    cwd: &Path,
     stdin_filepath: &str,
     stdin: &[u8],
     reporter: Reporter,
@@ -558,44 +551,41 @@ fn run_stdin(
     loaded: &LoadedProjectConfig,
     ignore_matcher: &IgnoreMatcher,
 ) -> CliRunResult {
-    let path = Path::new(stdin_filepath);
-    let path_label = virtual_path_label(stdin_filepath);
-    if !is_supported_mf2_path(path) {
-        let error = unsupported_input_error(&path_label, path);
-        return render_fmt_report(
-            reporter,
-            &loaded.project_root,
-            FmtReport::empty(execution.operation, Some(execution.mode), vec![error]),
-        );
-    }
+    let path_label = match input::select_stdin_input(
+        cwd,
+        &loaded.project_root,
+        stdin_filepath,
+        CatalogSelection::Disabled,
+    ) {
+        StdinSelection::Selected {
+            label,
+            classification,
+        } => {
+            debug_assert!(matches!(
+                classification,
+                WorkflowClassification::StandaloneMf2
+            ));
+            label
+        }
+        StdinSelection::Skipped { label } => {
+            return render_skipped_stdin(stdin, &label, reporter, execution, &loaded.project_root);
+        }
+        StdinSelection::Error(error) => {
+            return render_fmt_report(
+                reporter,
+                &loaded.project_root,
+                FmtReport::empty(execution.operation, Some(execution.mode), vec![error]),
+            );
+        }
+    };
 
     if ignore_matcher.is_ignored(&path_label) {
-        let original = match str::from_utf8(stdin) {
-            Ok(source) => source,
-            Err(error) => {
-                return render_fmt_report(
-                    reporter,
-                    &loaded.project_root,
-                    FmtReport::empty(
-                        execution.operation,
-                        Some(execution.mode),
-                        vec![input_decode_error(&path_label, error)],
-                    ),
-                );
-            }
-        };
-        if reporter == Reporter::Text && !execution.operation.is_check() {
-            return CliRunResult {
-                exit_code: 0,
-                stdout: original.to_owned(),
-                stderr: String::new(),
-            };
-        }
-
-        return render_fmt_report(
+        return render_skipped_stdin(
+            stdin,
+            &path_label,
             reporter,
+            execution,
             &loaded.project_root,
-            FmtReport::zero_targets(execution.operation, execution.mode),
         );
     }
 
@@ -661,6 +651,42 @@ fn run_stdin(
     render_run_output(reporter, &loaded.project_root, result)
 }
 
+fn render_skipped_stdin(
+    stdin: &[u8],
+    path_label: &str,
+    reporter: Reporter,
+    execution: FormatExecution,
+    project_root: &Path,
+) -> CliRunResult {
+    let original = match str::from_utf8(stdin) {
+        Ok(source) => source,
+        Err(error) => {
+            return render_fmt_report(
+                reporter,
+                project_root,
+                FmtReport::empty(
+                    execution.operation,
+                    Some(execution.mode),
+                    vec![input_decode_error(path_label, error)],
+                ),
+            );
+        }
+    };
+    if reporter == Reporter::Text && !execution.operation.is_check() {
+        return CliRunResult {
+            exit_code: 0,
+            stdout: original.to_owned(),
+            stderr: String::new(),
+        };
+    }
+
+    render_fmt_report(
+        reporter,
+        project_root,
+        FmtReport::zero_targets(execution.operation, execution.mode),
+    )
+}
+
 fn run_files(
     cwd: &Path,
     parsed: FmtArgs,
@@ -675,51 +701,83 @@ fn run_files(
     } else {
         parsed.operands
     };
-    let discovery = discover_targets(cwd, &loaded.project_root, &operands, ignore_matcher);
+    // Catalog classification is already implemented by the shared boundary,
+    // but fmt enables that consumer only with the catalog integration in PR 7.
+    let selection = input::select_file_inputs(
+        cwd,
+        &loaded.project_root,
+        &operands,
+        ignore_matcher,
+        CatalogSelection::Disabled,
+    );
     let mut stdout = String::new();
-    let mut stderr = render_text_errors(&discovery.errors);
+    let mut stderr = render_text_errors(&selection.errors);
     let mut results = Vec::new();
 
-    for target in discovery.targets {
-        match process_file(&target, operation, options) {
-            ProcessedFile::Formatted {
-                status,
-                changed,
-                output,
-            } => {
-                if operation == Operation::Write && changed {
-                    match fs::write(&target.path, output) {
-                        Ok(()) => {
-                            stdout.push_str(&target.label);
-                            stdout.push('\n');
-                            results.push(FmtResult::success(target.label, status, changed));
+    for unit in selection.units {
+        match unit {
+            ExecutionUnit::TargetError(failure) => {
+                let label = failure.target.candidate.label;
+                stderr.push_str(&render_text_errors(std::slice::from_ref(&failure.error)));
+                results.push(FmtResult::error(label, failure.error));
+            }
+            ExecutionUnit::Group(group) => {
+                let mut blocked_by = None;
+                for target in group.aliases {
+                    let label = target.candidate.label.clone();
+                    if let Some(predecessor) = blocked_by.as_deref() {
+                        let error = alias_processing_blocked_error(&label, predecessor);
+                        stderr.push_str(&render_text_errors(std::slice::from_ref(&error)));
+                        results.push(FmtResult::error(label, error));
+                        continue;
+                    }
+
+                    match process_file(&target, operation, options) {
+                        ProcessedFile::Formatted {
+                            status,
+                            changed,
+                            output,
+                        } => {
+                            if operation == Operation::Write && changed {
+                                match fs::write(&target.candidate.logical_path, output) {
+                                    Ok(()) => {
+                                        stdout.push_str(&label);
+                                        stdout.push('\n');
+                                        results.push(FmtResult::success(label, status, changed));
+                                    }
+                                    Err(error) => {
+                                        let error = output_write_error(&label, &error);
+                                        stderr.push_str(&render_text_errors(std::slice::from_ref(
+                                            &error,
+                                        )));
+                                        blocked_by = Some(label.clone());
+                                        results.push(FmtResult::error(label, error));
+                                    }
+                                }
+                            } else {
+                                if operation.is_check() && changed {
+                                    stdout.push_str(&label);
+                                    stdout.push('\n');
+                                }
+                                results.push(FmtResult::success(label, status, changed));
+                            }
                         }
-                        Err(error) => {
-                            let error = output_write_error(&target.label, &error);
+                        ProcessedFile::Diagnostic { diagnostics } => {
+                            stderr.push_str(&render_diagnostics(&label, &diagnostics));
+                            results.push(FmtResult::diagnostic(label, diagnostics));
+                        }
+                        ProcessedFile::Error { error } => {
                             stderr.push_str(&render_text_errors(std::slice::from_ref(&error)));
-                            results.push(FmtResult::error(target.label, error));
+                            results.push(FmtResult::error(label, error));
                         }
                     }
-                } else {
-                    if operation.is_check() && changed {
-                        stdout.push_str(&target.label);
-                        stdout.push('\n');
-                    }
-                    results.push(FmtResult::success(target.label, status, changed));
                 }
-            }
-            ProcessedFile::Diagnostic { diagnostics } => {
-                stderr.push_str(&render_diagnostics(&target.label, &diagnostics));
-                results.push(FmtResult::diagnostic(target.label, diagnostics));
-            }
-            ProcessedFile::Error { error } => {
-                stderr.push_str(&render_text_errors(std::slice::from_ref(&error)));
-                results.push(FmtResult::error(target.label, error));
             }
         }
     }
 
-    let report = FmtReport::from_results(operation, mode, results, discovery.errors);
+    let _selection_aborted = selection.aborted;
+    let report = FmtReport::from_results(operation, mode, results, selection.errors);
     render_run_output(
         parsed.reporter,
         &loaded.project_root,
@@ -729,249 +787,6 @@ fn run_files(
             report,
         },
     )
-}
-
-#[derive(Debug)]
-struct Discovery {
-    targets: Vec<Target>,
-    errors: Vec<OperationalError>,
-}
-
-#[derive(Debug, Clone)]
-struct Target {
-    path: PathBuf,
-    label: String,
-}
-
-fn discover_targets(
-    cwd: &Path,
-    project_root: &Path,
-    operands: &[String],
-    ignore_matcher: &IgnoreMatcher,
-) -> Discovery {
-    let mut targets = BTreeMap::<String, Target>::new();
-    let mut errors = Vec::new();
-
-    // Deterministic output order and duplicate suppression share one key:
-    // slash-normalized absolute paths gathered from explicit, dir, and glob inputs.
-    for operand in operands {
-        if has_glob_meta(operand) {
-            discover_glob(
-                cwd,
-                project_root,
-                operand,
-                ignore_matcher,
-                &mut targets,
-                &mut errors,
-            );
-        } else {
-            discover_path(
-                cwd,
-                project_root,
-                operand,
-                ignore_matcher,
-                &mut targets,
-                &mut errors,
-            );
-        }
-    }
-
-    Discovery {
-        targets: targets.into_values().collect(),
-        errors,
-    }
-}
-
-fn discover_path(
-    cwd: &Path,
-    project_root: &Path,
-    operand: &str,
-    ignore_matcher: &IgnoreMatcher,
-    targets: &mut BTreeMap<String, Target>,
-    errors: &mut Vec<OperationalError>,
-) {
-    let path = resolve_operand_path(cwd, operand);
-    let Ok(metadata) = fs::symlink_metadata(&path) else {
-        errors.push(unmatched_input_error(operand, "path"));
-        return;
-    };
-
-    if metadata.file_type().is_symlink() {
-        match fs::metadata(&path) {
-            Ok(target_metadata) if target_metadata.is_file() => {
-                add_explicit_file(
-                    project_root,
-                    operand,
-                    &path,
-                    ignore_matcher,
-                    targets,
-                    errors,
-                );
-            }
-            Ok(_) => {}
-            Err(error) => errors.push(input_read_error(&display_path(project_root, &path), &error)),
-        }
-        return;
-    }
-
-    if metadata.is_dir() {
-        collect_directory(project_root, &path, ignore_matcher, targets, errors);
-    } else if metadata.is_file() {
-        add_explicit_file(
-            project_root,
-            operand,
-            &path,
-            ignore_matcher,
-            targets,
-            errors,
-        );
-    } else {
-        errors.push(unsupported_input_error(
-            &display_path(project_root, &path),
-            &path,
-        ));
-    }
-}
-
-fn add_explicit_file(
-    project_root: &Path,
-    operand: &str,
-    path: &Path,
-    ignore_matcher: &IgnoreMatcher,
-    targets: &mut BTreeMap<String, Target>,
-    errors: &mut Vec<OperationalError>,
-) {
-    if !is_supported_mf2_path(path) {
-        errors.push(unsupported_input_error(
-            &display_path(project_root, path),
-            Path::new(operand),
-        ));
-        return;
-    }
-
-    add_target(project_root, path, ignore_matcher, targets);
-}
-
-fn collect_directory(
-    project_root: &Path,
-    dir: &Path,
-    ignore_matcher: &IgnoreMatcher,
-    targets: &mut BTreeMap<String, Target>,
-    errors: &mut Vec<OperationalError>,
-) {
-    if dir != project_root && should_skip_discovered_dir_path(project_root, dir, ignore_matcher) {
-        return;
-    }
-
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(error) => {
-            errors.push(input_read_error(&display_path(project_root, dir), &error));
-            return;
-        }
-    };
-
-    for entry in entries {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                errors.push(input_read_error(&display_path(project_root, dir), &error));
-                continue;
-            }
-        };
-        let path = entry.path();
-        let file_type = match entry.file_type() {
-            Ok(file_type) => file_type,
-            Err(error) => {
-                errors.push(input_read_error(&display_path(project_root, &path), &error));
-                continue;
-            }
-        };
-
-        if file_type.is_symlink() {
-            if !should_skip_discovered_file_path(project_root, &path, ignore_matcher)
-                && is_supported_mf2_path(&path)
-                && fs::metadata(&path).is_ok_and(|metadata| metadata.is_file())
-            {
-                add_target(project_root, &path, ignore_matcher, targets);
-            }
-            continue;
-        }
-
-        if file_type.is_dir() {
-            if should_skip_discovered_dir_path(project_root, &path, ignore_matcher) {
-                continue;
-            }
-            collect_directory(project_root, &path, ignore_matcher, targets, errors);
-        } else if file_type.is_file()
-            && !should_skip_discovered_file_path(project_root, &path, ignore_matcher)
-            && is_supported_mf2_path(&path)
-        {
-            add_target(project_root, &path, ignore_matcher, targets);
-        }
-    }
-}
-
-fn discover_glob(
-    cwd: &Path,
-    project_root: &Path,
-    operand: &str,
-    ignore_matcher: &IgnoreMatcher,
-    targets: &mut BTreeMap<String, Target>,
-    errors: &mut Vec<OperationalError>,
-) {
-    let pattern = resolve_glob_pattern(cwd, operand);
-    let options = glob_match_options();
-    let Ok(entries) = glob_with(&pattern, options) else {
-        errors.push(invalid_glob_error(operand));
-        return;
-    };
-
-    let mut matched_entries = 0usize;
-    for entry in entries {
-        matched_entries += 1;
-        let path = match entry {
-            Ok(path) => path,
-            Err(error) => {
-                if should_skip_discovered_file_path(project_root, error.path(), ignore_matcher) {
-                    continue;
-                }
-                let label = display_path(project_root, error.path());
-                errors.push(input_read_error(&label, error.error()));
-                continue;
-            }
-        };
-        if should_skip_discovered_file_path(project_root, &path, ignore_matcher) {
-            continue;
-        }
-        if fs::metadata(&path).is_ok_and(|metadata| metadata.is_file())
-            && is_supported_mf2_path(&path)
-        {
-            add_target(project_root, &path, ignore_matcher, targets);
-        }
-    }
-
-    if matched_entries == 0 {
-        errors.push(unmatched_input_error(operand, "glob"));
-    }
-}
-
-fn add_target(
-    project_root: &Path,
-    path: &Path,
-    ignore_matcher: &IgnoreMatcher,
-    targets: &mut BTreeMap<String, Target>,
-) {
-    let absolute = normalize_path(path);
-    let label = display_path(project_root, &absolute);
-    if ignore_matcher.is_ignored(&label) {
-        return;
-    }
-    let key = config::slash_normalize_path(&absolute);
-    targets.entry(key).or_insert(Target {
-        path: absolute,
-        label,
-    });
 }
 
 #[derive(Debug)]
@@ -1004,17 +819,21 @@ enum ProcessedSource {
     },
 }
 
-fn process_file(target: &Target, operation: Operation, options: FormatOptions) -> ProcessedFile {
-    let bytes = match fs::read(&target.path) {
+fn process_file(
+    target: &input::SelectedTarget,
+    operation: Operation,
+    options: FormatOptions,
+) -> ProcessedFile {
+    let bytes = match fs::read(&target.candidate.logical_path) {
         Ok(bytes) => bytes,
         Err(error) => {
             return ProcessedFile::Error {
-                error: input_read_error(&target.label, &error),
+                error: input_read_error(&target.candidate.label, &error),
             };
         }
     };
 
-    match process_source(&bytes, &target.label, operation, options) {
+    match process_source(&bytes, &target.candidate.label, operation, options) {
         ProcessedSource::Formatted {
             status,
             changed,
@@ -1172,6 +991,16 @@ impl IgnoreMatcher {
                 .rules
                 .iter()
                 .any(|rule| rule.negated && rule.may_match_descendant_of(path_label))
+    }
+}
+
+impl InputIgnore for IgnoreMatcher {
+    fn is_ignored(&self, path_label: &str) -> bool {
+        Self::is_ignored(self, path_label)
+    }
+
+    fn can_prune_directory(&self, path_label: &str) -> bool {
+        self.is_ignored_for_directory_prune(path_label)
     }
 }
 
@@ -1590,46 +1419,6 @@ fn severity_label(severity: DiagnosticSeverity) -> &'static str {
     }
 }
 
-fn unsupported_input_error(path_label: &str, path: &Path) -> OperationalError {
-    OperationalError {
-        kind: "input",
-        code: "unsupported_input_file",
-        message: format!("Input file extension is not supported: {path_label}"),
-        path: Some(path_label.to_owned()),
-        details: Some(json!({
-            "extension": extension_label(path),
-            "supportedExtensions": SUPPORTED_EXTENSIONS
-        })),
-    }
-}
-
-fn invalid_glob_error(input: &str) -> OperationalError {
-    OperationalError {
-        kind: "input",
-        code: "invalid_cli_argument",
-        message: format!("Input glob is invalid: {input}"),
-        path: None,
-        details: Some(json!({
-            "input": input,
-            "kind": "glob",
-            "reason": "invalid_glob"
-        })),
-    }
-}
-
-fn unmatched_input_error(input: &str, kind: &'static str) -> OperationalError {
-    OperationalError {
-        kind: "input",
-        code: "unmatched_input",
-        message: format!("Input did not match any filesystem entries: {input}"),
-        path: None,
-        details: Some(json!({
-            "input": input,
-            "kind": kind
-        })),
-    }
-}
-
 fn invalid_ignore_pattern_error(
     path_label: &str,
     pattern: &str,
@@ -1693,6 +1482,21 @@ fn output_write_error(path_label: &str, error: &io::Error) -> OperationalError {
     }
 }
 
+fn alias_processing_blocked_error(path_label: &str, predecessor_path: &str) -> OperationalError {
+    OperationalError {
+        kind: "io",
+        code: "alias_processing_blocked",
+        message: format!(
+            "Input processing was blocked by a prior alias write failure: {path_label}"
+        ),
+        path: Some(path_label.to_owned()),
+        details: Some(json!({
+            "reason": "prior_alias_write_failed",
+            "predecessorPath": predecessor_path
+        })),
+    }
+}
+
 fn internal_error(path_label: &str) -> OperationalError {
     OperationalError {
         kind: "internal",
@@ -1721,69 +1525,12 @@ fn io_reason(error: &io::Error) -> &'static str {
     }
 }
 
-fn is_supported_mf2_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension == "mf2")
-}
-
-fn extension_label(path: &Path) -> String {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .map_or_else(String::new, |extension| format!(".{extension}"))
-}
-
 fn has_glob_meta(input: &str) -> bool {
     input.contains('*') || input.contains('?') || input.contains('[')
 }
 
-fn should_skip_discovered_dir(name: &str) -> bool {
-    is_hidden_name(name) || DEFAULT_EXCLUDED_DIRS.contains(&name)
-}
-
-fn should_skip_discovered_file_path(
-    project_root: &Path,
-    path: &Path,
-    ignore_matcher: &IgnoreMatcher,
-) -> bool {
-    let label = display_path(project_root, path);
-    should_skip_discovered_label(&label) || ignore_matcher.is_ignored(&label)
-}
-
-fn should_skip_discovered_dir_path(
-    project_root: &Path,
-    path: &Path,
-    ignore_matcher: &IgnoreMatcher,
-) -> bool {
-    let label = display_path(project_root, path);
-    should_skip_discovered_label(&label) || ignore_matcher.is_ignored_for_directory_prune(&label)
-}
-
-fn should_skip_discovered_label(label: &str) -> bool {
-    label
-        .split('/')
-        .any(|part| should_skip_discovered_dir(part) || is_hidden_name(part))
-}
-
-fn is_hidden_name(name: &str) -> bool {
-    name.starts_with('.') && name != "." && name != ".."
-}
-
 fn display_path(project_root: &Path, path: &Path) -> String {
     config::config_error_path(project_root, path)
-}
-
-fn virtual_path_label(path: &str) -> String {
-    config::slash_normalize_path(Path::new(path))
-}
-
-fn resolve_operand_path(cwd: &Path, operand: &str) -> PathBuf {
-    let path = Path::new(operand);
-    if path.is_absolute() {
-        normalize_path(path)
-    } else {
-        normalize_path(&cwd.join(path))
-    }
 }
 
 fn resolve_ignore_path(project_root: &Path, ignore_path: &str) -> PathBuf {
@@ -1793,16 +1540,6 @@ fn resolve_ignore_path(project_root: &Path, ignore_path: &str) -> PathBuf {
     } else {
         normalize_path(&project_root.join(path))
     }
-}
-
-fn resolve_glob_pattern(cwd: &Path, operand: &str) -> String {
-    let path = Path::new(operand);
-    let path = if path.is_absolute() {
-        normalize_path(path)
-    } else {
-        normalize_path(&cwd.join(path))
-    };
-    config::slash_normalize_path(&path)
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
