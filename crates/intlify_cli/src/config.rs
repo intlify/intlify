@@ -1,12 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+use std::cell::Cell;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
 use intlify_format::FormatMode;
+use intlify_resource::{ResolvedResources, ResourceConfigViolation, ResourcesConfig};
 use schemars::JsonSchema;
+use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -18,6 +22,7 @@ const SUPPORTED_EXTENSIONS: [&str; 2] = [".json", ".jsonc"];
 pub struct ProjectConfig {
     pub fmt: FormatterConfig,
     pub lint: EmptyConfig,
+    pub resources: ResourcesConfig,
 }
 
 impl Default for ProjectConfig {
@@ -25,6 +30,7 @@ impl Default for ProjectConfig {
         Self {
             fmt: FormatterConfig::default(),
             lint: EmptyConfig {},
+            resources: ResourcesConfig::default(),
         }
     }
 }
@@ -87,13 +93,25 @@ pub(crate) struct ProjectConfigFile {
     pub(crate) fmt: Option<FormatterConfig>,
     #[schemars(description = "Linter configuration. Phase 3C accepts only an empty object.")]
     pub(crate) lint: Option<EmptyConfig>,
+    #[schemars(
+        with = "Option<ResourcesConfig>",
+        description = "Resource catalog configuration."
+    )]
+    pub(crate) resources: Option<Value>,
 }
 
-impl From<ProjectConfigFile> for ProjectConfig {
-    fn from(file: ProjectConfigFile) -> Self {
-        Self {
-            fmt: file.fmt.unwrap_or_default(),
-            lint: file.lint.unwrap_or_default(),
+impl ProjectConfigFile {
+    fn into_project_config(self, resources: ResourcesConfig) -> ProjectConfig {
+        let Self {
+            schema: _,
+            fmt,
+            lint,
+            resources: _,
+        } = self;
+        ProjectConfig {
+            fmt: fmt.unwrap_or_default(),
+            lint: lint.unwrap_or_default(),
+            resources,
         }
     }
 }
@@ -104,6 +122,12 @@ pub struct LoadedProjectConfig {
     pub config_path: Option<PathBuf>,
     pub source: ConfigSource,
     pub config: ProjectConfig,
+    pub resolved_resources: ResolvedResources,
+}
+
+struct LoadedConfigBody {
+    config: ProjectConfig,
+    resolved_resources: ResolvedResources,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,32 +184,42 @@ pub fn load_project_config(
 
     if let Some(config_path) = explicit_config_path {
         let path = resolve_explicit_config_path(cwd, config_path);
-        let config = load_config_file(&project_root, &path)?;
+        let LoadedConfigBody {
+            config,
+            resolved_resources,
+        } = load_config_file(&project_root, &path)?;
         return Ok(LoadedProjectConfig {
             project_root,
             config_path: Some(path),
             source: ConfigSource::Explicit,
             config,
+            resolved_resources,
         });
     }
 
-    match discover_root_config(&project_root)? {
-        Some(path) => {
-            let config = load_config_file(&project_root, &path)?;
-            Ok(LoadedProjectConfig {
-                project_root,
-                config_path: Some(path),
-                source: ConfigSource::Discovered,
-                config,
-            })
-        }
-        None => Ok(LoadedProjectConfig {
+    if let Some(path) = discover_root_config(&project_root)? {
+        let LoadedConfigBody {
+            config,
+            resolved_resources,
+        } = load_config_file(&project_root, &path)?;
+        return Ok(LoadedProjectConfig {
             project_root,
-            config_path: None,
-            source: ConfigSource::Default,
-            config: ProjectConfig::default(),
-        }),
+            config_path: Some(path),
+            source: ConfigSource::Discovered,
+            config,
+            resolved_resources,
+        });
     }
+
+    let config = ProjectConfig::default();
+    let resolved_resources = config.resources.clone().resolve();
+    Ok(LoadedProjectConfig {
+        project_root,
+        config_path: None,
+        source: ConfigSource::Default,
+        config,
+        resolved_resources,
+    })
 }
 
 pub fn discover_root_config(project_root: &Path) -> Result<Option<PathBuf>, ConfigError> {
@@ -254,7 +288,7 @@ pub fn resolve_explicit_config_path(cwd: &Path, config_path: &str) -> PathBuf {
     }
 }
 
-fn load_config_file(project_root: &Path, path: &Path) -> Result<ProjectConfig, ConfigError> {
+fn load_config_file(project_root: &Path, path: &Path) -> Result<LoadedConfigBody, ConfigError> {
     let path_label = config_error_path(project_root, path);
 
     if !path.exists() {
@@ -269,10 +303,10 @@ fn load_config_file(project_root: &Path, path: &Path) -> Result<ProjectConfig, C
     let source = fs::read_to_string(path).map_err(|error| read_error(&path_label, &error))?;
 
     match config_syntax(path) {
-        Some(ConfigSyntax::Json) => parse_json_config(&source, &path_label),
+        Some(ConfigSyntax::Json) => parse_json_config(&source, &source, &path_label),
         Some(ConfigSyntax::Jsonc) => {
             let normalized = normalize_jsonc(&source);
-            parse_json_config(&normalized, &path_label)
+            parse_json_config(&normalized, &source, &path_label)
         }
         None => Err(ConfigError::new(
             "config_extension_unsupported",
@@ -283,20 +317,33 @@ fn load_config_file(project_root: &Path, path: &Path) -> Result<ProjectConfig, C
     }
 }
 
-fn parse_json_config(source: &str, path_label: &str) -> Result<ProjectConfig, ConfigError> {
-    let value = serde_json::from_str::<Value>(source).map_err(|error| {
-        ConfigError::new(
-            "config_parse_failed",
-            format!("Config file could not be parsed: {path_label}"),
-            Some(path_label.to_owned()),
-            Some(json!({
-                "line": error.line(),
-                "column": error.column()
-            })),
+fn parse_json_config(
+    source: &str,
+    location_source: &str,
+    path_label: &str,
+) -> Result<LoadedConfigBody, ConfigError> {
+    debug_assert_eq!(source.len(), location_source.len());
+    let duplicate_found = Cell::new(false);
+    let mut deserializer = serde_json::Deserializer::from_str(source);
+    let parsed = UniqueJsonValueSeed {
+        duplicate_found: &duplicate_found,
+    }
+    .deserialize(&mut deserializer)
+    .and_then(|value| {
+        deserializer.end()?;
+        Ok(value)
+    });
+    let value = parsed.map_err(|error| {
+        config_parse_error(
+            source,
+            location_source,
+            path_label,
+            &error,
+            duplicate_found.get(),
         )
     })?;
 
-    validate_config_value(&value, path_label)?;
+    let resources = validate_config_value(&value, path_label)?;
 
     let file = serde_json::from_value::<ProjectConfigFile>(value).map_err(|error| {
         ConfigError::new(
@@ -311,28 +358,225 @@ fn parse_json_config(source: &str, path_label: &str) -> Result<ProjectConfig, Co
         )
     })?;
 
-    Ok(file.into())
+    let resolved_resources = resources.clone().resolve();
+    Ok(LoadedConfigBody {
+        config: file.into_project_config(resources),
+        resolved_resources,
+    })
 }
 
-fn validate_config_value(value: &Value, path_label: &str) -> Result<(), ConfigError> {
+#[derive(Clone, Copy)]
+struct UniqueJsonValueSeed<'a> {
+    duplicate_found: &'a Cell<bool>,
+}
+
+struct UniqueJsonValueVisitor<'a> {
+    duplicate_found: &'a Cell<bool>,
+}
+
+impl<'de> DeserializeSeed<'de> for UniqueJsonValueSeed<'_> {
+    type Value = Value;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(UniqueJsonValueVisitor {
+            duplicate_found: self.duplicate_found,
+        })
+    }
+}
+
+impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("any JSON value without duplicate object members")
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+        Ok(Value::Bool(value))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E> {
+        Ok(serde_json::Number::from_f64(value).map_or(Value::Null, Value::Number))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Value::String(value.to_owned()))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+        Ok(Value::String(value))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut values = Vec::new();
+        while let Some(value) = sequence.next_element_seed(UniqueJsonValueSeed {
+            duplicate_found: self.duplicate_found,
+        })? {
+            values.push(value);
+        }
+        Ok(Value::Array(values))
+    }
+
+    fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut values = serde_json::Map::new();
+        while let Some(key) = object.next_key::<String>()? {
+            if values.contains_key(&key) {
+                self.duplicate_found.set(true);
+                return Err(de::Error::custom("duplicate object member"));
+            }
+            let value = object.next_value_seed(UniqueJsonValueSeed {
+                duplicate_found: self.duplicate_found,
+            })?;
+            values.insert(key, value);
+        }
+        Ok(Value::Object(values))
+    }
+}
+
+fn config_parse_error(
+    source: &str,
+    location_source: &str,
+    path_label: &str,
+    error: &serde_json::Error,
+    duplicate_found: bool,
+) -> ConfigError {
+    let details = if duplicate_found {
+        let (line, column) = duplicate_member_location(source, location_source, error);
+        json!({
+            "line": line,
+            "column": column,
+            "reason": "duplicate_object_member"
+        })
+    } else {
+        json!({
+            "line": error.line(),
+            "column": error.column().saturating_sub(1)
+        })
+    };
+
+    ConfigError::new(
+        "config_parse_failed",
+        format!("Config file could not be parsed: {path_label}"),
+        Some(path_label.to_owned()),
+        Some(details),
+    )
+}
+
+fn duplicate_member_location(
+    source: &str,
+    location_source: &str,
+    error: &serde_json::Error,
+) -> (usize, usize) {
+    let detected =
+        byte_offset_for_line_column(source, error.line(), error.column()).unwrap_or(source.len());
+    let opening = previous_unescaped_quote(source, detected)
+        .and_then(|closing| closing.checked_sub(1))
+        .and_then(|before_closing| previous_unescaped_quote(source, before_closing))
+        .unwrap_or(detected.min(location_source.len()));
+    line_and_byte_column(location_source, opening)
+}
+
+fn byte_offset_for_line_column(source: &str, line: usize, column: usize) -> Option<usize> {
+    if line == 0 {
+        return None;
+    }
+
+    let mut line_start = 0;
+    for _ in 1..line {
+        let newline = source.as_bytes()[line_start..]
+            .iter()
+            .position(|byte| *byte == b'\n')?;
+        line_start += newline + 1;
+    }
+    Some(
+        line_start
+            .saturating_add(column.saturating_sub(1))
+            .min(source.len()),
+    )
+}
+
+fn previous_unescaped_quote(source: &str, before_or_at: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut index = before_or_at.min(bytes.len().checked_sub(1)?);
+
+    loop {
+        if bytes[index] == b'"' {
+            let preceding_backslashes = bytes[..index]
+                .iter()
+                .rev()
+                .take_while(|byte| **byte == b'\\')
+                .count();
+            if preceding_backslashes % 2 == 0 {
+                return Some(index);
+            }
+        }
+        index = index.checked_sub(1)?;
+    }
+}
+
+fn line_and_byte_column(source: &str, byte_offset: usize) -> (usize, usize) {
+    let prefix = &source.as_bytes()[..byte_offset.min(source.len())];
+    let mut line = 1;
+    let mut line_start = 0;
+    for (index, byte) in prefix.iter().enumerate() {
+        if *byte == b'\n' {
+            line += 1;
+            line_start = index + 1;
+        }
+    }
+    (line, prefix.len() - line_start)
+}
+
+fn validate_config_value(value: &Value, path_label: &str) -> Result<ResourcesConfig, ConfigError> {
     let Some(root) = value.as_object() else {
         return validation_error(path_label, "", "expected_object");
     };
 
-    for (key, value) in root {
-        match key.as_str() {
-            "$schema" => {
-                if !value.is_string() {
-                    return validation_error(path_label, "/$schema", "expected_string");
-                }
-            }
-            "fmt" => validate_formatter_section(path_label, value)?,
-            "lint" => validate_empty_section(path_label, key, value)?,
-            key => return validation_error(path_label, &json_pointer(&[key]), "unknown_field"),
+    if let Some(key) = first_unknown_key(root, &["$schema", "fmt", "lint", "resources"]) {
+        return validation_error(path_label, &json_pointer(&[key]), "unknown_field");
+    }
+    if let Some(schema) = root.get("$schema") {
+        if !schema.is_string() {
+            return validation_error(path_label, "/$schema", "expected_string");
         }
     }
+    if let Some(formatter) = root.get("fmt") {
+        validate_formatter_section(path_label, formatter)?;
+    }
+    if let Some(linter) = root.get("lint") {
+        validate_empty_section(path_label, "lint", linter)?;
+    }
 
-    Ok(())
+    ResourcesConfig::validate(root.get("resources"))
+        .map_err(|violation| resource_validation_error(path_label, &violation))
 }
 
 fn validate_formatter_section(path_label: &str, value: &Value) -> Result<(), ConfigError> {
@@ -340,14 +584,14 @@ fn validate_formatter_section(path_label: &str, value: &Value) -> Result<(), Con
         return validation_error(path_label, "/fmt", "expected_object");
     };
 
-    for (key, field) in fields {
-        match key.as_str() {
-            "mode" => validate_formatter_mode(path_label, field)?,
-            "ignorePatterns" => validate_formatter_ignore_patterns(path_label, field)?,
-            key => {
-                return validation_error(path_label, &json_pointer(&["fmt", key]), "unknown_field")
-            }
-        }
+    if let Some(key) = first_unknown_key(fields, &["mode", "ignorePatterns"]) {
+        return validation_error(path_label, &json_pointer(&["fmt", key]), "unknown_field");
+    }
+    if let Some(mode) = fields.get("mode") {
+        validate_formatter_mode(path_label, mode)?;
+    }
+    if let Some(patterns) = fields.get("ignorePatterns") {
+        validate_formatter_ignore_patterns(path_label, patterns)?;
     }
 
     Ok(())
@@ -407,11 +651,41 @@ fn validate_empty_section(
         return validation_error(path_label, &json_pointer(&[section]), "expected_object");
     };
 
-    if let Some(key) = fields.keys().next() {
+    if let Some(key) = first_unknown_key(fields, &[]) {
         return validation_error(path_label, &json_pointer(&[section, key]), "unknown_field");
     }
 
     Ok(())
+}
+
+fn first_unknown_key<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    known: &[&str],
+) -> Option<&'a str> {
+    object
+        .keys()
+        .filter(|field| !known.contains(&field.as_str()))
+        .min_by(|left, right| left.as_bytes().cmp(right.as_bytes()))
+        .map(String::as_str)
+}
+
+fn resource_validation_error(path_label: &str, violation: &ResourceConfigViolation) -> ConfigError {
+    let mut details = serde_json::Map::new();
+    details.insert("pointer".to_owned(), json!(violation.pointer()));
+    details.insert("reason".to_owned(), json!(violation.reason().as_str()));
+    if let Some(field) = violation.field() {
+        details.insert("field".to_owned(), json!(field));
+    }
+    if let Some(value) = violation.value() {
+        details.insert("value".to_owned(), value.clone());
+    }
+
+    ConfigError::new(
+        "config_validation_failed",
+        format!("Config file is not valid: {path_label}"),
+        Some(path_label.to_owned()),
+        Some(Value::Object(details)),
+    )
 }
 
 fn validation_error<T>(
@@ -514,7 +788,9 @@ fn config_syntax(path: &Path) -> Option<ConfigSyntax> {
 
 fn normalize_jsonc(source: &str) -> String {
     let without_comments = strip_jsonc_comments(source);
-    strip_jsonc_trailing_commas(&without_comments)
+    let normalized = strip_jsonc_trailing_commas(&without_comments);
+    debug_assert_eq!(normalized.len(), source.len());
+    normalized
 }
 
 fn strip_jsonc_comments(source: &str) -> String {
@@ -551,7 +827,7 @@ fn strip_jsonc_comments(source: &str) -> String {
                     output.push('\n');
                     break;
                 }
-                output.push(' ');
+                push_jsonc_comment_mask(&mut output, comment);
             }
             continue;
         }
@@ -565,7 +841,7 @@ fn strip_jsonc_comments(source: &str) -> String {
                 if comment == '\n' {
                     output.push('\n');
                 } else {
-                    output.push(' ');
+                    push_jsonc_comment_mask(&mut output, comment);
                 }
                 if previous == '*' && comment == '/' {
                     break;
@@ -579,6 +855,10 @@ fn strip_jsonc_comments(source: &str) -> String {
     }
 
     output
+}
+
+fn push_jsonc_comment_mask(output: &mut String, character: char) {
+    output.extend(std::iter::repeat_n(' ', character.len_utf8()));
 }
 
 fn strip_jsonc_trailing_commas(source: &str) -> String {

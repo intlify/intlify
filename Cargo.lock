@@ -147,6 +147,7 @@ version = "0.14.0-alpha.9"
 dependencies = [
  "glob",
  "intlify_format",
+ "intlify_resource",
  "ox_mf2_parser",
  "schemars",
  "serde",
@@ -190,6 +191,9 @@ name = "intlify_resource"
 version = "0.14.0-alpha.9"
 dependencies = [
  "allocation-counter",
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

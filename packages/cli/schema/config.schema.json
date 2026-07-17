@@ -2,6 +2,34 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "CatalogConfig": {
+      "additionalProperties": false,
+      "description": "One validated resource catalog definition.",
+      "properties": {
+        "exclude": {
+          "description": "Project-relative patterns removed from this definition's include set.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "format": {
+          "description": "Optional shipped host-format override.",
+          "enum": ["json"],
+          "type": "string"
+        },
+        "include": {
+          "description": "Non-empty project-relative resource membership patterns.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": ["include"],
+      "type": "object"
+    },
     "EmptyConfig": {
       "additionalProperties": false,
       "type": "object"
@@ -32,6 +60,20 @@
     "FormatterMode": {
       "enum": ["standard", "preserve"],
       "type": "string"
+    },
+    "ResourcesConfig": {
+      "additionalProperties": false,
+      "description": "Validated project resource configuration.",
+      "properties": {
+        "catalogs": {
+          "description": "Project-relative resource catalog definitions. Omission preserves absent policy; an empty array disables catalogs.",
+          "items": {
+            "$ref": "#/definitions/CatalogConfig"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
     }
   },
   "properties": {
@@ -46,6 +88,10 @@
     "lint": {
       "$ref": "#/definitions/EmptyConfig",
       "description": "Linter configuration. Phase 3C accepts only an empty object."
+    },
+    "resources": {
+      "$ref": "#/definitions/ResourcesConfig",
+      "description": "Resource catalog configuration."
     }
   },
   "title": "ProjectConfigFile",

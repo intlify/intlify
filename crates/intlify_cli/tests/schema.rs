@@ -17,6 +17,31 @@ fn generated_config_schema_matches_design_contract() {
     assert!(json.get("required").is_none());
     assert!(json["definitions"].get("FormatterConfig").is_some());
     assert!(json["definitions"].get("FormatterMode").is_some());
+    assert!(json["definitions"].get("ResourcesConfig").is_some());
+    assert!(json["definitions"].get("CatalogConfig").is_some());
+
+    let resources = &json["properties"]["resources"];
+    assert_eq!(resources["$ref"], "#/definitions/ResourcesConfig");
+    assert!(resources.get("anyOf").is_none());
+
+    let catalogs = &json["definitions"]["ResourcesConfig"]["properties"]["catalogs"];
+    assert_eq!(catalogs["type"], "array");
+    assert!(catalogs.get("anyOf").is_none());
+    assert!(json["definitions"]["ResourcesConfig"]
+        .get("required")
+        .is_none());
+
+    let catalog = &json["definitions"]["CatalogConfig"];
+    assert_eq!(catalog["required"], serde_json::json!(["include"]));
+    assert_eq!(catalog["properties"]["include"]["minItems"], 1);
+    assert_eq!(catalog["properties"]["exclude"]["type"], "array");
+    assert!(catalog["properties"]["exclude"].get("anyOf").is_none());
+    assert_eq!(catalog["properties"]["format"]["type"], "string");
+    assert_eq!(
+        catalog["properties"]["format"]["enum"],
+        serde_json::json!(["json"])
+    );
+    assert!(catalog["properties"]["format"].get("anyOf").is_none());
     assert!(schema.ends_with('\n'));
 }
 
