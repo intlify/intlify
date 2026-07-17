@@ -3,14 +3,17 @@
 
 //! Consumer-neutral host resource extraction and validated write-back support.
 //!
-//! This crate owns host-document identity, spans, resource limits, offset maps,
-//! and adapter artifacts. It intentionally does not depend on the MF2 parser,
-//! formatter, linter, or CLI: consumers compose extracted message entries with
-//! those message-level cores.
+//! This crate owns resource configuration and membership resolution,
+//! host-document identity, spans, resource limits, offset maps, and adapter
+//! artifacts. It intentionally does not depend on the MF2 parser, formatter,
+//! linter, or CLI: consumers compose extracted message entries with those
+//! message-level cores.
 
 mod adapter;
 mod artifact;
+mod config;
 mod error;
+mod glob;
 mod identity;
 mod limits;
 mod offset_map;
@@ -20,6 +23,13 @@ mod span;
 pub use artifact::{
     CandidateMessageAdmission, ExtractedCatalog, FormattedEntry, MessageEntry, RawReplacement,
     ValidatedWriteBack, WriteBackOutcome,
+};
+pub use config::{
+    CatalogAssignmentConflict, CatalogAssignmentOrigin, CatalogConfig, CatalogDefinitionRef,
+    CatalogOverlayConfig, CatalogPolicyState, CatalogResolution, LayeredCatalogMatch,
+    LayeredCatalogResolution, ProjectRelativeResourcePath, ProjectRelativeResourcePathError,
+    ResolvedCatalogOverlay, ResolvedResources, ResourceConfigReason, ResourceConfigViolation,
+    ResourcesConfig,
 };
 pub use error::{
     DeclaredFormat, DocumentUnsupportedFeature, EntryUnsupportedReason, FormatClassificationSource,
@@ -41,9 +51,10 @@ pub use span::Utf8ByteSpan;
 #[cfg(test)]
 mod tests {
     use super::{
-        CatalogKey, EntryHandle, EntryKey, ExtractedCatalog, HostFormatRegistry, MessageOffsetMap,
-        ResolvedHostFormat, ResourceError, ResourceErrorSite, StructuralPathKey, Utf8ByteSpan,
-        ValidatedWriteBack, WriteBackOutcome,
+        CatalogKey, CatalogOverlayConfig, EntryHandle, EntryKey, ExtractedCatalog,
+        HostFormatRegistry, MessageOffsetMap, ResolvedCatalogOverlay, ResolvedHostFormat,
+        ResolvedResources, ResourceError, ResourceErrorSite, ResourcesConfig, StructuralPathKey,
+        Utf8ByteSpan, ValidatedWriteBack, WriteBackOutcome,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -63,5 +74,9 @@ mod tests {
         assert_send_sync::<ExtractedCatalog>();
         assert_send_sync::<ValidatedWriteBack>();
         assert_send_sync::<WriteBackOutcome>();
+        assert_send_sync::<ResourcesConfig>();
+        assert_send_sync::<ResolvedResources>();
+        assert_send_sync::<CatalogOverlayConfig>();
+        assert_send_sync::<ResolvedCatalogOverlay>();
     }
 }

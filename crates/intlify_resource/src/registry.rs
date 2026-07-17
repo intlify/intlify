@@ -4,21 +4,31 @@
 use std::fmt;
 use std::sync::Arc;
 
+use schemars::JsonSchema;
+use serde::Serialize;
+
 use crate::adapter::{HostAdapter, JsonAdapter};
 use crate::artifact::{extract_resolved, ExtractedCatalog};
+use crate::config::CatalogDefinitionRef;
 use crate::{DeclaredFormat, FormatClassificationSource, ResourceError, ResourcePhase};
 
 const SUPPORTED_DIRECT_EXTENSIONS: &[&str] = &[".json"];
-const SUPPORTED_FORMATS: &[&str] = &["json"];
+pub(crate) const SUPPORTED_FORMATS: &[&str] = &["json"];
 
 /// Canonical format ids fixed by the resource design, including deferred tiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum KnownHostFormatId {
+    /// RFC 8259 JSON catalogs.
     Json,
+    /// Vue single-file components with inline `<i18n>` blocks.
     Vue,
+    /// YAML 1.2 catalogs, including `.yaml` and `.yml` spellings.
     Yaml,
+    /// JSON with comments and trailing commas.
     Jsonc,
+    /// Standard JSON5 catalogs.
     Json5,
+    /// XLIFF catalogs, including `.xlf` and `.xliff` spellings.
     Xliff,
 }
 
@@ -35,11 +45,20 @@ impl KnownHostFormatId {
             Self::Xliff => "xliff",
         }
     }
+
+    pub(crate) const fn from_shipped(format: HostFormat) -> Self {
+        match format {
+            HostFormat::Json => Self::Json,
+        }
+    }
 }
 
 /// Host adapters shipped in this release.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+#[schemars(rename_all = "lowercase")]
 pub enum HostFormat {
+    /// The built-in RFC 8259 JSON adapter.
     Json,
 }
 
@@ -64,6 +83,16 @@ pub enum HostFormatClassification {
     UnrecognizedExtension,
 }
 
+impl HostFormatClassification {
+    pub(crate) const fn known_id(self) -> Option<KnownHostFormatId> {
+        match self {
+            Self::Shipped(format) => Some(KnownHostFormatId::from_shipped(format)),
+            Self::KnownButUnshipped(format) => Some(format),
+            Self::UnrecognizedExtension => None,
+        }
+    }
+}
+
 /// Validated catalog-membership output consumed by the registry.
 ///
 /// The resource resolver introduced in Milestone 9 is the only production
@@ -73,25 +102,50 @@ pub enum HostFormatClassification {
 pub struct ResolvedCatalogAssignment {
     classification: HostFormatClassification,
     retained_extension: Arc<str>,
+    surviving_definitions: Arc<[CatalogDefinitionRef]>,
+    assigning_definitions: Arc<[CatalogDefinitionRef]>,
 }
 
 impl ResolvedCatalogAssignment {
-    #[allow(dead_code)]
     pub(crate) fn new(
         classification: HostFormatClassification,
         retained_extension: Arc<str>,
+        surviving_definitions: Arc<[CatalogDefinitionRef]>,
+        assigning_definitions: Arc<[CatalogDefinitionRef]>,
     ) -> Self {
         Self {
             classification,
             retained_extension,
+            surviving_definitions,
+            assigning_definitions,
         }
     }
 
-    pub(crate) const fn classification(&self) -> HostFormatClassification {
+    /// Return the one resolved host-format classification.
+    #[must_use]
+    pub const fn classification(&self) -> HostFormatClassification {
         self.classification
     }
 
-    pub(crate) fn retained_extension(&self) -> &Arc<str> {
+    /// Return the exact extension spelling retained from the logical path.
+    #[must_use]
+    pub fn retained_extension(&self) -> &str {
+        &self.retained_extension
+    }
+
+    /// Return every definition that included and did not exclude the path.
+    #[must_use]
+    pub fn surviving_definitions(&self) -> &[CatalogDefinitionRef] {
+        &self.surviving_definitions
+    }
+
+    /// Return the surviving definitions that contributed the resolved format.
+    #[must_use]
+    pub fn assigning_definitions(&self) -> &[CatalogDefinitionRef] {
+        &self.assigning_definitions
+    }
+
+    fn retained_extension_arc(&self) -> &Arc<str> {
         &self.retained_extension
     }
 }
@@ -158,15 +212,18 @@ impl HostFormatRegistry {
     ) -> Result<ResolvedHostFormat, ResourceError> {
         match assignment.classification() {
             HostFormatClassification::Shipped(format) => {
-                Ok(self.resolved(format, Arc::clone(assignment.retained_extension())))
+                Ok(self.resolved(format, Arc::clone(assignment.retained_extension_arc())))
             }
             HostFormatClassification::KnownButUnshipped(format) => Err(self
                 .unsupported_assignment_error(
                     Some(format.as_str()),
-                    Arc::clone(assignment.retained_extension()),
+                    Arc::clone(assignment.retained_extension_arc()),
                 )),
             HostFormatClassification::UnrecognizedExtension => Err(self
-                .unsupported_assignment_error(None, Arc::clone(assignment.retained_extension()))),
+                .unsupported_assignment_error(
+                    None,
+                    Arc::clone(assignment.retained_extension_arc()),
+                )),
         }
     }
 
@@ -382,6 +439,8 @@ mod tests {
         let assignment = ResolvedCatalogAssignment::new(
             HostFormatClassification::KnownButUnshipped(KnownHostFormatId::Yaml),
             Arc::from(".YML"),
+            Arc::from([]),
+            Arc::from([]),
         );
         let error = registry.resolve_format(&assignment).unwrap_err();
 
