@@ -13,7 +13,7 @@ use crate::config::CatalogDefinitionRef;
 use crate::{DeclaredFormat, FormatClassificationSource, ResourceError, ResourcePhase};
 
 const SUPPORTED_DIRECT_EXTENSIONS: &[&str] = &[".json"];
-const SUPPORTED_FORMATS: &[&str] = &["json"];
+pub(crate) const SUPPORTED_FORMATS: &[&str] = &["json"];
 
 /// Canonical format ids fixed by the resource design, including deferred tiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

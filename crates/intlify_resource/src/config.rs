@@ -11,6 +11,7 @@ use serde_json::{Map, Value};
 use crate::glob::ResourceGlob;
 use crate::registry::{
     classify_logical_path, HostFormat, HostFormatClassification, ResolvedCatalogAssignment,
+    SUPPORTED_FORMATS,
 };
 
 /// Stable resource-configuration validation reasons.
@@ -235,8 +236,11 @@ fn resource_glob_array_schema(generator: &mut SchemaGenerator) -> Schema {
     Vec::<String>::json_schema(generator)
 }
 
-fn host_format_schema(generator: &mut SchemaGenerator) -> Schema {
-    HostFormat::json_schema(generator)
+fn host_format_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "enum": SUPPORTED_FORMATS,
+    })
 }
 
 fn validate_catalog_section(
