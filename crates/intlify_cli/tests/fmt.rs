@@ -76,6 +76,31 @@ fn stdin_formatting_and_check_use_virtual_path() {
 }
 
 #[test]
+fn relative_stdin_filepath_is_reported_from_the_project_root() {
+    let root = temp_project_root("stdin-nested-path");
+    let cwd = root.join("packages/app");
+    fs::create_dir_all(&cwd).expect("nested cwd should be created");
+
+    let result = run_stdin(
+        &[
+            "fmt",
+            "--stdin-filepath",
+            "virtual/message.mf2",
+            "--reporter=json",
+        ],
+        &cwd,
+        unformatted_message(),
+    );
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 0);
+    assert_eq!(
+        output["results"][0]["path"],
+        "packages/app/virtual/message.mf2"
+    );
+}
+
+#[test]
 fn json_reporter_reports_check_differences() {
     let root = temp_project_root("json-check");
     write(&root.join("messages/count.mf2"), unformatted_message());
@@ -189,6 +214,91 @@ fn discovery_excludes_hidden_and_output_dirs_but_accepts_explicit_hidden_file() 
 }
 
 #[test]
+fn standalone_extension_lookup_accepts_ascii_case_variants() {
+    let root = temp_project_root("mf2-case");
+    let file = root.join("message.MF2");
+    write(&file, unformatted_message());
+
+    let result = run(&["fmt", "message.MF2"], &root);
+
+    assert_eq!(result.exit_code, 0);
+    assert_eq!(result.stdout, "message.MF2\n");
+    assert_eq!(read(&file), formatted_message_with_lf());
+}
+
+#[test]
+fn hard_link_aliases_reread_serially_in_logical_path_order() {
+    let root = temp_project_root("hard-link-aliases");
+    let first = root.join("a.mf2");
+    let second = root.join("z.mf2");
+    write(&second, unformatted_message());
+    fs::hard_link(&second, &first).expect("hard link should be created");
+
+    let result = run(&["fmt", "z.mf2", "a.mf2", "--reporter=json"], &root);
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 0);
+    assert_eq!(output["summary"]["matchedFiles"], 2);
+    assert_eq!(output["summary"]["formattedFiles"], 1);
+    assert_eq!(output["summary"]["unchangedFiles"], 1);
+    assert_eq!(output["results"][0]["path"], "a.mf2");
+    assert_eq!(output["results"][0]["status"], "formatted");
+    assert_eq!(output["results"][1]["path"], "z.mf2");
+    assert_eq!(output["results"][1]["status"], "unchanged");
+    assert_eq!(read(&second), formatted_message_with_lf());
+}
+
+#[cfg(unix)]
+#[test]
+fn broken_symlink_metadata_failure_is_a_file_result() {
+    use std::os::unix::fs::symlink;
+
+    let root = temp_project_root("broken-alias");
+    symlink(root.join("missing.mf2"), root.join("broken.mf2")).expect("symlink should be created");
+
+    let result = run(&["fmt", "broken.mf2", "--reporter=json"], &root);
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert!(output["errors"].as_array().expect("errors").is_empty());
+    assert_eq!(output["results"][0]["path"], "broken.mf2");
+    assert_eq!(output["results"][0]["status"], "error");
+    assert_eq!(
+        output["results"][0]["errors"][0]["code"],
+        "input_read_failed"
+    );
+    assert_eq!(
+        output["results"][0]["errors"][0]["details"]["reason"],
+        "metadata_failed"
+    );
+    assert_eq!(
+        output["results"][0]["errors"][0]["details"]["ioKind"],
+        "not_found"
+    );
+}
+
+#[test]
+fn catalog_inputs_remain_publicly_gated_until_formatter_integration() {
+    let root = temp_project_root("catalog-gate");
+    write(&root.join("locales/en.json"), "{}");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{"resources":{"catalogs":[{"include":["locales/**"]}]}}"#,
+    );
+
+    let result = run(&["fmt", "locales/en.json", "--reporter=json"], &root);
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(output["errors"][0]["code"], "unsupported_input_file");
+    assert_eq!(
+        output["errors"][0]["details"]["supportedExtensions"],
+        serde_json::json!([".mf2"])
+    );
+    assert!(output["results"].as_array().expect("results").is_empty());
+}
+
+#[test]
 fn end_of_options_treats_dash_prefixed_paths_as_operands() {
     let root = temp_project_root("end-of-options");
     let file = root.join("--dash.mf2");
@@ -259,6 +369,24 @@ fn ignore_sources_apply_in_precedence_order() {
         read(&root.join("ignored/skip.mf2")),
         formatted_message_with_lf()
     );
+}
+
+#[test]
+fn ignored_file_is_not_read_after_classification() {
+    let root = temp_project_root("ignore-before-read");
+    fs::write(root.join("ignored.mf2"), [0xff]).expect("fixture should be written");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{"fmt":{"ignorePatterns":["ignored.mf2"]}}"#,
+    );
+
+    let result = run(&["fmt", "ignored.mf2", "--reporter=json"], &root);
+    let output = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 0);
+    assert_eq!(output["summary"]["matchedFiles"], 0);
+    assert!(output["results"].as_array().expect("results").is_empty());
+    assert!(output["errors"].as_array().expect("errors").is_empty());
 }
 
 #[cfg(unix)]
