@@ -4,7 +4,8 @@
 use ox_mf2_parser::{ParseResult, SnapshotView, SourceFileInput, SourceStore};
 
 use crate::{
-    error::OperationalError, layout::LayoutDocument, options::FormatOptions, render::render,
+    error::OperationalError, layout::LayoutDocument, options::FormatOptions,
+    parsed::ParsedFormatInput, render::render,
 };
 
 /// Run the formatter pipeline after the public parser-diagnostics gate.
@@ -13,8 +14,6 @@ pub(crate) fn format_parse_result(
     parse: &ParseResult,
     options: FormatOptions,
 ) -> Result<String, OperationalError> {
-    ensure_parse_invariant(parse)?;
-
     let mut sources = SourceStore::with_capacity(1);
     let source_id = sources.add(SourceFileInput {
         source,
@@ -22,7 +21,19 @@ pub(crate) fn format_parse_result(
     });
     debug_assert_eq!(source_id, parse.source);
 
-    let layout = LayoutDocument::from_parse(source, &sources, parse, options)?;
+    let input = ParsedFormatInput::new(&sources, parse)?.validate_options(options)?;
+    format_parsed_input(input, options)
+}
+
+/// Enter the shared Layout IR and renderer using an attached parser artifact.
+pub(crate) fn format_parsed_input(
+    input: ParsedFormatInput<'_>,
+    options: FormatOptions,
+) -> Result<String, OperationalError> {
+    ensure_parse_invariant(input.result())?;
+
+    let source = input.source();
+    let layout = LayoutDocument::from_parse(source, input.sources(), input.result(), options)?;
     let document = layout.into_document();
     render(&document, source)
 }
