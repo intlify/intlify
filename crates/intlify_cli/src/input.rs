@@ -11,9 +11,9 @@ use std::path::{Component, Path, PathBuf};
 use file_id::FileId;
 use glob::{glob_with, MatchOptions};
 use intlify_resource::{
-    CatalogAssignmentConflict, CatalogPolicyState, CatalogResolution, DeclaredFormat, HostFormat,
+    CatalogAssignmentConflict, CatalogPolicyState, CatalogResolution, HostFormat,
     HostFormatRegistry, ProjectRelativeResourcePath, ResolvedHostFormat, ResolvedResources,
-    ResourceError, ResourceErrorDetails,
+    ResourceError,
 };
 use serde_json::{json, Value};
 
@@ -42,8 +42,8 @@ pub(crate) trait InputIgnore {
 /// Resource classification is implemented here before a command enables its consumer.
 #[derive(Clone, Copy)]
 pub(crate) enum CatalogSelection<'a> {
+    #[allow(dead_code)] // Retained for classification boundary tests and future gated consumers.
     Disabled,
-    #[allow(dead_code)] // Enabled by the catalog command consumer in PR 7.
     Enabled {
         resources: &'a ResolvedResources,
         registry: &'a HostFormatRegistry,
@@ -79,7 +79,6 @@ pub(crate) enum WorkflowClassification {
     StandaloneMf2,
     Catalog {
         format: HostFormat,
-        #[allow(dead_code)] // Carried intact for extraction by the PR 7 consumer.
         resolved: ResolvedHostFormat,
     },
 }
@@ -702,56 +701,7 @@ fn supported_direct_extensions(registry: &HostFormatRegistry) -> Vec<&'static st
 }
 
 fn resource_selection_error(path_label: &str, error: &ResourceError) -> OperationalError {
-    let details = match error.details() {
-        ResourceErrorDetails::FormatUnsupported {
-            classification_source,
-            declared_format,
-            format,
-            extension,
-            outer_format,
-            supported_formats,
-        } => {
-            let mut details = serde_json::Map::new();
-            details.insert(
-                "classificationSource".to_owned(),
-                json!(classification_source.as_str()),
-            );
-            if !matches!(declared_format, DeclaredFormat::Absent) {
-                details.insert(
-                    "declaredFormat".to_owned(),
-                    match declared_format {
-                        DeclaredFormat::Absent | DeclaredFormat::Valueless => Value::Null,
-                        DeclaredFormat::Value(value) => json!(value.as_ref()),
-                    },
-                );
-            }
-            if let Some(format) = format {
-                details.insert("format".to_owned(), json!(format));
-            }
-            details.insert("extension".to_owned(), json!(extension.as_ref()));
-            if let Some(outer_format) = outer_format {
-                details.insert("outerFormat".to_owned(), json!(outer_format));
-            }
-            details.insert(
-                "supportedFormats".to_owned(),
-                json!(supported_formats.as_ref()),
-            );
-            Value::Object(details)
-        }
-        _ => json!({ "phase": error.phase().as_str() }),
-    };
-
-    OperationalError {
-        kind: if error.code().as_str() == "internal_error" {
-            "internal"
-        } else {
-            "input"
-        },
-        code: error.code().as_str(),
-        message: format!("Resource input could not be selected: {path_label}"),
-        path: Some(path_label.to_owned()),
-        details: Some(details),
-    }
+    crate::resource::resource_error(path_label, None, error)
 }
 
 fn catalog_assignment_conflict_error(

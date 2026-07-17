@@ -8,11 +8,12 @@ mod error;
 mod fmt;
 mod input;
 mod output;
+mod resource;
 pub mod schema;
 pub mod version;
 
 use std::env;
-use std::io::{self, Read};
+use std::io;
 use std::path::Path;
 
 use args::{parse_args, ParsedCommand};
@@ -25,16 +26,12 @@ pub use output::CliRunResult;
 pub fn run_env() -> CliRunResult {
     let raw_args = env::args().skip(1).collect::<Vec<_>>();
     let cwd = env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-    let stdin = if fmt::argv_requests_stdin(&raw_args) && !argv_has_help_or_version(&raw_args) {
-        let mut stdin = Vec::new();
-        if let Err(error) = io::stdin().read_to_end(&mut stdin) {
-            return fmt::render_stdin_read_error(&raw_args, &cwd, &error);
-        }
-        stdin
-    } else {
-        Vec::new()
-    };
-    run_with_stdin(raw_args, cwd, stdin)
+    if fmt::argv_requests_stdin(&raw_args) && !argv_has_help_or_version(&raw_args) {
+        let stdin = io::stdin();
+        let mut stdin = stdin.lock();
+        return fmt::run_with_reader(&raw_args, &cwd, &mut stdin);
+    }
+    run_with_stdin(raw_args, cwd, [])
 }
 
 pub fn run<I, S>(args: I, cwd: impl AsRef<Path>) -> CliRunResult

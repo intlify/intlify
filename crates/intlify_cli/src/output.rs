@@ -37,7 +37,7 @@ impl CliRunResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Envelope<TSummary> {
+struct Envelope<TSummary, TResult> {
     // Field order follows this struct definition; fixture tests rely on it for
     // stable single-line JSON output consumed by tools and agents.
     schema_version: &'static str,
@@ -45,7 +45,7 @@ struct Envelope<TSummary> {
     version: &'static str,
     project_root: String,
     summary: TSummary,
-    results: Vec<serde_json::Value>,
+    results: Vec<TResult>,
     errors: Vec<OperationalError>,
 }
 
@@ -123,20 +123,21 @@ fn serialize_envelope(command: &str, project_root: &Path, errors: Vec<Operationa
         command,
         project_root,
         Summary { status: "error" },
-        Vec::new(),
+        Vec::<serde_json::Value>::new(),
         errors,
     )
 }
 
-pub(crate) fn serialize_json_envelope<TSummary>(
+pub(crate) fn serialize_json_envelope<TSummary, TResult>(
     command: &str,
     project_root: &Path,
     summary: TSummary,
-    results: Vec<serde_json::Value>,
+    results: Vec<TResult>,
     errors: Vec<OperationalError>,
 ) -> String
 where
     TSummary: Serialize,
+    TResult: Serialize,
 {
     let envelope = Envelope {
         schema_version: OUTPUT_SCHEMA_VERSION,
