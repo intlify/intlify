@@ -6,8 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use intlify_format::{format_message, FormatMode, FormatOptions};
-use ox_mf2_parser::{parse_message, Diagnostic};
+use intlify_format::{format_message, format_parsed, FormatMode, FormatOptions};
+use ox_mf2_parser::{
+    parse_message, parse_source, Diagnostic, ParseOptions, ParseResult, SourceFileInput,
+    SourceStore,
+};
 use serde::{Deserialize, Serialize};
 
 const UPDATE_ENV: &str = "INTLIFY_UPDATE_FORMAT_FIXTURES";
@@ -101,9 +104,17 @@ fn run_valid_case(
             .as_deref()
             .expect("valid fixture case declares expected"),
     );
-    let actual = format_message(input, options)
-        .unwrap_or_else(|failure| panic!("fixture case {} failed: {failure:?}", case.name))
-        .code;
+    let source_result = format_message(input, options)
+        .unwrap_or_else(|failure| panic!("fixture case {} failed: {failure:?}", case.name));
+    let (sources, parse) = parse_fixture(input);
+    let parsed_result = format_parsed(&sources, &parse, options)
+        .unwrap_or_else(|failure| panic!("parsed fixture case {} failed: {failure:?}", case.name));
+    assert_eq!(
+        parsed_result, source_result,
+        "fixture case {} parsed/source parity",
+        case.name
+    );
+    let actual = source_result.code;
 
     if update {
         write_message_fixture(&expected_path, &actual);
@@ -151,6 +162,14 @@ fn run_invalid_case(
     );
     let failure = format_message(input, options)
         .expect_err("invalid fixture case must not produce formatted output");
+    let (sources, parse) = parse_fixture(input);
+    let parsed_failure = format_parsed(&sources, &parse, options)
+        .expect_err("invalid parsed fixture case must not produce formatted output");
+    assert_eq!(
+        parsed_failure, failure,
+        "fixture case {} parsed/source diagnostic parity",
+        case.name
+    );
 
     assert!(
         failure.errors.is_empty(),
@@ -166,6 +185,17 @@ fn run_invalid_case(
 
     let expected = read_diagnostics_fixture(&diagnostics_path);
     assert_eq!(actual, expected, "fixture case {}", case.name);
+}
+
+fn parse_fixture(source: &str) -> (SourceStore, ParseResult) {
+    let mut sources = SourceStore::with_capacity(1);
+    let source_id = sources.add(SourceFileInput {
+        source,
+        ..SourceFileInput::default()
+    });
+    let result = parse_source(&sources, source_id, ParseOptions::default())
+        .expect("fixture source should parse into an owned artifact");
+    (sources, result)
 }
 
 fn mode(value: &str) -> FormatMode {
