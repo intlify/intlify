@@ -706,7 +706,7 @@ mod tests {
             "01",
             "1.",
             "1e",
-            "tru",
+            concat!("tr", "u"),
             "undefined",
             "'text'",
             "[1,]",
