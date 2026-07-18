@@ -19,14 +19,16 @@ const fixtureSelectionPath = resolve(packageRoot, 'fixture-selection.json')
 const defaultResultPath = resolve(packageRoot, 'results/latest.json')
 const coreManifestPath = resolve(packageRoot, 'rs/Cargo.toml')
 const coreBinary = resolve(
-  packageRoot,
-  'rs/target/release',
-  process.platform === 'win32' ? 'intlify-resource-bench.exe' : 'intlify-resource-bench'
+  process.env.INTLIFY_RESOURCE_BENCH_CORE_BINARY ??
+    resolve(
+      packageRoot,
+      'rs/target/release',
+      process.platform === 'win32' ? 'intlify-resource-bench.exe' : 'intlify-resource-bench'
+    )
 )
 const cliBinary = resolve(
-  repoRoot,
-  'target/release',
-  process.platform === 'win32' ? 'intlify.exe' : 'intlify'
+  process.env.INTLIFY_RESOURCE_BENCH_CLI_BINARY ??
+    resolve(repoRoot, 'target/release', process.platform === 'win32' ? 'intlify.exe' : 'intlify')
 )
 
 const cli = parseCliArgs(process.argv.slice(2))
