@@ -58,6 +58,25 @@ test('result schema rejects missing extraction memory for a declared generated p
   )
 })
 
+test('result schema rejects a result that references an undeclared fixture', () => {
+  const result = validResult()
+  result.results.find(measurement => measurement.phase === 'fmt_catalog_check_e2e').fixture =
+    'missing-catalog'
+
+  expect(() => assertValidResourceBenchmarkResult(result)).toThrow(
+    '/fixture must reference a declared fixture'
+  )
+})
+
+test('result schema rejects a generated-profile timing at an undeclared scale', () => {
+  const result = validResult()
+  result.results.find(measurement => measurement.phase === 'resource_extract').scale = 4
+
+  expect(() => assertValidResourceBenchmarkResult(result)).toThrow(
+    '/scale is not declared by generated fixture "message-dense"'
+  )
+})
+
 test('timing values remain observational rather than threshold gates', () => {
   const result = validResult()
   const timing = result.results.find(measurement => measurement.metric === 'duration')

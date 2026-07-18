@@ -511,7 +511,9 @@ fn execute_formatter_admission(
         checksum = checksum.wrapping_add(checksum_bytes(&formatted.code));
         outputs.push(formatted.code);
     }
+    let started = Instant::now();
     admission.finish().map_err(|error| error.to_string())?;
+    admission_elapsed += started.elapsed();
 
     Ok(FormatterAdmissionRun {
         outputs,

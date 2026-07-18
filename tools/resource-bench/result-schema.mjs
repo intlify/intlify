@@ -18,8 +18,8 @@ export function assertValidResourceBenchmarkResult(value) {
   assertString(value.generatedAt, '/generatedAt')
   assertPositiveInteger(value.iterations, '/iterations')
   assertEqual(JSON.stringify(value.phases), JSON.stringify(RESOURCE_BENCHMARK_PHASES), '/phases')
-  const expectedCoreMemory = assertFixtures(value.fixtures)
-  const measuredCoreMemory = assertResults(value.results, expectedCoreMemory)
+  const fixtureMetadata = assertFixtures(value.fixtures)
+  const measuredCoreMemory = assertResults(value.results, fixtureMetadata)
   assertMemoryGrowthChecks(value.memoryGrowthChecks, measuredCoreMemory)
 }
 
@@ -30,6 +30,7 @@ function assertFixtures(fixtures) {
   }
   const names = new Set()
   const shapes = new Set()
+  const byName = new Map()
   const expectedCoreMemory = new Map()
   let catalogFixtureCount = 0
   for (const [index, fixture] of fixtures.entries()) {
@@ -56,12 +57,17 @@ function assertFixtures(fixtures) {
       for (const variant of ['original', 'candidate']) {
         expectedCoreMemory.set(`${fixture.name}\0${variant}`, new Set(fixture.scales))
       }
+      byName.set(fixture.name, {
+        kind: fixture.kind,
+        scales: new Set(fixture.scales)
+      })
       continue
     }
     assertEqual(fixture.kind, 'catalog_file', `${pointer}/kind`)
     catalogFixtureCount += 1
     assertString(fixture.path, `${pointer}/path`)
     assertPositiveInteger(fixture.inputBytes, `${pointer}/inputBytes`)
+    byName.set(fixture.name, { kind: fixture.kind })
   }
   for (const shape of ['message_dense', 'structurally_dense_few_message']) {
     if (!shapes.has(shape)) {
@@ -71,10 +77,10 @@ function assertFixtures(fixtures) {
   if (catalogFixtureCount === 0) {
     throw new Error('/fixtures is missing a catalog fixture')
   }
-  return expectedCoreMemory
+  return { byName, expectedCoreMemory }
 }
 
-function assertResults(results, expectedCoreMemory) {
+function assertResults(results, fixtureMetadata) {
   assertArray(results, '/results')
   if (results.length === 0) {
     throw new Error('/results must contain measurements or skip records')
@@ -102,6 +108,10 @@ function assertResults(results, expectedCoreMemory) {
     if (!costs.has(result.cost)) {
       throw new Error(`${pointer}/cost must be valid for phase "${result.phase}"`)
     }
+    const fixture = fixtureMetadata.byName.get(result.fixture)
+    if (!fixture) {
+      throw new Error(`${pointer}/fixture must reference a declared fixture`)
+    }
     observed.add(`${result.phase}\0${result.cost}`)
 
     if (result.status === 'skipped') {
@@ -111,6 +121,9 @@ function assertResults(results, expectedCoreMemory) {
 
     assertEqual(result.status, 'measured', `${pointer}/status`)
     assertPositiveInteger(result.scale, `${pointer}/scale`)
+    if (fixture.kind === 'generated_profile' && !fixture.scales.has(result.scale)) {
+      throw new Error(`${pointer}/scale is not declared by generated fixture "${result.fixture}"`)
+    }
     assertPositiveInteger(result.inputBytes, `${pointer}/inputBytes`)
     assertNonNegativeInteger(result.entryCount, `${pointer}/entryCount`)
     if (result.metric === 'duration') {
@@ -125,7 +138,7 @@ function assertResults(results, expectedCoreMemory) {
     assertPositiveInteger(result.allocationCount, `${pointer}/allocationCount`)
     if (result.phase === 'resource_extract_peak_memory') {
       const key = `${result.fixture}\0${result.variant}`
-      const expectedScales = expectedCoreMemory.get(key)
+      const expectedScales = fixtureMetadata.expectedCoreMemory.get(key)
       if (!expectedScales) {
         throw new Error(`${pointer} does not match a declared extraction-memory fixture/variant`)
       }
@@ -149,7 +162,7 @@ function assertResults(results, expectedCoreMemory) {
     }
   }
   if (measuredCoreMemory.size > 0) {
-    for (const [key, expectedScales] of expectedCoreMemory) {
+    for (const [key, expectedScales] of fixtureMetadata.expectedCoreMemory) {
       const measuredScales = measuredCoreMemory.get(key)
       if (!measuredScales || measuredScales.size !== expectedScales.size) {
         throw new Error(

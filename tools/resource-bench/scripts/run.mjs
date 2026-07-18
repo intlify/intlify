@@ -10,6 +10,7 @@ import {
   RESOURCE_BENCHMARK_CORE_PHASE_NAMES,
   RESOURCE_BENCHMARK_PHASES
 } from '../benchmark-phases.mjs'
+import { decodeCoreProcessResult } from '../core-process-result.mjs'
 import { assertValidResourceBenchmarkResult } from '../result-schema.mjs'
 
 const packageRoot = resolve(import.meta.dirname, '..')
@@ -142,28 +143,17 @@ function runCoreBenchmarks(selectionValue) {
     ['--fixture-selection', fixtureSelectionPath, '--iterations', String(cli.iterations)],
     { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
   )
-  if (result.status !== 0) {
-    const reason = result.stderr.trim() || `${coreBinary} failed with status ${result.status}`
-    return unavailableCore(selectionValue, reason)
+  const decoded = decodeCoreProcessResult(result, coreBinary)
+  if (decoded.kind === 'unavailable') {
+    return unavailableCore(selectionValue, decoded.reason)
   }
-  try {
-    const output = JSON.parse(result.stdout)
-    if (!Array.isArray(output.results) || !Array.isArray(output.memoryGrowthChecks)) {
-      throw new Error('core output is missing result arrays')
-    }
-    return {
-      results: output.results.map(record => ({
-        ...record,
-        runtime: 'intlify-resource-bench-rs',
-        operation: record.cost
-      })),
-      memoryGrowthChecks: output.memoryGrowthChecks
-    }
-  } catch (error) {
-    return unavailableCore(
-      selectionValue,
-      `resource benchmark core emitted malformed JSON: ${error.message}`
-    )
+  return {
+    results: decoded.output.results.map(record => ({
+      ...record,
+      runtime: 'intlify-resource-bench-rs',
+      operation: record.cost
+    })),
+    memoryGrowthChecks: decoded.output.memoryGrowthChecks
   }
 }
 
@@ -239,8 +229,8 @@ function measureCatalogWrite(fixture) {
       writeFileSync(path, fixture.source)
       const started = process.hrtime.bigint()
       const result = runCli(['fmt', '--reporter=json', 'catalog.json'], cwd, [0])
-      const formatted = readFileSync(path, 'utf8')
       elapsedNs += process.hrtime.bigint() - started
+      const formatted = readFileSync(path, 'utf8')
       const envelope = parseCatalogEnvelope(result.stdout, 'catalog.json')
       if (formatted === fixture.source) {
         throw new Error('fmt write did not change the unformatted catalog fixture')
