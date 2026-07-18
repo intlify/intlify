@@ -94,7 +94,12 @@ test('benchmark command reads fixtures and emits a schema-valid result with unav
       ['scripts/run.mjs', '--skip-build', '--allow-skips', '--iterations', '1', '--out', out],
       {
         cwd: fileURLToPath(new URL('..', import.meta.url)),
-        encoding: 'utf8'
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          INTLIFY_RESOURCE_BENCH_CORE_BINARY: join(tempDir, 'missing-resource-bench'),
+          INTLIFY_RESOURCE_BENCH_CLI_BINARY: join(tempDir, 'missing-intlify')
+        }
       }
     )
 

@@ -20,6 +20,8 @@ Results are written to `tools/resource-bench/results/latest.json`. Validate an e
 vp run bench:resource:validate
 ```
 
+`INTLIFY_RESOURCE_BENCH_CORE_BINARY` and `INTLIFY_RESOURCE_BENCH_CLI_BINARY` can select explicit prebuilt executables when running `scripts/run.mjs --skip-build`. Relative overrides are resolved from the command's working directory. An existing executable that fails or emits invalid output remains a fatal benchmark error; `--allow-skips` only permits unavailable executables.
+
 ## Phases
 
 The result keeps resource, formatter, aggregation, and file-I/O costs observable as separate records:
