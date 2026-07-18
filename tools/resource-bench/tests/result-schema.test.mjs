@@ -89,6 +89,8 @@ test('benchmark command reads fixtures and emits a schema-valid result with unav
   const tempDir = await mkdtemp(join(tmpdir(), 'intlify-resource-bench-test-'))
   try {
     const out = join(tempDir, 'result.json')
+    const missingCoreBinary = join(tempDir, 'missing-resource-bench')
+    const missingCliBinary = join(tempDir, 'missing-intlify')
     const result = spawnSync(
       process.execPath,
       ['scripts/run.mjs', '--skip-build', '--allow-skips', '--iterations', '1', '--out', out],
@@ -97,14 +99,22 @@ test('benchmark command reads fixtures and emits a schema-valid result with unav
         encoding: 'utf8',
         env: {
           ...process.env,
-          INTLIFY_RESOURCE_BENCH_CORE_BINARY: join(tempDir, 'missing-resource-bench'),
-          INTLIFY_RESOURCE_BENCH_CLI_BINARY: join(tempDir, 'missing-intlify')
+          INTLIFY_RESOURCE_BENCH_CORE_BINARY: missingCoreBinary,
+          INTLIFY_RESOURCE_BENCH_CLI_BINARY: missingCliBinary
         }
       }
     )
 
     expect(result.status).toBe(0)
-    assertValidResourceBenchmarkResult(JSON.parse(await readFile(out, 'utf8')))
+    const benchmark = JSON.parse(await readFile(out, 'utf8'))
+    assertValidResourceBenchmarkResult(benchmark)
+    expect(benchmark.results.every(measurement => measurement.status === 'skipped')).toBe(true)
+    expect(new Set(benchmark.results.map(measurement => measurement.reason))).toEqual(
+      new Set([
+        `missing resource benchmark binary at ${missingCoreBinary}`,
+        `missing CLI binary at ${missingCliBinary}`
+      ])
+    )
   } finally {
     await rm(tempDir, { recursive: true, force: true })
   }
