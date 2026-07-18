@@ -126,7 +126,10 @@ test('root package exposes CLI local validation entry points', async () => {
     'bench:cli-startup': 'vp run cli#bench:startup',
     'bench:format': 'vp run format-bench#bench',
     'bench:format:smoke': 'vp run format-bench#bench:smoke',
-    'bench:format:validate': 'vp run format-bench#validate'
+    'bench:format:validate': 'vp run format-bench#validate',
+    'bench:resource': 'vp run resource-bench#bench',
+    'bench:resource:smoke': 'vp run resource-bench#bench:smoke',
+    'bench:resource:validate': 'vp run resource-bench#validate'
   })
   expect(pkg.scripts.release).toContain('"packages/format-napi/package.json"')
   expect(pkg.scripts.release).toContain('"packages/format-wasm/package.json"')

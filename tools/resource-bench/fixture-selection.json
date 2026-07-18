@@ -1,0 +1,18 @@
+{
+  "profiles": [
+    {
+      "name": "message-dense",
+      "shape": "message_dense",
+      "scales": [128, 512, 2048]
+    },
+    {
+      "name": "structurally-dense-few-message",
+      "shape": "structurally_dense_few_message",
+      "scales": [2048, 8192, 32768]
+    }
+  ],
+  "catalogFixture": {
+    "name": "catalog-format",
+    "path": "fixtures/catalog-format.json"
+  }
+}

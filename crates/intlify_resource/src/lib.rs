@@ -24,6 +24,9 @@ pub use artifact::{
     CandidateMessageAdmission, ExtractedCatalog, FormattedEntry, MessageEntry, RawReplacement,
     ValidatedWriteBack, WriteBackOutcome,
 };
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub use artifact::{ProfiledWriteBack, WriteBackBenchmarkProfile};
 pub use config::{
     CatalogAssignmentConflict, CatalogAssignmentOrigin, CatalogConfig, CatalogDefinitionRef,
     CatalogOverlayConfig, CatalogPolicyState, CatalogResolution, LayeredCatalogMatch,

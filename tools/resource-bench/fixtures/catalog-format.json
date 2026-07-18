@@ -1,0 +1,4 @@
+{
+  "greeting": "Hello, {$name}!",
+  "count": ".input   {$count   :number}\n{{Value {$count   :number}}}"
+}

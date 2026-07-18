@@ -5,7 +5,7 @@ members = ["crates/*"]
 # member list. Excluding tools/mf-parser-bench/rs keeps the benchmark CLI
 # standalone (it also declares its own `[workspace]` so cargo unambiguously
 # resolves path deps against its own workspace).
-exclude = ["refers/*", "tools/mf-parser-bench/rs"]
+exclude = ["refers/*", "tools/mf-parser-bench/rs", "tools/resource-bench/rs"]
 
 [workspace.package]
 edition = "2021"

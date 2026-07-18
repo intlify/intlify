@@ -233,6 +233,15 @@ importers:
         specifier: 4.0.0
         version: 4.0.0
 
+  tools/resource-bench:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.2
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.1(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))(yaml@2.9.0)
+
 packages:
 
   '@ark/schema@0.56.0':

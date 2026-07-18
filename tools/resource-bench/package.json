@@ -1,0 +1,16 @@
+{
+  "name": "resource-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node scripts/run.mjs",
+    "bench:smoke": "node scripts/run.mjs --iterations 1",
+    "validate": "node scripts/validate-result.mjs results/latest.json",
+    "test": "vp test"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

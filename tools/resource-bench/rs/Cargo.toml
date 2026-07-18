@@ -1,0 +1,23 @@
+[package]
+name = "intlify-resource-bench"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "intlify-resource-bench"
+path = "src/main.rs"
+
+[dependencies]
+allocation-counter = "0.8.1"
+intlify_format = { path = "../../../crates/intlify_format" }
+intlify_resource = { path = "../../../crates/intlify_resource", features = ["benchmark"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
