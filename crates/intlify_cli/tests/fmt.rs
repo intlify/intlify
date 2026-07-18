@@ -265,6 +265,18 @@ fn catalog_alias_write_failure_discards_entries_and_blocks_later_aliases() {
     permissions.set_mode(0o444);
     fs::set_permissions(&first, permissions).expect("catalog should become read-only");
 
+    // Elevated users can bypass mode 0444, so this fixture cannot certify a
+    // write failure in that environment.
+    if fs::OpenOptions::new().write(true).open(&first).is_ok() {
+        let mut permissions = fs::metadata(&first)
+            .expect("writable catalog metadata")
+            .permissions();
+        permissions.set_mode(0o600);
+        fs::set_permissions(&first, permissions)
+            .expect("writable catalog permissions should be restored");
+        return;
+    }
+
     let result = run(&["fmt", "z.json", "a.json", "--reporter=json"], &root);
 
     let mut permissions = fs::metadata(&second)
