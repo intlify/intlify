@@ -30,6 +30,8 @@ const defaultRunTimeoutMs = 300_000
 const timeoutKillGraceMs = 5_000
 const formatterSmokeInput = '.input   {$count   :number}\n{{Value {$count   :number}}}'
 const formatterSmokeOutput = '.input {$count :number}\n{{Value {$count :number}}}\n'
+const catalogSmokeInput = '{"count":".input   {$count   :number}\\n{{Value {$count   :number}}}"}'
+const catalogSmokeOutput = '{"count":".input {$count :number}\\n{{Value {$count :number}}}"}'
 
 const command = process.argv[2]
 
@@ -147,6 +149,30 @@ async function smokeCli() {
     assertEqual(envelope.results?.[0]?.path, 'count.mf2', 'formatter smoke result path')
     assertEqual(envelope.results?.[0]?.status, 'formatted', 'formatter smoke result status')
     assertEqual(await readFile(fixturePath, 'utf8'), formatterSmokeOutput, 'formatter smoke output')
+
+    const catalogPath = join(formatterRoot, 'messages.json')
+    await writeFile(catalogPath, catalogSmokeInput)
+    const catalogFormatted = await run(
+      process.execPath,
+      [wrapperBinPath, 'fmt', '--reporter=json', 'messages.json'],
+      { cwd: formatterRoot, capture: true }
+    )
+    const catalogEnvelope = JSON.parse(catalogFormatted.stdout)
+    assertEqual(catalogFormatted.stderr, '', 'catalog formatter smoke stderr')
+    assertEqual(catalogEnvelope.command, 'fmt', 'catalog formatter envelope command')
+    assertEqual(
+      catalogEnvelope.summary?.formattedFiles,
+      1,
+      'catalog formatter formatted file count'
+    )
+    assertEqual(catalogEnvelope.results?.[0]?.path, 'messages.json', 'catalog formatter path')
+    assertEqual(catalogEnvelope.results?.[0]?.status, 'formatted', 'catalog formatter status')
+    assertEqual(
+      catalogEnvelope.results?.[0]?.entries?.[0]?.status,
+      'formatted',
+      'catalog formatter entry status'
+    )
+    assertEqual(await readFile(catalogPath, 'utf8'), catalogSmokeOutput, 'catalog formatter output')
   } finally {
     await rm(formatterRoot, { recursive: true, force: true })
   }

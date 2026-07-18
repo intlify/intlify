@@ -493,6 +493,42 @@ fn mixed_standalone_and_catalog_results_use_exclusive_variants_in_path_order() {
 }
 
 #[test]
+fn catalog_physical_group_aggregation_is_deterministic_across_runs() {
+    let root = temp_project_root("catalog-determinism");
+    let first = root.join("a-catalog.json");
+    write(&first, r#"{"message":"{$value   :number}"}"#);
+    fs::hard_link(&first, root.join("b-alias.json")).expect("hard-link alias should be created");
+    write(
+        &root.join("c-catalog.json"),
+        r#"{"message":"{$other   :number}"}"#,
+    );
+    let args = [
+        "fmt",
+        "--check",
+        "--reporter=json",
+        "c-catalog.json",
+        "b-alias.json",
+        "a-catalog.json",
+    ];
+
+    let baseline = run(&args, &root);
+    let repeated = run(&args, &root);
+
+    assert_eq!(baseline.exit_code, 1);
+    assert_eq!(repeated.exit_code, baseline.exit_code);
+    assert_eq!(repeated.stdout, baseline.stdout);
+    assert_eq!(repeated.stderr, baseline.stderr);
+    let output = json_stdout(&baseline);
+    let paths = output["results"]
+        .as_array()
+        .expect("catalog results")
+        .iter()
+        .map(|result| result["path"].as_str().expect("result path"))
+        .collect::<Vec<_>>();
+    assert_eq!(paths, ["a-catalog.json", "b-alias.json", "c-catalog.json"]);
+}
+
+#[test]
 fn direct_catalog_check_and_list_different_validate_without_writing() {
     let root = temp_project_root("catalog-check");
     let catalog = root.join("messages.JSON");

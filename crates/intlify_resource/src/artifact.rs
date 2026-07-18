@@ -432,6 +432,12 @@ pub struct ExtractedCatalog {
     adapter_state: AdapterArtifactState,
 }
 
+struct PreparedWriteBack<'message> {
+    formatted_by_index: Vec<Option<&'message str>>,
+    plans: Vec<Option<AdapterReescapePlan>>,
+    projected_host_bytes: u128,
+}
+
 impl ExtractedCatalog {
     #[must_use]
     pub fn source(&self) -> &str {
@@ -457,6 +463,66 @@ impl ExtractedCatalog {
         &self,
         formatted_entries: &[FormattedEntry<'_>],
     ) -> Result<WriteBackOutcome, ResourceError> {
+        let Some(prepared) = self.prepare_write_back(formatted_entries)? else {
+            return Ok(WriteBackOutcome::Unchanged);
+        };
+        let (replacements, candidate_source) = self.materialize_write_back(&prepared)?;
+        let candidate =
+            self.validate_write_back_candidate(candidate_source, &prepared.formatted_by_index)?;
+
+        Ok(WriteBackOutcome::Changed(ValidatedWriteBack {
+            replacements,
+            candidate,
+        }))
+    }
+
+    #[cfg(feature = "benchmark")]
+    #[doc(hidden)]
+    pub fn benchmark_build_and_validate_write_back(
+        &self,
+        formatted_entries: &[FormattedEntry<'_>],
+    ) -> Result<ProfiledWriteBack, ResourceError> {
+        let started = std::time::Instant::now();
+        let prepared = self.prepare_write_back(formatted_entries)?;
+        let measurement = started.elapsed();
+
+        let Some(prepared) = prepared else {
+            return Ok(ProfiledWriteBack {
+                outcome: WriteBackOutcome::Unchanged,
+                profile: WriteBackBenchmarkProfile {
+                    measurement,
+                    materialization_and_edit_composition: std::time::Duration::ZERO,
+                    candidate_reparse_and_validation: std::time::Duration::ZERO,
+                },
+            });
+        };
+
+        let started = std::time::Instant::now();
+        let (replacements, candidate_source) = self.materialize_write_back(&prepared)?;
+        let materialization_and_edit_composition = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let candidate =
+            self.validate_write_back_candidate(candidate_source, &prepared.formatted_by_index)?;
+        let candidate_reparse_and_validation = started.elapsed();
+
+        Ok(ProfiledWriteBack {
+            outcome: WriteBackOutcome::Changed(ValidatedWriteBack {
+                replacements,
+                candidate,
+            }),
+            profile: WriteBackBenchmarkProfile {
+                measurement,
+                materialization_and_edit_composition,
+                candidate_reparse_and_validation,
+            },
+        })
+    }
+
+    fn prepare_write_back<'message>(
+        &self,
+        formatted_entries: &[FormattedEntry<'message>],
+    ) -> Result<Option<PreparedWriteBack<'message>>, ResourceError> {
         let mut has_changes = false;
         for formatted in formatted_entries {
             if formatted.entry.artifact_identity() != self.artifact_identity
@@ -474,12 +540,12 @@ impl ExtractedCatalog {
         }
 
         if formatted_entries.is_empty() {
-            return Ok(WriteBackOutcome::Unchanged);
+            return Ok(None);
         }
 
         if !has_changes {
             self.validate_unchanged_formatted_entries(formatted_entries)?;
-            return Ok(WriteBackOutcome::Unchanged);
+            return Ok(None);
         }
 
         let mut counts = vec![0_usize; self.entries.len()];
@@ -532,7 +598,7 @@ impl ExtractedCatalog {
         }
 
         if plans.iter().all(Option::is_none) {
-            return Ok(WriteBackOutcome::Unchanged);
+            return Ok(None);
         }
 
         let projected_host_bytes = self.projected_host_bytes(&plans)?;
@@ -543,13 +609,24 @@ impl ExtractedCatalog {
             None,
         )?;
 
-        let mut replacements = Vec::with_capacity(plans.iter().flatten().count());
-        for (index, plan) in plans.iter().enumerate() {
+        Ok(Some(PreparedWriteBack {
+            formatted_by_index,
+            plans,
+            projected_host_bytes,
+        }))
+    }
+
+    fn materialize_write_back(
+        &self,
+        prepared: &PreparedWriteBack<'_>,
+    ) -> Result<(Vec<RawReplacement>, Arc<str>), ResourceError> {
+        let mut replacements = Vec::with_capacity(prepared.plans.iter().flatten().count());
+        for (index, plan) in prepared.plans.iter().enumerate() {
             let Some(plan) = plan else {
                 continue;
             };
             let entry = &self.entries[index];
-            let formatted_message = formatted_by_index[index]
+            let formatted_message = prepared.formatted_by_index[index]
                 .expect("changed plans only exist for supplied formatted entries");
             let raw_text = self.resolved.adapter().materialize(
                 self.adapter_state.as_ref(),
@@ -572,19 +649,24 @@ impl ExtractedCatalog {
             });
         }
 
-        let candidate_source = self.apply_replacements(&replacements, projected_host_bytes)?;
+        let candidate_source =
+            self.apply_replacements(&replacements, prepared.projected_host_bytes)?;
+        Ok((replacements, candidate_source))
+    }
+
+    fn validate_write_back_candidate(
+        &self,
+        candidate_source: Arc<str>,
+        formatted_by_index: &[Option<&str>],
+    ) -> Result<ExtractedCatalog, ResourceError> {
         let candidate = extract_resolved(
             self.resolved.clone(),
             candidate_source,
             ResourcePhase::ValidateWriteBack,
         )
         .map_err(|error| self.convert_candidate_error(error))?;
-        self.validate_candidate_equivalence(&candidate, &formatted_by_index)?;
-
-        Ok(WriteBackOutcome::Changed(ValidatedWriteBack {
-            replacements,
-            candidate,
-        }))
+        self.validate_candidate_equivalence(&candidate, formatted_by_index)?;
+        Ok(candidate)
     }
 
     fn validate_unchanged_formatted_entries(
@@ -941,6 +1023,51 @@ impl fmt::Debug for WriteBackOutcome {
                 formatter.debug_tuple("Changed").field(write_back).finish()
             }
         }
+    }
+}
+
+/// Benchmark-only phase durations for one integrated write-back.
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WriteBackBenchmarkProfile {
+    measurement: std::time::Duration,
+    materialization_and_edit_composition: std::time::Duration,
+    candidate_reparse_and_validation: std::time::Duration,
+}
+
+#[cfg(feature = "benchmark")]
+impl WriteBackBenchmarkProfile {
+    #[must_use]
+    pub const fn measurement(self) -> std::time::Duration {
+        self.measurement
+    }
+
+    #[must_use]
+    pub const fn materialization_and_edit_composition(self) -> std::time::Duration {
+        self.materialization_and_edit_composition
+    }
+
+    #[must_use]
+    pub const fn candidate_reparse_and_validation(self) -> std::time::Duration {
+        self.candidate_reparse_and_validation
+    }
+}
+
+/// Benchmark-only write-back result paired with phase durations.
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct ProfiledWriteBack {
+    outcome: WriteBackOutcome,
+    profile: WriteBackBenchmarkProfile,
+}
+
+#[cfg(feature = "benchmark")]
+impl ProfiledWriteBack {
+    #[must_use]
+    pub fn into_parts(self) -> (WriteBackOutcome, WriteBackBenchmarkProfile) {
+        (self.outcome, self.profile)
     }
 }
 
