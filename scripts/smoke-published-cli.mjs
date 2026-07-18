@@ -22,6 +22,8 @@ const npmAvailabilityDelayMs = readPositiveIntegerEnv('NPM_SMOKE_DELAY_MS', 10_0
 const defaultRunTimeoutMs = readPositiveIntegerEnv('CLI_SMOKE_RUN_TIMEOUT_MS', 120_000)
 const formatterSmokeInput = '.input   {$count   :number}\n{{Value {$count   :number}}}'
 const formatterSmokeOutput = '.input {$count :number}\n{{Value {$count :number}}}\n'
+const catalogSmokeInput = '{"count":".input   {$count   :number}\\n{{Value {$count   :number}}}"}'
+const catalogSmokeOutput = '{"count":".input {$count :number}\\n{{Value {$count :number}}}"}'
 const nativeTargets = [
   {
     platform: 'darwin',
@@ -105,6 +107,36 @@ try {
     await readFile(formatterFixturePath, 'utf8'),
     formatterSmokeOutput,
     'published formatter output'
+  )
+
+  const catalogFixturePath = join(tempDir, 'messages.json')
+  await writeFile(catalogFixturePath, catalogSmokeInput)
+  const catalogFormatted = run(wrapperBinPath, ['fmt', '--reporter=json', 'messages.json'], {
+    cwd: tempDir,
+    capture: true
+  })
+  const catalogEnvelope = JSON.parse(catalogFormatted.stdout)
+  assertEqual(catalogFormatted.stderr, '', 'published catalog formatter stderr')
+  assertEqual(catalogEnvelope.command, 'fmt', 'published catalog formatter command')
+  assertEqual(
+    catalogEnvelope.summary?.formattedFiles,
+    1,
+    'published catalog formatter formatted file count'
+  )
+  assertEqual(
+    catalogEnvelope.results?.[0]?.path,
+    'messages.json',
+    'published catalog formatter path'
+  )
+  assertEqual(
+    catalogEnvelope.results?.[0]?.entries?.[0]?.status,
+    'formatted',
+    'published catalog formatter entry status'
+  )
+  assertEqual(
+    await readFile(catalogFixturePath, 'utf8'),
+    catalogSmokeOutput,
+    'published catalog formatter output'
   )
 
   const schemaPath = join(
