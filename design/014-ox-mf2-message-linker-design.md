@@ -32,7 +32,7 @@ This document owns the language-neutral linker boundary and its public artifacts
 
 ## Ownership
 
-The future `intlify_link_contract` boundary owns public artifact types, wire compatibility, version negotiation, and producer conformance tests. Language-specific producers own source, object, or binary analysis and emit that contract. The future `intlify_message_linker` core consumes only reference artifacts, definition artifacts, locale policy, and the delivery graph; it owns resolution, reachability, placement, findings, and bundle plans.
+The future `intlify_link_contract` boundary owns public artifact types, wire compatibility, version negotiation, and producer conformance tests. Language-specific producers own source, object, or binary analysis and emit that contract. The future `intlify_linker` core consumes only reference artifacts, definition artifacts, locale policy, and the delivery graph; it owns resolution, reachability, placement, findings, and bundle plans.
 
 `intlify_resource` remains the sole owner of catalog assignment, host parsing, message entry extraction, catalog key domains, source spans, and validated write-back. `intlify_lint` presents linker findings through its rule and reporting contracts. Platform integrations own build-graph adaptation and exporter invocation, while runtimes own loading policy after consuming generated assets and loader maps.
 
@@ -426,7 +426,7 @@ language reference producers
   ├─ intlify_producer_js   (oxc-based JS/TS + Vue SFC frontend)
   └─ intlify_producer_bin  (tagged-ID scanner for native/WASM; later)
 
-intlify_message_linker
+intlify_linker
   ├─ reference resolution, locale/fallback resolution
   ├─ reachability over the delivery graph, placement
   └─ bundle plans + findings
