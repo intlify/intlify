@@ -42,3 +42,7 @@
 	path = refers/typescript-go
 	url = https://github.com/microsoft/typescript-go.git
 	shallow = true
+[submodule "refers/icu4x"]
+	path = refers/icu4x
+	url = https://github.com/unicode-org/icu4x.git
+	shallow = true
