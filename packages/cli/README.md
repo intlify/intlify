@@ -94,7 +94,7 @@ vp run format-bench#bench
 vp run format-bench#bench:smoke
 ```
 
-The benchmark result schema is validated, but timing thresholds are not used as CI gates.
+The benchmark result schema is validated, but timing thresholds are not used as CI gates. Parser N-API, formatter N-API, formatter WASM, and CLI artifacts are built in release mode. Cold-start stages are reported separately from warm measurements. Warm API timings run in one process after unmeasured warm-up calls, while CLI timings retain fresh-process startup on every iteration and are labeled accordingly. wasm-pack downloads its build tools into the workspace cache before measurements begin.
 
 Resource extraction, write-back, catalog CLI, peak-memory scaling, and deterministic physical-group aggregation have a separate local-first gate:
 

@@ -4,7 +4,10 @@ import {
   FORMAT_BENCHMARK_PHASES
 } from './benchmark-phases.mjs'
 
-export const FORMAT_BENCH_RESULT_SCHEMA_VERSION = '0'
+export const FORMAT_BENCH_RESULT_SCHEMA_VERSION = '1'
+
+const COLD_START_STAGES = new Set(['module_load', 'runtime_init', 'first_call', 'first_process'])
+const EXECUTION_MODELS = new Set(['in_process', 'fresh_process'])
 
 /**
  * Validate the local formatter benchmark result shape.
@@ -21,8 +24,10 @@ export function assertValidFormatBenchmarkResult(value) {
   assertString(value.version, '/version')
   assertString(value.generatedAt, '/generatedAt')
   assertPositiveInteger(value.iterations, '/iterations')
+  assertPositiveInteger(value.warmupIterations, '/warmupIterations')
   assertPhaseTable(value.phases)
   assertFixtures(value.fixtures)
+  assertColdStartResults(value.coldStartResults)
   assertResults(value.results)
 }
 
@@ -64,6 +69,8 @@ function assertResults(results) {
     assertString(result.fixture, `${pointer}/fixture`)
     assertString(result.runtime, `${pointer}/runtime`)
     assertString(result.operation, `${pointer}/operation`)
+    assertEqual(result.measurement, 'warm', `${pointer}/measurement`)
+    assertExecutionModel(result.executionModel, `${pointer}/executionModel`)
     assertEqual(
       phaseNames.has(result.phase),
       true,
@@ -91,6 +98,49 @@ function assertResults(results) {
     assertNonNegativeInteger(result.checksum, `${pointer}/checksum`)
     assertNonNegativeInteger(result.inputBytes, `${pointer}/inputBytes`)
   }
+}
+
+function assertColdStartResults(results) {
+  assertArray(results, '/coldStartResults')
+  if (results.length === 0) {
+    throw new Error('/coldStartResults must contain at least one measurement or skip record')
+  }
+
+  for (const [index, result] of results.entries()) {
+    const pointer = `/coldStartResults/${index}`
+    assertObject(result, pointer)
+    assertEqual(result.measurement, 'cold_start', `${pointer}/measurement`)
+    assertString(result.stage, `${pointer}/stage`)
+    assertEqual(
+      COLD_START_STAGES.has(result.stage),
+      true,
+      `${pointer}/stage must be a cold-start stage`
+    )
+    assertExecutionModel(result.executionModel, `${pointer}/executionModel`)
+    assertString(result.runtime, `${pointer}/runtime`)
+    assertString(result.operation, `${pointer}/operation`)
+
+    if (result.fixture !== undefined) {
+      assertString(result.fixture, `${pointer}/fixture`)
+    }
+
+    if (result.status === 'skipped') {
+      assertString(result.reason, `${pointer}/reason`)
+      continue
+    }
+
+    assertEqual(result.status, 'measured', `${pointer}/status`)
+    assertNonNegativeNumber(result.elapsedMs, `${pointer}/elapsedMs`)
+    assertNonNegativeInteger(result.checksum, `${pointer}/checksum`)
+    if (result.fixture !== undefined) {
+      assertNonNegativeInteger(result.inputBytes, `${pointer}/inputBytes`)
+    }
+  }
+}
+
+function assertExecutionModel(value, pointer) {
+  assertString(value, pointer)
+  assertEqual(EXECUTION_MODELS.has(value), true, `${pointer} must be a known execution model`)
 }
 
 function assertObject(value, pointer) {

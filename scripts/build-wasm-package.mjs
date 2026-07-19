@@ -3,18 +3,21 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 import { spawn } from 'node:child_process'
-import { open, unlink } from 'node:fs/promises'
+import { mkdir, open, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = fileURLToPath(new URL('..', import.meta.url))
 const lockPath = join(workspaceRoot, '.wasm-pack-build.lock')
+const wasmPackCachePath =
+  process.env.WASM_PACK_CACHE ?? join(workspaceRoot, 'node_modules', '.cache', 'wasm-pack')
 const waitTimeoutMs = 10 * 60 * 1000
 const waitIntervalMs = 250
 
 try {
   const options = parseOptions()
+  await mkdir(wasmPackCachePath, { recursive: true })
   await withWasmPackLock(() => runWasmPackBuild(options))
 } catch (error) {
   console.error(`error: ${error instanceof Error ? error.message : String(error)}`)
@@ -89,6 +92,7 @@ function runWasmPackBuild({ crate, outDir, outName }) {
       'wasm-pack',
       ['build', crate, '--target', 'web', '--no-pack', '--out-dir', outDir, '--out-name', outName],
       {
+        env: { ...process.env, WASM_PACK_CACHE: wasmPackCachePath },
         stdio: 'inherit',
         shell: process.platform === 'win32'
       }

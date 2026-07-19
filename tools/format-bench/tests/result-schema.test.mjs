@@ -51,6 +51,24 @@ test('result schema rejects phase and cost mismatches', () => {
   )
 })
 
+test('result schema rejects missing warmup iterations', () => {
+  const result = validResult()
+  delete result.warmupIterations
+
+  expect(() => assertValidFormatBenchmarkResult(result)).toThrow(
+    '/warmupIterations must be a positive integer'
+  )
+})
+
+test('result schema rejects malformed cold-start stages', () => {
+  const result = validResult()
+  result.coldStartResults[0].stage = 'unknown'
+
+  expect(() => assertValidFormatBenchmarkResult(result)).toThrow(
+    '/coldStartResults/0/stage must be a cold-start stage'
+  )
+})
+
 test('benchmark command reads fixtures and emits a schema-valid result', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'intlify-format-bench-test-'))
   try {
@@ -62,6 +80,8 @@ test('benchmark command reads fixtures and emits a schema-valid result', async (
         '--skip-build',
         '--allow-skips',
         '--iterations',
+        '1',
+        '--warmup-iterations',
         '1',
         '--fixture',
         'basic-message',
@@ -83,11 +103,12 @@ test('benchmark command reads fixtures and emits a schema-valid result', async (
 
 function validResult() {
   return {
-    schemaVersion: '0',
+    schemaVersion: '1',
     tool: 'intlify-format-bench',
     version: '0.14.0',
     generatedAt: '2026-01-01T00:00:00.000Z',
     iterations: 1,
+    warmupIterations: 1,
     phases: FORMAT_BENCHMARK_PHASES,
     fixtures: [
       {
@@ -96,9 +117,35 @@ function validResult() {
         inputBytes: 12
       }
     ],
+    coldStartResults: [
+      {
+        status: 'measured',
+        measurement: 'cold_start',
+        stage: 'module_load',
+        executionModel: 'in_process',
+        runtime: '@intlify/format-napi',
+        operation: 'import(@intlify/format-napi)',
+        elapsedMs: 1.2,
+        checksum: 0
+      },
+      {
+        status: 'measured',
+        measurement: 'cold_start',
+        stage: 'first_call',
+        executionModel: 'in_process',
+        fixture: 'basic-message',
+        runtime: '@intlify/format-napi',
+        operation: 'formatMessage',
+        elapsedMs: 0.4,
+        checksum: 1,
+        inputBytes: 12
+      }
+    ],
     results: [
       {
         status: 'measured',
+        measurement: 'warm',
+        executionModel: 'in_process',
         phase: 'format_standard',
         cost: 'napi_binding_call',
         fixture: 'basic-message',

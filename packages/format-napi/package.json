@@ -38,7 +38,7 @@
   },
   "scripts": {
     "build": "vp run ox-mf2-shared#build && vp run build:napi && vp run build:pack",
-    "build:napi": "napi build --manifest-path ../../crates/intlify_format_napi/Cargo.toml --output-dir dist --platform --esm --no-dts-header --js native-binding.js --dts native-binding.d.ts",
+    "build:napi": "napi build --release --manifest-path ../../crates/intlify_format_napi/Cargo.toml --output-dir dist --platform --esm --no-dts-header --js native-binding.js --dts native-binding.d.ts",
     "build:pack": "vp pack",
     "test": "vp run ox-mf2-shared#build && vp test"
   },

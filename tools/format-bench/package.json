@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "bench": "node scripts/run.mjs",
-    "bench:smoke": "node scripts/run.mjs --iterations 1 --fixture basic-message",
+    "bench:smoke": "node scripts/run.mjs --iterations 1 --warmup-iterations 1 --fixture basic-message",
     "validate": "node scripts/validate-result.mjs results/latest.json",
     "test": "vp test"
   },
