@@ -1,6 +1,6 @@
 [package]
 name = "ox_mf2_wasm"
-version = "0.14.0-alpha.9"
+version = "0.14.0-alpha.10"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
