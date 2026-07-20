@@ -1,6 +1,6 @@
 {
   "name": "@intlify/ox-mf2-wasm",
-  "version": "0.14.0-alpha.10",
+  "version": "0.14.0-alpha.11",
   "description": "WASM runtime package for ox-mf2.",
   "keywords": [
     "intlify",
