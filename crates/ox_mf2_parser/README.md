@@ -16,7 +16,7 @@ ox_mf2_parser = "0.1"
 ```rust
 use ox_mf2_parser::parse_message;
 
-let result = parse_message("Hello, {$name}!");
+let result = parse_message("Hello, {$name}!").expect("valid message should parse");
 
 assert!(result.diagnostics.is_empty());
 assert!(result.cst.node_count() > 0);
@@ -31,7 +31,7 @@ Malformed input is parsed with recovery enabled by default. Diagnostics carry st
 ```rust
 use ox_mf2_parser::{parse_message, DiagnosticSeverity};
 
-let result = parse_message("Hello, {$name");
+let result = parse_message("Hello, {$name").expect("malformed message should recover");
 
 assert!(!result.diagnostics.is_empty());
 assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -60,7 +60,8 @@ let result = parse_source(
         parse_semantic: true,
         ..ParseOptions::default()
     },
-);
+)
+.expect("source should parse");
 
 assert!(result.semantic.is_some());
 ```
