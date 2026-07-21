@@ -15,7 +15,7 @@ catalogMode: prefer
 
 catalog:
   '@types/node': ^24
-  typescript: ^6.0.0
+  typescript: ^7.0.0
   vite: npm:@voidzero-dev/vite-plus-core@0.2.1
   vue: ^3.5.39
   '@vitejs/plugin-vue': ^6.0.7
