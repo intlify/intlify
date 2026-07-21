@@ -25,8 +25,8 @@ catalogs:
       specifier: ^0.55.1
       version: 0.55.1
     pkg-pr-new:
-      specifier: 0.0.75
-      version: 0.0.75
+      specifier: 0.0.78
+      version: 0.0.78
     typescript:
       specifier: ^6.0.0
       version: 6.0.3
@@ -64,7 +64,7 @@ importers:
         version: 0.2.8
       pkg-pr-new:
         specifier: 'catalog:'
-        version: 0.0.75
+        version: 0.0.78
       vite-plus:
         specifier: 'catalog:'
         version: 0.2.1(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))(yaml@2.9.0)
@@ -3682,8 +3682,8 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  pkg-pr-new@0.0.75:
-    resolution: {integrity: sha512-u9mdErTewKSMsr+ceCt8VcNuNP0ro5AXiPXhUVApuEyqr2Zlvt+DdCFBcm+yGWN8mhOdZJ27meIDbnoZgfzpOw==}
+  pkg-pr-new@0.0.78:
+    resolution: {integrity: sha512-sBfGGCiCLmJArx99Z/QmNN3jmkqRYhp1TV8Y1IOpSpXfOljqFcEjDyyc4HCVy+nbrmlkw9qXRq/9/L4ahF/d4w==}
     hasBin: true
 
   pngjs@7.0.0:
@@ -6962,7 +6962,7 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  pkg-pr-new@0.0.75: {}
+  pkg-pr-new@0.0.78: {}
 
   pngjs@7.0.0: {}
 
