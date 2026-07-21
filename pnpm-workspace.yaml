@@ -27,7 +27,7 @@ catalog:
   wasm-pack: 0.15.0
   bumpp: ^11.1.0
   gh-changelogen: ^0.2.8
-  pkg-pr-new: 0.0.75
+  pkg-pr-new: 0.0.78
 overrides:
   vite: 'catalog:'
 peerDependencyRules:
