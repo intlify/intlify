@@ -2182,8 +2182,8 @@ The BLAKE3 input starts with these exact bytes followed by the unsigned big-endi
 
 ```text
 69 6e 74 6c 69 66 79 00                         # "intlify\0"
-64 65 66 69 6e 69 74 69 6f 6e 2d 66 69 6e 67 65 # "definition-finge"
-72 70 72 69 6e 74 00                            # "rprint\0"
+64 65 66 69 6e 69 74 69 6f 6e 2d 66 69 6e 67 65
+72 70 72 69 6e 74 00                            # together: "definition-fingerprint\0"
 62 6c 61 6b 65 33 2d 32 35 36 00                # "blake3-256\0"
 00 01                                           # framing version: u16be(1)
 ```
