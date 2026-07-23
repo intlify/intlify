@@ -6,7 +6,7 @@ This document defines the Phase 3 design boundary for tooling and transport work
 
 Phase 1 parser design is defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Phase 2 Binary AST snapshot design is defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). Phase 2 language binding design is defined in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 
-This document focuses on formatter/linter input, future SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
+This document focuses on formatter/linter input, resource and message-linker layering, future SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
 
 ## Basic Policy
 
@@ -54,6 +54,22 @@ Implementation should be split by consumer-facing product surface:
 
 This milestone deliberately has no Phase 3 number because it is a layered capability rather than another standalone product surface. Its consumer-neutral `intlify_resource` crate, Tier 1 adapter, and resource configuration foundation may start and land without waiting for the Phase 3C linter product; they do not depend on `intlify_lint`. Catalog-aware formatting depends on the completed Phase 3B message-level formatter, while catalog-aware linting separately depends on the Phase 3C message-level linter. The complete milestone must finish before Phase 3D starts its opted-in catalog path, so editor integration consumes one implemented resource layer instead of creating a provisional duplicate. The complete Tier 1 milestone is part of the initial tooling v0.1 feature scope. In Phase 3 documents, that label describes the tooling product feature set; it is independent of the Binary AST snapshot header version and the existing `@intlify/cli` npm package version.
 
+**Parallel track: Message Linker and Distribution**
+
+The [014 message-linker design](./014-ox-mf2-message-linker-design.md) defines a layered track rather than another Phase 3C or Phase 3D subphase:
+
+- M0 establishes `intlify_contract`, the language-neutral `intlify_linker`, a JS/TS source-scan producer, completeness-gated findings, and basic bundle plans.
+- M1 adds coverage-baseline-driven typed keys, and M2 adds locale/fallback-aware linking.
+- M3 adds workspace-internal `crates/intlify_export`, which owns the common export-preparation and exporter boundary plus the initial ESM exporter. `crates/intlify_cli` owns the `intlify messages emit` orchestration, exporter factory/registry wiring, and output registration.
+- M4 adds live bundler-graph integration over the M3 exporter transaction.
+- M5 adds `intlify messages prune` through a separate 013 structural-deletion contract; it does not broaden formatter value write-back.
+- L0 and L1 are later lint-presentation adapters. They wait for the Phase 3C result/rule contracts and the catalog-level lint addendum, but do not gate M0 through M5.
+- N0 and N1 are a parallel native-producer track after M0 for Rust and then C/C++/WASM reference production.
+
+M0 may begin when 013 Tier 1 extraction and the coordinated explicit scope, `path` / `fixed` locale binding, and producer-to-scope/domain binding prerequisites are available. It has no dependency on `intlify_lint` or Phase 3D. M3 additionally depends on the common Phase 3A `messages` configuration and CLI namespace plus the shared parser and SemanticModel export-validation gate. M4 builds on the M3 transaction. M5 waits for the dedicated 013 structural-mutation addendum and format capability rules.
+
+Phase 3D may consume M0 linker findings through the additive project-backed editor session defined by 009, but neither the initial editor product nor its completion gates the linker main track. The exact contract, algorithm, CLI, exporter, and validation details remain owned by 014 rather than being duplicated here.
+
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
    - `.mf2` and opted-in catalog resource message mapping
@@ -71,7 +87,7 @@ This milestone deliberately has no Phase 3 number because it is a layered capabi
    - MessagePack transport evaluation
    - daemon/session/cache optimization for repeated language-service queries
 
-Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. Consumer-neutral resource work may land in separate resource PRs while Phase 3C is still in progress; this does not retroactively add resource implementation work to the Phase 3B or Phase 3C product PR sequences.
+Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. Consumer-neutral resource and linker work may land in separate PRs while Phase 3C is still in progress; this does not retroactively add resource or linker implementation work to the Phase 3B or Phase 3C product PR sequences. Lint and editor adapters join the linker only at their declared integration milestones.
 
 ## CLI File Execution Boundary
 
@@ -117,6 +133,16 @@ Failure to inspect one selected target's physical identity is a target-local `in
 Every runnable physical group has one workflow classification. Products that add classifications own their stable classification tokens and the error contract for a group whose logical aliases disagree; the resource catalog workflow defines its `standalone:mf2` and `catalog:<registry-id>` conflict in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#input-selection). A non-conflicting group's logical aliases run serially in normalized logical-path order. Each alias opens and reads the source only after every earlier alias has completed, so a successful formatter write is visible to the next alias through a fresh read.
 
 A target-local failure before a filesystem write attempt does not stop later aliases in its physical group. This includes read, parse, extraction, formatter, linter, candidate-validation, diagnostic-mapping, and result-construction failures. An `output_write_failed` result in formatter write mode is the sole fail-stop case because direct writes provide no rollback guarantee and may leave the physical file indeterminate. The CLI performs no further stat, open, read, parse, format, lint, or write for later aliases in that group; unrelated groups continue. The exact current-target result, synthesized `alias_processing_blocked` results, details, and summary accounting are owned by [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md#physical-alias-write-failure). Check modes and lint never cross this write-failure boundary and therefore always continue after a target-local failure.
+
+## CLI Project Inventory Boundary
+
+`intlify messages emit` and `intlify messages prune` use the project-inventory workflow defined by 014 rather than the operand-driven file mode above. They accept no positional file, directory, or glob operands and do not translate an empty operand list into directory `.`. The 006 project root plus the validated `resources` and `messages` sections are their only initial inventory authority.
+
+`crates/intlify_cli` owns filesystem enumeration, physical-file grouping, execution accounting, and construction of the execution-derived completeness evidence. `intlify_resource`, language producers, `intlify_contract`, and `intlify_linker` remain synchronous filesystem-neutral cores. The CLI may reuse the shared path-representability, deterministic native discovery ordering, file-symlink, directory-symlink, metadata, and physical-identity primitives, but it does not reuse direct-operand classification or formatter/linter ignore semantics.
+
+The project-inventory workflow selects definition paths only through linker-participating `resources.catalogs` definitions, reference source paths through resolved producer include patterns, and external reference artifacts through their exact resolved declarations. These explicit sets are authoritative. Root `.gitignore`, `--ignore-path`, `fmt.ignorePatterns`, `lint.ignorePatterns`, the ordinary hidden-file exclusion, and the default dependency/output-directory exclusion cannot silently remove an input from a closed-world link. Configuration-owned include/exclude policy must express any omission.
+
+A zero-match valid pattern is a complete empty selection, not a fallback request or implicit scan. Conversely, an enumeration, metadata, read, extraction, projection, producer, or external-artifact failure remains attached to its configured inventory participant and prevents the affected completeness side from becoming `Closed`. `--target` changes only delivery/export selection and never narrows either evidence inventory. The exact inventory, failure-to-completeness mapping, and no-generation/no-mutation gates remain owned by 014.
 
 ## Deferred Follow-Up Notes
 

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 770" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1050" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">Phase 3D LSP and editor architecture</title>
-<desc id="desc">The editor integration owns document URI and version state, request routing, position conversion, and protocol results. Standalone mf2 files use an editor-owned framing adapter. Opt-in catalogs use the shared intlify_resource resolver and registry, whose built-in host adapters parse, extract, map, and validate write-back. Both paths expose an editor-local message entry view to the LSP-agnostic message core. The editor maps diagnostics to protocol positions and projects standalone framing or validated catalog replacements into TextEdit values.</desc>
+<desc id="desc">The editor integration owns document URI and version state, request routing, position conversion, and protocol results. Standalone mf2 files use an editor-owned framing adapter. Opt-in catalogs use the shared intlify_resource resolver and registry, whose built-in host adapters parse, extract, map, and validate write-back. Both paths expose an editor-local message entry view to the LSP-agnostic message core. An additive project-backed linker session combines complete disk inventory with current open-buffer overrides, derives scope completeness, calls the shared intlify_linker, and projects LinkOutcome findings only after configuration, inventory, source, and document generations still match.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -21,6 +21,7 @@
     .output { fill:#475569; }
     .future { fill:#64748b; }
     .entrymodel { fill:#b45309; }
+    .linker { fill:#9333ea; }
     .note { fill:#e2e8f0; stroke:#cbd5e1; }
     .arrow { stroke:#64748b; }
     .dashed { stroke:#64748b; stroke-dasharray:8 7; }
@@ -46,7 +47,7 @@
   </style>
 </defs>
 
-<rect x="0" y="0" width="1240" height="770" fill="none"/>
+<rect x="0" y="0" width="1240" height="1050" fill="none"/>
 
 <text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Phase 3D LSP and editor architecture</text>
 <text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">The editor integration orchestrates an editor-owned standalone path and the shared resource catalog path over one entry view.</text>
@@ -187,4 +188,37 @@
 <!-- Arrows: mapping to outputs -->
 <path d="M 600 568 L 575 568" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 <path d="M 600 658 L 575 658" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<!-- Project-backed linker diagnostics -->
+<rect x="46" y="750" width="1148" height="255" rx="14" class="adapter-boundary" stroke-width="2"/>
+<text x="620" y="782" font-size="16" font-weight="700" text-anchor="middle" class="label">Project-backed linker diagnostics (additive 014 integration)</text>
+<text x="620" y="804" font-size="11.5" text-anchor="middle" class="muted">disk inventory and current buffers form one generation-checked project snapshot; editor code never reimplements linker semantics</text>
+
+<rect x="75" y="828" width="250" height="68" rx="8" class="output"/>
+<text x="200" y="850" font-size="12.2" font-weight="700" text-anchor="middle" class="white">resolved project inventory</text>
+<text x="200" y="868" font-size="10.4" text-anchor="middle" class="soft-white">disk definitions + producer sources</text>
+<text x="200" y="884" font-size="10.4" text-anchor="middle" class="soft-white">inventory generation</text>
+
+<rect x="350" y="828" width="250" height="68" rx="8" class="entrymodel"/>
+<text x="475" y="850" font-size="12.2" font-weight="700" text-anchor="middle" class="white">open-buffer overrides</text>
+<text x="475" y="868" font-size="10.4" text-anchor="middle" class="soft-white">current URI + document version</text>
+<text x="475" y="884" font-size="10.4" text-anchor="middle" class="soft-white">replace matching disk bytes</text>
+
+<rect x="625" y="828" width="250" height="68" rx="8" class="note" stroke-width="1.5"/>
+<text x="750" y="850" font-size="12.2" font-weight="700" text-anchor="middle" class="note-text">resolved project config</text>
+<text x="750" y="868" font-size="10.4" text-anchor="middle" class="note-text">resources + messages + graph</text>
+<text x="750" y="884" font-size="10.4" text-anchor="middle" class="note-text">config generation</text>
+
+<rect x="220" y="925" width="520" height="58" rx="8" class="linker"/>
+<text x="480" y="948" font-size="12.5" font-weight="700" text-anchor="middle" class="white">editor link session</text>
+<text x="480" y="968" font-size="10.5" text-anchor="middle" class="soft-white">select one source · derive completeness · intlify_linker::link</text>
+
+<rect x="805" y="925" width="340" height="58" rx="8" class="lint"/>
+<text x="975" y="948" font-size="12.5" font-weight="700" text-anchor="middle" class="white">LinkOutcome → LSP projection</text>
+<text x="975" y="968" font-size="10.4" text-anchor="middle" class="soft-white">generation gate · primary + related evidence</text>
+
+<path d="M 200 896 L 200 912 L 340 912 L 340 925" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 475 896 L 475 925" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 750 896 L 750 912 L 650 912 L 650 925" fill="none" class="arrow" stroke-width="2.1" marker-end="url(#arrow)"/>
+<path d="M 740 954 L 805 954" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 </svg>
