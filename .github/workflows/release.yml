@@ -67,7 +67,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
           components: rustfmt, clippy
 
       - name: Add wasm target
@@ -172,7 +172,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -275,7 +275,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -378,7 +378,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -520,7 +520,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Add wasm target
         run: rustup target add wasm32-unknown-unknown
@@ -680,7 +680,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -814,7 +814,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.97.0'
+          toolchain: '1.97.1'
 
       - name: Smoke test published crate
         run: node scripts/smoke-published-crate.mjs
