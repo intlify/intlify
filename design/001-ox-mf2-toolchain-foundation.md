@@ -258,19 +258,23 @@ crates/
                     # resource limits, and validated write-back re-escaping
   intlify_contract  # versioned message reference/definition artifacts, selector
                     # and domain contracts, wire compatibility, conformance
-  intlify_producer_js # initial JS/TS reference production; no link resolution
+  intlify_producer_js # initial JS/TS reference production;
+                      # Vue SFC reference production is a later phase;
+                      # no link resolution
   intlify_linker    # language-neutral resolution, reachability, findings,
-                    # and bundle plans
+                    # bundle plans, and the M1 key-only typed-key model
   intlify_export    # shared export preparation, validated batches, exporter
                     # contract, common output artifacts, and built-in exporters
   intlify_producer_bin # later native/WASM tagged-reference scanning
 ```
 
-`intlify_format` and `intlify_lint` depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. `intlify_resource` remains independent of the parser, formatter, linter, and linker cores. It exposes complete extraction artifacts but neither imports `intlify_contract` nor aggregates files. A host-owned definition producer outside `intlify_resource` combines each successful extraction with its resolved catalog assignment and projects the result into the definition-artifact contract without performing selector matching or reachability analysis.
+`intlify_format` and `intlify_lint` depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. `intlify_resource` remains independent of the parser, formatter, linter, contract, and linker cores. It exposes complete extraction artifacts but neither imports `intlify_contract` nor aggregates files. `intlify_contract` likewise does not import `intlify_resource`; similarly named catalog-key, scope, locale, and entry-reference values remain boundary-specific checked types rather than shared Rust types.
+
+For linker definition production, the `intlify_cli` project inventory enumerates logical catalog targets, inspects physical identity, and forms canonically ordered physical-source groups. A host-owned pre-extraction stage validates each already formed group's assignments and portable path/alias limits, `intlify_resource` extracts that physical source once, and a host-owned post-extraction projection performs checked conversion into one `MessageDefinitionArtifact`. Neither stage performs selector matching or reachability analysis.
 
 `intlify_contract` owns the public, versioned interchange boundary. Language-specific producers emit that boundary, and `intlify_linker` consumes it without parsing source languages, catalog host formats, or depending on `intlify_lint`.
 
-`intlify_export` owns the M3 shared export-preparation and exporter boundary. It depends on `intlify_linker`, `intlify_contract`, and `ox_mf2_parser`, reuses parser syntax and semantic validation, and exposes an opaque validated batch before any exporter invocation. This keeps `intlify_linker` parser-independent while allowing non-CLI build integrations to reuse the same preparation, common output, error, and built-in exporter contracts.
+`intlify_export` owns the M3 shared export-preparation and exporter boundary. It depends on `intlify_linker`, `intlify_contract`, and `ox_mf2_parser`, validates the identity-deduplicated union of plan-selected delivery definitions and M1 baseline definitions required for typed signatures, derives any MF2 argument-signature information required by typed platform output, and exposes an opaque validated batch before any exporter invocation. The M1 linker model carries only resolved scope plus domain-qualified message-key identity; it never parses a payload or carries an MF2 argument signature. This keeps `intlify_linker` parser-independent while allowing non-CLI build integrations to reuse the same preparation, common output, error, and built-in exporter contracts.
 
 `intlify_cli` composes the message-level, resource, producer, linker, and exporter workflows required by each command. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal crates do not imply crates.io publishing.
 
@@ -390,7 +394,7 @@ The third phase expands ox-mf2 into broader tooling workflows.
 - editor workflow cache and repeated query model
 - versioned message reference and definition artifact contracts
 - language-specific reference producers and language-neutral message linking
-- deterministic linker findings, bundle plans, export preparation, and platform build integration
+- deterministic linker findings, bundle plans, the M1 key-only typed-key model, export preparation, and platform build integration
 - optional MessagePack transport for internal language-service sessions
 - editor workflow benchmarks that separate parser, semantic, snapshot, transport, and binding costs
 

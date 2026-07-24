@@ -41,15 +41,17 @@ It builds on four related designs:
 
 The future `intlify_contract` boundary owns public artifact types, wire compatibility, version negotiation, selector wire grammar, the normative selector semantics for each catalog-key domain, and producer/linker conformance fixtures.
 
-Language-specific producers own source, object, or binary analysis and emit that contract.
+Language-specific producers own source, object, or binary analysis and emit that contract. When an editor feature requires language-specific source recognition or spelling conversion, the applicable producer also owns the checked language frontend query or projection; E0 therefore reuses `intlify_producer_js` rather than teaching the editor or linker JavaScript grammar.
 
-The future `intlify_linker` core consumes only reference artifacts, definition artifacts, checked scope mapping and completeness inputs, a resolved link policy, and the delivery graph; it owns execution of the contract-defined selector matching, resolution, reachability, placement, findings, bundle plans, and linker-result identity composites such as `DefinitionLocation`.
+The future `intlify_linker` core consumes only reference artifacts, definition artifacts, checked scope mapping and completeness inputs, a resolved link policy, and the delivery graph; it owns execution of the contract-defined selector matching, resolution, reachability, placement, findings, bundle plans, the M1 key-only typed-key model, and linker-result identity composites such as `DefinitionLocation`. The M1 model carries resolved scope and domain-qualified message-key identity only; the linker never parses `MessagePayload` or derives an MF2 argument signature.
 
 `intlify_resource` remains the sole owner of catalog assignment, host parsing, message entry extraction, catalog-key production and domain issuance, source spans, and validated write-back.
 
 It emits canonical domain-qualified keys but has no selector-matching API and never expands selectors. `intlify_linker` returns linker-owned findings without depending on `intlify_lint`; a later lint integration presents those findings through its rule and reporting contracts.
 
-The workspace-internal `intlify_export` crate owns shared MF2 export preparation, mapped export diagnostics, `ValidatedExportBatch`, the object-safe exporter trait, common exporter output/error contracts, and built-in exporters. It depends on `intlify_linker`, `intlify_contract`, and `ox_mf2_parser`; `intlify_linker` never gains a parser or exporter dependency.
+`intlify_resource` and `intlify_contract` own distinct boundary-specific Rust newtypes and neither crate depends on the other. Matching catalog-key, scope, locale, structural-path, and entry-reference semantics do not imply shared representations. The host-owned post-extraction projection performs the checked bridge and must surface any value, variant, or limit incompatibility before constructing an artifact.
+
+The workspace-internal `intlify_export` crate owns shared MF2 export preparation, mapped export diagnostics, parser-backed MF2 argument-signature derivation for typed platform output, `ValidatedExportBatch`, the object-safe exporter trait, common exporter output/error contracts, and built-in exporters. Its preparation gate validates the identity-deduplicated union of plan-selected delivery definitions and the coverage-baseline definitions required by admitted M1 models. It depends on `intlify_linker`, `intlify_contract`, and `ox_mf2_parser`; `intlify_linker` never gains a parser or exporter dependency.
 
 Platform integrations own build-graph adaptation, checked exporter construction and selection, invocation orchestration, destination mapping, and final registration. The initial `intlify_cli` integration owns the built-in target registry and typed factory wiring but not the shared preparation, exporter, or output contracts. Runtimes own loading policy after consuming generated assets and loader maps.
 
@@ -95,11 +97,11 @@ The linker first applies one checked host scope-mapping table, then resolves ref
 
 ![ox-mf2 message linker architecture including platform build integrations](./assets/014-ox-mf2-message-linker-architecture.svg)
 
-The linker never parses JS/TS source, Rust crates, or C/C++ objects directly. Each language producer emits a common-format `MessageReferenceArtifact`; on the catalog side, a host-owned definition projection outside `intlify_resource` combines each complete extraction with its resolved catalog assignment and constructs one common-format `MessageDefinitionArtifact`.
+The linker never parses JS/TS source, Rust crates, or C/C++ objects directly. Each language producer emits a common-format `MessageReferenceArtifact`; on the catalog side, `intlify_cli` forms physical-source groups, a host-owned pre-extraction stage admits each group, `intlify_resource` extracts it once, and a host-owned post-extraction projection constructs one common-format `MessageDefinitionArtifact`.
 
 The linker consumes only the two artifacts, a checked `ScopeMappingTable`, a checked `ScopeCompletenessTable`, the resolved link policy, and the delivery graph.
 
-A platform build integration orchestrates the surrounding workflow: it runs the relevant producer or scanner, resolves policy, supplies any checked host-owned scope mapping, derives scope completeness from configured inputs and their execution results, supplies the delivery graph, invokes the linker and selected exporter, and registers emitted artifacts with the build system. The M0-owned built-in CLI/editor orchestration contract always supplies the checked empty mapping table when a later M3/M5/L0 surface invokes it; M0 alone exposes no such user-facing surface.
+A platform build integration orchestrates the surrounding workflow: it runs the relevant producer or scanner, resolves policy, supplies any checked host-owned scope mapping, derives scope completeness from configured inputs and their execution results, supplies the delivery graph, invokes the linker and selected exporter, and registers emitted artifacts with the build system. The M0-owned built-in CLI/editor orchestration contract always supplies the checked empty mapping table when a later E0/M3/M5/L0 surface invokes it; M0 alone exposes no such user-facing surface.
 
 ### Architecture Components
 
@@ -108,6 +110,8 @@ The diagram separates language- and host-specific input production from language
 #### Reference producer path
 
 Runs outside the linker core and recognizes message usage in one source or build artifact format. A JS/TS producer may inspect an AST and bundler graph, while native producers may use macros plus object or final-binary scanning.
+
+The M0 built-in path is `intlify_producer_js`, covering JavaScript and TypeScript syntax. Vue SFC reference production is the next producer phase tracked in Deferred Follow-Up Notes. Rust, C/C++, and WASM reference production belongs to the later native track and is not presented as an M0 implementation.
 
 The producer owns language-specific recognition, provenance, and delivery-unit attribution; it does not resolve references against catalogs.
 
@@ -119,17 +123,24 @@ The artifact identity plus each array ordinal gives every reference record a det
 
 #### Catalog definition path
 
-Uses the configured `intlify_resource` registry and host-format adapters to extract messages from catalog files. The resource boundary owns host parsing, canonical catalog keys, message text, source spans, and validated write-back; it does not import the linker contract, inspect application code, aggregate files, or decide reachability.
+Begins in the `intlify_cli` project inventory. It enumerates configured logical catalog targets, resolves each assignment, inspects physical identity, forms one group per selected physical source, and fixes the canonical primary-plus-alias order.
 
-#### Host-owned definition projection
+The CLI alone owns this grouping. Physical identity remains local execution evidence and never enters the artifact contract.
 
-Consumes one successful `intlify_resource` extraction plus its resolved project catalog assignment. It validates the physical-alias group's equal namespace, host-format, scope, and locale binding; selects the canonical primary source identity and ordered aliases; and constructs the `MessageDefinitionArtifact` through `intlify_contract`.
+#### Host-owned definition production
 
-The initial implementation is a shared module in the `intlify_cli` project-inventory layer rather than a new crate. It owns no host parser, catalog-key semantics, selector matching, reachability, or linker analysis. A later non-CLI host must reuse this exact boundary or extract it into a shared crate before implementing another projection path; it must not duplicate the rules independently or move them into `intlify_resource`.
+Uses two explicit stages around one resource extraction:
+
+1. The pre-extraction stage consumes an already formed physical-source group. It validates equal namespace, host-format profile, scope, and locale binding; validates the complete portable primary-plus-alias set and its limits; and rejects the whole group before any host parse on failure.
+2. After admission, the CLI invokes the configured `intlify_resource` adapter exactly once. The post-extraction stage consumes that complete successful extraction and the admitted group, performs checked resource-to-contract conversion, and constructs one `MessageDefinitionArtifact`.
+
+The resource boundary owns host parsing, canonical catalog keys, message text, source spans, and validated write-back. It does not import the linker contract, inspect application code, aggregate files, or decide reachability.
+
+The initial two-stage implementation is a shared module in the `intlify_cli` project-inventory layer rather than a new crate. It owns no host parser, catalog-key semantics, selector matching, reachability, or linker analysis. A later non-CLI host must reuse this exact boundary or extract it into a shared crate before implementing another definition-production path; it must not duplicate the rules independently or move them into `intlify_resource`.
 
 #### Message Definition Artifact
 
-Projects exactly one completely extracted, selected catalog source document into ordered language-neutral definitions containing a portable namespaced source identity, scope, key domain, canonical key, locale, message payload, and source-entry evidence.
+Represents exactly one admitted physical-source group after one complete extraction. Its primary portable source identity and ordered aliases describe the group, while its ordered language-neutral definitions carry scope, key domain, canonical key, locale, message payload, and source-entry evidence.
 
 It is the only catalog-definition input accepted by the linker core; several source artifacts compose through `LinkRequest`.
 
@@ -138,6 +149,8 @@ It is the only catalog-definition input accepted by the linker core; several sou
 Carries the final application's checked, exact, one-hop structural-scope mappings. It permits explicit many-to-one equivalence, leaves unmapped scopes unchanged, and forbids artifact rewriting, chains, cycles, namespace inference, and name-only fallback.
 
 The host constructs it through the checked typed API and the linker applies it uniformly before semantic indexing. The M0-owned built-in CLI/editor configuration contract exposes no mapping field and supplies the empty table when activated by a later surface; non-empty M0 tables are available only to custom in-process build integrations.
+
+When many-to-one resolution collapses scope-keyed policy, equal configured-root reasons or coverage-baseline locales merge canonically. Unequal values make the resolved request invalid; no source scope wins by order.
 
 #### Scope Completeness Table
 
@@ -177,7 +190,7 @@ Produces typed linker findings and related evidence for ambiguous, unresolved, m
 
 #### Linker findings
 
-Feed `intlify lint` and future editor integration through the diagnostic, rule, and catalog-finding contracts owned by 008 and 013. Consumers present the findings but do not rerun link analysis.
+Feed `intlify lint` through the rule, severity, counting, result, and reporter contracts owned by 008, with concrete catalog-entry evidence mapped through 013. They feed editor integrations through the projection, publication, generation, and lifecycle contracts owned by 009, again using 013 for concrete catalog-entry and host-span mapping. Consumers present the findings but do not rerun link analysis or move editor behavior into the linker.
 
 #### `MessageBundlePlan`
 
@@ -185,11 +198,19 @@ Records the deterministic resolved-message selection and placement for one reque
 
 Each selected `ResolvedMessage` is a fully owned immutable snapshot of the exact resolved scope, domain-qualified key, selected definition locale, decoded message payload, and definition location. It is an input to shared export preparation, not a directly callable exporter argument, runtime serialization format, or loading policy.
 
+#### M1 typed-key model
+
+Records one deterministic language-neutral key surface for an explicitly configured resolved scope after the coverage-baseline gate. It carries the resolved scope and canonical domain-qualified message keys only.
+
+It contains no parsed MF2 state, argument signature, platform source, logical output path, destination, or runtime binding. M3 export preparation owns parser-backed argument-signature derivation when a platform representation requires it.
+
+For that M3 handoff, the checked `LinkOutcome` privately retains one exact unambiguous coverage-baseline definition snapshot for every admitted model key. This baseline-source relation is not part of the public M1 model and is not exposed as parser state. It lets preparation consume the already checked payload and `DefinitionLocation` without reloading an artifact or choosing among competing definitions.
+
 #### Platform build integrations
 
 Orchestrate the platform build around the neutral contracts.
 
-A Vite/Rolldown plugin, Cargo task or `build.rs`, CMake integration, or another toolchain adapter runs producers or scanners, supplies the checked host-owned scope mapping table and execution-derived completeness table, supplies the delivery graph, invokes the linker, and asks `intlify_export` to create one opaque `ValidatedExportBatch` before invoking exactly one selected exporter for the export transaction. Built-in M0 integrations use the empty mapping table; a custom in-process integration may construct a non-empty table through the same checked API.
+A Vite/Rolldown plugin, Cargo task or `build.rs`, CMake integration, or another toolchain adapter runs producers or scanners, supplies the checked host-owned scope mapping table and execution-derived completeness table, supplies the delivery graph, invokes the linker, and asks `intlify_export` to create one opaque `ValidatedExportBatch` over the admitted plans, M1 key models, and M3 validation state before invoking exactly one selected exporter for the export transaction. Built-in M0 integrations use the empty mapping table; a custom in-process integration may construct a non-empty table through the same checked API.
 
 It maps each generic returned artifact's portable relative logical path, kind, payload, and metadata into platform-specific registration and then registers the one returned `ExportArtifactSet` in the final build. A parser or semantic diagnostic produces no batch, invokes no exporter, and publishes no partial asset or manifest.
 
@@ -199,7 +220,7 @@ One exporter may return multiple artifacts and artifact kinds in its one set.
 
 #### Platform exporters
 
-Convert the message-validated plans and their selected definition snapshots exposed read-only through `ValidatedExportBatch` into an ordered list of generic `ExportArtifact` records representing ESM, binary blobs, baked Rust, generated C/C++, or outputs for other languages and platforms.
+Convert the message-validated plans, their selected definition snapshots, and any admitted M1 key models plus M3-derived validated argument signatures exposed read-only through `ValidatedExportBatch` into an ordered list of generic `ExportArtifact` records representing ESM, binary blobs, baked Rust, generated C/C++, or outputs for other languages and platforms.
 
 Each record uses an open namespaced semantic `ExportArtifactKind` plus an explicit kind-specific `ExportArtifactFormatVersion`; loader maps and manifests are ordinary artifacts with distinct kinds in the same list rather than side-channel result fields.
 
@@ -542,11 +563,15 @@ Fourth, one complete `reason_bytes` pass visits every present reason in record-o
 
 Sixth, one complete `path_segment_bytes` pass visits those origins in record-ordinal order and each decoded segment in segment order. Seventh, one complete `path_bytes` pass visits the same origins in record-ordinal order and adds each already admitted complete segment to a counter reset for that path.
 
-All four passes use the established `ReferenceArtifactGroup(identity)` subject. `ReasonBytes`, `PathSegments`, and `PathSegmentBytes` return exactly `Exact(effective_limit + 1)`; `PathBytes` returns the exact attempted per-path running total.
+Eighth, one catalog-key structural parse/token phase visits every `Exact` and `Prefix` payload in record-ordinal order and each decoded domain token from left to right. It performs the selected domain's separator, escape, typed-segment, complete-key or non-empty-prefix grammar together with `catalog_key_tokens` admission. `Pattern`, `AllInScope`, and `UnboundedDynamic` contribute nothing to this phase.
 
-An earlier complete pass wins over every later failure regardless of record ordinal. Only after all seven admission phases succeed does validation continue with remaining domain-specific path/literal rules, selector semantics, reason grammar, origin path grammar and span validation, and other record fields.
+As in pattern parsing, a structural error or token overrun is selected at the first failing segment in canonical record-and-segment order. Validation does not fabricate a token count for malformed input or continue to a later record merely to find a token overrun.
 
-Sequential, cached, partitioned, and parallel implementations must expose the same phase and canonical-order result without retaining a reason, path, segment, or ordinal in limit evidence.
+The reason and path passes use the established `ReferenceArtifactGroup(identity)` subject. `ReasonBytes`, `PathSegments`, and `PathSegmentBytes` return exactly `Exact(effective_limit + 1)`; `PathBytes` returns the exact attempted per-path running total. The structural-token phase uses the same subject and returns `CatalogKeyTokens` with exactly `Exact(effective_limit + 1)`.
+
+An earlier complete pass wins over every later failure regardless of record ordinal. Only after all eight admission phases succeed does validation continue with remaining selector semantics, reason grammar, origin path grammar and span validation, and other record fields.
+
+Sequential, cached, partitioned, and parallel implementations must expose the same phase and canonical-order result without retaining a key, prefix, token, reason, path, segment, or ordinal in limit evidence.
 
 Each per-artifact record count is checked during the complete per-artifact phase.
 
@@ -728,6 +753,7 @@ pub enum LinkLimitCounter {
     BundlePlansTotal,
     ResolvedMessagesTotal,
     BundlePlanBytesTotal,
+    CatalogKeyTokens,
     // Later owning decisions add explicit variants; there is no custom-string case.
 }
 
@@ -756,7 +782,7 @@ pub struct LinkLimitEvidence {
 }
 ```
 
-The fields are private and exposed read-only through a checked constructor. The forty currently fixed counter variants form a closed set.
+The fields are private and exposed read-only through a checked constructor. The forty-one currently fixed counter variants form a closed set.
 
 Within the reference-request, definition-request, delivery-graph, and resolved-policy groups, declaration order matches the non-interleaved local precedence fixed in their owning sections.
 
@@ -773,6 +799,8 @@ The per-artifact transport/accounting counters follow without renumbering those 
 The linker-result counters are appended without renumbering any input counter. `FindingsTotal` and `FindingBytesTotal` occupy ordinals 36 and 37. `BundlePlansTotal`, `ResolvedMessagesTotal`, and `BundlePlanBytesTotal` occupy ordinals 38 through 40.
 
 The finding counters run only after semantic suppression and canonical finding construction rules have selected the complete final finding candidate set. The plan counters run only when that set contains no blocking finding and therefore admits plan construction.
+
+`CatalogKeyTokens` is appended as the forty-first variant without renumbering the forty previously fixed counters. Its owning definition- and reference-artifact phases run beside domain-specific `CatalogKey` or prefix parsing rather than at its enum declaration position. The variant is active from M0 and has the same fixed protocol ceiling of `256` as the coordinated 013 source contract.
 
 Their declaration order groups one artifact kind's wire and decoded boundary and does not create cross-artifact-kind precedence. Field-, path-, and artifact-level variants follow their owning contexts' local phases rather than creating a cross-input group by declaration position.
 
@@ -822,6 +850,7 @@ Structured adapters use these exact spellings. The common v0.1 counter registry 
 | `BundlePlansTotal`                    | `bundle_plans_total`                      |
 | `ResolvedMessagesTotal`               | `resolved_messages_total`                 |
 | `BundlePlanBytesTotal`                | `bundle_plan_bytes_total`                 |
+| `CatalogKeyTokens`                    | `catalog_key_tokens`                      |
 
 There is no unknown, other, custom, or raw-string counter. Adding a later policy or output counter adds one explicit variant and its ordering/ceiling/subject invariants through the owning compatibility decision rather than accepting an extension string.
 
@@ -1246,6 +1275,8 @@ Each of the other three reference variants requires the exact selected `Referenc
 
 `EntryStructuralPathBytes`, `CatalogKeyBytes`, `MessageBytes`, and `TotalMessageBytes` also require exactly `DefinitionArtifactGroup(source)` and never retain a raw field, `EntryReference`, definition index, occurrence index, or an arbitrary duplicate artifact occurrence.
 
+`CatalogKeyTokens` requires exactly `DefinitionArtifactGroup(source)` for a definition key and exactly `ReferenceArtifactGroup(identity)` for an `Exact` or `Prefix` selector path. It never accepts `Request`, a raw key or prefix, a decoded token, a definition index, a record ordinal, or a complete submitted token count.
+
 `CatalogScopeNameBytes` requires the exact owning `ReferenceArtifactGroup(identity)`, `DefinitionArtifactGroup(source)`, `ResolvedPolicy`, or payload-free `ScopeMappings` subject according to whether the occurrence belongs to a reference artifact, definition artifact, policy/completeness input, or scope-mapping endpoint; it never accepts `Request`, a raw `CatalogScopeName` or `CatalogScopeId`, a record/mapping index, or another subject.
 
 `ScopeMappingEntries` also requires exactly the payload-free `ScopeMappings` subject; it never accepts `Request`, an individual mapping, an endpoint, or an entry index.
@@ -1273,6 +1304,8 @@ A later locale- or scope-bearing context must add its one bounded owning subject
 ##### Limit observations
 
 For `LocaleBytes`, `EntryStructuralPathBytes`, `CatalogKeyBytes`, `MessageBytes`, `CatalogScopeNameBytes`, `ReasonBytes`, and `PathSegmentBytes`, `attempted` is always exactly `effective_limit + 1`; every valid effective limit is at most `67,108,864`, so `ArithmeticOverflow` is unconstructible for those counters.
+
+`CatalogKeyTokens` also always returns exactly `Exact(effective_limit + 1)`. Domain parsing checks the incremented structural-token count before retaining the next token, and direct construction or cache revalidation never substitutes a complete submitted count. Its protocol ceiling is `256`, so `ArithmeticOverflow` is unconstructible.
 
 Streaming decode stops field-byte accounting at that first attempted byte and does not retain, re-decode, or scan the remainder merely to compute a complete submitted length; direct construction and cache revalidation report the same canonical observation even when a complete length is already available.
 
@@ -1472,7 +1505,7 @@ Changing the root member set, requiredness, field meaning, or canonical name fol
 
 #### Message key domains and selector semantics
 
-A message key is **not restricted to an object path** and has no universal dot-separated format. The linker-facing identity is the opaque, canonical `CatalogKey` defined by 013 and interpreted only together with its `CatalogKeyDomain`.
+A message key is **not restricted to an object path** and has no universal dot-separated format. 013 defines the canonical catalog-key semantics and resource-owned value. `intlify_contract` owns the distinct checked linker-facing `CatalogKey` and `CatalogKeyDomain`, and the host-owned post-extraction projection reconstructs those contract values from the resource values. The linker interprets a `CatalogKey` only together with its `CatalogKeyDomain`.
 
 For example, JSON uses RFC 6901 JSON Pointer (`/checkout/title`), YAML uses a typed path (`/k:str:checkout/k:str:title`), and XLIFF uses its unit hierarchy. A literal JSON member named `checkout.title` canonicalizes to `/checkout.title`, which is distinct from the nested JSON path `/checkout/title`.
 
@@ -1496,6 +1529,20 @@ The actual escaped JSON token contributes to `reference_artifact_wire_bytes`; th
 Because the accepted set is closed and its longest token is 15 bytes, M0 has no caller-adjustable `catalog_key_domain_bytes` limit. Adding a built-in domain requires a coordinated 013 semantic contract, artifact schema/version decision, canonical ordering and fingerprint update, and conformance fixtures.
 
 A third-party domain cannot claim an arbitrary token under v0.1.
+
+##### Catalog-key structural-token limit
+
+Every admitted complete `CatalogKey` and every admitted structural `Prefix` contains at most `256` decoded domain tokens. The domain-valid empty root key contains zero tokens; `Prefix` remains independently non-empty and therefore contains at least one.
+
+One token is one path segment after the selected domain's separator, escape, and typed-segment grammar have been validated. JSON Pointer segments, YAML typed segments, and XLIFF typed hierarchy segments each count once independently of their decoded or encoded byte length. No layer counts slash separators, JSON escaping, the XLIFF concrete source/target side omitted from its logical catalog key, a display key, or a host path component.
+
+`CatalogKeyTokens` is the forty-first common `LinkLimitCounter` variant, with exact structured spelling `catalog_key_tokens` and an inclusive protocol ceiling of `256`. It applies independently to every `MessageDefinition.key`, `Exact.key`, and `Prefix.prefix`. A caller may select a lower immutable value through `LinkLimits`, including zero, but cannot raise the protocol ceiling.
+
+Domain parsing walks tokens from left to right and checks the incremented count before retaining the next token. The first token above the effective limit rejects the complete artifact with `CatalogKeyTokens`, exactly `Exact(effective_limit + 1)`, and the established owning `DefinitionArtifactGroup(source)` or `ReferenceArtifactGroup(identity)`. Evidence never retains the key, prefix, token, definition index, record ordinal, or complete submitted token count.
+
+The 013 source contract independently rejects a resource-produced catalog key above the same fixed protocol maximum before publishing an extraction artifact. Definition projection rechecks the contract-owned value and applies any lower linker budget. Serialized decode, direct checked construction, cache revalidation, and defensive linker admission perform the same structural check, so an artifact that did not pass through 013 cannot bypass the candidate ceiling.
+
+This token ceiling is a public catalog-key contract, not an inference from one parser's recursion or host nesting setting. The current built-in 013 adapters prove the same value from their format-specific nesting and key-derivation rules, but a future producer or adapter must satisfy the explicit token contract directly.
 
 Source spellings such as `t('checkout.title')`, `message!(" checkout.title")`, or `useMessageSet('errors.*')` belong to a configured runtime API or producer recognizer; they are not artifact key syntax.
 
@@ -1718,13 +1765,13 @@ It never retains the raw pattern, rejected token, or record ordinal, reports a c
 
 A caller-selected lower immutable value follows the common limits rule, and zero rejects every non-empty `Pattern`.
 
-The value is derived from 013's fixed maximum candidate structural-path depth of 256 tokens. A literal or `*` consumes exactly one candidate token, so a pattern that can match an admitted candidate has at most 256 consuming tokens.
+The value is derived from the coordinated `CatalogKeyTokens` protocol ceiling of `256`, not from an implementation parser's recursion or host-nesting setting. A literal or `*` consumes exactly one candidate token, so a pattern that can match an admitted candidate has at most 256 consuming tokens.
 
 Because adjacent `**` operators are forbidden, at most one `**` can occupy each of the 257 gaps before, between, and after those consuming tokens. The largest potentially matchable pattern therefore has `256 + 257 = 513` tokens.
 
-Any larger admitted spelling would necessarily require at least 257 consuming tokens and could never match a 013-admitted candidate. `*/*` and the alternating maximum remain expressible; the token ceiling does not count decoded token bytes or NFA state pairs.
+Any larger admitted spelling would necessarily require at least 257 consuming tokens and could never match a protocol-admitted candidate. `*/*` and the alternating maximum remain expressible; the token ceiling does not count decoded token bytes or NFA state pairs.
 
-This derivation is part of the coordinated 013/014 contract rather than a universal glob constant. Changing 013's maximum structural depth requires re-evaluating the formula `2 × candidate_token_ceiling + 1`, its protocol value, artifact compatibility, work ceilings, and fixtures.
+This derivation is part of the coordinated 013/014 catalog-key contract rather than a universal glob constant. Changing the `CatalogKeyTokens` protocol ceiling requires re-evaluating the formula `2 × candidate_token_ceiling + 1`, its protocol value, artifact compatibility, work ceilings, and fixtures in both documents.
 
 An implementation must not infer a larger local value from a parser setting or accept an otherwise unmatchable oversized pattern as a harmless non-match.
 
@@ -1732,7 +1779,7 @@ M0 has no independent caller-adjustable `pattern_match_states` limit for one pat
 
 The implementation computes the exact reachable count with checked `u64` arithmetic and treats a value above the derived maximum as an internal contract invariant failure, not as another configurable resource outcome. There is no separate protocol value to clamp, serialize, or negotiate.
 
-A caller that needs less per-evaluation work lowers `selector_pattern_tokens`; the candidate ceiling remains inherited from the admitted 013 definition contract. Aggregate logical work uses the inclusive request-level `LinkLimits` counter `pattern_match_states_total`.
+A caller that needs less per-evaluation work may lower `selector_pattern_tokens`, `catalog_key_tokens`, or both. A lower candidate budget shrinks admitted definition and `Exact` / `Prefix` paths but does not rewrite the fixed 513-token protocol maximum for `Pattern`; the actual state rectangle is bounded by the effective values for that invocation. Aggregate logical work uses the inclusive request-level `LinkLimits` counter `pattern_match_states_total`.
 
 Thus a single evaluation cannot bypass the aggregate budget, but M0 does not add a redundant per-evaluation knob whose hard ceiling is already completely implied by two existing structural limits.
 
@@ -1818,7 +1865,7 @@ An unsupported selector/domain-contract version or an invalid selector is reject
 
 `AllInScope` is an intentional, explicit bound selected by an API or configuration contract. `UnboundedDynamic` is never a spelling or fallback encoding of `AllInScope`; it preserves the producer's inability to prove a bound so link policy can decide the outcome.
 
-These boundaries keep source syntax in producers, canonical catalog identity in `intlify_resource`, portable semantics in `intlify_contract`, and catalog enumeration and matching in `intlify_linker`.
+These boundaries keep source syntax in producers, canonical catalog identity in `intlify_resource`, portable semantics in `intlify_contract`, filesystem inventory and physical grouping in the host integration, and definition-key enumeration plus selector matching in `intlify_linker`.
 
 #### Public artifact stability
 
@@ -1868,7 +1915,7 @@ Introducing orthogonal feature negotiation later requires concrete evidence and 
 
 ### Message Definition Artifact
 
-One `MessageDefinitionArtifact` represents exactly one selected catalog source document after complete `intlify_resource` extraction and scope/locale binding. Its conceptual envelope and entry shape are:
+One `MessageDefinitionArtifact` represents exactly one admitted physical-source group after one complete `intlify_resource` extraction and checked scope/locale binding. Its conceptual envelope and entry shape are:
 
 ```rust
 pub struct MessageDefinitionArtifact {
@@ -1953,6 +2000,8 @@ The same private-state and complete-construction rule applies to the definition 
 
 It does not perform a wire-byte check, freshness recomputation, host parsing, or MF2 parsing. A failed call returns no artifact and leaves no builder state that can later be completed under a different validation order.
 
+The types shown here are `intlify_contract` types, not aliases or re-exports of resource-owned types with similar names. The host-owned post-extraction projection exhaustively maps the four comparable built-in resource `CatalogKeyDomain` variants, rejects resource `StandaloneMf2`, reconstructs checked contract `CatalogKey`, `CatalogScopeName`, `Locale`, and `EntryReference` values, and propagates every constructor or limit failure. Neither crate imports the other, and no blanket infallible conversion may turn an added resource variant into an accidental linker domain. Coordinated conformance fixtures require the bridge to remain exhaustive.
+
 #### M0 definition-artifact JSON schema
 
 The M0 serialized `MessageDefinitionArtifact` wire is exactly one JSON object encoded as valid UTF-8 without a byte-order mark.
@@ -2025,7 +2074,7 @@ Its bytes still contribute independently per definition occurrence to `definitio
 
 The default ceiling deliberately matches 013's complete source-local `identity_bytes` ceiling, so one structural path admitted by 013 is not rejected merely by definition projection. A caller-selected lower value may intentionally reject it; no layer truncates, hashes, replaces, or normalizes an over-limit path.
 
-The definition-side `MessageDefinition.key` carries the exact canonical `CatalogKey` emitted by 013 and is interpreted only with the record's `CatalogKeyDomain`.
+The definition-side `MessageDefinition.key` carries the exact canonical key value projected from 013's resource-owned `CatalogKey` into the distinct contract-owned `CatalogKey`. It is interpreted only with the record's contract-owned `CatalogKeyDomain`.
 
 Every value independently uses the inclusive field-specific `LinkLimits` counter `catalog_key_bytes`, also with a fixed protocol ceiling of 64 MiB (`67,108,864` decoded UTF-8 bytes). Its public evidence variant is the seventeenth common counter, `CatalogKeyBytes`.
 
@@ -2034,6 +2083,10 @@ A domain-valid empty root key contributes zero and remains valid.
 Key bytes are charged independently per definition occurrence to `definition_artifact_decoded_bytes`, including repeated equal keys. `catalog_key_bytes` is distinct from the reference-side `selector_path_bytes`: the former validates a catalog definition produced by resource extraction, while the latter validates an `Exact` or `Prefix` reference selector, and neither counter borrows, pools, or offsets the other.
 
 The matching numeric ceiling preserves the same single-value compatibility with 013; a caller may select independent lower values for the two counters.
+
+Every definition key also passes the independent `CatalogKeyTokens` contract fixed in [Catalog-key structural-token limit](#catalog-key-structural-token-limit). Its inclusive protocol ceiling is `256` decoded domain tokens, matching 013's fixed source-side ceiling. A domain-valid empty root key contributes zero.
+
+The host-owned projection rechecks the 013-produced key while reconstructing the contract-owned `CatalogKey`; serialized decode, direct checked construction, cache revalidation, and defensive linker admission perform the same check. A caller-selected lower linker limit may reject an otherwise valid 013 artifact without changing the source-side maximum or key identity.
 
 There is no additional `definition_identity_bytes_total` counter. The 013 `identity_bytes` counter remains a source-local producer fact over distinct interned structural-path, catalog-key, and display-key payloads and is enforced before projection.
 
@@ -2117,7 +2170,7 @@ The `kind` member's actual JSON bytes contribute to `definition_artifact_wire_by
   - The slug is one kebab-case component matching `[a-z0-9]+(?:-[a-z0-9]+)*`.
   - There is exactly one `/`; empty components, uppercase, `_`, whitespace, URI schemes, percent encoding, query/fragment text, and additional `/` are invalid rather than normalized.
   - The built-in 013 definition projection uses `dev.intlify/resource-definition`; a third party uses a namespace conventionally controlled by that producer, such as `com.example/custom-json`.
-  - The built-in JS/TS/Vue reference producer uses `dev.intlify/js-reference`. JS, JSX, TS, TSX, and Vue are frontend profiles of that one implementation family rather than separate producer IDs.
+  - The built-in M0 JS/TS reference producer uses `dev.intlify/js-reference`. JS, JSX, TS, and TSX are frontend profiles of that one implementation family rather than separate producer IDs.
   - A release or build identifier belongs in `revision`; a producer does not mint a new id merely because its implementation version changes.
 - `ProducerRevision` is 1–128 decoded ASCII bytes and matches `[A-Za-z0-9][A-Za-z0-9._+-]*`.
   - Uppercase is valid in a revision even though it is forbidden in a producer ID.
@@ -2279,15 +2332,17 @@ Because the final `source_bytes` field supplies its known byte length before its
 
 #### Logical alias grouping and primary identity
 
-The local definition producer resolves catalog membership and binding independently for every selected logical target, then groups targets that the shared 005/013 host inspection identifies as the same physical source. This grouping is only a local production step; it does not add physical identity to the artifact contract.
+The `intlify_cli` project inventory resolves catalog membership and binding independently for every selected logical target, inspects physical identity, then forms the targets into physical-source groups. This grouping and canonical alias ordering occur before the host-owned definition-production boundary and do not add physical identity to the artifact contract.
 
-Every participating alias in one physical group must resolve to the same binding tuple: `ArtifactNamespace`, canonical host-format id, `CatalogScopeId`, and exact locale. A mismatch is a configuration operational error for the complete group.
+The project-backed editor session in 009 reuses this same grouping boundary before applying open-buffer substitution. URI-local parsing, diagnostics, and formatting remain independent, but linker definition production still receives one source snapshot per already formed physical group. One open alias, or several aliases with byte-identical current UTF-8 contents, may provide that snapshot when every contributing URI/version is captured for freshness. Unequal buffers or unresolved group ownership yield `Partial(OpenEditorWorld)`, no group artifact, and no disk fallback; no URI wins by open order, alias order, or primary-path status.
 
-The producer emits no artifact for it and does not pick one binding by config order, discovery order, or path order. Excluded or otherwise non-participating logical targets are absent from the group and from alias evidence.
+The host-owned pre-extraction stage receives one already formed group. Every participating alias must resolve to the same binding tuple: `ArtifactNamespace`, canonical host-format id, `CatalogScopeId`, and exact locale. M0 fixes the namespace to `Project`, and canonical host-format disagreement has already failed through the 013-owned `catalog_format_conflict`. A remaining scope or exact-locale mismatch is the 013-owned `config_validation_failed` with `details.reason: "catalog_binding_conflict"`.
 
-For a valid group, paths are ordered segment-by-segment by exact UTF-8 bytes, with a shorter equal-prefix path first. The first path becomes `SourceDocumentIdentity.path`; the remaining paths become `logical_aliases` in that same order.
+Definition production emits no artifact for it and does not pick one binding by config order, discovery order, or path order. The contradiction constructs no `LinkRequest`, starts no reference-source scan, and never records `SourceFailed`; 013 owns its canonical path-plus-definition selection order and bounded evidence. Excluded or otherwise non-participating logical targets are absent from the group and from alias evidence.
 
-The producer performs one complete extraction and emits one definition artifact whose entries use the primary source identity. Input enumeration order, filesystem enumeration order, symlink traversal order, and command operand order cannot affect the artifact.
+The CLI orders a valid group's paths segment-by-segment by exact UTF-8 bytes, with a shorter equal-prefix path first. The first path becomes `SourceDocumentIdentity.path`; the remaining paths become `logical_aliases` in that same order. Pre-extraction admission validates this complete ordered set and its path/alias limits without regrouping or reordering it.
+
+After admission, the CLI performs one complete extraction. The post-extraction projection emits one definition artifact whose entries use the primary source identity. Input enumeration order, filesystem enumeration order, symlink traversal order, and command operand order cannot affect the artifact.
 
 If two distinct host paths collapse to the same `PortableRelativePath`, production fails as a duplicate logical identity rather than retaining one arbitrarily.
 
@@ -2297,7 +2352,7 @@ Definition linking needs one semantic definition set per source; aliases remain 
 
 ### Locale identity
 
-`Locale` is one shared checked, opaque identity used by 013 catalog binding, every `MessageDefinition`, and resolved policy or output fields that name a locale. Its M0 scalar grammar is exactly one or more Unicode scalar values.
+The contract-owned `Locale` is a checked, opaque identity used by every `MessageDefinition` and resolved policy or output field that names a locale. Its M0 scalar grammar is exactly one or more Unicode scalar values. The 013 resolved binding follows the same value grammar but remains a distinct resource-owned value; the post-extraction projection reconstructs this contract newtype through its checked constructor.
 
 Equality and canonical ordering use the exact decoded UTF-8 bytes and are case-sensitive. No layer trims, Unicode-normalizes, case-folds, replaces `_` with `-`, canonicalizes deprecated subtags, or requires BCP 47, Unicode Locale Identifier, ICU, or POSIX syntax.
 
@@ -2353,7 +2408,7 @@ Input member order is non-semantic; canonical emission orders `namespace` before
 
 A `"package"` kind or a `package` member is invalid in v0.1 rather than a partially supported alternate form.
 
-`CatalogScopeName` is exactly the 013 validated non-empty Unicode-scalar name. Its decoded UTF-8 bytes are retained and compared case-sensitively without trimming, Unicode normalization, case folding, separator rewriting, percent decoding, or locale-sensitive comparison.
+The contract-owned `CatalogScopeName` has the same non-empty Unicode-scalar grammar as the distinct 013 validated resource value. The post-extraction projection reconstructs it through the contract constructor. Its decoded UTF-8 bytes are retained and compared case-sensitively without trimming, Unicode normalization, case folding, separator rewriting, percent decoding, or locale-sensitive comparison.
 
 A bare string such as `"app"`, a combined string such as `"project/app"` or `"com.example/app"`, an array, a request-local integer, a hash, and a producer-defined opaque object are not alternate wire spellings and are never normalized into this object.
 
@@ -2458,6 +2513,19 @@ A mapping that brings incompatible domains into one resolved scope fails the res
 
 A mapping that brings two definitions onto the same resolved `(scope, domain, key, locale)` intentionally exposes the ordinary `ambiguous-message-definition` semantics instead of selecting a winner.
 
+After uniform resolution and resolved-domain consistency, the linker canonicalizes scope-keyed policy before building semantic indexes:
+
+1. M0 configured roots are grouped by resolved `(scope, domain, selector)`.
+2. Beginning with M1, coverage-baseline entries are grouped by resolved scope.
+
+Configured roots in one group collapse to one canonical root only when their optional reasons are equal. Equal baseline entries collapse only when their locales are equal. These merges express the mapping table's intentional many-to-one equivalence; they do not create another policy occurrence or duplicate reachability/model work.
+
+A root group with unequal reasons or a baseline group with unequal locales is an invalid resolved request. The linker returns one fail-complete `LinkOperationalError` mapped to `message_link_failed` with `details.kind: "invalid_request"` before findings, plans, models, export preparation, or cache admission. It never chooses by declared-scope order, configuration order, mapping order, or first/last occurrence and never invents a multi-reason root or multi-baseline scope.
+
+When both collision classes are present, the M0 configured-root pass precedes the appended M1 coverage-baseline pass. Within either class, the smallest canonical resolved policy identity selects the failure. Sequential, partitioned, cached, and parallel implementations expose the same result.
+
+This post-mapping canonicalization does not relax pre-mapping policy validation. Submitted roots, baseline entries, mapping endpoints, and their decoded bytes remain independently charged and validated before resolution; a semantic merge grants no limit deduction. Link-request and incremental-cache identity continue to include the complete canonical pre-mapping policy plus mapping table, even when two entries later collapse to one semantic policy subject.
+
 All semantic indexes, finding subjects, coverage identities, and plan selections use `ResolvedCatalogScopeId`.
 
 The original `CatalogScopeId` remains byte-for-byte in its immutable artifact and is recoverable through reference-record or definition-location provenance; neither the linker nor host writes the target back into an artifact.
@@ -2521,7 +2589,7 @@ On the reference side it means every enabled producer selected for that scope co
 
 An integration derives it only after comparing the resolved inventory with complete successful execution results.
 
-`Partial` records why the integration cannot make that proof. `SourceOmitted` and `SourceFailed` are valid only for `definitions`; `ProducerOmitted` and `ProducerFailed` are valid only for `references`; `OpenEditorWorld` and `ExternalArtifactUnverified` are valid for either side. A successfully decoded exact `producers.artifacts` disk snapshot, or one unambiguous configured open-buffer replacement selected under 009, is authoritative for that invocation and never receives `ExternalArtifactUnverified`. That reason is reserved for a cache, ad hoc editor overlay, package artifact, or another integration-supplied external value that is not tied to an authoritative current-invocation declaration. Invalid selected configured bytes are `ProducerFailed`; ambiguous live-source ownership is `OpenEditorWorld`, and neither case falls back to another snapshot.
+`Partial` records why the integration cannot make that proof. `SourceOmitted` and `SourceFailed` are valid only for `definitions`; `ProducerOmitted` and `ProducerFailed` are valid only for `references`; `OpenEditorWorld` and `ExternalArtifactUnverified` are valid for either side. Configuration-derived catalog assignment, locale, scope, alias-binding, or domain contradictions are not completeness reasons: they fail through their owning `config_validation_failed` contract before a `LinkRequest` exists. A successfully decoded exact `producers.artifacts` disk snapshot, one mapped configured open buffer, or a byte-identical set of mapped buffers selected under 009 is authoritative for that invocation and never receives `ExternalArtifactUnverified`. Every contributing buffer version belongs to the editor freshness snapshot. That reason is reserved for a cache, ad hoc editor overlay, package artifact, or another integration-supplied external value that is not tied to an authoritative current-invocation declaration. Invalid selected configured bytes are `ProducerFailed`; unequal claiming buffers or unresolved live-source ownership are `OpenEditorWorld`, and neither case falls back to another snapshot.
 
 A side-inapplicable reason rejects checked construction. When several causes affect one side, the integration chooses the deterministic most-specific reason in this order: failed input, omitted input, unverified external artifact, then intentionally open editor world.
 
@@ -2581,6 +2649,8 @@ pub fn link(
 Artifact inputs use the private owned values and read-only slices fixed above, while `LinkRequest` borrows those complete immutable values for one call; exact private `Vec`-versus-boxed-slice storage remains an implementation detail.
 
 `LinkOutcome` is a fully owned immutable result with no request lifetime. It retains the checked semantic values needed by every finding and plan, including each selected definition's exact decoded `MessagePayload` and `DefinitionLocation`, rather than borrowing an artifact, policy, mapping table, completeness table, graph, temporary index, or worker arena.
+
+Beginning with M1, it also privately retains the exact baseline definition snapshot related to every key in each admitted typed-key model. That relation is checked during model construction, is unreachable through the public model, and exists only so M3 preparation can validate and derive typed-output signatures from the same definition that established the model key.
 
 Its fields are private. Only `link` constructs it after complete semantic, result-limit, blocking, and plan invariants pass; there is no public constructor, struct literal, setter, mutable slice, deserializer, or post-construction revalidation route.
 
@@ -2661,19 +2731,20 @@ The inherited definition-source counters and the definition-request counters fix
 
 #### Definition extraction limits
 
-The definition producer inherits these inclusive source-local ceilings directly from 013:
+The definition-production boundary inherits these inclusive source-local ceilings directly from 013:
 
 | Counter | Initial protocol ceiling |
 | --- | --: |
 | `host_bytes` | 64 MiB (`67,108,864` bytes) |
 | `entries` / emitted `definitions` | `100,000` |
+| `catalog_key_tokens` for one definition's decoded domain path | `256` |
 | `message_bytes` for one definition's extracted UTF-8 message text | 1 MiB (`1,048,576` bytes) |
 | `total_message_bytes` across one source artifact | 64 MiB (`67,108,864` bytes) |
 | `identity_bytes` for distinct interned structural-path, catalog-key, and present display-key payloads | 64 MiB (`67,108,864` bytes) |
 
-All five counters retain 013's exact admission order, distinct-string accounting, and inclusive-boundary semantics. Under protocol-default limits, every successful 013 extraction is therefore eligible for definition projection without a stricter duplicate source budget.
+All six counters retain 013's exact admission order, structural-token semantics, distinct-string accounting, and inclusive-boundary behavior. Under protocol-default limits, every successful 013 extraction is therefore eligible for definition projection without a stricter duplicate source budget.
 
-A caller-selected lower value may intentionally reject it. The built-in producer consumes the accepted extraction's counters and exact messages without reparsing the host document or maintaining a second interpretation of entry identity.
+A caller-selected lower value may intentionally reject it. The built-in post-extraction projection consumes the accepted extraction's counters and exact messages without reparsing the host document or maintaining a second interpretation of entry identity.
 
 It emits one definition for every admitted entry; a payload that cannot represent one admitted message makes production fail-complete rather than reducing the definition count.
 
@@ -2681,7 +2752,7 @@ It emits one definition for every admitted entry; a payload that cannot represen
 
 A remote consumer validates every observable projected count and payload under the artifact-wire and decoded-budget counters fixed separately; it does not claim to have verified unavailable host bytes.
 
-The open limits work therefore covers reference artifacts, serialized/decoded definition expansion, aliases and paths, aggregate request counts, the delivery graph, and bounded output construction — not replacement values for these five source-local ceilings.
+The open limits work therefore covers reference artifacts, serialized/decoded definition expansion, aliases and paths, aggregate request counts, the delivery graph, and bounded output construction — not replacement values for these six source-local ceilings.
 
 #### Definition artifact byte budgets
 
@@ -2750,7 +2821,11 @@ This preserves source-envelope validation as one complete phase, the already fix
 
 A cache owner with the complete canonical fingerprint inputs may recompute only after structural admission and treats mismatch as stale/cache-miss evidence; `intlify_linker` and a remote consumer never fabricate unavailable inputs or turn mismatch into a semantic finding.
 
-Only after all five passes succeed does validation apply locale and scope-name grammar, domain-specific catalog-key grammar, entry-reference continuity, and the remaining definition-record semantics.
+Only after all five byte/message passes succeed does validation apply locale and scope-name grammar in preserved raw-entry order.
+
+It then runs one complete catalog-key structural parse/token phase over definitions in that same order. For each key, the selected domain's separator, escape, and typed-segment grammar are validated while decoded tokens are admitted from left to right under `catalog_key_tokens`. The first structural failure or token overrun in canonical record-and-segment order wins; validation never invents a token count for malformed input or scans later records merely to find a token overrun.
+
+Only after that phase succeeds does validation apply entry-reference continuity and the remaining definition-record semantics.
 
 A failure in an earlier pass wins even when a later counter would fail at an earlier definition occurrence; decoder strategy, JSON member order, partitioning, and worker completion cannot interleave or reorder the passes.
 
@@ -2761,6 +2836,8 @@ Empty structural paths, domain-valid empty root catalog keys, and empty messages
 A protocol or lower-budget per-value overrun returns its exact `LocaleBytes`, `CatalogScopeNameBytes`, `EntryStructuralPathBytes`, `CatalogKeyBytes`, or `MessageBytes` variant with `DefinitionArtifactGroup(source)` and `Exact(effective_limit + 1)`.
 
 A running message-total overrun instead returns `TotalMessageBytes` with the same subject and the exact attempted sum. Neither form retains a submitted scalar, `CatalogScopeId`, `EntryReference`, definition index, or occurrence index.
+
+A structural-token overrun returns `CatalogKeyTokens` with the same subject and exactly `Exact(effective_limit + 1)`. It retains no raw key, decoded token, definition index, occurrence index, or complete submitted token count.
 
 When linker-side lower-budget revalidation sees several artifact groups, canonical `SourceDocumentIdentity` order selects the first failing group for the current pass; equal-source occurrences retain the same group subject and observation, so their input or worker order cannot change public evidence.
 
@@ -2884,7 +2961,7 @@ Empty `logical_aliases` remains valid; an empty source path is structurally inva
 
 A reference origin applies the three per-path counters to its one path and does not consume the definition-only alias or cumulative counter.
 
-The definition producer applies all five counters to the complete participating physical-source group before extraction. If any ceiling or lower caller budget is exceeded, it rejects the group without extracting, truncating aliases, selecting a smaller subset, or changing the primary path.
+The host-owned pre-extraction stage applies all five counters to the complete participating physical-source group supplied by the CLI inventory. If any ceiling or lower caller budget is exceeded, it rejects the group without extracting, truncating aliases, selecting a smaller subset, changing the primary path, or regrouping aliases.
 
 A reference producer applies the first three before admitting each present origin. The published consumer repeats all observable checks and additionally requires a definition alias sequence to remain sorted and duplicate-free.
 
@@ -2919,9 +2996,9 @@ After construction of checked `Locale` values, the production-locale collection 
 
 An equal duplicate rejects the complete policy; first-wins, last-wins, source-order override, sorting-based retention, and silent set/map normalization are forbidden. This semantic rejection occurs after the submitted collection counters have already charged every occurrence.
 
-A configured root's semantic identity is exactly its checked `(CatalogScopeId, CatalogKeyDomain, MessageSelector)` tuple. `reason` is optional declaration evidence and does not participate in identity or reachability.
+A configured root's declared-policy identity before scope mapping is exactly its checked `(CatalogScopeId, CatalogKeyDomain, MessageSelector)` tuple. `reason` is optional declaration evidence and does not participate in identity or reachability.
 
-Two roots with the same tuple reject the complete policy even when their reasons differ; the resolver never runs both, chooses one reason, or merges reasons into a new multi-reason representation. Both submitted roots remain charged to the collection limit before duplicate detection.
+Two declared roots with the same tuple reject the complete policy even when their reasons differ; the policy constructor never runs both, chooses one reason, or merges reasons into a new multi-reason representation. Both submitted roots remain charged to the collection limit before duplicate detection. The separate post-mapping rule may collapse roots that were distinct only because their declared scopes differed, but only when their reasons are equal.
 
 Beginning with M2, each fallback array is the complete ordered fallback sequence for its one source locale, not an adjacency list. Resolution for source `S` considers `S` first and then the array's targets exactly once in stored order.
 
@@ -3194,7 +3271,7 @@ A caller may retry the same immutable logical inputs with larger valid lower lim
 
 ### Export preparation handoff
 
-Shared export preparation considers only concrete `MessageBundlePlan` values from `Some` and exposes them to exporters only through `ValidatedExportBatch`; exporters never inspect findings or attempt to repair a blocked outcome.
+Shared export preparation runs only when `bundle_plans` is `Some`. It consumes the concrete plans together with any admitted M1 models and their private baseline-source relation, then exposes validated plans and typed output to exporters only through `ValidatedExportBatch`; exporters never inspect findings or attempt to repair a blocked outcome.
 
 A future incremental editor or dev-server session may cache indexes and invalidation state around this operation, but it must preserve equivalence with a full `link` call for the same logical request.
 
@@ -3437,15 +3514,25 @@ If `ja` lacks a message that `en` supplies, fallback makes runtime resolution su
 
 Resolution semantics need no privileged locale — the chain replaces it. A **coverage baseline** locale per scope survives for exactly two jobs: as the yardstick for coverage-style reporting (`orphaned-translation`: defined in some locale but absent from the baseline) and as the source of typed-key generation.
 
-It has no effect on resolution. The `coverageBaseline` mapping is optional per scope, but a scope selected for typed-key generation must have one explicit entry.
+It has no effect on resolution. The `coverageBaseline` mapping is optional. In the initial M1/M3/E0 contract, the presence of at least one explicit declared baseline entry resolving to a scope is itself the only selection mechanism for coverage-baseline reporting and typed-key model construction. There is no separate typed-key scope list, request flag, recognizer-derived requirement, delivery-target-derived requirement, or CLI leaf.
 
-The integration never infers a baseline from the largest catalog, the first discovered locale, fallback order, or definition order. The selected locale must belong to `messages.locales` and have a definition-closed baseline inventory for that scope.
+An admitted resolved scope without such an entry is not selected for M1 model construction. It produces no typed-key model and no additional configuration, operational, or linker finding merely because its baseline is absent. E0 exposes no completion for that scope, and M3 emits no typed accessor module for it while ordinary reference resolution and message bundle emission remain available. A consumer cannot replace that absent model with the union of definitions, a fallback locale, the first discovered locale, or an open-document key set.
+
+The integration never infers a baseline from the largest catalog, the first discovered locale, fallback order, or definition order. The pre-discovery configuration validator requires only that the selected scope exists and the selected locale belongs to `messages.locales`; it does not inspect concrete catalog matches or claim inventory completeness.
+
+After optional scope mapping, post-mapping policy canonicalization guarantees at most one locale for each resolved scope. Equal mapped locale values merge; unequal values fail the resolved request before this coverage phase begins.
+
+M1 model construction begins for each canonical resolved scope with a baseline only after the definition-side completeness state is known. `Partial` uses the existing blocking `degraded-analysis` finding and produces no typed-key model for that scope; M3 export is already withheld by the same checked outcome. It does not add another config or operational error for the same incomplete world.
+
+When the definition side is `Closed`, the baseline key set is the exact set of admitted definitions for that locale and may be empty. A closed empty baseline is not an incomplete inventory. If another production locale defines any key, the ordinary baseline-versus-union gate fails model construction; if every production locale is empty, the resulting empty typed-key model is valid.
 
 For typed-key generation, the baseline's canonical key set must contain the union of keys defined by every admitted production locale in the same resolved scope-domain pair.
 
-If another locale contains a key absent from the baseline, generation for that scope fails complete and emits no stale or partial accessor module; it never silently omits the runtime-resolvable key or widens the generated surface from the union.
+If another locale contains a key absent from the baseline, M1 model construction for that scope fails complete and returns no stale or partial typed-key model; it never silently omits the runtime-resolvable key or widens the generated surface from the union. Beginning with M3, that failure also prevents the ESM exporter from rendering or registering an accessor module for the scope.
 
 M1 performs this deterministic baseline-versus-union preflight as a generation gate without publishing an `orphaned-translation` linker finding. M2 reuses the same canonical difference as the subject set for that finding.
+
+For every admitted model key, the same preflight records exactly one unambiguous definition from the configured baseline locale in private `LinkOutcome` state. It records that definition's exact decoded payload and `DefinitionLocation`; it does not copy either into the public key-only model. A blocking duplicate-definition ambiguity produces no plans or model and therefore never leaves M3 preparation to select a winner.
 
 Missing keys in a non-baseline locale do not invalidate the baseline key surface; M2 reports them separately as non-blocking `missing-translation` findings under the fixed fallback and baseline analysis.
 
@@ -3463,6 +3550,8 @@ catalog definitions
   ├─ checkout.total  ← reachable
   └─ checkout.old    ← unreachable
 ```
+
+Configured roots reach this phase only after post-mapping policy canonicalization has produced at most one root for each resolved `(scope, domain, selector)`. Equal reasons merge; conflicting reasons fail the resolved request rather than changing reachability or retaining arbitrary evidence.
 
 `checkout.old` can be excluded from production assets. Project-wide unused definitions are distinct from messages that are used by one delivery unit but absent from another's plan — the latter is normal slicing, not a finding. Exclusion from shipping does not remove the entry from the catalog; that is `prune`'s job below.
 
@@ -4037,6 +4126,8 @@ The CLI envelope's top-level `schemaVersion: "0"` owns this JSON adapter's pre-s
 
 It maps each category one-to-one to a lint rule under the same ID. Configuration, reporting, counting, and exit status remain governed by the 008 contracts and the catalog-level linter addendum already required by 013: project-scope execution, typed subject identities, and related-entry evidence.
 
+Every such rule has 008 required analysis input kind `project-link-outcome`. Only the project-capable CLI/editor adapter admits and evaluates it from this section's one checked `LinkOutcome`. The message-only Rust `lint_message` API and N-API/WASM `lintMessage` bindings reject an explicitly configured linker-backed rule with `invalid_options` / `rule_requires_project_context`; L0/L1 do not add a public `lintLinkOutcome` API or imply resource/linker bindings.
+
 The adapter does not rerun resolution or create a second finding model. These rules are the toolchain successor of the ESLint plugin's `no-missing-keys` / `no-unused-keys`.
 
 Reference-anchored findings (`unresolved-message`, `unbounded-dynamic-reference`) anchor at the code site when `origin` is available, with the probed chain as evidence; definition-anchored findings (`ambiguous-message-definition`, `unused-message`, coverage findings) anchor at 013 entries.
@@ -4047,9 +4138,15 @@ One linker finding counts exactly once under the 008 warning/error accounting re
 
 Producer failures are producer-owned operational errors, not linker findings; when a later lint adapter invokes production, it maps those failures into the existing lint operational-error surface.
 
-The lint integration first resolves rule configuration, preset membership, and severity, then unions the declared input capabilities of every enabled linker-backed rule. If no linker-backed rule is enabled, it performs no linker orchestration.
+The lint integration first resolves rule configuration, preset membership, and severity. If at least one linker-backed rule is enabled, a present valid `messages` section is required by the 006/008 post-section activation contract before any definition inventory or linker work begins.
 
-If at least one is enabled but none requires application-reference analysis, it invokes the shared linker orchestration once with the required definition/policy inputs and an integration-derived non-closed reference side, but neither loads nor produces reference artifacts and pays no source-scan cost.
+It then unions the static capabilities of every enabled linker-backed rule according to the normative [008 capability table](./008-ox-mf2-phase-3c-linter-design.md#linker-backed-rule-activation-and-input-capabilities). `ambiguous-message-definition` and `orphaned-translation` are definition-only. `unresolved-message`, `missing-translation`, `unused-message`, `unbounded-dynamic-reference`, and `degraded-analysis` require application-reference input. `degraded-analysis` requires it because the one rule includes the reference-record `wide-selector` variant as well as partial-completeness evidence.
+
+These capabilities are implementation-owned rule metadata, not configuration, severity, reporter state, or cache identity. If no linker-backed rule is enabled, the integration performs no linker orchestration.
+
+If at least one is enabled but none requires application-reference analysis, it invokes the shared linker orchestration once with the required definition/policy inputs, but neither loads nor produces reference artifacts and pays no source-scan cost.
+
+The reference completeness supplied by this fast path is derived per target scope from the resolved producer inventory rather than being hard-coded as non-closed. A scope with no configured producer participant is `Closed`. A configured participant intentionally excluded from the current request yields `Partial(ProducerOmitted)`, while a required participant whose invocation failed yields `Partial(ProducerFailed)`. Merely not needing reference records for the enabled rules never fabricates `ProducerOmitted`.
 
 If reference input is required, the same orchestration additionally uses the shared producer and artifact cache. In both enabled cases all adapters consume the resulting single `LinkOutcome`; a rule is never allowed to scan or link independently.
 
@@ -4078,10 +4175,13 @@ Promotion is per rule and is a deliberate preset/default change; merely configur
   - The formatter-facing `build_and_validate_write_back` API is not used for deletion and retains its fixed entry-count and identity-preservation invariants. `intlify_resource` alone owns host-structural edits, candidate reparse and re-extraction, and proof that exactly the requested definitions were removed without changing surviving definitions.
   - An unsupported or invalid deletion fails the affected document completely and produces no partial edit set. Concrete JSON member/array rules, occurrence renumbering, empty-ancestor behavior, API types, and error mapping are fixed by the coordinated 013 M5 addendum before implementation.
   - Initial milestones provide no missing-message or missing-translation stub insertion; that mutation is deferred below.
-- **Typed keys**: generated from each explicitly configured coverage baseline after the baseline-versus-union preflight.
-  - The language-neutral generation model carries resolved scope, canonical domain-qualified keys, and MF2 argument information.
-  - Each platform integration renders that model in its native form.
-  - The initial JS/TS form is an explicit scope-bound generated accessor module containing TypeScript key unions and, where MF2 declarations allow, argument types.
+- **Typed keys**: M1 derives one language-neutral key-only model from each canonical resolved coverage baseline after post-mapping policy canonicalization and the baseline-versus-union preflight.
+  - The model carries resolved scope and canonical domain-qualified keys without parsed MF2 state, MF2 argument information, JavaScript source, a logical output path, or a filesystem destination.
+  - The checked outcome separately and privately relates every admitted model key to its one exact unambiguous baseline definition snapshot. That relation is preparation input, not a public model member or a second definition lookup API.
+  - M1 exposes no CLI leaf, writes no file, and has no standalone `--check` mode. Its model is inspectable through the checked Rust/in-process boundary fixed by the M1 implementation addendum.
+  - Beginning with M3, shared export preparation may combine that model with parser-backed validated MF2 argument signatures before each platform exporter renders its native form through the existing export transaction. The initial built-in ESM exporter renders one explicit scope-bound JS/TS accessor module for each admitted model.
+  - `intlify messages emit` registers those modules together with the other artifacts in the selected ESM transaction, and `intlify messages emit --check` verifies their freshness through the same manifest and byte-comparison contract.
+  - The initial JS/TS module contains TypeScript key unions and, where the M3 preparation contract can derive them from validated MF2 declarations, argument types.
   - It does not use global or ambient `.d.ts` augmentation:
 
 ```ts
@@ -4097,9 +4197,9 @@ Explicit module imports keep scopes and generated revisions visible and avoid cr
 
 They also allow later Rust, C/C++, and other platform generators to consume the same language-neutral model without treating TypeScript augmentation as the contract.
 
-`useMessageSet` remains a producer-side bounded-selector API. It may consume generated key or pattern types in a later JS integration, but M1 does not replace it with, or make it an implicit entry point into, the generated accessor module.
+`useMessageSet` remains a producer-side bounded-selector API. It may consume generated key or pattern types in a later JS integration, but M1 does not replace it with, or make it an implicit entry point into, the M3-generated accessor module.
 
-- **Determinism and freshness**: linker output (plans, exported assets, generated types) is byte-deterministic for identical inputs, and every generation surface has a `--check` mode that re-runs and diffs instead of writing — the CI freshness job.
+- **Determinism and freshness**: linker plans and M1 typed-key models are deterministic for identical inputs. Every filesystem-writing CLI generation surface, beginning with M3 `messages emit`, has a `--check` mode that re-runs and diffs the complete registered artifact set instead of writing. A pure Rust/in-process model-construction API has no command-line flag and does not pretend to implement `--check`.
 
 ## Reference Producers
 
@@ -4121,13 +4221,13 @@ errors.format(errorCode)
 
 #### M0 built-in source artifact partition
 
-The built-in JS/Vue producer emits exactly one `MessageReferenceArtifact` for each selected physical source group, including a successfully scanned group with zero references. It uses the shared host inspection and grouping rules for equal regular-file identity, so repeated glob matches, symlink aliases, and hard-link aliases do not cause the same physical bytes to be scanned or emitted more than once.
+The built-in JS/TS producer emits exactly one `MessageReferenceArtifact` for each selected physical source group, including a successfully scanned group with zero references. It uses the shared host inspection and grouping rules for equal regular-file identity, so repeated glob matches, symlink aliases, and hard-link aliases do not cause the same physical bytes to be scanned or emitted more than once. Under 009, an active project-backed editor session applies its checked single-or-byte-identical open-buffer override only after this group is formed; unequal claims produce no artifact and weaken the affected reference side to `OpenEditorWorld`.
 
 Every such artifact carries exact producer ID `dev.intlify/js-reference`. CLI, editor, and in-process M0 orchestration obtain its one immutable `ProducerRevision` from the same build-provenance value compiled into the artifact-producing implementation; project configuration, command options, source contents, worker identity, and invocation state cannot replace it.
 
-That revision covers every output-affecting JS parser, TypeScript grammar, Vue SFC/template frontend, recognizer, static evaluator, source mapping, ordering, and artifact-writer component. A uniquely identifying immutable release version may be used directly. Otherwise the build supplies a deterministic release-plus-source/build fingerprint accepted by the shared `ProducerRevision` grammar; a locally modified artifact-producing build cannot retain an unchanged release revision. CLI and editor builds with different effective producer implementations therefore occupy different cache provenance even when they scan equal source bytes.
+That revision covers every output-affecting JS parser, TypeScript grammar, recognizer, static evaluator, source mapping, ordering, and artifact-writer component. A uniquely identifying immutable release version may be used directly. Otherwise the build supplies a deterministic release-plus-source/build fingerprint accepted by the shared `ProducerRevision` grammar; a locally modified artifact-producing build cannot retain an unchanged release revision. CLI and editor builds with different effective producer implementations therefore occupy different cache provenance even when they scan equal source bytes.
 
-Participating logical paths in a group are ordered segment-by-segment by exact UTF-8 bytes, with the shorter equal-prefix path first. The first path is the primary path. The artifact identity is the M0 `Project` namespace plus the exact segment sequence `["js", "module", ...primary_path_segments]`; an ordinary JS, JSX, TS, TSX, or Vue source uses this same producer-family prefix.
+Participating logical paths in a group are ordered segment-by-segment by exact UTF-8 bytes, with the shorter equal-prefix path first. The first path is the primary path. The artifact identity is the M0 `Project` namespace plus the exact segment sequence `["js", "module", ...primary_path_segments]`; an ordinary JS, JSX, TS, or TSX source uses this same producer-family prefix.
 
 The complete prefixed sequence passes through the ordinary checked `ReferenceArtifactIdentity` constructor. Its two fixed prefix segments consume the same segment and byte ceilings as every other segment. If the resulting identity is not admissible, the producer neither truncates nor hashes the path, emits no artifact for that group, and derives `ProducerFailed`.
 
@@ -4141,20 +4241,19 @@ This per-group partition keeps cache invalidation and editor recomputation local
 
 Every logical file matched by `producers.js.include` must have one exact lowercase, case-sensitive supported suffix. Matching is filename-based and tests the longer declaration suffixes first:
 
-| Exact suffix | Frontend grammar profile      | Source goal                            |
-| ------------ | ----------------------------- | -------------------------------------- |
-| `.js`        | JavaScript                    | bounded unambiguous                    |
-| `.jsx`       | JavaScript with JSX           | bounded unambiguous                    |
-| `.mjs`       | JavaScript                    | module                                 |
-| `.cjs`       | JavaScript                    | CommonJS                               |
-| `.ts`        | TypeScript                    | bounded unambiguous                    |
-| `.tsx`       | TypeScript with JSX           | bounded unambiguous                    |
-| `.mts`       | TypeScript                    | module                                 |
-| `.cts`       | TypeScript                    | CommonJS                               |
-| `.d.ts`      | TypeScript declaration source | bounded unambiguous                    |
-| `.d.mts`     | TypeScript declaration source | module                                 |
-| `.d.cts`     | TypeScript declaration source | CommonJS                               |
-| `.vue`       | Vue SFC profile fixed below   | module for every admitted script block |
+| Exact suffix | Frontend grammar profile      | Source goal         |
+| ------------ | ----------------------------- | ------------------- |
+| `.js`        | JavaScript                    | bounded unambiguous |
+| `.jsx`       | JavaScript with JSX           | bounded unambiguous |
+| `.mjs`       | JavaScript                    | module              |
+| `.cjs`       | JavaScript                    | CommonJS            |
+| `.ts`        | TypeScript                    | bounded unambiguous |
+| `.tsx`       | TypeScript with JSX           | bounded unambiguous |
+| `.mts`       | TypeScript                    | module              |
+| `.cts`       | TypeScript                    | CommonJS            |
+| `.d.ts`      | TypeScript declaration source | bounded unambiguous |
+| `.d.mts`     | TypeScript declaration source | module              |
+| `.d.cts`     | TypeScript declaration source | CommonJS            |
 
 An extensionless file, an uppercase or mixed-case spelling, and every unlisted suffix are unsupported. A selected unsupported source fails its complete physical source group and derives `ProducerFailed`; it is never silently removed from the configured closed inventory. A valid include set that matches no files remains the separately specified successful empty scan.
 
@@ -4162,19 +4261,19 @@ The producer does not inspect MIME metadata, shebang text, `package.json`, `tsco
 
 The bounded-unambiguous goal is one closed parsing algorithm, not project inference. The frontend first parses the complete source with the table's grammar profile and module goal. Only an ordinary module-goal grammar rejection permits one complete retry of the same bytes and grammar profile with script goal. If module parsing succeeds, its AST is authoritative and no script parse runs. If module rejects and script succeeds, the script AST is authoritative. If both reject, the complete source fails and derives `ProducerFailed`.
 
-A resource-limit failure, invalid UTF-8 input, frontend invariant or internal failure, cancellation, or any other non-grammar failure during the module attempt does not trigger the script retry. No route merges two ASTs, retains records from a rejected attempt, selects a goal per statement or Vue expression, or retries after scanning has begun. The maximum parse-attempt count is therefore one for fixed-goal sources and two for bounded-unambiguous sources.
+A resource-limit failure, invalid UTF-8 input, frontend invariant or internal failure, cancellation, or any other non-grammar failure during the module attempt does not trigger the script retry. No route merges two ASTs, retains records from a rejected attempt, selects a goal per statement, or retries after scanning has begun. The maximum parse-attempt count is therefore one for fixed-goal sources and two for bounded-unambiguous sources.
 
 For this contract, parser success means that the complete selected grammar/source-goal parse reports zero syntax-error diagnostics. A parser may internally recover and return an AST beside one or more syntax errors, but that AST is rejected-attempt state: the producer never scans it, caches it, combines it with another attempt, or emits any record obtained from it. Parser warnings and later lint or semantic diagnostics are outside this syntax-success test and do not make an otherwise valid source fail production.
 
 For a bounded-unambiguous source, any module-attempt syntax error makes that attempt the ordinary grammar rejection eligible for the one script retry. The script attempt succeeds only with zero syntax errors. If it also reports an error, the source fails as `parse` / `syntax_invalid`; the error evidence uses the smallest exact safe source span available under the common producer-failure ordering and never exposes the recovery AST or dependency diagnostic text.
 
-Every participating logical alias in one physical source group derives its profile independently before the group is scanned. All aliases must resolve to the same complete grammar/source-goal profile. An unsupported alias or disagreement such as one physical source selected through both `.ts` and `.vue` names fails the group as `ProducerFailed`; primary-path order never chooses one interpretation and the producer emits neither a partial nor duplicate artifact.
+Every participating logical alias in one physical source group derives its profile independently before the group is scanned. All aliases must resolve to the same complete grammar/source-goal profile. An unsupported alias or disagreement such as one physical source selected through both `.ts` and `.cts` names fails the group as `ProducerFailed`; primary-path order never chooses one interpretation and the producer emits neither a partial nor duplicate artifact.
 
 Declaration sources use the selected parser's declaration grammar and still pass through the same complete scan and artifact-production path. A valid declaration source with no recognized runtime call emits the ordinary empty source artifact; declaration spelling does not cause the source to disappear from completeness accounting.
 
 #### M0 source snapshot and encoding
 
-The built-in producer analyzes one complete exact UTF-8 source snapshot. A disk source uses the bytes selected by the shared input-snapshot contract. An authoritative editor buffer uses its exact Unicode scalar sequence and protocol version encoded as UTF-8 under 009; neither route falls back to another snapshot after analysis begins.
+The built-in producer analyzes one complete exact UTF-8 source snapshot. A disk source uses the bytes selected by the shared input-snapshot contract. An authoritative editor override uses the exact Unicode scalar sequence shared by its one buffer or byte-identical buffer set, encoded as UTF-8 under 009, and captures every contributing protocol version; neither route falls back to another snapshot after analysis begins.
 
 The snapshot must be valid UTF-8. Exactly one optional leading UTF-8 signature byte sequence `EF BB BF` is admitted as a BOM. A frontend may consume that signature before invoking its parser, but it retains a checked mapping to the original snapshot so every `SourceOrigin` offset includes those three bytes. Any following `U+FEFF` is ordinary source text interpreted by the selected language grammar rather than another transport instruction.
 
@@ -4182,11 +4281,9 @@ No layer converts UTF-16, Shift_JIS, Latin-1, or another encoding; applies Unico
 
 The exact retained bytes are the source-length and source-origin coordinate space. They are also an indivisible input to any built-in producer cache key, along with the separately required producer revision and effective semantic configuration; equal parsed ASTs, equal decoded selector values, or normalized line endings do not make different byte snapshots cache-equivalent.
 
-Vue SFC parsing and every embedded-expression mapping use this same host snapshot. A BOM consumed by the SFC frontend, entity decoding, parser-local UTF-16 coordinates, or any temporary embedded buffer must be mapped back to the exact original `.vue` UTF-8 byte range before a record can be emitted.
-
 #### M0 built-in source admission limits
 
-Built-in JS/Vue source admission has three independent inclusive fixed ceilings:
+Built-in JS/TS source admission has three independent inclusive fixed ceilings:
 
 | Producer counter | Accounting rule | M0 ceiling |
 | --- | --- | --: |
@@ -4231,7 +4328,7 @@ A hit is admitted only after the current selected snapshot has independently pas
 
 A missing entry, old cache-schema revision, mismatched key component, malformed or corrupted value, failed revalidation, cache read error, or cache write error is an optimization miss. The implementation discards that value and regenerates from the authoritative current snapshot; it does not emit `ProducerFailed`, weaken completeness, or use a stale value merely because regeneration costs more. A successfully regenerated artifact alone may replace the entry after the complete producer invocation passes its global admission gates.
 
-For an editor buffer, the key depends on its exact current UTF-8 bytes but not its protocol version. Equal bytes may reuse equal production safely; 009's captured document version remains outside the cache as the mandatory publication-freshness gate. A cache hit never authorizes publication for a superseded buffer version and never claims that disk bytes, another open buffer, or an upstream external producer are current.
+For an editor override, the key depends on its exact current UTF-8 bytes but not its one or several protocol versions. Equal bytes may reuse equal production safely; 009's complete captured URI/version set remains outside the cache as the mandatory publication-freshness gate. A cache hit never authorizes publication when any contributing buffer version is superseded and never claims that disk bytes, an unequal open buffer, or an upstream external producer are current.
 
 #### M0 recognizer and key-canonicalization contract
 
@@ -4254,7 +4351,7 @@ A matched zero-argument call or a call whose first argument is a `SpreadElement`
 
 Every reference record emitted by the built-in JS/TS producer carries `SourceOrigin`. Its span is the first argument expression's exact half-open source range as reported by the selected parser. It includes parentheses and admitted TypeScript wrappers that belong to that argument, but excludes the call's opening and closing parentheses, the following comma, and every later argument. The same rule applies to a static selector and `UnboundedDynamic`; the producer never substitutes a decoded-string-content range or the complete call range.
 
-For an ordinary JS/TS file, that range addresses the exact selected file bytes. For a Vue embedded expression, the SFC frontend maps the same argument-expression range to the exact host `.vue` UTF-8 range. An endpoint beyond `u32`, a non-scalar boundary, or a missing, ambiguous, or invalid embedded-to-host mapping fails the complete source's producer operation and derives `ProducerFailed`; this built-in profile does not recover by omitting origin.
+For an ordinary JS/TS file, that range addresses the exact selected file bytes. An endpoint beyond `u32` or a non-scalar boundary fails the complete source's producer operation and derives `ProducerFailed`; this built-in profile does not recover by omitting origin.
 
 The key of each `recognizers` member is one static callee chain. It denotes either a direct `Identifier` call or a non-computed, non-optional `MemberExpression` chain whose root is an `Identifier` or exact `ThisExpression` and whose remaining properties are static identifier names. Thus configured `t`, `i18n.t`, `i18n.global.t`, and `this.$t` match those exact call-expression callee shapes.
 
@@ -4307,23 +4404,9 @@ For a recognized normal lookup such as `t(runtimeKey)`, the producer emits `Unbo
 
 It still records the known scope, domain, producer, and source origin and supplies exact `ReasonText` value `lookup argument is not statically known`. `useMessageSet('errors.*')`, by contrast, emits the corresponding bounded `Pattern` with exact reason `bounded set declared by configured recognizer`; producer policy never rewrites one call kind into the other.
 
-These two fixed English strings are the only `ReasonText` values emitted by the M0 built-in JS/Vue producer. Every built-in `UnboundedDynamic` and `Pattern` record includes its applicable value, while every built-in `Exact` record omits `reason`. Project configuration, source comments, callee spelling, selector spelling, parser diagnostics, and reporter locale cannot replace, prefix, suffix, or localize either artifact value.
+These two fixed English strings are the only `ReasonText` values emitted by the M0 built-in JS/TS producer. Every built-in `UnboundedDynamic` and `Pattern` record includes its applicable value, while every built-in `Exact` record omits `reason`. Project configuration, source comments, callee spelling, selector spelling, parser diagnostics, and reporter locale cannot replace, prefix, suffix, or localize either artifact value.
 
 The strings are human-readable provenance only. The linker never parses them as a reason code, policy switch, selector, rule identity, or compatibility signal; call kind and `MessageSelector` remain the typed semantic authority. Their presence and exact bytes participate in artifact equality, canonical emission, accounting, and cache values under the ordinary `ReasonText` contract without changing reachability.
-
-#### M0 Vue SFC source profile
-
-An included `.vue` source is one Vue SFC producer participant. The frontend parses the complete SFC, then scans both inline `<script>` / `<script setup>` blocks and every JavaScript expression exposed by the standard `<template>` AST, including interpolations, directive values and dynamic arguments, event handlers, and slot expressions. Both script blocks participate when the SFC validly contains both; reference-record order follows exact host-source start position with the ordinary record tie-breakers.
-
-An absent script `lang` means JavaScript. The exact admitted script tokens are `js`, `jsx`, `ts`, and `tsx`, and every admitted inline script block uses module goal without an unambiguous/script retry. The initial template profile requires the standard template syntax with no custom `lang`; Pug and every other preprocessor-owned template language are unsupported. A SFC syntax failure, an unsupported script/template language, an embedded JS/TS parse failure, or inability to construct the required exact host-span mapping fails that source's complete producer operation and derives `ProducerFailed`; no partial artifact silently omits the failed block or expression.
-
-The zero-syntax-error success rule applies independently to the SFC parse, every admitted script block, and every standard-template embedded expression. A recovery AST or partially decoded template AST from any failed component is discarded, and previously scanned blocks or expressions contribute no records or cache value for that source. Parser recovery order never determines which subset survives because no subset survives.
-
-The frontend maps every locally produced `SourceOrigin` back to the original `.vue` source's UTF-8 byte coordinates through one checked monotonic embedded-expression map. It never reports block-local offsets as host offsets, splits a source scalar or decoded template escape, guesses a location after preprocessing, or drops origin merely to retain a reference.
-
-An inline `<script src>` is not followed by the SFC participant and does not expand configured inventory. The referenced external file participates only when it independently matches `producers.js.include`, using its own project source identity and ordinary JS/TS profile. Style blocks and custom blocks are not JavaScript-reference sources under this profile.
-
-Declarative template usage that is not a call expression — for example an `<i18n-t keypath="...">` prop — is not matched by the M0 callee recognizer. A project using such an API declares the affected exact or bounded configured roots, or supplies an external artifact, until the deferred framework-declarative producer contract is promoted; the built-in producer never guesses a component's message semantics from its tag or prop spelling.
 
 Integration with Vite/Rolldown:
 
@@ -4549,9 +4632,9 @@ The build integration and exporter are separate responsibilities. In M3, one exp
 
 The integration supplies build context, selects and invokes the exporter, and registers the returned set; the exporter performs no final-build registration itself.
 
-For one M3 CLI command, export preparation is project-shared rather than repeated per selected target. After one successful `LinkOutcome` with plans, orchestration invokes `prepare_export` exactly once over the outcome's common selected definition snapshots. A message-validation failure blocks every selected target before any exporter instance, destination mapping, lock, or registration work; one successful borrowed `ValidatedExportBatch` is reused by every independent target transaction.
+For one M3 CLI command, export preparation is project-shared rather than repeated per selected target. After one successful `LinkOutcome` with plans, orchestration invokes `prepare_export` exactly once over the identity-deduplicated union of the outcome's plan-selected delivery definitions and the baseline definitions privately related to every admitted M1 model key. A message-validation failure blocks every selected target before any exporter instance, destination mapping, lock, or registration work; one successful borrowed `ValidatedExportBatch` is reused by every independent target transaction.
 
-Target options such as eager locales change exporter representation but do not change the linker's selected definition records or the MF2 syntax/semantic validity of their exact payloads. A future target type that genuinely selects a different message set requires an explicit preparation-partition contract rather than silently rerunning and duplicating the M3 diagnostic result.
+Target options such as eager locales change exporter representation but do not change the linker's selected delivery records, private model-to-baseline relation, or the MF2 syntax/semantic validity of their exact payloads. A future target type that genuinely selects a different message set requires an explicit preparation-partition contract rather than silently rerunning and duplicating the M3 diagnostic result.
 
 Integrations and exporters need not be paired one-to-one: Vite and Rolldown integrations can share an ESM exporter, and the same integration may reuse a borrowed batch in separate independent transactions with different exporters.
 
@@ -4563,7 +4646,7 @@ Multiple output records do not require multiple exporters: one Rust exporter can
 
 `MessageDefinitionArtifact` structural conformance and `intlify_linker` intentionally treat `MessagePayload` as opaque MF2 source. A `MessageBundlePlan` can therefore be computed while parser or parser-owned semantic diagnostics exist, which lets lint and editor consumers preserve key-resolution, missing, and unused analysis over the complete definition set.
 
-Any integration that turns plans into deployable output must pass the complete `LinkOutcome` through one shared export-preparation pipeline before invoking the transaction's selected exporter. The pipeline reads the exact decoded `MessagePayload` retained by every selected `ResolvedMessage`; it never reloads or re-resolves a definition artifact. For each unique selected definition, that pipeline:
+Any integration that turns plans or M1 models into deployable output must pass the complete `LinkOutcome` through one shared export-preparation pipeline before invoking the transaction's selected exporter. The pipeline reads the exact decoded `MessagePayload` retained by either a selected `ResolvedMessage` or the checked private baseline-source relation; it never reloads or re-resolves a definition artifact. For each unique definition in their union, that pipeline:
 
 1. parses the payload through `ox_mf2_parser`;
 2. maps parser diagnostics and skips semantic construction when any parser diagnostic exists;
@@ -4572,33 +4655,36 @@ Any integration that turns plans into deployable output must pass the complete `
 
 The pipeline runs no configurable `intlify_lint` rule. Parser-owned MF2 syntax and Data Model validation are deployment correctness gates; configurable lint policy remains independent.
 
-Definitions absent from all plans, including unused definitions that will not ship, are outside this export gate; their parser and semantic diagnostics remain visible through ordinary lint/editor diagnostics but do not block deployment of a disjoint valid output set. The gate does not format, normalize, repair, re-escape, or run configurable lint rules over a payload.
+An unused baseline definition still belongs to the gate when an admitted M1 model exposes its key, because the generated accessor module consumes the signature derived from that definition. A definition outside both the delivery set and every admitted model's baseline-source set remains outside the gate; its parser and semantic diagnostics stay visible through ordinary lint/editor diagnostics but do not block deployment of a disjoint valid output set. The gate does not format, normalize, repair, re-escape, or run configurable lint rules over a payload.
 
 #### Definition selection and deduplication
 
-The preparation boundary unions selections from the complete `Some(bundle_plans)` value and validates each stable definition record identity exactly once across repeated placement, locales, and delivery units.
+The preparation boundary forms two exact sets from the complete checked outcome:
 
-Dedupe is by `ResolvedMessage::definition` — the selected record's `SourceDocumentIdentity` plus its entry-level `EntryReference` under the canonical codec above — never by message text, logical message identity, or plan position. An M3 transaction selects exactly one exporter, so exporter identity is not a dedupe dimension.
+- the **delivery validation set** contains every definition selected by the complete `Some(bundle_plans)` value; and
+- the **typed-signature validation set** contains the one private coverage-baseline definition related to every key in every admitted M1 model.
 
-Every occurrence with an equal `DefinitionLocation` is linker-guaranteed to carry equal resolved scope, domain, key, definition locale, and exact payload. A disagreement is an internal `LinkOutcome` invariant violation, not a second definition, first/last-wins choice, or request to inspect an external artifact.
+The **export validation set** is their union, deduplicated by `DefinitionLocation` — the record's `SourceDocumentIdentity` plus its entry-level `EntryReference` under the canonical codec above. The same definition is parsed exactly once when it appears in both roles or through repeated placement, locales, delivery units, or model keys. Message text, logical message identity, plan position, validation role, and exporter identity are not dedupe dimensions.
 
-Within one `prepare_export` call, implementations may reuse parse and semantic computation for byte-identical payloads only if each selected record retains the same diagnostic mapping and observable result as its own complete validation. The initial contract admits no reuse from an earlier call.
+Every delivery or baseline-source occurrence with an equal `DefinitionLocation` is linker-guaranteed to carry equal resolved scope, domain, key, definition locale, and exact payload. A disagreement is an internal `LinkOutcome` invariant violation, not a second definition, first/last-wins choice, or request to inspect an external artifact.
+
+Within one `prepare_export` call, implementations may reuse parse and semantic computation for byte-identical payloads only if each distinct `DefinitionLocation` retains the same diagnostic mapping and observable result as its own complete validation. The initial contract admits no reuse from an earlier call.
 
 #### Failure behavior
 
 If any linker-owned finding blocks plans and `bundle_plans` is `None`, there is no export transaction and the message-validation gate is not run merely to manufacture export errors.
 
-`Some(Vec::new())` has an empty validation set, passes the gate, and produces a valid empty `ValidatedExportBatch`. The integration still invokes the transaction's one selected exporter exactly once.
+`Some(Vec::new())` has an empty delivery validation set, but it does not necessarily have an empty export validation set. If admitted M1 models exist, preparation still validates their baseline definitions and may produce typed output; only an outcome with an empty plan slice and no admitted models produces a truly empty valid `ValidatedExportBatch`. The integration invokes the transaction's one selected exporter exactly once in every successful `Some` case.
 
 That exporter may return an empty checked `ExportArtifactSet` or target-native bootstrap, loader, or metadata artifacts that do not require a message plan. The ordinary output contract validates either result; orchestration never substitutes an automatic empty set or rejects the batch merely because `plans().is_empty()`.
 
-For a non-empty set, one parser or semantic diagnostic fails the complete export transaction: no exporter is invoked, no asset, generated source, blob, loader map, or manifest is registered, and `--check` also reports failure.
+For a non-empty export validation set, one parser or semantic diagnostic in either role fails the complete export transaction: no exporter is invoked, no asset, generated source, blob, loader map, or manifest is registered, and `--check` also reports failure.
 
 The failure belongs to the build/export integration surface, not `LinkFinding` or `LinkOperationalError`, because linking itself completed over a structurally valid request.
 
 #### Diagnostic ordering and retention
 
-The gate validates every unique selected definition in stable definition-record identity order even after the diagnostic reporting limit is reached.
+The gate validates every unique export-validation definition in stable `DefinitionLocation` order even after the diagnostic reporting limit is reached. Delivery-versus-typed-signature role does not affect ordering, and a definition present in both roles contributes diagnostics only once.
 
 Within one record, parser diagnostics preserve `ox_mf2_parser` order. When that list is empty, semantic diagnostics preserve the deterministic order owned by `validate_semantics`. The gate checks the portable mapping contract for every diagnostic and maps each retained diagnostic to that record's source evidence until the effective bounded limit is full. A record never contributes both categories because semantic construction is forbidden after parser diagnostics.
 
@@ -4606,9 +4692,9 @@ Later diagnostics are still mapping-validated and counted but are not retained, 
 
 The shared export-validation contract sets an inclusive hard ceiling of `10,000` retained mapped message diagnostics per export transaction. An integration uses `1,000` when the caller omits an explicit retention limit; the caller may select any value from zero through `10,000`.
 
-Zero deliberately retains no diagnostic records while still validating the complete selected set and reporting the exact nonzero total and truncation state. A value above `10,000` is rejected before parsing rather than clamped.
+Zero deliberately retains no diagnostic records while still validating the complete export validation set and reporting the exact nonzero total and truncation state. A value above `10,000` is rejected before parsing rather than clamped.
 
-This retention budget is separate from linker-core `LinkLimits`: it neither changes `LinkOutcome` nor limits how many selected definitions, parser diagnostics, or semantic diagnostics are examined.
+This retention budget is separate from linker-core `LinkLimits`: it neither changes `LinkOutcome` nor limits how many export-validation definitions, parser diagnostics, or semantic diagnostics are examined.
 
 The initial M3 CLI always supplies the exact effective retention limit `1,000`. It exposes no `--diagnostic-limit`, config field, environment variable, reporter override, target option, or worker-dependent adjustment. JSON emits the retained canonical prefix plus exact total and truncation state; the text reporter presents that same retained prefix and the exact omitted count when nonzero.
 
@@ -4759,7 +4845,7 @@ impl MessageUtf8Span {
 
 The Rust fields are private and exposed only through the exact read-only accessors above. There is no public constructor, struct literal, setter, mutable label slice, deserializer, default, unchecked conversion, or partial builder for any of the three record/span structs.
 
-Construction is mapper-owned and accepts one existing selected `DefinitionLocation`, the exact decoded payload, and either an `ox_mf2_parser` parser diagnostic or parser-owned `SemanticDiagnostic` rather than independently supplied field values. It clones the complete linker-owned definition identity from `ResolvedMessage::definition()` and never reconstructs a source/entry pair through another public path.
+Construction is mapper-owned and accepts one existing `DefinitionLocation` from the checked export validation set, the exact decoded payload, and either an `ox_mf2_parser` parser diagnostic or parser-owned `SemanticDiagnostic` rather than independently supplied field values. The internal validation record clones that complete linker-owned identity from either `ResolvedMessage::definition()` or the private model baseline-source relation and never reconstructs a source/entry pair through another public path.
 
 `MappedMessageDiagnosticKind` keeps category and code inseparable. `category()` returns exactly `"parser"` or `"semantic"`, and `code()` returns the corresponding parser-owned kebab-case JSON code. Rust consumers that need the typed code match the public enum rather than reparsing that string.
 
@@ -4808,12 +4894,12 @@ pub enum OutcomeContractInvariant {
 
 `DiagnosticMappingInvariant` is limited to contradictions between a parser-owned diagnostic and the portable mapping contract. Its variants respectively mean more than `32` labels, an inverted or out-of-payload primary span, an inverted or out-of-payload label span, or a label whose parser source differs from the primary diagnostic's parser source.
 
-`OutcomeContractInvariant` is limited to a state that the private checked `LinkOutcome` construction forbids. Its variants respectively mean a repeated delivery-unit/requested-locale coordinate, plan order that contradicts the canonical coordinate order, a repeated logical-message identity within one plan, message order that contradicts the canonical logical-message order, or unequal resolved snapshots attached to one equal `DefinitionLocation`.
+`OutcomeContractInvariant` is limited to a state that the private checked `LinkOutcome` construction forbids. Its variants respectively mean a repeated delivery-unit/requested-locale coordinate, plan order that contradicts the canonical coordinate order, a repeated logical-message identity within one plan, message order that contradicts the canonical logical-message order, or unequal resolved snapshots attached to one equal `DefinitionLocation`. The final case applies across every delivery and private baseline-source occurrence, including one definition that appears in both roles.
 
 Preparation selects failures deterministically:
 
 1. It preflights the complete outcome contract before parsing. If several outcome contradictions are detectable, `OutcomeContractInvariant` declaration order wins, followed by the smallest affected canonical plan, message, or definition identity for that variant.
-2. After a clean preflight, it visits unique definitions in stable definition-record identity order. The first record with a semantic API failure or preparation-owned invariant determines the result; later records do not run merely to collect another operational error.
+2. After a clean preflight, it visits the identity-deduplicated export validation set in stable `DefinitionLocation` order. The first record with a semantic API failure or preparation-owned invariant determines the result; later records do not run merely to collect another operational error.
 3. For each ordinary diagnostic, it checks label count, primary span, label spans in parser-owned label order, and label-source equality in that order. These checks run even after the retention budget is full.
 4. Only after that diagnostic's mapping contract succeeds does preparation checked-add one to `total_diagnostics`. A mapping invariant on that diagnostic therefore precedes `DiagnosticCountOverflow`.
 
@@ -4823,13 +4909,13 @@ Structured adapters project `definition().source()` and `definition().entry()` a
 
 Parser and semantic `code` values use their shared kebab-case tooling spellings, `category` uses the shared 008 spellings, and `severity` uses the shared lowercase spelling. An export reporter does not define a second diagnostic vocabulary.
 
-Neither `SourceId`, `location`, nor host coordinates are added. `category` is required because one failure may contain parser diagnostics from one selected definition and semantic diagnostics from another.
+Neither `SourceId`, `location`, nor host coordinates are added. `category` is required because one failure may contain parser diagnostics from one export-validation definition and semantic diagnostics from another.
 
 Adapter serialization reads the static catalog strings directly and is governed by its ordinary bounded reporter/output writer; the in-memory failure has no separate diagnostic-message-byte counter.
 
 A future parser or semantic diagnostic with input-dependent or otherwise owned message text requires an explicit bounded owned-message contract and cannot silently change these fields from `&'static str` to `String`. The concrete checked wrapper supplied to exporters remains separate.
 
-All platform integrations use the same parser, SemanticModel, and semantic-validation contracts rather than implementing target-specific MF2 validity rules. They map each ordinary diagnostic back through the selected `ResolvedMessage::definition`.
+All platform integrations use the same parser, SemanticModel, and semantic-validation contracts rather than implementing target-specific MF2 validity rules. They map each ordinary diagnostic through the exact `DefinitionLocation` retained by its checked export-validation record, regardless of whether that record entered through delivery, typed-signature preparation, or both.
 
 The initial implementation performs a new complete export-validation operation for every `prepare_export` call. Only duplicate work inside that call may be shared under the rule above; cross-call or persistent export-validation caching is deferred.
 
@@ -4862,6 +4948,8 @@ impl ValidatedExportBatch<'_> {
     pub fn plans(&self) -> &[MessageBundlePlan];
 }
 ```
+
+This is the pre-M1 base surface. The coordinated M1/M3 addendum extends its private storage with bounded derived signatures and adds the single typed-output accessor described below; it does not change `prepare_export` into a second entry point or expose the private baseline-source relation.
 
 ##### Output artifact types
 
@@ -5095,7 +5183,7 @@ The built-in orchestration constructs the linker request and ESM options from on
 
 #### Validated batch lifecycle
 
-`prepare_export` returns `Ok(None)` for `bundle_plans: None` without running the message-validation gate. It returns `Ok(Some(batch))` for a parser-and-semantically clean `Some`, including one valid empty batch for `Some(Vec::new())`.
+`prepare_export` returns `Ok(None)` for `bundle_plans: None` without running the message-validation gate. It returns `Ok(Some(batch))` for a parser-and-semantically clean `Some`. An empty plan slice may still yield typed output from admitted M1 models; the batch is empty only when both its plan slice and typed-output slice are empty.
 
 Ordinary parser or semantic diagnostics return `ExportPreparationError::MessageValidation(ExportMessageValidationFailure)`. A `build_semantic_model` error returns `SemanticModelConstruction`; a `validate_semantics` error returns `SemanticValidation`; and checked-count overflow, diagnostic-mapping contradiction, or invalid outcome/batch state returns `InternalInvariant`. Every error returns no batch.
 
@@ -5105,21 +5193,23 @@ Platform integrations map these typed distinctions to their own 006-compatible u
 
 `ValidatedExportBatch` has private fields, no public or unsafe constructor, no deserializer, and no persisted proof-token format.
 
-Successful private construction by `prepare_export` is the complete validation proof. The batch stores the immutable `outcome` borrow and no per-message validated flag, status map, definition digest list, location proof vector, independently editable marker, or serialized capability.
+Successful private construction by `prepare_export` is the complete validation proof. Before the coordinated M1/M3 addition, the batch stores only the immutable `outcome` borrow. Once typed output is admitted, it additionally owns the bounded immutable language-neutral argument signatures derived during the same successful gate. It stores no per-message validated flag, status map, definition digest list, location proof vector, independently editable marker, or serialized capability.
 
-It borrows the exact `LinkOutcome`. Its only public data accessor is `plans()`, which returns the outcome's complete canonical read-only `MessageBundlePlan` slice; selected message-validated `ResolvedMessage` values are reached only through each plan's `messages()` accessor.
+It borrows the exact `LinkOutcome`. Before the coordinated M1/M3 addendum, its only public data accessor is `plans()`, which returns the outcome's complete canonical read-only `MessageBundlePlan` slice; selected message-validated `ResolvedMessage` values are reached only through each plan's `messages()` accessor.
+
+That addendum atomically introduces exactly one additional read-only typed-output accessor. Each canonical item pairs one admitted key-only M1 model with its M3-derived validated argument signatures. The addendum fixes the exact item and signature types, lifetime, bounds, and ordering; it does not add a second model-only or signature-only accessor. Until that contract lands, neither a built-in nor third-party exporter may reconstruct models from plans, inspect private outcome state, or render the M3 accessor modules.
 
 The batch exposes no finding access, outcome accessor, flattened or unique-definition view, definition-artifact collection, parser workspace, parse result, semantic model, mutable cache handle, target option, or exporter-specific data. Slice `len`, `is_empty`, and iteration provide the ordinary collection operations without duplicate batch methods.
 
-Preparation groups the outcome's selections by exact `DefinitionLocation`, verifies the linker-owned equal-snapshot invariant for repeated placements, and validates each unique selected payload exactly once.
+Preparation unions the outcome's plan-selected delivery definitions with its private model baseline-source definitions, groups every occurrence by exact `DefinitionLocation`, verifies the linker-owned equal-snapshot invariant across both roles, and validates each unique payload exactly once.
 
-The immutable outcome borrow prevents mutation or replacement of plans or selected payload snapshots while the batch lives. Another `LinkOutcome`, including one produced from changed definition artifacts, requires a new complete call to `prepare_export`; an earlier batch or private implementation state never validates it.
+The immutable outcome borrow prevents mutation or replacement of plans, models, or their retained payload snapshots while the batch lives. Another `LinkOutcome`, including one produced from changed definition artifacts, requires a new complete call to `prepare_export`; an earlier batch or private implementation state never validates it.
 
-The batch and every value reachable through `plans()` have no interior mutability or process-global dependency and are `Send + Sync`. Preparation retains no parser workspace, non-thread-safe AST, mutable semantic state, or cache guard in the successful batch.
+The batch and every value reachable through `plans()` have no interior mutability or process-global dependency and are `Send + Sync`. The M1/M3 addendum applies the same requirement to every key model and derived signature reachable through its typed-output accessor. Preparation retains no parser workspace, non-thread-safe AST, mutable semantic state, or cache guard in the successful batch.
 
 The batch is borrowed by exporter calls rather than consumed, so one successful preparation can feed separate independent exporter invocations without repeating message validation. Each M3 export transaction nevertheless passes the batch to exactly one independently constructed exporter; reusing the batch does not combine those invocations into one transaction.
 
-An empty batch follows that same rule. `Ok(Some(batch))` always permits and requires the selected transaction to invoke its exporter once; only `Ok(None)` means that no exporter transaction exists.
+An empty batch follows that same rule. An empty plan slice paired with non-empty typed output is not an empty batch. `Ok(Some(batch))` always permits and requires the selected transaction to invoke its exporter once; only `Ok(None)` means that no exporter transaction exists.
 
 An integration may move those separate `Send` exporter instances to different workers and share the same immutable batch through scoped concurrency. Worker count, scheduling, runtime, cancellation, join barrier, deterministic target-result ordering, and error aggregation remain integration-owned. Neither `prepare_export` nor `PlatformExporter::export` creates a thread or chooses a runtime.
 
@@ -5708,11 +5798,15 @@ Code may define an unrelated raw-plan function, but it is outside the conforming
 
 The initial `dev.intlify/esm-module` format `0.1` is a data-only ESM representation of exact validated MF2 source. Each locale module carries the selected records' scope, catalog-key domain, canonical message key, and exact decoded `MessagePayload`; it does not compile, normalize, format, or otherwise rewrite the MF2 text.
 
-The shared export-preparation gate has already parsed and semantically validated every selected definition before the ESM exporter runs. That proof makes the raw payload deployable source data but does not turn the ESM module into an MF2 runtime: it exports no formatter function, locale negotiation, function registry, ICU data provider, retry policy, cache, suspense primitive, or application provider.
+The shared export-preparation gate has already parsed and semantically validated every definition in the delivery-plus-baseline export validation set before the ESM exporter runs. That proof makes the raw payload deployable source data but does not turn the ESM module into an MF2 runtime: it exports no formatter function, locale negotiation, function registry, ICU data provider, retry policy, cache, suspense primitive, or application provider.
 
 An application/runtime adapter loads the module and passes its exact source records to the selected MF2 runtime. Runtime formatter semantics remain outside 014 and cannot be inferred from this data-only ABI.
 
 M3 `0.1` never emits message-compiler-generated JavaScript functions or a 003 Binary AST snapshot. `GenerationStage::MessageCompilation` remains available to another exporter or future representation but is unreachable for an ordinary built-in `0.1` ESM transaction. Introducing compiled functions, a snapshot, or another executable/runtime-coupled payload requires an explicit new artifact kind or coordinated format-version decision with its runtime and integration contract; it cannot silently replace the raw records under the existing pair.
+
+The M1 typed-key model is key-only, is not JavaScript source, and is never rendered by `intlify_linker`. When an M3 ESM transaction receives admitted M1 models and the corresponding M3 preparation state, the built-in exporter additionally renders one scope-bound JS/TS accessor module per model and returns it through the same `ExportArtifactSet`.
+
+The coordinated M1/M3 implementation addendum must realize the fixed private model-to-baseline relation and the fixed delivery-plus-baseline export validation set. It must then fix the exact language-neutral argument-signature shape, the batch's single typed-output accessor, accessor-module ABI, logical path, artifact kind and format version, runtime binding, canonical source bytes, relationships, and resource accounting before either M1 or this typed-module portion of M3 is implemented. The locale-module and loader-map `0.1` contracts below do not implicitly choose those remaining values.
 
 #### Linker-resolved fallback materialization
 
@@ -5732,7 +5826,9 @@ Because `ProductionLocales` is non-empty, a successful built-in outcome therefor
 
 The ESM exporter requires the exact duplicate-free production-locale plan set captured by its private options. A missing, repeated, or extra locale, or any unit other than exact `["main"]`, is `InternalInvariantViolation::CapabilityPreflightContract` for the built-in orchestration; it never synthesizes a missing plan from configuration or drops an unexpected one. A future custom integration that invokes an ESM exporter explicitly designed for M3 against a valid multi-unit batch receives `UnsupportedBatchFeature::DeliveryUnitPartitioning` rather than implicit flattening.
 
-Consequently, one successful M3 ESM transaction returns exactly `production_locales.len() + 1` artifacts: one locale module per production locale plus one loader map. With the 1,024-locale configuration ceiling this is at most 1,025 artifacts, and the loader map carries exactly `production_locales.len()` relationships. Empty message sets do not alter either count.
+The resource-delivery subset of one successful M3 ESM transaction contains exactly `production_locales.len() + 1` artifacts: one locale module per production locale plus one loader map. With the 1,024-locale configuration ceiling this subset contains at most 1,025 artifacts, and the loader map carries exactly `production_locales.len()` relationships. Empty message sets do not alter either count.
+
+When M1 typed-key models are present, the complete transaction additionally contains exactly `typed_key_models.len()` accessor-module artifacts, one per resolved scope model. Those modules do not change the loader map's locale relationships. The coordinated M1/M3 addendum fixes the bounded model count and therefore the tighter built-in total; the common 65,536-artifact set ceiling remains mandatory regardless.
 
 #### Locale module ABI
 
@@ -5841,7 +5937,7 @@ The loader-map metadata contains exactly one relationship to every emitted local
 
 #### Canonical ESM source bytes
 
-Both built-in ESM kinds emit ECMAScript 2020 module source as valid UTF-8 without a BOM. The canonical writer is part of the `0.1` payload contract and is not Oxfmt, a generic pretty-printer, or a host JavaScript serializer.
+The built-in locale-module and loader-map kinds emit ECMAScript 2020 module source as valid UTF-8 without a BOM. Their canonical writer is part of their `0.1` payload contracts and is not Oxfmt, a generic pretty-printer, or a host JavaScript serializer. The M3 accessor-module writer follows the separate coordinated M1/M3 contract rather than inheriting either resource-delivery ABI accidentally.
 
 Every physical line ends with LF, no CR is emitted, and the payload ends with exactly one LF after its final statement or closing brace. Import declarations, `export const` declarations, and `return` statements end in semicolons. Function declarations do not receive a trailing semicolon. Indentation is exactly two ASCII spaces per block level, with one message tuple, fallback tuple, import, or switch case/return pair in canonical semantic order.
 
@@ -5884,17 +5980,19 @@ intlify_contract
 intlify_resource
   └─ catalog definitions, canonical domain-qualified keys, messages, source spans (013)
 
-host-owned definition projection (initially an intlify_cli project-inventory module)
-  └─ combines one complete extraction with its resolved catalog assignment,
-     validates and groups physical aliases, and constructs MessageDefinitionArtifact
-
 intlify_cli project inventory
-  └─ enumerates configured definition/reference inputs, groups physical aliases,
-     invokes the shared definition projection, records execution outcomes,
+  └─ enumerates configured definition/reference inputs, inspects physical identity,
+     forms canonical physical-source groups, records execution outcomes,
      and derives scope completeness
 
+host-owned definition production (initially an intlify_cli project-inventory module)
+  ├─ pre-extraction: validates an already formed group's bindings, profile,
+  │  portable primary/aliases, and limits
+  └─ post-extraction: checks resource-to-contract conversions and constructs
+     one MessageDefinitionArtifact from one complete intlify_resource extraction
+
 language reference producers
-  ├─ intlify_producer_js   (oxc-based JS/TS + Vue SFC frontend)
+  ├─ intlify_producer_js   (oxc-based JS/TS; Vue SFC frontend deferred)
   └─ intlify_producer_bin  (tagged-ID scanner for native/WASM; later)
 
 intlify_linker
@@ -5925,7 +6023,7 @@ LSP/editor integration (009)
   └─ incremental findings from available source-level reference info
 ```
 
-013's deferred catalog-level and cross-locale checks, unused-translation reporting, and application-source reference analysis all layer above the one shared catalog extraction path; no second resource extractor is introduced.
+013's deferred catalog-native structural checks and the cross-locale, unused-message, and application-source reference analyses owned by this design all layer above the one shared catalog extraction path; no second resource extractor is introduced.
 
 Linker M0 brings forward 013's explicit `scope` plus `path` and `fixed` locale-binding configuration as a coordinated prerequisite and projects their resolved values into mandatory `MessageDefinition.scope` and `MessageDefinition.locale`.
 
@@ -5938,6 +6036,8 @@ The resource/configuration integration owns binding resolution; `intlify_linker`
 This is an additive section under the 006 unified config contract. `messages` is the normative section name for linker policy, reference producers, and delivery targets; `catalog` is not accepted as an alias. `resources.catalogs` remains the separately owned resource-source selection section from 013.
 
 The 006 loader owns JSON/JSONC syntax, duplicate-member and known-root-field admission, config discovery, schema composition, config-path attachment, the command-independent cross-section validation order, and the final CLI error envelope. It validates and compiles `resources` before passing the raw optional `messages` section, `ResolvedResources`, and project-root context to the 014-owned validator. This document owns only validation within `messages`: all of its fields, cross-section scope references, immutable policy/producer/target construction, section-local ordering, and path-independent violation evidence. The generated 014 schema fragment is composed as `definitions.messages` in the one published 006 schema. Omission remains distinct from a present section and enables no linker consumer implicitly.
+
+The 014 section validator accepts an absent `messages` section as absent. After all independent sections succeed, 006 performs the 008-owned consumer-activation check. Any enabled linker-backed lint rule with no `messages` section produces one `config_validation_failed` with `details.reason: "linker_messages_required"` at the selected activating rule and stops before discovery or linker orchestration. This cross-section reason is not a member of the closed 014 section-local reason table below, and it never causes 014 to synthesize locales, policy, producers, or roots.
 
 Configuration admission is milestone-gated. A release accepts exactly the fields whose owning milestone is implemented and included in that release; a field shown for a later milestone is an unknown field until that milestone lands. The validator never accepts a dormant placeholder, silently ignores a recognized future field, or stores an unimplemented value for later activation. Schema generation, strict object validation, resolved Rust types, and fixtures add each field atomically with its owning behavior.
 
@@ -5961,7 +6061,7 @@ Within 014, validation is append-only by owning milestone:
 4. M0 validates `dynamicReferences` to completion when present.
 5. M0 validates `roots` to completion when present.
 6. M0 validates `producers` to completion when present.
-7. M1 appends complete `coverageBaseline` validation when present.
+7. M1 appends complete static `coverageBaseline` validation when present.
 8. M2 appends complete `fallback` validation when present.
 9. M3 appends complete `delivery` validation when present.
 
@@ -5971,7 +6071,7 @@ When a later milestone makes a member known, that release removes its earlier `u
 
 Stable `details.reason` values are grouped by the invalid field or contract layer, while `details.pointer` identifies the narrowest applicable object, member, or array occurrence. A field-family reason may therefore cover its missing value, wrong JSON shape, forbidden empty form, invalid scalar, limit violation, membership failure, or duplicate; those conditions do not each create another public reason.
 
-A relation spanning multiple fields, scopes, or targets receives a dedicated relation-level reason and points to the narrowest common owning object. Existing 013-owned catalog assignment/domain failures and the post-extraction `scope_key_domain_mismatch` remain separate because they cross the resource/linker boundary at later stages. The validator never collapses every failure into one generic messages-config reason, and it never exposes an unbounded rejected value merely to distinguish conditions within one reason family.
+A relation spanning multiple fields, scopes, or targets receives a dedicated relation-level reason and points to the narrowest common owning object. Existing 013-owned catalog assignment/binding/domain failures and the post-extraction `scope_key_domain_mismatch` remain separate because they cross the resource/linker boundary at later stages. The validator never collapses every failure into one generic messages-config reason, and it never exposes an unbounded rejected value merely to distinguish conditions within one reason family.
 
 The closed 014 configuration reason vocabulary is:
 
@@ -5983,13 +6083,13 @@ The closed 014 configuration reason vocabulary is:
 | M0 | `invalid_message_dynamic_references` | Optional `dynamicReferences` token and defaultable scalar contract. |
 | M0 | `invalid_message_roots` | Optional `roots` collection, entries, selectors, identities, and scope/domain references. |
 | M0 | `invalid_message_producers` | Optional `producers`, built-in JS configuration, recognizers, and external artifact declarations. |
-| M1 | `invalid_message_coverage_baseline` | Optional non-empty `coverageBaseline` mapping and its scope/locale references. |
+| M1 | `invalid_message_coverage_baseline` | Optional non-empty `coverageBaseline` mapping and its static scope/locale references. |
 | M2 | `invalid_message_fallback` | Optional fallback occurrence mapping, chains, membership, and canonical construction. |
 | M3 | `invalid_message_delivery` | Optional `delivery`, target count, target-local identity/exporter/output/eager-locale fields, and canonical construction. |
 | M3 | `delivery_output_conflict` | Equal or ancestor/descendant `out` roots across configured targets. |
 | M0 post-extraction | `scope_key_domain_mismatch` | One recognizer or configured-root domain differs from the successfully observed domain for its scope. |
 
-For a field-family reason, a missing or collection-wide violation points to the field, while an entry-local violation points to its exact array occurrence or object member. `delivery_output_conflict` points to `/messages/delivery/targets`, the narrowest common owner of both targets. The existing 013-owned `catalog_locale_not_production` and `catalog_scope_key_domain_conflict` reasons retain their resource-owned stages and evidence; 014 does not alias them into this table.
+For a field-family reason, a missing or collection-wide violation points to the field, while an entry-local violation points to its exact array occurrence or object member. `delivery_output_conflict` points to `/messages/delivery/targets`, the narrowest common owner of both targets. The existing 013-owned `catalog_binding_conflict`, `catalog_locale_not_production`, and `catalog_scope_key_domain_conflict` reasons retain their resource-owned stages and evidence; 014 does not alias them into this table.
 
 #### Configuration violation evidence
 
@@ -6038,7 +6138,7 @@ A semantic duplicate points `details.pointer` to the later submitted occurrence 
     "producers": {
       // M0 optional; default {}
       "js": {
-        "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+        "include": ["src/**/*.ts", "src/**/*.tsx"],
         "recognizers": {
           "t": {
             "kind": "lookup",
@@ -6117,6 +6217,8 @@ Checked M0 policy construction canonically sorts locale-set values and roots by 
 
 Configured roots are exceptional reachability declarations for messages intentionally consumed outside the available reference-producer world, such as a server-driven key. Ordinary code-derived reachability continues to come from `MessageReferenceArtifact`; projects with no such exception do not need a placeholder root. This preserves meaningful `unused-message` findings and pruning instead of making every definition implicitly reachable.
 
+The duplicate rule above applies to declared roots before scope mapping. A custom in-process mapping may make roots from different declared scopes share one resolved `(scope, domain, selector)`. The linker collapses them only when their optional reasons are equal; unequal reasons make the resolved request invalid before reachability analysis. The built-in CLI supplies an empty mapping table, so this post-mapping rule does not normalize duplicate configuration entries or change `invalid_message_roots`.
+
 ### Dynamic reference policy
 
 `dynamicReferences` is an optional M0 field with the exact accepted tokens `"compat"` and `"strict"`. Omission resolves to `compat`; explicit `"compat"` produces the same immutable `LinkPolicy`, semantic fingerprint, cache identity, findings, and plans as omission. `null`, booleans, numbers, arrays, objects, case variants, whitespace-padded strings, and every other token are invalid rather than being coerced or treated as omission.
@@ -6127,9 +6229,13 @@ Configured roots are exceptional reachability declarations for messages intentio
 
 `coverageBaseline` is an optional M1 exact mapping from declared scope name to one locale in `messages.locales`. When present, it must contain at least one scope member; an explicit empty object is a configuration error rather than a second spelling of omission. It has no project-wide default and no inference rule.
 
-Omitting a scope disables coverage-baseline reporting and typed-key generation for that scope without changing reference resolution or ordinary bundle emission; requesting typed-key generation for an omitted scope is a configuration error rather than a request to guess.
+Omitting every entry that resolves to one scope disables coverage-baseline reporting and typed-key generation for that resolved scope without changing reference resolution or ordinary bundle emission. Baseline presence is the initial contract's only typed-key scope selection; no other configuration field, recognizer, delivery target, command option, or consumer request can make an omitted scope erroneous. Under a custom mapping, a declared scope with no own member may intentionally share the equal baseline of another declared scope that maps to the same target.
 
-An explicit entry whose scope is unknown, whose locale is outside `messages.locales`, or whose selected scope has no definition-closed inventory for that locale is rejected before generation.
+An explicit entry whose scope is unknown or whose locale is outside `messages.locales` is rejected by the pre-discovery configuration validator. Concrete catalog matches, extraction outcomes, and completeness do not participate in `invalid_message_coverage_baseline`.
+
+A custom in-process mapping may make entries from different declared scopes target one resolved scope. Equal locale values collapse to one semantic baseline. Unequal locales make the resolved link request invalid before coverage or model construction; neither declared-scope order nor mapping order selects a baseline. The built-in CLI's empty mapping table means this rule never overwrites a duplicate configuration member or changes `invalid_message_coverage_baseline`.
+
+After discovery and post-mapping policy canonicalization, a definition-partial resolved scope follows the existing blocking `degraded-analysis` path and produces no typed-key model for that scope. A definition-closed resolved scope supplies an exact baseline set even when that set is empty; no matching baseline definition source or entry is required merely to prove closure.
 
 M1 adds this field together with its occurrence-preserving bounded configuration representation, count/byte ceilings, admission precedence, schema, and exact error contract; it cannot borrow the configured-root pass or silently collapse duplicate object members.
 
@@ -6141,7 +6247,9 @@ When no producer is configured, the reference inventory is the intentionally emp
 
 `ProducerOmitted` is reserved for a producer that exists in the resolved inventory but was not executed or included in the current integration request. It never represents absence of producer configuration.
 
-`producers.js` configures the built-in CLI source-scan producer and is itself optional. When present, it requires both a non-empty `include` array and a non-empty `recognizers` object. An empty array, an empty object, or omission of either member is a configuration error; a project that does not use the built-in producer omits `js` itself.
+`producers.js` configures the built-in `intlify_producer_js` implementation invoked by `intlify_cli` and is itself optional. In M0, `intlify_producer_js` owns JS/TS parsing, recognizer matching, static evaluation, source mapping, producer-specific cache identity, and `MessageReferenceArtifact` construction. `intlify_cli` owns project inventory, physical grouping, source-snapshot selection, invocation, execution-outcome accounting, completeness construction, and `LinkRequest` orchestration; it does not parse JS/TS or construct reference records itself. The deferred Vue SFC frontend remains producer-owned when promoted and does not move SFC parsing into the CLI.
+
+When `producers.js` is present, it requires both a non-empty `include` array and a non-empty `recognizers` object. An empty array, an empty object, or omission of either member is a configuration error; a project that does not use the built-in producer omits `js` itself.
 
 Each recognizer binding requires exact `kind`, `scope`, `domain`, and `keySyntax` members and follows the M0 canonicalization contract above. The exact `kind` tokens are `"lookup"` and `"set"`. There is no default recognizer, call kind, include pattern, scope, domain, or key syntax, so names such as `t`, `i18n.t`, and `useMessageSet` in the example have no effect unless explicitly declared.
 
@@ -6159,7 +6267,7 @@ Domain IDs use the exact `CatalogKeyDomain` tokens above, and selector objects u
 
 ### Delivery configuration
 
-`delivery` is an optional M3 field so link analysis, lint adaptation, typed-key generation, and prune analysis do not require an exporter destination. When present, it requires a `targets` array containing 1 through 64 submitted targets inclusive; an empty object, an omitted `targets` member, and an explicit empty array are configuration errors rather than no-op delivery plans.
+`delivery` is an optional M3 field so link analysis, lint adaptation, M1 typed-key model construction, and prune analysis do not require an exporter destination. Rendering that model as a JS/TS accessor module is M3 ESM export work and therefore does require a selected delivery target. When present, `delivery` requires a `targets` array containing 1 through 64 submitted targets inclusive; an empty object, an omitted `targets` member, and an explicit empty array are configuration errors rather than no-op delivery plans.
 
 The M3 configuration validator preflights the submitted target count before target-name validation, duplicate detection, exporter lookup, option validation, inventory work, or allocation proportional to target contents. The 65th submitted target rejects the complete delivery configuration; invalid and duplicate targets receive no count deduction. The validator never truncates, partitions, or executes a valid prefix.
 
@@ -6454,7 +6562,7 @@ For every target supplied to the M0 core contract and every configured delivery 
 
 The initial `intlify messages emit` and `intlify messages prune` commands are project-wide closed-world consumers. They accept no positional file, directory, glob, or stdin operands and do not treat an empty operand list as directory `.`. The discovered 006 `projectRoot`, the resolved linker-participating `resources.catalogs` assignments, and the resolved `messages` configuration are the only initial inventory authority.
 
-The definition inventory contains every concrete logical file selected by a resource catalog definition with the coordinated M0 `scope` and locale binding. Resource definitions without that pair remain entry-level `fmt` / `lint` inputs and are not omitted linker sources. `PolicyAbsent`, `PolicyEmpty`, and the config-free direct-file exception never trigger an implicit project scan for a linker command.
+The definition inventory contains every concrete logical file selected by a resource catalog definition with the coordinated M0 `scope` and locale binding. Resource definitions without that pair remain entry-level `fmt` / `lint` inputs and are not linker sources, so the ordinary project-wide linker inventory does not select them. An integration that nevertheless explicitly attempts to project one as a linker definition fails before linking rather than inventing or omitting identity metadata. `PolicyAbsent`, `PolicyEmpty`, and the config-free direct-file exception never trigger an implicit project scan for a linker command.
 
 The reference inventory contains every source file matched by each enabled built-in producer plus every exact external artifact declaration. For M0, a present `producers.js` object requires the non-empty `include` and `recognizers` members fixed above. Include patterns use exactly the 013 resource-membership glob syntax and matching semantics, including its rejection of brace expansion, character classes, extglobs, negation, absolute paths, and `..`. The producer validator owns its pointers and error evidence; reusing the grammar does not move producer configuration into `intlify_resource`.
 
@@ -6468,21 +6576,23 @@ Each declaration makes the complete file bytes the authoritative external refere
 
 After successful decode, built-in single-unit request validation requires the artifact's checked `delivery_unit` to equal `["main"]`. Another valid ID is not rewritten and does not create a graph node; it fails through the ordinary missing-node `LinkOperationalError`.
 
-For project-backed editor diagnostics, 009 applies the open-document override before this read/decode boundary. One unambiguous current buffer for the exact configured artifact source replaces the disk bytes and, after complete successful bounded decode, is authoritative for that editor invocation. Invalid buffer bytes are `ProducerFailed` without disk fallback; ambiguous source ownership is `Partial(OpenEditorWorld)`; closing the override selects the then-current disk snapshot. The editor does not label a successfully decoded configured override `ExternalArtifactUnverified` or infer upstream-source freshness.
+For project-backed editor diagnostics, 009 applies the open-document override before this read/decode boundary. One mapped current buffer, or several mapped buffers with byte-identical current UTF-8 contents, replaces the exact configured artifact source's disk bytes and, after complete successful bounded decode, is authoritative for that editor invocation. The editor captures every contributing URI/version for freshness. Invalid selected bytes are `ProducerFailed` without disk fallback; unequal claims or unresolved source ownership are `Partial(OpenEditorWorld)`; closing every override selects the then-current disk snapshot. The editor does not label a successfully decoded configured override `ExternalArtifactUnverified` or infer upstream-source freshness.
 
 The declaration is project-global rather than scope-qualified. A successfully decoded artifact containing zero references is still one completed external producer participant for every target scope. I/O or contract failure conservatively makes every target reference side partial because the failed complete snapshot cannot reveal a trustworthy narrower scope set.
 
 `crates/intlify_cli` owns enumeration and the execution report. It may prune a directory only when the complete compiled include set proves that no descendant can match. It follows selected file symlinks, never follows directory symlinks, and inspects selected file-symlink and hard-link aliases through the 005 physical identity boundary.
 
-A catalog physical group produces one definition artifact under 013/014's primary/alias rules. The built-in JS/Vue producer likewise collapses its selected logical aliases into the one physical-group participant and one primary-path artifact fixed in the JS/TS section; it does not reconstruct one artifact per alias. This grouping does not cross producer sides: a source file that belongs to both definition and reference inventories participates independently on both sides, and one side never suppresses the other.
+A catalog physical group produces one definition artifact under 013/014's primary/alias rules. The built-in JS/TS producer likewise collapses its selected logical aliases into the one physical-group participant and one primary-path artifact fixed in the JS/TS section; it does not reconstruct one artifact per alias. This grouping does not cross producer sides: a source file that belongs to both definition and reference inventories participates independently on both sides, and one side never suppresses the other.
 
 The explicit project patterns are authoritative for closed-world selection. Root `.gitignore`, `--ignore-path`, `fmt.ignorePatterns`, `lint.ignorePatterns`, hidden-name filtering, and default VCS, dependency, or output-directory exclusions do not subtract a matching source. Projects exclude such content through `resources.catalogs[].exclude` or by narrowing the corresponding producer include set. A valid include pattern that matches no file is a successfully enumerated empty set, not an error, warning, fallback scan, or partial-world claim.
 
 Inventory and execution order are deterministic. Representable definition and built-in producer paths use their exact slash-normalized project-relative logical identities and are ordered by those identities, independently within each side. External artifact declarations are admitted in canonical resolved-path order after duplicate rejection. Native directory-entry order is used only to select and order filesystem-discovery failures for names that cannot enter the Unicode logical-path order. Worker completion, filesystem iteration, config member order, glob order, and physical alias discovery cannot change artifacts, completeness, findings, plans, errors, or output order.
 
-The complete resolved inventory is fixed before constructing a `LinkRequest`. A known definition-source enumeration, metadata, read, extraction, binding, freshness, or projection failure records `SourceFailed`; a known configured definition deliberately not executed records `SourceOmitted`. A built-in source-scan failure records `ProducerFailed` for every scope bound by that producer's enabled recognizers, while a deliberately unexecuted matched source records `ProducerOmitted`. An exact configured external artifact becomes a complete authoritative participant after successful bounded read and contract decoding; it needs no embedded source fingerprint, sidecar, or independent upstream-source proof. Its I/O or contract-decoding failure is `ProducerFailed` for every target scope. `ExternalArtifactUnverified` applies only when another integration submits an external artifact or cached value without the authoritative configured-snapshot evidence required by that integration.
+The complete resolved inventory is fixed before constructing a `LinkRequest`. Configuration-derived assignment and binding checks remain fail-complete even when concrete paths, physical groups, or successfully extracted entries are required to evaluate them. `catalog_format_conflict`, `locale_capture_mismatch`, `catalog_binding_conflict`, `catalog_locale_not_production`, `catalog_scope_key_domain_conflict`, and `scope_key_domain_mismatch` return their owning `config_validation_failed`, emit no affected definition artifact, start no reference-source scan, and never derive `Partial`.
 
-If project-root or configuration setup fails before a resolved inventory exists, the command returns the ordinary operational error and does not invoke the linker. Once the inventory exists, source-attributable discovery and execution failures remain operational evidence and also derive the affected partial side; the linker may still return safe present-world findings, but no command with an operational failure or partial target scope generates, registers, diffs, or mutates output.
+After those configuration gates succeed, a known definition-source enumeration, metadata, read, extraction, freshness, or projection failure records `SourceFailed`; a known configured definition deliberately not executed records `SourceOmitted`. A built-in source-scan failure records `ProducerFailed` for every scope bound by that producer's enabled recognizers, while a deliberately unexecuted matched source records `ProducerOmitted`. An exact configured external artifact becomes a complete authoritative participant after successful bounded read and contract decoding; it needs no embedded source fingerprint, sidecar, or independent upstream-source proof. Its I/O or contract-decoding failure is `ProducerFailed` for every target scope. `ExternalArtifactUnverified` applies only when another integration submits an external artifact or cached value without the authoritative configured-snapshot evidence required by that integration.
+
+If project-root setup, configuration setup, or a later configuration-derived assignment/binding check fails, the command returns the ordinary configuration or operational error and does not invoke the linker, regardless of whether an inventory or successful extraction prefix already exists. Once the inventory exists and every applicable configuration gate succeeds, source-attributable discovery and execution failures remain operational evidence and also derive the affected partial side; the linker may still return safe present-world findings, but no command with an operational failure or partial target scope generates, registers, diffs, or mutates output.
 
 Omitting `--target` selects every configured delivery target; `--target <name>` selects the one exact checked-name match. Selection changes delivery targets and exporters only after the same complete definition and reference inventories have been processed. It never narrows catalog files, producer source files, external artifacts, scopes, findings evidence, or completeness. `emit --check` performs the identical full inventory and selected export transactions before comparing expected artifacts. `prune` always analyzes the complete configured project inventory because a delivery-target subset cannot prove project-wide unreachability.
 
@@ -6494,7 +6604,7 @@ The one shared `prepare_export` call belongs to that project-global prefix after
 
 `MessageValidation` is the deliberate non-operational exception. It retains the checked command-level diagnostic result and creates one `blocked` result for every selected target without entering any exporter transaction.
 
-After a successful shared prefix, selected targets are independent transactions. The initial M3 CLI visits them sequentially in exact checked target-name order; it does not introduce a target worker pool ahead of the deferred shared CLI scheduler. A later scheduler may overlap independent target preparation only if it preserves the same per-target transaction, result, failure, and side-effect semantics.
+After a successful shared prefix, selected targets are independent transactions. The initial M3 CLI visits them sequentially in exact checked target-name order; it does not introduce a target worker pool ahead of the deferred shared CLI scheduler. A later extension of the shared [CLI parallel-execution boundary](./005-ox-mf2-phase-3-tooling-transport-design.md#cli-parallel-execution-boundary) may reuse its command-scoped bounded pool to overlap independent target transactions only after the shared prefix completes and only if it preserves the same per-target transaction, result, failure, and side-effect semantics.
 
 Every selected target receives exactly one result entry. A target-local export, destination-mapping, registration, check, or target-scoped internal failure completes that entry as an error and does not suppress entries for later targets. The CLI continues with every remaining target because configuration has already rejected equal or nested roots and one target holds no authority over another target's output or lock.
 
@@ -6557,7 +6667,7 @@ When shared export preparation returns `ExportMessageValidationFailure`, `analys
 }
 ```
 
-`messageValidation` uses the existing exact structured adapter shape and exists only when `totalDiagnostics > 0`. `diagnostics` is the retained canonical prefix, `totalDiagnostics` is the exact count across the one complete shared validation pass, and `truncated` is true exactly when that count exceeds the retained vector length. A retention limit of zero therefore emits an empty vector, positive total, and `truncated: true`.
+`messageValidation` uses the existing exact structured adapter shape and exists only when `totalDiagnostics > 0`. `diagnostics` is the retained canonical prefix, `totalDiagnostics` is the exact count across the one complete delivery-plus-typed-signature validation pass, and `truncated` is true exactly when that count exceeds the retained vector length. A retention limit of zero therefore emits an empty vector, positive total, and `truncated: true`.
 
 Every selected target is `blocked` after shared message-validation failure. Its target-local `diagnostics` remains empty, and no exporter or registration step runs. `summary.diagnosticCount` is `totalDiagnostics`, not the retained vector length; `preparedTargets`, `preparedArtifacts`, and `preparedPayloadBytes` are zero.
 
@@ -6746,9 +6856,11 @@ The shared registry in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-c
 
 These codes preserve the public boundary rather than allocating one top-level string for every typed enum variant. The selected `details.kind` is required and stable. When the originating error has checked structured evidence, `details.evidence` is its canonical bounded adapter shape; a reporter does not replace it with `Display`, `Debug`, a dependency error name, a source chain, source text, or an arbitrary message.
 
+The stable artifact/link code, kind, and evidence mapping is also consumed by 009's project-link editor operational channel. The top-level CLI `errors[]`, summary, exit-code, and target-result placement rules in this section remain CLI-only; 009 owns editor notification episodes, retry, retained publication, and recovery and never turns these operational values into document diagnostics.
+
 `ArtifactReadError::Transport` and ordinary configured source-file I/O reuse `input_read_failed` with the existing normalized I/O details. External artifact decoding, caller-owned direct construction, cache admission, and defensive contract admission map `ArtifactContractError` one-to-one to `invalid_artifact`, `unsupported_version`, or `limit`.
 
-The built-in JS/Vue source producer instead uses `message_artifact_failed` with `details.kind: "producer_failed"` once one resolved inventory participant cannot produce its complete artifact. This includes a source/profile failure discovered before bytes need to be read and a producer-owned checked output failure after scanning; an ordinary attempt to read selected disk bytes still uses `input_read_failed`, and a logical host path that cannot become the shared portable source identity still uses `input_path_unrepresentable`.
+The built-in JS/TS source producer instead uses `message_artifact_failed` with `details.kind: "producer_failed"` once one resolved inventory participant cannot produce its complete artifact. This includes a source/profile failure discovered before bytes need to be read and a producer-owned checked output failure after scanning; an ordinary attempt to read selected disk bytes still uses `input_read_failed`, and a logical host path that cannot become the shared portable source identity still uses `input_path_unrepresentable`.
 
 The canonical `details.evidence` object for `producer_failed` contains the members below in this exact emission order:
 
@@ -6766,15 +6878,14 @@ The stage and reason vocabulary is:
 | Stage | Admitted reasons |
 | --- | --- |
 | `identity` | `artifact_identity_limit` |
-| `profile` | `unsupported_source_suffix`, `conflicting_alias_profile`, `unsupported_vue_script_lang`, `unsupported_vue_template_lang` |
+| `profile` | `unsupported_source_suffix`, `conflicting_alias_profile` |
 | `snapshot` | `invalid_utf8`, `source_count_limit`, `source_bytes_limit`, `source_bytes_total_limit` |
 | `parse` | `syntax_invalid` |
-| `source_map` | `host_span_unavailable`, `host_span_ambiguous`, `host_span_unrepresentable` |
 | `recognizer` | `selector_argument_missing`, `selector_argument_spread` |
 | `selector` | `lookup_selector_invalid`, `set_selector_dynamic`, `set_selector_invalid` |
 | `artifact` | `output_contract_invalid`, `output_limit`, `canonical_encoding_failed` |
 
-No other stage/reason pairing is valid. `span` is permitted only for `parse`, `source_map`, `recognizer`, and `selector`; `limit` plus `observed` is required only for `artifact_identity_limit`, all three `*_limit` snapshot reasons, and `output_limit`, and forbidden for every other reason. A parse frontend may use a bounded dependency diagnostic internally for display, but no parser code, dependency type name, source excerpt, selector spelling, arbitrary message, debug string, or error chain enters this stable evidence.
+No other stage/reason pairing is valid. `span` is permitted only for `parse`, `recognizer`, and `selector`; `limit` plus `observed` is required only for `artifact_identity_limit`, all three `*_limit` snapshot reasons, and `output_limit`, and forbidden for every other reason. A parse frontend may use a bounded dependency diagnostic internally for display, but no parser code, dependency type name, source excerpt, selector spelling, arbitrary message, debug string, or error chain enters this stable evidence.
 
 Within one source group, failure selection completes stages in the table's declaration order. For stages that can observe several source sites, the smallest checked `(span.start, span.end)` wins, followed by the reason order shown in that stage. Across groups, errors are ordered by the primary `SourceDocumentIdentity` canonical order. Glob order, alias discovery, AST traversal, parser recovery order, cache hits, worker completion, and reporter choice cannot change selection or ordering.
 
@@ -6948,17 +7059,19 @@ M0 also fixes the execution-derived `ScopeCompletenessTable`, the explicit JS re
 
 It also fixes the resolved project-inventory and failure-accounting model used by the later M3 and M5 CLI leaves. Fixing that model in M0 makes source-scan and completeness conformance testable without exposing an early generation or mutation command.
 
-M0 implements the reusable `crates/intlify_cli` project-inventory, built-in producer, single-unit graph, completeness construction, and in-process integration-test path, but publishes no new executable CLI leaf and activates no editor link session. M3 exposes `intlify messages emit`, M5 exposes `intlify messages prune`, and L0 enables linker-backed editor/lint diagnostics; each reuses this M0-owned orchestration rather than defining another inventory or link path.
+M0 implements the built-in source producer in `crates/intlify_producer_js`. It separately implements reusable `crates/intlify_cli` orchestration for project inventory, physical grouping and snapshot selection, producer invocation, the single-unit graph, execution-derived completeness, `LinkRequest` construction, and the in-process integration-test path.
+
+The M0 orchestration publishes no new executable CLI leaf and activates no editor link session. E0 enables 009-owned JS/TS catalog-key completion after M1, M3 exposes `intlify messages emit`, M5 exposes `intlify messages prune`, and L0 enables linker-backed editor/lint diagnostics; each reuses this M0-owned orchestration rather than defining another inventory or link path.
 
 It returns deterministic linker-owned `ambiguous-message-definition`, `unresolved-message`, `unused-message`, `unbounded-dynamic-reference`, and `degraded-analysis` findings and produces basic plans only when no finding or completeness gate blocks them; no exporter consumes those plans until M3.
 
-M0 includes a JS/TS source-scan producer without bundler integration and has no dependency on `intlify_lint`. It depends on 013 Tier 1 extraction, the coordinated promotion of explicit 013 `scope` plus `path` / `fixed` locale binding, and explicit producer-to-scope/domain bindings.
+M0 includes a JavaScript/TypeScript source-scan producer without bundler integration and has no dependency on `intlify_lint`. Vue SFC reference production is the next producer phase in Deferred Follow-Up Notes and does not gate M0. M0 depends on 013 Tier 1 extraction, the coordinated promotion of explicit 013 `scope` plus `path` / `fixed` locale binding, and explicit producer-to-scope/domain bindings.
 
 #### M1 — typed keys
 
-Derive the language-neutral typed-key model from each explicit per-scope coverage baseline. Fail generation when any production-locale key is absent from that baseline, and emit the initial JS/TS scope-bound generated accessor module without ambient `.d.ts` augmentation.
+Derive one language-neutral key-only typed-key model from each canonical resolved coverage baseline. A resolved scope without an explicit baseline produces no model and is not widened from another locale or definition union. Equal mapped declarations therefore share one model, while conflicting mapped locales have already failed the resolved request. Fail model construction when any production-locale key is absent from that baseline. The model contains resolved scope plus canonical domain-qualified keys and no parsed MF2 or argument-signature state. M1 exposes the checked model to Rust/in-process consumers but publishes no CLI leaf, writes no platform source file, and has no filesystem freshness mode.
 
-The M1 implementation addendum fixes the bounded `coverageBaseline` config admission contract plus exact module ABI, file naming, runtime binding, argument-type derivation, and freshness behavior. `useMessageSet` remains a producer-side bounded-selector API.
+The M1 implementation addendum fixes the bounded `coverageBaseline` config admission contract, exact key-only model/API shape, deterministic ordering, failure result, and private model-key-to-baseline-source representation. The coordinated M3 portion implements the fixed delivery-plus-baseline validation set and fixes the language-neutral argument-signature type, the batch's single typed-output accessor, JS/TS module ABI, artifact identity and path, runtime binding, canonical bytes, registration, and freshness behavior. `useMessageSet` remains a producer-side bounded-selector API.
 
 #### M2 — fallback-aware link
 
@@ -6976,6 +7089,7 @@ Establish the initial exporter contract:
 - exactly one exporter per export transaction, with multiple artifact records allowed in its one set;
 - initial built-in output format `0.1`;
 - per-locale ESM assets and a loader map represented through the generic artifact envelope;
+- one scope-bound JS/TS accessor module per admitted M1 typed-key model, rendered by the ESM exporter through that same envelope;
 - `--check`; and
 - one delivery unit under the same `duplicate` policy.
 
@@ -6993,7 +7107,7 @@ Add the coordinated 013 structural-deletion contract and its format-specific cap
 
 After the Phase 3C contracts and the dedicated catalog-level addendum are available, map the five M0 linker finding categories into initially default-off `intlify lint` rules without changing linker analysis.
 
-Resolve enabled-rule input capabilities before work, skip reference production when none requires it, and otherwise reuse one shared producer/cache/linker orchestration and one `LinkOutcome`.
+Require a present valid `messages` section for any enabled linker-backed rule, resolve the 008 static input-capability union before work, skip reference production when none requires it, and otherwise reuse one shared producer/cache/linker orchestration and one `LinkOutcome`.
 
 #### L1 — locale finding adapter
 
@@ -7024,14 +7138,15 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - Reason-vocabulary fixtures admit exactly the milestone-gated closed table above, preserve the existing 006 `unknown_field`, later-stage `scope_key_domain_mismatch`, and 013-owned catalog reasons without aliases, and reject spelling variants, generic/custom reasons, or use before the owning milestone.
   - Config-evidence fixtures include exact scalar `value` only within the owning per-value or 255-byte fallback evidence ceiling; omit missing, `null`, collection, object, and over-ceiling values without truncation or substitution; expose exact `limit` and `observed` for count/byte overruns; and use later `pointer` plus earlier `firstPointer` for semantic duplicates without copying the value.
   - Output-conflict evidence fixtures expose only the validated `firstTarget`, `secondTarget`, `firstOutPointer`, and `secondOutPointer` fields in addition to common reason/pointer data, never either raw output root. They preserve the independently owned unknown-field, scope/domain-mismatch, and 013 catalog evidence shapes.
+- Consumer-activation fixtures keep an omitted `messages` section valid when no linker consumer is enabled, then reject every explicitly enabled linker-backed lint rule against that absence with the 008-owned `linker_messages_required` reason, ASCII-smallest enabled rule id, exact `/lint/rules/<rule-id>` pointer, and no inferred value or downstream work. A malformed present `messages` section retains its earlier 014 failure, and future implicit preset activation uses `/lint` only under the separately gated 008 branch.
 - Project-inventory CLI fixtures reject every positional file, directory, glob, stdin, and post-`--` operand before project processing; prove that no operands do not imply `.`; and preserve the same resolved command identities for valid option-only invocations.
 - Inventory-selection fixtures enumerate only linker-participating resource definitions, built-in producer include matches, and exact external artifact declarations; accept a valid zero-match pattern as a complete empty set; and reject config-free direct-extension, content-sniffing, or standalone `.mf2` fallback.
 - Empty-producer fixtures require omitted `producers` and an explicit empty object to resolve to the same empty producer inventory, cache identity, scope completeness, findings, and plans without scanning project files. They mark each target scope's reference side `Closed`, permit ordinary `unused-message` and explicit prune selection when the definition side is also closed, and never synthesize `ProducerOmitted`.
 - Built-in-producer shape fixtures require both non-empty `include` and non-empty `recognizers` whenever `producers.js` is present; reject an omitted or empty member without supplying defaults; and accept omission of `js` itself.
 - External-producer shape fixtures accept omission of `producers.artifacts`, require a non-empty array when the member is present, and reject an explicit empty array rather than normalizing it to omission.
-- Producer-include fixtures use the exact 013 glob grammar, accept the example's separate `.ts`, `.tsx`, and `.vue` patterns, accept a valid non-empty pattern set that matches zero files as one completed closed scan, and reject brace expansion or a glob-shaped external artifact path rather than delegating syntax to a filesystem dependency.
-  - Source-profile fixtures admit only exact lowercase `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, `.d.ts`, `.d.mts`, `.d.cts`, and `.vue` suffixes with longest-suffix matching; parse declaration suffixes through the declaration profile; and reject every unsupported, extensionless, or case-varied selected source as `ProducerFailed` without metadata, editor-language, or project-config inference.
-  - Source-goal fixtures use fixed module for `.mjs`/`.mts`/`.d.mts`, fixed CommonJS for `.cjs`/`.cts`/`.d.cts`, and fixed module for every Vue script block. Neutral suffixes parse module first and retry the complete source exactly once as script only after an ordinary grammar rejection; they keep only the successful authoritative AST, prefer module when it succeeds, and never retry a limit, UTF-8, cancellation, invariant, internal, or post-scan failure.
+- Producer-include fixtures use the exact 013 glob grammar, accept the example's separate `.ts` and `.tsx` patterns, accept a valid non-empty pattern set that matches zero files as one completed closed scan, and reject brace expansion or a glob-shaped external artifact path rather than delegating syntax to a filesystem dependency.
+  - Source-profile fixtures admit only exact lowercase `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts`, `.d.ts`, `.d.mts`, and `.d.cts` suffixes with longest-suffix matching; parse declaration suffixes through the declaration profile; and reject every unsupported, extensionless, or case-varied selected source — including `.vue` in M0 — as `ProducerFailed` with exact `profile` / `unsupported_source_suffix`, without metadata, editor-language, or project-config inference.
+  - Source-goal fixtures use fixed module for `.mjs`/`.mts`/`.d.mts` and fixed CommonJS for `.cjs`/`.cts`/`.d.cts`. Neutral suffixes parse module first and retry the complete source exactly once as script only after an ordinary grammar rejection; they keep only the successful authoritative AST, prefer module when it succeeds, and never retry a limit, UTF-8, cancellation, invariant, internal, or post-scan failure.
   - Parser-recovery fixtures require zero syntax errors for one successful complete parse; discard every recovered AST and record from a failed attempt; allow only the specified neutral-source module-to-script retry; and map two failed attempts to one `parse` / `syntax_invalid` result with the smallest safe span independently of dependency recovery order. Parser warnings and later lint/semantic diagnostics do not fail producer syntax admission.
   - Source-snapshot fixtures require exact valid UTF-8 bytes, admit an optional leading UTF-8 BOM while retaining its three bytes in every host offset and cache input, preserve line endings and scalar spelling, and reject malformed or transcoding-dependent input as `ProducerFailed` without an unambiguous-goal retry.
   - Producer-source-limit fixtures accept zero and exact `65,536` physical groups, 64 MiB in one snapshot, and 1 GiB across admitted snapshots; reject the first-over group or byte; charge empty and equal-byte groups independently; charge aliases once; and provide no deductions for BOM removal, normalization, cache reuse, compression, interning, memory mapping, or worker partitioning.
@@ -7040,21 +7155,18 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - Built-in cache-key fixtures distinguish cache-schema revision, artifact version, complete producer identity, primary and canonical aliases, grammar and goal, every canonical recognizer field, exact source length and BLAKE3-256 digest, and `["main"]`; they prove include spelling and linker/export-only policy cannot cause a miss when the semantic producer inputs are equal.
   - Cache-value fixtures store only a complete checked artifact, including empty output; never store recovery ASTs, failures, cancellation, or partial records; reapply current source and artifact limits plus expected identity/provenance/origin/order validation on hit; and treat missing, stale, corrupt, invalid, and cache-I/O outcomes as regeneration misses without changing completeness.
   - Cache-publication fixtures count hit bytes normally, discard every pending entry after producer-wide count/aggregate failure, publish only after global admission, and keep editor protocol version in the external publication gate so equal-byte reuse cannot publish against a superseded buffer.
-  - Vue snapshot fixtures map every parser-local or embedded coordinate back through BOM and template decoding to the exact original `.vue` UTF-8 snapshot; no normalized, block-local, UTF-16, or decoded-expression coordinate may escape as `SourceOrigin`.
   - Physical-profile fixtures require every participating alias to derive the same complete grammar/source-goal profile and fail the group for an unsupported or conflicting alias rather than selecting by primary path; a valid zero-reference declaration source still emits one empty artifact.
 - Built-in source-partition fixtures emit one artifact per selected physical source group, including an empty artifact for a successful zero-reference scan; choose the exact UTF-8-ordered primary logical path; construct `Project` plus `["js", "module", ...primary_path_segments]` through ordinary identity limits; and map an inadmissible prefixed identity to `ProducerFailed` without truncation, hashing, or an alternate ID.
   - They use the primary path for every record origin, suppress alias artifacts and alias-induced duplicate records, retain equal selectors at distinct source ranges, reject a duplicate complete first-argument range as a frontend invariant failure, order records by exact host `(start, end)`, and order completed artifacts by canonical identity independently of glob, alias, AST, and worker order.
-  - Built-in provenance fixtures require exact ID `dev.intlify/js-reference` for every JS, JSX, TS, TSX, and Vue artifact; use one immutable build-supplied revision across CLI, editor, empty artifacts, and worker partitions; reject configuration or invocation overrides; and change cache provenance whenever the effective output-affecting producer build changes.
+  - Built-in provenance fixtures require exact ID `dev.intlify/js-reference` for every JS, JSX, TS, and TSX artifact; use one immutable build-supplied revision across CLI, editor, empty artifacts, and worker partitions; reject configuration or invocation overrides; and change cache provenance whenever the effective output-affecting producer build changes.
 - JS-call argument fixtures consume only an ordinary non-spread first argument, ignore every later argument for selector semantics, emit `UnboundedDynamic` for a dynamic lookup first argument, and fail the complete source as `ProducerFailed` for a matched zero-argument call, a spread first argument, or a dynamic set first argument.
   - Static-string fixtures accept exact decoded string literals and substitution-free template literals through only the admitted parenthesized and TypeScript value-preserving wrappers. They classify identifiers, imports, properties, binary and conditional expressions, calls, tagged templates, and templates with substitutions as dynamic without attempting lexical or module resolution; lookup emits `UnboundedDynamic`, while set fails production.
   - Static-selector failure fixtures map a statically known lookup rejected by key-syntax conversion, domain grammar, or size limits to `selector` / `lookup_selector_invalid` at the first-argument span; never retry another syntax, widen it to `UnboundedDynamic`, retain the scope, or omit the call; and keep only genuinely unknown lookup values on the dynamic path. They distinguish a set's unknown value as `set_selector_dynamic` from its known invalid finite pattern as `set_selector_invalid`.
   - Built-in reason fixtures require exact `lookup argument is not statically known` on every `UnboundedDynamic`, exact `bounded set declared by configured recognizer` on every `Pattern`, and omission on every `Exact`; reject configuration, source, callee, selector, diagnostic, or reporter-derived changes; and prove reason bytes remain provenance rather than semantic control.
-  - Built-in-origin fixtures require every emitted JS/TS record to span exactly the complete first argument expression, including its own parentheses and admitted TypeScript wrappers but excluding call delimiters and later arguments. They apply the same rule to static and dynamic lookup records, map Vue ranges to exact host bytes, and fail the complete source rather than omit origin when the checked `u32` UTF-8 range cannot be constructed.
-- Vue SFC producer fixtures scan both valid inline script forms and every standard-template embedded expression in canonical host-source order; map origins to exact original `.vue` UTF-8 spans through checked monotonic maps; accept only absent/`js`/`jsx`/`ts`/`tsx` script language and no custom template language; and fail the complete source as `ProducerFailed` for SFC, language, embedded parse, or mapping failure without a partial artifact.
-  - They never follow `<script src>` or scan style/custom blocks, scan a referenced external script only through its own include match and identity, match template calls through the same callee contract, and require declarative non-call APIs such as `<i18n-t keypath>` to be represented by configured roots or an external artifact rather than guessed.
-- Closed-world fixtures prove that `.gitignore`, `--ignore-path`, formatter/linter ignore patterns, hidden-name filtering, and default VCS/dependency/output exclusions cannot remove configured inputs; directory symlinks are not traversed, selected file symlinks and hard links use physical grouping, and a dual-role Vue file participates once on each applicable side.
-- Completeness fixtures map every known source and producer outcome to the fixed partial reason; treat a successfully decoded exact configured external artifact, including an empty one selected from CLI disk or one unambiguous editor buffer, as an authoritative project-global participant; conservatively weaken every target reference scope on its I/O or contract failure; reserve `ExternalArtifactUnverified` for non-authoritative integration/cache inputs; and prove that setup failure creates no `LinkRequest` while post-inventory failure produces no export, check diff, registration, or mutation.
-- Editor external-artifact override fixtures replace configured disk bytes with the exact current uniquely owned buffer, include its version in the captured editor snapshot, accept complete successful decode as closed configured participation without `ExternalArtifactUnverified`, map invalid selected bytes to `ProducerFailed` without disk fallback, map multiple claiming documents or unresolved ownership to `OpenEditorWorld`, and return to the current disk snapshot after close.
+  - Built-in-origin fixtures require every emitted JS/TS record to span exactly the complete first argument expression, including its own parentheses and admitted TypeScript wrappers but excluding call delimiters and later arguments. They apply the same rule to static and dynamic lookup records and fail the complete source rather than omit origin when the checked `u32` UTF-8 range cannot be constructed.
+- Closed-world fixtures prove that `.gitignore`, `--ignore-path`, formatter/linter ignore patterns, hidden-name filtering, and default VCS/dependency/output exclusions cannot remove configured inputs; directory symlinks are not traversed, selected file symlinks and hard links use physical grouping, and a file selected by both definition and reference inventories participates once on each applicable side.
+- Completeness fixtures map every admitted source and producer execution outcome to the fixed partial reason; treat a successfully decoded exact configured external artifact, including an empty one selected from CLI disk or one unambiguous editor buffer, as an authoritative project-global participant; conservatively weaken every target reference scope on its I/O or contract failure; reserve `ExternalArtifactUnverified` for non-authoritative integration/cache inputs; and prove that setup failure creates no `LinkRequest` while post-inventory execution failure produces no export, check diff, registration, or mutation. Separate configuration-gate fixtures require every assignment, locale, scope, alias-binding, and domain contradiction to retain its owning `config_validation_failed`, produce no partial reason or `LinkOutcome`, and start no reference-source scan even when discovery, physical grouping, or successful extraction was needed to observe it.
+- Editor open-buffer override fixtures form physical groups before substitution; admit one mapped buffer or a set of mapped buffers only when their exact current UTF-8 bytes are equal; capture every contributing URI/version; and produce exactly one definition or reference artifact for an admitted group. They accept complete successful external-artifact decode as closed configured participation without `ExternalArtifactUnverified`, map invalid selected bytes to `ProducerFailed` without disk fallback, map unequal claims or unresolved ownership to `OpenEditorWorld` with no artifact or disk fallback, reject first/last/primary-alias winner selection, and return to the current disk snapshot only after every override closes.
 - External-artifact cache fixtures hash the exact complete file bytes with BLAKE3-256, include normalized declared path, byte length, decoder revision, and effective-limit compatibility, miss on any byte change, and prove that this consumer-side fingerprint neither enters the artifact wire contract nor claims upstream source freshness.
 - Target-selection fixtures require omission of `--target` to select every configured target and one supplied exact name to select exactly one; expose no default-target setting; reject equal checked target names without first/last-wins or merging; and prove that selection changes only delivery/export work after full analysis and never changes inventories, artifact identities, completeness, findings, or prune reachability.
   - Target-name fixtures accept the exact one-byte and 255-byte lowercase ASCII-slug boundaries; accept internal `.`, `_`, and `-`; and reject empty, 256-byte, leading-punctuation, uppercase, non-ASCII, whitespace, and control-containing values. Configuration and CLI operands use identical validation and exact equality without trimming, case folding, normalization, aliasing, or path conversion.
@@ -7103,7 +7215,8 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - Locale-path collision fixtures retain exact locale keys in the loader map, detect one equal logical path for unequal locales before publication, and fail the complete set as `DuplicateArtifactPath` without winner selection, suffixing, digest extension, or relationship-order dependence.
   - ESM v0.1 representation fixtures preserve exact validated MF2 source together with scope, domain, and canonical key in data-only modules; reject formatting, normalization, generated formatter functions, Binary AST snapshots, embedded runtime/provider behavior, and invocation of `MessageCompilation`; and require an explicit kind/version decision before another representation replaces the `0.1` payload.
   - Fallback-materialization fixtures place every linker-selected resolved message in its requested-locale artifact, retain its exact definition locale as provenance, emit an artifact for an empty plan, charge equal fallback materialization independently, and reject source-locale repartitioning, exporter/runtime fallback search, omitted fallback selections, and loader-driven message-key reselection.
-  - Built-in plan-cardinality fixtures produce one canonical `["main"]` plan per production locale even for empty messages, reject empty/missing/duplicate/extra/wrong-unit plan sets as a built-in capability-preflight invariant, retain generic empty-batch validity outside that route, classify an explicitly custom multi-unit use as unsupported rather than flattening it, and require exactly `locales + 1` artifacts plus `locales` loader relationships.
+  - Built-in plan-cardinality fixtures produce one canonical `["main"]` plan per production locale even for empty messages, reject empty/missing/duplicate/extra/wrong-unit plan sets as a built-in capability-preflight invariant, retain generic empty-batch validity outside that route, classify an explicitly custom multi-unit use as unsupported rather than flattening it, and require exactly `locales + 1` resource-delivery artifacts plus `locales` loader relationships.
+    - With M1 models, complete-set fixtures additionally require exactly one accessor-module artifact per model without changing loader relationships; the coordinated addendum fixes its tighter bounded total before implementation.
   - Locale-module ABI fixtures emit exactly named `formatVersion`, `deliveryUnit`, `locale`, and `messages` exports with no default; use exact five-position tuples containing explicit project scope namespace/name, domain, canonical key, definition locale, and MF2 source; preserve the fixed canonical record order; and reject duplicate resolved identities, source/debug evidence, object-key catalogs, mutation helpers, or a second payload API.
   - Loader-module ABI fixtures emit one `["loader.mjs"]` `dev.intlify/loader-map` `0.1` artifact with no default; order static eager imports and aliases canonically; emit exact `formatVersion`, canonical `locales`, priority-preserving `fallbacks`, and one `loadLocale` switch case per locale; and return a promise for every branch.
   - Loader behavior fixtures resolve eager modules through `Promise.resolve`, lazy modules through direct dynamic import, and unsupported inputs through a rejected `RangeError("unsupported locale")`; perform no coercion, normalization, input interpolation, or fallback traversal; and require one matching eager/lazy relationship per locale with no reverse edge.
@@ -7146,23 +7259,31 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - They emit every operation-specific counter including zero once target result construction starts, omit unresolved counters rather than inventing zero after earlier project-global failure, retain only safely resolved operation, and enforce error/exit `2` over blocking-or-different failure/exit `1` over success/exit `0`. A successful mutating write remains success.
 - Operational-mapping fixtures cover every typed artifact, linker, export-preparation, exporter, and registration branch; require the exact boundary-level code plus `details.kind` and canonical evidence; keep transport I/O on `input_read_failed`; and map every internal variant to its registered unique `internal_error` reason.
   - Semantic-error fixtures preserve the 012-owned kind: `semantic_api_misuse` contains no `stage`, while `semantic_invariant_failed` requires exactly `semantic_model_construction` or `semantic_validation` from the owning call site.
-  - Built-in producer-failure fixtures require exact `message_artifact_failed` / `producer_failed` evidence with `producer`, `stage`, `reason`, and primary `source` followed only by permitted optional `span` or paired `limit`/`observed`; accept exactly the closed stage/reason pairings; and reject null optionals, arbitrary parser text, source excerpts, selector spellings, dependency codes, and cross-stage evidence fields.
+  - Built-in producer-failure fixtures require exact `message_artifact_failed` / `producer_failed` evidence with `producer`, `stage`, `reason`, and primary `source` followed only by permitted optional `span` or paired `limit`/`observed`; accept exactly the current M0 closed stage/reason pairings; reject the deferred Vue-only `unsupported_vue_script_lang`, `unsupported_vue_template_lang`, `source_map`, and `host_span_*` vocabulary before that frontend is promoted; and reject null optionals, arbitrary parser text, source excerpts, selector spellings, dependency codes, and cross-stage evidence fields.
   - Failure-selection fixtures complete producer stages in declaration order, choose the smallest safe `(span.start, span.end)` and then declared reason order within one source, order failed groups by canonical primary source identity, emit at most one producer error per group, emit no failed artifact, and derive `ProducerFailed` for every recognizer-bound scope independently of glob, alias, recovery, cache, traversal, reporter, and worker order.
   - Producer-invariant fixtures keep impossible AST duplication, invalid parser spans over valid UTF-8, validated-state contradictions, and equivalent impossible output rejection on `internal_error` / `message_producer_invariant_failed`; they never relabel an invariant with an input-facing producer stage.
 - Namespace-separation fixtures prove that blocking `LinkFinding` values and ordinary export-gate parser/semantic diagnostics never enter `errors[]`, while an operational failure never becomes a linker or source diagnostic merely to obtain a severity.
 - Placement fixtures keep artifact/link errors at the project-transaction top level and exporter/registration errors on the selected target result, require exit `2` for every operational code, and reject first emission before the owning M0, M3, or M5 addendum fixes its remaining bounded evidence and transaction fields.
 - M0–M3 CLI-surface fixtures reject plan-dump options and serialized-plan output.
   - Core tests and in-process integration tests inspect the typed `MessageBundlePlan` directly, while M3 `emit` passes it through export preparation without adding a public inspection wire format.
-- M0 exposure fixtures exercise the complete internal project-inventory, built-in JS producer, `["main"]` graph, completeness, and linker orchestration in process while proving that an M0-only product publishes no new CLI leaf, starts no editor link session, performs no export or prune, and defers activation unchanged to M3, M5, and L0.
-- Coverage-baseline semantic fixtures require an explicit entry for every typed-key generation scope, accept omission of the field or omission of scopes not requesting coverage or types, require at least one scope when the field is present, reject an explicit empty object, reject largest-catalog, discovery-order, fallback-order, and definition-order inference, and reject an unknown scope, an out-of-policy locale, or an incomplete baseline inventory.
-  - Baseline-versus-union fixtures accept equal sets and baseline-only keys, reject every non-baseline-locale-only key fail-complete before writing generated output, preserve canonical offending-key order under input and worker permutations, and make M2 expose the same difference as `orphaned-translation` without changing M1 output semantics.
-- Typed-key generation fixtures emit explicit scope-bound JS/TS modules and require explicit imports; reject global or ambient `.d.ts` augmentation, cross-scope merging, partial output after baseline failure, and treatment of `useMessageSet` as a generated accessor.
-  - Cross-platform fixtures prove the language-neutral model contains no TypeScript module, declaration-merging, path, or runtime-binding assumptions.
+- M0 exposure fixtures exercise the complete internal project-inventory, built-in JS producer, `["main"]` graph, completeness, and linker orchestration in process while proving that an M0-only product publishes no new CLI leaf, starts no editor link session, performs no export or prune, and defers activation unchanged to E0, M3, M5, and L0.
+- Coverage-baseline config fixtures treat the admitted entries themselves as the complete typed-key scope selection, accept omission of the field and omission of any resolved scope, require at least one member when the field is present, reject an explicit empty object, reject largest-catalog, discovery-order, fallback-order, and definition-order inference, and reject an unknown declared scope or out-of-policy locale without inspecting concrete inventory. They prove that recognizers, delivery targets, command options, E0 activation, and other consumers cannot independently request a missing scope or turn baseline omission into an error.
+  - Custom-mapping fixtures merge equal baseline locales from different declared scopes only after checked scope resolution and reject unequal locales as one fail-complete linker `invalid_request` before coverage, model construction, findings, or plans. Built-in empty-table fixtures preserve configuration duplicate-member rejection without normalization.
+  - Completeness fixtures route a definition-partial configured scope through the existing blocking `degraded-analysis` result and produce no typed-key model for that scope without a second config or operational error. They accept a definition-closed empty baseline set, fail the ordinary baseline-versus-union gate when another production locale supplies a key, and accept an empty model when every production locale is empty.
+  - Baseline-versus-union fixtures accept equal sets and baseline-only keys, reject every non-baseline-locale-only key fail-complete before constructing a model, preserve canonical offending-key order under input and worker permutations, and make M2 expose the same difference as `orphaned-translation` without changing M1 model semantics.
+- M1 typed-key model fixtures construct one deterministic language-neutral key-only model per canonical resolved scope with a baseline and expose no CLI leaf, generated source bytes, output path, registration operation, or `--check` flag. A resolved scope without a baseline produces no model, error, or finding and is never widened from the definition union, fallback order, locale order, catalog size, or open-document evidence.
+  - Cross-platform fixtures prove the model contains only resolved scope plus canonical domain-qualified keys and contains no parsed MF2 state, argument signature, TypeScript module, declaration-merging, path, runtime-binding, destination, or manifest assumptions.
+  - Outcome fixtures require one private exact baseline definition snapshot for every admitted model key, reject a missing, extra, or mismatched relation, and prove that neither the model nor another public linker accessor exposes the payload or location.
+  - Ambiguous baseline definitions produce the existing blocking outcome with no plans or model and never reach export preparation as a first/last-wins source choice.
+- M3 typed-key rendering fixtures emit one explicit scope-bound JS/TS accessor module per admitted M1 model and require explicit imports; reject global or ambient `.d.ts` augmentation, cross-scope merging, partial output after model failure, and treatment of `useMessageSet` as a generated accessor.
+  - Signature fixtures derive argument information only after the complete delivery-plus-baseline gate succeeds and expose each model with its bounded immutable signatures through the batch's one typed-output accessor.
+  - Transaction fixtures register those modules in the same ESM `ExportArtifactSet`, manifest, write transaction, and `emit --check` comparison as locale and loader artifacts; they reject a separate type-generation write path or CLI leaf.
 - Stub-absence fixtures expose no initial config field, CLI option, lint autofix, placeholder default, destination inference, or partial write for `unresolved-message` or `missing-translation`; the only initial catalog mutation remains the explicitly requested, eligibility-checked `prune` path.
-- Lint-gating fixtures resolve rules and severities before producer work; perform no linker invocation when no linker-backed rule is enabled; skip reference-artifact load, source scan, and reference-cache lookup when enabled rules require only definition/policy inputs; and invoke exactly one shared linker orchestration, adding the shared producer/cache path only when one or several enabled rules require references.
-  - They prove rule order, severity, preset, reporter, and disabled findings do not alter artifact/cache identity or linker output; `emit` and `prune` remain independent consumers; absent reference production and narrow operands derive typed `Partial` completeness and adapt `degraded-analysis` instead of fabricating absence-dependent results.
+- Lint-gating fixtures resolve rules and severities before producer work; perform no linker invocation when no linker-backed rule is enabled; reject enabled linker-backed rules before inventory when `messages` is absent; skip reference-artifact load, source scan, and reference-cache lookup when enabled rules require only definition/policy inputs; and invoke exactly one shared linker orchestration, adding the shared producer/cache path only when one or several enabled rules require references.
+  - Capability fixtures exercise every 008 table row alone and in unions: `ambiguous-message-definition` and `orphaned-translation` remain definition-only, while each of `unresolved-message`, `missing-translation`, `unused-message`, `unbounded-dynamic-reference`, and `degraded-analysis` activates the one shared reference path. The `degraded-analysis` case must retain its wide-selector variant rather than being narrowed from current completeness evidence.
+  - They prove rule order, severity, preset, reporter, and disabled findings do not alter artifact/cache identity or linker output; `emit` and `prune` remain independent consumers. A producer declared in the resolved inventory but intentionally omitted from the lint request, or a deliberately narrow operand, derives typed `Partial` completeness and adapts `degraded-analysis` instead of fabricating absence-dependent results. No configured producer remains the intentionally empty `Closed` reference world defined by the configuration contract and never derives `ProducerOmitted`.
 - Lint-rollout fixtures make every L0/L1 linker-backed rule `off` and absent from `recommended` initially, require explicit configuration to enable it, apply ordinary 008 severity/quiet/max-warning/exit behavior, and count one linker finding once regardless of related-entry count.
-  - They reject implicit enablement from resource config, cache presence, or another linker command and require a deliberate per-rule contract change for later preset promotion.
+  - They reject implicit enablement from resource config, cache presence, or another linker command and require a deliberate per-rule contract change for later preset promotion. Promotion fixtures additionally cover missing-`messages` selection by ASCII rule id and `/lint` evidence when no explicit rule node exists.
 
 ### Native reference production
 
@@ -7190,7 +7311,7 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 - Per-artifact decoded-budget precedence fixtures place one field-specific or shape failure against a decoded-total overrun at every adjacent canonical phase for both artifact kinds.
   - They require the current phase's field check before its decoded addition, an admitted payload's decoded overrun before every later phase, and every unfinished earlier phase before that overrun, independently of JSON member order.
   - Streaming fixtures provisionally observe an overrun, retain no payload beyond the effective budget, continue only the bounded syntax/earlier-phase scan needed to select the public result, and produce the same failure as producer, direct-construction, cache, defensive, partitioned, and parallel routes without allocating past the decoded ceiling.
-- Per-artifact limit-contract fixtures require the forty-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, followed by the linker-result counters at ordinals 36 through 40, all with their exact snake-case spellings.
+- Per-artifact limit-contract fixtures require the forty-one-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, the linker-result counters unchanged at ordinals 36 through 40, and `CatalogKeyTokens` appended at ordinal 41, all with their exact snake-case spellings.
   - Contract-boundary failures use subject-free `ArtifactContractError::Limit`; linker lower-budget revalidation permits only the matching decoded counter with its established artifact-group subject, wire counters are unconstructible in `LinkLimitEvidence`, and every finding- or plan-result counter is unconstructible at every artifact boundary.
   - Wire observations are exactly `Exact(effective_limit + 1)` and decoded observations are the exact attempted running total after one complete admitted payload; none of the four permits `ArithmeticOverflow`.
   - Wire-precedence fixtures make known-length and every stream chunking return wire overrun before syntax, stop at the first excess byte, return syntax only after bounded at-or-below-limit EOF, and give direct typed construction no wire phase.
@@ -7205,7 +7326,7 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - They reject every cross-artifact envelope field, undeclared path role or field, whole-path failure mislabeled as a segment, whole-alias failure with a fabricated segment, and known-leaf failure collapsed to its container.
   - They map missing or unknown fields without a valid identity to the containing object, map unpositioned UTF-8/JSON failures to root, and reject raw unknown names, rejected values, JSON Pointers, byte offsets, line/column, excerpts, host paths, unbounded vectors, and route-specific optional detail.
   - Decoder, constructor, cache, defensive, member-permutation, escape, whitespace, slice, and reader fixtures select identical semantic code/location pairs, and enum order never changes failure precedence.
-- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all forty counter tokens, and exact/arithmetic-overflow observation shapes.
+- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all forty-one counter tokens, and exact/arithmetic-overflow observation shapes.
   - They accept every input object-member permutation but reject missing, duplicate, unknown, or required `null` members, Rust enum ordinals, alternate casing, display messages, parser errors, and source chains; canonical round trips reproduce the exact examples above.
 - Artifact-version-support fixtures admit only the Rust/API names `Exact` and `StableRange` and the structured tags `exact` and `stable_range`; reject `DraftExact`, `Stable`, `Compatible`, aliases, alternate casing, and raw strings; and require the checked evidence/support-table boundary to pair `Exact` only with major zero and `StableRange` only with a nonzero stable major.
   - Exact draft and stable range acceptance follow the same negotiation result in direct construction, both typed decoders, both encoders, cache revalidation, and linker admission.
@@ -7256,8 +7377,8 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 
 #### Operational-limit evidence fixtures
 
-- **Counter vocabulary:** require all forty closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
-  - The list includes `locale_bytes`, `entry_structural_path_bytes`, `catalog_key_bytes`, `message_bytes`, `total_message_bytes`, `catalog_scope_name_bytes`, and `scope_mapping_entries`.
+- **Counter vocabulary:** require all forty-one closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
+  - The list includes `locale_bytes`, `entry_structural_path_bytes`, `catalog_key_bytes`, `catalog_key_tokens`, `message_bytes`, `total_message_bytes`, `catalog_scope_name_bytes`, and `scope_mapping_entries`.
   - Selector and pattern spellings include `selector_path_bytes`, `selector_pattern_bytes`, `selector_pattern_tokens`, `pattern_match_states_total`, and `reason_bytes`.
   - Path spellings include `path_segments`, `path_segment_bytes`, `path_bytes`, `logical_aliases`, and `source_path_bytes`.
   - Artifact-byte spellings include `reference_artifact_wire_bytes`, `reference_artifact_decoded_bytes`, `definition_artifact_wire_bytes`, and `definition_artifact_decoded_bytes`.
@@ -7266,10 +7387,10 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 - **Subject vocabulary:** enforce compatibility with `Request`, `DefinitionArtifactEnvelope`, `ReferenceArtifactGroup`, `DefinitionArtifactGroup`, `DeliveryGraph`, `DeliveryUnitGroup`, `ResolvedPolicy`, `FallbackSource`, and `ScopeMappings`.
 - **Effective limit:** retain the invocation's exact effective lower or default limit.
 - **Locale subjects:** permit `LocaleBytes` only with `DefinitionArtifactGroup` or `ResolvedPolicy`.
-- **Definition subjects:** permit `EntryStructuralPathBytes`, `CatalogKeyBytes`, `MessageBytes`, and `TotalMessageBytes` only with `DefinitionArtifactGroup`.
+- **Definition subjects:** permit `EntryStructuralPathBytes`, `CatalogKeyBytes`, `CatalogKeyTokens`, `MessageBytes`, and `TotalMessageBytes` only with `DefinitionArtifactGroup`.
 - **Scope subjects:** permit `CatalogScopeNameBytes` only with `ReferenceArtifactGroup`, `DefinitionArtifactGroup`, `ResolvedPolicy`, or `ScopeMappings`, according to the owning context.
   - Permit `ScopeMappingEntries` only with `ScopeMappings`.
-- **Reference subjects:** permit `SelectorPathBytes`, `SelectorPatternBytes`, `SelectorPatternTokens`, and `ReasonBytes` only with `ReferenceArtifactGroup`.
+- **Reference subjects:** permit `SelectorPathBytes`, `SelectorPatternBytes`, `SelectorPatternTokens`, `CatalogKeyTokens`, and `ReasonBytes` only with `ReferenceArtifactGroup`.
 - **Path subjects:** permit the three path counters only with the subject that owns the path.
   - Use `DefinitionArtifactEnvelope` for a primary definition path.
   - Use `DefinitionArtifactGroup` for an alias.
@@ -7278,7 +7399,7 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 - **Pattern-work subject:** permit `PatternMatchStatesTotal` only with `Request`.
 - **Finding-result subjects:** permit `FindingsTotal` and `FindingBytesTotal` only with `Request`; reject finding kind, subject, evidence, canonical position, blocking disposition, target, and reporter detail.
 - **Plan-result subjects:** permit `BundlePlansTotal`, `ResolvedMessagesTotal`, and `BundlePlanBytesTotal` only with `Request`; reject delivery unit, locale, message, definition, payload, plan position, exporter, target, worker, and reporter detail.
-- **Per-value observations:** require the ten per-value field, selector, and path-segment counters, plus `ScopeMappingEntries`, `PathSegments`, and `LogicalAliases`, to carry exactly `Exact(effective_limit + 1)` and never `ArithmeticOverflow`.
+- **Per-value observations:** require the eleven per-value field, selector, catalog-key-token, and path-segment counters, plus `ScopeMappingEntries`, `PathSegments`, and `LogicalAliases`, to carry exactly `Exact(effective_limit + 1)` and never `ArithmeticOverflow`.
 - **Running-sum observations:** require `PathBytes`, `SourcePathBytes`, and `TotalMessageBytes` to carry their exact checked attempted running sums and never `ArithmeticOverflow`.
 - **Pattern-work observations:** require `PatternMatchStatesTotal` to carry the exact attempted total after one complete evaluation, never `effective_limit + 1` or `ArithmeticOverflow`.
 - **Finding-result observations:** require `FindingsTotal` to carry exactly `Exact(effective_limit + 1)` and `FindingBytesTotal` to carry the exact first attempted semantic-payload running total; neither admits `ArithmeticOverflow`.
@@ -7384,18 +7505,20 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - Projection fixtures compare the payload byte-for-byte with the admitted 013 `message_text` and exercise overlapping per-message, per-source-total, decoded-artifact, and actual-wire budgets.
   - No M0 fixture accepts an AST, snapshot, compiled payload, raw host string, fallback, or format tag in place of the string.
   - Structural artifact and linker fixtures retain syntax-invalid and syntax-valid-but-semantically-invalid payloads as definitions and prove that key findings are unchanged apart from their normal source evidence.
-- Export-gate fixtures construct the stable-identity union of definitions selected across all valid plans and run the shared parse, `build_semantic_model`, and `validate_semantics` pipeline once per selected record over exact decoded payloads before any exporter call.
+- Export-gate fixtures construct the stable-identity union of definitions selected across all valid plans and the exact baseline definitions privately related to all admitted M1 model keys. They run the shared parse, `build_semantic_model`, and `validate_semantics` pipeline once per unique `DefinitionLocation` over exact decoded payloads before any exporter call.
   - Parser-diagnostic records skip SemanticModel construction and semantic validation. Parser-clean records run both semantic phases, including records that return ordinary semantic diagnostics.
-  - They cover repeated placement/locale/unit references, equal text at distinct identities, optional byte-identical parse-and-semantic-result reuse with record-specific evidence, `None` plans skipping the gate, `Some(Vec::new())` passing an empty gate, and unused invalid definitions not blocking a disjoint output.
-  - They preserve stable record order, parser order or semantic order within a record, category, and exact `DefinitionLocation` mapping; prove reused and non-reused computation within one call observationally equivalent; and exercise invalid built-in and third-party artifacts, exactly one selected exporter per transaction, an exporter returning multiple artifact kinds, direct/custom integrations, and `--check`.
+  - They cover repeated placement/locale/unit references, one definition appearing in both validation roles, several model keys related to one definition, equal text at distinct identities, and optional byte-identical parse-and-semantic-result reuse with record-specific evidence.
+  - `None` plans skip the gate. `Some(Vec::new())` with no models passes an empty gate, while the same empty plan slice with admitted models validates their baseline sources and can produce typed output.
+  - An invalid unused baseline definition blocks when its key is exposed by an admitted model. An invalid unused definition outside both validation sets does not block a disjoint output.
+  - They preserve stable `DefinitionLocation` order independently of validation role, parser order or semantic order within a record, category, and exact diagnostic mapping; prove reused and non-reused computation within one call observationally equivalent; and exercise invalid built-in and third-party artifacts, exactly one selected exporter per transaction, an exporter returning multiple artifact kinds, direct/custom integrations, and `--check`.
   - Cross-call fixtures invoke `prepare_export` repeatedly over equal and changed outcomes and require a new complete validation operation each time, with no process-global, persistent, serialized-proof, location-only, or prior-batch reuse.
   - Limit-type fixtures require private immutable `ExportValidationLimits`, make `MAX_DIAGNOSTIC_RETENTION` equal exactly `10,000`, make `protocol_defaults()` and `Default` select exactly `1,000`, accept every `u32` value from zero through the maximum, and reject the first value above it through `ExportValidationLimitConfigurationError` without clamping or changing the original value.
   - Configuration-error fixtures store only the submitted `u32` and expose exactly `submitted()`; compile-fail fixtures reject public construction, setters, deserialization, a duplicated maximum/counter, and presentation storage.
   - Direct Rust API fixtures prevent an above-ceiling `u32` from reaching `prepare_export` and return the exact `ExportValidationLimitConfigurationError`.
   - Initial M3 CLI fixtures always construct the fixed `1,000` value and cannot emit either that configuration error or `invalid_options` for diagnostic retention.
   - Future CLI controls and custom raw-input adapters must add conformance fixtures for their own admitted numeric domain, decoding failure, checked above-ceiling failure, and structured error mapping before exposing a raw retention value.
-  - Retention fixtures continue parsing every selected record after the retention limit is full, retain only the bounded deterministic prefix, mapping-validate and count all later diagnostics with checked arithmetic, and expose an exact total plus truncation state.
-  - Initial M3 CLI retention fixtures always supply exactly `1,000`; expose no command option, config field, environment variable, reporter override, target override, or worker-derived override; and still parse every selected record to compute the exact total.
+  - Retention fixtures continue parsing every export-validation record after the retention limit is full, retain only the bounded deterministic prefix, mapping-validate and count all later diagnostics with checked arithmetic, and expose an exact total plus truncation state.
+  - Initial M3 CLI retention fixtures always supply exactly `1,000`; expose no command option, config field, environment variable, reporter override, target override, or worker-derived override; and still parse every export-validation record to compute the exact total.
     - JSON output exposes the retained prefix, exact total, and derived truncation state. Text output reports the exact omitted count when truncated. Separate programmatic fixtures retain the checked zero and `10,000` boundary behavior without changing the CLI contract.
   - Failure-shape fixtures require private immutable fields and the exact `diagnostics()`, `total_diagnostics()`, and `truncated()` read-only accessors; cover nonzero-total construction, an empty retained prefix at limit zero, exact-limit and truncated results, checked length conversion, the `total_diagnostics >= diagnostics.len()` invariant, equivalence of `truncated` with a positive derived omitted count, and camel-case adapter field names without redundant omitted-count or limit fields.
     - Compile-fail fixtures reject public construction, struct literals, setters, mutable diagnostic slices, deserialization, defaults, unchecked conversion, and inconsistent total/truncation state.
@@ -7423,31 +7546,31 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
     - They reject per-target duplication, first-target assignment, an empty or discarded checked analysis, partial ordinary diagnostics, synthetic blocked/error target results, and target-count-dependent error counts.
   - Preparation-invariant fixtures admit exactly `DiagnosticCountOverflow`, `DiagnosticMapping`, and `OutcomeContract`, with the exact four mapping variants and five outcome-contract variants.
     - Complete outcome preflight precedes parsing; outcome variant declaration order and canonical affected identity select one contradiction.
-    - A clean outcome is scanned in stable definition order; within one diagnostic, label count precedes primary span, parser-ordered label spans, label-source equality, and then checked total increment.
+    - A clean outcome is scanned in stable `DefinitionLocation` order over the delivery-plus-baseline union; within one diagnostic, label count precedes primary span, parser-ordered label spans, label-source equality, and then checked total increment.
     - Input, hash-map, optional within-call reuse, worker, and retention-state permutations select the same error and discard every earlier ordinary diagnostic.
     - They reject parser semantic API failures as preparation-owned invariants and reject generic assertion, panic, custom, source-I/O, cache, and exporter variants.
     - Structured-error fixtures map the ten exact Rust values bijectively to the ten fixed `details.invariant` tokens under `message_export_preparation_invariant_failed`.
     - They require `reason` followed by `invariant` and reject category/violation splitting, unknown or alternate tokens, source or entry identity, plan/message indexes, paths, spans, payload excerpts, nested errors, and secondary invariant vectors.
-  - Batch fixtures prove `None -> Ok(None)` without parsing and `Some(Vec::new()) -> Ok(Some(empty batch))`.
+  - Batch fixtures prove `None -> Ok(None)` without parsing; `Some(Vec::new())` plus no models yields `Ok(Some(empty batch))`; and `Some(Vec::new())` plus admitted models yields `Ok(Some(non-empty typed-output batch))` only after validating their baseline sources.
     - Parser diagnostics, semantic diagnostics, and operational errors return no batch.
     - Every `Ok(Some(batch))`, including an empty batch, causes the selected transaction to invoke its exporter exactly once. Empty-batch exporters may return either a checked empty set or checked target-native bootstrap/loader/metadata artifacts; orchestration neither synthesizes an empty set nor rejects the transaction.
-    - API fixtures expose only `plans() -> &[MessageBundlePlan]`; they reach validated messages through each plan's `messages()` and use ordinary slice operations for length, emptiness, and iteration.
-    - Proof fixtures require successful private `prepare_export` construction itself to be the validation proof and the batch to retain only its immutable outcome borrow.
+    - Before M1, API fixtures expose only `plans() -> &[MessageBundlePlan]`; they reach validated messages through each plan's `messages()` and use ordinary slice operations for length, emptiness, and iteration. The coordinated M1/M3 addendum adds exactly one read-only typed-output accessor that pairs every admitted key-only model with M3-derived signatures; it adds no model-only or signature-only accessor.
+    - Proof fixtures require successful private `prepare_export` construction itself to be the validation proof. Before M1 the batch retains only its immutable outcome borrow; after the coordinated addition it also owns only the bounded immutable derived signatures needed by the typed-output accessor.
     - Compile-fail fixtures reject public or unsafe construction, deserialization, mutable plans, per-message validated flags, status maps, digest/location proof collections, independent markers, an outcome or findings accessor, a flattened/unique-definition accessor, definition-artifact input, parser/semantic workspace access, target options, exporter-specific data, and a persisted proof token.
-    - Static trait assertions require `ValidatedExportBatch<'_>: Send + Sync` and every value reachable from `plans()` to remain immutable and thread-safe. A successful batch retains no parser workspace, AST, mutable semantic state, or cache guard.
+    - Static trait assertions require `ValidatedExportBatch<'_>: Send + Sync` and every value reachable from `plans()` or the M1/M3 typed-output accessor to remain immutable and thread-safe. A successful batch retains no parser workspace, AST, mutable semantic state, or cache guard.
     - Custom-integration concurrency fixtures reuse one batch across separately constructed target exporter instances under scoped workers without repeating validation; sequential and concurrent target scheduling produce the same canonical per-target results after integration-owned aggregation.
     - Initial M3 CLI fixtures remain sequential in canonical target-name order and prove that the trait capability alone does not activate a worker pool before the shared scheduler follow-up.
   - Exporter-trait fixtures require `PlatformExporter: Send` and permit moving each independently constructed instance into one worker for exactly one invocation.
     - They do not require `Sync`, never share or invoke one instance twice, and reject exporter-created worker pools or runtime selection as part of the common trait contract.
     - Third-party and built-in factories return the same object-safe `Box<dyn PlatformExporter>` boundary; target worker count, cancellation, join behavior, result ordering, and error aggregation remain integration-owned.
     - Stable-record resolution precedes parsing.
-    - A batch borrows its exact immutable outcome and exposes only its validated plans.
+    - A batch borrows its exact immutable outcome, exposes its validated plans, and after the coordinated M1/M3 addition exposes the paired models and derived signatures only through the one typed-output accessor.
     - No constructor, deserializer, or persisted-token bypass exists.
     - A changed input requires new preparation; repeated fresh preparation of equal input is equivalent.
     - The same batch can feed separate independent invocations of built-in and third-party `PlatformExporter` implementations without another message-validation pass.
     - Every transaction still invokes exactly one exporter.
   - Compile-fail/API-surface fixtures reject raw `MessageBundlePlan` as a `PlatformExporter::export` argument and prevent registry admission of a raw-plan callback.
-  - Any ordinary selected-record parser or semantic diagnostic yields one integration-owned fail-complete result with zero exporter invocations and no asset, generated source, blob, loader map, manifest, or partial registration.
+  - Any ordinary parser or semantic diagnostic from either role in the export validation set yields one integration-owned fail-complete result with zero exporter invocations and no asset, generated source, blob, loader map, manifest, or partial registration.
   - The fixtures do not produce a `LinkFinding` or `LinkOperationalError` for MF2 parser or semantic validation.
 - Exporter-result API fixtures prove heterogeneous built-in and third-party implementations can coexist behind `dyn PlatformExporter`; every invocation returns the concrete `Result<ExportArtifactSet, ExportError>` without associated types or an exporter-specific erased adapter; a successful call returns one complete in-memory set and performs no final-build registration; and an error exposes no partial set.
   - Responsibility fixtures keep MF2 parser/semantic validation and batch preparation in `ExportPreparationError`, linker analysis in `LinkOutcome` / `LinkOperationalError`, exporter interpretation/generation/shared-result construction in `ExportError`, and platform capability, destination mapping, platform collision, and final registration in integration operational errors.
@@ -7662,6 +7785,9 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
   - They reject an unknown or entry-level-only endpoint, duplicate source even with an equal target, self-map, any target that also occurs as a source, chain, cycle, name-only/wildcard/prefix/case/normalization fallback, surrounding-namespace inheritance, reverse lookup, and input-order precedence.
   - Permutation fixtures produce the same table and outcomes, and checked/direct-link validation returns one fail-complete operational error before semantic work for every invalid table.
   - Uniform-resolution fixtures apply the table to references, definitions, policy, and completeness inputs before domain and semantic indexes; use `ResolvedCatalogScopeId` in finding/coverage/plan semantics; expose a mapped domain conflict as invalid input and a mapped definition collision as ordinary complete ambiguity evidence; retain original artifact scopes through provenance; and never rewrite artifact bytes or fingerprints.
+  - Post-mapping policy fixtures group roots by resolved `(scope, domain, selector)` and M1 baselines by resolved scope. Equal root reasons and equal baseline locales collapse to one canonical semantic entry; unequal root reasons or baseline locales return `message_link_failed` / `invalid_request` with no outcome.
+    - Resolved-domain inconsistency precedes these collision passes. The M0 root pass precedes the appended M1 baseline pass, and each pass selects its smallest canonical resolved identity independently of declared-scope, mapping, configuration, hash-map, or worker order.
+    - Merge fixtures retain every pre-mapping policy and mapping occurrence in limit accounting and link/cache identity, perform one reachability or model operation for the merged semantic subject, and prove that the built-in empty mapping table changes no raw configuration duplicate rule.
   - Cache fixtures keep extraction/producer caches valid while changing the mapping invalidates the link-result cache through the complete canonical table.
   - Count-limit fixtures accept zero and exactly 4,096 submitted entries and reject the first occurrence above each effective limit before endpoint or mapping-semantic validation.
   - Count-limit evidence uses `ScopeMappingEntries`, payload-free `ScopeMappings`, and exactly `Exact(effective_limit + 1)`.
@@ -7682,10 +7808,10 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 
 #### Definition-artifact conformance
 
-- **Artifact production:** produce one complete artifact for every selected source and retain stable raw-entry ordering.
+- **Artifact production:** produce one complete artifact for every selected physical-source group and retain stable raw-entry ordering.
   - Accept a valid source with zero entries.
   - Produce no artifact after a source-level extraction, binding, domain, or projection failure.
-  - A source edit invalidates only that source's artifact.
+  - A physical-source edit invalidates only that source group's artifact.
   - Compose several artifacts independently of input order.
   - Do not infer project or scope completeness from individually complete sources.
 - **Locale codec:** require the exact locale-string codec.
@@ -7952,15 +8078,16 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 
 ### Field-level limit evidence
 
-- Definition-identity field-limit fixtures accept an empty root `EntryStructuralPath` and every domain-valid empty root `CatalogKey`, accept each exact 64 MiB decoded boundary, and reject the first decoded byte above each independently under protocol and caller-selected lower limits.
-  - They require the closed `EntryStructuralPathBytes` and `CatalogKeyBytes` variants with exact structured spellings, only `DefinitionArtifactGroup(source)`, and exactly `Exact(effective_limit + 1)` without a raw field, `EntryReference`, definition/occurrence index, complete-length scan, or `ArithmeticOverflow`.
-  - Precedence fixtures run complete non-interleaved raw-entry passes for `locale_bytes`, `entry_structural_path_bytes`, and `catalog_key_bytes` in that order after source identity and definitions-count admission, require an earlier pass to win over an earlier-occurrence failure in a later pass, and prove identical selection under JSON-member, input, duplicate-source, partition, and worker permutations.
+- Definition-identity field-limit fixtures accept an empty root `EntryStructuralPath` and every domain-valid empty root `CatalogKey`, accept each exact 64 MiB decoded boundary and the exact 256-token catalog-key boundary, and reject the first decoded byte or attempted token `257` independently under protocol and caller-selected lower limits.
+  - They require the closed `EntryStructuralPathBytes`, `CatalogKeyBytes`, and `CatalogKeyTokens` variants with exact structured spellings, only `DefinitionArtifactGroup(source)`, and exactly `Exact(effective_limit + 1)` without a raw field or key, decoded token, `EntryReference`, definition/occurrence index, complete-length or token-count scan, or `ArithmeticOverflow`.
+  - Precedence fixtures run complete non-interleaved raw-entry byte passes for `locale_bytes`, `catalog_scope_name_bytes`, `entry_structural_path_bytes`, and `catalog_key_bytes`, followed by the complete message pass, locale/scope grammar, and then the catalog-key structural parse/token phase. They require every earlier phase to win over an earlier-occurrence failure in a later phase and prove identical selection under JSON-member, input, duplicate-source, partition, and worker permutations.
+  - Token fixtures cover every built-in domain, a zero-token valid root, lower limit zero, exact 256-token acceptance, first attempted token 257 rejection, malformed-segment precedence within the same canonical phase, and exhaustive checked projection from each comparable 013 domain.
   - Accounting fixtures charge every occurrence again to `definition_artifact_decoded_bytes`, including equal and interned values, keep those counters and reference-side `selector_path_bytes` distinct, and prove that no `definition_identity_bytes_total` counter or consumer-side reconstruction of 013's distinct interner accounting exists.
   - An enclosing per-artifact or request decoded-byte limit may still reject individually valid values.
 
 - Definition-message limit fixtures accept empty messages and the exact 1 MiB per-message and 64 MiB per-source-total boundaries; reject the first per-message byte above and the first raw-entry addition whose exact checked sum exceeds the total; and apply independent zero and lower values.
   - They require `MessageBytes` with `Exact(effective_limit + 1)` and `TotalMessageBytes` with the exact attempted running sum, both using only `DefinitionArtifactGroup(source)` and never `ArithmeticOverflow`, a message copy, record/index evidence, or `EntryReference`.
-  - Admission fixtures run this one raw-entry message pass only after the four fixed locale/catalog-scope-name/structural-path/catalog-key passes, check the per-message counter before adding that record to the total, let an earlier total overrun beat a later per-message overrun, and preserve the same result under decoder, cache, duplicate-source, partition, and worker permutations.
+  - Admission fixtures run this one raw-entry message pass only after the four fixed locale/catalog-scope-name/structural-path/catalog-key byte passes and before locale/scope grammar and the catalog-key structural-token phase. They check the per-message counter before adding that record to the total, let an earlier total overrun beat a later per-message overrun, and preserve the same result under decoder, cache, duplicate-source, partition, and worker permutations.
   - Accounting fixtures charge empty and repeated values without deductions and require both inherited counters plus the overlapping artifact decoded/wire counters to pass independently.
 
 - Catalog-scope-name limit fixtures accept exact 1- and 255-byte names, reject empty grammar and the first byte above the effective ceiling independently, and apply zero/lower values without normalization.
@@ -7977,28 +8104,81 @@ baked native data (two-phase build machinery), per-object unit granularity, bina
 - Resolved-policy catalog-scope precedence fixtures require one complete submitted-root-order `catalog_scope_name_bytes` pass after target semantics, followed by remaining root-field validation, equal checked `(scope, domain, selector)` duplicate rejection, canonical root ordering, and only then the remaining policy semantics.
   - They require `ResolvedPolicy` with `Exact(effective_limit + 1)` for a root-name overrun and prove that a future coverage-baseline mapping cannot participate until its own occurrence-preserving representation, count ceiling, and policy phase are fixed.
 
-- Selector-limit evidence fixtures require the closed `SelectorPathBytes`, `SelectorPatternBytes`, and `SelectorPatternTokens` variants at ordinals 22 through 24 and the exact `selector_path_bytes`, `selector_pattern_bytes`, and `selector_pattern_tokens` spellings.
-  - They accept the exact 64 MiB, 128 MiB, and 513-token boundaries and reject each first value above the effective limit with the established `ReferenceArtifactGroup(identity)` and exactly `Exact(effective_limit + 1)`.
-  - They reject `Request`, raw selector/pattern/token payloads, record ordinals, complete submitted lengths or token counts, and `ArithmeticOverflow`.
-  - Decoder, direct-construction, producer, cache, partitioned, and parallel fixtures select identical evidence; `Exact` and `Prefix` share only `SelectorPathBytes`, while `Pattern` passes `SelectorPatternBytes` before parsing and `SelectorPatternTokens` while admitting parsed tokens.
+- Selector-limit evidence fixtures require the closed `SelectorPathBytes`, `SelectorPatternBytes`, and `SelectorPatternTokens` variants unchanged at ordinals 22 through 24, plus `CatalogKeyTokens` at ordinal 41, with the exact `selector_path_bytes`, `selector_pattern_bytes`, `selector_pattern_tokens`, and `catalog_key_tokens` spellings.
+  - They accept the exact 64 MiB selector-path, 128 MiB pattern, 513 pattern-token, and 256 catalog-key-token boundaries and reject each first value above the effective limit with the established `ReferenceArtifactGroup(identity)` and exactly `Exact(effective_limit + 1)`.
+  - They reject `Request`, raw selector/key/prefix/pattern/token payloads, record ordinals, complete submitted lengths or token counts, and `ArithmeticOverflow`.
+  - Decoder, direct-construction, producer, cache, partitioned, and parallel fixtures select identical evidence; `Exact` and `Prefix` independently pass both `SelectorPathBytes` and `CatalogKeyTokens`, while `Pattern` passes `SelectorPatternBytes` before parsing and `SelectorPatternTokens` while admitting parsed tokens.
   - Checked-addition and host-size-conversion coverage proves that alternate failure forms are unreachable under bounded first-over admission; those forms are not accepted.
-  - Cross-record precedence fixtures require the complete scope-name pass, then the complete ordinal-order selector-path byte pass, then the complete ordinal-order pattern-byte pass, then the ordinal-and-segment-order pattern parse/token phase, and only afterward remaining record validation.
-  - They prove that the first structural parse error or token overrun in the third phase wins without fabricating a token count or deferring the parse error to search later records, and that worker completion cannot change the selected phase or failure.
+  - Cross-record precedence fixtures require the complete scope-name pass, then the eight fixed admission phases: selector-path bytes, pattern bytes, pattern parse/tokens, reason bytes, origin path count, origin segment bytes, origin path bytes, and finally `Exact` / `Prefix` structural parse/tokens, each in its documented canonical order.
+  - They prove that the first structural parse error or token overrun in either parsing phase wins within that phase without fabricating a token count or deferring the parse error to search later records, and that worker completion cannot change the selected phase or failure.
 
 ## Relationship to Other Documents
 
 | Document | Relationship |
 | --- | --- |
-| [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) | definition side: complete per-document extraction artifacts projected outside the resource crate into one linker artifact per selected source, entry identity/spans, canonical catalog-key/domain production without selector matching, explicit project-local scope and locale binding, formatter value write-back, and the separate M5 structural-mutation boundary used by `prune` |
+| [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) | definition side: complete per-document extraction artifacts; CLI-owned physical-source grouping; host-owned pre-extraction group admission and checked post-extraction projection into one linker artifact per physical-source group; distinct resource/contract types without a cross-crate dependency; entry identity/spans; canonical catalog-key/domain production without selector matching; explicit project-local scope and locale binding; formatter value write-back; and the separate M5 structural-mutation boundary used by `prune` |
+| [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md) | CLI project inventory, physical-file grouping and alias ordering, initial sequential execution, deterministic aggregation, and the deferred common worker-scheduler boundary reused by later linker/export orchestration |
 | [006-ox-mf2-phase-3a-tooling-foundation-design.md](./006-ox-mf2-phase-3a-tooling-foundation-design.md) | config envelope, schema pipeline, reporters, operational errors, exit codes |
-| [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) | later presentation adapter: linker findings ship as rules through its contracts and the catalog-level addendum, without gating linker M0 |
-| [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md) | candidate payload representation; format-version precedent |
-| [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md) | editor surfacing; incremental open-world findings |
+| [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) | later presentation adapter: linker findings ship as rules through its contracts and the catalog-level addendum, with the missing-`messages` activation error and static rule capability table owned there, without gating linker M0 |
+| [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md) | versioned binary syntax-transport and format-evolution precedent; neither the M0 `MessagePayload` nor the M3 ESM representation uses a Binary AST snapshot |
+| [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md) | editor surfacing; incremental open-world findings; E0 JS/TS catalog-key completion activation, cursor query, publication, and source-edit behavior |
+| [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) | parser-owned `SemanticModel` construction and `validate_semantics` contract reused by shared export preparation, including the retained distinction between `semantic_api_misuse` and staged `semantic_invariant_failed` |
+| [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md) | syntax-only, source-identity-bound parse-cache precedent; a future export-validation cache may reuse its concurrency and bounded-residency principles but remains a separate `intlify_export`-owned cache with different keys, values, and lifetime |
+| [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md) | registry and namespace index for public linker/export operational codes and their detail-schema ownership; 014 remains authoritative for the typed mappings and bounded evidence |
 | `refers/formatjs` | code-first reference-producer comparison recorded in Message-Domain Prior Art |
 
 ## Deferred Follow-Up Notes
 
 The following work is intentionally outside the current milestone contracts and does not block their implementation.
+
+### Vue SFC Reference Producer Frontend
+
+Vue SFC application-reference production is not part of M0. It is the first follow-up producer phase after the initial JS/TS producer.
+
+Until that phase is promoted, `.vue` is an unsupported `producers.js` source profile. If an explicit include selects a `.vue` logical source, the complete physical source group derives `ProducerFailed`; the producer does not silently skip it, scan familiar-looking JavaScript text, infer support from an editor language ID, or borrow support from 013's independent Vue SFC resource-catalog adapter.
+
+The follow-up extends the existing `intlify_producer_js` implementation family and retains producer ID `dev.intlify/js-reference`. Adding the Vue frontend is output-affecting and therefore requires a new immutable `ProducerRevision`. Its implementation, contract text, example configuration, schema/help presentation, cache provenance, and conformance fixtures must be promoted together before `.vue` can appear in an advertised supported include set.
+
+The promotion also extends the closed producer-failure vocabulary atomically. The planned `profile` additions are `unsupported_vue_script_lang` and `unsupported_vue_template_lang`. The planned `source_map` stage admits only `host_span_unavailable`, `host_span_ambiguous`, and `host_span_unrepresentable`, with `span` permitted for that stage. Before promotion, none of those reasons and no `source_map` stage are valid M0 evidence; a selected `.vue` source fails earlier as `profile` / `unsupported_source_suffix`.
+
+The promoted contract must define the exact boundary between the three mapping reasons, their safe-span availability, and their deterministic precedence before admitting them. An invalid direct JS/TS parser span, a broken checked map, or another impossible validated state remains `internal_error` / `message_producer_invariant_failed`; the frontend cannot use a new input-facing reason to hide an invariant.
+
+#### SFC participant and source profile
+
+One included `.vue` source becomes one producer participant. The frontend parses the complete SFC, then scans both inline `<script>` / `<script setup>` blocks and every JavaScript expression exposed by the standard `<template>` AST, including interpolations, directive values and dynamic arguments, event handlers, and slot expressions. Both script blocks participate when the SFC validly contains both; reference-record order follows exact host-source start position with the ordinary record tie-breakers.
+
+An absent script `lang` means JavaScript. The admitted script tokens are exactly `js`, `jsx`, `ts`, and `tsx`. Every admitted inline script block uses module goal without an unambiguous/script retry. The template profile accepts only standard template syntax with no custom `lang`; Pug and every other preprocessor-owned template language remain unsupported.
+
+An SFC syntax failure, unsupported script or template language, embedded JS/TS parse failure, or inability to construct the required exact host-span mapping fails the complete producer operation and derives `ProducerFailed`. The zero-syntax-error success rule applies independently to the SFC parse, every admitted script block, and every standard-template embedded expression. A recovery AST or partially decoded template AST is discarded, and no previously scanned block or expression contributes records or a cache value after any component fails.
+
+An inline `<script src>` is not followed by the SFC participant and does not expand configured inventory. The referenced external file participates only when it independently matches `producers.js.include`, using its own project source identity and ordinary JS/TS profile. Style blocks and custom blocks are not JavaScript-reference sources under this profile.
+
+#### Host-source mapping and editor behavior
+
+Vue SFC parsing and every embedded-expression mapping use the complete exact UTF-8 host snapshot fixed by the M0 snapshot contract. A BOM consumed by the SFC frontend, entity decoding, parser-local UTF-16 coordinates, or any temporary embedded buffer must be mapped through one checked monotonic map to the original `.vue` byte coordinates before a record can be emitted.
+
+Every locally produced `SourceOrigin` addresses the first argument expression in the original host source. The frontend never reports block-local offsets, splits a source scalar or decoded template escape, guesses a location after preprocessing, or drops origin merely to retain a reference.
+
+Disk and authoritative open-buffer paths use the same complete SFC profile. The editor does not scan only the currently selected block or tolerate an invalid unsaved block by retaining references from a preceding version; a producer failure follows 009's ordinary generation and publication gates without stale-disk or stale-artifact fallback.
+
+#### Reference semantics and catalog independence
+
+The promoted frontend applies the existing configured callee, call-kind, scope, domain, key-syntax, static-evaluation, selector, reason, ordering, artifact identity, and source-limit contracts to embedded call expressions. Declarative template usage that is not a call expression — for example an `<i18n-t keypath="...">` prop — remains outside this frontend and follows the separate framework-declarative follow-up below. Until that later contract is promoted, projects represent such references with intentional configured roots or a complete external artifact.
+
+013's Vue SFC `<i18n>` adapter extracts definitions and does not imply application-reference support. Once this frontend ships, one physical Vue source may independently participate once in the definition inventory and once in the reference inventory. Neither side suppresses the other; immutable snapshot reuse is only an orchestration optimization when both sides prove that they selected the same bytes.
+
+#### Promotion validation
+
+The follow-up must add conformance fixtures that:
+
+- admit exact lowercase `.vue` only after promotion and keep unsupported, extensionless, and case-varied selected sources on the complete-source `ProducerFailed` path;
+- scan both valid inline script forms and every standard-template embedded expression in canonical host-source order;
+- accept only absent, `js`, `jsx`, `ts`, and `tsx` script language tokens, use fixed module goal for every script block, and reject every custom template language;
+- map parser-local and embedded coordinates through BOM and template decoding to exact original `.vue` UTF-8 spans, with no normalized, block-local, UTF-16, or decoded-expression coordinate escaping as `SourceOrigin`;
+- fail the complete source for SFC, language, embedded-parse, or mapping failure without a partial artifact or cache value, while admitting the two planned Vue profile reasons and the three planned `source_map` reasons only after their exact classification and precedence contract lands;
+- never follow `<script src>` or scan style/custom blocks, while allowing the referenced external script to participate through its own independent include match and identity;
+- preserve producer ID `dev.intlify/js-reference`, require a changed producer revision, and apply the ordinary source partition, alias grouping, cache, limit, and origin invariants; and
+- exercise equal disk/open-buffer semantics, dual definition/reference participation, and the continued exclusion of declarative non-call APIs.
 
 ### Artifact v1 Freeze
 
@@ -8049,9 +8229,15 @@ Reporter choice, target count, environment state, and worker scheduling cannot b
 
 ### Cross-Call Export Validation Cache
 
-The initial export-preparation implementation retains no process-global, command-external, persistent, or cross-call parser/semantic validation cache. Every `prepare_export` call validates its selected definitions completely.
+The initial export-preparation implementation retains no process-global, command-external, persistent, or cross-call parser/semantic validation cache. Every `prepare_export` call validates its complete delivery-plus-baseline export validation set.
 
 Within one call it still validates each exact `DefinitionLocation` once. It may reuse computation for byte-identical payloads only as an invisible optimization that preserves each record's independent diagnostic mapping, complete count, ordering, and observable result.
+
+A promoted cross-call cache is a separate consumer cache owned by `intlify_export`. It does not reuse, wrap, or extend the `ParseCache` described in [ox-mf2-parse-artifact-cache.md](./ox-mf2-parse-artifact-cache.md).
+
+That existing syntax cache keys an entry by dictionary/source namespace, message id, parser revision and options, and exact source bytes. Its value owns the `SourceStore` that gives its `SourceId` values meaning. Export validation instead needs location-independent parse and semantic results for one exact `MessagePayload`, followed by deterministic remapping of relative diagnostics to every independently retained `DefinitionLocation`.
+
+Sharing the existing key or stored value would make export reuse depend on a catalog location and parser-owned source identity that are not part of payload equivalence. The export cache may reuse established design principles—revision-complete keys, exact-byte collision confirmation, single-flight production, bounded capacity, explicit invalidation, and concurrency-safe immutable values—but it shares no key type, entry storage, capacity budget, eviction state, or lifecycle with `ParseCache`.
 
 A cross-call cache is promoted only after measurement shows that repeated preparation remains a material cost. Its design must define together:
 
@@ -8063,16 +8249,71 @@ A cross-call cache is promoted only after measurement shows that repeated prepar
 - memory and entry ceilings, eviction, concurrency, cancellation, poisoning, and process lifetime;
 - invalidation across dependency, feature, target, toolchain, and contract changes;
 - interaction with `ExportValidationLimits` without treating a prior retained prefix as a complete result under another limit;
-- cache ownership, observability, metrics, persistence and trust boundaries; and
+- `intlify_export` ownership, observability, metrics, persistence and trust boundaries, without borrowing `ParseCache` capacity or residency; and
 - fresh-versus-cached conformance fixtures under sequential and concurrent calls.
 
 Until promotion, no cache directory, config field, environment variable, serialized validation proof, reusable batch token, or location-only cache key exists.
+
+### JS/TS Typed-Key Completion Projection
+
+M1 exposes language-neutral canonical typed-key models but does not ship editor completion. The first JS/TS application-source completion feature is 009-owned E0. E0 depends on M1 but not on L0/L1, M2, or M3, and follows 009's activation, cursor, publication, and source-edit contract.
+
+#### Recovery-aware cursor-query boundary
+
+`intlify_producer_js` owns the workspace-internal synchronous cursor-query API used by E0. Its conceptual boundary is:
+
+```rust
+fn query_completion_context(
+    source: &str,
+    logical_path: &PortableRelativePath,
+    cursor: u32,
+    config: &ResolvedJsProducerConfig,
+) -> Result<Option<JsCompletionContext>, JsCompletionQueryInvariantError>;
+```
+
+The exact Rust names and field layout are internal, but the boundary responsibilities are fixed. `source` is the complete exact editor snapshot, including any leading BOM scalar; `logical_path` is its checked normalized project-relative identity; `cursor` is a UTF-8 byte offset in that exact source; and `config` is the immutable resolved `producers.js` include and recognizer configuration already installed for the root. The query repeats the applicable path/profile, cursor-boundary, source-size, and frontend-work admission checks defensively rather than trusting an editor-constructed parser mode.
+
+One successful context contains only:
+
+- the exact admitted JS/TS source profile;
+- the exact configured `kind: "lookup"` recognizer identity and its checked scope, domain, and `keySyntax`;
+- string-literal or no-substitution-template container kind and its existing delimiter;
+- the complete checked half-open UTF-8 content span between those delimiters; and
+- enough opaque frontend identity to prove that every admitted recovery result selected the same call, binding, container, delimiter, and content span.
+
+It exposes no AST, recovery diagnostic, parser-owned node, mutable recognizer, application reference, artifact ordinal, candidate key, JavaScript source edit, or LSP type. The editor owns prefix decoding, model selection, candidate filtering, JavaScript escaping, `TextEdit` construction, request freshness, and protocol results.
+
+The strict artifact producer and this query share one internal source-profile table, suffix selection, BOM/source-coordinate mapping, parser grammar configuration, callee-chain grammar, recognizer normalization, and applicable frontend limits. They deliberately use different acceptance policies over parser output: artifact production accepts only a complete parse with zero syntax errors, while the cursor query may inspect recovery output under 009's bounded local-proof rule. Neither path calls the other, and the recovery query can never populate or read the `MessageReferenceArtifact` cache.
+
+Every input-facing inability to prove one safe context returns `Ok(None)`. This includes a path outside `producers.js.include`, an unsupported suffix, an out-of-bounds or split-scalar cursor, an exceeded applicable source/frontend limit, no matching lookup call, a dynamic or substituted argument, a missing delimiter, a syntax error intersecting the required local structure, and disagreement between recovery results. It emits no partial context and exposes no dependency diagnostic text.
+
+`Err(JsCompletionQueryInvariantError)` is reserved for an impossible state after checked frontend construction, such as a returned range outside the supplied source or disagreement between supposedly identical normalized binding identities. It produces no context, artifact, cache value, or completeness change. The 009 adapter treats it as a request-scoped internal operational failure and publishes no document diagnostic; a concrete LSP product owns any protocol-level error mapping rather than allocating an artifact or linker error code.
+
+The API is reentrant, owns all mutable parser/recovery scratch state within one call, and is safe for concurrent calls over independent or shared immutable source/config inputs. It creates no worker, executor, global mutable parser session, or cross-call cache. No N-API or WASM export is implied; the initial project-backed E0 implementation remains the Rust-host target fixed by 005.
+
+Promotion fixtures in `intlify_producer_js` must prove exact agreement with the strict producer for suffix/profile selection, BOM coordinates, callee grammar, recognizer identity, and source limits while separately covering the recovery-only acceptance matrix. They must also prove `Ok(None)` for every ordinary negative case, deterministic agreement across module/script recovery results, checked content spans for every delimiter, invariant rejection of impossible frontend output, reentrant concurrent equivalence, and absence of artifact/cache/completeness side effects.
+
+That feature does not teach `intlify_linker` about JavaScript spelling. `intlify_producer_js` owns one checked reverse projection from an admitted canonical model key to the runtime string accepted by an exact configured `kind: "lookup"` recognizer. Its input includes the binding's domain and `keySyntax`; its result is either one decoded runtime string or a typed not-representable result. It does not return JavaScript source text, select a quote style, inspect editor state, or widen the model.
+
+The initial reverse projection is fixed as follows:
+
+- `canonical` returns every domain-valid canonical key unchanged.
+- `literal` is admitted only for `json-pointer` and only when the canonical pointer contains exactly one structural segment. It JSON-Pointer-decodes that segment and returns it as the complete runtime string. `/` represents one empty segment; the empty root pointer has zero segments and is not representable.
+- `dot-path` is admitted only for `json-pointer` and only when the canonical pointer contains one or more non-empty structural segments. It JSON-Pointer-decodes every segment, escapes `\` as `\\` and `.` as `\.`, and joins the encoded segments with `.`.
+
+Every candidate must round-trip through the existing forward conversion for the same `Lookup` binding to the exact original `(domain, CatalogKey)`. An unsupported syntax/domain pair, invalid canonical key, `dot-path` empty segment, unrepresentable root key, or failed round trip is omitted rather than returned under another spelling. In particular, the producer never falls back to the canonical string for a `literal` or `dot-path` binding.
+
+The projection remains independent of `coverageBaseline` selection, model construction, locale/fallback policy, and cursor discovery. The consumer first selects an existing M1 model and exact recognizer binding; absence of a model or binding means completion is unavailable before projection is called. Several recognizers may share one resolved scope because the exact cursor callee selects one binding and therefore one reverse syntax.
+
+Completion is a definition-only linker capability. Cursor parsing selects a binding but does not require project-wide reference inventory or artifacts, so activating completion alone uses the capability-aware definition-only fast path and does not derive `ProducerOmitted`.
+
+Promotion requires conformance fixtures for all three syntaxes, the empty JSON-Pointer root versus one empty segment, escaped pointer tokens, dot and backslash escaping, literal `*` lookup segments, unsupported domains, non-representable keys, and exact forward/reverse round trips. 009 separately verifies ECMAScript literal/template encoding and cursor-scoped edit behavior.
 
 ### Binding-Aware JS/TS Recognizers
 
 M0 recognizers match exact configured callee syntax and deliberately do not claim module, lexical-binding, or type identity. Binding-aware recognition is deferred until measured false positives justify the added language-service cost and configuration.
 
-A promoted follow-up must define whether provenance is declared through import source/export name, composable or factory return, destructuring, dependency injection, global augmentation, framework metadata, or a checked combination. It must cover renamed imports, re-exports, local wrappers, lexical shadowing, JS without a type checker, TS with multiple project configs, Vue SFC script blocks, and unsaved editor buffers without silently changing existing syntactic recognizers.
+A promoted follow-up must define whether provenance is declared through import source/export name, composable or factory return, destructuring, dependency injection, global augmentation, framework metadata, or a checked combination. It must cover renamed imports, re-exports, local wrappers, lexical shadowing, JS without a type checker, TS with multiple project configs, unsaved editor buffers, and — after the Vue frontend above has shipped — Vue SFC script blocks, without silently changing existing syntactic recognizers.
 
 It must also fix capability negotiation, parser/type-checker and module-resolution versions, source/project discovery, failure-to-partial-completeness mapping, bounded work and memory, cache identity and invalidation, configuration schema and append-only validation order, deterministic source evidence, and fallback behavior. A failed semantic resolver cannot silently revert one configured binding to broad syntactic matching.
 
@@ -8084,7 +8325,7 @@ A future evaluator may admit those sources only with a concrete demand and a ver
 
 ### Framework-Declarative Reference Producers
 
-M0's JS/Vue recognizer consumes call expressions only. Component props, directives, macros, route metadata, JSX attributes, and other framework declarations do not acquire message semantics from familiar names such as `i18n-t`, `keypath`, or `v-t`.
+M0's JS/TS recognizer consumes call expressions only. The deferred Vue SFC frontend above retains that same call-expression boundary. Component props, directives, macros, route metadata, JSX attributes, and other framework declarations do not acquire message semantics from familiar names such as `i18n-t`, `keypath`, or `v-t`.
 
 A future declarative producer requires a concrete framework integration and must define exact component/directive/macro identity, static and dynamic selector conversion, scope/domain/key syntax, alias and binding behavior, template/preprocessor coverage, source-span mapping, unsupported-value failure, completeness, bounded work, cache identity, and conformance fixtures. It must coexist with call recognition without duplicating equal source occurrences or weakening pruning safety.
 

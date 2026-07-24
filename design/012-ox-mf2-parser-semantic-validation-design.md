@@ -1,6 +1,6 @@
 # ox-mf2 Parser Semantic Validation Design
 
-This document defines the parser-owned semantic validation contract for ox-mf2. It is the canonical owner for core semantic diagnostics referenced by the Phase 3C linter design. The linter, future validators, LSP/editor integrations, and resource/catalog adapters consume this contract instead of reimplementing MF2 data model validation.
+This document defines the parser-owned semantic validation contract for ox-mf2. It is the canonical owner for core semantic diagnostics referenced by the Phase 3C linter design. The linter, the message linker's shared export-preparation layer, future validators, and LSP/editor integrations consume this contract instead of reimplementing MF2 data model validation.
 
 ## Goals
 
@@ -26,6 +26,10 @@ Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-
 `ox_mf2_parser` owns CST construction, parser diagnostics, `SemanticModel` construction, and core semantic validation. The parser crate exposes semantic diagnostics through a parser-owned API so downstream consumers do not need to infer MF2 data model errors themselves.
 
 `intlify_lint` consumes parser semantic diagnostics and shapes them for CLI, N-API, and WASM outputs. It must not reimplement parser-owned semantic checks.
+
+`intlify_export` consumes the same parser construction and validation contract at the shared export-preparation gate defined by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md#mf2-syntax-and-semantic-validation-export-gate). Before invoking an exporter, it validates the identity-deduplicated union of plan-selected delivery definitions and the coverage-baseline definitions required to derive signatures for every admitted M1 key model. It derives language-neutral MF2 argument-signature information only from those parser- and semantically clean baseline definitions. The M1 `intlify_linker` model remains key-only and parser-independent, and target-specific MF2 validity rules remain forbidden.
+
+`intlify_resource` and its host-format adapters remain independent of `ox_mf2_parser`. They own host parsing, extraction, mapping, and write-back under [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), but do not construct `SemanticModel` or run semantic validation. A host integration may pass extracted message text to a parser-backed lint, editor, or export consumer without moving parser responsibility into the resource crate.
 
 ## SemanticModel and Validation API
 
@@ -83,7 +87,7 @@ Calling this boundary with a parse result that contains parser diagnostics retur
 
 ## SemanticModel Fact Surface
 
-`SemanticModel` is the canonical owner for semantic facts shared by parser semantic validation, the Phase 3C linter, and future LSP/editor or resource/catalog consumers. The lint crate must not build a parallel semantic fact model for these records.
+`SemanticModel` is the canonical owner for semantic facts shared by parser semantic validation, the Phase 3C linter, shared export preparation, and future parser-backed validator or LSP/editor consumers. The lint and export crates must not build a parallel semantic fact model for these records.
 
 Initial facts include:
 
@@ -512,7 +516,7 @@ The parser crate should expose parser diagnostic code and semantic diagnostic co
 
 ## Implementation Phasing
 
-The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics. Product-level linter PR ordering remains owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md); this section scopes only the parser-side prerequisite work.
+The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics. The same implemented parser contract is also a prerequisite for the 014 M3 shared export-preparation gate before `crates/intlify_export` can produce a `ValidatedExportBatch`. Product-level linter PR ordering remains owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while linker/export milestone ordering remains owned by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md); this section scopes only the parser-side prerequisite work.
 
 Suggested implementation steps:
 
@@ -535,7 +539,7 @@ These items are intentionally deferred and do not block this design document's P
 - Snapshot-backed semantic validation, including the snapshot-to-`SemanticModel` path. This parser-owned path must land before detailed design or implementation of any future linter `lintSnapshot` API begins. Only after this parser path exists does a separate linter follow-up own the consumer API design. Its promotion gates are to construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans; these gates are not a current linter API contract.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional body-owned reference kinds beyond the Phase 3C initial `output_references()` fact surface.
-- Additional semantic facts needed by resource/catalog adapters.
+- Additional semantic facts needed by future parser-backed validator, compiler, or LSP/editor consumers. Any promoted consumer must use this parser-owned surface without moving semantic-model construction or validation into `intlify_resource` or its host-format adapters.
 - Public documentation pages and static help text for semantic diagnostic codes. The design-time pages under `design/linter-rules/` do not define the runtime `help` field or public docs URL contract.
 
 ## Open Questions

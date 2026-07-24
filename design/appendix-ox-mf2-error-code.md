@@ -218,7 +218,7 @@ The editor design intentionally projects original-extraction `resource_format_un
 | Domain | Stable code | Initial status |
 | --- | --- | --- |
 | Artifact production and contract ingestion | `message_artifact_failed` | Defined for M0 contract ingestion and the closed built-in producer stage/reason evidence owned by 014. |
-| Stateless link request execution | `message_link_failed` | Reserved for M0 host integration. |
+| Stateless link request execution | `message_link_failed` | Defined for M0 stateless link execution and host mapping; user-visible emission begins only when a consuming integration ships. |
 | Exporter invocation and checked common output | `message_export_failed` | Reserved for M3. |
 | Platform destination mapping and registration | `message_output_registration_failed` | Reserved for M3 emission; its closed evidence and target-continuation contract are defined by 014. |
 
