@@ -7138,6 +7138,39 @@ C/C++ macros and WASM after object/linker format-survival validation.
 
 baked native data (two-phase build machinery), per-object unit granularity, binary container, stub scaffolding, identical-to-fallback omission.
 
+## Benchmarks
+
+Message-linker benchmarks are local-first tooling under `tools/` and are phase-separated, following the Phase 3 parser, formatter, and resource benchmark conventions.
+
+Initial M0 benchmark phases:
+
+- `message_reference_produce_js`: JS/TS source parsing, configured recognizer matching and bounded static evaluation, key canonicalization, provenance construction, and `MessageReferenceArtifact` construction, with each cost reported separately
+- `message_reference_produce_js_cache`: a complete cache miss followed by source scanning and artifact construction, and a validated cache hit followed by artifact access, reported as separate variants
+- `message_artifact_codec`: canonical reference-artifact and definition-artifact JSON encoding and checked decoding, split by artifact kind and direction
+- `message_definition_project`: pre-extraction physical-group admission and post-extraction checked `ExtractedCatalog`-to-`MessageDefinitionArtifact` projection, excluding host parsing and resource extraction
+- `message_link_core`: request validation and scope mapping, semantic index construction, selector expansion and reference resolution, reachability and placement, and finding/plan materialization, with each cost reported separately
+- `message_link_peak_memory`: allocator-level peak live memory across increasing reference-dense, definition-dense, selector-expansion, and finding-dense requests
+- `message_project_link_e2e`: project inventory, physical grouping, catalog extraction, definition projection, JS/TS reference production, completeness construction, request construction, linking, and deterministic ordered aggregation through the M0 in-process integration path
+
+Milestone-activated benchmark phases:
+
+- `message_typed_key_model` at M1: coverage-baseline selection and checked key-model construction over an already linked outcome
+- `message_link_fallback` at M2: fallback-chain validation and locale-aware resolution, with chain construction, resolution, and locale finding materialization reported separately
+- `message_export_prepare` at M3: selected-message MF2 parsing, semantic validation, portable diagnostic mapping, argument-signature derivation, and `ValidatedExportBatch` construction
+- `message_export_esm` at M3: built-in ESM locale assets, loader map, typed-key accessor modules, canonical artifact metadata, and complete `ExportArtifactSet` construction over an already validated batch
+- `message_output_register` at M3: capability preflight, portable-path mapping, ownership inspection, staging, commit, and `--check` comparison, using isolated output roots and reporting filesystem costs separately
+- `messages_emit_e2e`, `messages_emit_check_e2e`, and `messages_emit_json` at M3: complete command execution, freshness comparison, and JSON reporter cost
+- `message_delivery_graph_link` at M4: reachability and duplicate placement over representative live chunk DAG shapes
+- `messages_prune_e2e` at M5: dry-run planning and explicitly requested fail-complete structural mutation, after the coordinated 013 deletion boundary exists
+
+Generated benchmark profiles cover at least three increasing scales for exact-reference-dense sources, definition-dense catalogs with sparse references, bounded-selector fan-out, finding-dense failures, locale/fallback expansion, and delivery-graph growth when the owning milestone is active. A representative project fixture covers the complete M0 integration path; M3 adds deterministic ESM output and output-registration fixtures. Cache miss and hit, in-process core execution and fresh-process CLI execution, and each generated profile remain distinct cases rather than being averaged together.
+
+Each result declares the complete phase and cost vocabulary, fixture, variant, scale, runtime, operation, applicable input and output counts, and execution status. Duration records include iterations, elapsed time, and a checksum over the observed semantic result. Peak-memory records include peak live bytes, retained live bytes, and allocation count under one documented allocator measurement setup. Fresh-process CLI peak RSS may be added as a separate metric when the benchmark harness can measure it consistently; it is never substituted silently for allocator-level peak live memory.
+
+JS/TS parsing and recognition, resource extraction, definition projection, artifact encoding and decoding, linker indexing and resolution, export preparation, exporter rendering, output registration, CLI reporting, and file I/O costs must remain separately observable. End-to-end measurements supplement those phase records and never replace them.
+
+Benchmark commands, the complete phase/cost vocabulary, declared fixture coverage, result-schema validation, and semantic checksums are implementation gates. Elapsed-time and memory values are observations and are not CI pass/fail thresholds while the implementation and representative workloads are still evolving. A numeric regression threshold may be introduced only by a later explicit benchmark-policy update after a representative workload, stable measurement environment, accepted baseline, noise treatment, threshold, owning milestone, and failure behavior have all been fixed.
+
 ## Validation
 
 ### Configuration, CLI, and lint integration
