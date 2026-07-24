@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1260" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">ox-mf2 message linker architecture</title>
-<desc id="desc">Language-specific reference producers emit a Message Reference Artifact. The M0 producer handles JavaScript and TypeScript syntax. Vue SFC reference production is the next producer phase, while Rust, C and C++, and WASM producers belong to later native milestones. On the catalog side, the intlify_cli project inventory enumerates catalog targets, inspects physical identity, and forms canonically ordered physical-source groups. Host-owned pre-extraction admission validates each already formed group's bindings, profile, and path and alias limits. intlify_resource then extracts that physical source exactly once, and host-owned post-extraction projection performs checked resource-to-contract conversion to produce one ordered Message Definition Artifact. Those artifacts, a checked one-hop scope mapping table, an execution-derived scope completeness table, a resolved link policy, and a delivery unit graph enter the language-neutral intlify_linker through one stateless request and outcome operation. The linker performs scope resolution, completeness gating, reference resolution, locale fallback resolution, reachability and duplicate placement, and finding generation. It emits linker findings, deterministic Message Bundle Plans, and beginning with M1 a parser-independent key-only typed-key model. The shared intlify_export crate runs parser and SemanticModel validation, derives validated MF2 argument-signature information required by typed platform output, creates one opaque ValidatedExportBatch tied to the admitted plans and M1 key models, and owns the exporter trait, common output contracts, and built-in ESM exporter. Platform build integrations construct and select one exporter, invoke it with the checked batch, map the returned ExportArtifactSet, and register the complete output. Extensible platform exporters return only the common ExportArtifactSet or ExportError contract.</desc>
+<desc id="desc">Language-specific reference producers emit a Message Reference Artifact. The M0 producer handles JavaScript and TypeScript syntax. Vue SFC reference production is the next producer phase, while Rust, C and C++, and WASM producers belong to later native milestones. On the catalog side, the intlify_cli project inventory enumerates catalog targets, inspects physical identity, and forms canonically ordered physical-source groups. Host-owned pre-extraction admission validates every already formed group's bindings, profile, and path and alias limits. intlify_resource then extracts each admitted physical source exactly once. The host aggregates domains from all successful extractions and applies the project-global catalog and recognizer or root domain gate before post-extraction projection performs checked resource-to-contract conversion to produce one ordered Message Definition Artifact per successful group. Those artifacts, a checked one-hop scope mapping table, an execution-derived scope completeness table, a resolved link policy, and a delivery unit graph enter the language-neutral intlify_linker through one stateless request and outcome operation. The linker performs scope resolution, completeness gating, reference resolution, locale fallback resolution, reachability and duplicate placement, and finding generation. It emits linker findings, deterministic Message Bundle Plans, and beginning with M1 a parser-independent key-only typed-key model. The shared intlify_export crate runs parser and SemanticModel validation, derives validated MF2 argument-signature information required by typed platform output, creates one opaque ValidatedExportBatch tied to the admitted plans and M1 key models, and owns the exporter trait, common output contracts, and built-in ESM exporter. Platform build integrations construct and select one exporter, invoke it with the checked batch, map the returned ExportArtifactSet, and register the complete output. Extensible platform exporters return only the common ExportArtifactSet or ExportError contract.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -72,33 +72,39 @@
 <rect x="405" y="110" width="300" height="310" rx="12" class="group" stroke-width="2"/>
 <text x="555" y="140" font-size="16" font-weight="700" text-anchor="middle" class="label">Catalog definition path</text>
 
-<rect x="435" y="154" width="240" height="40" rx="8" class="artifact"/>
-<text x="555" y="171" font-size="11.2" font-weight="700" text-anchor="middle" class="white">intlify_cli physical-source grouping</text>
-<text x="555" y="187" font-size="8.8" text-anchor="middle" class="soft-white">enumerate · inspect · canonical aliases</text>
+<rect x="435" y="154" width="240" height="36" rx="8" class="artifact"/>
+<text x="555" y="169" font-size="10.8" font-weight="700" text-anchor="middle" class="white">intlify_cli physical-source grouping</text>
+<text x="555" y="184" font-size="8.4" text-anchor="middle" class="soft-white">enumerate · inspect · canonical aliases</text>
 
-<path d="M 555 194 L 555 205" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 555 190 L 555 198" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="435" y="205" width="240" height="40" rx="8" class="projection"/>
-<text x="555" y="222" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Pre-extraction group admission</text>
-<text x="555" y="238" font-size="8.8" text-anchor="middle" class="soft-white">bindings · profile · alias/path limits</text>
+<rect x="435" y="198" width="240" height="36" rx="8" class="projection"/>
+<text x="555" y="213" font-size="10.8" font-weight="700" text-anchor="middle" class="white">Pre-extraction group admission</text>
+<text x="555" y="228" font-size="8.4" text-anchor="middle" class="soft-white">bindings · profile · alias/path limits</text>
 
-<path d="M 555 245 L 555 256" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 555 234 L 555 242" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="435" y="256" width="240" height="40" rx="8" class="resource"/>
-<text x="555" y="273" font-size="11.5" font-weight="700" text-anchor="middle" class="white">intlify_resource</text>
-<text x="555" y="289" font-size="8.8" text-anchor="middle" class="soft-white">extract once · key · message · span</text>
+<rect x="435" y="242" width="240" height="36" rx="8" class="resource"/>
+<text x="555" y="257" font-size="11" font-weight="700" text-anchor="middle" class="white">intlify_resource</text>
+<text x="555" y="272" font-size="8.4" text-anchor="middle" class="soft-white">extract every group · key · message · span</text>
 
-<path d="M 555 296 L 555 307" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 555 278 L 555 286" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="435" y="307" width="240" height="40" rx="8" class="projection"/>
-<text x="555" y="324" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Post-extraction projection</text>
-<text x="555" y="340" font-size="8.8" text-anchor="middle" class="soft-white">checked type bridge · construct</text>
+<rect x="435" y="286" width="240" height="40" rx="8" class="policy"/>
+<text x="555" y="302" font-size="10.6" font-weight="700" text-anchor="middle" class="white">Project-global domain gate</text>
+<text x="555" y="317" font-size="8.4" text-anchor="middle" class="soft-white">catalog → recognizer/root</text>
 
-<path d="M 555 347 L 555 358" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 555 326 L 555 334" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="435" y="358" width="240" height="50" rx="8" class="artifact"/>
-<text x="555" y="378" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Message Definition Artifact</text>
-<text x="555" y="396" font-size="9.2" text-anchor="middle" class="soft-white">one physical group · ordered entries</text>
+<rect x="435" y="334" width="240" height="36" rx="8" class="projection"/>
+<text x="555" y="349" font-size="10.8" font-weight="700" text-anchor="middle" class="white">Post-extraction projection</text>
+<text x="555" y="364" font-size="8.4" text-anchor="middle" class="soft-white">checked type bridge · construct</text>
+
+<path d="M 555 370 L 555 378" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="435" y="378" width="240" height="34" rx="8" class="artifact"/>
+<text x="555" y="392" font-size="10.8" font-weight="700" text-anchor="middle" class="white">Message Definition Artifact</text>
+<text x="555" y="406" font-size="8.3" text-anchor="middle" class="soft-white">one successful group · ordered entries</text>
 
 <!-- Resolved mapping and policy inputs -->
 <rect x="735" y="140" width="230" height="112" rx="10" class="policy"/>
@@ -115,7 +121,7 @@
 
 <!-- Inputs to the linker -->
 <path d="M 205 358 L 205 430" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
-<path d="M 555 408 L 555 430" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+<path d="M 555 412 L 555 430" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
 <path d="M 850 252 L 850 405 L 795 405 L 795 430" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
 <path d="M 1095 252 L 1095 405 L 1015 405 L 1015 430" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
 

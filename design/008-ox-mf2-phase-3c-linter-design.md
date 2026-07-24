@@ -470,7 +470,9 @@ The unified config contract in [006-ox-mf2-phase-3a-tooling-foundation-design.md
 
 Root, `$schema`, formatter, resource, and message-linker validation remain owned by 006 and their respective section designs. They are deliberately not repeated as a supposedly closed global list here. Adding a later section therefore does not change this lint-local order or require this document to duplicate the complete project-config vocabulary.
 
-The resource workflow has one deliberate assignment-time use of the same config code. `catalog_format_conflict` depends on a concrete selected path and therefore runs after discovery rather than as part of the structural order above. It follows retained discovery/input errors, aborts the complete target set with `results: []`, and uses the deterministic path and catalog-definition ordering fixed by the resource catalog adapter design. This staged error does not weaken the rule that every structurally invalid config aborts before ignore setup or discovery.
+Resource and project-link workflows deliberately retain staged uses of the same config code. Every structural and path-independent cross-section failure still aborts before ignore setup or discovery. `catalog_format_conflict` depends on a concrete selected path and therefore runs during assignment after discovery. When the resolved linker-rule capability union activates project definition input, the shared orchestration additionally checks path capture and captured production-locale membership per canonical target, equal scope/locale binding after physical-source grouping, and catalog plus recognizer/root domain compatibility after the complete definition extraction attempt.
+
+Every such configuration-derived contradiction remains `config_validation_failed`, aborts the complete lint target set with `results: []`, constructs no `LinkRequest`, starts no reference-source scan, and never becomes partial-completeness evidence. The closed reason/evidence contracts and total late-gate order are owned by 013/014 rather than duplicated here. Only source-attributable execution failures after the applicable configuration gates may enter the 014 partial-world lint path.
 
 Object-map validation uses ASCII ascending order. Array validation uses source order. This keeps validation independent of JSON object insertion order so JSON, JSONC, and runtime parser differences do not change fixture output.
 
@@ -747,7 +749,7 @@ When `--quiet` suppresses warnings, `diagnostics` arrays omit those warnings, bu
 }
 ```
 
-Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), and public concurrency controls such as `--threads`. File-group parallel execution itself uses the initial automatic bounded width.
+Deferred CLI features: `lint --fix`, rule listing/introspection commands, resolved-config printing, file discovery debugging, rule timing output, additional reporters (including GitHub annotations and SARIF), file-group parallel execution, and public concurrency controls such as `--threads`. Initial file-group execution remains sequential; the common worker scheduler, automatic bounded width, and explicit width control are all owned by the shared deferred CLI parallel-execution boundary.
 
 ## Programmatic API Shape
 

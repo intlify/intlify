@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">ox-mf2 resource catalog adapter architecture</title>
-<desc id="desc">The CLI fmt workflow, the CLI lint workflow, and editor adapters all consume one shared resource adapter layer for extraction and write-back re-escaping, and separately call the applicable LSP-agnostic message-level core API per entry. Formatting reuses each paired parser artifact through format_parsed without reparsing. The resource layer contains the host format registry driven by project resources configuration and an optional editor-only overlay, host format adapters, and the message entry model. A separate read-only catalog-definition path admits one physical-source group, calls intlify_resource extraction once, and performs a host-owned checked projection into one MessageDefinitionArtifact. The resource layer does not depend on the message-level cores, intlify_contract, or intlify_linker.</desc>
+<desc id="desc">The CLI fmt workflow, the CLI lint workflow, and editor adapters all consume one shared resource adapter layer for extraction and write-back re-escaping, and separately call the applicable LSP-agnostic message-level core API per entry. Formatting reuses each paired parser artifact through format_parsed without reparsing. The resource layer contains the host format registry driven by project resources configuration and an optional editor-only overlay, host format adapters, and the message entry model. A separate read-only catalog-definition path admits physical-source groups and calls intlify_resource extraction once per group. The host aggregates domains from all successful extractions and applies one project-global domain gate before checked post-extraction projection constructs one MessageDefinitionArtifact per successful group. The resource layer does not depend on the message-level cores, intlify_contract, or intlify_linker.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -120,25 +120,30 @@
 <rect x="60" y="630" width="1120" height="160" rx="12" class="panel" stroke-width="2"/>
 <text x="620" y="659" font-size="13" font-weight="700" text-anchor="middle" class="label">014 catalog definition path — owned by the intlify_cli host integration</text>
 
-<rect x="85" y="682" width="235" height="70" rx="8" class="note" stroke-width="1.5"/>
-<text x="202.5" y="708" font-size="11.6" font-weight="700" text-anchor="middle" class="note-text">pre-extraction admission</text>
-<text x="202.5" y="729" font-size="10.3" text-anchor="middle" class="note-text">host-owned · complete group</text>
+<rect x="85" y="682" width="190" height="70" rx="8" class="note" stroke-width="1.5"/>
+<text x="180" y="708" font-size="10.7" font-weight="700" text-anchor="middle" class="note-text">pre-extraction admission</text>
+<text x="180" y="729" font-size="9.6" text-anchor="middle" class="note-text">host-owned · complete groups</text>
 
-<rect x="355" y="682" width="235" height="70" rx="8" class="output"/>
-<text x="472.5" y="708" font-size="11.6" font-weight="700" text-anchor="middle" class="white">shared intlify_resource</text>
-<text x="472.5" y="729" font-size="10.3" text-anchor="middle" class="soft-white">extract once · read-only</text>
+<rect x="300" y="682" width="190" height="70" rx="8" class="output"/>
+<text x="395" y="708" font-size="10.7" font-weight="700" text-anchor="middle" class="white">shared intlify_resource</text>
+<text x="395" y="729" font-size="9.6" text-anchor="middle" class="soft-white">extract once per group</text>
 
-<rect x="625" y="682" width="235" height="70" rx="8" class="note" stroke-width="1.5"/>
-<text x="742.5" y="708" font-size="11.6" font-weight="700" text-anchor="middle" class="note-text">post-extraction projection</text>
-<text x="742.5" y="729" font-size="10.3" text-anchor="middle" class="note-text">host-owned · checked bridge</text>
+<rect x="515" y="682" width="190" height="70" rx="8" class="parser"/>
+<text x="610" y="708" font-size="10.4" font-weight="700" text-anchor="middle" class="white">project-global domain gate</text>
+<text x="610" y="729" font-size="9.4" text-anchor="middle" class="soft-white">all successful extractions</text>
 
-<rect x="895" y="682" width="260" height="70" rx="8" class="entrymodel"/>
-<text x="1025" y="708" font-size="11.6" font-weight="700" text-anchor="middle" class="white">MessageDefinitionArtifact</text>
-<text x="1025" y="729" font-size="10.3" text-anchor="middle" class="soft-white">intlify_contract value</text>
+<rect x="730" y="682" width="190" height="70" rx="8" class="note" stroke-width="1.5"/>
+<text x="825" y="708" font-size="10.5" font-weight="700" text-anchor="middle" class="note-text">post-extraction projection</text>
+<text x="825" y="729" font-size="9.6" text-anchor="middle" class="note-text">host-owned · checked bridge</text>
 
-<path d="M 320 717 L 355 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
-<path d="M 590 717 L 625 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
-<path d="M 860 717 L 895 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<rect x="945" y="682" width="190" height="70" rx="8" class="entrymodel"/>
+<text x="1040" y="708" font-size="9.9" font-weight="700" text-anchor="middle" class="white">MessageDefinitionArtifact</text>
+<text x="1040" y="729" font-size="9.6" text-anchor="middle" class="soft-white">one per successful group</text>
 
-<text x="620" y="817" font-size="11.2" text-anchor="middle" class="muted">Read-only: no re-escaping, message-core call, selector matching, reachability analysis, or resource-to-contract dependency.</text>
+<path d="M 275 717 L 300 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 490 717 L 515 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 705 717 L 730 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 920 717 L 945 717" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+<text x="620" y="817" font-size="11.2" text-anchor="middle" class="muted">Read-only: domain admission precedes contract projection; no re-escaping, message-core call, selector matching, or reachability analysis.</text>
 </svg>
