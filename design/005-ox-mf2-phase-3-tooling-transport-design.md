@@ -6,13 +6,15 @@ This document defines the Phase 3 design boundary for tooling and transport work
 
 Phase 1 parser design is defined in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md). Phase 2 Binary AST snapshot design is defined in [003-ox-mf2-phase-2-binary-ast-snapshot-design.md](./003-ox-mf2-phase-2-binary-ast-snapshot-design.md). Phase 2 language binding design is defined in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 
-This document focuses on formatter/linter input, future SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
+This document focuses on formatter/linter input, resource and message-linker layering, future SemanticView exposure, LSP/editor workflows, agent coding workflows, transport choices, and long-lived language-service scenarios.
 
 ## Basic Policy
 
-The standard CST/AST product boundary remains the versioned Binary AST snapshot. Tooling may use Rust-internal construction-time tables for fast paths, but public cross-language tooling input should converge on the Binary AST decoder/accessor view.
+The standard public cross-language CST/AST syntax boundary remains the versioned Binary AST snapshot. Tooling may use Rust-internal construction-time tables for fast paths, but a public cross-language input that exposes MF2 syntax-tree structure should converge on the Binary AST decoder/accessor view.
 
 Semantic information can be exposed later as SemanticView or a later compact semantic snapshot. It is not forced into the lossless Binary AST snapshot.
+
+This syntax-boundary policy does not absorb versioned product-domain contracts. The 014 `MessageReferenceArtifact`, `MessageDefinitionArtifact`, selectors, scope/completeness values, linker findings, and bundle plans remain language-neutral message-linker artifacts under `intlify_contract` and `intlify_linker`; they are neither CST/AST inputs nor Binary AST extensions. Binary AST, a future SemanticView, and message-linker artifacts remain separate boundaries with separate ownership and compatibility rules.
 
 MessagePack is not the CST/AST representation of ox-mf2. It is reserved as a future transport for long-lived language-service workflows.
 
@@ -54,6 +56,25 @@ Implementation should be split by consumer-facing product surface:
 
 This milestone deliberately has no Phase 3 number because it is a layered capability rather than another standalone product surface. Its consumer-neutral `intlify_resource` crate, Tier 1 adapter, and resource configuration foundation may start and land without waiting for the Phase 3C linter product; they do not depend on `intlify_lint`. Catalog-aware formatting depends on the completed Phase 3B message-level formatter, while catalog-aware linting separately depends on the Phase 3C message-level linter. The complete milestone must finish before Phase 3D starts its opted-in catalog path, so editor integration consumes one implemented resource layer instead of creating a provisional duplicate. The complete Tier 1 milestone is part of the initial tooling v0.1 feature scope. In Phase 3 documents, that label describes the tooling product feature set; it is independent of the Binary AST snapshot header version and the existing `@intlify/cli` npm package version.
 
+**Parallel track: Message Linker and Distribution**
+
+The [014 message-linker design](./014-ox-mf2-message-linker-design.md) defines a layered track rather than another Phase 3C or Phase 3D subphase:
+
+- M0 establishes `intlify_contract`, the language-neutral `intlify_linker`, a JavaScript/TypeScript source-scan producer, completeness-gated findings, and basic bundle plans.
+- M1 adds the coverage-baseline-driven language-neutral key-only typed-key model without parsing MF2 payloads, adding a CLI leaf, or writing platform source, and M2 adds locale/fallback-aware linking.
+- M3 adds workspace-internal `crates/intlify_export`, which owns the common parser-backed export-preparation and exporter boundary plus the initial ESM exporter. Export preparation validates the identity-deduplicated union of plan-selected delivery definitions and M1 baseline definitions required for typed signatures, then derives the validated language-neutral signature information. The ESM exporter combines that M3 information with admitted M1 key models and renders scope-bound JS/TS accessor modules in the same transaction as its resource assets. `crates/intlify_cli` owns the `intlify messages emit` orchestration, exporter factory/registry wiring, output registration, and `--check`.
+- M4 adds live bundler-graph integration over the M3 exporter transaction.
+- M5 adds `intlify messages prune` through a separate 013 structural-deletion contract; it does not broaden formatter value write-back.
+- L0 and L1 are later lint-presentation adapters. They wait for the Phase 3C result/rule contracts and the catalog-level lint addendum, but do not gate M0 through M5.
+- E0 is the first JS/TS catalog-key completion milestone owned by 009. It depends on the M1 typed-key model and producer reverse projection, but not on L0/L1, M2, or an exporter milestone.
+- N0 and N1 are a parallel native-producer track after M0 for Rust and then C/C++/WASM reference production.
+
+M0 may begin when 013 Tier 1 extraction and the coordinated explicit scope, `path` / `fixed` locale binding, and producer-to-scope/domain binding prerequisites are available. It also integrates the M0 `messages` fields into the common Phase 3A configuration envelope, generated schema, and validation pipeline and implements the reusable `crates/intlify_cli` project-inventory and linker orchestration, but it exposes no executable CLI leaf. M0 has no dependency on `intlify_lint` or Phase 3D. M3 additionally admits `messages.delivery`, exposes `intlify messages emit` and its result contract, and depends on the shared parser and SemanticModel export-validation gate. M4 builds on the M3 transaction. M5 waits for the dedicated 013 structural-mutation addendum and format capability rules.
+
+Vue SFC application-reference production is not part of M0. It is the next producer phase tracked by 014's Deferred Follow-Up Notes and is independent of 013's Vue SFC resource-catalog adapter.
+
+Phase 3D may consume M0 linker findings through the additive project-backed editor session defined by 009, and E0 may later consume M1 typed-key models through that same session. Neither the initial editor product nor E0 gates the linker main track. The exact linker, exporter, and artifact contracts remain owned by 014, while E0 activation, cursor behavior, publication, and source edits remain owned by 009.
+
 4. **Phase 3D: LSP/Editor Integration**
    - adapter workflows for diagnostics and formatting
    - `.mf2` and opted-in catalog resource message mapping
@@ -71,7 +92,7 @@ This milestone deliberately has no Phase 3 number because it is a layered capabi
    - MessagePack transport evaluation
    - daemon/session/cache optimization for repeated language-service queries
 
-Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. Consumer-neutral resource work may land in separate resource PRs while Phase 3C is still in progress; this does not retroactively add resource implementation work to the Phase 3B or Phase 3C product PR sequences.
+Earlier phases should keep later consumers in mind when shaping public contracts, but later consumer workflows remain layered integrations until their product phase starts. Consumer-neutral resource and linker work may land in separate PRs while Phase 3C is still in progress; this does not retroactively add resource or linker implementation work to the Phase 3B or Phase 3C product PR sequences. Lint and editor adapters join the linker only at their declared integration milestones.
 
 ## CLI File Execution Boundary
 
@@ -118,6 +139,18 @@ Every runnable physical group has one workflow classification. Products that add
 
 A target-local failure before a filesystem write attempt does not stop later aliases in its physical group. This includes read, parse, extraction, formatter, linter, candidate-validation, diagnostic-mapping, and result-construction failures. An `output_write_failed` result in formatter write mode is the sole fail-stop case because direct writes provide no rollback guarantee and may leave the physical file indeterminate. The CLI performs no further stat, open, read, parse, format, lint, or write for later aliases in that group; unrelated groups continue. The exact current-target result, synthesized `alias_processing_blocked` results, details, and summary accounting are owned by [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md#physical-alias-write-failure). Check modes and lint never cross this write-failure boundary and therefore always continue after a target-local failure.
 
+## CLI Project Inventory Boundary
+
+`intlify messages emit` and `intlify messages prune` use the project-inventory workflow defined by 014 rather than the operand-driven file mode above. They accept no positional file, directory, or glob operands and do not translate an empty operand list into directory `.`. The 006 project root plus the validated `resources` and `messages` sections are their only initial inventory authority.
+
+`crates/intlify_cli` owns filesystem enumeration, physical-file grouping, execution accounting, and construction of the execution-derived completeness evidence. `intlify_resource`, language producers, `intlify_contract`, and `intlify_linker` remain synchronous filesystem-neutral cores. The CLI may reuse the shared path-representability, deterministic native discovery ordering, file-symlink, directory-symlink, metadata, and physical-identity primitives, but it does not reuse direct-operand classification or formatter/linter ignore semantics.
+
+For linker definition inputs, the CLI resolves assignments for every logical target, inspects physical identity, forms one physical-source group, and fixes its canonical primary-plus-alias order before invoking host-owned definition production. Pre-extraction admission validates every already formed group's equal bindings, host-format profile, and portable path/alias limits, then the CLI invokes `intlify_resource` exactly once for each admitted group. After the complete definition extraction attempt, the host aggregates resource-owned domain observations and applies the project-global catalog plus recognizer/root domain gates before constructing any contract artifact. Only after those gates succeed does post-extraction projection perform checked resource-to-contract conversion into one `MessageDefinitionArtifact` per successful physical-source group. Neither `intlify_resource` nor `intlify_contract` enumerates paths, groups aliases, aggregates project domains, or depends on the other crate.
+
+The project-inventory workflow selects definition paths only through linker-participating `resources.catalogs` definitions, reference source paths through resolved producer include patterns, and external reference artifacts through their exact resolved declarations. These explicit sets are authoritative. Root `.gitignore`, `--ignore-path`, `fmt.ignorePatterns`, `lint.ignorePatterns`, the ordinary hidden-file exclusion, and the default dependency/output-directory exclusion cannot silently remove an input from a closed-world link. Configuration-owned include/exclude policy must express any omission.
+
+A zero-match valid pattern is a complete empty selection, not a fallback request or implicit scan. Conversely, an enumeration, metadata, read, extraction, projection, producer, or external-artifact failure remains attached to its configured inventory participant and prevents the affected completeness side from becoming `Closed`. `--target` changes only delivery/export selection and never narrows either evidence inventory. The exact inventory, failure-to-completeness mapping, and no-generation/no-mutation gates remain owned by 014.
+
 ## Deferred Follow-Up Notes
 
 The following tooling work is intentionally deferred and is not required by the initial formatter, linter, or resource implementation.
@@ -137,6 +170,16 @@ After a post-initialization failure is detected, the coordinator stops dispatchi
 Workers never write reporter output directly. They return structured target results tagged with their stable logical identities; the coordinating thread orders results by the command's normalized-path and within-file rules, computes summaries, and renders text or JSON only after ordered aggregation. Completion order therefore cannot affect stdout, stderr, JSON arrays, selected errors, or exit status. Formatter writes to different physical groups may complete in any order, but a write failure affects only the remaining aliases in its own group. The scheduler uses backpressure and does not eagerly retain every file's source or parse artifacts merely because every path has already been discovered.
 
 The first scheduler implementation parallelizes only across physical file groups. It does not split one standalone message or catalog into nested worker tasks. Public concurrency controls such as `--threads` remain a later CLI surface; tests and benchmarks may inject a worker width through an internal scheduler construction boundary without exposing it as configuration.
+
+A later explicit scheduler extension may reuse that same command-scoped bounded pool for independent delivery-target transactions. Target work starts only after the 014 project-global configuration, inventory, artifact-production, completeness, linking, and export-preparation prefix has completed successfully. Physical-group work and target-transaction work are separate scheduler stages; they do not overlap, and no target, exporter, or registration path creates a nested or private pool.
+
+That extension may change completion order only. The coordinator still assembles results in canonical target-name order, preserves each target's independent commit, rollback, recovery, and error boundary, and applies the 014 command-summary and exit precedence after every selected transaction finishes. Initial M3 target execution remains sequential until this extension is separately implemented and validated with completion-order permutations, bounded live-work checks, and the existing target-transaction fixtures.
+
+### Non-Rust Project-Backed Editor Bridge
+
+Direct Node and browser access to catalog extraction, project inventory, definition and reference artifacts, linking, typed-key models, and project-backed findings is deferred until a concrete non-Rust editor or language-service consumer requires it. Existing parser, formatter, and linter N-API/WASM packages remain message-local and do not absorb those APIs.
+
+A promoted integration must choose one explicit boundary: a versioned native-process protocol suitable for the target environment, or separately designed bounded read-only bindings for every required resource, contract, producer, linker, and orchestration value. It must define lifecycle, cancellation, resource limits, error mapping, snapshot identity, cache invalidation, and compatibility without serializing private Rust representations or duplicating 013/014 project semantics. Browser support cannot be claimed through a native-process design.
 
 ## SnapshotView
 
@@ -400,7 +443,15 @@ The initial CLI lints physical file groups sequentially in stable normalized-pat
 
 ### Message and Catalog Scope
 
-The linter supports message-level linting as its reusable core. The initial layered resource workflow defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) extracts each selected resource entry and applies that same message-level pipeline. Catalog-wide linting across multiple entries, locales, or files is a separate future linter layer and does not change the message-level core.
+The linter supports message-level linting as its reusable core. The initial layered resource workflow defined by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) extracts each selected resource entry and applies that same message-level pipeline.
+
+Catalog-level analysis is split by the evidence it requires:
+
+- Catalog-native structural checks over affirmative, present-entry evidence are a future layer owned jointly by the linter product boundary in [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md) and the resource evidence contract in 013.
+- Application-level missing, unused, fallback, coverage, and reachability analysis across entries, locales, files, and source references is owned by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md).
+- L0/L1 lint integrations may present applicable 014 `LinkFinding` values through linter surfaces, but they must not reimplement linker analysis in `intlify_lint`.
+
+Neither layer changes the reusable message-level lint core.
 
 ### File Discovery
 
@@ -482,7 +533,8 @@ Phase 3 linter core scope:
 
 Future or layered linter scope:
 
-- catalog-wide and cross-locale lint rules and presets
+- catalog-native structural rules and presets over affirmative present-entry evidence, layered on 008 and 013
+- L0/L1 presentation rules and preset policy for applicable 014 `LinkFinding` values, without reimplementing application-level linker analysis
 - nested config discovery
 - recovery-aware editor linting
 - spec-compatible suppression model
@@ -505,7 +557,7 @@ Out-of-scope linter features:
 
 ### Product Boundary
 
-Phase 3 does not require a dedicated LSP server or editor extension as a direct product. Instead, LSP and editor integrations are treated as adapter workflows built on top of the parser, formatter, linter, binding packages, `SnapshotView` for syntax traversal, and future `SemanticView` once semantic APIs are exposed.
+Phase 3 does not require a dedicated LSP server or editor extension as a direct product. Instead, LSP and editor integrations are treated as adapter workflows built on top of the parser, formatter, linter, resource layer, binding packages, `SnapshotView` for syntax traversal, future `SemanticView` for message-local MF2 semantic relationships, and the 014 linker artifacts and `LinkOutcome` for application- and project-level message relationships.
 
 The parser, formatter, and linter cores remain LSP-agnostic. They should not return LSP protocol types such as `Diagnostic`, `TextEdit`, `CodeAction`, or UTF-16 positions directly.
 
@@ -513,7 +565,7 @@ The parser, formatter, and linter cores remain LSP-agnostic. They should not ret
 
 The initial editor workflow focuses on diagnostics and formatting.
 
-Code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, and minimal-diff formatting are not required in the initial workflow. Future `SemanticView` exposure should preserve enough stable semantic relationships to support those future editor features.
+Code actions, quick fixes, hover, completion, go-to-definition, rename, true range-only formatting, and minimal-diff formatting are not required in the initial workflow. Future `SemanticView` exposure should preserve enough stable relationships for message-local MF2 semantic features. Application-source and project-level message features instead consume the 014 checked typed-key model, `LinkOutcome`, and producer projection contracts; they do not reconstruct project semantics from `SemanticView`.
 
 ### Document and Message Mapping
 
@@ -529,7 +581,7 @@ For standalone `.mf2` files, the adapter applies the formatter's CLI [File Frami
 
 Parser, formatter, and linter core APIs operate on the extracted message text. Adapters map message-local results back to the containing document.
 
-Host document parsing, string escaping, message-to-raw offset mapping, and outer document edit ownership are adapter concerns. Their exact contracts should be specified in a dedicated LSP/editor or resource adapter design.
+Host document parsing, host-string unescaping and re-escaping, message-to-raw offset mapping, and validated catalog write-back are owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md). Editor-facing document mapping, protocol position conversion, version and generation freshness checks, and construction of outer-document edits from validated resource replacements are owned by [009-ox-mf2-phase-3d-lsp-editor-design.md](./009-ox-mf2-phase-3d-lsp-editor-design.md). This overview does not define a third adapter contract.
 
 ### Span and Position Conversion
 
@@ -605,17 +657,23 @@ The following features are deferred from the initial Phase 3 editor workflow:
 - recovery-aware partial linting for incomplete buffers
 - dedicated LSP server CLI, protocol handlers, and extension packaging
 
-Future editor quick fixes are adapter-owned. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Future semantic editor features should build on future `SemanticView` exposure rather than requiring LSP-specific semantic state in the parser core.
+Future editor quick fixes are adapter-owned. They may use stable diagnostic codes, configurable rule metadata, formatter output, and future rule suggestions, but the initial linter core does not expose a fix API. Style fixes should call formatter APIs rather than reimplementing formatting inside editor or linter adapters. Message-local MF2 semantic features should build on future `SemanticView` exposure rather than requiring LSP-specific semantic state in the parser core. Application-source and project-level message features should consume the 014 linker model and producer contracts rather than extending `SemanticView` into a second project analyzer.
 
 ### Implementation Targets
 
-Different integration environments can use the same conceptual workflow through different implementation targets:
+Implementation targets are split by the workflow inputs they can actually construct.
 
-- Rust LSP servers can call parser, formatter, and linter crates directly
-- Node-based language servers or editor extensions can use N-API packages
-- browser-based editors and playgrounds can use WASM packages
+The message-local workflow covers standalone MF2 messages and already extracted message text. Its implementations are:
 
-The transport or binding layer is selected by the integration environment. The core workflow remains the same across these targets.
+- Rust integrations call the parser, formatter, and linter crates directly.
+- Node-based language servers and editor extensions use the parser, formatter, and linter N-API packages.
+- Browser-based editors and playgrounds use the corresponding WASM packages.
+
+These targets share message-local parser, semantic, formatter, and linter behavior. N-API or WASM availability for those cores does not imply catalog extraction, project inventory, definition production, reference production, linking, typed-key models, or project-backed findings.
+
+The project-backed workflow additionally requires `intlify_resource`, `intlify_contract`, `intlify_linker`, the applicable producer, and the host-owned 013/014 definition-production and project-inventory orchestration. Its initial implementation target is a Rust host, including a Rust language server or another native integration that reuses the exact shared orchestration boundary. No resource, contract, linker, or project-orchestration N-API/WASM surface is implied by this document.
+
+A Node or browser integration cannot reconstruct the project-backed workflow by combining the existing message-level bindings. A future concrete non-Rust consumer must introduce either a separately designed native-process bridge or the required bounded read-only bindings. That decision must preserve 013/014 configuration, grouping, artifact, limit, completeness, and error contracts rather than creating a second project analyzer.
 
 ## Agent Coding Workflow
 

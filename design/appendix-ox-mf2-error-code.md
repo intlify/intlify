@@ -40,7 +40,7 @@ These enums are compact parser / snapshot values. They are allowed to use small 
 
 CLI JSON operational error codes, such as `config_not_found` or `command_not_ready`, are stable string identifiers in the CLI output contract. They are not numeric `OxMf2ErrorCode` values and are not allocated from the ranges in this appendix. A CLI operational error may include lower-level API error information in structured details when needed, but the CLI `errors[].code` field remains a string namespace.
 
-Product-level formatter and linter operational errors exposed through CLI, N-API, or WASM, such as `invalid_options`, `invalid_input`, `internal_error`, or `source_snapshot_mismatch`, are also stable string identifiers. They are not allocated from the numeric `OxMf2ErrorCode` ranges unless a lower-level binding, runtime initialization, snapshot, or source-text failure needs a numeric API error code.
+Product-level formatter, linter, resource, linker, and export operational errors exposed through CLI, N-API, WASM, or an equivalent structured integration, such as `invalid_options`, `invalid_input`, `internal_error`, `source_snapshot_mismatch`, or `message_link_failed`, are also stable string identifiers. They are not allocated from the numeric `OxMf2ErrorCode` ranges unless a lower-level binding, runtime initialization, snapshot, or source-text failure needs a numeric API error code.
 
 An operational `details.reason` value is interpreted together with its top-level `code` and owning product boundary. Reason strings do not have an independent global allocation table, and reuse under different codes does not make their remaining detail fields equivalent. A reason or other detail field is a stable compatibility surface only when its owning design says so. Human-readable `message` text is not a stable discriminator.
 
@@ -124,6 +124,14 @@ The current allocation is:
 
 It covers fatal parser API failures: an oversized source, an invalid source id, exhaustion of a `u32`-indexed parser resource, or a missing CST root. Recoverable MF2 syntax errors remain successful parse results with diagnostics and never use this range. `parse_batch` reports the zero-based input index together with the underlying `ParseError` and fails the whole call rather than returning a partial batch. N-API and WASM `parseBatch` preserve the underlying `ParseErrorCode` and expose that position as optional `OxMf2ErrorShape.inputIndex`; other error paths omit the property.
 
+### Message Linker Typed Error Domains
+
+[The message-linker design](./014-ox-mf2-message-linker-design.md) defines `ArtifactContractError`, `ArtifactReadError`, `LinkOperationalError`, `ExportPreparationError`, and `ExportError` as typed Rust or cross-process contract boundaries. They are not numeric `OxMf2ErrorCode` domains and do not consume the reserved `5000..9999` range merely because they originate in Rust crates.
+
+Their variants and checked structured evidence remain authoritative inside the owning API. A CLI or platform adapter performs the explicit boundary mapping registered below; it does not serialize a Rust discriminant as the CLI code, allocate one top-level code per nested variant, or collapse the evidence into a display string.
+
+`LinkFinding` is successful analysis data in the JSON-visible finding/diagnostic family, not a typed operational error. `ExportMessageValidationFailure` similarly carries existing parser and semantic diagnostic identities as result data. Neither is admitted into `errors[].code` merely because it can block bundle generation.
+
 ## Binding Error Domains
 
 Binding error domains are produced by N-API or WASM wrapper code rather than the Rust crate API or snapshot format itself.
@@ -151,7 +159,7 @@ Most wrong input types, invalid numeric ranges, and indexed accessor misuse shou
 
 ## Phase 3 Operational String Code Registry
 
-Phase 3 operational codes form one snake_case string namespace across CLI JSON and equivalent formatter or linter programmatic failure results. The registry below prevents accidental spelling collisions and points to the document that owns each detailed contract. It is not a second copy of each code's `details` schema.
+Phase 3 operational codes form one snake_case string namespace across CLI JSON and equivalent product-programmatic failure results. The registry below prevents accidental spelling collisions and points to the document that owns each detailed contract. It is not a second copy of each code's `details` schema.
 
 Intentional reuse keeps the same top-level code rather than adding a product-prefixed alias. The owner of the concrete boundary still defines required details, top-level versus target-local placement, ordering, recovery, and cross-surface conversion. Callers therefore interpret an error using the product API or CLI `command` context as well as `code`.
 
@@ -203,6 +211,27 @@ It reuses `config_validation_failed`, `input_path_unrepresentable`, `input_read_
 
 The editor design intentionally projects original-extraction `resource_format_unsupported`, `resource_entry_unsupported`, `resource_document_unsupported`, and `resource_limit_exceeded` into error-severity editor diagnostics with source `ox-mf2-resource`. A `resource_limit_exceeded` with `phase: "validate_write_back"` is instead a request-scoped formatting failure: it returns no edits and does not change document diagnostics or installed state. This is a defined cross-surface projection, not admission into the parser/semantic/lint diagnostic namespace. `resource_parse_failed` remains an operational extraction outcome and does not produce a new ox-mf2 editor diagnostic; the exact publication and retention behavior is owned by [Diagnostics Publication](./009-ox-mf2-phase-3d-lsp-editor-design.md#diagnostics-publication).
 
+### Message Linker and Export Workflow
+
+[The message-linker design](./014-ox-mf2-message-linker-design.md#cli-operational-error-mapping) reserves one top-level operational code per user-visible boundary rather than one code per typed nested variant:
+
+| Domain | Stable code | Initial status |
+| --- | --- | --- |
+| Artifact production and contract ingestion | `message_artifact_failed` | Defined for M0 contract ingestion and the closed built-in producer stage/reason evidence owned by 014. |
+| Stateless link request execution | `message_link_failed` | Defined for M0 stateless link execution and host mapping; user-visible emission begins only when a consuming integration ships. |
+| Exporter invocation and checked common output | `message_export_failed` | Reserved for M3. |
+| Platform destination mapping and registration | `message_output_registration_failed` | Reserved for M3 emission; its closed evidence and target-continuation contract are defined by 014. |
+
+Each code requires the closed `details.kind` vocabulary and canonical structured evidence defined by 014. Artifact transport and ordinary configured-source I/O intentionally reuse `input_read_failed`; config admission reuses `config_validation_failed`; and internal invariants reuse `internal_error`.
+
+The initial M3 CLI exposes no raw export-diagnostic retention option and therefore has no `invalid_options` mapping for `ExportValidationLimitConfigurationError`. A future CLI control or custom raw-input adapter must define its own exact decoding and structured error mapping before reusing `invalid_options`; this appendix does not reserve one implicitly.
+
+`resource_limit_exceeded` remains specific to 013 host-resource processing and is not an alias for an artifact, linker, or exporter limit.
+
+`LinkFinding` values and `ExportMessageValidationFailure` parser/semantic diagnostics remain result data under their own namespaces. A blocking finding or ordinary source diagnostic can prevent output without creating one of the four operational codes. Conversely, an artifact, link, export, or registration operational error never becomes a source diagnostic merely to acquire severity or location.
+
+The four codes are defined ahead of their first CLI emission. `message_artifact_failed` and `message_link_failed` are project-transaction top-level errors. `message_artifact_failed` has its M0 artifact and built-in producer evidence fixed by 014; later additions remain append-only and milestone-owned. `message_export_failed` and `message_output_registration_failed` are selected-target result errors beginning with M3. The 014 M3 text fixes the emit target DTO, counters, output-state field, registration's bounded evidence and deterministic failure selection, independent-target continuation, and command exit precedence. The two codes do not emit before M3, and an implementation does not publish a placeholder or reduced shape ahead of that milestone.
+
 ### Detail Schema Ownership
 
 The registry assigns top-level code ownership. Stable subordinate schemas remain in these documents:
@@ -215,6 +244,7 @@ The registry assigns top-level code ownership. Stable subordinate schemas remain
 | Formatter options, snapshots, discovery, ignore files, target I/O, exact alias-blocked results, and formatter invariant phases | [Phase 3B](./007-ox-mf2-phase-3b-formatter-design.md) and [Formatter IR](./011-ox-mf2-formatter-ir-design.md) |
 | Linter binding input/options and semantic or rule invariant reasons | [Phase 3C](./008-ox-mf2-phase-3c-linter-design.md) and [Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) |
 | Resource config, catalog classification conflicts, parsing, representability, limits, catalog result specializations, and adapter invariant reasons | [Resource catalog adapter](./013-ox-mf2-resource-catalog-adapter-design.md) |
+| Message artifact, linker, export-preparation, exporter, and platform-registration mappings | [Message linker](./014-ox-mf2-message-linker-design.md#cli-operational-error-mapping) and its M0/M3/M5 addenda |
 
 When two products reuse a top-level code, their detail variants are a union only after the owning documents define how a consumer distinguishes and validates every variant. This appendix indexes the current ownership but does not silently normalize incompatible `details` fields.
 
@@ -224,8 +254,9 @@ When two products reuse a top-level code, their detail variants are a union only
 | --- | --- | --- |
 | Shared CLI scheduler (deferred; not emitted by initial sequential execution) | `cli_worker_runtime_failed` | required `phase`: `initialize`, `dispatch`, `execute`, or `join`; optional top-level `path` when the active logical target is known exactly |
 | Formatter | `formatter_invariant_failed` | required formatter `phase` |
-| Linter and parser semantic validation | `semantic_invariant_failed`, `semantic_api_misuse`, `lint_rule_invariant_failed` | reason-specific `stage` or `ruleId` |
+| Linter and parser semantic validation | `semantic_invariant_failed`, `semantic_api_misuse`, `lint_rule_invariant_failed` | `semantic_invariant_failed` requires `stage`; `semantic_api_misuse` has no additional required field; `lint_rule_invariant_failed` requires `ruleId` |
 | Resource catalog adapter | `resource_invalid_entry_handle`, `resource_artifact_identity_exhausted`, `resource_offset_map_invariant_failed`, `resource_offset_map_failed`, `resource_write_back_failed`, `resource_adapter_invariant_failed` | required resource `phase`; optional `entryKey` when one entry is known |
+| Message linker and export workflow | `message_artifact_invariant_failed`, `message_producer_invariant_failed`, `message_linker_invariant_failed`, `message_export_preparation_invariant_failed`, `message_exporter_invariant_failed`, `message_output_registration_invariant_failed` | `message_export_preparation_invariant_failed` and `message_exporter_invariant_failed` require the 014-owned `invariant`; the artifact, producer, linker, and output-registration reasons are reason-only variants whose exact `details` object contains no field after `reason` |
 
 Reasons in this `internal_error` registry are globally unique across products. A new product-owned reason must not reuse an existing spelling for another condition. Deliberate reuse is allowed only when every owner is reporting the same shared invariant and adopts one identical reason-specific details contract. Each product keeps a compile-time reason catalog available to tests; the Phase 3 shared CLI integration test combines those catalogs and fails on a duplicate. This catalog is test-facing metadata and does not require a public runtime introspection API.
 

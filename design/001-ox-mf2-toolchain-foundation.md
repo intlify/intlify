@@ -2,13 +2,13 @@
 
 ## Purpose
 
-ox-mf2 is designed not only as a high-performance parser for MessageFormat 2.0 (MF2), but also as an MF2 toolchain foundation that can later support linting, formatting, compilation, diagnostics, and bindings.
+ox-mf2 is designed not only as a high-performance parser for MessageFormat 2.0 (MF2), but also as an MF2 toolchain foundation that can later support resource extraction, linting, formatting, message linking, compilation, diagnostics, and bindings.
 
 The initial implementation focuses on the parser. However, tokens, trivia, spans, NodeId, diagnostics, and the table boundary are treated as part of the initial design so that later tools can be added without breaking the foundation.
 
 ## Design Overview
 
-- Make Rust crates the single source of truth for MF2 behavior across parser, formatter, and linter products.
+- Make Rust crates the single source of truth for MF2 behavior across parser, resource, formatter, linter, and message-linker workflows.
 - In Phase 1, build a recovering, lossless, snapshot-friendly parser foundation.
 - In Phase 2, make a versioned Binary AST snapshot the standard boundary for the public CST/AST view.
 - Treat N-API and WASM as the primary language binding targets.
@@ -20,6 +20,7 @@ The initial implementation focuses on the parser. However, tokens, trivia, spans
 - The implementation-oriented details for Phase 2 language bindings live in [004-ox-mf2-phase-2-language-bindings-design.md](./004-ox-mf2-phase-2-language-bindings-design.md).
 - The implementation-oriented details for Phase 3 tooling and transport live in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md).
 - The unnumbered resource catalog milestone whose consumer-neutral foundation may start independently of Phase 3C, and whose complete CLI integration precedes Phase 3D, lives in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md).
+- The message-linker track, which may proceed independently of the linter and editor product sequence once its resource prerequisites are available, lives in [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md).
 
 ## Design Philosophy
 
@@ -241,9 +242,9 @@ The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1
 
 ### Crate Structure
 
-Adopt `parser core plus product crates`.
+Adopt `parser core plus product and contract crates`.
 
-The parser crate is the MF2 foundation crate. Formatter, linter, CLI, and resource catalog behavior live in separate workspace-internal crates so each layer can own its configuration, result shaping, fixtures, and release boundary without duplicating parser or host-adapter behavior.
+The parser crate is the MF2 syntax and semantic foundation crate. Formatter, linter, CLI, resource-catalog, public message-artifact, language-specific producer, linker, and export behavior live in separate crates so each layer can own its configuration, result shaping, fixtures, and compatibility boundary without duplicating parser, host-adapter, link-analysis, or export-preparation behavior.
 
 ```text
 crates/
@@ -255,9 +256,27 @@ crates/
                     # lint config, rule registry, and result shaping
   intlify_resource  # host-format registry, catalog config, extraction, mapping,
                     # resource limits, and validated write-back re-escaping
+  intlify_contract  # versioned message reference/definition artifacts, selector
+                    # and domain contracts, wire compatibility, conformance
+  intlify_producer_js # initial JS/TS reference production;
+                      # Vue SFC reference production is a later phase;
+                      # no link resolution
+  intlify_linker    # language-neutral resolution, reachability, findings,
+                    # bundle plans, and the M1 key-only typed-key model
+  intlify_export    # shared export preparation, validated batches, exporter
+                    # contract, common output artifacts, and built-in exporters
+  intlify_producer_bin # later native/WASM tagged-reference scanning
 ```
 
-`intlify_format` and `intlify_lint` depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. `intlify_resource` remains independent of the parser, formatter, and linter cores; `intlify_cli` composes its extracted entries with those message-level products. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal crates do not imply crates.io publishing.
+`intlify_format` and `intlify_lint` depend on `ox_mf2_parser` instead of reimplementing parser, diagnostic, snapshot, or semantic validation logic. `intlify_resource` remains independent of the parser, formatter, linter, contract, and linker cores. It exposes complete extraction artifacts but neither imports `intlify_contract` nor aggregates files. `intlify_contract` likewise does not import `intlify_resource`; similarly named catalog-key, scope, locale, and entry-reference values remain boundary-specific checked types rather than shared Rust types.
+
+For linker definition production, the `intlify_cli` project inventory enumerates logical catalog targets, inspects physical identity, and forms canonically ordered physical-source groups. A host-owned pre-extraction stage validates each already formed group's assignments and portable path/alias limits, then `intlify_resource` extracts every admitted physical source once. Before any contract artifact is constructed, the host aggregates resource-owned domain observations from all successful extractions and applies the project-global catalog plus recognizer/root domain gates. Only after those gates succeed does host-owned post-extraction projection perform checked conversion into one `MessageDefinitionArtifact` per successful physical-source group. These stages perform no selector matching or reachability analysis.
+
+`intlify_contract` owns the public, versioned interchange boundary. Language-specific producers emit that boundary, and `intlify_linker` consumes it without parsing source languages, catalog host formats, or depending on `intlify_lint`.
+
+`intlify_export` owns the M3 shared export-preparation and exporter boundary. It depends on `intlify_linker`, `intlify_contract`, and `ox_mf2_parser`, validates the identity-deduplicated union of plan-selected delivery definitions and M1 baseline definitions required for typed signatures, derives any MF2 argument-signature information required by typed platform output, and exposes an opaque validated batch before any exporter invocation. The M1 linker model carries only resolved scope plus domain-qualified message-key identity; it never parses a payload or carries an MF2 argument signature. This keeps `intlify_linker` parser-independent while allowing non-CLI build integrations to reuse the same preparation, common output, error, and built-in exporter contracts.
+
+`intlify_cli` composes the message-level, resource, producer, linker, and exporter workflows required by each command. Public distribution is handled through npm packages and language bindings where appropriate; workspace-internal crates do not imply crates.io publishing.
 
 ### Spec Tracking
 
@@ -370,10 +389,16 @@ The third phase expands ox-mf2 into broader tooling workflows.
 
 - formatter expansion
 - linter expansion
+- resource catalog extraction, mapping, and validated write-back
 - language service / LSP model
 - editor workflow cache and repeated query model
+- versioned message reference and definition artifact contracts
+- language-specific reference producers and language-neutral message linking
+- deterministic linker findings, bundle plans, the M1 key-only typed-key model, export preparation, and platform build integration
 - optional MessagePack transport for internal language-service sessions
 - editor workflow benchmarks that separate parser, semantic, snapshot, transport, and binding costs
+
+Phase 3 product numbering does not impose one serial implementation chain on every layered capability. The consumer-neutral resource foundation may proceed independently of the linter product as defined by 013. The 014 main linker track may start once its explicit 013 Tier 1 extraction, scope, locale-binding, and producer-binding prerequisites are available; it does not wait for `intlify_lint` or the LSP/editor product. Lint presentation and editor projection remain later consumers of linker findings, while native producers and platform build integrations follow the milestone dependencies defined by 014.
 
 ## Non-Goals
 

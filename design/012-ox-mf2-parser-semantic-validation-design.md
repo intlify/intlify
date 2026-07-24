@@ -1,6 +1,6 @@
 # ox-mf2 Parser Semantic Validation Design
 
-This document defines the parser-owned semantic validation contract for ox-mf2. It is the canonical owner for core semantic diagnostics referenced by the Phase 3C linter design. The linter, future validators, LSP/editor integrations, and resource/catalog adapters consume this contract instead of reimplementing MF2 data model validation.
+This document defines the parser-owned semantic validation contract for ox-mf2. It is the canonical owner for core semantic diagnostics referenced by the Phase 3C linter design. The linter, the message linker's shared export-preparation layer, future validators, and LSP/editor integrations consume this contract instead of reimplementing MF2 data model validation.
 
 ## Goals
 
@@ -27,6 +27,10 @@ Some non-goals are still tracked in [Deferred Follow-Up Notes](#deferred-follow-
 
 `intlify_lint` consumes parser semantic diagnostics and shapes them for CLI, N-API, and WASM outputs. It must not reimplement parser-owned semantic checks.
 
+`intlify_export` consumes the same parser construction and validation contract at the shared export-preparation gate defined by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md#mf2-syntax-and-semantic-validation-export-gate). Before invoking an exporter, it validates the identity-deduplicated union of plan-selected delivery definitions and the coverage-baseline definitions required to derive signatures for every admitted M1 key model. It derives language-neutral MF2 argument-signature information only from those parser- and semantically clean baseline definitions. The M1 `intlify_linker` model remains key-only and parser-independent, and target-specific MF2 validity rules remain forbidden.
+
+`intlify_resource` and its host-format adapters remain independent of `ox_mf2_parser`. They own host parsing, extraction, mapping, and write-back under [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md), but do not construct `SemanticModel` or run semantic validation. A host integration may pass extracted message text to a parser-backed lint, editor, or export consumer without moving parser responsibility into the resource crate.
+
 ## SemanticModel and Validation API
 
 Semantic validation runs after parsing and explicit `SemanticModel` construction. The zero diagnostic guarantee from [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md) applies: a parse result with zero parser diagnostics is syntactically valid per the MF2 ABNF. Semantic validation may therefore assume grammar-valid CST shapes.
@@ -39,7 +43,7 @@ pub fn validate_semantics(
 ) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>
 ```
 
-`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections. If semantic validation detects an invariant failure, it returns `Err(SemanticInvariantError)`; downstream host boundaries convert that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_validation"`.
+`SemanticModel` owns semantic facts. `validate_semantics` owns diagnostic production and returns diagnostics in deterministic report order through the `Ok` branch. Semantic diagnostics are returned separately from parser diagnostics. They are not stored permanently on `SemanticModel`, are not mixed into `ParseResult.diagnostics`, and are not encoded into Binary AST snapshot diagnostic sections. If semantic validation detects an invariant failure, it returns `Err(SemanticInvariantError)` with kind `InvariantViolation`; downstream host boundaries convert that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_validation"`.
 
 SemanticModel construction is also part of the parser-owned invariant boundary. `ParseResult` never owns an optional `SemanticModel`; parsing and semantic construction are separate phases. If parser diagnostics exist, downstream tooling does not construct a model or run semantic validation. If parser diagnostics are empty, SemanticModel construction and semantic validation must succeed. A construction or validation invariant failure is not a user-facing semantic diagnostic; it is an implementation failure that downstream CLI, N-API, WASM, or linter layers map to `internal_error`. Construction failures use `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
 
@@ -52,13 +56,38 @@ pub fn build_semantic_model(
 ) -> Result<SemanticModel, SemanticInvariantError>
 ```
 
+The parser owns the error classification needed by every downstream boundary:
+
+```rust
+pub struct SemanticInvariantError {
+    kind: SemanticInvariantErrorKind,
+}
+
+pub enum SemanticInvariantErrorKind {
+    ApiMisuse,
+    InvariantViolation,
+}
+
+impl SemanticInvariantError {
+    pub fn kind(&self) -> SemanticInvariantErrorKind;
+}
+```
+
+Both types form one closed parser contract. `SemanticInvariantError` has private fields and parser-owned construction, and exposes no public constructor, mutable state, deserializer, arbitrary code, free-form classification string, or consumer-defined extension. Presentation text and implementation-local context do not change `kind()`.
+
+`ApiMisuse` means that the caller supplied a parse result containing parser diagnostics or a detectably inconsistent `SourceStore` / `ParseResult` pair. `InvariantViolation` means that a correctly attached, parser-diagnostic-free result could not produce a valid semantic model, or that `validate_semantics` detected a contradiction in a valid model.
+
+`build_semantic_model` may return either kind. `validate_semantics` accepts an already constructed `SemanticModel` and returns only `InvariantViolation`; it does not reinterpret an ordinary semantic diagnostic as an error.
+
+The error does not store the downstream presentation stage. The caller already knows whether the failure came from `build_semantic_model` or `validate_semantics` and combines that call-site fact with `kind()`: `ApiMisuse` maps to `semantic_api_misuse` with no additional required details field, while `InvariantViolation` maps to `semantic_invariant_failed` with required stage `semantic_model_construction` or `semantic_validation`.
+
 `sources` must be the original owner that assigned every `SourceId` referenced by `result`; semantic construction reads source slices through that pair to derive cooked identifiers, literal values, and comparison keys. The function neither reparses nor mutates the syntax artifact and never stores the model back into `ParseResult`. Phase 1 `parse_message` satisfies this requirement by returning a `StandaloneParseResult`; standalone callers pass `parsed.sources()` and `parsed.result()` from that same wrapper.
 
-Calling this boundary with a parse result that contains parser diagnostics is caller misuse and returns `Err`. A detectably inconsistent owner/result attachment is also misuse. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. Downstream host boundaries convert misuse to `internal_error` with `details.reason: "semantic_api_misuse"` rather than panicking, because CLI, N-API, and WASM callers should receive structured operational errors for implementation bugs. If the attachment is valid and parser diagnostics are empty but construction still returns `Err`, the downstream host boundary converts that error to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
+Calling this boundary with a parse result that contains parser diagnostics returns `Err` with `SemanticInvariantErrorKind::ApiMisuse`. A detectably inconsistent owner/result attachment uses the same kind. `intlify_lint` and other downstream tools must check parser diagnostics first and skip SemanticModel construction when they are present. Downstream host boundaries convert misuse to `internal_error` with only required `details.reason: "semantic_api_misuse"` rather than adding the currently redundant construction stage or panicking, because CLI, N-API, and WASM callers should receive one identical structured operational error for implementation bugs. If the attachment is valid and parser diagnostics are empty but construction still returns `Err`, the error kind is `InvariantViolation` and the downstream host boundary converts it to `internal_error` with `details.reason: "semantic_invariant_failed"` and `details.stage: "semantic_model_construction"`.
 
 ## SemanticModel Fact Surface
 
-`SemanticModel` is the canonical owner for semantic facts shared by parser semantic validation, the Phase 3C linter, and future LSP/editor or resource/catalog consumers. The lint crate must not build a parallel semantic fact model for these records.
+`SemanticModel` is the canonical owner for semantic facts shared by parser semantic validation, the Phase 3C linter, shared export preparation, and future parser-backed validator or LSP/editor consumers. The lint and export crates must not build a parallel semantic fact model for these records.
 
 Initial facts include:
 
@@ -410,6 +439,10 @@ Duplicate detection is owner-local: options are compared only within the same fu
 
 Parser semantic validation fixtures live under `crates/ox_mf2_parser/fixtures/semantic/` and are exercised by parser crate tests. They must cover:
 
+- the exact closed `SemanticInvariantErrorKind` set, read-only `kind()` accessor, and parser-only checked construction
+- `ApiMisuse` for a parse result with parser diagnostics and for every detectably inconsistent source-owner/result attachment
+- `InvariantViolation` for valid-call model-construction and semantic-validation contradictions
+- downstream classification from `kind()` plus call site without message-string inspection or a stored presentation stage, including omission of `stage` for `semantic_api_misuse`
 - every semantic diagnostic with positive and negative cases
 - deterministic report ordering
 - duplicate-family partitioning
@@ -483,20 +516,21 @@ The parser crate should expose parser diagnostic code and semantic diagnostic co
 
 ## Implementation Phasing
 
-The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics. Product-level linter PR ordering remains owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md); this section scopes only the parser-side prerequisite work.
+The parser semantic validation implementation is a Phase 3C prerequisite for the linter. It should land before `crates/intlify_lint` depends on core semantic diagnostics. The same implemented parser contract is also a prerequisite for the 014 M3 shared export-preparation gate before `crates/intlify_export` can produce a `ValidatedExportBatch`. Product-level linter PR ordering remains owned by [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md), while linker/export milestone ordering remains owned by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md); this section scopes only the parser-side prerequisite work.
 
 Suggested implementation steps:
 
-1. expose `build_semantic_model(sources, result) -> Result<SemanticModel, SemanticInvariantError>` as the only source-backed construction path, including the paired accessors on `StandaloneParseResult`
-2. define `SemanticDiagnosticCode` and `SemanticDiagnostic`
-3. expose `validate_semantics(model: &SemanticModel) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>`
-4. implement declaration dependency diagnostics
-5. implement selector annotation diagnostics
-6. implement matcher variant diagnostics
-7. implement duplicate option diagnostics
-8. add construction, attachment, ordering, and cascade tests
-9. expose parser and semantic diagnostic code catalogs
-10. add the cross-catalog collision test in `intlify_lint` once the linter crate exists
+1. define the closed `SemanticInvariantErrorKind` and read-only `SemanticInvariantError::kind()` contract
+2. expose `build_semantic_model(sources, result) -> Result<SemanticModel, SemanticInvariantError>` as the only source-backed construction path, including the paired accessors on `StandaloneParseResult`
+3. define `SemanticDiagnosticCode` and `SemanticDiagnostic`
+4. expose `validate_semantics(model: &SemanticModel) -> Result<Vec<SemanticDiagnostic>, SemanticInvariantError>`
+5. implement declaration dependency diagnostics
+6. implement selector annotation diagnostics
+7. implement matcher variant diagnostics
+8. implement duplicate option diagnostics
+9. add error-kind, construction, attachment, ordering, and cascade tests
+10. expose parser and semantic diagnostic code catalogs
+11. add the cross-catalog collision test in `intlify_lint` once the linter crate exists
 
 ## Deferred Follow-Up Notes
 
@@ -505,7 +539,7 @@ These items are intentionally deferred and do not block this design document's P
 - Snapshot-backed semantic validation, including the snapshot-to-`SemanticModel` path. This parser-owned path must land before detailed design or implementation of any future linter `lintSnapshot` API begins. Only after this parser path exists does a separate linter follow-up own the consumer API design. Its promotion gates are to construct `SemanticModel` from decoded snapshot bytes without silently reparsing source text, verify parser diagnostic capability, preserve all semantic facts needed by validation and linting, provide source/span consistency guarantees equivalent to source-backed validation, and carry fixtures proving source-backed and snapshot-backed validation return the same diagnostic codes, order, and spans; these gates are not a current linter API contract.
 - Selector-function domain modeling for future `unreachable-variant`.
 - Additional body-owned reference kinds beyond the Phase 3C initial `output_references()` fact surface.
-- Additional semantic facts needed by resource/catalog adapters.
+- Additional semantic facts needed by future parser-backed validator, compiler, or LSP/editor consumers. Any promoted consumer must use this parser-owned surface without moving semantic-model construction or validation into `intlify_resource` or its host-format adapters.
 - Public documentation pages and static help text for semantic diagnostic codes. The design-time pages under `design/linter-rules/` do not define the runtime `help` field or public docs URL contract.
 
 ## Open Questions

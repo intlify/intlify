@@ -605,8 +605,7 @@ These stages supplement the formatter benchmark categories in [007-ox-mf2-phase-
 
 ## Deferred Follow-Up Notes
 
-- After the Phase 3C message-level linter crate, `intlify lint` command, and diagnostic reporter contract have landed, create a dedicated implementation plan for `intlify lint` resource-catalog integration before starting that integration work. The follow-up must reuse the `intlify_resource` registry, resolved catalog configuration, CLI classification and physical-group path, extraction artifacts, and offset maps defined by [013](./013-ox-mf2-resource-catalog-adapter-design.md); it must not introduce a second host extraction path or config resolver. It must also cover `lint_catalog_e2e`, formatter/linter cross-command determinism, and the complete Tier 1 acceptance gate. This work is intentionally outside the active resource-plus-formatter PR sequence, but it must be complete before Phase 3D begins catalog editor integration.
-- Catalog-level and cross-locale rules, locale binding, and key selectors remain separate follow-ups under the deferred contract in [013](./013-ox-mf2-resource-catalog-adapter-design.md#deferred-follow-up-notes). They do not become part of the initial entry-level catalog lint integration merely because that integration starts.
+- Reminder only: before catalog-aware `intlify lint` composition begins, create its dedicated implementation plan. This formatter IR design does not own that integration. The message-level lint and later presentation contracts are owned by [008](./008-ox-mf2-phase-3c-linter-design.md#resource-and-catalog-linting), catalog extraction and mapping by [013](./013-ox-mf2-resource-catalog-adapter-design.md#catalog-linting), and application-level cross-file analysis and linker findings by [014](./014-ox-mf2-message-linker-design.md). Those documents are the normative sources and must be reused rather than introducing another extraction, configuration, or analysis path.
 
 ## Open Questions
 

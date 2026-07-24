@@ -62,19 +62,19 @@ The binary entry point should stay thin. CLI core behavior, including command ro
 
 The CLI crate owns command routing, config discovery, config loading, output formatting, exit-code behavior, and package-level CLI composition.
 
-Formatter and linter crates own their resolved config models once Phase 3B and Phase 3C begin. Phase 3A owns only the project-level config envelope, schema generation boundary, and normalization path that lets the CLI pass `fmt` and `lint` sections to product-specific crates later.
+Formatter, linter, resource, and message-linker product layers own their resolved config models. Phase 3A owns only the project-level config envelope, schema-generation composition boundary, and normalization path that lets the CLI pass known sections to their owning validators. The additive `messages` section and `messages.emit` / `messages.prune` command semantics are owned by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md); this document owns their integration into common config loading, routing, reporting, and exit behavior.
 
 Parser crates remain responsible for parsing, diagnostics, Binary AST snapshots, SemanticModel construction, and parser-owned semantic validation. Phase 3A should not move parser behavior into the CLI crate.
 
 ## Architecture
 
-Phase 3A introduces the CLI shell and distribution layer without moving parser behavior or implementing formatter/linter engines. The architecture separates the user-facing `intlify` binary from product-specific engines so later phases can add formatter and linter behavior behind the same command and reporting contracts.
+Phase 3A introduces the CLI shell and distribution layer without moving parser behavior or implementing product engines. The architecture separates the user-facing `intlify` binary from product-specific layers so later milestones can add formatter, linter, resource, and message-linker/export integrations behind the same command, configuration, and reporting contracts.
 
 ![Phase 3A CLI foundation architecture](./assets/006-ox-mf2-phase-3a-cli-architecture.svg)
 
 The public `@intlify/cli` wrapper package owns the user-facing command, bundled config schema, native package resolution, and release-time installed-package smoke-test coverage. The `@intlify/cli-native` package source owns the compiled native `intlify` binary artifacts prepared by release automation. The Rust CLI crate owns runtime command routing, config loading, reporter selection, JSON envelope shaping, and exit-code mapping.
 
-Formatter and linter crates remain product-specific extension points. Both future engines consume parser-owned parse artifacts instead of owning parsing themselves. Phase 3A only defines how their future config sections, results, and operational errors flow through the CLI foundation.
+Product crates remain extension points behind the common CLI shell. Formatter and linter engines consume parser-owned parse artifacts, the resource layer owns catalog extraction, and the message-linker track owns reference/definition linking and generation policy. Phase 3A defines how their config sections, command results, and operational errors flow through the CLI foundation without moving product semantics into `intlify_cli`.
 
 ## CLI Surface
 
@@ -88,6 +88,21 @@ intlify init
 ```
 
 Phase 3A reserves the `fmt`, `lint`, `check`, and `init` command names but keeps them out of normal `intlify --help` output until the required product behavior is ready. Reserving `check` prevents a command-name conflict; it does not commit the v0.1 product to providing a combined command. If any reserved command is invoked directly in Phase 3A, the CLI returns an operational error, exits with code `2`, and uses `kind: "unsupported"` with `code: "command_not_ready"` in JSON reporter output. The `intlify check` placeholder records formatter and linter as prerequisites with `details.requiredPhase: "3B+3C"`, but remains a placeholder until a dedicated post-v0.1 addendum defines the command. `intlify init` is reserved for future config scaffolding.
+
+The 014 product track additively introduces one nested command namespace:
+
+```text
+intlify messages emit
+intlify messages prune
+```
+
+`messages` is the exact namespace and is not an alias for `catalog`. Its two resolved machine command identities are `messages.emit` and `messages.prune`; the dotted spellings are JSON-envelope identities, not alternate shell command spellings. `emit` becomes executable with 014 M3 and `prune` with M5. Before an included leaf implementation is ready, routing may return the existing `command_not_ready` with its required 014 milestone; it must not execute a partial product pipeline.
+
+M1 typed-key model construction adds no third command leaf such as `messages types` or `messages generate`. It is a checked Rust/in-process capability until the M3 ESM exporter renders its model through `messages emit`; the existing `emit --check` transaction owns filesystem freshness rather than a second type-generation command.
+
+`intlify messages`, `intlify messages --help`, and `intlify messages -h` print namespace help and exit with `0`. The namespace help lists only leaves included in that release and may label a reserved-but-not-ready included leaf as unavailable. `intlify messages emit --help` and `intlify messages prune --help` follow the ordinary product-help contract without loading configuration or running discovery. An unknown leaf has no resolved command identity: it uses `unknown_command`, reports the joined spelling such as `messages.foo` in `details.command`, and retains `command: "intlify"` in JSON.
+
+The initial `messages.emit` and `messages.prune` leaves accept no positional file, directory, or glob operands. After help/version and complete argument-shape validation, they derive their inventory from the discovered project root and the validated `resources` and `messages` sections under the 014 project-inventory contract. An unexpected positional value is `invalid_cli_argument` before project-root discovery, configuration loading, or filesystem enumeration; it is not reinterpreted as a target, catalog, source root, or implicit directory. `--target` is an `emit` output-selection option and never a file operand or source-inventory filter. Command-specific options, project-inventory execution, and result DTOs remain owned by 014 and its milestone addenda; shared global-option parsing, help/version precedence, reporters, and exit-code selection remain owned here.
 
 The CLI should provide consistent global behavior for help output, version output, config path handling, machine-readable output selection, and operational errors. Phase 3A global options are:
 
@@ -122,7 +137,7 @@ Top-level help and version behavior:
 
 `intlify --reporter json` without a subcommand follows the same behavior as `intlify`: it writes human-readable top-level help to stdout and exits with `0`. The JSON reporter affects command result output and operational errors, but it does not JSON-encode help output for no-subcommand execution.
 
-Global options can appear before or after the subcommand. For example, `intlify --reporter json fmt` and `intlify fmt --reporter json` are equivalent. Duplicate global options, including duplicate value-taking options such as `--config`, are operational input errors with `kind: "input"`, `code: "duplicate_cli_option"`, and exit code `2`.
+Global options can appear before or after the subcommand. For example, `intlify --reporter json fmt` and `intlify fmt --reporter json` are equivalent. For the nested namespace, `intlify --reporter json messages emit`, `intlify messages --reporter json emit`, and `intlify messages emit --reporter json` are equivalent. Duplicate global options, including duplicate value-taking options such as `--config`, are operational input errors with `kind: "input"`, `code: "duplicate_cli_option"`, and exit code `2`.
 
 Operational error precedence:
 
@@ -171,14 +186,26 @@ Unknown positional input is treated as command routing input. For `intlify foo b
 
 ## Configuration Contract
 
-Project configuration is one config file with separate `fmt` and `lint` sections. Phase 3A supports JSON and JSONC config syntax through these root config file names:
+Project configuration is one config file. Phase 3A begins with separate `fmt` and `lint` sections, and later product tracks add known optional root sections through the same strict envelope. Phase 3A supports JSON and JSONC config syntax through these root config file names:
 
 - `intlify.config.json`
 - `intlify.config.jsonc`
 
 Phase 3A establishes the initial `fmt` and `lint` sections. The resource catalog milestone in [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) additively introduces the optional root `resources` section under the same file, parser, strict-validation, Rust-model, and generated-schema contract. References below to the Phase 3A-only two-section shape describe that foundation boundary; the complete Tier 1 resource milestone remains part of the tooling v0.1 feature scope even though its consumer-neutral foundation may land independently of Phase 3C and its command integrations land only when their respective message-level products are ready. Once that milestone ships, `resources` is a known root field and participates in the command-independent validation order fixed by the Phase 3C and resource designs. The unified loader preserves whether `resources.catalogs` was omitted or explicitly supplied as an empty array; it must not erase the resource design's absent-versus-disable-all policy distinction while applying defaults to unrelated sections.
 
-The unified loader continues to own config syntax, root-field validation, config-path reporting, and the final CLI `config_validation_failed` envelope. After validating the existing `fmt` and `lint` sections, it passes the missing-or-present raw `resources` value to the resource-owned section validator rather than deserializing that section into a second CLI-owned model. The validator returns either normalized `ResourcesConfig` or path-independent structured violation evidence; the loader adds the config path and CLI error envelope. A successfully loaded config retains both the normalized resource config and one compiled `ResolvedResources` value for reuse by formatter and linter classification. The resource crate never owns config discovery or config-file diagnostics.
+The message-linker track in [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md) additively introduces the optional root `messages` section under that same contract. `messages` becomes a known root field when the coordinated 014 M0 config contract lands; `catalog` is never accepted as an alias. An omitted `messages` section remains absent and does not synthesize an empty object or silently enable producer, linker, lint, emit, or prune behavior. The 014-owned validator decides whether a present section is complete for a particular milestone and constructs its immutable resolved policy, producer, and delivery-target values.
+
+Omission remains valid only while no resolved consumer configuration explicitly requires the linker. In particular, once the 008 L0/L1 adapter exists, enabling any linker-backed lint rule requires a present, valid `messages` section because production locales and the base link policy have no inferred defaults. This is a post-section cross-section check, not permission for the 014 section validator to manufacture a value for an absent section.
+
+The unified loader continues to own config syntax, root-field validation, config-path reporting, and the final CLI `config_validation_failed` envelope. After syntax and duplicate-member validation, root known-field admission recognizes exactly `$schema`, `fmt`, `lint`, and the additive shipped `resources` and `messages` fields. Present known product sections validate in fixed order: `fmt`, `lint`, `resources`, then `messages`. Only after every present section succeeds does the loader run consumer-activation cross-section checks, initially the 008-owned linker-backed-lint requirement below. A section-local failure always wins over that later activation check.
+
+The loader passes the missing-or-present raw `resources` value to the resource-owned section validator rather than deserializing that section into a second CLI-owned model. That validator returns either normalized `ResourcesConfig` or path-independent structured violation evidence. A successfully loaded config retains both the normalized resource config and one compiled `ResolvedResources` value for reuse by downstream classification.
+
+Only after resource validation succeeds does the loader pass the missing-or-present raw `messages` value, the compiled `ResolvedResources`, and the already established project-root context to the 014-owned section validator. This pre-discovery pass validates message-section structure, declared scope existence, domain tokens, syntax/domain compatibility, and membership of every statically known fixed catalog locale in `messages.locales` without reparsing or independently resolving `resources.catalogs`. It returns immutable resolved message configuration or path-independent structured violation evidence, but it does not claim that a path-captured locale or a scope's concrete catalog-key domain has already been observed. The shared 013/014 orchestration then uses the fixed total late-gate order: canonical targets with format, capture, and captured production-locale checks; canonical physical groups with equal scope/locale binding checks; the complete definition extraction attempt followed by catalog-domain aggregation; and finally recognizer/root domain comparison. Only after every domain gate succeeds may it project successful extractions into definition artifacts or begin reference-source scanning. These configuration-derived contradictions retain `config_validation_failed` even when discovery or successful extraction was needed to observe them; they construct no `LinkRequest` and never become partial-completeness evidence.
+
+The same boundary applies to M1 `coverageBaseline`: the section validator checks its bounded shape plus static scope and locale references only. It never turns a zero-match catalog pattern, extraction result, or post-discovery completeness state into `config_validation_failed`; 014's existing completeness findings and generation gates own those later facts.
+
+After that result, the loader compares the resolved lint rule set with message-section presence. If at least one linker-backed rule is enabled while `messages` is absent, it returns exactly one `config_validation_failed` with the 008-owned `details.reason: "linker_messages_required"` and does no ignore setup, discovery, extraction, producer work, or linking. Rule selection, pointer evidence, and future preset behavior are fixed by 008. The loader attaches the config path and common CLI error envelope for every stage. Neither the resource nor linker crate owns config discovery, config-file parsing, or CLI diagnostic presentation.
 
 The initial config discovery model is root-only. Root means the git repository root found by walking up from `cwd`; when no git repository root exists, root falls back to `cwd`. Discovery checks for `<root>/intlify.config.json` and `<root>/intlify.config.jsonc`. If exactly one exists, that file is used. If both exist, the CLI reports a config conflict instead of silently choosing one. Nested config discovery, nearest-config-wins behavior, and file-specific overrides are deferred until a concrete multi-workspace or resource/catalog requirement appears.
 
@@ -199,9 +226,9 @@ When root discovery does not find any supported config file, the CLI continues w
 
 When `--config <path>` is provided and that file does not exist, the CLI returns an operational config error with `code: "config_not_found"` and exits with code `2`.
 
-The unified config JSON Schema is the schema that users and editors should reference. Formatter, linter, and later resource config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
+The unified config JSON Schema is the schema that users and editors should reference. Formatter, linter, resource, and message-linker config models can be defined independently under the unified root schema, but users should not need separate top-level schemas for one project config file.
 
-The unified config JSON Schema is published with the public `@intlify/cli` wrapper package. The schema is exported at `./schema/config.schema.json` from that package and can internally separate formatter, linter, and resource configuration under draft-07 `definitions` such as `definitions.fmt`, `definitions.lint`, and `definitions.resources`. Product detail schemas remain separately owned, but users reference one schema for `intlify.config.json` or `intlify.config.jsonc`. Native packages may contain internal implementation artifacts, but they do not define a public config schema path.
+The unified config JSON Schema is published with the public `@intlify/cli` wrapper package. The schema is exported at `./schema/config.schema.json` from that package and can internally separate formatter, linter, resource, and message-linker configuration under draft-07 `definitions` such as `definitions.fmt`, `definitions.lint`, `definitions.resources`, and `definitions.messages`. Product detail schema fragments remain separately owned and are composed into one generated root schema; users reference one schema for `intlify.config.json` or `intlify.config.jsonc`. Native packages may contain internal implementation artifacts, but they do not define a public config schema path.
 
 Config parsing should deserialize supported config syntax into the same Rust config model. JSON configs use `serde_json`; JSONC configs use a syntax-aware parser or comment/trailing-comma normalization before applying the same config-model validation. In either path, a syntax-aware stage must reject duplicate object member names before deserialization can collapse them into the Rust model. The rule applies to every object at every depth. Names are compared after JSON string-escape decoding by exact Unicode scalar sequence, without normalization or case folding, so `"fmt"` and `"\u0066mt"` are duplicates while `"fmt"` and `"FMT"` are not. The first second-or-later occurrence encountered in source order is the parse failure; scopes are object-local, so the same name in different objects is valid. Phase 3A JSONC accepts line comments (`//`), block comments (`/* */`), and trailing commas. JSON5 config files are not supported in Phase 3A, and JSON5-only syntax such as single-quoted strings or unquoted object keys is invalid. Schema generation uses Rust config types as the source of truth and should use `schemars` to generate the unified JSON Schema from the project-level Rust config model, using standard schema annotations for editor-facing descriptions and examples where needed. The generated schema should follow JSON Schema draft-07 and should not include a `$id`; the npm package artifact path is the canonical public location. The schema artifact itself remains standard JSON and should not emit non-standard editor extensions such as `allowComments`, `allowTrailingCommas`, or `markdownDescription`. A dedicated schema generation crate is not required in Phase 3A.
 
@@ -235,7 +262,7 @@ The same `$schema` value is recommended for `intlify.config.jsonc`:
 
 The `$schema` field is optional and, when present, must be a string. The CLI does not use the `$schema` value to locate its validation schema at runtime; it is editor-facing metadata only. A non-string value is `config_validation_failed` with `details.reason: "invalid_schema_metadata"` and `details.pointer: "/$schema"`. JSONC editor schema support is expected in VS Code-compatible JSONC tooling.
 
-Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt`, `lint`, and, once introduced, `resources` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates. The resource design is that explicit additive update, so a shipped resource-aware schema and model must accept `resources` before top-level unknown-field validation proceeds to section validation.
+Unknown root-level fields are validation errors, except for the root-level `$schema` metadata field. Unknown fields inside `fmt`, `lint`, and, once introduced, `resources` and `messages` are also validation errors. This keeps typo detection strict; future configuration fields should be added through explicit schema and config-model updates. The 013 and 014 designs are explicit additive updates, so a shipped unified schema and model must admit their exact root fields before section validation. Neither `catalog` nor another message-linker alias is reserved or accepted.
 
 In Phase 3A, `fmt` and `lint` are optional product sections. Omitted product sections resolve as empty product configs. When present, `fmt` and `lint` must be objects, and only empty objects are valid in Phase 3A. Therefore `{}`, `{ "fmt": {} }`, `{ "lint": {} }`, and `{ "fmt": {}, "lint": {} }` are valid project configs. Product-specific formatter and linter options are not accepted until Phase 3B and Phase 3C add explicit schema and config-model fields.
 
@@ -265,13 +292,13 @@ For `config_conflict`, `errors[].path` is omitted and `errors[].details.paths` l
 
 For `config_extension_unsupported`, `errors[].path` follows the shared machine-readable path rule and `errors[].details.supportedExtensions` is `[".json", ".jsonc"]`.
 
-Open product-specific config details remain in the formatter and linter design documents.
+Product-specific config details remain in their owning formatter, linter, resource, and message-linker design documents.
 
 ## Machine-Readable Output
 
 Machine-readable CLI output should use JSON and should be stable enough for CI, editor adapters, and agent coding workflows to consume.
 
-The config schema and output schemas are separate surfaces. `lint`, `fmt --check`, and future combined `check` output may use command-specific JSON result schemas while sharing common conventions where practical.
+The config schema and output schemas are separate surfaces. `lint`, `fmt --check`, future combined `check`, `messages.emit`, and `messages.prune` output may use command-specific JSON result schemas while sharing this envelope.
 
 Phase 3A publishes only the config JSON Schema. The output envelope remains documented and fixture-tested, but no public output JSON Schema is published while `schemaVersion` is `"0"`. Publishing output schemas should be reconsidered in Phase 3B or Phase 3C after command-specific result shapes become clearer.
 
@@ -280,14 +307,19 @@ JSON reporter output should be serialized from typed Rust structs with `serde_js
 The initial shared top-level JSON envelope uses `schemaVersion: "0"` while the output contract remains pre-stable. It contains:
 
 - `schemaVersion`: output contract version
-- `command`: command that produced the result, such as `fmt`, `lint`, `check`, or `init`
+- `command`: resolved command that produced the result, such as `fmt`, `lint`, `check`, `init`, `messages.emit`, or `messages.prune`
 - `version`: CLI/package version
 - `projectRoot`: discovered project root, or `null` only when a pre-project operational error prevents an exact Unicode root identity
 - `summary`: command-level aggregate status and optional command-specific counts
-- `results`: command-specific file, message, diagnostic, or formatting results; a command-specific result may define a target-local `errors` array
+- optional command-specific `analysis`: one owning design's typed project-level successful-analysis result, inserted after `summary` and before `results`
+- `results`: command-specific file, message, diagnostic, formatting, generation, or mutation results; a command-specific result may define a target-local `errors` array
 - `errors`: global operational errors that are not owned by one command target, separated from parser, formatter, and linter diagnostics
 
 Command-specific result schemas should preserve deterministic ordering and stable command/version metadata through this envelope. They may add `results[].errors` for failures tied to one selected file, message, or other target. Such target-local errors use the same operational error shape and code namespace as top-level errors; they are not diagnostics.
+
+`analysis` is not a generic free-form extension point. A command omits it unless its owning design defines one exact typed shape, completion/admission rule, member order, limits, and relationship to summary counts. Its presence means that checked analysis result exists; omission is distinct from an empty successful analysis and no command emits `analysis: null`.
+
+The initial command-specific use is `messages.emit`, whose 014 contract places the one shared canonical `LinkOutcome::findings()` vector and optional shared message-validation failure there. The command emits that vector once at command level rather than repeating it for each selected target; it performs no additional semantic deduplication and preserves the linker's exact finding identity, cardinality, evidence, and order. Formatter, linter, init, and prune do not acquire an empty field merely because the shared envelope permits this position. Top-level operational errors remain in `errors`, target-local errors remain in `results[].errors`, and `analysis` never becomes a third operational-error array.
 
 The shared `summary.status` values are:
 
@@ -333,7 +365,7 @@ For example, a known `fmt` command whose discovered root is not representable us
 }
 ```
 
-The envelope `command` field is the resolved command name when a subcommand is known: `fmt`, `lint`, `check`, or `init`. If no subcommand is resolved, if an invalid top-level argument prevents command resolution, or if a wrapper-level native resolution error occurs before the Rust CLI starts, `command` is `"intlify"`. Unknown command tokens are reported in `errors[].details` while keeping `command: "intlify"`. The envelope does not use `null` or `"unknown"` for the command field.
+The envelope `command` field is the resolved command identity: `fmt`, `lint`, `check`, `init`, `messages.emit`, or `messages.prune`. The nested namespace alone is not a machine command identity. If no complete command is resolved, if an invalid top-level or namespace argument prevents leaf resolution, or if a wrapper-level native resolution error occurs before the Rust CLI starts, `command` is `"intlify"`. Unknown command tokens are reported in `errors[].details` while keeping `command: "intlify"`. The envelope does not use `null`, `"unknown"`, bare `"messages"`, or the space-separated spelling for the command field.
 
 Reserved command placeholder JSON output uses the same envelope. For example, `intlify fmt --reporter json` returns:
 
@@ -363,11 +395,13 @@ Reserved command placeholder JSON output uses the same envelope. For example, `i
 
 For `lint`, `details.requiredPhase` is `"3C"`. For `check`, `details.requiredPhase` is `"3B+3C"` and `details.requires` is `["fmt", "lint"]`. For `init`, `details.requiredPhase` is `"3B+3C"` and `details.requires` is `["fmt", "lint"]` because config scaffolding should wait until formatter and linter config fields are stable enough to write.
 
+When the 014 namespace is included but a leaf implementation is not ready, the resolved envelope command is still `messages.emit` or `messages.prune`. Its `command_not_ready.details.requiredPhase` is exactly `"014-M3"` or `"014-M5"` respectively. A build that does not include the 014 namespace at all treats `messages` as an unknown top-level command instead of advertising a placeholder accidentally.
+
 Global operational errors are represented in the top-level `errors` array. Examples include invalid CLI arguments, configuration failures, input-selection failures, reporter setup failures, and pathless internal failures that occur before or outside processing one target.
 
 Command-specific result schemas may represent target-local operational errors in `results[].errors`. Examples include reading, decoding, formatting, linting, or writing one selected file when other targets can still be processed. The result entry identifies the affected target and normally uses `status: "error"`. A target-local error must not be duplicated in the top-level array.
 
-Phase 3A reserved-command placeholders have no selected targets and therefore use only top-level `errors`. Phase 3B/3C formatter and linter result schemas extend the same envelope with target-local errors; this is an allowed command-specific extension, not a different envelope contract.
+Reserved-command placeholders have no selected targets and therefore use only top-level `errors`. Formatter, linter, and 014 command result schemas may extend the same envelope with target-local errors; this is an allowed command-specific extension, not a different envelope contract.
 
 CLI operational error codes are stable string identifiers scoped to the CLI JSON output contract. They are intentionally separate from the numeric `OxMf2ErrorCode` API namespace defined in [appendix-ox-mf2-error-code.md](./appendix-ox-mf2-error-code.md). CLI operational failures may wrap lower-level API errors later, but both top-level `errors[].code` and target-local `results[].errors[].code` remain in the same string namespace.
 
@@ -625,7 +659,7 @@ Phase 3A validation should focus on foundation behavior:
 - JSON/JSONC root config conflict handling through crate-level unit/integration tests
 - JSONC comment and trailing-comma parsing through crate-level unit/integration tests
 - JSON5-only syntax rejection in JSONC config through crate-level unit/integration tests
-- JSON and JSONC duplicate-member rejection at the repeated key token for root, product-section, rule-map, resource, and nested definition objects; fixtures include escape-equivalent names, case-distinct names, the same name in separate objects, and a duplicate before a later unrelated syntax or validation error
+- JSON and JSONC duplicate-member rejection at the repeated key token for root, product-section, rule-map, resource, message-linker, and nested definition objects; fixtures include escape-equivalent names, case-distinct names, the same name in separate objects, and a duplicate before a later unrelated syntax or validation error
 - default config behavior when no root config exists through crate-level unit/integration tests
 - explicit `--config` missing-file errors through crate-level unit/integration tests
 - explicit non-Unicode `--config` rejection before filesystem metadata, extension, or config-content errors, without lossy path output
@@ -635,9 +669,11 @@ Phase 3A validation should focus on foundation behavior:
 - config validation fixtures through crate-level unit/integration tests
 - CLI help/version behavior
 - reserved command placeholder behavior
+- additive `messages` namespace routing, all three global-option positions, namespace/leaf help, exact `messages.emit` and `messages.prune` envelope identities, unknown-leaf joining, rejection of `catalog` as an alias, and pre-project rejection of positional operands for both initial leaves
 - release-time installed-package smoke tests for CLI wrapper/native resolution
 - native package resolution error handling
 - output envelope fixtures
+- command-specific analysis fixtures require placement after `summary` and before `results`, omission rather than `null` when no checked owner result exists, one exact owner-defined typed shape, and no movement or duplication of operational errors; non-owning commands omit the field
 - slash-normalized string `projectRoot` and result paths, plus the non-Unicode-root `projectRoot: null` error envelope
 - stdout/stderr behavior
 - deterministic JSON ordering
@@ -657,9 +693,10 @@ The following items are intentionally not delivered in Phase 3A, but should rema
 - User-visible `intlify check` is not part of the v0.1 product. After both Phase 3B formatter and Phase 3C linter products exist, a dedicated addendum may define its behavior.
 - Formatter-specific option names, defaults, layout rules, ignore behavior, and formatter result schemas belong to [007-ox-mf2-phase-3b-formatter-design.md](./007-ox-mf2-phase-3b-formatter-design.md).
 - Linter-specific rule semantics, presets, include/exclude behavior, ignore behavior, severity policy details, and diagnostic result schemas belong to [008-ox-mf2-phase-3c-linter-design.md](./008-ox-mf2-phase-3c-linter-design.md).
-- Command-specific JSON result schemas for `fmt --check` and `lint` are deferred to their product phases. A future combined `check` schema belongs to its dedicated addendum. Phase 3A owns only the shared envelope and operational error shape.
+- Command-specific JSON result schemas for `fmt --check` and `lint` are deferred to their product phases. A future combined `check` schema belongs to its dedicated addendum. `messages.emit` and `messages.prune` result DTOs belong to 014 M3 and M5 respectively. Phase 3A owns only the shared envelope and operational error shape.
 - Formatter and linter N-API/WASM packages are deferred to their product phases. Phase 3A only records package boundaries and keeps parser binding packages focused on parser-level APIs.
 - Resource/catalog parsing, host-file escaping, outer document edits, and resource-level linting or formatting remain layered workflows outside the Phase 3A CLI foundation.
+- Message artifact production, linking, export preparation, exporters, and prune semantics remain the 014 product workflow; this foundation only composes its config fragment and routes its commands and results.
 - LSP/editor adapters, agent integrations, and MessagePack or daemon transport remain later consumers of this foundation.
 - Nested config discovery, nearest-config-wins behavior, file-specific config overrides, `--cwd`, and `--root` remain out of scope until a concrete multi-workspace or adapter requirement appears.
 - Additional native targets such as `aarch64-pc-windows-msvc` and `aarch64-unknown-linux-musl` are future candidates, not initial Phase 3A requirements.
