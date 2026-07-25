@@ -65,7 +65,7 @@ The [014 message-linker design](./014-ox-mf2-message-linker-design.md) defines a
 - M3 adds workspace-internal `crates/intlify_export`, which owns the common parser-backed export-preparation and exporter boundary plus the initial ESM exporter. Export preparation validates the identity-deduplicated union of plan-selected delivery definitions and M1 baseline definitions required for typed signatures, then derives the validated language-neutral signature information. The ESM exporter combines that M3 information with admitted M1 key models and renders scope-bound JS/TS accessor modules in the same transaction as its resource assets. `crates/intlify_cli` owns the `intlify messages emit` orchestration, exporter factory/registry wiring, output registration, and `--check`.
 - M4 adds live bundler-graph integration over the M3 exporter transaction.
 - M5 adds `intlify messages prune` through a separate 013 structural-deletion contract; it does not broaden formatter value write-back.
-- L0 and L1 are later lint-presentation adapters. They wait for the Phase 3C result/rule contracts and the catalog-level lint addendum, but do not gate M0 through M5.
+- L0 and L1 are later lint-presentation adapters. They wait for the Phase 3C result/rule contracts and the project-level finding addendum shared with future catalog-native rules, but do not gate M0 through M5.
 - E0 is the first JS/TS catalog-key completion milestone owned by 009. It depends on the M1 typed-key model and producer reverse projection, but not on L0/L1, M2, or an exporter milestone.
 - N0 and N1 are a parallel native-producer track after M0 for Rust and then C/C++/WASM reference production.
 
