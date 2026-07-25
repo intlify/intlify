@@ -2654,7 +2654,9 @@ Artifact inputs use the private owned values and read-only slices fixed above, w
 
 Beginning with M1, it also privately retains the exact baseline definition snapshot related to every key in each admitted typed-key model. That relation is checked during model construction, is unreachable through the public model, and exists only so M3 preparation can validate and derive typed-output signatures from the same definition that established the model key.
 
-Its fields are private. Only `link` constructs it after complete semantic, result-limit, blocking, and plan invariants pass; there is no public constructor, struct literal, setter, mutable slice, deserializer, or post-construction revalidation route.
+Its fields are private. On the default product surface, only `link` constructs it after complete semantic, result-limit, blocking, and plan invariants pass; there is no public product constructor, struct literal, setter, mutable slice, deserializer, or post-construction revalidation route.
+
+The sole non-product exception is the workspace-only, feature-gated artifact-size benchmark support defined below. It may construct the paired full-retention outcome only through `intlify_linker`'s private checked plan machinery after the same request admission and result-limit validation. That support is absent from default and release builds, is documentation-hidden and non-stable, and cannot supply an arbitrary caller-authored plan.
 
 `findings()` returns the complete canonical read-only slice. `bundle_plans()` preserves the semantic distinction between `None`, `Some(empty)`, and `Some(non-empty)`. `generation_blocked()` is exactly `bundle_plans().is_none()` and is never stored independently.
 
@@ -7150,7 +7152,13 @@ Initial M0 benchmark phases:
 - `message_definition_project`: pre-extraction physical-group admission and post-extraction checked `ExtractedCatalog`-to-`MessageDefinitionArtifact` projection, excluding host parsing and resource extraction
 - `message_link_core`: request validation and scope mapping, semantic index construction, selector expansion and reference resolution, reachability and placement, and finding/plan materialization, with each cost reported separately
 - `message_link_peak_memory`: allocator-level peak live memory across increasing reference-dense, definition-dense, selector-expansion, and finding-dense requests
-- `message_project_link_e2e`: project inventory, physical grouping, catalog extraction, definition projection, JS/TS reference production, completeness construction, request construction, linking, and deterministic ordered aggregation through the M0 in-process integration path
+- `message_project_link_e2e`: project inventory, physical grouping, catalog extraction, definition projection, JS/TS reference production, completeness construction, request construction, linking, and deterministic ordered aggregation through the M0 in-process integration path; its one aggregate record uses exact cost `complete_workflow`
+
+Every `message_project_link_e2e` case that plans Tier 1 catalog extraction emits exactly one independent companion record using the exact 013-owned `resource_extract` phase and `host_parse_and_entry_extraction` cost. Both records use the [shared benchmark record envelope](./001-ox-mf2-toolchain-foundation.md#shared-benchmark-record-envelope) and the same complete `BenchmarkCaseIdentity`; the companion relation names the one aggregate `message_project_link_e2e` / `complete_workflow` record as its parent.
+
+013 exclusively owns the companion's physical-group order, interval boundary, counters, successful aggregation, failure shape, and semantic-checksum inputs. The initial record therefore covers the aggregate of the case's sequential JSON physical-source-group extraction calls, while the parent end-to-end record retains the complete workflow wall time. A qualifying successful E2E record with no companion, more than one companion, a mismatched case identity or parent relation, or a failed companion is an invalid benchmark result and fails the 014 schema/integrity gate.
+
+The harness does not nest the metric, rename its phase to `message_resource_extract`, fold it into `message_definition_project`, or introduce a duplicate 014-owned extraction vocabulary. A later mixed-format or concurrent case must first extend the 013 measurement contract.
 
 Milestone-activated benchmark phases:
 
@@ -7158,6 +7166,7 @@ Milestone-activated benchmark phases:
 - `message_link_fallback` at M2: fallback-chain validation and locale-aware resolution, with chain construction, resolution, and locale finding materialization reported separately
 - `message_export_prepare` at M3: selected-message MF2 parsing, semantic validation, portable diagnostic mapping, argument-signature derivation, and `ValidatedExportBatch` construction
 - `message_export_esm` at M3: built-in ESM locale assets, loader map, typed-key accessor modules, canonical artifact metadata, and complete `ExportArtifactSet` construction over an already validated batch
+- `message_export_artifact_size` at M3: exact payload-byte comparison between the benchmark-only full-retention baseline and ordinary linked output, including complete-set, initial/eager-load, per-locale, per-delivery-unit, and per-artifact-kind totals
 - `message_output_register` at M3: capability preflight, portable-path mapping, ownership inspection, staging, commit, and `--check` comparison, using isolated output roots and reporting filesystem costs separately
 - `messages_emit_e2e`, `messages_emit_check_e2e`, and `messages_emit_json` at M3: complete command execution, freshness comparison, and JSON reporter cost
 - `message_delivery_graph_link` at M4: reachability and duplicate placement over representative live chunk DAG shapes
@@ -7167,9 +7176,99 @@ Generated benchmark profiles cover at least three increasing scales for exact-re
 
 Each result declares the complete phase and cost vocabulary, fixture, variant, scale, runtime, operation, applicable input and output counts, and execution status. Duration records include iterations, elapsed time, and a checksum over the observed semantic result. Peak-memory records include peak live bytes, retained live bytes, and allocation count under one documented allocator measurement setup. Fresh-process CLI peak RSS may be added as a separate metric when the benchmark harness can measure it consistently; it is never substituted silently for allocator-level peak live memory.
 
+### Export artifact-size comparison
+
+`message_export_artifact_size` compares exactly two variants under one typed `BenchmarkComparisonIdentity`. The identity contains:
+
+- the benchmark-result schema revision, fixture revision, benchmark-profile revision, and active message-linker milestone/contract revision;
+- the complete canonical reference-artifact and definition-artifact snapshot identities;
+- the complete resolved `LinkPolicy`, `ScopeMappingTable`, `ScopeCompletenessTable`, and `DeliveryUnitGraph` semantic identities;
+- the selected exporter ID, exporter benchmark revision, exact checked target options, and accepted artifact kind/version contracts.
+
+The artifact snapshot members retain every artifact fingerprint in canonical artifact-identity order rather than only a set-sized aggregate. The link-request semantic member uses the same canonical values that participate in ordinary link/incremental cache identity, so changing roots, dynamic-reference policy, production locales, coverage baseline, fallback policy, mapping, completeness, or delivery topology changes the comparison identity even when the fixture label is unchanged.
+
+Schema, fixture, profile, milestone/contract, and exporter benchmark revisions are typed `u32` values with initial value `1`; they are not package versions, git commits, timestamps, or arbitrary strings. The exporter owner increments its benchmark revision whenever canonical generation or benchmark artifact classification changes without an artifact kind/version change. The fixture owner increments the fixture revision when fixture-owned source or configuration meaning changes, and the profile owner increments the profile revision when entry roots, grouping, scale construction, or another measurement rule changes.
+
+The structured identity remains in the result for inspection. Its comparison digest is BLAKE3-256 over a domain-separated, length-prefixed canonical encoding of those typed members and the already canonical nested values; generic JSON object order, hash-map order, absolute paths, process identity, and worker order never enter the digest. Two records are comparable only when both the complete structured identity and digest are equal. A digest mismatch, structured mismatch, or digest/structure disagreement makes the pair invalid rather than comparable.
+
+Both variants start from the same definitions that have passed inventory admission, duplicate/ambiguity checks, and MF2 syntax and semantic validation:
+
+- `all_definitions_baseline` is a benchmark-only full-retention plan. It places every eligible definition under its own production locale in every real delivery unit without reference-reachability removal. M3 has exactly the built-in `["main"]` unit`; after M4 delivery-graph profiles activate, the baseline repeats the eligible set in every real unit and never emits a virtual super-root.
+- `linked_output` is the exact ordinary result of the same fixture passing through `link(LinkRequest) -> LinkOutcome`, `prepare_export`, the selected exporter, and checked `ExportArtifactSet` construction. The benchmark does not add roots, retain otherwise unreachable definitions, rewrite fallback selection, or post-process the artifact set.
+
+`tools/messages-bench` explicitly enables one workspace-only internal benchmark feature. Under that feature, `intlify_linker` exposes one documentation-hidden checked operation that accepts the ordinary `LinkRequest` and returns an opaque pair containing the exact ordinary `link` outcome and its corresponding full-retention benchmark outcome. It runs ordinary request validation and linking for the first member, requires generation to be unblocked, and constructs the second member from that same admitted request, resolved policy, mapping, completeness, delivery graph, definition snapshots, and M1 model/baseline relation.
+
+The baseline member reuses the private `MessageBundlePlan`, `ResolvedMessage`, canonical-order, deduplication, snapshot-consistency, and plan-result-limit machinery. It does not accept a raw plan, skip a counter, weaken completeness, or construct a prefix after failure. The pair operation fails the benchmark case if either member cannot be produced under the same effective limits and returns neither a comparable pair nor a partial baseline.
+
+Both opaque outcomes then pass independently through the ordinary `prepare_export`, built-in exporter generation, checked `ExportArtifactSet`, and canonical encoding paths. The feature is not enabled by `intlify_cli`, platform integrations, default crate features, or release builds. No normal product caller can construct the baseline outcome, and the harness never serializes it as a product plan, registers it, or publishes it.
+
+An artifact's measured payload bytes are exactly `ExportArtifactPayload::len()` after checked exporter construction. Logical paths, kinds, versions, metadata, relationships, manifests, filesystem allocation, compression, and registration overhead are not payload bytes; a separately named future metric must measure any of those costs.
+
+Each artifact is counted once in the complete-set total and once in each applicable grouping axis. Per-kind totals use the exact `ExportArtifactKind`. Per-locale and per-delivery-unit assignment comes only from the selected exporter contract and its validated batch-to-artifact association, never from filename parsing, path conventions, content sniffing, or common metadata inference.
+
+The internal benchmark feature adds the following observation-only semantic values:
+
+- `BenchmarkLocaleBucket::Locale(Locale)` and `BenchmarkLocaleBucket::Shared`;
+- `BenchmarkDeliveryUnitBucket::Unit(DeliveryUnitId)` and `BenchmarkDeliveryUnitBucket::Shared`;
+- one `BenchmarkArtifactAssociation` containing an artifact's exact logical path and one value from each bucket family;
+- one `BenchmarkExportObservation` containing the checked `ExportArtifactSet` plus the canonical path-ordered association vector.
+
+The built-in exporter creates each association from the same validated batch record and semantic generation branch that creates its artifact. The benchmark wrapper retains that association while invoking the exact internal renderer and checked `ExportArtifactSet` constructor used by ordinary `PlatformExporter::export`; it does not run a second renderer or reconstruct provenance afterward.
+
+After the checked set establishes canonical artifact order, observation construction requires exactly one equal-path association for every artifact and rejects a missing, extra, or duplicate association as a benchmark-contract failure. A concrete locale or unit must exist in the validated batch; `Shared` is admitted only by an exporter/profile rule for an artifact that has no single value on that axis. Association values do not enter `ExportArtifactMetadata`, artifact equality, fingerprints, cache keys, structured product output, registration, or `--check`.
+
+Artifacts such as a loader map or scope accessor that have no single locale are counted in the `Shared` locale bucket. An artifact shared across delivery units is likewise counted in the `Shared` unit bucket. The M3 built-in ESM profile assigns all artifacts to unit `["main"]`, assigns each locale module to its exact requested locale, and assigns the loader map and typed accessors to the `Shared` locale bucket.
+
+The initial benchmark association provider is implemented only for the built-in ESM exporter. A later exporter participates in this benchmark only after its owner defines and validates an equivalent typed provider and increments the benchmark-profile revision when that addition changes the profile; the common `PlatformExporter` trait and product artifact metadata do not gain a benchmark method or field.
+
+The initial/eager-load total is the union of each benchmark-profile entry artifact and every artifact transitively reachable from it through `EagerLoad`, with each artifact payload counted once. `LazyLoad` targets are excluded unless another eager path reaches them. Entry paths are exact, versioned benchmark-profile data and must resolve in the checked set; for the M3 built-in resource-delivery profile the sole entry is the loader map. Adding typed-accessor or future exporter entry roots requires a benchmark-profile revision rather than inference from an extension, artifact kind, or relationship order.
+
+#### Artifact-size result and checksum contract
+
+For one comparison case, `message_export_esm` emits separate records with exact variants `all_definitions_baseline` and `linked_output`. `message_export_artifact_size` emits one comparison record with exact variant `all_definitions_baseline_vs_linked_output`; it contains both tagged artifact observations and all derived bucket comparisons. A reporter never presents two independent size records and asks a downstream consumer to join them heuristically.
+
+Every complete-set, initial/eager-load, per-locale, per-delivery-unit, and per-kind comparison is one typed `ArtifactSizeBucketRecord`. It contains the bucket axis and identity, `baselineBytes: u64`, `linkedBytes: u64`, one exact difference, and one exact ratio state.
+
+The difference is:
+
+```text
+ByteDifference {
+  direction: baseline-larger | equal | linked-larger,
+  bytes: u64,
+}
+```
+
+`bytes` is the exact absolute difference. `equal` requires zero; either larger direction requires a positive value. A linked result larger than its baseline is retained as `linked-larger` and is never clamped, converted to failure, or encoded as an unsigned underflow.
+
+The ratio is:
+
+```text
+ByteRatio =
+  defined { numerator: linkedBytes, denominator: baselineBytes }
+  | undefined-zero-baseline
+```
+
+`defined` requires a nonzero denominator and preserves the unreduced exact integers; the semantic result never converts them to floating point, rounds them, or stores a percentage. `undefined-zero-baseline` is required whenever the baseline is zero, including the equal zero/zero case. Human reporters may derive a decimal or percentage for display but cannot feed it back into result identity, checksum, comparison, or CI integrity.
+
+The two fixed aggregate axes appear first in `complete-set` then `initial-eager-load` order. Locale records use the union of concrete locale buckets present in either variant in canonical `Locale` byte order followed by `Shared`; delivery-unit records use the corresponding canonical `DeliveryUnitId` order followed by `Shared`; kind records use the union in exact `ExportArtifactKind` byte order. A missing bucket in one variant contributes zero bytes rather than deleting the record. Within each variant, the locale, unit, and kind axes must each independently sum to the complete-set total, while the initial/eager-load total is the separately defined reachable subset and need not equal it.
+
+Each successful `message_export_esm` variant carries one `artifactChecksum`. The comparison record carries `baselineArtifactChecksum` and `linkedArtifactChecksum`, which must equal the checksums on the corresponding exact exporter variant records. Each checksum is BLAKE3-256 over a domain-separated, length-prefixed canonical encoding of that complete checked `ExportArtifactSet` in artifact order. Each artifact contributes its logical-path segments, kind, format-version integers, exact payload bytes, optional media type, and canonical relationship vector including relationship kind and complete target path. Timing, allocator state, association buckets, registration data, absolute paths, and capacity are excluded.
+
+The artifact-size comparison additionally carries `measurementChecksum`, computed as BLAKE3-256 over its separate domain tag, complete `BenchmarkComparisonIdentity`, exact comparison variant, both tagged artifact checksums, both canonical association vectors, exact benchmark-profile entry roots, and every canonical `ArtifactSizeBucketRecord` including raw totals, difference, and ratio state. Thus exporter byte integrity and measurement/grouping integrity remain independently diagnosable.
+
+Both checksums use their exact 32-byte values internally and canonical lowercase 64-digit hexadecimal in structured benchmark output. A malformed length or spelling, an artifact checksum that differs from the corresponding exporter result, a bucket reconciliation failure, or either checksum mismatch makes the result invalid and fails the semantic-integrity gate. Elapsed time, RSS, and allocator metrics remain outside both checksums.
+
 JS/TS parsing and recognition, resource extraction, definition projection, artifact encoding and decoding, linker indexing and resolution, export preparation, exporter rendering, output registration, CLI reporting, and file I/O costs must remain separately observable. End-to-end measurements supplement those phase records and never replace them.
 
-Benchmark commands, the complete phase/cost vocabulary, declared fixture coverage, result-schema validation, and semantic checksums are implementation gates. Elapsed-time and memory values are observations and are not CI pass/fail thresholds while the implementation and representative workloads are still evolving. A numeric regression threshold may be introduced only by a later explicit benchmark-policy update after a representative workload, stable measurement environment, accepted baseline, noise treatment, threshold, owning milestone, and failure behavior have all been fixed.
+The CI gate consists only of benchmark-target build success, smoke execution of every milestone-required fixture/variant, result-schema validation, and semantic-result integrity. Schema validation requires the complete phase/cost vocabulary, declared fixture, variant and scale identities, applicable counts and metrics, and the expected semantic checksum inputs. A missing case, malformed record, unknown vocabulary value, execution failure, or semantic-checksum mismatch fails CI.
+
+The separately invoked Phase 3A startup benchmark is not a milestone-required fixture or variant for this gate and remains outside normal CI. A fresh-process record always reports its unadjusted samples and timing summary.
+
+When startup adjustment is explicitly requested, `tools/messages-bench` follows the exact [Phase 3A paired startup contract](./006-ox-mf2-phase-3a-tooling-foundation-design.md#paired-startup-adjustment-for-product-e2e-benchmarks). A native, source-wrapper, or installed-package messages route selects only its corresponding startup phase. Equal zero-based sample ordinals run in alternating startup/product order under one equal `StartupCompatibilityIdentity`, and the optional observation retains each signed nanosecond difference plus the required nearest-rank summary without clamping.
+
+A missing or failed sample, unequal count, different session, incompatible route, build, OS, architecture, libc, Node.js, or npm value, or any other compatibility mismatch omits the complete adjusted observation. It never changes the raw E2E record, reuses a startup result from another run, pairs by temporal proximity, or fails the 014 CI gate.
+
+Elapsed time, allocator memory, RSS, artifact payload bytes, and derived byte differences or ratios are recorded and compared as observations only. CI does not apply a numeric pass/fail threshold to any of them while the implementation, workloads, and measurement environment are still evolving. A numeric regression threshold may be introduced only by a later explicit benchmark-policy update after a representative workload, stable measurement environment, accepted baseline, noise treatment, threshold, owning milestone, and failure behavior have all been fixed.
 
 ## Validation
 
@@ -8120,7 +8219,13 @@ Benchmark commands, the complete phase/cost vocabulary, declared fixture coverag
 - Dynamic-policy fixtures require omitted and explicit `compat` configuration to resolve to the same immutable policy, fingerprint, cache identity, findings, and plans. They consume the same `UnboundedDynamic` artifact in strict and compat modes: strict returns one blocking finding and no valid plan; compat returns the non-blocking finding, retains the exact scope-domain pair, suppresses `unused-message` only there, and does not duplicate `degraded-analysis`. They reject `null`, non-string values, case or whitespace variants, and every unknown token without coercion or fallback to the default.
 - Native format-survival fixtures: strip/LTO/COMDAT matrices proving tagged IDs survive (or over-retain, never under-report).
 - Prune safety under the separate 013 structural-mutation invariants; byte-determinism with `--check`.
-- Benchmarks measure the problems: initial-bundle bytes, per-locale and per-unit asset bytes before/after, scan and link wall time — `tools/messages-bench`.
+- Benchmark fixtures exercise every milestone-required phase and the exact `all_definitions_baseline` / `linked_output` artifact-size variants through `tools/messages-bench`; build, smoke execution, schema validity, and semantic checksums are gated, while elapsed-time, memory, and size values remain observational.
+  - Default-feature and release-build API fixtures prove that no benchmark outcome constructor, raw-plan constructor, or benchmark association provider is reachable. Internal-feature fixtures require the paired operation's linked member to equal an independent ordinary `link` result, require both members to use the same admitted request and effective limits, and reject blocked generation, baseline limit excess, arbitrary caller-authored plans, partial pairs, registration, and publication.
+  - Artifact-association fixtures require one canonical equal-path association per checked ESM artifact, reject missing, extra, duplicate, nonexistent-locale, nonexistent-unit, and disallowed-`Shared` values, and prove that changing observation data cannot change artifact metadata, equality, fingerprints, cache identity, product JSON, registration, or `--check`.
+  - Comparison-identity fixtures change each reference snapshot, definition snapshot, policy family, mapping, completeness side/reason, delivery edge, milestone/contract revision, exporter ID/revision/options, kind/version contract, fixture revision, and profile revision independently and require an identity change. They require equivalent input permutations to retain one identity, validate the BLAKE3-256 digest against the structured value, and reject digest-only equality or a digest/structure disagreement.
+  - Artifact-size result fixtures require the two exact exporter variants and one exact comparison variant; cover every difference direction, equal and unequal zero, undefined zero-baseline ratio, exact unreduced ratio integers, union bucket insertion with a zero on the absent side, canonical axis/bucket order, and independent locale/unit/kind reconciliation. They require both tagged exporter checksums to equal their corresponding `message_export_esm` records, validate `measurementChecksum`, and reject heuristic joins, floating-point semantic ratios, clamping, unsigned underflow, malformed hexadecimal, timing in either checksum, and every artifact, association, entry-root, or bucket mutation without the required checksum change.
+  - Cross-product envelope fixtures require one exact 013-owned `resource_extract` companion for every qualifying E2E case; reject a case, parent, phase, cost, status, count, or checksum mismatch, a missing/duplicate/nested companion, and successful E2E status after extraction failure; and preserve 013 ownership of aggregation semantics.
+  - Fresh-process fixtures always retain raw samples and map native, source-wrapper, and installed-package routes to their exact 006 phases. Explicit paired mode alternates order, preserves signed observations, and omits the whole adjustment on every compatibility or sample-set mismatch without changing raw results, case completeness, or CI threshold behavior.
 
 ### Field-level limit evidence
 

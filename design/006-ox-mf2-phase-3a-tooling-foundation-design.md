@@ -100,6 +100,8 @@ intlify messages prune
 
 M1 typed-key model construction adds no third command leaf such as `messages types` or `messages generate`. It is a checked Rust/in-process capability until the M3 ESM exporter renders its model through `messages emit`; the existing `emit --check` transaction owns filesystem freshness rather than a second type-generation command.
 
+This milestone summary does not define the typed-output ABI. The M1 model implementation and the M3 typed-accessor path remain gated by the coordinated M1/M3 implementation addendum owned by 014, which must fix the model/export ABI, artifact path and kind, versioning, runtime bytes, and output-accounting rules. The already fixed M3 locale-module and loader-map contracts do not supply those missing decisions.
+
 `intlify messages`, `intlify messages --help`, and `intlify messages -h` print namespace help and exit with `0`. The namespace help lists only leaves included in that release and may label a reserved-but-not-ready included leaf as unavailable. `intlify messages emit --help` and `intlify messages prune --help` follow the ordinary product-help contract without loading configuration or running discovery. An unknown leaf has no resolved command identity: it uses `unknown_command`, reports the joined spelling such as `messages.foo` in `details.command`, and retains `command: "intlify"` in JSON.
 
 The initial `messages.emit` and `messages.prune` leaves accept no positional file, directory, or glob operands. After help/version and complete argument-shape validation, they derive their inventory from the discovered project root and the validated `resources` and `messages` sections under the 014 project-inventory contract. An unexpected positional value is `invalid_cli_argument` before project-root discovery, configuration loading, or filesystem enumeration; it is not reinterpreted as a target, catalog, source root, or implicit directory. `--target` is an `emit` output-selection option and never a file operand or source-inventory filter. Command-specific options, project-inventory execution, and result DTOs remain owned by 014 and its milestone addenda; shared global-option parsing, help/version precedence, reporters, and exit-code selection remain owned here.
@@ -613,7 +615,7 @@ Parser binding packages remain focused on parsing, snapshots, and parser-level A
 
 Phase 3A should provide a standalone benchmark entry point for measuring CLI startup overhead. This benchmark is a foundation baseline for the broader Phase 3 benchmark plan in [005-ox-mf2-phase-3-tooling-transport-design.md](./005-ox-mf2-phase-3-tooling-transport-design.md), not a formatter, linter, parser, or transport benchmark.
 
-The purpose is to quantify the cost added by the npm wrapper before later `fmt`, `lint`, `check`, editor, or agent benchmarks start measuring product work. The benchmark must separate:
+The purpose is to quantify the cost added by the npm wrapper before any later CLI product end-to-end benchmark starts measuring product work. This includes `fmt`, `lint`, a future `check`, `messages emit`, and later editor- or agent-driven CLI workflows. The benchmark must separate:
 
 - direct native binary startup
 - npm wrapper startup from the source tree
@@ -648,7 +650,31 @@ Benchmark reporting should include:
 - derived wrapper overhead compared with direct native startup
 - derived installed-package overhead compared with direct native startup
 
-Timing results are environment-sensitive, so Phase 3A should not define pass/fail thresholds. Failures to execute the benchmark command itself are implementation errors for the benchmark entry point, but slow timings are observations rather than blocking failures. Benchmark results should be used to compare startup overhead over time and to subtract wrapper/native launch cost from later formatter, linter, and transport end-to-end measurements.
+### Paired startup adjustment for product E2E benchmarks
+
+A later fresh-process product benchmark may request an optional paired startup adjustment. Runtime route selects exactly one baseline:
+
+| Fresh-process product route   | Required startup phase  |
+| ----------------------------- | ----------------------- |
+| Direct native executable      | `cli_startup_native`    |
+| Source-tree npm wrapper       | `cli_startup_wrapper`   |
+| Installed package entry point | `cli_startup_installed` |
+
+The product command and startup command must run in the same explicit benchmark invocation under one equal `StartupCompatibilityIdentity`. That identity contains a run-local measurement-session ID, package version, git commit, invocation route, OS, architecture, libc where applicable, and a BLAKE3-256 build fingerprint over the exact executed native binary plus wrapper/package entry bytes applicable to that route. Wrapper and installed routes additionally contain exact Node.js and npm versions. Absolute paths, timestamps, process IDs, and sample order are reported only as operational context and do not substitute for any compatibility member.
+
+Warmup executions complete before paired measurement and never enter a pair. The measured product and startup sets have the same positive sample count and pair by zero-based sample ordinal. Even ordinals run startup then product; odd ordinals run product then startup. Each command is measured independently in integer nanoseconds through the same monotonic clock boundary.
+
+For every pair:
+
+```text
+adjusted = product elapsed - startup elapsed
+```
+
+The result stores this exact signed meaning as `direction: product-larger | equal | startup-larger` plus a non-negative `nanoseconds: u64`; it never clamps a negative observation to zero or encodes unsigned underflow. Paired-delta summary ordering uses the mathematical signed value. It reports count, minimum, nearest-rank p50, nearest-rank p95, and maximum; nearest-rank percentile `p` selects sorted zero-based index `ceil(p * count) - 1`.
+
+Every fresh-process product record always retains its ordinary unadjusted samples and timing summary. The adjusted observation is present only when every product sample has one compatible successful startup sample in the same session. A missing sample, command failure, route mismatch, build/environment mismatch, or unequal sample count omits the complete adjusted observation rather than pairing by proximity, reusing a result from another run, or returning a prefix.
+
+Timing results are environment-sensitive, so Phase 3A should not define pass/fail thresholds. Failures to execute the benchmark command itself are implementation errors for the benchmark entry point, but slow or negative adjusted timings are observations rather than blocking failures. Benchmark results should be used to compare startup overhead over time and, through the exact paired contract above, to observe wrapper/native launch cost separately from later formatter, linter, resource, message-linker/export, and transport end-to-end measurements.
 
 ## Validation
 
@@ -679,6 +705,7 @@ Phase 3A validation should focus on foundation behavior:
 - deterministic JSON ordering
 - operational error shape
 - standalone CLI startup benchmark entry point
+- paired-startup fixtures map each product runtime route to its one startup phase; alternate pair order by ordinal; preserve raw samples; compute exact signed deltas plus nearest-rank summaries; and omit the whole adjusted observation for missing, failed, unequal-count, cross-session, route-mismatched, build-mismatched, or environment-mismatched samples without clamping, nearest-time pairing, cross-run reuse, or CI timing thresholds
 
 Formatter and linter semantic correctness tests belong to later product phases.
 

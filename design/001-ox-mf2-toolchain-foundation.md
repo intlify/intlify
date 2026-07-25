@@ -238,6 +238,30 @@ Target phases:
 
 `snapshot_accessor_traversal` and `binding_call` are aggregate reporting families, not required standalone result series. The snapshot traversal family maps to the canonical `traverse_nodes`, `traverse_tokens`, and `traverse_diagnostics` series defined by the Binary AST design. The binding call family maps to `parse_message_binding`, `parse_batch_binding`, `decode_snapshot_binding`, and `snapshot_to_bytes_copy_binding` from the language bindings design. Reports use the detailed names for measurements and may group them under the aggregate family labels in summaries.
 
+#### Shared benchmark record envelope
+
+Cross-product benchmark tooling uses one versioned `BenchmarkRecordEnvelope` so an end-to-end record can correlate with independently owned phase records without transferring ownership of their phase or cost vocabulary.
+
+Its `BenchmarkCaseIdentity` contains the benchmark-result schema revision, benchmark-profile revision, fixture ID and fixture revision, variant, scale, runtime, operation, and sample-set identity. Every member is a checked typed value. A sample-set identity describes one measured sample collection within the explicit harness invocation; it is neither a timestamp nor a process-random identifier.
+
+`phase` and `cost` are not members of the case identity. They remain separate required envelope fields so several phase/cost records can share one exact case while `(case identity, phase, cost)` remains unique within a result document.
+
+The envelope also carries execution status, the applicable typed metric payload, and a phase-owned semantic checksum when the status is successful. A failed record carries its bounded typed failure evidence and no successful metric payload or semantic checksum.
+
+An independent subphase record may carry `BenchmarkRecordRelation::Companion { parent_phase, parent_cost }`. Its parent must be the one existing record with the same complete case identity and the named phase/cost. A companion with a different case identity, a missing parent, more than one matching parent, or a duplicate equal `(case, phase, cost)` key makes the result document invalid.
+
+The shared envelope owns only identity, correlation, uniqueness, status, and structural schema rules. Each product design owns:
+
+- its exact phase and cost IDs;
+- which parent requires which companion;
+- its typed metric fields and units;
+- its aggregation and semantic-checksum inputs;
+- whether a missing, extra, failed, or mismatched record fails that product's benchmark gate.
+
+Envelope revisions are typed `u32` values beginning at `1`. Structured adapters preserve the declared field order and exact checked values. Generic JSON object order, absolute paths, timestamps, worker completion, and hash-map order never become case identity or correlation fallbacks.
+
+This foundation list is an overview rather than an exhaustive benchmark registry. The canonical resource-catalog phase and cost vocabulary is owned by [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md#benchmarks). The canonical reference-producer, message-linker, export-preparation, exporter, output-registration, and messages-command phase and cost vocabulary is owned by [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md#benchmarks). Those product designs extend the same phase-separation principle without requiring this foundation document to duplicate every later benchmark name.
+
 The Phase 1 parser / AST / performance design is detailed in [002-ox-mf2-phase-1-rust-parser-design.md](./002-ox-mf2-phase-1-rust-parser-design.md).
 
 ### Crate Structure
