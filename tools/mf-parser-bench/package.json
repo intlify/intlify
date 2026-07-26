@@ -26,7 +26,7 @@
     "bindings": "node js/run-binding.mjs"
   },
   "dependencies": {
-    "@formatjs/icu-messageformat-parser": "3.5.14",
+    "@formatjs/icu-messageformat-parser": "3.5.15",
     "@intlify/ox-mf2-napi": "workspace:*",
     "@intlify/ox-mf2-wasm": "workspace:*",
     "messageformat": "4.0.0"
