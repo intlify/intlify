@@ -129,7 +129,7 @@ The CLI alone owns this grouping. Physical identity remains local execution evid
 
 #### Host-owned definition production
 
-Uses two per-group stages separated by one project-global domain gate:
+Uses two per-group stages separated by one project-global domain admission stage. That stage contains two ordered gates:
 
 1. The pre-extraction stage consumes an already formed physical-source group. It validates equal namespace, host-format profile, scope, and locale binding; validates the complete portable primary-plus-alias set and its limits; and rejects the complete project input before any host parse on a configuration contradiction.
 2. After every group passes configuration admission, the CLI invokes the configured `intlify_resource` adapter exactly once for each group and retains successful extraction artifacts without constructing contract artifacts.

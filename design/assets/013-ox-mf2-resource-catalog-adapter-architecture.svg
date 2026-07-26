@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 840" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">ox-mf2 resource catalog adapter architecture</title>
-<desc id="desc">The CLI fmt workflow, the CLI lint workflow, and editor adapters all consume one shared resource adapter layer for extraction and write-back re-escaping, and separately call the applicable LSP-agnostic message-level core API per entry. Formatting reuses each paired parser artifact through format_parsed without reparsing. The resource layer contains the host format registry driven by project resources configuration and an optional editor-only overlay, host format adapters, and the message entry model. A separate read-only catalog-definition path admits physical-source groups and calls intlify_resource extraction once per group. The host aggregates domains from all successful extractions and applies one project-global domain gate before checked post-extraction projection constructs one MessageDefinitionArtifact per successful group. The resource layer does not depend on the message-level cores, intlify_contract, or intlify_linker.</desc>
+<desc id="desc">The CLI fmt workflow, the CLI lint workflow, and editor adapters all consume one shared resource adapter layer through the public extraction and build_and_validate_write_back boundaries, and separately call the applicable LSP-agnostic message-level core API per entry. Adapter-specific re-escaping remains private inside validated write-back. Formatting reuses each paired parser artifact through format_parsed without reparsing. The resource layer contains the host format registry driven by project resources configuration and an optional editor-only overlay, host format adapters, and the message entry model. A separate read-only catalog-definition path admits physical-source groups and calls intlify_resource extraction once per group. The host aggregates domains from all successful extractions and applies one project-global domain admission stage containing an ordered catalog-domain gate followed by a recognizer or root-domain gate. Only after both gates succeed does checked post-extraction projection construct one MessageDefinitionArtifact per successful group. The resource layer does not depend on the message-level cores, intlify_contract, or intlify_linker.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -65,7 +65,7 @@
 <path d="M 1020 210 L 1020 232" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 220 232 L 1020 232" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 335 232 L 335 300" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="347" y="272" font-size="10.8" text-anchor="start" class="muted">extract / re-escape</text>
+<text x="347" y="272" font-size="10.8" text-anchor="start" class="muted">extract / build_and_validate_write_back</text>
 <path d="M 905 232 L 905 300" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 <text x="917" y="272" font-size="10.8" text-anchor="start" class="muted">per entry: lintMessage / format_parsed as applicable</text>
 
@@ -82,9 +82,10 @@
 <text x="448" y="384" font-size="10.4" text-anchor="middle" class="note-text">project resources · editor overlay</text>
 
 <rect x="120" y="436" width="200" height="76" rx="8" class="output"/>
-<text x="220" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">host format adapters</text>
-<text x="220" y="478" font-size="10.4" text-anchor="middle" class="soft-white">extract() / re-escape()</text>
-<text x="220" y="494" font-size="10.4" text-anchor="middle" class="soft-white">JSON (Tier 1) · deferred tiers</text>
+<text x="220" y="456" font-size="12" font-weight="700" text-anchor="middle" class="white">host format adapters</text>
+<text x="220" y="474" font-size="10.4" text-anchor="middle" class="soft-white">host parse/extract</text>
+<text x="220" y="490" font-size="10.4" text-anchor="middle" class="soft-white">private re-escaping</text>
+<text x="220" y="504" font-size="9.8" text-anchor="middle" class="soft-white">JSON (Tier 1) · deferred tiers</text>
 
 <rect x="346" y="436" width="204" height="76" rx="8" class="entrymodel"/>
 <text x="448" y="460" font-size="12" font-weight="700" text-anchor="middle" class="white">message entries</text>
@@ -129,8 +130,8 @@
 <text x="395" y="729" font-size="9.6" text-anchor="middle" class="soft-white">extract once per group</text>
 
 <rect x="515" y="682" width="190" height="70" rx="8" class="parser"/>
-<text x="610" y="708" font-size="10.4" font-weight="700" text-anchor="middle" class="white">project-global domain gate</text>
-<text x="610" y="729" font-size="9.4" text-anchor="middle" class="soft-white">all successful extractions</text>
+<text x="610" y="708" font-size="10.4" font-weight="700" text-anchor="middle" class="white">project-global domain admission</text>
+<text x="610" y="729" font-size="9.4" text-anchor="middle" class="soft-white">catalog gate → recognizer/root gate</text>
 
 <rect x="730" y="682" width="190" height="70" rx="8" class="note" stroke-width="1.5"/>
 <text x="825" y="708" font-size="10.5" font-weight="700" text-anchor="middle" class="note-text">post-extraction projection</text>
