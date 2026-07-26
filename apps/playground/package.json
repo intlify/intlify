@@ -8,7 +8,7 @@
     "lint": "vp exec vize lint --preset happy-path src",
     "build:bindings": "vp run @intlify/ox-mf2-shared#build && vp run @intlify/ox-mf2-wasm#build",
     "dev": "vp run build:bindings && vp dev --configLoader runner",
-    "build": "vp run build:bindings && vp build --configLoader runner",
+    "build": "vp build --configLoader runner",
     "preview": "vp preview",
     "deploy": "void deploy",
     "vize:check": "vp run vize:lint && vp run vize:_check",
