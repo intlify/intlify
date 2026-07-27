@@ -165,6 +165,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_contract"
+version = "0.14.0-alpha.11"
+
+[[package]]
 name = "intlify_format"
 version = "0.14.0-alpha.11"
 dependencies = [
