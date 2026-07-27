@@ -40,3 +40,54 @@ pub(crate) fn write_sequence<'a>(items: impl IntoIterator<Item = &'a [u8]>, outp
         output.extend_from_slice(item);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{write_sequence, write_tagged_field, FingerprintPayload};
+
+    struct FixedPayload;
+
+    impl FingerprintPayload for FixedPayload {
+        fn write_fingerprint_payload(&self, output: &mut Vec<u8>) {
+            output.extend_from_slice(b"payload");
+        }
+    }
+
+    #[test]
+    fn payload_helper_collects_the_exact_written_bytes() {
+        assert_eq!(FixedPayload.fingerprint_payload().as_ref(), b"payload");
+    }
+
+    #[test]
+    fn tagged_field_encodes_tag_u64be_length_and_payload() {
+        let mut output = vec![0xff];
+        write_tagged_field(0x03, b"abc", &mut output);
+        assert_eq!(
+            output,
+            [0xff, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, b'a', b'b', b'c',]
+        );
+    }
+
+    #[test]
+    fn sequence_encodes_count_order_and_empty_item_boundaries() {
+        let items: [&[u8]; 3] = [b"ab", b"", b"c"];
+        let mut output = Vec::new();
+        write_sequence(items, &mut output);
+        assert_eq!(
+            output,
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, // item count
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, b'a', b'b', 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, b'c',
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_sequence_encodes_only_a_zero_u64be_count() {
+        let items: [&[u8]; 0] = [];
+        let mut output = Vec::new();
+        write_sequence(items, &mut output);
+        assert_eq!(output, [0; 8]);
+    }
+}
