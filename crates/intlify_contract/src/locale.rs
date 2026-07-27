@@ -1,6 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Exact locale identity used at artifact and linker boundaries.
+//!
+//! This module owns non-empty locale spellings and their byte-limit validation.
+//! A `Locale` is deliberately opaque, case-sensitive, and preserved byte for
+//! byte so producers and consumers compare the same submitted identity.
+//!
+//! It does not validate or canonicalize BCP 47 language tags, negotiate locales,
+//! or resolve fallback chains. Configuration and linker policy own those
+//! semantics.
+
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::FingerprintPayload;
 use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits};

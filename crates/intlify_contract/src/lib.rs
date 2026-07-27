@@ -3,10 +3,14 @@
 
 //! Shared, language-neutral contracts for intlify message artifacts and linking.
 //!
-//! This crate owns checked identities, catalog-key selectors, portable source
-//! evidence, and immutable resource limits. It intentionally does not depend on
-//! resource extraction, MF2 parsing, JavaScript parsing, CLI orchestration,
-//! linking, or exporting.
+//! The crate root owns the public contract facade. It re-exports checked
+//! identities, catalog-key selectors, portable source evidence, construction
+//! errors, and immutable resource limits while keeping their implementation
+//! modules private.
+//!
+//! This crate defines values exchanged across artifact producers, codecs, and
+//! linker consumers. It intentionally does not perform resource extraction, MF2
+//! or JavaScript parsing, CLI orchestration, linking, or exporting.
 
 mod error;
 mod fingerprint;

@@ -1,6 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Resource-limit configuration and failure evidence contracts.
+//!
+//! This module owns the compatibility-stable counter vocabulary, protocol
+//! defaults, immutable caller-selected lower limits, and validated artifact- or
+//! linker-side evidence describing the first rejected observation.
+//!
+//! It does not measure work, mutate shared counters, or decide when an operation
+//! must stop. Artifact codecs and linker stages observe their own work and use
+//! these types to apply and report the shared limits consistently.
+
 use std::error::Error;
 use std::fmt;
 

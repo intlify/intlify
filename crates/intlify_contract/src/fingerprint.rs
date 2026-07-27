@@ -1,6 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Canonical fingerprint-payload framing primitives.
+//!
+//! This module owns the byte-exact tagged-field and length-prefixed sequence
+//! encoding shared by contract identities. The framing makes field boundaries
+//! and collection order unambiguous before a caller computes a fingerprint.
+//!
+//! It does not choose a hash algorithm, compute a digest, or define an artifact
+//! wire format. Those responsibilities belong to the artifact or linker layer
+//! that consumes the canonical payload.
+
 #[allow(dead_code)]
 pub(crate) trait FingerprintPayload {
     fn write_fingerprint_payload(&self, output: &mut Vec<u8>);

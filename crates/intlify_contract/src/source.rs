@@ -1,6 +1,17 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Portable source evidence and definition payload values.
+//!
+//! This module owns checked UTF-8 spans, source origins, host entry references,
+//! opaque MF2 message payloads, and bounded human-readable selector reasons. It
+//! preserves exact offsets and spellings needed for artifacts, fingerprints, and
+//! later diagnostic attribution.
+//!
+//! It does not retain source buffers, decode host formats, parse MF2 messages, or
+//! convert byte offsets into line and column locations. Producers and diagnostic
+//! consumers own those operations.
+
 use crate::error::{ValueConstructionError, ValueGrammar, ValueRangeError};
 use crate::fingerprint::{write_tagged_field, FingerprintPayload};
 use crate::{

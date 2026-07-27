@@ -1,6 +1,17 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Portable project-relative paths and source-document identities.
+//!
+//! This module owns checked Unicode path segments, non-empty relative segment
+//! sequences, their aggregate limits, and the namespace-qualified identity of a
+//! source document. It preserves segment boundaries and exact spelling for
+//! deterministic comparison and fingerprinting across hosts.
+//!
+//! It does not join native path strings, access the file system, canonicalize
+//! platform separators, or resolve symbolic links. Host integrations map these
+//! portable identities to local files under an already selected project root.
+
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::{write_sequence, write_tagged_field, FingerprintPayload};
 use crate::{

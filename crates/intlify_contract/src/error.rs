@@ -1,6 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Checked-value construction failure vocabulary.
+//!
+//! This module owns the closed grammar, structural-limit, field-limit, and range
+//! errors returned while constructing common contract values. It preserves
+//! machine-readable evidence at the point where an invalid value is rejected.
+//!
+//! Artifact codecs and linker operations remain responsible for mapping these
+//! failures into their own protocol errors; this module does not parse artifacts,
+//! run linker stages, or render user-facing diagnostics.
+
 use std::error::Error;
 use std::fmt;
 

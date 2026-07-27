@@ -1,6 +1,17 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Domain-aware catalog keys and message selectors.
+//!
+//! This module owns the closed catalog-key domains, canonical structural token
+//! parsing, exact keys, prefixes, patterns, selector ordering, and their
+//! construction-time limits. It retains domain-specific structure so equality
+//! and matching inputs do not collapse into ambiguous object-path strings.
+//!
+//! It does not parse host resource documents or resolve selectors against a
+//! catalog inventory. Host adapters produce canonical keys, and the linker owns
+//! selector evaluation.
+
 use std::cmp::Ordering;
 
 use crate::error::{ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind};

@@ -1,6 +1,17 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Checked identities shared by artifact producers and linker consumers.
+//!
+//! This module owns artifact version and namespace values, producer provenance,
+//! catalog-scope identities, reference-artifact identities, and delivery-unit
+//! identities. Constructors preserve exact spellings, enforce the contract
+//! grammar and size ceilings, and provide canonical fingerprint payloads.
+//!
+//! It does not discover producers, resolve catalog scopes, construct delivery
+//! graphs, or decide whether two independently supplied identities refer to the
+//! same external entity beyond their defined value equality.
+
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::{write_sequence, write_tagged_field, FingerprintPayload};
 use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits};
