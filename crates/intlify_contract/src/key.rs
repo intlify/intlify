@@ -23,7 +23,7 @@ const CATALOG_KEY_TOKENS: usize = 256;
 const SELECTOR_PATTERN_BYTES: usize = 134_217_728;
 const SELECTOR_PATTERN_TOKENS: usize = 513;
 
-/// Closed catalog-key comparison domains admitted by M0 artifacts.
+/// Closed catalog-key comparison domains admitted by the artifact contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CatalogKeyDomain {
     /// RFC 6901 JSON Pointer.
@@ -345,7 +345,7 @@ impl Ord for CatalogKeyPattern {
     }
 }
 
-/// Closed M0 message selector vocabulary in canonical variant order.
+/// Closed message selector vocabulary in canonical variant order.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MessageSelector {
     /// Select exactly one canonical key.

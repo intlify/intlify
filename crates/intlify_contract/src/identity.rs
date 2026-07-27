@@ -31,7 +31,7 @@ pub struct ArtifactVersion {
 }
 
 impl ArtifactVersion {
-    /// Current mutable draft version emitted by M0 writers.
+    /// Current mutable draft version emitted by artifact writers.
     pub const DRAFT_V0_1: Self = Self::new(0, 1);
 
     /// Construct one artifact version from its unsigned components.
@@ -60,7 +60,7 @@ impl FingerprintPayload for ArtifactVersion {
     }
 }
 
-/// Portable namespace for application-owned M0 artifacts.
+/// Portable namespace for application-owned artifacts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ArtifactNamespace {
     /// Identity is contextual to the consuming project.
@@ -402,7 +402,7 @@ impl DeliveryUnitId {
         Ok(Self(segments.into_boxed_slice()))
     }
 
-    /// Construct the built-in one-node M0 delivery-unit identity `["main"]`.
+    /// Construct the built-in one-node delivery-unit identity `["main"]`.
     pub fn main() -> Self {
         Self::try_new(vec![
             DeliveryUnitSegment::try_new("main").expect("the built-in main segment is valid")

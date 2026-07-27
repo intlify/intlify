@@ -18,7 +18,7 @@ use crate::{DeliveryUnitId, Locale, ReferenceArtifactIdentity, SourceDocumentIde
 
 const COUNTER_COUNT: usize = 49;
 
-/// Closed M0/M1 linker and artifact resource-counter vocabulary.
+/// Closed linker and artifact resource-counter vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum LinkLimitCounter {
@@ -44,11 +44,11 @@ pub enum LinkLimitCounter {
     DeliveryGraphIdBytes,
     /// Submitted production-locale occurrences.
     ProductionLocales,
-    /// Reserved M2 fallback-source occurrences.
+    /// Reserved fallback-source occurrences.
     FallbackSources,
     /// Submitted configured-root occurrences.
     ConfiguredRoots,
-    /// Reserved M2 target occurrences for one fallback source.
+    /// Reserved target occurrences for one fallback source.
     FallbackTargetsPerSource,
     /// Decoded bytes in one locale occurrence.
     LocaleBytes,
@@ -288,9 +288,9 @@ impl LinkLimitCounter {
         }
     }
 
-    /// Return whether this counter is reserved and unreachable before M2.
+    /// Return whether this counter is reserved by the current protocol.
     #[must_use]
-    pub const fn is_reserved_before_m2(self) -> bool {
+    pub const fn is_reserved(self) -> bool {
         matches!(self, Self::FallbackSources | Self::FallbackTargetsPerSource)
     }
 
@@ -324,7 +324,7 @@ impl LinkLimits {
         counter: LinkLimitCounter,
         value: u64,
     ) -> Result<Self, LinkLimitConfigurationError> {
-        if counter.is_reserved_before_m2() || value > counter.protocol_ceiling() {
+        if counter.is_reserved() || value > counter.protocol_ceiling() {
             return Err(LinkLimitConfigurationError {
                 counter,
                 submitted: value,
@@ -376,10 +376,10 @@ impl LinkLimitConfigurationError {
 
 impl fmt::Display for LinkLimitConfigurationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.counter.is_reserved_before_m2() {
+        if self.counter.is_reserved() {
             return write!(
                 formatter,
-                "{} is reserved and cannot be configured before M2",
+                "{} is reserved by the current protocol and cannot be configured",
                 self.counter.as_str()
             );
         }
@@ -421,7 +421,7 @@ pub enum LinkLimitSubject {
     DeliveryUnitGroup(DeliveryUnitId),
     /// Complete resolved link policy.
     ResolvedPolicy,
-    /// Canonical checked fallback source, available beginning with M2.
+    /// Canonical checked fallback source reserved for a future protocol revision.
     FallbackSource(Locale),
     /// Complete scope-mapping table.
     ScopeMappings,
@@ -432,7 +432,7 @@ pub enum LinkLimitSubject {
 pub enum LinkLimitEvidenceConstructionError {
     /// The supplied effective limit is above the counter's protocol ceiling.
     EffectiveLimitAboveProtocol,
-    /// The counter remains reserved and unreachable before M2.
+    /// The counter is reserved by the current protocol.
     ReservedCounter,
     /// The exact observation does not exceed the effective limit.
     NonExceedingObservation,
@@ -567,7 +567,7 @@ fn validate_common_evidence(
     effective_limit: u64,
     observation: LinkLimitObservation,
 ) -> Result<(), LinkLimitEvidenceConstructionError> {
-    if counter.is_reserved_before_m2() {
+    if counter.is_reserved() {
         return Err(LinkLimitEvidenceConstructionError::ReservedCounter);
     }
     if effective_limit > counter.protocol_ceiling() {
@@ -908,7 +908,7 @@ mod tests {
     #[test]
     fn active_lower_limits_accept_zero_exact_and_reject_first_over() {
         for counter in LinkLimitCounter::ALL {
-            if counter.is_reserved_before_m2() {
+            if counter.is_reserved() {
                 continue;
             }
             let ceiling = counter.protocol_ceiling();
@@ -939,7 +939,7 @@ mod tests {
             LinkLimitCounter::FallbackSources,
             LinkLimitCounter::FallbackTargetsPerSource,
         ] {
-            assert!(counter.is_reserved_before_m2());
+            assert!(counter.is_reserved());
             assert_eq!(
                 LinkLimits::default()
                     .try_with_limit(counter, 0)
