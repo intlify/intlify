@@ -167,6 +167,9 @@ dependencies = [
 [[package]]
 name = "intlify_contract"
 version = "0.14.0-alpha.11"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "intlify_format"

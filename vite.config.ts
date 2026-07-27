@@ -13,7 +13,11 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/.git/**', 'refers/**']
   },
   fmt: defineFmtConfig({
-    ignorePatterns: ['CHANGELOG.md', 'refers/**']
+    ignorePatterns: [
+      'CHANGELOG.md',
+      'refers/**',
+      'crates/intlify_contract/fixtures/reference/**/*.json'
+    ]
   }),
   lint: defineLintConfig({
     ignorePatterns: ['refers/**'],

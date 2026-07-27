@@ -1,0 +1,17 @@
+{
+  "references": [],
+  "deliveryUnit": ["main"],
+  "identity": {
+    "segments": ["empty"],
+    "namespace": { "kind": "project" }
+  },
+  "producer": {
+    "revision": "0.1.0",
+    "id": "dev.intlify/js-reference"
+  },
+  "version": {
+    "minor": 1,
+    "major": 0
+  },
+  "kind": "message-\u0072eference"
+}
