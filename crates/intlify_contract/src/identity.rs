@@ -14,14 +14,10 @@
 
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::{write_sequence, write_tagged_field, FingerprintPayload};
-use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits};
+use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimits};
 
 const PRODUCER_ID_BYTES: usize = 255;
 const PRODUCER_REVISION_BYTES: usize = 128;
-const CATALOG_SCOPE_NAME_BYTES: usize = 255;
-const LOGICAL_SEGMENT_BYTES: usize = 255;
-const LOGICAL_SEGMENTS: usize = 64;
-const LOGICAL_IDENTITY_BYTES: u64 = 4_096;
 
 /// Artifact wire-contract version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -203,13 +199,7 @@ impl CatalogScopeName {
         if value.is_empty() {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
         }
-        if value.len() > CATALOG_SCOPE_NAME_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                crate::LinkLimitCounter::CatalogScopeNameBytes,
-                CATALOG_SCOPE_NAME_BYTES as u64,
-                CATALOG_SCOPE_NAME_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::CatalogScopeNameBytes.check_construction_limit(value.len() as u64)?;
         Ok(Self(value))
     }
 
@@ -224,17 +214,7 @@ impl CatalogScopeName {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        let counter = crate::LinkLimitCounter::CatalogScopeNameBytes;
-        let limit = limits.effective_limit(counter);
-        if self.0.len() as u64 > limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                counter,
-                limit,
-                LinkLimitObservation::Exact(limit + 1),
-            )
-            .expect("checked first-over scope-name evidence is valid"));
-        }
-        Ok(())
+        LinkLimitCounter::CatalogScopeNameBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 
@@ -468,13 +448,7 @@ fn validate_logical_segment(
     value: &str,
     segment_counter: LinkLimitCounter,
 ) -> Result<(), ValueConstructionError> {
-    if value.len() > LOGICAL_SEGMENT_BYTES {
-        return Err(ValueConstructionError::field_limit(
-            segment_counter,
-            LOGICAL_SEGMENT_BYTES as u64,
-            LOGICAL_SEGMENT_BYTES as u64 + 1,
-        ));
-    }
+    segment_counter.check_construction_limit(value.len() as u64)?;
     if value.is_empty() {
         return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
     }
@@ -492,27 +466,15 @@ fn validate_identity_segments<T: LogicalSegment>(
     if segments.is_empty() {
         return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
     }
-    if segments.len() > LOGICAL_SEGMENTS {
-        return Err(ValueConstructionError::field_limit(
-            segment_count_counter,
-            LOGICAL_SEGMENTS as u64,
-            LOGICAL_SEGMENTS as u64 + 1,
-        ));
-    }
+    segment_count_counter.check_construction_limit(segments.len() as u64)?;
 
     let mut total = 0_u64;
     for segment in segments {
         let length = segment.logical_segment().len() as u64;
         total = total
             .checked_add(length)
-            .unwrap_or(LOGICAL_IDENTITY_BYTES + 1);
-        if total > LOGICAL_IDENTITY_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                identity_bytes_counter,
-                LOGICAL_IDENTITY_BYTES,
-                total,
-            ));
-        }
+            .unwrap_or(identity_bytes_counter.protocol_ceiling() + 1);
+        identity_bytes_counter.check_construction_limit(total)?;
     }
     Ok(())
 }
@@ -524,40 +486,15 @@ fn revalidate_identity_segments<T: LogicalSegment>(
     identity_bytes_counter: LinkLimitCounter,
     limits: &LinkLimits,
 ) -> Result<(), ArtifactLimitEvidence> {
-    let segment_count_limit = limits.effective_limit(segment_count_counter);
-    if segments.len() as u64 > segment_count_limit {
-        return Err(ArtifactLimitEvidence::try_new(
-            segment_count_counter,
-            segment_count_limit,
-            LinkLimitObservation::Exact(segment_count_limit + 1),
-        )
-        .expect("checked first-over identity segment-count evidence is valid"));
-    }
-
-    let segment_bytes_limit = limits.effective_limit(segment_bytes_counter);
-    let identity_bytes_limit = limits.effective_limit(identity_bytes_counter);
+    segment_count_counter.check_artifact_limit(segments.len() as u64, limits)?;
     let mut total = 0_u64;
     for segment in segments {
         let length = segment.logical_segment().len() as u64;
-        if length > segment_bytes_limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                segment_bytes_counter,
-                segment_bytes_limit,
-                LinkLimitObservation::Exact(segment_bytes_limit + 1),
-            )
-            .expect("checked first-over identity segment-byte evidence is valid"));
-        }
+        segment_bytes_counter.check_artifact_limit(length, limits)?;
         total = total
             .checked_add(length)
             .expect("checked logical identity components cannot overflow u64");
-        if total > identity_bytes_limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                identity_bytes_counter,
-                identity_bytes_limit,
-                LinkLimitObservation::Exact(total),
-            )
-            .expect("checked running identity-byte evidence is valid"));
-        }
+        identity_bytes_counter.check_artifact_limit(total, limits)?;
     }
     Ok(())
 }

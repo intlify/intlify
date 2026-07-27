@@ -16,12 +16,14 @@ use std::cmp::Ordering;
 
 use crate::error::{ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind};
 use crate::fingerprint::FingerprintPayload;
-use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits};
+use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimits};
 
-const CATALOG_KEY_BYTES: usize = 67_108_864;
-const CATALOG_KEY_TOKENS: usize = 256;
-const SELECTOR_PATTERN_BYTES: usize = 134_217_728;
-const SELECTOR_PATTERN_TOKENS: usize = 513;
+const CATALOG_KEY_BYTES: usize = LinkLimitCounter::CatalogKeyBytes.protocol_ceiling() as usize;
+const CATALOG_KEY_TOKENS: usize = LinkLimitCounter::CatalogKeyTokens.protocol_ceiling() as usize;
+const SELECTOR_PATTERN_BYTES: usize =
+    LinkLimitCounter::SelectorPatternBytes.protocol_ceiling() as usize;
+const SELECTOR_PATTERN_TOKENS: usize =
+    LinkLimitCounter::SelectorPatternTokens.protocol_ceiling() as usize;
 
 /// Closed catalog-key comparison domains admitted by the artifact contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -114,11 +116,7 @@ impl CatalogKey {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.canonical.len() as u64,
-            LinkLimitCounter::CatalogKeyBytes,
-            limits,
-        )
+        LinkLimitCounter::CatalogKeyBytes.check_artifact_limit(self.canonical.len() as u64, limits)
     }
 
     #[allow(dead_code)]
@@ -126,11 +124,8 @@ impl CatalogKey {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.canonical.len() as u64,
-            LinkLimitCounter::SelectorPathBytes,
-            limits,
-        )
+        LinkLimitCounter::SelectorPathBytes
+            .check_artifact_limit(self.canonical.len() as u64, limits)
     }
 
     #[allow(dead_code)]
@@ -138,11 +133,7 @@ impl CatalogKey {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.tokens.len() as u64,
-            LinkLimitCounter::CatalogKeyTokens,
-            limits,
-        )
+        LinkLimitCounter::CatalogKeyTokens.check_artifact_limit(self.tokens.len() as u64, limits)
     }
 }
 
@@ -216,11 +207,8 @@ impl CatalogKeyPrefix {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.canonical.len() as u64,
-            LinkLimitCounter::SelectorPathBytes,
-            limits,
-        )
+        LinkLimitCounter::SelectorPathBytes
+            .check_artifact_limit(self.canonical.len() as u64, limits)
     }
 
     #[allow(dead_code)]
@@ -228,11 +216,7 @@ impl CatalogKeyPrefix {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.tokens.len() as u64,
-            LinkLimitCounter::CatalogKeyTokens,
-            limits,
-        )
+        LinkLimitCounter::CatalogKeyTokens.check_artifact_limit(self.tokens.len() as u64, limits)
     }
 }
 
@@ -311,11 +295,8 @@ impl CatalogKeyPattern {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.canonical.len() as u64,
-            LinkLimitCounter::SelectorPatternBytes,
-            limits,
-        )
+        LinkLimitCounter::SelectorPatternBytes
+            .check_artifact_limit(self.canonical.len() as u64, limits)
     }
 
     #[allow(dead_code)]
@@ -323,11 +304,8 @@ impl CatalogKeyPattern {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_first_over(
-            self.tokens.len() as u64,
-            LinkLimitCounter::SelectorPatternTokens,
-            limits,
-        )
+        LinkLimitCounter::SelectorPatternTokens
+            .check_artifact_limit(self.tokens.len() as u64, limits)
     }
 }
 
@@ -724,23 +702,6 @@ fn check_structural_bytes(value: &str, limit: usize) -> Result<(), ValueConstruc
             limit as u64,
             limit as u64 + 1,
         )));
-    }
-    Ok(())
-}
-
-fn revalidate_first_over(
-    observed: u64,
-    counter: LinkLimitCounter,
-    limits: &LinkLimits,
-) -> Result<(), ArtifactLimitEvidence> {
-    let limit = limits.effective_limit(counter);
-    if observed > limit {
-        return Err(ArtifactLimitEvidence::try_new(
-            counter,
-            limit,
-            LinkLimitObservation::Exact(limit + 1),
-        )
-        .expect("checked first-over key or selector evidence is valid"));
     }
     Ok(())
 }

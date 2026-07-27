@@ -14,13 +14,7 @@
 
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::{write_sequence, write_tagged_field, FingerprintPayload};
-use crate::{
-    ArtifactLimitEvidence, ArtifactNamespace, LinkLimitCounter, LinkLimitObservation, LinkLimits,
-};
-
-const PATH_SEGMENTS: usize = 1_024;
-const PATH_SEGMENT_BYTES: usize = 4_096;
-const PATH_BYTES: u64 = 262_144;
+use crate::{ArtifactLimitEvidence, ArtifactNamespace, LinkLimitCounter, LinkLimits};
 
 /// One exact Unicode segment in a portable project-relative path.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -30,13 +24,7 @@ impl PortablePathSegment {
     /// Validate and retain one portable path segment.
     pub fn try_new(value: impl Into<Box<str>>) -> Result<Self, ValueConstructionError> {
         let value = value.into();
-        if value.len() > PATH_SEGMENT_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::PathSegmentBytes,
-                PATH_SEGMENT_BYTES as u64,
-                PATH_SEGMENT_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::PathSegmentBytes.check_construction_limit(value.len() as u64)?;
         if value.is_empty() {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
         }
@@ -54,17 +42,7 @@ impl PortablePathSegment {
 
     #[allow(dead_code)]
     fn revalidate_limit(&self, limits: &LinkLimits) -> Result<(), ArtifactLimitEvidence> {
-        let counter = LinkLimitCounter::PathSegmentBytes;
-        let limit = limits.effective_limit(counter);
-        if self.0.len() as u64 > limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                counter,
-                limit,
-                LinkLimitObservation::Exact(limit + 1),
-            )
-            .expect("checked first-over path-segment evidence is valid"));
-        }
-        Ok(())
+        LinkLimitCounter::PathSegmentBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 
@@ -81,13 +59,7 @@ pub struct PortableRelativePath(Box<[PortablePathSegment]>);
 impl PortableRelativePath {
     /// Validate and retain one exact ordered segment array.
     pub fn try_new(segments: Vec<PortablePathSegment>) -> Result<Self, ValueConstructionError> {
-        if segments.len() > PATH_SEGMENTS {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::PathSegments,
-                PATH_SEGMENTS as u64,
-                PATH_SEGMENTS as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::PathSegments.check_construction_limit(segments.len() as u64)?;
         if segments.is_empty() {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
         }
@@ -96,14 +68,8 @@ impl PortableRelativePath {
         for segment in &segments {
             total = total
                 .checked_add(segment.as_str().len() as u64)
-                .unwrap_or(PATH_BYTES + 1);
-            if total > PATH_BYTES {
-                return Err(ValueConstructionError::field_limit(
-                    LinkLimitCounter::PathBytes,
-                    PATH_BYTES,
-                    total,
-                ));
-            }
+                .unwrap_or(LinkLimitCounter::PathBytes.protocol_ceiling() + 1);
+            LinkLimitCounter::PathBytes.check_construction_limit(total)?;
         }
 
         Ok(Self(segments.into_boxed_slice()))
@@ -128,36 +94,18 @@ impl PortableRelativePath {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        let segment_count_counter = LinkLimitCounter::PathSegments;
-        let segment_count_limit = limits.effective_limit(segment_count_counter);
-        if self.0.len() as u64 > segment_count_limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                segment_count_counter,
-                segment_count_limit,
-                LinkLimitObservation::Exact(segment_count_limit + 1),
-            )
-            .expect("checked first-over path-segment-count evidence is valid"));
-        }
+        LinkLimitCounter::PathSegments.check_artifact_limit(self.0.len() as u64, limits)?;
 
         for segment in &self.0 {
             segment.revalidate_limit(limits)?;
         }
 
-        let path_counter = LinkLimitCounter::PathBytes;
-        let path_limit = limits.effective_limit(path_counter);
         let mut total = 0_u64;
         for segment in &self.0 {
             total = total
                 .checked_add(segment.as_str().len() as u64)
                 .expect("checked path components cannot overflow u64");
-            if total > path_limit {
-                return Err(ArtifactLimitEvidence::try_new(
-                    path_counter,
-                    path_limit,
-                    LinkLimitObservation::Exact(total),
-                )
-                .expect("checked running path-byte evidence is valid"));
-            }
+            LinkLimitCounter::PathBytes.check_artifact_limit(total, limits)?;
         }
         Ok(())
     }

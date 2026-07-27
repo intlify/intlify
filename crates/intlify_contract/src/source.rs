@@ -14,14 +14,7 @@
 
 use crate::error::{ValueConstructionError, ValueGrammar, ValueRangeError};
 use crate::fingerprint::{write_tagged_field, FingerprintPayload};
-use crate::{
-    ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits,
-    SourceDocumentIdentity,
-};
-
-const ENTRY_STRUCTURAL_PATH_BYTES: usize = 67_108_864;
-const MESSAGE_BYTES: usize = 1_048_576;
-const REASON_BYTES: usize = 4_096;
+use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimits, SourceDocumentIdentity};
 
 /// Half-open UTF-8 byte range in an exact source document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -96,13 +89,7 @@ impl EntryStructuralPath {
     /// Retain an exact structural path, including the valid empty root path.
     pub fn try_new(value: impl Into<Box<str>>) -> Result<Self, ValueConstructionError> {
         let value = value.into();
-        if value.len() > ENTRY_STRUCTURAL_PATH_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::EntryStructuralPathBytes,
-                ENTRY_STRUCTURAL_PATH_BYTES as u64,
-                ENTRY_STRUCTURAL_PATH_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::EntryStructuralPathBytes.check_construction_limit(value.len() as u64)?;
         Ok(Self(value))
     }
 
@@ -117,11 +104,7 @@ impl EntryStructuralPath {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_field_bytes(
-            self.0.len() as u64,
-            LinkLimitCounter::EntryStructuralPathBytes,
-            limits,
-        )
+        LinkLimitCounter::EntryStructuralPathBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 
@@ -176,13 +159,7 @@ impl MessagePayload {
     /// Retain an exact message payload, including an empty message.
     pub fn try_new(value: impl Into<Box<str>>) -> Result<Self, ValueConstructionError> {
         let value = value.into();
-        if value.len() > MESSAGE_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::MessageBytes,
-                MESSAGE_BYTES as u64,
-                MESSAGE_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::MessageBytes.check_construction_limit(value.len() as u64)?;
         Ok(Self(value))
     }
 
@@ -197,7 +174,7 @@ impl MessagePayload {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_field_bytes(self.0.len() as u64, LinkLimitCounter::MessageBytes, limits)
+        LinkLimitCounter::MessageBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 
@@ -218,13 +195,7 @@ impl ReasonText {
         if value.is_empty() {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
         }
-        if value.len() > REASON_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::ReasonBytes,
-                REASON_BYTES as u64,
-                REASON_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::ReasonBytes.check_construction_limit(value.len() as u64)?;
         if value.chars().any(is_forbidden_reason_control) {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Invalid));
         }
@@ -242,7 +213,7 @@ impl ReasonText {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        revalidate_field_bytes(self.0.len() as u64, LinkLimitCounter::ReasonBytes, limits)
+        LinkLimitCounter::ReasonBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 
@@ -255,24 +226,6 @@ impl FingerprintPayload for ReasonText {
 fn is_forbidden_reason_control(value: char) -> bool {
     let scalar = value as u32;
     matches!(scalar, 0x00..=0x08 | 0x0b..=0x0c | 0x0e..=0x1f | 0x7f..=0x9f)
-}
-
-#[allow(dead_code)]
-fn revalidate_field_bytes(
-    bytes: u64,
-    counter: LinkLimitCounter,
-    limits: &LinkLimits,
-) -> Result<(), ArtifactLimitEvidence> {
-    let limit = limits.effective_limit(counter);
-    if bytes > limit {
-        return Err(ArtifactLimitEvidence::try_new(
-            counter,
-            limit,
-            LinkLimitObservation::Exact(limit + 1),
-        )
-        .expect("checked first-over field evidence is valid"));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

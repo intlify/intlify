@@ -13,9 +13,7 @@
 
 use crate::error::{ValueConstructionError, ValueGrammar};
 use crate::fingerprint::FingerprintPayload;
-use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimitObservation, LinkLimits};
-
-const LOCALE_BYTES: usize = 255;
+use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimits};
 
 /// Exact, opaque locale identity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -28,13 +26,7 @@ impl Locale {
         if value.is_empty() {
             return Err(ValueConstructionError::Grammar(ValueGrammar::Empty));
         }
-        if value.len() > LOCALE_BYTES {
-            return Err(ValueConstructionError::field_limit(
-                LinkLimitCounter::LocaleBytes,
-                LOCALE_BYTES as u64,
-                LOCALE_BYTES as u64 + 1,
-            ));
-        }
+        LinkLimitCounter::LocaleBytes.check_construction_limit(value.len() as u64)?;
         Ok(Self(value))
     }
 
@@ -49,17 +41,7 @@ impl Locale {
         &self,
         limits: &LinkLimits,
     ) -> Result<(), ArtifactLimitEvidence> {
-        let counter = LinkLimitCounter::LocaleBytes;
-        let limit = limits.effective_limit(counter);
-        if self.0.len() as u64 > limit {
-            return Err(ArtifactLimitEvidence::try_new(
-                counter,
-                limit,
-                LinkLimitObservation::Exact(limit + 1),
-            )
-            .expect("checked first-over locale evidence is valid"));
-        }
-        Ok(())
+        LinkLimitCounter::LocaleBytes.check_artifact_limit(self.0.len() as u64, limits)
     }
 }
 

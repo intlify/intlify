@@ -14,9 +14,77 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::{DeliveryUnitId, Locale, ReferenceArtifactIdentity, SourceDocumentIdentity};
+use crate::{
+    DeliveryUnitId, Locale, ReferenceArtifactIdentity, SourceDocumentIdentity,
+    ValueConstructionError,
+};
 
-const COUNTER_COUNT: usize = 49;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CounterState {
+    Active,
+    Reserved,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ObservationContract {
+    Exact,
+    FirstOver,
+    ExactOrArithmeticOverflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CounterBoundary {
+    LinkOnly,
+    ArtifactAndLink,
+    ArtifactOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+enum LinkLimitSubjectKind {
+    Request = 1 << 0,
+    DefinitionArtifactEnvelope = 1 << 1,
+    ReferenceArtifactGroup = 1 << 2,
+    DefinitionArtifactGroup = 1 << 3,
+    DeliveryGraph = 1 << 4,
+    DeliveryUnitGroup = 1 << 5,
+    ResolvedPolicy = 1 << 6,
+    FallbackSource = 1 << 7,
+    ScopeMappings = 1 << 8,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LinkLimitCounterMetadata {
+    counter: LinkLimitCounter,
+    name: &'static str,
+    protocol_ceiling: u64,
+    state: CounterState,
+    observation: ObservationContract,
+    boundary: CounterBoundary,
+    subject_mask: u16,
+}
+
+macro_rules! counter_metadata {
+    (
+        $counter:ident,
+        $name:literal,
+        $ceiling:literal,
+        $state:ident,
+        $observation:ident,
+        $boundary:ident,
+        [$($subject:ident),* $(,)?]
+    ) => {
+        LinkLimitCounterMetadata {
+            counter: LinkLimitCounter::$counter,
+            name: $name,
+            protocol_ceiling: $ceiling,
+            state: CounterState::$state,
+            observation: ObservationContract::$observation,
+            boundary: CounterBoundary::$boundary,
+            subject_mask: 0_u16 $(| (LinkLimitSubjectKind::$subject as u16))*,
+        }
+    };
+}
 
 /// Closed linker and artifact resource-counter vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -122,59 +190,486 @@ pub enum LinkLimitCounter {
     Definitions,
 }
 
+// This registry is the single source of truth for counter names, ceilings,
+// activation state, observation semantics, boundary availability, and admitted
+// linker subjects. Its order must remain identical to the enum discriminants;
+// the registry tests lock that compatibility contract.
+const LINK_LIMIT_COUNTER_METADATA: &[LinkLimitCounterMetadata] = &[
+    counter_metadata!(
+        ReferenceArtifacts,
+        "reference_artifacts",
+        65_536,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        ReferenceIdentityBytesTotal,
+        "reference_identity_bytes_total",
+        67_108_864,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceRecordsTotal,
+        "reference_records_total",
+        4_000_000,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceArtifactDecodedBytesTotal,
+        "reference_artifact_decoded_bytes_total",
+        1_073_741_824,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        DefinitionArtifacts,
+        "definition_artifacts",
+        65_536,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        DefinitionsTotal,
+        "definitions_total",
+        4_000_000,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        DefinitionArtifactDecodedBytesTotal,
+        "definition_artifact_decoded_bytes_total",
+        1_073_741_824,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        DeliveryGraphNodes,
+        "delivery_graph_nodes",
+        65_536,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [DeliveryGraph]
+    ),
+    counter_metadata!(
+        DeliveryGraphEdges,
+        "delivery_graph_edges",
+        1_048_576,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [DeliveryGraph]
+    ),
+    counter_metadata!(
+        DeliveryGraphIdBytes,
+        "delivery_graph_id_bytes",
+        67_108_864,
+        Active,
+        ExactOrArithmeticOverflow,
+        LinkOnly,
+        [DeliveryUnitGroup]
+    ),
+    counter_metadata!(
+        ProductionLocales,
+        "production_locales",
+        1_024,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [ResolvedPolicy]
+    ),
+    counter_metadata!(
+        FallbackSources,
+        "fallback_sources",
+        1_024,
+        Reserved,
+        FirstOver,
+        LinkOnly,
+        []
+    ),
+    counter_metadata!(
+        ConfiguredRoots,
+        "configured_roots",
+        4_096,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [ResolvedPolicy]
+    ),
+    counter_metadata!(
+        FallbackTargetsPerSource,
+        "fallback_targets_per_source",
+        64,
+        Reserved,
+        FirstOver,
+        LinkOnly,
+        [FallbackSource]
+    ),
+    counter_metadata!(
+        LocaleBytes,
+        "locale_bytes",
+        255,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup, ResolvedPolicy]
+    ),
+    counter_metadata!(
+        EntryStructuralPathBytes,
+        "entry_structural_path_bytes",
+        67_108_864,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        CatalogKeyBytes,
+        "catalog_key_bytes",
+        67_108_864,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        MessageBytes,
+        "message_bytes",
+        1_048_576,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        TotalMessageBytes,
+        "total_message_bytes",
+        67_108_864,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        CatalogScopeNameBytes,
+        "catalog_scope_name_bytes",
+        255,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [
+            ReferenceArtifactGroup,
+            DefinitionArtifactGroup,
+            ResolvedPolicy,
+            ScopeMappings
+        ]
+    ),
+    counter_metadata!(
+        ScopeMappingEntries,
+        "scope_mapping_entries",
+        4_096,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [ScopeMappings]
+    ),
+    counter_metadata!(
+        SelectorPathBytes,
+        "selector_path_bytes",
+        67_108_864,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        SelectorPatternBytes,
+        "selector_pattern_bytes",
+        134_217_728,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        SelectorPatternTokens,
+        "selector_pattern_tokens",
+        513,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        PatternMatchStatesTotal,
+        "pattern_match_states_total",
+        100_000_000,
+        Active,
+        Exact,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        ReasonBytes,
+        "reason_bytes",
+        4_096,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        PathSegments,
+        "path_segments",
+        1_024,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [
+            DefinitionArtifactEnvelope,
+            ReferenceArtifactGroup,
+            DefinitionArtifactGroup
+        ]
+    ),
+    counter_metadata!(
+        PathSegmentBytes,
+        "path_segment_bytes",
+        4_096,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [
+            DefinitionArtifactEnvelope,
+            ReferenceArtifactGroup,
+            DefinitionArtifactGroup
+        ]
+    ),
+    counter_metadata!(
+        PathBytes,
+        "path_bytes",
+        262_144,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [
+            DefinitionArtifactEnvelope,
+            ReferenceArtifactGroup,
+            DefinitionArtifactGroup
+        ]
+    ),
+    counter_metadata!(
+        LogicalAliases,
+        "logical_aliases",
+        4_096,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        SourcePathBytes,
+        "source_path_bytes",
+        67_108_864,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceArtifactWireBytes,
+        "reference_artifact_wire_bytes",
+        536_870_912,
+        Active,
+        FirstOver,
+        ArtifactOnly,
+        []
+    ),
+    counter_metadata!(
+        ReferenceArtifactDecodedBytes,
+        "reference_artifact_decoded_bytes",
+        268_435_456,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        DefinitionArtifactWireBytes,
+        "definition_artifact_wire_bytes",
+        536_870_912,
+        Active,
+        FirstOver,
+        ArtifactOnly,
+        []
+    ),
+    counter_metadata!(
+        DefinitionArtifactDecodedBytes,
+        "definition_artifact_decoded_bytes",
+        268_435_456,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        FindingsTotal,
+        "findings_total",
+        1_000_000,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        FindingBytesTotal,
+        "finding_bytes_total",
+        268_435_456,
+        Active,
+        Exact,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        BundlePlansTotal,
+        "bundle_plans_total",
+        1_048_576,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        ResolvedMessagesTotal,
+        "resolved_messages_total",
+        4_000_000,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        BundlePlanBytesTotal,
+        "bundle_plan_bytes_total",
+        1_073_741_824,
+        Active,
+        Exact,
+        LinkOnly,
+        [Request]
+    ),
+    counter_metadata!(
+        CatalogKeyTokens,
+        "catalog_key_tokens",
+        256,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup, DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceIdentitySegmentBytes,
+        "reference_identity_segment_bytes",
+        255,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceIdentitySegments,
+        "reference_identity_segments",
+        64,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        ReferenceIdentityBytes,
+        "reference_identity_bytes",
+        4_096,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        DeliveryUnitSegmentBytes,
+        "delivery_unit_segment_bytes",
+        255,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup, DeliveryUnitGroup]
+    ),
+    counter_metadata!(
+        DeliveryUnitSegments,
+        "delivery_unit_segments",
+        64,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup, DeliveryUnitGroup]
+    ),
+    counter_metadata!(
+        DeliveryUnitBytes,
+        "delivery_unit_bytes",
+        4_096,
+        Active,
+        Exact,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup, DeliveryUnitGroup]
+    ),
+    counter_metadata!(
+        ReferenceRecords,
+        "reference_records",
+        1_000_000,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [ReferenceArtifactGroup]
+    ),
+    counter_metadata!(
+        Definitions,
+        "definitions",
+        100_000,
+        Active,
+        FirstOver,
+        ArtifactAndLink,
+        [DefinitionArtifactGroup]
+    ),
+];
+
+const COUNTER_COUNT: usize = LINK_LIMIT_COUNTER_METADATA.len();
+
 impl LinkLimitCounter {
     /// All counters in their compatibility-stable declaration order.
-    pub const ALL: [Self; COUNTER_COUNT] = [
-        Self::ReferenceArtifacts,
-        Self::ReferenceIdentityBytesTotal,
-        Self::ReferenceRecordsTotal,
-        Self::ReferenceArtifactDecodedBytesTotal,
-        Self::DefinitionArtifacts,
-        Self::DefinitionsTotal,
-        Self::DefinitionArtifactDecodedBytesTotal,
-        Self::DeliveryGraphNodes,
-        Self::DeliveryGraphEdges,
-        Self::DeliveryGraphIdBytes,
-        Self::ProductionLocales,
-        Self::FallbackSources,
-        Self::ConfiguredRoots,
-        Self::FallbackTargetsPerSource,
-        Self::LocaleBytes,
-        Self::EntryStructuralPathBytes,
-        Self::CatalogKeyBytes,
-        Self::MessageBytes,
-        Self::TotalMessageBytes,
-        Self::CatalogScopeNameBytes,
-        Self::ScopeMappingEntries,
-        Self::SelectorPathBytes,
-        Self::SelectorPatternBytes,
-        Self::SelectorPatternTokens,
-        Self::PatternMatchStatesTotal,
-        Self::ReasonBytes,
-        Self::PathSegments,
-        Self::PathSegmentBytes,
-        Self::PathBytes,
-        Self::LogicalAliases,
-        Self::SourcePathBytes,
-        Self::ReferenceArtifactWireBytes,
-        Self::ReferenceArtifactDecodedBytes,
-        Self::DefinitionArtifactWireBytes,
-        Self::DefinitionArtifactDecodedBytes,
-        Self::FindingsTotal,
-        Self::FindingBytesTotal,
-        Self::BundlePlansTotal,
-        Self::ResolvedMessagesTotal,
-        Self::BundlePlanBytesTotal,
-        Self::CatalogKeyTokens,
-        Self::ReferenceIdentitySegmentBytes,
-        Self::ReferenceIdentitySegments,
-        Self::ReferenceIdentityBytes,
-        Self::DeliveryUnitSegmentBytes,
-        Self::DeliveryUnitSegments,
-        Self::DeliveryUnitBytes,
-        Self::ReferenceRecords,
-        Self::Definitions,
-    ];
+    pub const ALL: [Self; COUNTER_COUNT] = Self::build_all();
+
+    const fn build_all() -> [Self; COUNTER_COUNT] {
+        let mut counters = [Self::ReferenceArtifacts; COUNTER_COUNT];
+        let mut index = 0;
+        while index < COUNTER_COUNT {
+            counters[index] = LINK_LIMIT_COUNTER_METADATA[index].counter;
+            index += 1;
+        }
+        counters
+    }
 
     /// Return the one-based compatibility ordinal.
     #[must_use]
@@ -185,117 +680,89 @@ impl LinkLimitCounter {
     /// Return the exact structured spelling.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::ReferenceArtifacts => "reference_artifacts",
-            Self::ReferenceIdentityBytesTotal => "reference_identity_bytes_total",
-            Self::ReferenceRecordsTotal => "reference_records_total",
-            Self::ReferenceArtifactDecodedBytesTotal => "reference_artifact_decoded_bytes_total",
-            Self::DefinitionArtifacts => "definition_artifacts",
-            Self::DefinitionsTotal => "definitions_total",
-            Self::DefinitionArtifactDecodedBytesTotal => "definition_artifact_decoded_bytes_total",
-            Self::DeliveryGraphNodes => "delivery_graph_nodes",
-            Self::DeliveryGraphEdges => "delivery_graph_edges",
-            Self::DeliveryGraphIdBytes => "delivery_graph_id_bytes",
-            Self::ProductionLocales => "production_locales",
-            Self::FallbackSources => "fallback_sources",
-            Self::ConfiguredRoots => "configured_roots",
-            Self::FallbackTargetsPerSource => "fallback_targets_per_source",
-            Self::LocaleBytes => "locale_bytes",
-            Self::EntryStructuralPathBytes => "entry_structural_path_bytes",
-            Self::CatalogKeyBytes => "catalog_key_bytes",
-            Self::MessageBytes => "message_bytes",
-            Self::TotalMessageBytes => "total_message_bytes",
-            Self::CatalogScopeNameBytes => "catalog_scope_name_bytes",
-            Self::ScopeMappingEntries => "scope_mapping_entries",
-            Self::SelectorPathBytes => "selector_path_bytes",
-            Self::SelectorPatternBytes => "selector_pattern_bytes",
-            Self::SelectorPatternTokens => "selector_pattern_tokens",
-            Self::PatternMatchStatesTotal => "pattern_match_states_total",
-            Self::ReasonBytes => "reason_bytes",
-            Self::PathSegments => "path_segments",
-            Self::PathSegmentBytes => "path_segment_bytes",
-            Self::PathBytes => "path_bytes",
-            Self::LogicalAliases => "logical_aliases",
-            Self::SourcePathBytes => "source_path_bytes",
-            Self::ReferenceArtifactWireBytes => "reference_artifact_wire_bytes",
-            Self::ReferenceArtifactDecodedBytes => "reference_artifact_decoded_bytes",
-            Self::DefinitionArtifactWireBytes => "definition_artifact_wire_bytes",
-            Self::DefinitionArtifactDecodedBytes => "definition_artifact_decoded_bytes",
-            Self::FindingsTotal => "findings_total",
-            Self::FindingBytesTotal => "finding_bytes_total",
-            Self::BundlePlansTotal => "bundle_plans_total",
-            Self::ResolvedMessagesTotal => "resolved_messages_total",
-            Self::BundlePlanBytesTotal => "bundle_plan_bytes_total",
-            Self::CatalogKeyTokens => "catalog_key_tokens",
-            Self::ReferenceIdentitySegmentBytes => "reference_identity_segment_bytes",
-            Self::ReferenceIdentitySegments => "reference_identity_segments",
-            Self::ReferenceIdentityBytes => "reference_identity_bytes",
-            Self::DeliveryUnitSegmentBytes => "delivery_unit_segment_bytes",
-            Self::DeliveryUnitSegments => "delivery_unit_segments",
-            Self::DeliveryUnitBytes => "delivery_unit_bytes",
-            Self::ReferenceRecords => "reference_records",
-            Self::Definitions => "definitions",
-        }
+        self.metadata().name
     }
 
     /// Return the inclusive protocol hard ceiling.
     #[must_use]
     pub const fn protocol_ceiling(self) -> u64 {
-        match self {
-            Self::ReferenceArtifacts | Self::DefinitionArtifacts | Self::DeliveryGraphNodes => {
-                65_536
-            }
-            Self::ReferenceIdentityBytesTotal
-            | Self::EntryStructuralPathBytes
-            | Self::CatalogKeyBytes
-            | Self::TotalMessageBytes
-            | Self::SelectorPathBytes
-            | Self::SourcePathBytes
-            | Self::DeliveryGraphIdBytes => 67_108_864,
-            Self::ReferenceRecordsTotal | Self::DefinitionsTotal | Self::ResolvedMessagesTotal => {
-                4_000_000
-            }
-            Self::ReferenceArtifactDecodedBytesTotal
-            | Self::DefinitionArtifactDecodedBytesTotal
-            | Self::BundlePlanBytesTotal => 1_073_741_824,
-            Self::DeliveryGraphEdges | Self::BundlePlansTotal | Self::MessageBytes => 1_048_576,
-            Self::ProductionLocales | Self::FallbackSources | Self::PathSegments => 1_024,
-            Self::ConfiguredRoots
-            | Self::ScopeMappingEntries
-            | Self::LogicalAliases
-            | Self::ReasonBytes
-            | Self::PathSegmentBytes
-            | Self::ReferenceIdentityBytes
-            | Self::DeliveryUnitBytes => 4_096,
-            Self::FallbackTargetsPerSource
-            | Self::ReferenceIdentitySegments
-            | Self::DeliveryUnitSegments => 64,
-            Self::LocaleBytes
-            | Self::CatalogScopeNameBytes
-            | Self::ReferenceIdentitySegmentBytes
-            | Self::DeliveryUnitSegmentBytes => 255,
-            Self::SelectorPatternBytes => 134_217_728,
-            Self::SelectorPatternTokens => 513,
-            Self::PatternMatchStatesTotal => 100_000_000,
-            Self::PathBytes => 262_144,
-            Self::ReferenceArtifactWireBytes | Self::DefinitionArtifactWireBytes => 536_870_912,
-            Self::ReferenceArtifactDecodedBytes
-            | Self::DefinitionArtifactDecodedBytes
-            | Self::FindingBytesTotal => 268_435_456,
-            Self::FindingsTotal | Self::ReferenceRecords => 1_000_000,
-            Self::CatalogKeyTokens => 256,
-            Self::Definitions => 100_000,
-        }
+        self.metadata().protocol_ceiling
     }
 
     /// Return whether this counter is reserved by the current protocol.
     #[must_use]
     pub const fn is_reserved(self) -> bool {
-        matches!(self, Self::FallbackSources | Self::FallbackTargetsPerSource)
+        matches!(self.metadata().state, CounterState::Reserved)
     }
 
     const fn index(self) -> usize {
         self as usize
+    }
+
+    const fn metadata(self) -> LinkLimitCounterMetadata {
+        LINK_LIMIT_COUNTER_METADATA[self.index()]
+    }
+
+    const fn requires_first_over(self) -> bool {
+        matches!(self.metadata().observation, ObservationContract::FirstOver)
+    }
+
+    const fn allows_arithmetic_overflow(self) -> bool {
+        matches!(
+            self.metadata().observation,
+            ObservationContract::ExactOrArithmeticOverflow
+        )
+    }
+
+    const fn is_artifact_counter(self) -> bool {
+        matches!(
+            self.metadata().boundary,
+            CounterBoundary::ArtifactAndLink | CounterBoundary::ArtifactOnly
+        )
+    }
+
+    const fn is_artifact_only(self) -> bool {
+        matches!(self.metadata().boundary, CounterBoundary::ArtifactOnly)
+    }
+
+    const fn allows_subject(self, subject: LinkLimitSubjectKind) -> bool {
+        self.metadata().subject_mask & subject as u16 != 0
+    }
+
+    /// Enforce this counter's protocol ceiling while constructing a checked value.
+    pub(crate) fn check_construction_limit(
+        self,
+        observed: u64,
+    ) -> Result<(), ValueConstructionError> {
+        let limit = self.protocol_ceiling();
+        if observed <= limit {
+            return Ok(());
+        }
+        let attempted = if self.requires_first_over() {
+            limit + 1
+        } else {
+            observed
+        };
+        Err(ValueConstructionError::field_limit(self, limit, attempted))
+    }
+
+    /// Revalidate one artifact observation against the caller's effective limit.
+    pub(crate) fn check_artifact_limit(
+        self,
+        observed: u64,
+        limits: &LinkLimits,
+    ) -> Result<(), ArtifactLimitEvidence> {
+        let limit = limits.effective_limit(self);
+        if observed <= limit {
+            return Ok(());
+        }
+        let observation = if self.requires_first_over() {
+            LinkLimitObservation::Exact(limit + 1)
+        } else {
+            LinkLimitObservation::Exact(observed)
+        };
+        Err(ArtifactLimitEvidence::try_new(self, limit, observation)
+            .expect("checked artifact limit evidence is valid"))
     }
 }
 
@@ -427,6 +894,22 @@ pub enum LinkLimitSubject {
     ScopeMappings,
 }
 
+impl LinkLimitSubject {
+    const fn kind(&self) -> LinkLimitSubjectKind {
+        match self {
+            Self::Request => LinkLimitSubjectKind::Request,
+            Self::DefinitionArtifactEnvelope => LinkLimitSubjectKind::DefinitionArtifactEnvelope,
+            Self::ReferenceArtifactGroup(_) => LinkLimitSubjectKind::ReferenceArtifactGroup,
+            Self::DefinitionArtifactGroup(_) => LinkLimitSubjectKind::DefinitionArtifactGroup,
+            Self::DeliveryGraph => LinkLimitSubjectKind::DeliveryGraph,
+            Self::DeliveryUnitGroup(_) => LinkLimitSubjectKind::DeliveryUnitGroup,
+            Self::ResolvedPolicy => LinkLimitSubjectKind::ResolvedPolicy,
+            Self::FallbackSource(_) => LinkLimitSubjectKind::FallbackSource,
+            Self::ScopeMappings => LinkLimitSubjectKind::ScopeMappings,
+        }
+    }
+}
+
 /// Invalid attempted construction of limit evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkLimitEvidenceConstructionError {
@@ -472,7 +955,7 @@ impl ArtifactLimitEvidence {
         observation: LinkLimitObservation,
     ) -> Result<Self, LinkLimitEvidenceConstructionError> {
         validate_common_evidence(counter, effective_limit, observation)?;
-        if !is_artifact_counter(counter) {
+        if !counter.is_artifact_counter() {
             return Err(LinkLimitEvidenceConstructionError::CounterOutsideArtifactBoundary);
         }
         Ok(Self {
@@ -519,11 +1002,7 @@ impl LinkLimitEvidence {
         observation: LinkLimitObservation,
     ) -> Result<Self, LinkLimitEvidenceConstructionError> {
         validate_common_evidence(counter, effective_limit, observation)?;
-        if matches!(
-            counter,
-            LinkLimitCounter::ReferenceArtifactWireBytes
-                | LinkLimitCounter::DefinitionArtifactWireBytes
-        ) {
+        if counter.is_artifact_only() {
             return Err(LinkLimitEvidenceConstructionError::WireCounterAtLinkBoundary);
         }
         if !valid_subject(counter, &subject) {
@@ -578,197 +1057,27 @@ fn validate_common_evidence(
             Err(LinkLimitEvidenceConstructionError::NonExceedingObservation)
         }
         LinkLimitObservation::Exact(attempted)
-            if requires_first_over(counter) && attempted != effective_limit + 1 =>
+            if counter.requires_first_over() && attempted != effective_limit + 1 =>
         {
             Err(LinkLimitEvidenceConstructionError::NonCanonicalObservation)
         }
-        LinkLimitObservation::ArithmeticOverflow if !allows_arithmetic_overflow(counter) => {
+        LinkLimitObservation::ArithmeticOverflow if !counter.allows_arithmetic_overflow() => {
             Err(LinkLimitEvidenceConstructionError::ArithmeticOverflowUnavailable)
         }
         LinkLimitObservation::Exact(_) | LinkLimitObservation::ArithmeticOverflow => Ok(()),
     }
 }
 
-const fn requires_first_over(counter: LinkLimitCounter) -> bool {
-    matches!(
-        counter,
-        LinkLimitCounter::ReferenceArtifacts
-            | LinkLimitCounter::DefinitionArtifacts
-            | LinkLimitCounter::DeliveryGraphNodes
-            | LinkLimitCounter::DeliveryGraphEdges
-            | LinkLimitCounter::ProductionLocales
-            | LinkLimitCounter::FallbackSources
-            | LinkLimitCounter::ConfiguredRoots
-            | LinkLimitCounter::FallbackTargetsPerSource
-            | LinkLimitCounter::LocaleBytes
-            | LinkLimitCounter::EntryStructuralPathBytes
-            | LinkLimitCounter::CatalogKeyBytes
-            | LinkLimitCounter::MessageBytes
-            | LinkLimitCounter::CatalogScopeNameBytes
-            | LinkLimitCounter::ScopeMappingEntries
-            | LinkLimitCounter::SelectorPathBytes
-            | LinkLimitCounter::SelectorPatternBytes
-            | LinkLimitCounter::SelectorPatternTokens
-            | LinkLimitCounter::ReasonBytes
-            | LinkLimitCounter::PathSegments
-            | LinkLimitCounter::PathSegmentBytes
-            | LinkLimitCounter::LogicalAliases
-            | LinkLimitCounter::ReferenceArtifactWireBytes
-            | LinkLimitCounter::DefinitionArtifactWireBytes
-            | LinkLimitCounter::FindingsTotal
-            | LinkLimitCounter::BundlePlansTotal
-            | LinkLimitCounter::ResolvedMessagesTotal
-            | LinkLimitCounter::CatalogKeyTokens
-            | LinkLimitCounter::ReferenceIdentitySegmentBytes
-            | LinkLimitCounter::ReferenceIdentitySegments
-            | LinkLimitCounter::DeliveryUnitSegmentBytes
-            | LinkLimitCounter::DeliveryUnitSegments
-            | LinkLimitCounter::ReferenceRecords
-            | LinkLimitCounter::Definitions
-    )
-}
-
-const fn allows_arithmetic_overflow(counter: LinkLimitCounter) -> bool {
-    matches!(
-        counter,
-        LinkLimitCounter::ReferenceIdentityBytesTotal
-            | LinkLimitCounter::ReferenceRecordsTotal
-            | LinkLimitCounter::ReferenceArtifactDecodedBytesTotal
-            | LinkLimitCounter::DefinitionsTotal
-            | LinkLimitCounter::DefinitionArtifactDecodedBytesTotal
-            | LinkLimitCounter::DeliveryGraphIdBytes
-    )
-}
-
-const fn is_artifact_counter(counter: LinkLimitCounter) -> bool {
-    matches!(
-        counter,
-        LinkLimitCounter::LocaleBytes
-            | LinkLimitCounter::EntryStructuralPathBytes
-            | LinkLimitCounter::CatalogKeyBytes
-            | LinkLimitCounter::MessageBytes
-            | LinkLimitCounter::TotalMessageBytes
-            | LinkLimitCounter::CatalogScopeNameBytes
-            | LinkLimitCounter::SelectorPathBytes
-            | LinkLimitCounter::SelectorPatternBytes
-            | LinkLimitCounter::SelectorPatternTokens
-            | LinkLimitCounter::ReasonBytes
-            | LinkLimitCounter::PathSegments
-            | LinkLimitCounter::PathSegmentBytes
-            | LinkLimitCounter::PathBytes
-            | LinkLimitCounter::LogicalAliases
-            | LinkLimitCounter::SourcePathBytes
-            | LinkLimitCounter::ReferenceArtifactWireBytes
-            | LinkLimitCounter::ReferenceArtifactDecodedBytes
-            | LinkLimitCounter::DefinitionArtifactWireBytes
-            | LinkLimitCounter::DefinitionArtifactDecodedBytes
-            | LinkLimitCounter::CatalogKeyTokens
-            | LinkLimitCounter::ReferenceIdentitySegmentBytes
-            | LinkLimitCounter::ReferenceIdentitySegments
-            | LinkLimitCounter::ReferenceIdentityBytes
-            | LinkLimitCounter::DeliveryUnitSegmentBytes
-            | LinkLimitCounter::DeliveryUnitSegments
-            | LinkLimitCounter::DeliveryUnitBytes
-            | LinkLimitCounter::ReferenceRecords
-            | LinkLimitCounter::Definitions
-    )
-}
-
 fn valid_subject(counter: LinkLimitCounter, subject: &LinkLimitSubject) -> bool {
-    use LinkLimitCounter as Counter;
-    use LinkLimitSubject as Subject;
-
-    match subject {
-        Subject::Request => matches!(
-            counter,
-            Counter::ReferenceArtifacts
-                | Counter::DefinitionArtifacts
-                | Counter::PatternMatchStatesTotal
-                | Counter::FindingsTotal
-                | Counter::FindingBytesTotal
-                | Counter::BundlePlansTotal
-                | Counter::ResolvedMessagesTotal
-                | Counter::BundlePlanBytesTotal
-        ),
-        Subject::DefinitionArtifactEnvelope => matches!(
-            counter,
-            Counter::PathSegments | Counter::PathSegmentBytes | Counter::PathBytes
-        ),
-        Subject::ReferenceArtifactGroup(_) => matches!(
-            counter,
-            Counter::ReferenceIdentityBytesTotal
-                | Counter::ReferenceRecordsTotal
-                | Counter::ReferenceArtifactDecodedBytesTotal
-                | Counter::CatalogScopeNameBytes
-                | Counter::SelectorPathBytes
-                | Counter::SelectorPatternBytes
-                | Counter::SelectorPatternTokens
-                | Counter::ReasonBytes
-                | Counter::PathSegments
-                | Counter::PathSegmentBytes
-                | Counter::PathBytes
-                | Counter::ReferenceArtifactDecodedBytes
-                | Counter::CatalogKeyTokens
-                | Counter::ReferenceIdentitySegmentBytes
-                | Counter::ReferenceIdentitySegments
-                | Counter::ReferenceIdentityBytes
-                | Counter::DeliveryUnitSegmentBytes
-                | Counter::DeliveryUnitSegments
-                | Counter::DeliveryUnitBytes
-                | Counter::ReferenceRecords
-        ),
-        Subject::DefinitionArtifactGroup(_) => matches!(
-            counter,
-            Counter::DefinitionsTotal
-                | Counter::DefinitionArtifactDecodedBytesTotal
-                | Counter::LocaleBytes
-                | Counter::EntryStructuralPathBytes
-                | Counter::CatalogKeyBytes
-                | Counter::MessageBytes
-                | Counter::TotalMessageBytes
-                | Counter::CatalogScopeNameBytes
-                | Counter::PathSegments
-                | Counter::PathSegmentBytes
-                | Counter::PathBytes
-                | Counter::LogicalAliases
-                | Counter::SourcePathBytes
-                | Counter::DefinitionArtifactDecodedBytes
-                | Counter::CatalogKeyTokens
-                | Counter::Definitions
-        ),
-        Subject::DeliveryGraph => {
-            matches!(
-                counter,
-                Counter::DeliveryGraphNodes | Counter::DeliveryGraphEdges
-            )
-        }
-        Subject::DeliveryUnitGroup(_) => matches!(
-            counter,
-            Counter::DeliveryGraphIdBytes
-                | Counter::DeliveryUnitSegmentBytes
-                | Counter::DeliveryUnitSegments
-                | Counter::DeliveryUnitBytes
-        ),
-        Subject::ResolvedPolicy => matches!(
-            counter,
-            Counter::ProductionLocales
-                | Counter::ConfiguredRoots
-                | Counter::LocaleBytes
-                | Counter::CatalogScopeNameBytes
-        ),
-        Subject::FallbackSource(_) => counter == Counter::FallbackTargetsPerSource,
-        Subject::ScopeMappings => matches!(
-            counter,
-            Counter::ScopeMappingEntries | Counter::CatalogScopeNameBytes
-        ),
-    }
+    counter.allows_subject(subject.kind())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         ArtifactLimitEvidence, LinkLimitCounter, LinkLimitEvidence,
-        LinkLimitEvidenceConstructionError, LinkLimitObservation, LinkLimitSubject, LinkLimits,
+        LinkLimitEvidenceConstructionError, LinkLimitObservation, LinkLimitSubject,
+        LinkLimitSubjectKind, LinkLimits,
     };
     use crate::{
         ArtifactNamespace, DeliveryUnitId, DeliveryUnitSegment, PortablePathSegment,
@@ -889,8 +1198,226 @@ mod tests {
             .enumerate()
         {
             assert_eq!(counter.ordinal() as usize, index + 1);
+            assert_eq!(counter.metadata().counter, counter);
             assert_eq!(counter.as_str(), spelling);
             assert_eq!(counter.protocol_ceiling(), ceiling);
+        }
+    }
+
+    #[test]
+    fn counter_registry_keeps_exact_state_observation_and_boundary_contracts() {
+        use LinkLimitCounter as Counter;
+
+        let reserved = [Counter::FallbackSources, Counter::FallbackTargetsPerSource];
+        let first_over = [
+            Counter::ReferenceArtifacts,
+            Counter::DefinitionArtifacts,
+            Counter::DeliveryGraphNodes,
+            Counter::DeliveryGraphEdges,
+            Counter::ProductionLocales,
+            Counter::FallbackSources,
+            Counter::ConfiguredRoots,
+            Counter::FallbackTargetsPerSource,
+            Counter::LocaleBytes,
+            Counter::EntryStructuralPathBytes,
+            Counter::CatalogKeyBytes,
+            Counter::MessageBytes,
+            Counter::CatalogScopeNameBytes,
+            Counter::ScopeMappingEntries,
+            Counter::SelectorPathBytes,
+            Counter::SelectorPatternBytes,
+            Counter::SelectorPatternTokens,
+            Counter::ReasonBytes,
+            Counter::PathSegments,
+            Counter::PathSegmentBytes,
+            Counter::LogicalAliases,
+            Counter::ReferenceArtifactWireBytes,
+            Counter::DefinitionArtifactWireBytes,
+            Counter::FindingsTotal,
+            Counter::BundlePlansTotal,
+            Counter::ResolvedMessagesTotal,
+            Counter::CatalogKeyTokens,
+            Counter::ReferenceIdentitySegmentBytes,
+            Counter::ReferenceIdentitySegments,
+            Counter::DeliveryUnitSegmentBytes,
+            Counter::DeliveryUnitSegments,
+            Counter::ReferenceRecords,
+            Counter::Definitions,
+        ];
+        let arithmetic_overflow = [
+            Counter::ReferenceIdentityBytesTotal,
+            Counter::ReferenceRecordsTotal,
+            Counter::ReferenceArtifactDecodedBytesTotal,
+            Counter::DefinitionsTotal,
+            Counter::DefinitionArtifactDecodedBytesTotal,
+            Counter::DeliveryGraphIdBytes,
+        ];
+        let artifact = [
+            Counter::LocaleBytes,
+            Counter::EntryStructuralPathBytes,
+            Counter::CatalogKeyBytes,
+            Counter::MessageBytes,
+            Counter::TotalMessageBytes,
+            Counter::CatalogScopeNameBytes,
+            Counter::SelectorPathBytes,
+            Counter::SelectorPatternBytes,
+            Counter::SelectorPatternTokens,
+            Counter::ReasonBytes,
+            Counter::PathSegments,
+            Counter::PathSegmentBytes,
+            Counter::PathBytes,
+            Counter::LogicalAliases,
+            Counter::SourcePathBytes,
+            Counter::ReferenceArtifactWireBytes,
+            Counter::ReferenceArtifactDecodedBytes,
+            Counter::DefinitionArtifactWireBytes,
+            Counter::DefinitionArtifactDecodedBytes,
+            Counter::CatalogKeyTokens,
+            Counter::ReferenceIdentitySegmentBytes,
+            Counter::ReferenceIdentitySegments,
+            Counter::ReferenceIdentityBytes,
+            Counter::DeliveryUnitSegmentBytes,
+            Counter::DeliveryUnitSegments,
+            Counter::DeliveryUnitBytes,
+            Counter::ReferenceRecords,
+            Counter::Definitions,
+        ];
+        let artifact_only = [
+            Counter::ReferenceArtifactWireBytes,
+            Counter::DefinitionArtifactWireBytes,
+        ];
+
+        for counter in Counter::ALL {
+            assert_eq!(counter.is_reserved(), reserved.contains(&counter));
+            assert_eq!(counter.requires_first_over(), first_over.contains(&counter));
+            assert_eq!(
+                counter.allows_arithmetic_overflow(),
+                arithmetic_overflow.contains(&counter)
+            );
+            assert_eq!(counter.is_artifact_counter(), artifact.contains(&counter));
+            assert_eq!(counter.is_artifact_only(), artifact_only.contains(&counter));
+            assert!(
+                !(counter.requires_first_over() && counter.allows_arithmetic_overflow()),
+                "{} has conflicting observation contracts",
+                counter.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn counter_registry_keeps_exact_subject_contracts() {
+        use LinkLimitCounter as Counter;
+        use LinkLimitSubjectKind as Subject;
+
+        let expected: &[(Subject, &[Counter])] = &[
+            (
+                Subject::Request,
+                &[
+                    Counter::ReferenceArtifacts,
+                    Counter::DefinitionArtifacts,
+                    Counter::PatternMatchStatesTotal,
+                    Counter::FindingsTotal,
+                    Counter::FindingBytesTotal,
+                    Counter::BundlePlansTotal,
+                    Counter::ResolvedMessagesTotal,
+                    Counter::BundlePlanBytesTotal,
+                ],
+            ),
+            (
+                Subject::DefinitionArtifactEnvelope,
+                &[
+                    Counter::PathSegments,
+                    Counter::PathSegmentBytes,
+                    Counter::PathBytes,
+                ],
+            ),
+            (
+                Subject::ReferenceArtifactGroup,
+                &[
+                    Counter::ReferenceIdentityBytesTotal,
+                    Counter::ReferenceRecordsTotal,
+                    Counter::ReferenceArtifactDecodedBytesTotal,
+                    Counter::CatalogScopeNameBytes,
+                    Counter::SelectorPathBytes,
+                    Counter::SelectorPatternBytes,
+                    Counter::SelectorPatternTokens,
+                    Counter::ReasonBytes,
+                    Counter::PathSegments,
+                    Counter::PathSegmentBytes,
+                    Counter::PathBytes,
+                    Counter::ReferenceArtifactDecodedBytes,
+                    Counter::CatalogKeyTokens,
+                    Counter::ReferenceIdentitySegmentBytes,
+                    Counter::ReferenceIdentitySegments,
+                    Counter::ReferenceIdentityBytes,
+                    Counter::DeliveryUnitSegmentBytes,
+                    Counter::DeliveryUnitSegments,
+                    Counter::DeliveryUnitBytes,
+                    Counter::ReferenceRecords,
+                ],
+            ),
+            (
+                Subject::DefinitionArtifactGroup,
+                &[
+                    Counter::DefinitionsTotal,
+                    Counter::DefinitionArtifactDecodedBytesTotal,
+                    Counter::LocaleBytes,
+                    Counter::EntryStructuralPathBytes,
+                    Counter::CatalogKeyBytes,
+                    Counter::MessageBytes,
+                    Counter::TotalMessageBytes,
+                    Counter::CatalogScopeNameBytes,
+                    Counter::PathSegments,
+                    Counter::PathSegmentBytes,
+                    Counter::PathBytes,
+                    Counter::LogicalAliases,
+                    Counter::SourcePathBytes,
+                    Counter::DefinitionArtifactDecodedBytes,
+                    Counter::CatalogKeyTokens,
+                    Counter::Definitions,
+                ],
+            ),
+            (
+                Subject::DeliveryGraph,
+                &[Counter::DeliveryGraphNodes, Counter::DeliveryGraphEdges],
+            ),
+            (
+                Subject::DeliveryUnitGroup,
+                &[
+                    Counter::DeliveryGraphIdBytes,
+                    Counter::DeliveryUnitSegmentBytes,
+                    Counter::DeliveryUnitSegments,
+                    Counter::DeliveryUnitBytes,
+                ],
+            ),
+            (
+                Subject::ResolvedPolicy,
+                &[
+                    Counter::ProductionLocales,
+                    Counter::ConfiguredRoots,
+                    Counter::LocaleBytes,
+                    Counter::CatalogScopeNameBytes,
+                ],
+            ),
+            (
+                Subject::FallbackSource,
+                &[Counter::FallbackTargetsPerSource],
+            ),
+            (
+                Subject::ScopeMappings,
+                &[Counter::ScopeMappingEntries, Counter::CatalogScopeNameBytes],
+            ),
+        ];
+
+        for (subject, expected_counters) in expected {
+            for counter in Counter::ALL {
+                assert_eq!(
+                    counter.allows_subject(*subject),
+                    expected_counters.contains(&counter),
+                    "{} has an unexpected {subject:?} association",
+                    counter.as_str()
+                );
+            }
         }
     }
 
