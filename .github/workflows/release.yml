@@ -48,7 +48,6 @@ jobs:
         (inputs.job == 'all' || inputs.job == 'npm-publish' ||
           inputs.job == 'crate-publish'))
 
-
     steps:
       - name: Checkout codes
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -117,7 +116,6 @@ jobs:
     if: >-
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
         (inputs.job == 'all' || inputs.job == 'npm-publish'))
-
 
     strategy:
       fail-fast: false
@@ -221,7 +219,6 @@ jobs:
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
         (inputs.job == 'all' || inputs.job == 'npm-publish'))
 
-
     strategy:
       fail-fast: false
       matrix:
@@ -323,7 +320,6 @@ jobs:
     if: >-
       github.event_name == 'push' || (github.event_name == 'workflow_dispatch' &&
         (inputs.job == 'all' || inputs.job == 'npm-publish'))
-
 
     strategy:
       fail-fast: false
@@ -495,7 +491,6 @@ jobs:
           needs.build-cli-native.result == 'success')
       )
 
-
     # npm Trusted Publishing is configured for this workflow file and the
     # `npm-release` environment. The release flow does not use npm tokens.
     environment: npm-release
@@ -655,7 +650,6 @@ jobs:
           needs.validate.result == 'success')
       )
 
-
     # crates.io Trusted Publisher is configured for this workflow file and
     # the `crates-release` environment.
     environment: crates-release
@@ -723,7 +717,6 @@ jobs:
             (inputs.job == 'all' && needs.npm-publish.result == 'success')))
       )
 
-
     steps:
       - name: Checkout codes
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -756,7 +749,6 @@ jobs:
           (inputs.job == 'published-cli-smoke' ||
             (inputs.job == 'all' && needs.npm-publish.result == 'success')))
       )
-
 
     strategy:
       fail-fast: false
@@ -794,7 +786,6 @@ jobs:
           (inputs.job == 'published-crate-smoke' ||
             (inputs.job == 'all' && needs.crate-publish.result == 'success')))
       )
-
 
     steps:
       - name: Checkout codes
@@ -840,7 +831,6 @@ jobs:
               needs.published-cli-smoke.result == 'success' &&
               needs.published-crate-smoke.result == 'success')))
       )
-
 
     permissions:
       contents: write
