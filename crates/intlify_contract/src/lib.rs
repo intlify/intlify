@@ -11,16 +11,23 @@
 mod error;
 mod fingerprint;
 mod identity;
+mod key;
 mod limits;
 mod locale;
 mod path;
 mod source;
 
-pub use error::{ValueConstructionError, ValueGrammar, ValueRangeError};
+pub use error::{
+    ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind, ValueRangeError,
+};
 pub use identity::{
     ArtifactNamespace, ArtifactVersion, CatalogScopeId, CatalogScopeName, DeliveryUnitId,
     DeliveryUnitSegment, ProducerId, ProducerIdentity, ProducerRevision, ReferenceArtifactIdentity,
     ReferenceArtifactSegment,
+};
+pub use key::{
+    CatalogKey, CatalogKeyDomain, CatalogKeyPattern, CatalogKeyPrefix, CatalogKeyToken,
+    MessageSelector, PatternToken,
 };
 pub use limits::{
     ArtifactLimitEvidence, LinkLimitConfigurationError, LinkLimitCounter, LinkLimitEvidence,
@@ -35,11 +42,12 @@ pub use source::{
 #[cfg(test)]
 mod tests {
     use super::{
-        ArtifactLimitEvidence, ArtifactNamespace, ArtifactVersion, CatalogScopeId,
-        CatalogScopeName, DeliveryUnitId, DeliveryUnitSegment, EntryReference, EntryStructuralPath,
-        LinkLimitCounter, LinkLimitEvidence, LinkLimitObservation, LinkLimitSubject, LinkLimits,
-        Locale, MessagePayload, PortablePathSegment, PortableRelativePath, ProducerId,
-        ProducerIdentity, ProducerRevision, ReasonText, ReferenceArtifactIdentity,
+        ArtifactLimitEvidence, ArtifactNamespace, ArtifactVersion, CatalogKey, CatalogKeyDomain,
+        CatalogKeyPattern, CatalogKeyPrefix, CatalogKeyToken, CatalogScopeId, CatalogScopeName,
+        DeliveryUnitId, DeliveryUnitSegment, EntryReference, EntryStructuralPath, LinkLimitCounter,
+        LinkLimitEvidence, LinkLimitObservation, LinkLimitSubject, LinkLimits, Locale,
+        MessagePayload, MessageSelector, PatternToken, PortablePathSegment, PortableRelativePath,
+        ProducerId, ProducerIdentity, ProducerRevision, ReasonText, ReferenceArtifactIdentity,
         ReferenceArtifactSegment, SourceDocumentIdentity, SourceOrigin, SourceUtf8Span,
     };
 
@@ -68,6 +76,13 @@ mod tests {
         assert_send_sync::<EntryReference>();
         assert_send_sync::<MessagePayload>();
         assert_send_sync::<ReasonText>();
+        assert_send_sync::<CatalogKeyDomain>();
+        assert_send_sync::<CatalogKeyToken>();
+        assert_send_sync::<CatalogKey>();
+        assert_send_sync::<CatalogKeyPrefix>();
+        assert_send_sync::<PatternToken>();
+        assert_send_sync::<CatalogKeyPattern>();
+        assert_send_sync::<MessageSelector>();
         assert_send_sync::<LinkLimitCounter>();
         assert_send_sync::<LinkLimitObservation>();
         assert_send_sync::<LinkLimitSubject>();
