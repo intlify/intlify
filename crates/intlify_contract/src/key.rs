@@ -15,7 +15,7 @@
 use std::cmp::Ordering;
 
 use crate::error::{ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind};
-use crate::fingerprint::FingerprintPayload;
+use crate::fingerprint::{write_tagged_field, FingerprintPayload};
 use crate::{ArtifactLimitEvidence, LinkLimitCounter, LinkLimits};
 
 const CATALOG_KEY_BYTES: usize = LinkLimitCounter::CatalogKeyBytes.protocol_ceiling() as usize;
@@ -153,7 +153,8 @@ impl Ord for CatalogKey {
 
 impl FingerprintPayload for CatalogKey {
     fn write_fingerprint_payload(&self, output: &mut Vec<u8>) {
-        output.extend_from_slice(self.canonical.as_bytes());
+        write_tagged_field(0x01, self.domain.as_str().as_bytes(), output);
+        write_tagged_field(0x02, self.canonical.as_bytes(), output);
     }
 }
 
@@ -736,6 +737,24 @@ mod tests {
                 .fingerprint_payload()
                 .as_ref(),
             b"yaml-typed-path"
+        );
+    }
+
+    #[test]
+    fn catalog_key_fingerprint_is_domain_qualified_tagged_record() {
+        let json_root = CatalogKey::try_new(CatalogKeyDomain::JsonPointer, "").unwrap();
+        let yaml_root = CatalogKey::try_new(CatalogKeyDomain::YamlTypedPath, "").unwrap();
+
+        assert_eq!(
+            json_root.fingerprint_payload().as_ref(),
+            [
+                0x01, 0, 0, 0, 0, 0, 0, 0, 12, b'j', b's', b'o', b'n', b'-', b'p', b'o', b'i',
+                b'n', b't', b'e', b'r', 0x02, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]
+        );
+        assert_ne!(
+            json_root.fingerprint_payload(),
+            yaml_root.fingerprint_payload()
         );
     }
 
