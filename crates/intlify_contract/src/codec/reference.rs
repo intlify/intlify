@@ -1916,6 +1916,96 @@ mod tests {
     }
 
     #[test]
+    fn reader_chunking_preserves_every_selected_contract_failure() {
+        let inputs: [&[u8]; 6] = [
+            &[0xff],
+            b"{",
+            b"{} true",
+            br#"{"kind":"message-reference","kind":"message-reference"}"#,
+            br#"{"kind":"message-definition"}"#,
+            br#"{"kind":"message-reference","version":{"major":0,"minor":2}}"#,
+        ];
+        let limits = LinkLimits::default();
+
+        for input in inputs {
+            let expected = decode_reference_artifact(input, &limits).unwrap_err();
+            for chunk in [1, 2, 7, 64] {
+                let mut reader = ChunkReader::new(input, chunk);
+                let actual = match decode_reference_artifact_from_reader(&mut reader, &limits)
+                    .unwrap_err()
+                {
+                    ArtifactReadError::Contract(error) => error,
+                    ArtifactReadError::Transport(error) => {
+                        panic!("bounded in-memory fixture cannot fail transport: {error}")
+                    }
+                };
+                assert_eq!(actual, expected, "input={input:?}, chunk={chunk}");
+            }
+        }
+    }
+
+    #[test]
+    fn known_and_unknown_length_wire_overruns_select_identical_evidence() {
+        let limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::ReferenceArtifactWireBytes, 5)
+            .unwrap();
+        let expected = decode_reference_artifact(CANONICAL.as_bytes(), &limits).unwrap_err();
+
+        for chunk in [1, 2, 7, 64, 4096] {
+            let mut reader = ChunkReader::new(CANONICAL.as_bytes(), chunk);
+            let actual =
+                match decode_reference_artifact_from_reader(&mut reader, &limits).unwrap_err() {
+                    ArtifactReadError::Contract(error) => error,
+                    ArtifactReadError::Transport(error) => {
+                        panic!("bounded in-memory fixture cannot fail transport: {error}")
+                    }
+                };
+            assert_eq!(actual, expected, "chunk={chunk}");
+            assert_eq!(reader.offset, 6);
+        }
+    }
+
+    #[test]
+    fn direct_and_wire_admission_share_all_observable_lower_limit_phases() {
+        let defaults = LinkLimits::default();
+        let artifact = decode_reference_artifact(CANONICAL.as_bytes(), &defaults).unwrap();
+        let counters = [
+            LinkLimitCounter::ReferenceIdentitySegmentBytes,
+            LinkLimitCounter::ReferenceIdentitySegments,
+            LinkLimitCounter::ReferenceIdentityBytes,
+            LinkLimitCounter::DeliveryUnitSegmentBytes,
+            LinkLimitCounter::DeliveryUnitSegments,
+            LinkLimitCounter::DeliveryUnitBytes,
+            LinkLimitCounter::ReferenceRecords,
+            LinkLimitCounter::CatalogScopeNameBytes,
+            LinkLimitCounter::SelectorPathBytes,
+            LinkLimitCounter::SelectorPatternBytes,
+            LinkLimitCounter::SelectorPatternTokens,
+            LinkLimitCounter::ReasonBytes,
+            LinkLimitCounter::PathSegments,
+            LinkLimitCounter::PathSegmentBytes,
+            LinkLimitCounter::PathBytes,
+            LinkLimitCounter::CatalogKeyTokens,
+            LinkLimitCounter::ReferenceArtifactDecodedBytes,
+        ];
+
+        for counter in counters {
+            let limits = defaults.clone().try_with_limit(counter, 0).unwrap();
+            let direct = MessageReferenceArtifact::try_new(
+                *artifact.version(),
+                artifact.producer().clone(),
+                artifact.identity().clone(),
+                artifact.delivery_unit().clone(),
+                artifact.references().to_vec(),
+                &limits,
+            )
+            .unwrap_err();
+            let decoded = decode_reference_artifact(CANONICAL.as_bytes(), &limits).unwrap_err();
+            assert_eq!(direct, decoded, "counter={counter:?}");
+        }
+    }
+
+    #[test]
     fn reader_transport_failure_precedes_a_provisional_contract_result() {
         let limits = LinkLimits::default();
         let mut reader = ErrorBeforeEof {
