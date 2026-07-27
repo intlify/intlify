@@ -946,14 +946,14 @@ impl<'document> Decoder<'document> {
 
         let mut scopes = Vec::with_capacity(envelopes.len());
         for reference in envelopes {
-            self.decode_namespace(
+            let namespace = self.decode_namespace(
                 reference.scope.namespace,
                 reference_location(reference.ordinal, Some(ReferenceField::ScopeNamespace)),
             )?;
             let location = reference_location(reference.ordinal, Some(ReferenceField::ScopeName));
             let name = CatalogScopeName::try_new(reference.scope.name)
                 .map_err(|error| self.value_error(&error, location, None))?;
-            scopes.push(CatalogScopeId::new(ArtifactNamespace::Project, name));
+            scopes.push(CatalogScopeId::new(namespace, name));
         }
 
         let mut raw_selectors = Vec::with_capacity(envelopes.len());
@@ -1160,7 +1160,7 @@ impl<'document> Decoder<'document> {
                 continue;
             };
             let ordinal = envelopes[index].ordinal;
-            self.decode_namespace(
+            let namespace = self.decode_namespace(
                 origin.source_namespace,
                 reference_location(ordinal, Some(ReferenceField::OriginSourceNamespace)),
             )?;
@@ -1185,7 +1185,7 @@ impl<'document> Decoder<'document> {
             let span = SourceUtf8Span::try_new(start, end)
                 .map_err(|error| self.value_error(&error, span_location, None))?;
             origins.push(Some(SourceOrigin::new(
-                SourceDocumentIdentity::new(ArtifactNamespace::Project, path),
+                SourceDocumentIdentity::new(namespace, path),
                 span,
             )));
         }

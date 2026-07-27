@@ -23,6 +23,13 @@ fn committed_reference_schema_is_draft_2020_12_and_closed() {
     assert_eq!(schema["properties"]["kind"]["const"], "message-reference");
     assert_eq!(schema["properties"]["references"]["maxItems"], 1_000_000);
     assert_eq!(schema["$defs"]["reference"]["additionalProperties"], false);
+    let exact_key = &schema["$defs"]["selector"]["oneOf"][0]["properties"]["key"];
+    assert_eq!(exact_key["type"], "string");
+    assert!(exact_key.get("minLength").is_none());
+    assert_eq!(
+        exact_key["$comment"],
+        "An empty string is valid when the selected catalog-key domain defines a root key; the artifact codec enforces domain grammar."
+    );
     assert_eq!(
         schema["$defs"]["selector"]["oneOf"]
             .as_array()

@@ -134,7 +134,8 @@
               "const": "exact"
             },
             "key": {
-              "type": "string"
+              "type": "string",
+              "$comment": "An empty string is valid when the selected catalog-key domain defines a root key; the artifact codec enforces domain grammar."
             }
           }
         },

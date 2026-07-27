@@ -492,6 +492,14 @@ mod tests {
     }
 
     #[test]
+    fn parser_handles_deep_nesting_without_using_the_rust_call_stack() {
+        const DEPTH: usize = 100_000;
+        let source = format!("{}{}", "[".repeat(DEPTH), "]".repeat(DEPTH));
+        let document = JsonDocument::parse(&source).unwrap();
+        assert!(matches!(document.node(document.root()), JsonNode::Array(_)));
+    }
+
+    #[test]
     fn parser_distinguishes_syntax_from_data_after_a_complete_root() {
         assert_eq!(
             JsonDocument::parse(r#"{"a":]"#).unwrap_err(),
