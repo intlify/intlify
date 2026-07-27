@@ -413,6 +413,8 @@ Reference-artifact logical identity uses three independent inclusive protocol ce
 | `reference_identity_segments` | Number of elements in one non-empty `ReferenceArtifactSegments` array. | `64` |
 | `reference_identity_bytes` | Sum of decoded UTF-8 byte lengths of all segments in one identity. | 4 KiB (`4,096` bytes) |
 
+These are the common `ReferenceIdentitySegmentBytes`, `ReferenceIdentitySegments`, and `ReferenceIdentityBytes` variants at compatibility ordinals 42 through 44. Their exact structured spellings are the snake-case names shown in the table.
+
 The segment-count limit is checked before retaining the array; known structured lengths are preflighted, and streaming adapters stop admitting elements at the first value above the limit. After that preflight, segments are processed in semantic array order.
 
 Each decoded segment is checked against its individual byte ceiling before retention and contributes through checked `u64` addition to the per-identity total before the identity is exposed. Empty arrays remain structurally invalid rather than a zero-sized identity.
@@ -500,6 +502,8 @@ Delivery-unit identity uses three independent inclusive protocol ceilings:
 | `delivery_unit_segments` | Number of elements in one non-empty `DeliveryUnitId`. | `64` |
 | `delivery_unit_bytes` | Sum of decoded UTF-8 byte lengths of every segment in one `DeliveryUnitId`. | 4 KiB (`4,096` bytes) |
 
+These are the common `DeliveryUnitSegmentBytes`, `DeliveryUnitSegments`, and `DeliveryUnitBytes` variants at compatibility ordinals 45 through 47. Their exact structured spellings are the snake-case names shown in the table.
+
 Known array lengths are preflighted before retaining segments; adapters then validate and charge each decoded segment in array order using checked `u64` arithmetic before exposing the ID.
 
 Exactly 255 bytes in one valid segment, 64 segments, and 4,096 total bytes are accepted when all other checks pass; the first value over any ceiling rejects the complete artifact or graph. Repeated segment values and shared prefixes are charged per occurrence without deductions for interning or zero-copy storage.
@@ -534,6 +538,8 @@ Reference-record collections use two independent inclusive protocol ceilings:
 | --- | --- | --: |
 | `reference_records` | Number of submitted `MessageReference` occurrences in one artifact's semantic `references` array. | `1,000,000` |
 | `reference_records_total` | Sum of submitted reference-record counts across every reference artifact in one `LinkRequest`. | `4,000,000` |
+
+The per-artifact row is the common `ReferenceRecords` variant at compatibility ordinal 48. `ReferenceRecordsTotal` remains the request-aggregate variant at ordinal 3.
 
 The producer and reference-artifact decoder preflight `reference_records` from the array length before allocating or decoding individual records, and a direct checked constructor verifies the supplied vector length before exposing the artifact.
 
@@ -756,6 +762,14 @@ pub enum LinkLimitCounter {
     ResolvedMessagesTotal,
     BundlePlanBytesTotal,
     CatalogKeyTokens,
+    ReferenceIdentitySegmentBytes,
+    ReferenceIdentitySegments,
+    ReferenceIdentityBytes,
+    DeliveryUnitSegmentBytes,
+    DeliveryUnitSegments,
+    DeliveryUnitBytes,
+    ReferenceRecords,
+    Definitions,
     // Later owning decisions add explicit variants; there is no custom-string case.
 }
 
@@ -784,7 +798,7 @@ pub struct LinkLimitEvidence {
 }
 ```
 
-The fields are private and exposed read-only through a checked constructor. The forty-one currently fixed counter variants form a closed set.
+The fields are private and exposed read-only through a checked constructor. The forty-nine currently fixed counter variants form a closed set.
 
 Within the reference-request, definition-request, delivery-graph, and resolved-policy groups, declaration order matches the non-interleaved local precedence fixed in their owning sections.
 
@@ -803,6 +817,10 @@ The linker-result counters are appended without renumbering any input counter. `
 The finding counters run only after semantic suppression and canonical finding construction rules have selected the complete final finding candidate set. The plan counters run only when that set contains no blocking finding and therefore admits plan construction.
 
 `CatalogKeyTokens` is appended as the forty-first variant without renumbering the forty previously fixed counters. Its owning definition- and reference-artifact phases run beside domain-specific `CatalogKey` or prefix parsing rather than at its enum declaration position. The variant is active from M0 and has the same fixed protocol ceiling of `256` as the coordinated 013 source contract.
+
+The identity and artifact-local collection counters that were already normative in their owning sections follow without renumbering the first forty-one variants. `ReferenceIdentitySegmentBytes`, `ReferenceIdentitySegments`, and `ReferenceIdentityBytes` occupy ordinals 42 through 44. `DeliveryUnitSegmentBytes`, `DeliveryUnitSegments`, and `DeliveryUnitBytes` occupy ordinals 45 through 47. `ReferenceRecords` and `Definitions` occupy ordinals 48 and 49.
+
+Their declaration position does not change their owning local precedence. Reference identity and delivery-unit construction still apply their segment-count preflight followed by the segment-byte and running-total phases where those sections define them. `ReferenceRecords` runs at the per-reference-artifact collection preflight, and `Definitions` runs at the per-definition-artifact collection preflight after the source envelope and fingerprint phases.
 
 Their declaration order groups one artifact kind's wire and decoded boundary and does not create cross-artifact-kind precedence. Field-, path-, and artifact-level variants follow their owning contexts' local phases rather than creating a cross-input group by declaration position.
 
@@ -853,6 +871,14 @@ Structured adapters use these exact spellings. The common v0.1 counter registry 
 | `ResolvedMessagesTotal`               | `resolved_messages_total`                 |
 | `BundlePlanBytesTotal`                | `bundle_plan_bytes_total`                 |
 | `CatalogKeyTokens`                    | `catalog_key_tokens`                      |
+| `ReferenceIdentitySegmentBytes`       | `reference_identity_segment_bytes`        |
+| `ReferenceIdentitySegments`           | `reference_identity_segments`             |
+| `ReferenceIdentityBytes`              | `reference_identity_bytes`                |
+| `DeliveryUnitSegmentBytes`            | `delivery_unit_segment_bytes`             |
+| `DeliveryUnitSegments`                | `delivery_unit_segments`                  |
+| `DeliveryUnitBytes`                   | `delivery_unit_bytes`                     |
+| `ReferenceRecords`                    | `reference_records`                       |
+| `Definitions`                         | `definitions`                             |
 
 There is no unknown, other, custom, or raw-string counter. Adding a later policy or output counter adds one explicit variant and its ordering/ceiling/subject invariants through the owning compatibility decision rather than accepting an extension string.
 
@@ -1267,13 +1293,19 @@ In `LinkLimitEvidence`, `ReferenceArtifactDecodedBytes` requires exactly the che
 
 Their wire counterparts are unconstructible in that wrapper, and all four per-artifact variants are valid in subject-free `ArtifactContractError::Limit` only for their matching artifact kind and boundary.
 
+`ReferenceIdentitySegmentBytes`, `ReferenceIdentitySegments`, `ReferenceIdentityBytes`, and `ReferenceRecords` are likewise subject-free while constructing or decoding one reference artifact. Defensive linker revalidation uses exactly its already established `ReferenceArtifactGroup(identity)`.
+
+`DeliveryUnitSegmentBytes`, `DeliveryUnitSegments`, and `DeliveryUnitBytes` are subject-free while constructing or decoding one reference artifact. Defensive revalidation uses `ReferenceArtifactGroup(identity)` for an artifact-carried ID and `DeliveryUnitGroup(id)` for one already checked graph-node ID.
+
+`Definitions` is subject-free while constructing or decoding one definition artifact. Defensive linker revalidation uses exactly its already established `DefinitionArtifactGroup(source)`.
+
 `ReferenceArtifacts`, `DefinitionArtifacts`, `PatternMatchStatesTotal`, `FindingsTotal`, `FindingBytesTotal`, `BundlePlansTotal`, `ResolvedMessagesTotal`, and `BundlePlanBytesTotal` require `LinkLimitSubject::Request`.
 
 `PatternMatchStatesTotal` never accepts a reference-artifact group, reference-record identity, candidate key, pattern, matcher state, worker identity, or another subject.
 
 The two finding-result counters never retain a finding kind, subject, evidence, canonical position, blocking disposition, target, reporter, or another result fragment. The three plan-result counters never retain a delivery unit, locale, resolved message, definition location, payload, plan position, exporter, target, worker, or another plan fragment.
 
-Each of the other three reference variants requires the exact selected `ReferenceArtifactGroup`; `DefinitionsTotal` and `DefinitionArtifactDecodedBytesTotal` require the exact selected `DefinitionArtifactGroup`.
+Each of the other three reference aggregate variants requires the exact selected `ReferenceArtifactGroup`; `DefinitionsTotal` and `DefinitionArtifactDecodedBytesTotal` require the exact selected `DefinitionArtifactGroup`.
 
 `EntryStructuralPathBytes`, `CatalogKeyBytes`, `MessageBytes`, and `TotalMessageBytes` also require exactly `DefinitionArtifactGroup(source)` and never retain a raw field, `EntryReference`, definition index, occurrence index, or an arbitrary duplicate artifact occurrence.
 
@@ -1338,6 +1370,10 @@ Because the per-message pass has already limited that addend to 1 MiB and the pr
 `PatternMatchStatesTotal` likewise records the exact checked request total after atomically adding the complete reachable-state count of the current canonical evaluation; it never substitutes `effective_limit + 1`.
 
 The prior accepted total is at most 100,000,000 and one evaluation contributes at most 132,098, so the first rejected attempted total is at most `100,132,098` and `ArithmeticOverflow` is unconstructible for this counter.
+
+`ReferenceIdentitySegmentBytes`, `ReferenceIdentitySegments`, `DeliveryUnitSegmentBytes`, `DeliveryUnitSegments`, `ReferenceRecords`, and `Definitions` use the canonical first-over observation `Exact(effective_limit + 1)`. Known collection lengths never expose a larger complete count, and scalar ingestion stops before retaining bytes beyond the first excess value.
+
+`ReferenceIdentityBytes` and `DeliveryUnitBytes` instead record the exact checked running total immediately after adding the complete segment that first crosses the effective limit. Their prior accepted total is at most 4,096 bytes and one already admitted segment contributes at most 255 bytes, so the first attempted total is at most `4,351`; `ArithmeticOverflow` is unconstructible.
 
 For other counters, `ArithmeticOverflow` is used only when checked length conversion, group-subtotal addition, or request-total addition cannot produce an exact `u64` attempted value.
 
@@ -2761,6 +2797,8 @@ The definition-production boundary inherits these inclusive source-local ceiling
 | `message_bytes` for one definition's extracted UTF-8 message text | 1 MiB (`1,048,576` bytes) |
 | `total_message_bytes` across one source artifact | 64 MiB (`67,108,864` bytes) |
 | `identity_bytes` for distinct interned structural-path, catalog-key, and present display-key payloads | 64 MiB (`67,108,864` bytes) |
+
+The emitted definition-record count is also represented at the artifact contract boundary by the common `Definitions` variant, exact structured spelling `definitions`, at compatibility ordinal 49. It retains the inherited inclusive `100,000` ceiling. The resource producer continues to report its source-side admission as `entries`; the definition artifact constructor and decoder report the corresponding submitted artifact collection as `definitions`.
 
 All six counters retain 013's exact admission order, structural-token semantics, distinct-string accounting, and inclusive-boundary behavior. Under protocol-default limits, every successful 013 extraction is therefore eligible for definition projection without a stricter duplicate source budget.
 
@@ -7738,7 +7776,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
 - Per-artifact decoded-budget precedence fixtures place one field-specific or shape failure against a decoded-total overrun at every adjacent canonical phase for both artifact kinds.
   - They require the current phase's field check before its decoded addition, an admitted payload's decoded overrun before every later phase, and every unfinished earlier phase before that overrun, independently of JSON member order.
   - Streaming fixtures provisionally observe an overrun, retain no payload beyond the effective budget, continue only the bounded syntax/earlier-phase scan needed to select the public result, and produce the same failure as producer, direct-construction, cache, defensive, partitioned, and parallel routes without allocating past the decoded ceiling.
-- Per-artifact limit-contract fixtures require the forty-one-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, the linker-result counters unchanged at ordinals 36 through 40, and `CatalogKeyTokens` appended at ordinal 41, all with their exact snake-case spellings.
+- Per-artifact limit-contract fixtures require the forty-nine-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, the linker-result counters unchanged at ordinals 36 through 40, `CatalogKeyTokens` unchanged at ordinal 41, and the identity/artifact-local collection counters appended at ordinals 42 through 49, all with their exact snake-case spellings.
   - Contract-boundary failures use subject-free `ArtifactContractError::Limit`; linker lower-budget revalidation permits only the matching decoded counter with its established artifact-group subject, wire counters are unconstructible in `LinkLimitEvidence`, and every finding- or plan-result counter is unconstructible at every artifact boundary.
   - Wire observations are exactly `Exact(effective_limit + 1)` and decoded observations are the exact attempted running total after one complete admitted payload; none of the four permits `ArithmeticOverflow`.
   - Wire-precedence fixtures make known-length and every stream chunking return wire overrun before syntax, stop at the first excess byte, return syntax only after bounded at-or-below-limit EOF, and give direct typed construction no wire phase.
@@ -7753,7 +7791,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - They reject every cross-artifact envelope field, undeclared path role or field, whole-path failure mislabeled as a segment, whole-alias failure with a fabricated segment, and known-leaf failure collapsed to its container.
   - They map missing or unknown fields without a valid identity to the containing object, map unpositioned UTF-8/JSON failures to root, and reject raw unknown names, rejected values, JSON Pointers, byte offsets, line/column, excerpts, host paths, unbounded vectors, and route-specific optional detail.
   - Decoder, constructor, cache, defensive, member-permutation, escape, whitespace, slice, and reader fixtures select identical semantic code/location pairs, and enum order never changes failure precedence.
-- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all forty-one counter tokens, and exact/arithmetic-overflow observation shapes.
+- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all forty-nine counter tokens, and exact/arithmetic-overflow observation shapes.
   - They accept every input object-member permutation but reject missing, duplicate, unknown, or required `null` members, Rust enum ordinals, alternate casing, display messages, parser errors, and source chains; canonical round trips reproduce the exact examples above.
 - Artifact-version-support fixtures admit only the Rust/API names `Exact` and `StableRange` and the structured tags `exact` and `stable_range`; reject `DraftExact`, `Stable`, `Compatible`, aliases, alternate casing, and raw strings; and require the checked evidence/support-table boundary to pair `Exact` only with major zero and `StableRange` only with a nonzero stable major.
   - Exact draft and stable range acceptance follow the same negotiation result in direct construction, both typed decoders, both encoders, cache revalidation, and linker admission.
@@ -7804,12 +7842,13 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
 
 #### Operational-limit evidence fixtures
 
-- **Counter vocabulary:** require all forty-one closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
+- **Counter vocabulary:** require all forty-nine closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
   - The list includes `locale_bytes`, `entry_structural_path_bytes`, `catalog_key_bytes`, `catalog_key_tokens`, `message_bytes`, `total_message_bytes`, `catalog_scope_name_bytes`, and `scope_mapping_entries`.
   - Selector and pattern spellings include `selector_path_bytes`, `selector_pattern_bytes`, `selector_pattern_tokens`, `pattern_match_states_total`, and `reason_bytes`.
   - Path spellings include `path_segments`, `path_segment_bytes`, `path_bytes`, `logical_aliases`, and `source_path_bytes`.
   - Artifact-byte spellings include `reference_artifact_wire_bytes`, `reference_artifact_decoded_bytes`, `definition_artifact_wire_bytes`, and `definition_artifact_decoded_bytes`.
   - Result spellings include `findings_total`, `finding_bytes_total`, `bundle_plans_total`, `resolved_messages_total`, and `bundle_plan_bytes_total`.
+  - Identity and artifact-local collection spellings include `reference_identity_segment_bytes`, `reference_identity_segments`, `reference_identity_bytes`, `delivery_unit_segment_bytes`, `delivery_unit_segments`, `delivery_unit_bytes`, `reference_records`, and `definitions`.
   - Reject unknown, custom, or raw counter values.
 - **Subject vocabulary:** enforce compatibility with `Request`, `DefinitionArtifactEnvelope`, `ReferenceArtifactGroup`, `DefinitionArtifactGroup`, `DeliveryGraph`, `DeliveryUnitGroup`, `ResolvedPolicy`, `FallbackSource`, and `ScopeMappings`.
 - **Effective limit:** retain the invocation's exact effective lower or default limit.
