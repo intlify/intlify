@@ -214,6 +214,8 @@ pub enum LinkOperationalError {
     UnsupportedContract(UnsupportedContractError),
     /// One operational budget was exceeded.
     Limit(LinkLimitEvidence),
+    /// Linker logic detected a state forbidden by admitted inputs.
+    InternalInvariant,
 }
 
 impl fmt::Display for LinkOperationalError {
@@ -230,6 +232,7 @@ impl fmt::Display for LinkOperationalError {
                 evidence.effective_limit(),
                 evidence.observation()
             ),
+            Self::InternalInvariant => formatter.write_str("message linker invariant failed"),
         }
     }
 }
