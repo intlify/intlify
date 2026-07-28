@@ -12,6 +12,8 @@
 //! linker consumers. It intentionally does not perform resource extraction, MF2
 //! or JavaScript parsing, CLI orchestration, linking, or exporting.
 
+mod artifact_error;
+mod codec;
 mod error;
 mod fingerprint;
 mod identity;
@@ -19,8 +21,18 @@ mod key;
 mod limits;
 mod locale;
 mod path;
+mod reference;
 mod source;
 
+pub use artifact_error::{
+    ArtifactContractError, ArtifactEnvelopeLocation, ArtifactPathRole, ArtifactVersionEvidence,
+    ArtifactVersionSupport, ArtifactViolation, ArtifactViolationCode, ArtifactViolationLocation,
+    DefinitionEnvelopeField, DefinitionField, ReferenceEnvelopeField, ReferenceField,
+};
+pub use codec::{
+    decode_reference_artifact, decode_reference_artifact_from_reader, encode_reference_artifact,
+    ArtifactReadError,
+};
 pub use error::{
     ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind, ValueRangeError,
 };
@@ -39,6 +51,10 @@ pub use limits::{
 };
 pub use locale::Locale;
 pub use path::{PortablePathSegment, PortableRelativePath, SourceDocumentIdentity};
+pub use reference::{
+    MessageReference, MessageReferenceArtifact, MessageReferenceConstructionError,
+    ReferenceRecordIdentity,
+};
 pub use source::{
     EntryReference, EntryStructuralPath, MessagePayload, ReasonText, SourceOrigin, SourceUtf8Span,
 };
@@ -46,13 +62,16 @@ pub use source::{
 #[cfg(test)]
 mod tests {
     use super::{
-        ArtifactLimitEvidence, ArtifactNamespace, ArtifactVersion, CatalogKey, CatalogKeyDomain,
+        ArtifactContractError, ArtifactLimitEvidence, ArtifactNamespace, ArtifactReadError,
+        ArtifactVersion, ArtifactVersionEvidence, ArtifactVersionSupport, ArtifactViolation,
+        ArtifactViolationCode, ArtifactViolationLocation, CatalogKey, CatalogKeyDomain,
         CatalogKeyPattern, CatalogKeyPrefix, CatalogKeyToken, CatalogScopeId, CatalogScopeName,
         DeliveryUnitId, DeliveryUnitSegment, EntryReference, EntryStructuralPath, LinkLimitCounter,
         LinkLimitEvidence, LinkLimitObservation, LinkLimitSubject, LinkLimits, Locale,
-        MessagePayload, MessageSelector, PatternToken, PortablePathSegment, PortableRelativePath,
-        ProducerId, ProducerIdentity, ProducerRevision, ReasonText, ReferenceArtifactIdentity,
-        ReferenceArtifactSegment, SourceDocumentIdentity, SourceOrigin, SourceUtf8Span,
+        MessagePayload, MessageReference, MessageReferenceArtifact, MessageSelector, PatternToken,
+        PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity, ProducerRevision,
+        ReasonText, ReferenceArtifactIdentity, ReferenceArtifactSegment, ReferenceRecordIdentity,
+        SourceDocumentIdentity, SourceOrigin, SourceUtf8Span,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -87,6 +106,16 @@ mod tests {
         assert_send_sync::<PatternToken>();
         assert_send_sync::<CatalogKeyPattern>();
         assert_send_sync::<MessageSelector>();
+        assert_send_sync::<MessageReference>();
+        assert_send_sync::<ReferenceRecordIdentity>();
+        assert_send_sync::<MessageReferenceArtifact>();
+        assert_send_sync::<ArtifactViolationCode>();
+        assert_send_sync::<ArtifactViolationLocation>();
+        assert_send_sync::<ArtifactViolation>();
+        assert_send_sync::<ArtifactVersionSupport>();
+        assert_send_sync::<ArtifactVersionEvidence>();
+        assert_send_sync::<ArtifactContractError>();
+        assert_send_sync::<ArtifactReadError>();
         assert_send_sync::<LinkLimitCounter>();
         assert_send_sync::<LinkLimitObservation>();
         assert_send_sync::<LinkLimitSubject>();
