@@ -242,6 +242,9 @@ fn validate_parts(
         ));
     }
 
+    // Revalidation deliberately mirrors the wire decoder's canonical phases.
+    // Keep collection checks as separate whole-slice passes: validating each
+    // reference from start to finish would change which failure wins.
     let mut decoded_bytes = 0_u64;
     charge_decoded(
         &mut decoded_bytes,
@@ -266,6 +269,7 @@ fn validate_parts(
 
     LinkLimitCounter::ReferenceRecords.check_artifact_limit(references.len() as u64, limits)?;
 
+    // Scope-name limits and decoded accounting precede every selector phase.
     for reference in references {
         reference.scope.name().revalidate_limit(limits)?;
         charge_decoded(
@@ -275,6 +279,7 @@ fn validate_parts(
         )?;
     }
 
+    // Exact and Prefix byte limits share one phase across the collection.
     for reference in references {
         match &reference.selector {
             MessageSelector::Exact(key) => {
@@ -291,6 +296,7 @@ fn validate_parts(
         }
     }
 
+    // Pattern byte and token limits are independent of selector-path limits.
     for reference in references {
         if let MessageSelector::Pattern(pattern) = &reference.selector {
             pattern.revalidate_bytes(limits)?;
@@ -304,6 +310,8 @@ fn validate_parts(
         }
     }
 
+    // Checked ReasonText values still re-enter their byte phase so a caller-
+    // selected lower limit behaves exactly like serialized decoding.
     for reference in references {
         if let Some(reason) = &reference.reason {
             reason.revalidate_limit(limits)?;
@@ -311,6 +319,8 @@ fn validate_parts(
         }
     }
 
+    // Origin paths retain count, per-segment, and running-total phases instead
+    // of collapsing them into one path constructor check.
     for reference in references {
         if let Some(origin) = &reference.origin {
             LinkLimitCounter::PathSegments
@@ -340,6 +350,8 @@ fn validate_parts(
         }
     }
 
+    // Exact and Prefix token limits are last among selector checks, matching
+    // the decoder phase that follows origin byte admission.
     for reference in references {
         match &reference.selector {
             MessageSelector::Exact(key) => key.revalidate_tokens(limits)?,

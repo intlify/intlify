@@ -83,12 +83,17 @@ pub fn decode_reference_artifact_from_reader<R: Read>(
     let mut buffer = [0_u8; READER_BUFFER_BYTES];
 
     loop {
+        // Never ask the transport for bytes after the canonical first-over
+        // observation. This makes wire-limit evidence independent of the
+        // reader's chunk size and leaves the remaining transport unread.
         let remaining_through_first_over = wire_limit.saturating_add(1).saturating_sub(input.len());
         let read_capacity = remaining_through_first_over.min(buffer.len());
         debug_assert!(read_capacity > 0);
 
         match reader.read(&mut buffer[..read_capacity]) {
             Ok(0) => {
+                // Syntax and contract failures remain provisional until EOF:
+                // a transport error before this point must win instead.
                 return decode_admitted_bytes(&input, limits).map_err(ArtifactReadError::Contract);
             }
             Ok(read) => {
@@ -273,6 +278,9 @@ impl<'document> Decoder<'document> {
             ArtifactViolationLocation::Root,
         )?;
 
+        // Kind and version form the bootstrap schema. They are selected before
+        // the remaining required-member and unknown-member checks so an
+        // unsupported but structurally valid version wins deterministically.
         let kind_id = root.required(0, root_specs[0].location.clone())?;
         let kind = self.string(kind_id, root_specs[0].location.clone())?;
         if kind != REFERENCE_KIND {
@@ -296,6 +304,9 @@ impl<'document> Decoder<'document> {
         let references_id = root.required(5, root_specs[5].location.clone())?;
         root.reject_unknown(ArtifactViolationLocation::Root)?;
 
+        // From here onward the decoder follows the same canonical validation
+        // phases as direct typed construction while accumulating the exact
+        // decoded-byte charge in that order.
         let mut decoded_bytes = 0_u64;
         let producer = self.decode_producer(producer_id)?;
         self.charge_decoded(&mut decoded_bytes, producer.id().as_str().len() as u64)?;
@@ -329,6 +340,9 @@ impl<'document> Decoder<'document> {
             raw_references.push(self.decode_raw_reference_envelope(node, ordinal)?);
         }
 
+        // Record envelopes are staged first, then admitted collection-wide by
+        // field phase. Validating one record completely before the next would
+        // make error precedence depend on submitted record order.
         let references = self.admit_references(&raw_references, &mut decoded_bytes)?;
         let artifact = MessageReferenceArtifact::try_new(
             version,
@@ -365,6 +379,9 @@ impl<'document> Decoder<'document> {
         specs: &[FieldSpec],
         container: ArtifactViolationLocation,
     ) -> Result<ObjectFields, ArtifactContractError> {
+        // Preserve the first value while counting every decoded member name.
+        // The following passes select duplicates by schema order, not by the
+        // order in which an input object happened to spell its members.
         let mut occurrences: BTreeMap<&str, (NodeId, u32)> = BTreeMap::new();
         for member in members {
             let occurrence = occurrences
@@ -384,6 +401,8 @@ impl<'document> Decoder<'document> {
                 ));
             }
         }
+        // Unknown duplicate names have no field-specific location. They are
+        // considered only after every known field in canonical schema order.
         if occurrences
             .iter()
             .any(|(name, (_, count))| *count > 1 && !specs.iter().any(|spec| spec.name == *name))
@@ -495,6 +514,9 @@ impl<'document> Decoder<'document> {
         location: ArtifactViolationLocation,
         token_counter: Option<LinkLimitCounter>,
     ) -> ArtifactContractError {
+        // Checked-value constructors report against protocol ceilings. Replay
+        // their limit evidence through this decoder's possibly lower limits;
+        // only non-limit construction failures become schema grammar errors.
         match error {
             ValueConstructionError::FieldLimit {
                 counter, attempted, ..
@@ -520,6 +542,9 @@ impl<'document> Decoder<'document> {
     }
 }
 
+// These borrowed staging records preserve schema-admitted fields without
+// constructing semantic values too early. `admit_references` consumes them in
+// canonical collection-wide phases.
 struct RawReferenceEnvelope<'a> {
     ordinal: u32,
     scope: RawScope<'a>,
@@ -637,6 +662,9 @@ impl<'document> Decoder<'document> {
             .check_artifact_limit(raw_segments.len() as u64, self.limits)?;
         let mut total = 0_u64;
         let mut segments = Vec::with_capacity(raw_segments.len());
+        // Check each segment before extending the running path total. The
+        // counter order is observable contract behavior and must not be
+        // collapsed into one post-construction revalidation.
         for (ordinal, node) in raw_segments.iter().copied().enumerate() {
             let ordinal = u32::try_from(ordinal)
                 .expect("the admitted identity-segment ceiling is below u32::MAX");
@@ -673,6 +701,8 @@ impl<'document> Decoder<'document> {
             .check_artifact_limit(raw_segments.len() as u64, self.limits)?;
         let mut total = 0_u64;
         let mut segments = Vec::with_capacity(raw_segments.len());
+        // Delivery-unit evidence follows the same per-segment-before-total
+        // ordering as identity paths, but uses its own independent counters.
         for (ordinal, node) in raw_segments.iter().copied().enumerate() {
             let ordinal = u32::try_from(ordinal)
                 .expect("the admitted delivery-unit segment ceiling is below u32::MAX");
@@ -814,6 +844,9 @@ impl<'document> Decoder<'document> {
         let fields = self.inspect_object(id, &specs, container.clone())?;
         let kind_id = fields.required(0, specs[0].location.clone())?;
         let kind = self.string(kind_id, specs[0].location.clone())?;
+        // Resolve the tag before deciding which payload is required. Payloads
+        // belonging to another selector variant are rejected as unknown
+        // members rather than silently ignored.
         let allowed_payload = match kind {
             "exact" => Some(1),
             "prefix" => Some(2),
@@ -938,6 +971,13 @@ impl<'document> Decoder<'document> {
         envelopes: &[RawReferenceEnvelope<'document>],
         decoded_bytes: &mut u64,
     ) -> Result<Vec<MessageReference>, ArtifactContractError> {
+        // Every pass below covers the complete record collection before the
+        // next pass begins. This is intentionally not a record-at-a-time
+        // decoder: field-phase precedence must be independent of which record
+        // first contains a later failure.
+
+        // Scope-name byte admission precedes scope value construction for all
+        // records, including namespace and non-empty-name grammar checks.
         for reference in envelopes {
             LinkLimitCounter::CatalogScopeNameBytes
                 .check_artifact_limit(reference.scope.name.len() as u64, self.limits)?;
@@ -956,6 +996,8 @@ impl<'document> Decoder<'document> {
             scopes.push(CatalogScopeId::new(namespace, name));
         }
 
+        // Selector envelopes establish only the closed variant and raw payload.
+        // Domain-qualified key grammar is deferred to its canonical phase.
         let mut raw_selectors = Vec::with_capacity(envelopes.len());
         for envelope in envelopes {
             raw_selectors.push(self.decode_raw_selector(envelope.selector, envelope.ordinal)?);
@@ -964,6 +1006,8 @@ impl<'document> Decoder<'document> {
         let mut selectors: Vec<Option<MessageSelector>> = std::iter::repeat_with(|| None)
             .take(envelopes.len())
             .collect();
+        // Exact and Prefix share the selector-path byte counter. Complete this
+        // pass before inspecting any Pattern byte budget or catalog domain.
         for selector in &raw_selectors {
             let payload = match selector {
                 RawSelector::Exact(payload) | RawSelector::Prefix(payload) => payload,
@@ -976,6 +1020,7 @@ impl<'document> Decoder<'document> {
             self.charge_decoded(decoded_bytes, payload.len() as u64)?;
         }
 
+        // Pattern has an independent byte budget and decoded-byte contribution.
         for selector in &raw_selectors {
             let RawSelector::Pattern(pattern) = selector else {
                 continue;
@@ -985,6 +1030,7 @@ impl<'document> Decoder<'document> {
             self.charge_decoded(decoded_bytes, pattern.len() as u64)?;
         }
 
+        // Payload byte admission intentionally wins over an unknown domain.
         let mut domains = Vec::with_capacity(envelopes.len());
         for envelope in envelopes {
             let domain = self.string(
@@ -1006,6 +1052,8 @@ impl<'document> Decoder<'document> {
             domains.push(domain);
         }
 
+        // Pattern grammar and complexity are admitted before optional reason
+        // and origin phases. Exact and Prefix grammar occur later by contract.
         for (index, selector) in raw_selectors.iter().enumerate() {
             let RawSelector::Pattern(pattern) = selector else {
                 continue;
@@ -1030,6 +1078,8 @@ impl<'document> Decoder<'document> {
             }
         }
 
+        // Decode and charge reason strings now, but defer ReasonText grammar
+        // until the earlier selector and origin byte phases have completed.
         let mut raw_reasons = Vec::with_capacity(envelopes.len());
         for envelope in envelopes {
             raw_reasons.push(
@@ -1052,6 +1102,9 @@ impl<'document> Decoder<'document> {
             self.charge_decoded(decoded_bytes, reason.len() as u64)?;
         }
 
+        // Origin envelopes are staged without constructing path or span values.
+        // This lets collection-wide path count and byte limits select failures
+        // before per-segment grammar and span consistency.
         let mut raw_origins = Vec::with_capacity(envelopes.len());
         for envelope in envelopes {
             raw_origins.push(
@@ -1069,6 +1122,8 @@ impl<'document> Decoder<'document> {
                 .check_artifact_limit(origin.path.len() as u64, self.limits)?;
         }
 
+        // Decode every path segment and apply its individual byte limit before
+        // computing any complete-path running total.
         let mut raw_origin_paths: Vec<Option<Vec<&str>>> = std::iter::repeat_with(|| None)
             .take(envelopes.len())
             .collect();
@@ -1092,6 +1147,8 @@ impl<'document> Decoder<'document> {
             raw_origin_paths[index] = Some(path);
         }
 
+        // PathBytes observes the first crossing running total within each path,
+        // after all per-segment byte checks across the collection have passed.
         for path in &raw_origin_paths {
             let Some(path) = path else {
                 continue;
@@ -1105,6 +1162,9 @@ impl<'document> Decoder<'document> {
             }
         }
 
+        // Exact and Prefix become domain-qualified values only after every
+        // earlier origin byte phase. This ordering is easy to break by eagerly
+        // constructing a selector while decoding its record envelope.
         for (index, raw_selector) in raw_selectors.iter().enumerate() {
             let (payload, field, is_prefix) = match raw_selector {
                 RawSelector::Exact(payload) => (payload, ReferenceField::SelectorKey, false),
@@ -1129,6 +1189,8 @@ impl<'document> Decoder<'document> {
             };
             selectors[index] = Some(selector);
         }
+        // Token limits are separate from byte limits and run only after every
+        // Exact/Prefix value has passed its domain grammar.
         for selector in selectors.iter().flatten() {
             match selector {
                 MessageSelector::Exact(key) => key.revalidate_tokens(self.limits)?,
@@ -1139,6 +1201,8 @@ impl<'document> Decoder<'document> {
             }
         }
 
+        // Reason grammar follows selector admission; byte length was already
+        // charged above so invalid text cannot reorder an earlier byte failure.
         let mut reasons = Vec::with_capacity(envelopes.len());
         for (index, reason) in raw_reasons.iter().enumerate() {
             let Some(reason) = reason else {
@@ -1153,6 +1217,9 @@ impl<'document> Decoder<'document> {
             ));
         }
 
+        // Origin semantic construction is last: namespace, portable segment
+        // grammar, complete relative-path grammar, and span consistency are
+        // checked only after all earlier collection phases have passed.
         let mut origins = Vec::with_capacity(envelopes.len());
         for (index, origin) in raw_origins.iter().enumerate() {
             let Some(origin) = origin else {
@@ -1190,6 +1257,9 @@ impl<'document> Decoder<'document> {
             )));
         }
 
+        // All components are now independently admitted. The final constructor
+        // enforces only cross-field consistency and cannot expose partial
+        // references if one record is inconsistent.
         let mut references = Vec::with_capacity(envelopes.len());
         for (index, raw_selector) in raw_selectors.iter().enumerate() {
             let selector = match raw_selector {
@@ -1280,6 +1350,9 @@ fn write_artifact(
     sink: &mut impl JsonSink,
     artifact: &MessageReferenceArtifact,
 ) -> Result<(), ArtifactContractError> {
+    // Write the schema's canonical member order directly. Using a map or a
+    // general serializer here could make ordering and number spelling depend
+    // on an implementation detail rather than the versioned wire contract.
     sink.write_bytes(br#"{"kind":"message-reference","version":{"major":"#)?;
     write_u16(sink, artifact.version().major())?;
     sink.write_bytes(br#","minor":"#)?;
@@ -1419,6 +1492,9 @@ fn write_json_string(sink: &mut impl JsonSink, value: &str) -> Result<(), Artifa
     sink.write_bytes(b"\"")?;
     let mut scalar_buffer = [0_u8; 4];
     for character in value.chars() {
+        // Use one deterministic minimal spelling: named JSON escapes where
+        // available, lowercase \u00xx for remaining controls, and direct UTF-8
+        // for every other Unicode scalar.
         match character {
             '"' => sink.write_bytes(br#"\""#)?,
             '\\' => sink.write_bytes(br"\\")?,

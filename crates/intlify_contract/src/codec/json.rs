@@ -108,6 +108,9 @@ impl<'a> Parser<'a> {
         let mut pending_value = None;
 
         loop {
+            // A completed scalar or container is staged here and attached to
+            // its parent on the next iteration. This replaces the return path
+            // of recursive descent and keeps nesting on the explicit stack.
             if let Some(value) = pending_value.take() {
                 if let Some(parent) = self.stack.last_mut() {
                     match parent {
@@ -143,6 +146,9 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
+            // Advance exactly one container state. Child containers push a new
+            // frame; closing a container produces a pending value for its
+            // parent, so this loop never recurses through untrusted nesting.
             self.skip_whitespace();
             let frame = self
                 .stack
@@ -244,6 +250,9 @@ impl<'a> Parser<'a> {
             }
         }
 
+        // Completing the first root is not early success. Only insignificant
+        // whitespace may follow it; any other byte is a distinct transport
+        // contract failure rather than generic JSON syntax.
         self.skip_whitespace();
         if self.offset != self.bytes.len() {
             return Err(JsonParseError::TrailingData);
@@ -261,6 +270,8 @@ impl<'a> Parser<'a> {
         };
         match byte {
             b'{' => {
+                // Containers are opened by pushing their initial state instead
+                // of parsing their children on the Rust call stack.
                 self.offset += 1;
                 self.stack.push(Frame::Object {
                     members: Vec::new(),
@@ -270,6 +281,7 @@ impl<'a> Parser<'a> {
                 Ok(None)
             }
             b'[' => {
+                // Arrays use the same explicit-frame path as objects.
                 self.offset += 1;
                 self.stack.push(Frame::Array {
                     items: Vec::new(),
