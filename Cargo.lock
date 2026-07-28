@@ -470,6 +470,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_linker"
+version = "0.14.0-alpha.11"
+dependencies = [
+ "intlify_contract",
+]
+
+[[package]]
 name = "intlify_resource"
 version = "0.14.0-alpha.9"
 dependencies = [
