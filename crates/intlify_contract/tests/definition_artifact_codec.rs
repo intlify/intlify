@@ -277,6 +277,21 @@ fn committed_definition_schema_is_draft_2020_12_and_closed() {
         "https://json-schema.org/draft/2020-12/schema"
     );
     assert_eq!(schema["additionalProperties"], false);
+    for object_schema in [
+        "version",
+        "producer",
+        "projectNamespace",
+        "sourceIdentity",
+        "inputFingerprint",
+        "scope",
+        "entryReference",
+        "definition",
+    ] {
+        assert_eq!(
+            schema["$defs"][object_schema]["additionalProperties"], false,
+            "$defs.{object_schema} must remain closed"
+        );
+    }
     assert_eq!(schema["properties"]["kind"]["const"], "message-definition");
     assert_eq!(schema["properties"]["logicalAliases"]["maxItems"], 4_096);
     assert_eq!(schema["properties"]["definitions"]["maxItems"], 100_000);
