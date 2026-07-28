@@ -40,6 +40,34 @@ fn committed_reference_schema_is_draft_2020_12_and_closed() {
 }
 
 #[test]
+fn committed_reference_schema_validates_every_json_conformance_fixture() {
+    let schema: Value = serde_json::from_str(SCHEMA).expect("schema must be valid JSON");
+    let validator = jsonschema::validator_for(&schema).expect("schema must compile");
+
+    for (name, fixture) in [
+        ("canonical.json", CANONICAL),
+        ("zero-references.json", ZERO_REFERENCES),
+        ("noncanonical-input.json", NONCANONICAL_INPUT),
+    ] {
+        let instance: Value =
+            serde_json::from_slice(fixture).expect("fixture must be valid JSON syntax");
+        let errors = validator
+            .iter_errors(&instance)
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>();
+        assert!(errors.is_empty(), "{name} violates schema: {errors:#?}");
+    }
+
+    let mut wrong_kind: Value =
+        serde_json::from_slice(ZERO_REFERENCES).expect("fixture must be valid JSON syntax");
+    wrong_kind["kind"] = Value::String("message-definition".to_owned());
+    assert!(
+        !validator.is_valid(&wrong_kind),
+        "the validator must actively reject an invalid fixture"
+    );
+}
+
+#[test]
 fn canonical_fixtures_are_stable_complete_documents_without_a_final_newline() {
     let limits = LinkLimits::default();
     for fixture in [CANONICAL, ZERO_REFERENCES] {
