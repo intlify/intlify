@@ -1,0 +1,15 @@
+{
+  "definitions": [],
+  "inputFingerprint": {
+    "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "algorithm": "blake3-256"
+  },
+  "logicalAliases": [],
+  "source": {
+    "path": ["mess\u0061ges.json"],
+    "namespace": {"kind": "project"}
+  },
+  "producer": {"revision": "1", "id": "dev.intlify/test"},
+  "version": {"minor": 1, "major": 0},
+  "kind": "message-definition"
+}

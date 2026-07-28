@@ -1,0 +1,1 @@
+{"kind":"message-definition","version":{"major":0,"minor":1},"producer":{"id":"dev.intlify/test","revision":"1"},"source":{"namespace":{"kind":"project"},"path":["messages.json"]},"logicalAliases":[],"inputFingerprint":{"algorithm":"blake3-256","digest":"0000000000000000000000000000000000000000000000000000000000000000"},"definitions":[]}
