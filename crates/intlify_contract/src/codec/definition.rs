@@ -774,24 +774,32 @@ impl<'document> Decoder<'document> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Every collection-wide pass above produces exactly one component per
+        // raw record. Consume those owned vectors together so assembling the
+        // final immutable records does not clone potentially large payloads.
+        let components = namespaces
+            .into_iter()
+            .zip(scope_names)
+            .zip(domains)
+            .zip(checked_keys)
+            .zip(locales)
+            .zip(messages)
+            .zip(entry_sources);
         let mut definitions = Vec::with_capacity(raw.len());
-        for (index, raw_definition) in raw.iter().enumerate() {
-            let scope = CatalogScopeId::new(namespaces[index], scope_names[index].clone());
+        for (
+            raw_definition,
+            ((((((namespace, scope_name), domain), key), locale), message), entry_source),
+        ) in raw.iter().zip(components)
+        {
+            let scope = CatalogScopeId::new(namespace, scope_name);
             definitions.push(
-                MessageDefinition::try_new(
-                    scope,
-                    domains[index],
-                    checked_keys[index].clone(),
-                    locales[index].clone(),
-                    messages[index].clone(),
-                    entry_sources[index].clone(),
-                )
-                .map_err(|_| {
-                    invalid(
-                        ArtifactViolationCode::InconsistentValue,
-                        definition_location(raw_definition.ordinal, Some(DefinitionField::Key)),
-                    )
-                })?,
+                MessageDefinition::try_new(scope, domain, key, locale, message, entry_source)
+                    .map_err(|_| {
+                        invalid(
+                            ArtifactViolationCode::InconsistentValue,
+                            definition_location(raw_definition.ordinal, Some(DefinitionField::Key)),
+                        )
+                    })?,
             );
         }
         Ok(definitions)
