@@ -70,6 +70,7 @@ impl ScopeMappingTable {
         limits: &LinkLimits,
     ) -> Result<Self, LinkOperationalError> {
         validate_mapping_limits(&mappings, limits)?;
+        validate_scope_inventory_limits(declared_scopes, limits)?;
         let declared_scopes = canonical_scope_inventory(declared_scopes)?;
 
         let declared = declared_scopes.iter().collect::<BTreeSet<_>>();
@@ -286,7 +287,10 @@ impl ScopeCompletenessTable {
     pub fn try_new(
         target_scopes: &[CatalogScopeId],
         entries: Vec<ScopeCompleteness>,
+        limits: &LinkLimits,
     ) -> Result<Self, LinkOperationalError> {
+        validate_scope_inventory_limits(target_scopes, limits)?;
+        validate_scope_inventory_limits(entries.iter().map(ScopeCompleteness::scope), limits)?;
         let target_scopes = canonical_scope_inventory(target_scopes)?;
         let target_set = target_scopes.iter().collect::<BTreeSet<_>>();
 
@@ -497,6 +501,26 @@ fn validate_mapping_limits(
     Ok(())
 }
 
+/// Reapply the per-name lower budget to one host-admitted scope inventory.
+///
+/// Inventory cardinality remains bounded by its owning configuration contract;
+/// there is no independent linker counter for the number of target scopes.
+pub(crate) fn validate_scope_inventory_limits<'a>(
+    scopes: impl IntoIterator<Item = &'a CatalogScopeId>,
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    let subject = LinkLimitSubject::ResolvedPolicy;
+    for scope in scopes {
+        check_first_over(
+            LinkLimitCounter::CatalogScopeNameBytes,
+            subject.clone(),
+            usize_count(scope.name().as_str().len()),
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
 fn canonical_scope_inventory(
     scopes: &[CatalogScopeId],
 ) -> Result<Vec<CatalogScopeId>, LinkOperationalError> {
@@ -550,7 +574,7 @@ fn resolved_side(contributors: Vec<CompletenessContributor>) -> ResolvedInputCom
 mod tests {
     use intlify_contract::{
         ArtifactNamespace, CatalogScopeId, CatalogScopeName, LinkLimitCounter,
-        LinkLimitObservation, LinkLimits,
+        LinkLimitObservation, LinkLimitSubject, LinkLimits,
     };
 
     use super::{
@@ -570,6 +594,19 @@ mod tests {
     fn closed(scope: CatalogScopeId) -> ScopeCompleteness {
         ScopeCompleteness::try_new(scope, InputCompleteness::Closed, InputCompleteness::Closed)
             .unwrap()
+    }
+
+    fn assert_scope_name_limit(error: LinkOperationalError, effective_limit: u64) {
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected limit evidence");
+        };
+        assert_eq!(evidence.counter(), LinkLimitCounter::CatalogScopeNameBytes);
+        assert_eq!(evidence.subject(), &LinkLimitSubject::ResolvedPolicy);
+        assert_eq!(evidence.effective_limit(), effective_limit);
+        assert_eq!(
+            evidence.observation(),
+            LinkLimitObservation::Exact(effective_limit + 1)
+        );
     }
 
     #[test]
@@ -638,8 +675,12 @@ mod tests {
         )
         .is_err_and(|error| error.side() == CompletenessSide::Definitions));
 
-        let missing =
-            ScopeCompletenessTable::try_new(std::slice::from_ref(&app), Vec::new()).unwrap_err();
+        let missing = ScopeCompletenessTable::try_new(
+            std::slice::from_ref(&app),
+            Vec::new(),
+            &LinkLimits::default(),
+        )
+        .unwrap_err();
         assert_eq!(
             missing,
             LinkOperationalError::InvalidRequest(InvalidRequestError::MissingCompletenessScope(
@@ -650,6 +691,7 @@ mod tests {
         let duplicate = ScopeCompletenessTable::try_new(
             std::slice::from_ref(&app),
             vec![closed(app.clone()), closed(app.clone())],
+            &LinkLimits::default(),
         )
         .unwrap_err();
         assert_eq!(
@@ -664,6 +706,7 @@ mod tests {
         let unsorted = ScopeCompletenessTable::try_new(
             &[a.clone(), b.clone()],
             vec![closed(b.clone()), closed(a.clone())],
+            &LinkLimits::default(),
         )
         .unwrap_err();
         assert_eq!(
@@ -674,6 +717,44 @@ mod tests {
                     current: a,
                 }
             )
+        );
+    }
+
+    #[test]
+    fn scope_inventory_name_limits_precede_inventory_semantics() {
+        let long = scope("scope");
+        let limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CatalogScopeNameBytes, 3)
+            .unwrap();
+
+        assert_scope_name_limit(
+            ScopeMappingTable::empty(std::slice::from_ref(&long), &limits).unwrap_err(),
+            3,
+        );
+        assert_scope_name_limit(
+            ScopeCompletenessTable::try_new(std::slice::from_ref(&long), Vec::new(), &limits)
+                .unwrap_err(),
+            3,
+        );
+
+        let short = scope("a");
+        let entry_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CatalogScopeNameBytes, 1)
+            .unwrap();
+        assert!(ScopeCompletenessTable::try_new(
+            std::slice::from_ref(&short),
+            vec![closed(short.clone())],
+            &entry_limits,
+        )
+        .is_ok());
+        assert_scope_name_limit(
+            ScopeCompletenessTable::try_new(
+                std::slice::from_ref(&short),
+                vec![closed(long)],
+                &entry_limits,
+            )
+            .unwrap_err(),
+            1,
         );
     }
 
@@ -695,8 +776,12 @@ mod tests {
             )
             .unwrap(),
         ];
-        let table =
-            ScopeCompletenessTable::try_new(&[source.clone(), target.clone()], entries).unwrap();
+        let table = ScopeCompletenessTable::try_new(
+            &[source.clone(), target.clone()],
+            entries,
+            &LinkLimits::default(),
+        )
+        .unwrap();
         let mappings = ScopeMappingTable::try_new(
             &[source.clone(), target.clone()],
             vec![ScopeMapping::new(source.clone(), target.clone())],

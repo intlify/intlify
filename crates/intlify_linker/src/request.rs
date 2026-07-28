@@ -16,6 +16,7 @@ use intlify_contract::{
     MessageReferenceArtifact, ReferenceArtifactIdentity,
 };
 
+use crate::scope::validate_scope_inventory_limits;
 use crate::validation::{arithmetic_overflow, check_exact, check_first_over, usize_count};
 use crate::{
     ArtifactContractSubject, ArtifactKind, DeliveryUnitGraph, InvalidRequestError,
@@ -56,7 +57,7 @@ impl<'a> LinkRequest<'a> {
         scope_mappings.revalidate(limits)?;
         delivery_graph.revalidate(limits)?;
 
-        validate_scope_inventory(scope_mappings, scope_completeness)?;
+        validate_scope_inventory(scope_mappings, scope_completeness, limits)?;
         validate_scope_bindings(
             reference_artifacts,
             definition_artifacts,
@@ -382,7 +383,10 @@ fn definition_artifact_limit_subject(
 fn validate_scope_inventory(
     mappings: &ScopeMappingTable,
     completeness: &ScopeCompletenessTable,
+    limits: &LinkLimits,
 ) -> Result<(), LinkOperationalError> {
+    validate_scope_inventory_limits(mappings.declared_scopes(), limits)?;
+    validate_scope_inventory_limits(completeness.scopes(), limits)?;
     if mappings.declared_scopes().iter().ne(completeness.scopes()) {
         return Err(InvalidRequestError::MappingInventoryMismatch.into());
     }
@@ -608,6 +612,7 @@ mod tests {
                     .unwrap()
                 })
                 .collect(),
+            &LinkLimits::default(),
         )
         .unwrap()
     }
@@ -854,6 +859,31 @@ mod tests {
                 .unwrap_err(),
             LinkOperationalError::InvalidRequest(InvalidRequestError::MappingInventoryMismatch)
         );
+    }
+
+    #[test]
+    fn request_revalidates_scope_inventory_under_current_limits() {
+        let app = scope("application");
+        let mappings =
+            ScopeMappingTable::empty(std::slice::from_ref(&app), &LinkLimits::default()).unwrap();
+        let completeness = completeness(std::slice::from_ref(&app));
+        let policy = policy(Vec::new());
+        let graph =
+            DeliveryUnitGraph::try_new(Vec::new(), Vec::new(), &LinkLimits::default()).unwrap();
+        let limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CatalogScopeNameBytes, 3)
+            .unwrap();
+
+        let error =
+            LinkRequest::try_new(&[], &[], &policy, &mappings, &completeness, &graph, &limits)
+                .unwrap_err();
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected limit evidence");
+        };
+        assert_eq!(evidence.counter(), LinkLimitCounter::CatalogScopeNameBytes);
+        assert_eq!(evidence.subject(), &LinkLimitSubject::ResolvedPolicy);
+        assert_eq!(evidence.effective_limit(), 3);
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(4));
     }
 
     #[test]
