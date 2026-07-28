@@ -16,7 +16,8 @@ export default defineConfig({
     ignorePatterns: [
       'CHANGELOG.md',
       'refers/**',
-      'crates/intlify_contract/fixtures/reference/**/*.json'
+      'crates/intlify_contract/fixtures/reference/**/*.json',
+      'crates/intlify_contract/fixtures/definition/**/*.json'
     ]
   }),
   lint: defineLintConfig({

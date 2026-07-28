@@ -14,6 +14,7 @@
 
 mod artifact_error;
 mod codec;
+mod definition;
 mod error;
 mod fingerprint;
 mod identity;
@@ -30,8 +31,13 @@ pub use artifact_error::{
     DefinitionEnvelopeField, DefinitionField, ReferenceEnvelopeField, ReferenceField,
 };
 pub use codec::{
-    decode_reference_artifact, decode_reference_artifact_from_reader, encode_reference_artifact,
+    decode_definition_artifact, decode_definition_artifact_from_reader, decode_reference_artifact,
+    decode_reference_artifact_from_reader, encode_definition_artifact, encode_reference_artifact,
     ArtifactReadError,
+};
+pub use definition::{
+    FingerprintAlgorithm, FingerprintDigest, InputFingerprint, MessageDefinition,
+    MessageDefinitionArtifact, MessageDefinitionConstructionError,
 };
 pub use error::{
     ValueConstructionError, ValueGrammar, ValueLimit, ValueLimitKind, ValueRangeError,
@@ -66,8 +72,10 @@ mod tests {
         ArtifactVersion, ArtifactVersionEvidence, ArtifactVersionSupport, ArtifactViolation,
         ArtifactViolationCode, ArtifactViolationLocation, CatalogKey, CatalogKeyDomain,
         CatalogKeyPattern, CatalogKeyPrefix, CatalogKeyToken, CatalogScopeId, CatalogScopeName,
-        DeliveryUnitId, DeliveryUnitSegment, EntryReference, EntryStructuralPath, LinkLimitCounter,
+        DeliveryUnitId, DeliveryUnitSegment, EntryReference, EntryStructuralPath,
+        FingerprintAlgorithm, FingerprintDigest, InputFingerprint, LinkLimitCounter,
         LinkLimitEvidence, LinkLimitObservation, LinkLimitSubject, LinkLimits, Locale,
+        MessageDefinition, MessageDefinitionArtifact, MessageDefinitionConstructionError,
         MessagePayload, MessageReference, MessageReferenceArtifact, MessageSelector, PatternToken,
         PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity, ProducerRevision,
         ReasonText, ReferenceArtifactIdentity, ReferenceArtifactSegment, ReferenceRecordIdentity,
@@ -99,6 +107,9 @@ mod tests {
         assert_send_sync::<EntryReference>();
         assert_send_sync::<MessagePayload>();
         assert_send_sync::<ReasonText>();
+        assert_send_sync::<FingerprintAlgorithm>();
+        assert_send_sync::<FingerprintDigest>();
+        assert_send_sync::<InputFingerprint>();
         assert_send_sync::<CatalogKeyDomain>();
         assert_send_sync::<CatalogKeyToken>();
         assert_send_sync::<CatalogKey>();
@@ -109,6 +120,9 @@ mod tests {
         assert_send_sync::<MessageReference>();
         assert_send_sync::<ReferenceRecordIdentity>();
         assert_send_sync::<MessageReferenceArtifact>();
+        assert_send_sync::<MessageDefinition>();
+        assert_send_sync::<MessageDefinitionArtifact>();
+        assert_send_sync::<MessageDefinitionConstructionError>();
         assert_send_sync::<ArtifactViolationCode>();
         assert_send_sync::<ArtifactViolationLocation>();
         assert_send_sync::<ArtifactViolation>();

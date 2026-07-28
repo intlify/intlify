@@ -10,62 +10,39 @@
 //! It does not perform filesystem discovery, decompression, async I/O, artifact
 //! framing, source-language analysis, linking, or publication.
 
-use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt;
-use std::io::{self, Read};
+use std::io::Read;
 
-use super::json::{JsonDocument, JsonMember, JsonNode, JsonParseError, NodeId};
+use super::json::{JsonDocument, NodeId};
+use super::shared::{
+    admit_known_wire_length, decode_from_reader, invalid, parse_document, write_json_string,
+    write_namespace, write_string_array, write_u16, write_u32, ArtifactReadError, CountingSink,
+    FieldSpec, JsonSink, SchemaDecoder, VecSink,
+};
 use crate::{
     ArtifactContractError, ArtifactEnvelopeLocation, ArtifactNamespace, ArtifactPathRole,
-    ArtifactVersion, ArtifactVersionEvidence, ArtifactVersionSupport, ArtifactViolation,
-    ArtifactViolationCode, ArtifactViolationLocation, CatalogKey, CatalogKeyDomain,
-    CatalogKeyPattern, CatalogKeyPrefix, CatalogScopeId, CatalogScopeName, DeliveryUnitId,
-    DeliveryUnitSegment, LinkLimitCounter, LinkLimits, MessageReference, MessageReferenceArtifact,
-    MessageSelector, PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity,
-    ProducerRevision, ReasonText, ReferenceArtifactIdentity, ReferenceArtifactSegment,
-    ReferenceEnvelopeField, ReferenceField, SourceDocumentIdentity, SourceOrigin, SourceUtf8Span,
-    ValueConstructionError, ValueLimitKind,
+    ArtifactVersion, ArtifactVersionEvidence, ArtifactVersionSupport, ArtifactViolationCode,
+    ArtifactViolationLocation, CatalogKey, CatalogKeyDomain, CatalogKeyPattern, CatalogKeyPrefix,
+    CatalogScopeId, CatalogScopeName, DeliveryUnitId, DeliveryUnitSegment, LinkLimitCounter,
+    LinkLimits, MessageReference, MessageReferenceArtifact, MessageSelector, PortablePathSegment,
+    PortableRelativePath, ProducerId, ProducerIdentity, ProducerRevision, ReasonText,
+    ReferenceArtifactIdentity, ReferenceArtifactSegment, ReferenceEnvelopeField, ReferenceField,
+    SourceDocumentIdentity, SourceOrigin, SourceUtf8Span,
 };
 
 const REFERENCE_KIND: &str = "message-reference";
 const VERSION_SUPPORT: ArtifactVersionSupport =
     ArtifactVersionSupport::Exact(ArtifactVersion::DRAFT_V0_1);
-const READER_BUFFER_BYTES: usize = 8 * 1024;
-
-/// Failure while reading and admitting one serialized reference artifact.
-#[derive(Debug)]
-pub enum ArtifactReadError {
-    /// The input transport failed before a bounded EOF was observed.
-    Transport(io::Error),
-    /// The complete bounded byte sequence violated the artifact contract.
-    Contract(ArtifactContractError),
-}
-
-impl fmt::Display for ArtifactReadError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Transport(error) => write!(formatter, "artifact transport failed: {error}"),
-            Self::Contract(error) => error.fmt(formatter),
-        }
-    }
-}
-
-impl Error for ArtifactReadError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Transport(error) => Some(error),
-            Self::Contract(error) => Some(error),
-        }
-    }
-}
 
 /// Decode one complete in-memory reference-artifact JSON document.
 pub fn decode_reference_artifact(
     input: &[u8],
     limits: &LinkLimits,
 ) -> Result<MessageReferenceArtifact, ArtifactContractError> {
-    admit_known_wire_length(input.len(), limits)?;
+    admit_known_wire_length(
+        input.len(),
+        limits,
+        LinkLimitCounter::ReferenceArtifactWireBytes,
+    )?;
     decode_admitted_bytes(input, limits)
 }
 
@@ -78,34 +55,12 @@ pub fn decode_reference_artifact_from_reader<R: Read>(
     reader: &mut R,
     limits: &LinkLimits,
 ) -> Result<MessageReferenceArtifact, ArtifactReadError> {
-    let wire_limit = effective_wire_limit_usize(limits);
-    let mut input = Vec::with_capacity(wire_limit.min(READER_BUFFER_BYTES));
-    let mut buffer = [0_u8; READER_BUFFER_BYTES];
-
-    loop {
-        // Never ask the transport for bytes after the canonical first-over
-        // observation. This makes wire-limit evidence independent of the
-        // reader's chunk size and leaves the remaining transport unread.
-        let remaining_through_first_over = wire_limit.saturating_add(1).saturating_sub(input.len());
-        let read_capacity = remaining_through_first_over.min(buffer.len());
-        debug_assert!(read_capacity > 0);
-
-        match reader.read(&mut buffer[..read_capacity]) {
-            Ok(0) => {
-                // Syntax and contract failures remain provisional until EOF:
-                // a transport error before this point must win instead.
-                return decode_admitted_bytes(&input, limits).map_err(ArtifactReadError::Contract);
-            }
-            Ok(read) => {
-                if input.len() + read > wire_limit {
-                    return Err(ArtifactReadError::Contract(wire_limit_error(limits)));
-                }
-                input.extend_from_slice(&buffer[..read]);
-            }
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-            Err(error) => return Err(ArtifactReadError::Transport(error)),
-        }
-    }
+    decode_from_reader(
+        reader,
+        limits,
+        LinkLimitCounter::ReferenceArtifactWireBytes,
+        decode_admitted_bytes,
+    )
 }
 
 /// Encode one immutable reference artifact as one complete canonical JSON value.
@@ -123,67 +78,22 @@ pub fn encode_reference_artifact(
         ));
     }
 
-    let mut counter = CountingSink::new(limits);
+    let mut counter = CountingSink::new(limits, LinkLimitCounter::ReferenceArtifactWireBytes);
     write_artifact(&mut counter, artifact)?;
     artifact.revalidate(limits)?;
 
     let mut output = VecSink::with_capacity(counter.length());
     write_artifact(&mut output, artifact)?;
-    debug_assert_eq!(output.bytes.len(), counter.length());
-    Ok(output.bytes.into_boxed_slice())
+    debug_assert_eq!(output.length(), counter.length());
+    Ok(output.into_boxed_bytes())
 }
 
 fn decode_admitted_bytes(
     input: &[u8],
     limits: &LinkLimits,
 ) -> Result<MessageReferenceArtifact, ArtifactContractError> {
-    let source = std::str::from_utf8(input).map_err(|_| {
-        invalid(
-            ArtifactViolationCode::InvalidUtf8,
-            ArtifactViolationLocation::Root,
-        )
-    })?;
-    let document = JsonDocument::parse(source).map_err(|error| match error {
-        JsonParseError::Syntax => invalid(
-            ArtifactViolationCode::InvalidJsonSyntax,
-            ArtifactViolationLocation::Root,
-        ),
-        JsonParseError::TrailingData => invalid(
-            ArtifactViolationCode::TrailingData,
-            ArtifactViolationLocation::Root,
-        ),
-    })?;
+    let document = parse_document(input)?;
     Decoder::new(&document, limits).decode()
-}
-
-fn admit_known_wire_length(
-    length: usize,
-    limits: &LinkLimits,
-) -> Result<(), ArtifactContractError> {
-    if length > effective_wire_limit_usize(limits) {
-        return Err(wire_limit_error(limits));
-    }
-    Ok(())
-}
-
-fn effective_wire_limit_usize(limits: &LinkLimits) -> usize {
-    usize::try_from(limits.effective_limit(LinkLimitCounter::ReferenceArtifactWireBytes))
-        .expect("the reference wire ceiling fits every supported usize target")
-}
-
-fn wire_limit_error(limits: &LinkLimits) -> ArtifactContractError {
-    let limit = limits.effective_limit(LinkLimitCounter::ReferenceArtifactWireBytes);
-    LinkLimitCounter::ReferenceArtifactWireBytes
-        .check_artifact_limit(limit + 1, limits)
-        .expect_err("the canonical first-over value exceeds the effective wire limit")
-        .into()
-}
-
-fn invalid(
-    code: ArtifactViolationCode,
-    location: ArtifactViolationLocation,
-) -> ArtifactContractError {
-    ArtifactContractError::InvalidArtifact(ArtifactViolation::new(code, location))
 }
 
 fn reference_envelope(field: Option<ReferenceEnvelopeField>) -> ArtifactViolationLocation {
@@ -201,37 +111,6 @@ fn reference_origin_segment(
     ArtifactViolationLocation::ReferenceOriginSegment {
         reference_ordinal,
         segment_ordinal,
-    }
-}
-
-#[derive(Clone)]
-struct FieldSpec {
-    name: &'static str,
-    location: ArtifactViolationLocation,
-}
-
-struct ObjectFields {
-    values: Box<[Option<NodeId>]>,
-    has_unknown: bool,
-}
-
-impl ObjectFields {
-    fn required(
-        &self,
-        index: usize,
-        location: ArtifactViolationLocation,
-    ) -> Result<NodeId, ArtifactContractError> {
-        self.values[index].ok_or_else(|| invalid(ArtifactViolationCode::MissingMember, location))
-    }
-
-    fn reject_unknown(
-        &self,
-        container: ArtifactViolationLocation,
-    ) -> Result<(), ArtifactContractError> {
-        if self.has_unknown {
-            return Err(invalid(ArtifactViolationCode::UnknownMember, container));
-        }
-        Ok(())
     }
 }
 
@@ -356,148 +235,6 @@ impl<'document> Decoder<'document> {
         Ok(artifact)
     }
 
-    fn inspect_object(
-        &self,
-        id: NodeId,
-        specs: &[FieldSpec],
-        container: ArtifactViolationLocation,
-    ) -> Result<ObjectFields, ArtifactContractError> {
-        let members = match self.document.node(id) {
-            JsonNode::Null => {
-                return Err(invalid(ArtifactViolationCode::NullNotAllowed, container));
-            }
-            JsonNode::Object(members) => members,
-            JsonNode::Bool | JsonNode::Number(_) | JsonNode::String(_) | JsonNode::Array(_) => {
-                return Err(invalid(ArtifactViolationCode::TypeMismatch, container));
-            }
-        };
-        Self::inspect_members(members, specs, container)
-    }
-
-    fn inspect_members(
-        members: &[JsonMember],
-        specs: &[FieldSpec],
-        container: ArtifactViolationLocation,
-    ) -> Result<ObjectFields, ArtifactContractError> {
-        // Preserve the first value while counting every decoded member name.
-        // The following passes select duplicates by schema order, not by the
-        // order in which an input object happened to spell its members.
-        let mut occurrences: BTreeMap<&str, (NodeId, u32)> = BTreeMap::new();
-        for member in members {
-            let occurrence = occurrences
-                .entry(member.name.as_ref())
-                .or_insert((member.value, 0));
-            occurrence.1 += 1;
-        }
-
-        for spec in specs {
-            if occurrences
-                .get(spec.name)
-                .is_some_and(|(_, count)| *count > 1)
-            {
-                return Err(invalid(
-                    ArtifactViolationCode::DuplicateMember,
-                    spec.location.clone(),
-                ));
-            }
-        }
-        // Unknown duplicate names have no field-specific location. They are
-        // considered only after every known field in canonical schema order.
-        if occurrences
-            .iter()
-            .any(|(name, (_, count))| *count > 1 && !specs.iter().any(|spec| spec.name == *name))
-        {
-            return Err(invalid(ArtifactViolationCode::DuplicateMember, container));
-        }
-
-        let values = specs
-            .iter()
-            .map(|spec| occurrences.get(spec.name).map(|(id, _)| *id))
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
-        let has_unknown = occurrences
-            .keys()
-            .any(|name| !specs.iter().any(|spec| spec.name == *name));
-        Ok(ObjectFields {
-            values,
-            has_unknown,
-        })
-    }
-
-    fn string(
-        &self,
-        id: NodeId,
-        location: ArtifactViolationLocation,
-    ) -> Result<&'document str, ArtifactContractError> {
-        match self.document.node(id) {
-            JsonNode::Null => Err(invalid(ArtifactViolationCode::NullNotAllowed, location)),
-            JsonNode::String(value) => Ok(value),
-            JsonNode::Bool | JsonNode::Number(_) | JsonNode::Array(_) | JsonNode::Object(_) => {
-                Err(invalid(ArtifactViolationCode::TypeMismatch, location))
-            }
-        }
-    }
-
-    fn array(
-        &self,
-        id: NodeId,
-        location: ArtifactViolationLocation,
-    ) -> Result<&'document [NodeId], ArtifactContractError> {
-        match self.document.node(id) {
-            JsonNode::Null => Err(invalid(ArtifactViolationCode::NullNotAllowed, location)),
-            JsonNode::Array(values) => Ok(values),
-            JsonNode::Bool | JsonNode::Number(_) | JsonNode::String(_) | JsonNode::Object(_) => {
-                Err(invalid(ArtifactViolationCode::TypeMismatch, location))
-            }
-        }
-    }
-
-    fn unsigned_u16(
-        &self,
-        id: NodeId,
-        location: ArtifactViolationLocation,
-    ) -> Result<u16, ArtifactContractError> {
-        let token = self.integer_token(id, location.clone())?;
-        token
-            .parse::<u16>()
-            .map_err(|_| invalid(ArtifactViolationCode::InvalidInteger, location))
-    }
-
-    fn unsigned_u32(
-        &self,
-        id: NodeId,
-        location: ArtifactViolationLocation,
-    ) -> Result<u32, ArtifactContractError> {
-        let token = self.integer_token(id, location.clone())?;
-        token
-            .parse::<u32>()
-            .map_err(|_| invalid(ArtifactViolationCode::InvalidInteger, location))
-    }
-
-    fn integer_token(
-        &self,
-        id: NodeId,
-        location: ArtifactViolationLocation,
-    ) -> Result<&'document str, ArtifactContractError> {
-        match self.document.node(id) {
-            JsonNode::Null => Err(invalid(ArtifactViolationCode::NullNotAllowed, location)),
-            JsonNode::Number(token)
-                if token.as_ref() == "0"
-                    || (token
-                        .as_bytes()
-                        .first()
-                        .is_some_and(|byte| matches!(byte, b'1'..=b'9'))
-                        && token.as_bytes().iter().all(u8::is_ascii_digit)) =>
-            {
-                Ok(token)
-            }
-            JsonNode::Number(_) => Err(invalid(ArtifactViolationCode::InvalidInteger, location)),
-            JsonNode::Bool | JsonNode::String(_) | JsonNode::Array(_) | JsonNode::Object(_) => {
-                Err(invalid(ArtifactViolationCode::TypeMismatch, location))
-            }
-        }
-    }
-
     fn charge_decoded(&self, total: &mut u64, addend: u64) -> Result<(), ArtifactContractError> {
         let attempted = total
             .checked_add(addend)
@@ -507,38 +244,15 @@ impl<'document> Decoder<'document> {
         *total = attempted;
         Ok(())
     }
+}
 
-    fn value_error(
-        &self,
-        error: &ValueConstructionError,
-        location: ArtifactViolationLocation,
-        token_counter: Option<LinkLimitCounter>,
-    ) -> ArtifactContractError {
-        // Checked-value constructors report against protocol ceilings. Replay
-        // their limit evidence through this decoder's possibly lower limits;
-        // only non-limit construction failures become schema grammar errors.
-        match error {
-            ValueConstructionError::FieldLimit {
-                counter, attempted, ..
-            } => (*counter)
-                .check_artifact_limit(*attempted, self.limits)
-                .expect_err("a protocol-ceiling construction failure exceeds every lower limit")
-                .into(),
-            ValueConstructionError::StructuralLimit(evidence)
-                if evidence.kind() == ValueLimitKind::Tokens && token_counter.is_some() =>
-            {
-                let counter = token_counter.expect("guarded above");
-                counter
-                    .check_artifact_limit(evidence.attempted(), self.limits)
-                    .expect_err("a token construction failure exceeds every lower limit")
-                    .into()
-            }
-            ValueConstructionError::Grammar(_)
-            | ValueConstructionError::StructuralLimit(_)
-            | ValueConstructionError::Range(_) => {
-                invalid(ArtifactViolationCode::InvalidValueGrammar, location)
-            }
-        }
+impl<'document> SchemaDecoder<'document> for Decoder<'document> {
+    fn document(&self) -> &'document JsonDocument {
+        self.document
+    }
+
+    fn limits(&self) -> &LinkLimits {
+        self.limits
     }
 }
 
@@ -785,8 +499,8 @@ impl<'document> Decoder<'document> {
             scope,
             domain: domain_id,
             selector: selector_id,
-            reason: fields.values[3],
-            origin: fields.values[4],
+            reason: fields.optional(3),
+            origin: fields.optional(4),
         })
     }
 
@@ -863,9 +577,9 @@ impl<'document> Decoder<'document> {
             .map(|index| fields.required(index, specs[index].location.clone()))
             .transpose()?;
 
-        let has_variant_unknown = (1..fields.values.len())
-            .any(|index| fields.values[index].is_some() && Some(index) != allowed_payload);
-        if fields.has_unknown || has_variant_unknown {
+        let has_variant_unknown = (1..fields.len())
+            .any(|index| fields.optional(index).is_some() && Some(index) != allowed_payload);
+        if fields.has_unknown() || has_variant_unknown {
             return Err(invalid(ArtifactViolationCode::UnknownMember, container));
         }
 
@@ -1294,58 +1008,6 @@ impl<'document> Decoder<'document> {
     }
 }
 
-trait JsonSink {
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), ArtifactContractError>;
-}
-
-struct CountingSink<'a> {
-    length: u64,
-    limits: &'a LinkLimits,
-}
-
-impl<'a> CountingSink<'a> {
-    const fn new(limits: &'a LinkLimits) -> Self {
-        Self { length: 0, limits }
-    }
-
-    fn length(&self) -> usize {
-        usize::try_from(self.length)
-            .expect("the admitted reference-artifact wire length fits usize")
-    }
-}
-
-impl JsonSink for CountingSink<'_> {
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), ArtifactContractError> {
-        let attempted = self
-            .length
-            .checked_add(bytes.len() as u64)
-            .expect("the bounded canonical artifact length cannot overflow u64");
-        LinkLimitCounter::ReferenceArtifactWireBytes
-            .check_artifact_limit(attempted, self.limits)?;
-        self.length = attempted;
-        Ok(())
-    }
-}
-
-struct VecSink {
-    bytes: Vec<u8>,
-}
-
-impl VecSink {
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            bytes: Vec::with_capacity(capacity),
-        }
-    }
-}
-
-impl JsonSink for VecSink {
-    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), ArtifactContractError> {
-        self.bytes.extend_from_slice(bytes);
-        Ok(())
-    }
-}
-
 fn write_artifact(
     sink: &mut impl JsonSink,
     artifact: &MessageReferenceArtifact,
@@ -1463,85 +1125,6 @@ fn write_origin(
     write_u32(sink, origin.span().end())?;
     sink.write_bytes(b"}}")?;
     Ok(())
-}
-
-fn write_namespace(
-    sink: &mut impl JsonSink,
-    namespace: ArtifactNamespace,
-) -> Result<(), ArtifactContractError> {
-    sink.write_bytes(br#"{"kind":"#)?;
-    write_json_string(sink, namespace.as_str())?;
-    sink.write_bytes(b"}")
-}
-
-fn write_string_array<'a>(
-    sink: &mut impl JsonSink,
-    values: impl Iterator<Item = &'a str>,
-) -> Result<(), ArtifactContractError> {
-    sink.write_bytes(b"[")?;
-    for (index, value) in values.enumerate() {
-        if index > 0 {
-            sink.write_bytes(b",")?;
-        }
-        write_json_string(sink, value)?;
-    }
-    sink.write_bytes(b"]")
-}
-
-fn write_json_string(sink: &mut impl JsonSink, value: &str) -> Result<(), ArtifactContractError> {
-    sink.write_bytes(b"\"")?;
-    let mut scalar_buffer = [0_u8; 4];
-    for character in value.chars() {
-        // Use one deterministic minimal spelling: named JSON escapes where
-        // available, lowercase \u00xx for remaining controls, and direct UTF-8
-        // for every other Unicode scalar.
-        match character {
-            '"' => sink.write_bytes(br#"\""#)?,
-            '\\' => sink.write_bytes(br"\\")?,
-            '\u{0008}' => sink.write_bytes(br"\b")?,
-            '\t' => sink.write_bytes(br"\t")?,
-            '\n' => sink.write_bytes(br"\n")?,
-            '\u{000c}' => sink.write_bytes(br"\f")?,
-            '\r' => sink.write_bytes(br"\r")?,
-            '\u{0000}'..='\u{001f}' => {
-                const HEX: &[u8; 16] = b"0123456789abcdef";
-                let value = character as u8;
-                let escape = [
-                    b'\\',
-                    b'u',
-                    b'0',
-                    b'0',
-                    HEX[usize::from(value >> 4)],
-                    HEX[usize::from(value & 0x0f)],
-                ];
-                sink.write_bytes(&escape)?;
-            }
-            _ => sink.write_bytes(character.encode_utf8(&mut scalar_buffer).as_bytes())?,
-        }
-    }
-    sink.write_bytes(b"\"")
-}
-
-fn write_u16(sink: &mut impl JsonSink, value: u16) -> Result<(), ArtifactContractError> {
-    write_unsigned(sink, u64::from(value))
-}
-
-fn write_u32(sink: &mut impl JsonSink, value: u32) -> Result<(), ArtifactContractError> {
-    write_unsigned(sink, u64::from(value))
-}
-
-fn write_unsigned(sink: &mut impl JsonSink, mut value: u64) -> Result<(), ArtifactContractError> {
-    let mut buffer = [0_u8; 20];
-    let mut cursor = buffer.len();
-    loop {
-        cursor -= 1;
-        buffer[cursor] = b'0' + u8::try_from(value % 10).expect("one decimal digit fits u8");
-        value /= 10;
-        if value == 0 {
-            break;
-        }
-    }
-    sink.write_bytes(&buffer[cursor..])
 }
 
 #[cfg(test)]

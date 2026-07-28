@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "intlify Message Definition Artifact v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "producer",
+    "source",
+    "logicalAliases",
+    "inputFingerprint",
+    "definitions"
+  ],
+  "properties": {
+    "kind": {
+      "const": "message-definition"
+    },
+    "version": {
+      "$ref": "#/$defs/version"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "source": {
+      "$ref": "#/$defs/sourceIdentity"
+    },
+    "logicalAliases": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/portablePath"
+      },
+      "description": "The primary-plus-alias canonical order and cumulative decoded byte ceiling are enforced by intlify_contract."
+    },
+    "inputFingerprint": {
+      "$ref": "#/$defs/inputFingerprint"
+    },
+    "definitions": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/definition"
+      }
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["major", "minor"],
+      "properties": {
+        "major": {
+          "const": 0
+        },
+        "minor": {
+          "const": 1
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+/[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$"
+        }
+      }
+    },
+    "projectNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "const": "project"
+        }
+      }
+    },
+    "portablePathSegment": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000/]+$",
+      "not": {
+        "enum": [".", ".."]
+      },
+      "description": "The 4 KiB decoded UTF-8 byte ceiling is enforced by intlify_contract."
+    },
+    "portablePath": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/portablePathSegment"
+      },
+      "description": "The 256 KiB decoded path ceiling is enforced by intlify_contract."
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "path"],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/projectNamespace"
+        },
+        "path": {
+          "$ref": "#/$defs/portablePath"
+        }
+      }
+    },
+    "inputFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {
+          "const": "blake3-256"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name"],
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/projectNamespace"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The 255 decoded UTF-8 byte ceiling is enforced by intlify_contract."
+        }
+      }
+    },
+    "domain": {
+      "enum": ["json-pointer", "yaml-typed-path", "xliff-1.2", "xliff-2"]
+    },
+    "entryReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structuralPath", "occurrence"],
+      "properties": {
+        "structuralPath": {
+          "type": "string",
+          "description": "The empty root path is valid; the decoded byte ceiling and occurrence continuity are enforced by intlify_contract."
+        },
+        "occurrence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "domain", "key", "locale", "message", "source"],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "domain": {
+          "$ref": "#/$defs/domain"
+        },
+        "key": {
+          "type": "string",
+          "$comment": "An empty string is valid when the selected catalog-key domain defines a root key; domain grammar and token limits are enforced by intlify_contract."
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Locale is an exact opaque identity; its decoded UTF-8 byte ceiling is enforced by intlify_contract."
+        },
+        "message": {
+          "type": "string",
+          "description": "The empty payload is valid and remains opaque MF2 source; byte limits are enforced by intlify_contract."
+        },
+        "source": {
+          "$ref": "#/$defs/entryReference"
+        }
+      }
+    }
+  }
+}
