@@ -12,7 +12,7 @@
 
 use std::io::Read;
 
-use super::common::{
+use super::shared::{
     admit_known_wire_length, decode_from_reader, invalid, parse_document, write_json_string,
     write_namespace, write_string_array, write_u16, write_u32, ArtifactReadError, CountingSink,
     FieldSpec, JsonSink, SchemaDecoder, VecSink,
