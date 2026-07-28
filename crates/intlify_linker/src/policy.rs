@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Checked M0 link policy and post-mapping policy canonicalization.
+//! Checked link policy and post-mapping policy canonicalization.
 //!
 //! This module owns production locales, configured roots, dynamic-reference
 //! behavior, and duplicate placement. It deliberately contains no fallback
@@ -20,7 +20,7 @@ use crate::scope::{ResolvedCatalogScopeId, ScopeMappingTable};
 use crate::validation::{check_first_over, usize_count};
 use crate::{InvalidRequestError, LinkOperationalError};
 
-/// M0 treatment of an unbounded dynamic reference.
+/// Treatment of an unbounded dynamic reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DynamicReferenceMode {
     /// Report non-blocking degradation and conservatively retain the scope-domain set.
@@ -29,7 +29,7 @@ pub enum DynamicReferenceMode {
     Strict,
 }
 
-/// M0 shared-message placement policy.
+/// Shared-message placement policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PlacementPolicy {
     /// Retain one selected message in every referencing delivery unit.
@@ -117,7 +117,7 @@ impl ConfiguredRoot {
     }
 }
 
-/// Immutable, canonical M0 policy supplied to one link request.
+/// Immutable, canonical policy supplied to one link request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkPolicy {
     production_locales: Box<[Locale]>,
@@ -240,7 +240,7 @@ impl ResolvedConfiguredRoot {
     }
 }
 
-/// Canonical M0 policy after scope mapping.
+/// Canonical policy after scope mapping.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedLinkPolicy {
     production_locales: Box<[Locale]>,

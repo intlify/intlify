@@ -100,13 +100,13 @@ impl<'a> LinkRequest<'a> {
         self.definition_artifacts
     }
 
-    /// Return the complete canonical pre-mapping M0 policy.
+    /// Return the complete canonical pre-mapping policy.
     #[must_use]
     pub const fn policy(&self) -> &LinkPolicy {
         self.policy
     }
 
-    /// Return the canonical post-mapping M0 policy.
+    /// Return the canonical post-mapping policy.
     #[must_use]
     pub const fn resolved_policy(&self) -> &ResolvedLinkPolicy {
         &self.resolved_policy

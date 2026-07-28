@@ -95,7 +95,7 @@ pub enum DeliveryEdgeEndpoint {
 /// One request invariant rejected before semantic linking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvalidRequestError {
-    /// M0 policy requires at least one production locale.
+    /// Link policy requires at least one production locale.
     EmptyProductionLocales,
     /// One checked locale occurs more than once in the production set.
     DuplicateProductionLocale(Locale),
