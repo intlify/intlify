@@ -1,6 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 
@@ -8,6 +9,9 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
+use crate::binding::{
+    CatalogScopeName, LocaleBindingConfig, LocaleCaptureError, LocaleCapturePattern, ResolvedLocale,
+};
 use crate::glob::ResourceGlob;
 use crate::registry::{
     classify_logical_path, HostFormat, HostFormatClassification, ResolvedCatalogAssignment,
@@ -33,6 +37,14 @@ pub enum ResourceConfigReason {
     InvalidCatalogGlob,
     /// A present format is not an exact shipped host-format id.
     InvalidCatalogFormat,
+    /// Exactly one member of the coordinated `scope` / `locale` pair is present.
+    InvalidCatalogScopeLocalePair,
+    /// A paired catalog scope is not an admitted exact resource scope.
+    InvalidCatalogScope,
+    /// A paired locale binding has an invalid shape, discriminator, or payload.
+    InvalidCatalogLocaleBinding,
+    /// A path locale binding has an invalid capture-pattern spelling.
+    InvalidLocaleCapturePattern,
 }
 
 impl ResourceConfigReason {
@@ -48,6 +60,10 @@ impl ResourceConfigReason {
             Self::InvalidCatalogExcludeShape => "invalid_catalog_exclude_shape",
             Self::InvalidCatalogGlob => "invalid_catalog_glob",
             Self::InvalidCatalogFormat => "invalid_catalog_format",
+            Self::InvalidCatalogScopeLocalePair => "invalid_catalog_scope_locale_pair",
+            Self::InvalidCatalogScope => "invalid_catalog_scope",
+            Self::InvalidCatalogLocaleBinding => "invalid_catalog_locale_binding",
+            Self::InvalidLocaleCapturePattern => "invalid_locale_capture_pattern",
         }
     }
 }
@@ -129,7 +145,7 @@ impl ResourcesConfig {
         let Some(value) = value else {
             return Ok(Self::default());
         };
-        let catalogs = validate_catalog_section(value, "/resources")?;
+        let catalogs = validate_catalog_section(value, "/resources", true)?;
         Ok(Self { catalogs })
     }
 
@@ -147,35 +163,53 @@ impl ResourcesConfig {
             Some(catalogs) if catalogs.is_empty() => ResolvedCatalogPolicy::Empty,
             Some(catalogs) => ResolvedCatalogPolicy::Configured(resolve_definitions(catalogs)),
         };
-        ResolvedResources { policy }
+        let linker_scopes = resolved_linker_scopes(&policy);
+        ResolvedResources {
+            policy,
+            linker_scopes,
+        }
     }
 }
 
 /// One validated resource catalog definition.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
-#[schemars(deny_unknown_fields)]
 pub struct CatalogConfig {
-    #[schemars(
-        length(min = 1),
-        schema_with = "resource_glob_array_schema",
-        description = "Non-empty project-relative resource membership patterns."
-    )]
     include: Vec<ResourceGlob>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[schemars(
-        default,
-        schema_with = "resource_glob_array_schema",
-        description = "Project-relative patterns removed from this definition's include set."
-    )]
     exclude: Vec<ResourceGlob>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(
-        default,
-        schema_with = "host_format_schema",
-        description = "Optional shipped host-format override."
-    )]
     format: Option<HostFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scope: Option<CatalogScopeName>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locale: Option<LocaleBindingConfig>,
+}
+
+impl JsonSchema for CatalogConfig {
+    fn schema_name() -> Cow<'static, str> {
+        "CatalogConfig".into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        concat!(module_path!(), "::CatalogConfig").into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        let mut schema = CatalogConfigSchemaDefinition::json_schema(generator);
+        schema.insert(
+            "description".to_owned(),
+            Value::String("One validated resource catalog definition.".to_owned()),
+        );
+        schema.insert(
+            "dependencies".to_owned(),
+            serde_json::json!({
+                "scope": ["locale"],
+                "locale": ["scope"]
+            }),
+        );
+        schema
+    }
 }
 
 impl CatalogConfig {
@@ -194,6 +228,24 @@ impl CatalogConfig {
     pub const fn format(&self) -> Option<HostFormat> {
         self.format
     }
+
+    /// Return the exact linker-participating scope when this definition is coordinated.
+    #[must_use]
+    pub const fn scope(&self) -> Option<&CatalogScopeName> {
+        self.scope.as_ref()
+    }
+
+    /// Return the checked locale binding when this definition is coordinated.
+    #[must_use]
+    pub const fn locale(&self) -> Option<&LocaleBindingConfig> {
+        self.locale.as_ref()
+    }
+
+    /// Return whether this definition contributes to linker catalog inventory.
+    #[must_use]
+    pub const fn is_linker_participating(&self) -> bool {
+        self.scope.is_some()
+    }
 }
 
 /// Validated additive editor catalog overlay without a `resources` wrapper.
@@ -202,14 +254,14 @@ impl CatalogConfig {
 #[schemars(deny_unknown_fields)]
 pub struct CatalogOverlayConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[schemars(default, schema_with = "catalogs_schema")]
+    #[schemars(default, schema_with = "overlay_catalogs_schema")]
     catalogs: Vec<CatalogConfig>,
 }
 
 impl CatalogOverlayConfig {
     /// Validate one normalized overlay object.
     pub fn validate(value: &Value) -> Result<Self, ResourceConfigViolation> {
-        let catalogs = validate_catalog_section(value, "")?.unwrap_or_default();
+        let catalogs = validate_catalog_section(value, "", false)?.unwrap_or_default();
         Ok(Self { catalogs })
     }
 
@@ -232,6 +284,58 @@ fn catalogs_schema(generator: &mut SchemaGenerator) -> Schema {
     Vec::<CatalogConfig>::json_schema(generator)
 }
 
+#[derive(JsonSchema)]
+#[schemars(deny_unknown_fields)]
+#[allow(dead_code)]
+struct CatalogConfigSchemaDefinition {
+    #[schemars(
+        length(min = 1),
+        schema_with = "resource_glob_array_schema",
+        description = "Non-empty project-relative resource membership patterns."
+    )]
+    include: Vec<String>,
+    #[schemars(
+        default,
+        schema_with = "resource_glob_array_schema",
+        description = "Project-relative patterns removed from this definition's include set."
+    )]
+    exclude: Vec<String>,
+    #[schemars(
+        default,
+        schema_with = "host_format_schema",
+        description = "Optional shipped host-format override."
+    )]
+    format: Option<HostFormat>,
+    #[schemars(
+        default,
+        schema_with = "catalog_scope_schema",
+        description = "Optional exact linker-participating scope. Must be paired with locale."
+    )]
+    scope: Option<String>,
+    #[schemars(
+        default,
+        schema_with = "locale_binding_schema",
+        description = "Optional path or fixed locale binding. Must be paired with scope."
+    )]
+    locale: Option<Value>,
+}
+
+fn overlay_catalogs_schema(generator: &mut SchemaGenerator) -> Schema {
+    Vec::<CatalogOverlaySchemaDefinition>::json_schema(generator)
+}
+
+#[derive(JsonSchema)]
+#[schemars(deny_unknown_fields)]
+#[allow(dead_code)]
+struct CatalogOverlaySchemaDefinition {
+    #[schemars(length(min = 1), schema_with = "resource_glob_array_schema")]
+    include: Vec<String>,
+    #[schemars(default, schema_with = "resource_glob_array_schema")]
+    exclude: Vec<String>,
+    #[schemars(default, schema_with = "host_format_schema")]
+    format: Option<HostFormat>,
+}
+
 fn resource_glob_array_schema(generator: &mut SchemaGenerator) -> Schema {
     Vec::<String>::json_schema(generator)
 }
@@ -243,9 +347,42 @@ fn host_format_schema(_: &mut SchemaGenerator) -> Schema {
     })
 }
 
+fn catalog_scope_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "minLength": 1,
+    })
+}
+
+fn locale_binding_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "pattern"],
+                "properties": {
+                    "from": { "const": "path" },
+                    "pattern": { "type": "string" }
+                }
+            },
+            {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "value"],
+                "properties": {
+                    "from": { "const": "fixed" },
+                    "value": { "type": "string", "minLength": 1 }
+                }
+            }
+        ]
+    })
+}
+
 fn validate_catalog_section(
     value: &Value,
     base_pointer: &str,
+    allow_linker_bindings: bool,
 ) -> Result<Option<Vec<CatalogConfig>>, ResourceConfigViolation> {
     let Some(section) = value.as_object() else {
         return Err(ResourceConfigViolation::new(
@@ -282,7 +419,11 @@ fn validate_catalog_section(
         .iter()
         .enumerate()
         .map(|(index, catalog)| {
-            validate_catalog_definition(catalog, &pointer_index(&catalogs_pointer, index))
+            validate_catalog_definition(
+                catalog,
+                &pointer_index(&catalogs_pointer, index),
+                allow_linker_bindings,
+            )
         })
         .collect::<Result<Vec<_>, _>>()
         .map(Some)
@@ -291,6 +432,7 @@ fn validate_catalog_section(
 fn validate_catalog_definition(
     value: &Value,
     pointer: &str,
+    allow_linker_bindings: bool,
 ) -> Result<CatalogConfig, ResourceConfigViolation> {
     let Some(definition) = value.as_object() else {
         return Err(ResourceConfigViolation::new(
@@ -301,9 +443,12 @@ fn validate_catalog_definition(
         ));
     };
 
-    if let Some((field, rejected)) =
-        first_unknown_field(definition, &["include", "exclude", "format"])
-    {
+    let known_fields: &[&str] = if allow_linker_bindings {
+        &["include", "exclude", "format", "scope", "locale"]
+    } else {
+        &["include", "exclude", "format"]
+    };
+    if let Some((field, rejected)) = first_unknown_field(definition, known_fields) {
         return Err(ResourceConfigViolation::new(
             ResourceConfigReason::UnknownField,
             pointer_property(pointer, field),
@@ -379,11 +524,178 @@ fn validate_catalog_definition(
         }
     };
 
+    let has_scope = definition.contains_key("scope");
+    let has_locale = definition.contains_key("locale");
+    if has_scope != has_locale {
+        return Err(ResourceConfigViolation::new(
+            ResourceConfigReason::InvalidCatalogScopeLocalePair,
+            pointer.to_owned(),
+            None,
+            None,
+        ));
+    }
+
+    let (scope, locale) = if has_scope {
+        let scope_pointer = pointer_property(pointer, "scope");
+        let scope_value = definition
+            .get("scope")
+            .expect("presence was checked before interpretation");
+        let scope_string = scope_value.as_str().ok_or_else(|| {
+            ResourceConfigViolation::new(
+                ResourceConfigReason::InvalidCatalogScope,
+                scope_pointer.clone(),
+                Some(scope_value),
+                None,
+            )
+        })?;
+        let scope = CatalogScopeName::try_new(scope_string).map_err(|_| {
+            ResourceConfigViolation::new(
+                ResourceConfigReason::InvalidCatalogScope,
+                scope_pointer,
+                Some(scope_value),
+                None,
+            )
+        })?;
+        let locale = validate_locale_binding(
+            definition
+                .get("locale")
+                .expect("paired presence was checked before interpretation"),
+            &pointer_property(pointer, "locale"),
+        )?;
+        (Some(scope), Some(locale))
+    } else {
+        (None, None)
+    };
+
     Ok(CatalogConfig {
         include,
         exclude,
         format,
+        scope,
+        locale,
     })
+}
+
+fn validate_locale_binding(
+    value: &Value,
+    pointer: &str,
+) -> Result<LocaleBindingConfig, ResourceConfigViolation> {
+    let Some(binding) = value.as_object() else {
+        return Err(ResourceConfigViolation::new(
+            ResourceConfigReason::InvalidCatalogLocaleBinding,
+            pointer.to_owned(),
+            Some(value),
+            None,
+        ));
+    };
+
+    if let Some((field, rejected)) = first_unknown_field(binding, &["from", "pattern", "value"]) {
+        return Err(ResourceConfigViolation::new(
+            ResourceConfigReason::UnknownField,
+            pointer_property(pointer, field),
+            Some(rejected),
+            Some(field),
+        ));
+    }
+
+    let from_pointer = pointer_property(pointer, "from");
+    let from_value = binding.get("from").ok_or_else(|| {
+        ResourceConfigViolation::new(
+            ResourceConfigReason::InvalidCatalogLocaleBinding,
+            from_pointer.clone(),
+            None,
+            None,
+        )
+    })?;
+    let discriminator = from_value.as_str().ok_or_else(|| {
+        ResourceConfigViolation::new(
+            ResourceConfigReason::InvalidCatalogLocaleBinding,
+            from_pointer.clone(),
+            Some(from_value),
+            None,
+        )
+    })?;
+
+    match discriminator {
+        "path" => {
+            let pattern_pointer = pointer_property(pointer, "pattern");
+            let pattern_value = binding.get("pattern").ok_or_else(|| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    pattern_pointer.clone(),
+                    None,
+                    None,
+                )
+            })?;
+            if let Some(value) = binding.get("value") {
+                return Err(ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    pointer_property(pointer, "value"),
+                    Some(value),
+                    None,
+                ));
+            }
+            let pattern = pattern_value.as_str().ok_or_else(|| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    pattern_pointer.clone(),
+                    Some(pattern_value),
+                    None,
+                )
+            })?;
+            let pattern = LocaleCapturePattern::parse(pattern).map_err(|_| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidLocaleCapturePattern,
+                    pattern_pointer,
+                    Some(pattern_value),
+                    None,
+                )
+            })?;
+            Ok(LocaleBindingConfig::Path { pattern })
+        }
+        "fixed" => {
+            let value_pointer = pointer_property(pointer, "value");
+            let fixed_value = binding.get("value").ok_or_else(|| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    value_pointer.clone(),
+                    None,
+                    None,
+                )
+            })?;
+            if let Some(pattern) = binding.get("pattern") {
+                return Err(ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    pointer_property(pointer, "pattern"),
+                    Some(pattern),
+                    None,
+                ));
+            }
+            let fixed = fixed_value.as_str().ok_or_else(|| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    value_pointer.clone(),
+                    Some(fixed_value),
+                    None,
+                )
+            })?;
+            let value = ResolvedLocale::try_new(fixed).map_err(|_| {
+                ResourceConfigViolation::new(
+                    ResourceConfigReason::InvalidCatalogLocaleBinding,
+                    value_pointer,
+                    Some(fixed_value),
+                    None,
+                )
+            })?;
+            Ok(LocaleBindingConfig::Fixed { value })
+        }
+        _ => Err(ResourceConfigViolation::new(
+            ResourceConfigReason::InvalidCatalogLocaleBinding,
+            from_pointer,
+            Some(from_value),
+            None,
+        )),
+    }
 }
 
 fn validate_glob_array(
@@ -539,6 +851,7 @@ pub enum CatalogPolicyState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedResources {
     policy: ResolvedCatalogPolicy,
+    linker_scopes: Arc<[CatalogScopeName]>,
 }
 
 impl Default for ResolvedResources {
@@ -560,26 +873,104 @@ pub struct ResolvedCatalogOverlay {
     definitions: Arc<[ResolvedCatalogDefinition]>,
 }
 
+/// Read-only linker participation attached to one compiled catalog definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ResolvedCatalogDefinition {
+pub struct ResolvedCatalogBinding {
+    scope: CatalogScopeName,
+    locale: LocaleBindingConfig,
+}
+
+impl ResolvedCatalogBinding {
+    /// Return the exact project-local scope.
+    #[must_use]
+    pub const fn scope(&self) -> &CatalogScopeName {
+        &self.scope
+    }
+
+    /// Return the checked locale assignment strategy.
+    #[must_use]
+    pub const fn locale(&self) -> &LocaleBindingConfig {
+        &self.locale
+    }
+}
+
+/// One immutable compiled project or overlay catalog definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedCatalogDefinition {
     index: usize,
     include: Arc<[ResourceGlob]>,
     exclude: Arc<[ResourceGlob]>,
     format: Option<HostFormat>,
+    binding: Option<ResolvedCatalogBinding>,
+}
+
+impl ResolvedCatalogDefinition {
+    /// Return the zero-based source-array index.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Iterate exact validated include patterns.
+    pub fn include(&self) -> impl ExactSizeIterator<Item = &ResourceGlob> {
+        self.include.iter()
+    }
+
+    /// Iterate exact validated exclude patterns.
+    pub fn exclude(&self) -> impl ExactSizeIterator<Item = &ResourceGlob> {
+        self.exclude.iter()
+    }
+
+    /// Return the optional explicit shipped host format.
+    #[must_use]
+    pub const fn format(&self) -> Option<HostFormat> {
+        self.format
+    }
+
+    /// Return linker participation, or `None` for an entry-level-only definition.
+    #[must_use]
+    pub const fn binding(&self) -> Option<&ResolvedCatalogBinding> {
+        self.binding.as_ref()
+    }
 }
 
 fn resolve_definitions(catalogs: Vec<CatalogConfig>) -> Arc<[ResolvedCatalogDefinition]> {
     catalogs
         .into_iter()
         .enumerate()
-        .map(|(index, catalog)| ResolvedCatalogDefinition {
-            index,
-            include: Arc::from(catalog.include),
-            exclude: Arc::from(catalog.exclude),
-            format: catalog.format,
+        .map(|(index, catalog)| {
+            let binding = catalog
+                .scope
+                .zip(catalog.locale)
+                .map(|(scope, locale)| ResolvedCatalogBinding { scope, locale });
+            ResolvedCatalogDefinition {
+                index,
+                include: Arc::from(catalog.include),
+                exclude: Arc::from(catalog.exclude),
+                format: catalog.format,
+                binding,
+            }
         })
         .collect::<Vec<_>>()
         .into()
+}
+
+fn resolved_linker_scopes(policy: &ResolvedCatalogPolicy) -> Arc<[CatalogScopeName]> {
+    let ResolvedCatalogPolicy::Configured(definitions) = policy else {
+        return Arc::from([]);
+    };
+    let mut scopes = definitions
+        .iter()
+        .filter_map(|definition| {
+            definition
+                .binding
+                .as_ref()
+                .map(|binding| binding.scope.clone())
+        })
+        .collect::<Vec<_>>();
+    scopes.sort_unstable();
+    scopes.dedup();
+    Arc::from(scopes)
 }
 
 /// Project-only membership result.
@@ -595,6 +986,81 @@ pub enum CatalogResolution {
     Excluded,
     /// At least one including definition survives its own excludes.
     Matched(ResolvedCatalogAssignment),
+}
+
+/// Project catalog resolution with linker participation made explicit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LinkerCatalogResolution {
+    /// Project catalog policy is absent for every path.
+    PolicyAbsent,
+    /// Project catalogs are explicitly disabled for every path.
+    PolicyEmpty,
+    /// No configured definition includes the path.
+    Unmatched,
+    /// Definitions include the path, but every including definition excludes it.
+    Excluded,
+    /// The path is a resource input, but no surviving definition is linker-participating.
+    EntryLevelOnly(ResolvedCatalogAssignment),
+    /// At least one surviving definition supplies one coherent scope and locale.
+    Matched(ResolvedLinkerCatalogAssignment),
+}
+
+/// One resolved catalog assignment admitted for linker definition inventory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedLinkerCatalogAssignment {
+    catalog: ResolvedCatalogAssignment,
+    scope: CatalogScopeName,
+    locale: ResolvedLocale,
+    participating_definitions: Arc<[CatalogDefinitionRef]>,
+}
+
+impl ResolvedLinkerCatalogAssignment {
+    /// Borrow the ordinary resource format and membership assignment.
+    #[must_use]
+    pub const fn catalog(&self) -> &ResolvedCatalogAssignment {
+        &self.catalog
+    }
+
+    /// Return the one exact coherent linker scope.
+    #[must_use]
+    pub const fn scope(&self) -> &CatalogScopeName {
+        &self.scope
+    }
+
+    /// Return the one exact coherent locale resolved for this logical path.
+    #[must_use]
+    pub const fn locale(&self) -> &ResolvedLocale {
+        &self.locale
+    }
+
+    /// Return surviving definitions that contributed linker bindings.
+    #[must_use]
+    pub fn participating_definitions(&self) -> &[CatalogDefinitionRef] {
+        &self.participating_definitions
+    }
+
+    /// Require this concrete exact locale to belong to a production set.
+    ///
+    /// The caller supplies the already resolved messages policy membership
+    /// check. A failure retains the first contributing definition so the host
+    /// integration can attach its path-specific pointer and target evidence.
+    pub fn validate_production_locale(
+        &self,
+        mut is_production: impl FnMut(&str) -> bool,
+    ) -> Result<(), CatalogLocaleNotProduction> {
+        if is_production(self.locale.as_str()) {
+            return Ok(());
+        }
+        let definition = self
+            .participating_definitions
+            .first()
+            .expect("a linker assignment has at least one participating definition");
+        Err(CatalogLocaleNotProduction {
+            definition_index: definition.definition_index(),
+            scope: self.scope.clone(),
+            locale: self.locale.clone(),
+        })
+    }
 }
 
 /// Source layer attached to catalog definition evidence.
@@ -640,6 +1106,115 @@ pub struct CatalogAssignmentConflict {
     assignment: CatalogDefinitionRef,
     conflicting_assignment: CatalogDefinitionRef,
 }
+
+/// Binding component selected when two linker-participating definitions disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CatalogBindingConflictField {
+    /// The exact project-local scope differs.
+    Scope,
+    /// The exact resolved locale differs.
+    Locale,
+}
+
+/// Deterministic same-path linker binding conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogBindingConflict {
+    field: CatalogBindingConflictField,
+    assignment: CatalogDefinitionRef,
+    conflicting_assignment: CatalogDefinitionRef,
+}
+
+impl CatalogBindingConflict {
+    /// Return the first unequal field under scope-before-locale precedence.
+    #[must_use]
+    pub const fn field(self) -> CatalogBindingConflictField {
+        self.field
+    }
+
+    /// Return the later decisive conflicting definition.
+    #[must_use]
+    pub const fn assignment(self) -> CatalogDefinitionRef {
+        self.assignment
+    }
+
+    /// Return the earliest definition that established the expected binding.
+    #[must_use]
+    pub const fn conflicting_assignment(self) -> CatalogDefinitionRef {
+        self.conflicting_assignment
+    }
+}
+
+/// One path capture failure tied to its catalog definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogLocaleAssignmentError {
+    definition: CatalogDefinitionRef,
+    error: LocaleCaptureError,
+}
+
+/// One resolved catalog locale outside the production locale set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogLocaleNotProduction {
+    definition_index: usize,
+    scope: CatalogScopeName,
+    locale: ResolvedLocale,
+}
+
+impl CatalogLocaleNotProduction {
+    /// Return the project catalog definition index.
+    #[must_use]
+    pub const fn definition_index(&self) -> usize {
+        self.definition_index
+    }
+
+    /// Return the exact resource-owned scope.
+    #[must_use]
+    pub const fn scope(&self) -> &CatalogScopeName {
+        &self.scope
+    }
+
+    /// Return the exact resource-owned resolved locale.
+    #[must_use]
+    pub const fn locale(&self) -> &ResolvedLocale {
+        &self.locale
+    }
+}
+
+impl CatalogLocaleAssignmentError {
+    /// Return the definition whose binding could not resolve this path.
+    #[must_use]
+    pub const fn definition(self) -> CatalogDefinitionRef {
+        self.definition
+    }
+
+    /// Return the resource-owned capture or locale-value failure.
+    #[must_use]
+    pub const fn error(self) -> LocaleCaptureError {
+        self.error
+    }
+}
+
+/// Failure while resolving one linker-participating project catalog path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkerCatalogAssignmentError {
+    /// Ordinary host-format assignment failed before locale binding.
+    Format(CatalogAssignmentConflict),
+    /// One checked path binding could not resolve the concrete path.
+    Locale(CatalogLocaleAssignmentError),
+    /// Surviving definitions assigned unequal scope or locale identities.
+    Binding(CatalogBindingConflict),
+}
+
+impl fmt::Display for LinkerCatalogAssignmentError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Format(_) => formatter.write_str("catalog format assignment conflicts"),
+            Self::Locale(error) => error.error.fmt(formatter),
+            Self::Binding(_) => formatter.write_str("catalog scope or locale binding conflicts"),
+        }
+    }
+}
+
+impl std::error::Error for LinkerCatalogAssignmentError {}
 
 impl CatalogAssignmentConflict {
     /// Return the later decisive conflicting definition.
@@ -696,6 +1271,40 @@ impl ResolvedResources {
         }
     }
 
+    /// Return every configured definition in source-array order.
+    #[must_use]
+    pub fn definitions(&self) -> &[ResolvedCatalogDefinition] {
+        match &self.policy {
+            ResolvedCatalogPolicy::Configured(definitions) => definitions,
+            ResolvedCatalogPolicy::Absent | ResolvedCatalogPolicy::Empty => &[],
+        }
+    }
+
+    /// Return the canonical exact registry of linker-participating scopes.
+    #[must_use]
+    pub fn linker_scopes(&self) -> &[CatalogScopeName] {
+        &self.linker_scopes
+    }
+
+    /// Select the first fixed binding outside a caller-provided production set.
+    ///
+    /// Definitions are visited in source-array order. Path bindings are
+    /// intentionally deferred until one concrete assignment captures a locale.
+    pub fn first_fixed_locale_not_production(
+        &self,
+        mut is_production: impl FnMut(&str) -> bool,
+    ) -> Option<CatalogLocaleNotProduction> {
+        self.definitions().iter().find_map(|definition| {
+            let binding = definition.binding.as_ref()?;
+            let locale = binding.locale.fixed_locale()?;
+            (!is_production(locale.as_str())).then(|| CatalogLocaleNotProduction {
+                definition_index: definition.index,
+                scope: binding.scope.clone(),
+                locale: locale.clone(),
+            })
+        })
+    }
+
     /// Resolve one validated project-relative logical path.
     pub fn resolve_path(
         &self,
@@ -714,6 +1323,81 @@ impl ResolvedResources {
                 }
             }
         }
+    }
+
+    /// Resolve one path and require coherent scope/locale bindings for linker use.
+    pub fn resolve_linker_path(
+        &self,
+        path: &ProjectRelativeResourcePath,
+    ) -> Result<LinkerCatalogResolution, LinkerCatalogAssignmentError> {
+        let resolution = self
+            .resolve_path(path)
+            .map_err(LinkerCatalogAssignmentError::Format)?;
+        let CatalogResolution::Matched(catalog) = resolution else {
+            return Ok(match resolution {
+                CatalogResolution::PolicyAbsent => LinkerCatalogResolution::PolicyAbsent,
+                CatalogResolution::PolicyEmpty => LinkerCatalogResolution::PolicyEmpty,
+                CatalogResolution::Unmatched => LinkerCatalogResolution::Unmatched,
+                CatalogResolution::Excluded => LinkerCatalogResolution::Excluded,
+                CatalogResolution::Matched(_) => unreachable!("matched was handled above"),
+            });
+        };
+
+        let definitions = match &self.policy {
+            ResolvedCatalogPolicy::Configured(definitions) => definitions,
+            ResolvedCatalogPolicy::Absent | ResolvedCatalogPolicy::Empty => {
+                unreachable!("a matched assignment requires configured policy")
+            }
+        };
+        let mut expected: Option<(CatalogScopeName, ResolvedLocale, CatalogDefinitionRef)> = None;
+        let mut participating_definitions = Vec::new();
+
+        for definition_ref in catalog.surviving_definitions() {
+            let definition = &definitions[definition_ref.definition_index()];
+            let Some(binding) = definition.binding.as_ref() else {
+                continue;
+            };
+            let locale = binding.locale.resolve(path).map_err(|error| {
+                LinkerCatalogAssignmentError::Locale(CatalogLocaleAssignmentError {
+                    definition: *definition_ref,
+                    error,
+                })
+            })?;
+
+            if let Some((expected_scope, expected_locale, expected_definition)) = &expected {
+                let field = if binding.scope != *expected_scope {
+                    Some(CatalogBindingConflictField::Scope)
+                } else if locale != *expected_locale {
+                    Some(CatalogBindingConflictField::Locale)
+                } else {
+                    None
+                };
+                if let Some(field) = field {
+                    return Err(LinkerCatalogAssignmentError::Binding(
+                        CatalogBindingConflict {
+                            field,
+                            assignment: *definition_ref,
+                            conflicting_assignment: *expected_definition,
+                        },
+                    ));
+                }
+            } else {
+                expected = Some((binding.scope.clone(), locale.clone(), *definition_ref));
+            }
+            participating_definitions.push(*definition_ref);
+        }
+
+        let Some((scope, locale, _)) = expected else {
+            return Ok(LinkerCatalogResolution::EntryLevelOnly(catalog));
+        };
+        Ok(LinkerCatalogResolution::Matched(
+            ResolvedLinkerCatalogAssignment {
+                catalog,
+                scope,
+                locale,
+                participating_definitions: Arc::from(participating_definitions),
+            },
+        ))
     }
 
     /// Resolve project policy followed by the fallback-only overlay layer.
@@ -837,9 +1521,10 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::{
-        CatalogAssignmentOrigin, CatalogOverlayConfig, CatalogPolicyState, CatalogResolution,
-        LayeredCatalogResolution, ProjectRelativeResourcePath, ProjectRelativeResourcePathError,
-        ResourceConfigReason, ResourcesConfig,
+        CatalogAssignmentOrigin, CatalogBindingConflictField, CatalogOverlayConfig,
+        CatalogPolicyState, CatalogResolution, CatalogScopeName, LayeredCatalogResolution,
+        LinkerCatalogAssignmentError, LinkerCatalogResolution, ProjectRelativeResourcePath,
+        ProjectRelativeResourcePathError, ResourceConfigReason, ResourcesConfig,
     };
     use crate::{
         HostFormat, HostFormatClassification, HostFormatRegistry, KnownHostFormatId,
@@ -984,6 +1669,329 @@ mod tests {
             config.catalogs().unwrap()[0].format(),
             Some(HostFormat::Json)
         );
+    }
+
+    #[test]
+    fn validates_scope_and_locale_after_the_existing_catalog_fields() {
+        let cases = [
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app" }] }),
+                ResourceConfigReason::InvalidCatalogScopeLocalePair,
+                "/resources/catalogs/0",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "locale": { "from": "fixed", "value": "en" } }] }),
+                ResourceConfigReason::InvalidCatalogScopeLocalePair,
+                "/resources/catalogs/0",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": null, "locale": { "from": "fixed", "value": "en" } }] }),
+                ResourceConfigReason::InvalidCatalogScope,
+                "/resources/catalogs/0/scope",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "", "locale": { "from": "fixed", "value": "en" } }] }),
+                ResourceConfigReason::InvalidCatalogScope,
+                "/resources/catalogs/0/scope",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": "en" }] }),
+                ResourceConfigReason::InvalidCatalogLocaleBinding,
+                "/resources/catalogs/0/locale",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": {} }] }),
+                ResourceConfigReason::InvalidCatalogLocaleBinding,
+                "/resources/catalogs/0/locale/from",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": { "from": "host" } }] }),
+                ResourceConfigReason::InvalidCatalogLocaleBinding,
+                "/resources/catalogs/0/locale/from",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": { "from": "path" } }] }),
+                ResourceConfigReason::InvalidCatalogLocaleBinding,
+                "/resources/catalogs/0/locale/pattern",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": { "from": "path", "pattern": "*.json" } }] }),
+                ResourceConfigReason::InvalidLocaleCapturePattern,
+                "/resources/catalogs/0/locale/pattern",
+            ),
+            (
+                json!({ "catalogs": [{ "include": ["*.json"], "scope": "app", "locale": { "from": "fixed", "value": "" } }] }),
+                ResourceConfigReason::InvalidCatalogLocaleBinding,
+                "/resources/catalogs/0/locale/value",
+            ),
+        ];
+
+        for (value, reason, pointer) in cases {
+            let violation = validate(&value).unwrap_err();
+            assert_eq!(violation.reason(), reason);
+            assert_eq!(violation.pointer(), pointer);
+        }
+
+        let overlong_scope = validate(&json!({
+            "catalogs": [{
+                "include": ["*.json"],
+                "scope": "s".repeat(256),
+                "locale": { "from": "fixed", "value": "en" }
+            }]
+        }))
+        .unwrap_err();
+        assert_eq!(
+            overlong_scope.reason(),
+            ResourceConfigReason::InvalidCatalogScope
+        );
+
+        let overlong_locale = validate(&json!({
+            "catalogs": [{
+                "include": ["*.json"],
+                "scope": "app",
+                "locale": { "from": "fixed", "value": "l".repeat(256) }
+            }]
+        }))
+        .unwrap_err();
+        assert_eq!(
+            overlong_locale.reason(),
+            ResourceConfigReason::InvalidCatalogLocaleBinding
+        );
+
+        let format_precedes_pair = validate(&json!({
+            "catalogs": [{
+                "include": ["*.json"],
+                "format": "yaml",
+                "scope": "app"
+            }]
+        }))
+        .unwrap_err();
+        assert_eq!(
+            format_precedes_pair.reason(),
+            ResourceConfigReason::InvalidCatalogFormat
+        );
+
+        let locale_unknown_precedes_discriminator = validate(&json!({
+            "catalogs": [{
+                "include": ["*.json"],
+                "scope": "app",
+                "locale": { "zeta": true, "alpha": false }
+            }]
+        }))
+        .unwrap_err();
+        assert_eq!(
+            locale_unknown_precedes_discriminator.reason(),
+            ResourceConfigReason::UnknownField
+        );
+        assert_eq!(
+            locale_unknown_precedes_discriminator.pointer(),
+            "/resources/catalogs/0/locale/alpha"
+        );
+
+        let removed_group = validate(&json!({
+            "catalogs": [{
+                "include": ["*.json"],
+                "group": "app"
+            }]
+        }))
+        .unwrap_err();
+        assert_eq!(removed_group.reason(), ResourceConfigReason::UnknownField);
+        assert_eq!(removed_group.pointer(), "/resources/catalogs/0/group");
+        assert_eq!(removed_group.field(), Some("group"));
+    }
+
+    #[test]
+    fn retains_exact_coordinated_bindings_and_linker_scope_registry() {
+        let config = validate(&json!({
+            "catalogs": [
+                { "include": ["drafts/**/*.json"] },
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "z-app",
+                    "locale": { "from": "path", "pattern": "locales/{locale}.json" }
+                },
+                {
+                    "include": ["vendor/**/*.json"],
+                    "scope": "a-vendor",
+                    "locale": { "from": "fixed", "value": "EN_us" }
+                },
+                {
+                    "include": ["other/**/*.json"],
+                    "scope": "z-app",
+                    "locale": { "from": "fixed", "value": "ja" }
+                }
+            ]
+        }))
+        .unwrap();
+
+        assert!(!config.catalogs().unwrap()[0].is_linker_participating());
+        assert!(config.catalogs().unwrap()[1].is_linker_participating());
+        assert_eq!(
+            config.catalogs().unwrap()[2]
+                .locale()
+                .unwrap()
+                .fixed_locale()
+                .unwrap()
+                .as_str(),
+            "EN_us"
+        );
+
+        let resolved = config.resolve();
+        assert!(resolved.definitions()[0].binding().is_none());
+        assert!(resolved.definitions()[1].binding().is_some());
+        assert_eq!(
+            resolved
+                .linker_scopes()
+                .iter()
+                .map(CatalogScopeName::as_str)
+                .collect::<Vec<_>>(),
+            vec!["a-vendor", "z-app"]
+        );
+    }
+
+    #[test]
+    fn admits_exact_binding_boundaries_and_joins_equal_definitions() {
+        let scope = "s".repeat(255);
+        let locale = "l".repeat(255);
+        let resolved = validate(&json!({
+            "catalogs": [
+                {
+                    "include": ["fixed/*.json"],
+                    "scope": scope,
+                    "locale": { "from": "fixed", "value": locale }
+                },
+                {
+                    "include": ["fixed/*.json"],
+                    "scope": scope,
+                    "locale": { "from": "fixed", "value": locale }
+                }
+            ]
+        }))
+        .unwrap()
+        .resolve();
+
+        assert_eq!(resolved.linker_scopes()[0].as_str(), scope);
+        let LinkerCatalogResolution::Matched(assignment) = resolved
+            .resolve_linker_path(&path("fixed/messages.json"))
+            .unwrap()
+        else {
+            panic!("equal coordinated definitions should join");
+        };
+        assert_eq!(assignment.scope().as_str(), scope);
+        assert_eq!(assignment.locale().as_str(), locale);
+        assert_eq!(assignment.participating_definitions().len(), 2);
+
+        let captured = validate(&json!({
+            "catalogs": [{
+                "include": ["locales/*.json"],
+                "scope": "app",
+                "locale": { "from": "path", "pattern": "locales/{locale}.json" }
+            }]
+        }))
+        .unwrap()
+        .resolve();
+        let LinkerCatalogResolution::Matched(assignment) = captured
+            .resolve_linker_path(&path(&format!("locales/{locale}.json")))
+            .unwrap()
+        else {
+            panic!("the inclusive locale boundary should resolve");
+        };
+        assert_eq!(assignment.locale().as_str(), locale);
+    }
+
+    #[test]
+    fn linker_resolution_distinguishes_entry_only_and_resolves_path_locales() {
+        let resolved = validate(&json!({
+            "catalogs": [
+                { "include": ["drafts/**/*.json"] },
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "app",
+                    "locale": { "from": "path", "pattern": "locales/{locale}.json" }
+                }
+            ]
+        }))
+        .unwrap()
+        .resolve();
+
+        assert!(matches!(
+            resolved
+                .resolve_linker_path(&path("drafts/en/messages.json"))
+                .unwrap(),
+            LinkerCatalogResolution::EntryLevelOnly(_)
+        ));
+
+        let LinkerCatalogResolution::Matched(assignment) = resolved
+            .resolve_linker_path(&path("locales/JA_jp.json"))
+            .unwrap()
+        else {
+            panic!("coordinated definition should resolve");
+        };
+        assert_eq!(assignment.scope().as_str(), "app");
+        assert_eq!(assignment.locale().as_str(), "JA_jp");
+        assert_eq!(assignment.participating_definitions().len(), 1);
+
+        let mismatch = validate(&json!({
+            "catalogs": [{
+                "include": ["other/*.json"],
+                "scope": "app",
+                "locale": { "from": "path", "pattern": "locales/{locale}.json" }
+            }]
+        }))
+        .unwrap()
+        .resolve()
+        .resolve_linker_path(&path("other/en.json"))
+        .unwrap_err();
+        assert!(matches!(mismatch, LinkerCatalogAssignmentError::Locale(_)));
+    }
+
+    #[test]
+    fn linker_resolution_rejects_scope_then_locale_binding_conflicts() {
+        let scope_conflict = validate(&json!({
+            "catalogs": [
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "app",
+                    "locale": { "from": "fixed", "value": "en" }
+                },
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "admin",
+                    "locale": { "from": "fixed", "value": "ja" }
+                }
+            ]
+        }))
+        .unwrap()
+        .resolve()
+        .resolve_linker_path(&path("locales/messages.json"))
+        .unwrap_err();
+        let LinkerCatalogAssignmentError::Binding(scope_conflict) = scope_conflict else {
+            panic!("scope conflict expected");
+        };
+        assert_eq!(scope_conflict.field(), CatalogBindingConflictField::Scope);
+
+        let locale_conflict = validate(&json!({
+            "catalogs": [
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "app",
+                    "locale": { "from": "fixed", "value": "en" }
+                },
+                {
+                    "include": ["locales/*.json"],
+                    "scope": "app",
+                    "locale": { "from": "fixed", "value": "ja" }
+                }
+            ]
+        }))
+        .unwrap()
+        .resolve()
+        .resolve_linker_path(&path("locales/messages.json"))
+        .unwrap_err();
+        let LinkerCatalogAssignmentError::Binding(locale_conflict) = locale_conflict else {
+            panic!("locale conflict expected");
+        };
+        assert_eq!(locale_conflict.field(), CatalogBindingConflictField::Locale);
     }
 
     #[test]
@@ -1330,6 +2338,15 @@ mod tests {
         let root = CatalogOverlayConfig::validate(&Value::Null).unwrap_err();
         assert_eq!(root.pointer(), "");
         assert_eq!(root.reason(), ResourceConfigReason::InvalidSectionShape);
+
+        for field in ["scope", "locale"] {
+            let violation = CatalogOverlayConfig::validate(&json!({
+                "catalogs": [{ "include": ["*.json"], (field): true }]
+            }))
+            .unwrap_err();
+            assert_eq!(violation.reason(), ResourceConfigReason::UnknownField);
+            assert_eq!(violation.field(), Some(field));
+        }
     }
 
     #[test]
@@ -1339,5 +2356,15 @@ mod tests {
         assert_eq!(catalogs["type"], "array");
         assert!(catalogs.get("anyOf").is_none());
         assert!(schema.get("required").is_none());
+
+        let catalog = &schema["$defs"]["CatalogConfig"];
+        assert_eq!(catalog["properties"]["scope"]["type"], "string");
+        assert!(catalog["properties"]["scope"].get("anyOf").is_none());
+        assert!(catalog["properties"]["locale"].get("oneOf").is_some());
+
+        let overlay = serde_json::to_value(schema_for!(CatalogOverlayConfig)).unwrap();
+        let overlay_schema = overlay.to_string();
+        assert!(!overlay_schema.contains("\"scope\""));
+        assert!(!overlay_schema.contains("\"locale\""));
     }
 }
