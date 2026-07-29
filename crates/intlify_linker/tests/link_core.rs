@@ -19,31 +19,6 @@ use intlify_linker::{
 
 const DOMAIN: CatalogKeyDomain = CatalogKeyDomain::JsonPointer;
 
-struct Inputs {
-    references: Vec<MessageReferenceArtifact>,
-    definitions: Vec<MessageDefinitionArtifact>,
-    policy: LinkPolicy,
-    mappings: ScopeMappingTable,
-    completeness: ScopeCompletenessTable,
-    graph: DeliveryUnitGraph,
-    limits: LinkLimits,
-}
-
-impl Inputs {
-    fn link(&self) -> Result<LinkOutcome, LinkOperationalError> {
-        let request = LinkRequest::try_new(
-            &self.references,
-            &self.definitions,
-            &self.policy,
-            &self.mappings,
-            &self.completeness,
-            &self.graph,
-            &self.limits,
-        )?;
-        link(&request)
-    }
-}
-
 fn scope(name: &str) -> CatalogScopeId {
     CatalogScopeId::new(
         ArtifactNamespace::Project,
@@ -181,7 +156,7 @@ fn closed_completeness(scopes: &[CatalogScopeId]) -> ScopeCompletenessTable {
     )
 }
 
-fn single_scope_inputs(
+fn do_link(
     scope: CatalogScopeId,
     references: Vec<MessageReferenceArtifact>,
     definitions: Vec<MessageDefinitionArtifact>,
@@ -189,17 +164,43 @@ fn single_scope_inputs(
     completeness: ScopeCompletenessTable,
     graph: DeliveryUnitGraph,
     limits: LinkLimits,
-) -> Inputs {
-    let mappings = mappings(&[scope], Vec::new());
-    Inputs {
+) -> Result<LinkOutcome, LinkOperationalError> {
+    do_link_multi_scopes(
+        &[scope],
+        Vec::new(),
         references,
         definitions,
         policy,
-        mappings,
         completeness,
         graph,
         limits,
-    }
+    )
+}
+
+// Own the fixtures for the complete request-and-link call so tests can pass
+// constructed values directly without introducing lifetime-only locals.
+#[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)]
+fn do_link_multi_scopes(
+    scopes: &[CatalogScopeId],
+    mapping_entries: Vec<ScopeMapping>,
+    references: Vec<MessageReferenceArtifact>,
+    definitions: Vec<MessageDefinitionArtifact>,
+    policy: LinkPolicy,
+    completeness: ScopeCompletenessTable,
+    graph: DeliveryUnitGraph,
+    limits: LinkLimits,
+) -> Result<LinkOutcome, LinkOperationalError> {
+    let mappings = mappings(scopes, mapping_entries);
+    let request = LinkRequest::try_new(
+        &references,
+        &definitions,
+        &policy,
+        &mappings,
+        &completeness,
+        &graph,
+        &limits,
+    )?;
+    link(&request)
 }
 
 fn assert_limit(
@@ -235,7 +236,7 @@ fn exact_resolution_retains_exact_locale_snapshots_and_reports_unused_definition
         DeliveryUnitId::main(),
         vec![reference(app.clone(), MessageSelector::Exact(key("/used")))],
     )];
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         references,
         definitions,
@@ -243,9 +244,8 @@ fn exact_resolution_retains_exact_locale_snapshots_and_reports_unused_definition
         closed_completeness(std::slice::from_ref(&app)),
         DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(!outcome.generation_blocked());
     assert_eq!(outcome.findings().len(), 1);
     assert_eq!(outcome.findings()[0].kind(), LinkFindingKind::UnusedMessage);
@@ -276,7 +276,7 @@ fn exact_resolution_retains_exact_locale_snapshots_and_reports_unused_definition
 #[test]
 fn fallback_blind_union_resolution_does_not_invent_a_requested_locale_snapshot() {
     let app = scope("app");
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         vec![reference_artifact(
             "entry",
@@ -294,9 +294,8 @@ fn fallback_blind_union_resolution_does_not_invent_a_requested_locale_snapshot()
         closed_completeness(std::slice::from_ref(&app)),
         DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(outcome.findings().is_empty());
     let plans = outcome.bundle_plans().unwrap();
     assert_eq!(plans.len(), 2);
@@ -313,7 +312,7 @@ fn fallback_blind_union_resolution_does_not_invent_a_requested_locale_snapshot()
 #[test]
 fn unresolved_reference_retains_one_failure_per_canonical_production_locale() {
     let app = scope("app");
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         vec![reference_artifact(
             "entry",
@@ -328,9 +327,8 @@ fn unresolved_reference_retains_one_failure_per_canonical_production_locale() {
         closed_completeness(std::slice::from_ref(&app)),
         DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(outcome.generation_blocked());
     assert_eq!(outcome.findings().len(), 1);
     let LinkFindingRecord::UnresolvedMessage(unresolved) = outcome.findings()[0].record() else {
@@ -361,8 +359,8 @@ fn semantic_result_is_independent_of_artifact_and_definition_enumeration_order()
         vec![reference(app.clone(), MessageSelector::Exact(key("/b")))],
     );
 
-    let make_inputs = |references, definitions| {
-        single_scope_inputs(
+    let do_link_with_order = |references, definitions| {
+        do_link(
             app.clone(),
             references,
             definitions,
@@ -372,17 +370,15 @@ fn semantic_result_is_independent_of_artifact_and_definition_enumeration_order()
             LinkLimits::default(),
         )
     };
-    let forward = make_inputs(
+    let forward = do_link_with_order(
         vec![first_reference.clone(), second_reference.clone()],
         vec![first_definition.clone(), second_definition.clone()],
     )
-    .link()
     .unwrap();
-    let reverse = make_inputs(
+    let reverse = do_link_with_order(
         vec![second_reference, first_reference],
         vec![second_definition, first_definition],
     )
-    .link()
     .unwrap();
 
     assert_eq!(forward, reverse);
@@ -422,23 +418,20 @@ fn mapped_ambiguity_blocks_generation_and_suppresses_secondary_findings() {
             MessageSelector::Exact(key("/same")),
         )],
     )];
-    let inputs = Inputs {
+    let outcome = do_link_multi_scopes(
+        &scopes,
+        vec![ScopeMapping::new(
+            source_scope.clone(),
+            target_scope.clone(),
+        )],
         references,
         definitions,
-        policy: policy(&["en", "ja"], Vec::new(), DynamicReferenceMode::Compat),
-        mappings: mappings(
-            &scopes,
-            vec![ScopeMapping::new(
-                source_scope.clone(),
-                target_scope.clone(),
-            )],
-        ),
-        completeness: closed_completeness(&scopes),
-        graph: DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
-        limits: LinkLimits::default(),
-    };
-
-    let outcome = inputs.link().unwrap();
+        policy(&["en", "ja"], Vec::new(), DynamicReferenceMode::Compat),
+        closed_completeness(&scopes),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
     assert!(outcome.generation_blocked());
     assert!(outcome.bundle_plans().is_none());
     assert_eq!(outcome.findings().len(), 1);
@@ -473,7 +466,7 @@ fn mapped_ambiguity_blocks_generation_and_suppresses_secondary_findings() {
 #[test]
 fn blocking_ambiguity_does_not_stop_unrelated_analysis_or_change_kind_precedence() {
     let app = scope("app");
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         vec![reference_artifact(
             "entry",
@@ -501,9 +494,8 @@ fn blocking_ambiguity_does_not_stop_unrelated_analysis_or_change_kind_precedence
         closed_completeness(std::slice::from_ref(&app)),
         DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(outcome.generation_blocked());
     assert_eq!(
         outcome
@@ -535,7 +527,7 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
     let app = scope("app");
     let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
 
-    let definition_partial = single_scope_inputs(
+    let definition_partial = do_link(
         app.clone(),
         vec![reference_artifact(
             "missing",
@@ -558,7 +550,6 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
         graph.clone(),
         LinkLimits::default(),
     )
-    .link()
     .unwrap();
     assert_eq!(definition_partial.findings().len(), 1);
     assert!(matches!(
@@ -567,7 +558,7 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
     ));
     assert!(definition_partial.generation_blocked());
 
-    let reference_partial = single_scope_inputs(
+    let reference_partial = do_link(
         app.clone(),
         Vec::new(),
         vec![definition_artifact(
@@ -586,7 +577,6 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
         graph.clone(),
         LinkLimits::default(),
     )
-    .link()
     .unwrap();
     assert_eq!(reference_partial.findings().len(), 1);
     assert!(matches!(
@@ -594,7 +584,7 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
         LinkFindingRecord::DegradedAnalysis(DegradedAnalysisFinding::PartialCompleteness(_))
     ));
 
-    let wide_and_partial = single_scope_inputs(
+    let wide_and_partial = do_link(
         app.clone(),
         vec![reference_artifact(
             "wide",
@@ -617,7 +607,6 @@ fn partial_completeness_suppresses_absence_findings_and_remains_distinct_from_wi
         graph,
         LinkLimits::default(),
     )
-    .link()
     .unwrap();
     assert_eq!(wide_and_partial.findings().len(), 2);
     assert!(matches!(
@@ -648,8 +637,8 @@ fn strict_and_compat_dynamic_policies_change_only_widening_and_disposition() {
         DeliveryUnitId::main(),
         vec![reference(app.clone(), MessageSelector::UnboundedDynamic)],
     )];
-    let make_inputs = |mode| {
-        single_scope_inputs(
+    let do_link_with_mode = |mode| {
+        do_link(
             app.clone(),
             references.clone(),
             definitions.clone(),
@@ -660,7 +649,7 @@ fn strict_and_compat_dynamic_policies_change_only_widening_and_disposition() {
         )
     };
 
-    let compat = make_inputs(DynamicReferenceMode::Compat).link().unwrap();
+    let compat = do_link_with_mode(DynamicReferenceMode::Compat).unwrap();
     assert_eq!(compat.findings().len(), 1);
     assert!(matches!(
         compat.findings()[0].record(),
@@ -669,7 +658,7 @@ fn strict_and_compat_dynamic_policies_change_only_widening_and_disposition() {
     assert!(!compat.findings()[0].blocking());
     assert_eq!(compat.bundle_plans().unwrap()[0].messages().len(), 2);
 
-    let strict = make_inputs(DynamicReferenceMode::Strict).link().unwrap();
+    let strict = do_link_with_mode(DynamicReferenceMode::Strict).unwrap();
     assert_eq!(strict.findings().len(), 1);
     assert!(matches!(
         strict.findings()[0].record(),
@@ -732,7 +721,7 @@ fn prefix_pattern_and_all_in_scope_select_canonical_deduplicated_message_sets() 
             )],
         ),
     ];
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         references,
         definitions,
@@ -740,9 +729,8 @@ fn prefix_pattern_and_all_in_scope_select_canonical_deduplicated_message_sets() 
         closed_completeness(std::slice::from_ref(&app)),
         graph,
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert_eq!(outcome.findings().len(), 1);
     assert!(matches!(
         outcome.findings()[0].record(),
@@ -784,7 +772,7 @@ fn configured_roots_are_duplicated_only_into_real_graph_roots() {
         &LinkLimits::default(),
     )
     .unwrap();
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         Vec::new(),
         vec![definition_artifact(
@@ -802,9 +790,8 @@ fn configured_roots_are_duplicated_only_into_real_graph_roots() {
         closed_completeness(std::slice::from_ref(&app)),
         graph,
         LinkLimits::default(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(outcome.findings().is_empty());
     let plans = outcome.bundle_plans().unwrap();
     assert_eq!(plans.len(), 3);
@@ -843,7 +830,7 @@ fn pattern_work_uses_distinct_canonical_candidates_and_request_wide_accounting()
     let limits = LinkLimits::default()
         .try_with_limit(LinkLimitCounter::PatternMatchStatesTotal, 4)
         .unwrap();
-    let inputs = single_scope_inputs(
+    let result = do_link(
         app.clone(),
         references,
         definitions,
@@ -854,7 +841,7 @@ fn pattern_work_uses_distinct_canonical_candidates_and_request_wide_accounting()
     );
 
     assert_limit(
-        inputs.link().unwrap_err(),
+        result.unwrap_err(),
         LinkLimitCounter::PatternMatchStatesTotal,
         LinkLimitObservation::Exact(8),
     );
@@ -865,7 +852,7 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
     let app = scope("app");
     let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
 
-    let findings_zero = single_scope_inputs(
+    let findings_zero = do_link(
         app.clone(),
         vec![reference_artifact(
             "missing",
@@ -888,12 +875,12 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .unwrap(),
     );
     assert_limit(
-        findings_zero.link().unwrap_err(),
+        findings_zero.unwrap_err(),
         LinkLimitCounter::FindingsTotal,
         LinkLimitObservation::Exact(1),
     );
 
-    let finding_bytes = single_scope_inputs(
+    let finding_bytes = do_link(
         app.clone(),
         Vec::new(),
         vec![definition_artifact(
@@ -908,12 +895,12 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .unwrap(),
     );
     assert_limit(
-        finding_bytes.link().unwrap_err(),
+        finding_bytes.unwrap_err(),
         LinkLimitCounter::FindingBytesTotal,
         LinkLimitObservation::Exact(3),
     );
 
-    let plan_count = single_scope_inputs(
+    let plan_count = do_link(
         app.clone(),
         vec![reference_artifact(
             "used",
@@ -936,12 +923,12 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .unwrap(),
     );
     assert_limit(
-        plan_count.link().unwrap_err(),
+        plan_count.unwrap_err(),
         LinkLimitCounter::BundlePlansTotal,
         LinkLimitObservation::Exact(1),
     );
 
-    let resolved_messages = single_scope_inputs(
+    let resolved_messages = do_link(
         app.clone(),
         vec![reference_artifact(
             "used",
@@ -968,12 +955,12 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .unwrap(),
     );
     assert_limit(
-        resolved_messages.link().unwrap_err(),
+        resolved_messages.unwrap_err(),
         LinkLimitCounter::ResolvedMessagesTotal,
         LinkLimitObservation::Exact(2),
     );
 
-    let plan_bytes = single_scope_inputs(
+    let plan_bytes = do_link(
         app.clone(),
         Vec::new(),
         Vec::new(),
@@ -985,12 +972,12 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .unwrap(),
     );
     assert_limit(
-        plan_bytes.link().unwrap_err(),
+        plan_bytes.unwrap_err(),
         LinkLimitCounter::BundlePlanBytesTotal,
         LinkLimitObservation::Exact(10),
     );
 
-    let blocking_skips_plan_limits = single_scope_inputs(
+    let blocking_skips_plan_limits = do_link(
         app.clone(),
         vec![reference_artifact(
             "missing-with-plan-limits",
@@ -1012,7 +999,6 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
             .try_with_limit(LinkLimitCounter::BundlePlanBytesTotal, 0)
             .unwrap(),
     )
-    .link()
     .unwrap();
     assert!(blocking_skips_plan_limits.generation_blocked());
     assert_eq!(blocking_skips_plan_limits.findings().len(), 1);
@@ -1021,7 +1007,7 @@ fn result_limits_follow_finding_then_plan_precedence_and_exact_byte_accounting()
 #[test]
 fn valid_empty_graph_preserves_some_empty_plan_state() {
     let app = scope("app");
-    let inputs = single_scope_inputs(
+    let outcome = do_link(
         app.clone(),
         Vec::new(),
         Vec::new(),
@@ -1033,9 +1019,8 @@ fn valid_empty_graph_preserves_some_empty_plan_state() {
             .unwrap()
             .try_with_limit(LinkLimitCounter::BundlePlanBytesTotal, 0)
             .unwrap(),
-    );
-
-    let outcome = inputs.link().unwrap();
+    )
+    .unwrap();
     assert!(!outcome.generation_blocked());
     assert_eq!(outcome.bundle_plans(), Some([].as_slice()));
 }
@@ -1043,30 +1028,38 @@ fn valid_empty_graph_preserves_some_empty_plan_state() {
 #[test]
 fn independent_calls_are_reentrant_across_threads() {
     let app = scope("app");
-    let inputs = single_scope_inputs(
-        app.clone(),
-        vec![reference_artifact(
-            "entry",
-            DeliveryUnitId::main(),
-            vec![reference(
-                app.clone(),
-                MessageSelector::Exact(key("/message")),
-            )],
+    let references = vec![reference_artifact(
+        "entry",
+        DeliveryUnitId::main(),
+        vec![reference(
+            app.clone(),
+            MessageSelector::Exact(key("/message")),
         )],
-        vec![definition_artifact(
-            "messages.json",
-            vec![definition(app.clone(), "/message", "en", "Message", 0)],
-        )],
-        policy(&["en"], Vec::new(), DynamicReferenceMode::Compat),
-        closed_completeness(std::slice::from_ref(&app)),
-        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
-        LinkLimits::default(),
-    );
-    let expected = inputs.link().unwrap();
+    )];
+    let definitions = vec![definition_artifact(
+        "messages.json",
+        vec![definition(app.clone(), "/message", "en", "Message", 0)],
+    )];
+    let policy = policy(&["en"], Vec::new(), DynamicReferenceMode::Compat);
+    let mappings = mappings(std::slice::from_ref(&app), Vec::new());
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let request = LinkRequest::try_new(
+        &references,
+        &definitions,
+        &policy,
+        &mappings,
+        &completeness,
+        &graph,
+        &limits,
+    )
+    .unwrap();
+    let expected = link(&request).unwrap();
 
     std::thread::scope(|scope| {
         let handles = (0..4)
-            .map(|_| scope.spawn(|| inputs.link().unwrap()))
+            .map(|_| scope.spawn(|| link(&request).unwrap()))
             .collect::<Vec<_>>();
         for handle in handles {
             assert_eq!(handle.join().unwrap(), expected);
@@ -1078,7 +1071,7 @@ fn independent_calls_are_reentrant_across_threads() {
 fn outcome_owns_payload_and_location_after_every_request_input_is_dropped() {
     let outcome = {
         let app = scope("app");
-        let inputs = single_scope_inputs(
+        do_link(
             app.clone(),
             vec![reference_artifact(
                 "entry",
@@ -1096,8 +1089,8 @@ fn outcome_owns_payload_and_location_after_every_request_input_is_dropped() {
             closed_completeness(std::slice::from_ref(&app)),
             DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
             LinkLimits::default(),
-        );
-        inputs.link().unwrap()
+        )
+        .unwrap()
     };
 
     let message = &outcome.bundle_plans().unwrap()[0].messages()[0];
