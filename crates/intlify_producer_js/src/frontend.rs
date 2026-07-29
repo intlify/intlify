@@ -213,10 +213,17 @@ where
         return Err(JsProducerError::InternalInvariant);
     }
     if !parsed.errors.is_empty() {
+        let span = parsed
+            .errors
+            .iter()
+            .flat_map(|diagnostic| diagnostic.labels.iter().flatten())
+            .filter_map(|label| safe_diagnostic_span(source_text, label.offset(), label.len()))
+            .min();
         // OXC diagnostics and recovery state are dependency-owned. The frontend
         // rejects the entire AST and intentionally retains neither diagnostic
-        // text nor recovery identifiers in its output contract.
-        return Ok(ParseAttempt::SyntaxRejected(None));
+        // text nor recovery identifiers in its output contract. Only the
+        // smallest independently checked byte range crosses this boundary.
+        return Ok(ParseAttempt::SyntaxRejected(span));
     }
 
     let mut scanner = ReferenceScanner::new(source, source_text, recognizers, cancelled);
@@ -434,8 +441,19 @@ fn reason_text(value: &'static str) -> ReasonText {
 }
 
 fn safe_span(source_text: &str, span: Span) -> Option<SourceUtf8Span> {
-    let start = span.start as usize;
-    let end = span.end as usize;
+    if span.start > span.end {
+        return None;
+    }
+    safe_diagnostic_span(
+        source_text,
+        span.start as usize,
+        (span.end - span.start) as usize,
+    )
+}
+
+fn safe_diagnostic_span(source_text: &str, offset: usize, length: usize) -> Option<SourceUtf8Span> {
+    let end = offset.checked_add(length)?;
+    let start = offset;
     if start > end
         || end > source_text.len()
         || !source_text.is_char_boundary(start)
@@ -443,7 +461,7 @@ fn safe_span(source_text: &str, span: Span) -> Option<SourceUtf8Span> {
     {
         return None;
     }
-    SourceUtf8Span::try_new(span.start, span.end).ok()
+    SourceUtf8Span::try_new(u32::try_from(start).ok()?, u32::try_from(end).ok()?).ok()
 }
 
 fn earlier_span(
@@ -469,9 +487,10 @@ fn compare_references_by_origin(
 
 #[cfg(test)]
 mod tests {
-    use super::{admit_source_bytes, SOURCE_BYTES_LIMIT};
+    use super::{admit_source_bytes, safe_diagnostic_span, SOURCE_BYTES_LIMIT};
     use intlify_contract::{
         ArtifactNamespace, PortablePathSegment, PortableRelativePath, SourceDocumentIdentity,
+        SourceUtf8Span,
     };
 
     fn source() -> SourceDocumentIdentity {
@@ -494,6 +513,18 @@ mod tests {
         };
         assert_eq!(failure.limit(), Some(SOURCE_BYTES_LIMIT));
         assert_eq!(failure.observed(), Some(SOURCE_BYTES_LIMIT + 1));
+    }
+
+    #[test]
+    fn dependency_spans_cross_the_boundary_only_when_exact_and_utf8_safe() {
+        let source_text = "aあb";
+        assert_eq!(
+            safe_diagnostic_span(source_text, 1, "あ".len()),
+            SourceUtf8Span::try_new(1, 4).ok()
+        );
+        assert!(safe_diagnostic_span(source_text, 2, 1).is_none());
+        assert!(safe_diagnostic_span(source_text, source_text.len(), 1).is_none());
+        assert!(safe_diagnostic_span(source_text, usize::MAX, 1).is_none());
     }
 
     use crate::JsProducerError;

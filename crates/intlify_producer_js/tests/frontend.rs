@@ -200,6 +200,55 @@ fn supported_grammar_fixtures_produce_only_explicitly_recognized_calls() {
 }
 
 #[test]
+fn every_fixed_module_and_commonjs_suffix_parses_with_its_selected_goal() {
+    let cases: [(&str, &[u8], JsSelectedSourceGoal, usize); 6] = [
+        (
+            "src/module.mjs",
+            b"export const title = t('title')",
+            JsSelectedSourceGoal::Module,
+            1,
+        ),
+        (
+            "src/commonjs.cjs",
+            b"module.exports = t('title')",
+            JsSelectedSourceGoal::Script,
+            1,
+        ),
+        (
+            "src/module.mts",
+            b"export const title: string = t('title')",
+            JsSelectedSourceGoal::Module,
+            1,
+        ),
+        (
+            "src/commonjs.cts",
+            b"module.exports = t('title' as const)",
+            JsSelectedSourceGoal::Script,
+            1,
+        ),
+        (
+            "src/types.d.mts",
+            b"export declare const title: string",
+            JsSelectedSourceGoal::Module,
+            0,
+        ),
+        (
+            "src/types.d.cts",
+            b"declare const title: string",
+            JsSelectedSourceGoal::Script,
+            0,
+        ),
+    ];
+    let configured = one_lookup("t", JsKeySyntax::Literal);
+
+    for (path, bytes, selected_goal, reference_count) in cases {
+        let scan = scan_source(&source(path), bytes, &configured).unwrap();
+        assert_eq!(scan.selected_goal(), selected_goal, "{path}");
+        assert_eq!(scan.references().len(), reference_count, "{path}");
+    }
+}
+
+#[test]
 fn bounded_unambiguous_sources_prefer_module_and_retry_only_as_script() {
     let configured = one_lookup("t", JsKeySyntax::Literal);
 
@@ -245,16 +294,22 @@ fn bounded_unambiguous_sources_prefer_module_and_retry_only_as_script() {
 
 #[test]
 fn recovered_parser_state_never_emits_partial_references() {
+    let source_text = "t('before'); const = ; t('after')";
     let error = failed(
         scan_source(
             &source("src/broken.ts"),
-            b"t('before'); const = ; t('after')",
+            source_text.as_bytes(),
             &one_lookup("t", JsKeySyntax::Literal),
         )
         .unwrap_err(),
     );
     assert_eq!(error.stage(), JsProducerFailureStage::Parse);
     assert_eq!(error.reason(), JsProducerFailureReason::SyntaxInvalid);
+    let span = error.span().expect("OXC supplies one safe syntax label");
+    assert!(span.start() <= span.end());
+    assert!((span.end() as usize) <= source_text.len());
+    assert!(source_text.is_char_boundary(span.start() as usize));
+    assert!(source_text.is_char_boundary(span.end() as usize));
 }
 
 #[test]
@@ -467,6 +522,16 @@ fn key_syntax_and_call_kind_select_exact_or_pattern_without_inference() {
         ),
         recognizer("dot", JsRecognizerCallKind::Lookup, JsKeySyntax::DotPath),
         recognizer("set", JsRecognizerCallKind::Set, JsKeySyntax::DotPath),
+        recognizer(
+            "canonicalSet",
+            JsRecognizerCallKind::Set,
+            JsKeySyntax::Canonical,
+        ),
+        recognizer(
+            "literalSet",
+            JsRecognizerCallKind::Set,
+            JsKeySyntax::Literal,
+        ),
     ]);
     let scan = scan_source(
         &source("src/keys.ts"),
@@ -477,6 +542,8 @@ fn key_syntax_and_call_kind_select_exact_or_pattern_without_inference() {
             dot("errors.*");
             set("errors.*");
             set("errors.literal\\.*");
+            canonicalSet("/errors/*");
+            literalSet("errors.*");
         "#,
         &configured,
     )
@@ -519,6 +586,18 @@ fn key_syntax_and_call_kind_select_exact_or_pattern_without_inference() {
         scan.references()[4].reason().unwrap().as_str(),
         "bounded set declared by configured recognizer"
     );
+    assert!(matches!(
+        selectors[6],
+        MessageSelector::Pattern(pattern) if pattern.as_str() == "/errors/*"
+    ));
+    assert!(matches!(
+        selectors[7],
+        MessageSelector::Pattern(pattern) if pattern.as_str() == "/errors.~2"
+    ));
+    assert!(scan.references()[6..]
+        .iter()
+        .all(|reference| reference.reason().unwrap().as_str()
+            == "bounded set declared by configured recognizer"));
 }
 
 #[test]
@@ -529,6 +608,13 @@ fn known_invalid_and_dynamic_set_selectors_have_distinct_failures() {
     assert_eq!(invalid_lookup.stage(), JsProducerFailureStage::Selector);
     assert_eq!(
         invalid_lookup.reason(),
+        JsProducerFailureReason::LookupSelectorInvalid
+    );
+    let lone_surrogate_lookup = failed(
+        scan_source(&source("src/lookup-surrogate.ts"), br"t('\uD800')", &lookup).unwrap_err(),
+    );
+    assert_eq!(
+        lone_surrogate_lookup.reason(),
         JsProducerFailureReason::LookupSelectorInvalid
     );
 
