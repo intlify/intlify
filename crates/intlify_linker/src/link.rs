@@ -21,8 +21,9 @@ use crate::{
     DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, LinkFinding,
     LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkRequest, MessageBundlePlan,
     PartialCompletenessDegradation, PlacementPolicy, ResolutionFailure, ResolvedCatalogScopeId,
-    ResolvedInputCompleteness, ResolvedMessage, UnboundedDynamicReferenceFinding,
-    UnresolvedMessageFinding, UnusedMessageFinding, WideSelectorDegradation,
+    ResolvedInputCompleteness, ResolvedMessage, ResolvedScopeCompleteness,
+    UnboundedDynamicReferenceFinding, UnresolvedMessageFinding, UnusedMessageFinding,
+    WideSelectorDegradation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,6 +53,9 @@ struct DefinitionSnapshot {
     location: DefinitionLocation,
 }
 
+type UniqueDefinitions = BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, DefinitionSnapshot>>;
+type DeliveryUnitReachability = BTreeMap<DeliveryUnitId, BTreeSet<LogicalMessageIdentity>>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ReferenceFact {
     identity: ReferenceRecordIdentity,
@@ -72,7 +76,7 @@ struct SemanticIndex {
 struct DefinitionAnalysis {
     ambiguities: Vec<AmbiguityFact>,
     ambiguous_logical: BTreeSet<LogicalMessageIdentity>,
-    unique_definitions: BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, DefinitionSnapshot>>,
+    unique_definitions: UniqueDefinitions,
 }
 
 struct AmbiguityFact {
@@ -87,9 +91,40 @@ struct ReferenceResolution {
 }
 
 struct Reachability {
-    by_delivery_unit: BTreeMap<DeliveryUnitId, BTreeSet<LogicalMessageIdentity>>,
+    by_delivery_unit: DeliveryUnitReachability,
     reachable: BTreeSet<LogicalMessageIdentity>,
     unbounded_scope_domains: BTreeSet<ScopeDomain>,
+}
+
+impl ReferenceFact {
+    fn scope_domain(&self) -> ScopeDomain {
+        ScopeDomain {
+            scope: self.scope.clone(),
+            domain: self.domain,
+        }
+    }
+
+    fn is_unbounded_dynamic(&self) -> bool {
+        matches!(self.selector, MessageSelector::UnboundedDynamic)
+    }
+
+    fn is_wide_selector(&self) -> bool {
+        matches!(self.selector, MessageSelector::AllInScope)
+    }
+}
+
+impl ReferenceResolution {
+    const fn is_unresolved(&self) -> bool {
+        self.unresolved
+    }
+
+    fn is_unbounded_dynamic(&self) -> bool {
+        self.reference.is_unbounded_dynamic()
+    }
+
+    fn is_wide_selector(&self) -> bool {
+        self.reference.is_wide_selector()
+    }
 }
 
 /// Link one completely admitted immutable request.
@@ -230,17 +265,17 @@ fn resolve_references(
     let mut resolutions = Vec::with_capacity(index.references.len());
 
     for reference in &index.references {
-        let selected = match reference.selector {
-            MessageSelector::UnboundedDynamic => {
-                match request.resolved_policy().dynamic_references() {
-                    DynamicReferenceMode::Compat => all_candidates(reference, index),
-                    DynamicReferenceMode::Strict => BTreeSet::new(),
-                }
+        let unbounded_dynamic = reference.is_unbounded_dynamic();
+        let selected = if unbounded_dynamic {
+            match request.resolved_policy().dynamic_references() {
+                DynamicReferenceMode::Compat => all_candidates(reference, index),
+                DynamicReferenceMode::Strict => BTreeSet::new(),
             }
-            _ => select_reference_candidates(reference, index, pattern_budget)?,
+        } else {
+            select_reference_candidates(reference, index, pattern_budget)?
         };
 
-        let unresolved = !matches!(reference.selector, MessageSelector::UnboundedDynamic)
+        let unresolved = !unbounded_dynamic
             && selected.is_empty()
             && definition_side_closed(request, &reference.scope)?;
         resolutions.push(ReferenceResolution {
@@ -258,10 +293,7 @@ fn select_reference_candidates(
     index: &SemanticIndex,
     pattern_budget: &mut PatternWorkBudget,
 ) -> Result<BTreeSet<LogicalMessageIdentity>, LinkOperationalError> {
-    let scope_domain = ScopeDomain {
-        scope: reference.scope.clone(),
-        domain: reference.domain,
-    };
+    let scope_domain = reference.scope_domain();
     select_candidates(&scope_domain, &reference.selector, index, pattern_budget)
 }
 
@@ -305,18 +337,15 @@ fn all_candidates(
     reference: &ReferenceFact,
     index: &SemanticIndex,
 ) -> BTreeSet<LogicalMessageIdentity> {
-    let scope_domain = ScopeDomain {
-        scope: reference.scope.clone(),
-        domain: reference.domain,
-    };
+    let scope_domain = reference.scope_domain();
     index
         .candidates
         .get(&scope_domain)
         .into_iter()
         .flatten()
         .map(|key| LogicalMessageIdentity {
-            scope: reference.scope.clone(),
-            domain: reference.domain,
+            scope: scope_domain.scope.clone(),
+            domain: scope_domain.domain,
             key: key.clone(),
         })
         .collect()
@@ -341,13 +370,7 @@ fn build_duplicate_reachability(
         let Some(messages) = by_delivery_unit.get_mut(&resolution.reference.delivery_unit) else {
             return Err(LinkOperationalError::InternalInvariant);
         };
-        messages.extend(
-            resolution
-                .selected
-                .iter()
-                .filter(|identity| !ambiguous.contains(*identity))
-                .cloned(),
-        );
+        extend_unambiguous(messages, &resolution.selected, ambiguous);
     }
 
     for root in request.resolved_policy().configured_roots() {
@@ -360,12 +383,7 @@ fn build_duplicate_reachability(
             let Some(messages) = by_delivery_unit.get_mut(unit) else {
                 return Err(LinkOperationalError::InternalInvariant);
             };
-            messages.extend(
-                selected
-                    .iter()
-                    .filter(|identity| !ambiguous.contains(*identity))
-                    .cloned(),
-            );
+            extend_unambiguous(messages, &selected, ambiguous);
         }
     }
 
@@ -376,22 +394,27 @@ fn build_duplicate_reachability(
         .collect();
     let unbounded_scope_domains = resolutions
         .iter()
-        .filter(|resolution| {
-            matches!(
-                resolution.reference.selector,
-                MessageSelector::UnboundedDynamic
-            )
-        })
-        .map(|resolution| ScopeDomain {
-            scope: resolution.reference.scope.clone(),
-            domain: resolution.reference.domain,
-        })
+        .filter(|resolution| resolution.is_unbounded_dynamic())
+        .map(|resolution| resolution.reference.scope_domain())
         .collect();
     Ok(Reachability {
         by_delivery_unit,
         reachable,
         unbounded_scope_domains,
     })
+}
+
+fn extend_unambiguous(
+    messages: &mut BTreeSet<LogicalMessageIdentity>,
+    selected: &BTreeSet<LogicalMessageIdentity>,
+    ambiguous: &BTreeSet<LogicalMessageIdentity>,
+) {
+    messages.extend(
+        selected
+            .iter()
+            .filter(|identity| !ambiguous.contains(*identity))
+            .cloned(),
+    );
 }
 
 fn materialize_findings(
@@ -419,7 +442,7 @@ fn materialize_findings(
 
     for resolution in resolutions
         .iter()
-        .filter(|resolution| resolution.unresolved)
+        .filter(|resolution| resolution.is_unresolved())
     {
         findings.push(LinkFinding::new(LinkFindingRecord::UnresolvedMessage(
             UnresolvedMessageFinding::new(
@@ -442,13 +465,7 @@ fn materialize_findings(
     }
 
     for (logical, definitions_by_locale) in &definitions.unique_definitions {
-        if definitions.ambiguous_logical.contains(logical)
-            || reachability.reachable.contains(logical)
-            || reachability
-                .unbounded_scope_domains
-                .contains(&logical.scope_domain())
-            || !both_sides_closed(request, &logical.scope)?
-        {
+        if !should_report_unused(request, definitions, reachability, logical)? {
             continue;
         }
         for snapshot in definitions_by_locale.values() {
@@ -464,12 +481,10 @@ fn materialize_findings(
         }
     }
 
-    for resolution in resolutions.iter().filter(|resolution| {
-        matches!(
-            resolution.reference.selector,
-            MessageSelector::UnboundedDynamic
-        )
-    }) {
+    for resolution in resolutions
+        .iter()
+        .filter(|resolution| resolution.is_unbounded_dynamic())
+    {
         findings.push(LinkFinding::new(
             LinkFindingRecord::UnboundedDynamicReference(UnboundedDynamicReferenceFinding::new(
                 resolution.reference.identity.clone(),
@@ -485,7 +500,7 @@ fn materialize_findings(
 
     for resolution in resolutions
         .iter()
-        .filter(|resolution| matches!(resolution.reference.selector, MessageSelector::AllInScope))
+        .filter(|resolution| resolution.is_wide_selector())
     {
         findings.push(LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
             DegradedAnalysisFinding::WideSelector(WideSelectorDegradation::new(
@@ -500,10 +515,7 @@ fn materialize_findings(
     }
 
     for completeness in request.resolved_scope_completeness().entries() {
-        for (side, value) in [
-            (CompletenessSide::Definitions, completeness.definitions()),
-            (CompletenessSide::References, completeness.references()),
-        ] {
+        for (side, value) in completeness_sides(completeness) {
             if let ResolvedInputCompleteness::Partial(contributors) = value {
                 findings.push(LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
                     DegradedAnalysisFinding::PartialCompleteness(
@@ -540,19 +552,13 @@ fn count_findings(
         &mut count,
         resolutions
             .iter()
-            .filter(|resolution| resolution.unresolved)
+            .filter(|resolution| resolution.is_unresolved())
             .count(),
         request,
     )?;
 
     for (logical, definitions_by_locale) in &definitions.unique_definitions {
-        if definitions.ambiguous_logical.contains(logical)
-            || reachability.reachable.contains(logical)
-            || reachability
-                .unbounded_scope_domains
-                .contains(&logical.scope_domain())
-            || !both_sides_closed(request, &logical.scope)?
-        {
+        if !should_report_unused(request, definitions, reachability, logical)? {
             continue;
         }
         add_count(&mut count, definitions_by_locale.len(), request)?;
@@ -562,12 +568,7 @@ fn count_findings(
         &mut count,
         resolutions
             .iter()
-            .filter(|resolution| {
-                matches!(
-                    resolution.reference.selector,
-                    MessageSelector::UnboundedDynamic
-                )
-            })
+            .filter(|resolution| resolution.is_unbounded_dynamic())
             .count(),
         request,
     )?;
@@ -575,15 +576,13 @@ fn count_findings(
         &mut count,
         resolutions
             .iter()
-            .filter(|resolution| {
-                matches!(resolution.reference.selector, MessageSelector::AllInScope)
-            })
+            .filter(|resolution| resolution.is_wide_selector())
             .count(),
         request,
     )?;
 
     for completeness in request.resolved_scope_completeness().entries() {
-        for value in [completeness.definitions(), completeness.references()] {
+        for (_, value) in completeness_sides(completeness) {
             if matches!(value, ResolvedInputCompleteness::Partial(_)) {
                 add_count(&mut count, 1, request)?;
             }
@@ -591,6 +590,29 @@ fn count_findings(
     }
 
     Ok(count)
+}
+
+fn should_report_unused(
+    request: &LinkRequest<'_>,
+    definitions: &DefinitionAnalysis,
+    reachability: &Reachability,
+    logical: &LogicalMessageIdentity,
+) -> Result<bool, LinkOperationalError> {
+    Ok(!definitions.ambiguous_logical.contains(logical)
+        && !reachability.reachable.contains(logical)
+        && !reachability
+            .unbounded_scope_domains
+            .contains(&logical.scope_domain())
+        && both_sides_closed(request, &logical.scope)?)
+}
+
+fn completeness_sides(
+    completeness: &ResolvedScopeCompleteness,
+) -> [(CompletenessSide, &ResolvedInputCompleteness); 2] {
+    [
+        (CompletenessSide::Definitions, completeness.definitions()),
+        (CompletenessSide::References, completeness.references()),
+    ]
 }
 
 impl LogicalMessageIdentity {
@@ -633,8 +655,8 @@ fn check_finding_count(count: u64, request: &LinkRequest<'_>) -> Result<(), Link
 
 fn materialize_plans(
     request: &LinkRequest<'_>,
-    definitions: &BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, DefinitionSnapshot>>,
-    reachability: &BTreeMap<DeliveryUnitId, BTreeSet<LogicalMessageIdentity>>,
+    definitions: &UniqueDefinitions,
+    reachability: &DeliveryUnitReachability,
 ) -> Result<Vec<MessageBundlePlan>, LinkOperationalError> {
     let node_count = u64::try_from(request.delivery_graph().nodes().len())
         .map_err(|_| LinkOperationalError::InternalInvariant)?;
@@ -652,11 +674,7 @@ fn materialize_plans(
             .ok_or(LinkOperationalError::InternalInvariant)?;
         for locale in request.resolved_policy().production_locales() {
             for logical in selected {
-                if definitions
-                    .get(logical)
-                    .and_then(|by_locale| by_locale.get(locale))
-                    .is_some()
-                {
+                if exact_definition(definitions, logical, locale).is_some() {
                     resolved_count = resolved_count
                         .checked_add(1)
                         .ok_or(LinkOperationalError::InternalInvariant)?;
@@ -682,11 +700,7 @@ fn materialize_plans(
         for locale in request.resolved_policy().production_locales() {
             let messages = selected
                 .iter()
-                .filter_map(|logical| {
-                    definitions
-                        .get(logical)
-                        .and_then(|by_locale| by_locale.get(locale))
-                })
+                .filter_map(|logical| exact_definition(definitions, logical, locale))
                 .map(|snapshot| {
                     ResolvedMessage::new(
                         snapshot.logical.scope.clone(),
@@ -710,8 +724,8 @@ fn materialize_plans(
 
 fn account_plan_bytes(
     request: &LinkRequest<'_>,
-    definitions: &BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, DefinitionSnapshot>>,
-    reachability: &BTreeMap<DeliveryUnitId, BTreeSet<LogicalMessageIdentity>>,
+    definitions: &UniqueDefinitions,
+    reachability: &DeliveryUnitReachability,
 ) -> Result<(), LinkOperationalError> {
     let mut budget = SemanticByteBudget::new(LinkLimitCounter::BundlePlanBytesTotal, request);
 
@@ -723,10 +737,7 @@ fn account_plan_bytes(
             add_delivery_unit_bytes(&mut budget, unit)?;
             budget.add(locale.as_str().len())?;
             for logical in selected {
-                let Some(snapshot) = definitions
-                    .get(logical)
-                    .and_then(|by_locale| by_locale.get(locale))
-                else {
+                let Some(snapshot) = exact_definition(definitions, logical, locale) else {
                     continue;
                 };
                 add_scope_bytes(&mut budget, &snapshot.logical.scope)?;
@@ -741,14 +752,21 @@ fn account_plan_bytes(
     Ok(())
 }
 
+fn exact_definition<'a>(
+    definitions: &'a UniqueDefinitions,
+    logical: &LogicalMessageIdentity,
+    locale: &Locale,
+) -> Option<&'a DefinitionSnapshot> {
+    definitions
+        .get(logical)
+        .and_then(|by_locale| by_locale.get(locale))
+}
+
 fn definition_side_closed(
     request: &LinkRequest<'_>,
     scope: &ResolvedCatalogScopeId,
 ) -> Result<bool, LinkOperationalError> {
-    let completeness = request
-        .resolved_scope_completeness()
-        .get(scope)
-        .ok_or(LinkOperationalError::InternalInvariant)?;
+    let completeness = scope_completeness(request, scope)?;
     Ok(matches!(
         completeness.definitions(),
         ResolvedInputCompleteness::Closed
@@ -759,10 +777,7 @@ fn both_sides_closed(
     request: &LinkRequest<'_>,
     scope: &ResolvedCatalogScopeId,
 ) -> Result<bool, LinkOperationalError> {
-    let completeness = request
-        .resolved_scope_completeness()
-        .get(scope)
-        .ok_or(LinkOperationalError::InternalInvariant)?;
+    let completeness = scope_completeness(request, scope)?;
     Ok(matches!(
         (completeness.definitions(), completeness.references()),
         (
@@ -770,6 +785,17 @@ fn both_sides_closed(
             ResolvedInputCompleteness::Closed
         )
     ))
+}
+
+fn scope_completeness<'a>(
+    request: &'a LinkRequest<'_>,
+    scope: &ResolvedCatalogScopeId,
+) -> Result<&'a ResolvedScopeCompleteness, LinkOperationalError> {
+    let completeness = request
+        .resolved_scope_completeness()
+        .get(scope)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    Ok(completeness)
 }
 
 struct PatternWorkBudget {
@@ -897,13 +923,16 @@ fn account_finding_bytes(
                 }
             }
             LinkFindingRecord::UnresolvedMessage(finding) => {
-                add_reference_identity_bytes(&mut budget, finding.subject().reference())?;
                 let evidence = finding.evidence();
-                add_delivery_unit_bytes(&mut budget, evidence.delivery_unit())?;
-                add_scope_bytes(&mut budget, evidence.resolved_scope())?;
-                add_selector_bytes(&mut budget, evidence.selector())?;
-                add_optional_reason_bytes(&mut budget, evidence.reason())?;
-                add_optional_origin_bytes(&mut budget, evidence.origin())?;
+                add_reference_analysis_bytes(
+                    &mut budget,
+                    finding.subject().reference(),
+                    evidence.delivery_unit(),
+                    evidence.resolved_scope(),
+                    Some(evidence.selector()),
+                    evidence.reason(),
+                    evidence.origin(),
+                )?;
                 for failure in evidence.failures() {
                     budget.add(failure.requested_locale().as_str().len())?;
                     for locale in failure.probed_locales() {
@@ -942,21 +971,29 @@ fn account_finding_bytes(
                 add_definition_location_bytes(&mut budget, finding.evidence().definition())?;
             }
             LinkFindingRecord::UnboundedDynamicReference(finding) => {
-                add_reference_identity_bytes(&mut budget, finding.subject().reference())?;
                 let evidence = finding.evidence();
-                add_delivery_unit_bytes(&mut budget, evidence.delivery_unit())?;
-                add_scope_bytes(&mut budget, evidence.resolved_scope())?;
-                add_optional_reason_bytes(&mut budget, evidence.reason())?;
-                add_optional_origin_bytes(&mut budget, evidence.origin())?;
+                add_reference_analysis_bytes(
+                    &mut budget,
+                    finding.subject().reference(),
+                    evidence.delivery_unit(),
+                    evidence.resolved_scope(),
+                    None,
+                    evidence.reason(),
+                    evidence.origin(),
+                )?;
             }
             LinkFindingRecord::DegradedAnalysis(finding) => match finding {
                 DegradedAnalysisFinding::WideSelector(finding) => {
-                    add_reference_identity_bytes(&mut budget, finding.subject().reference())?;
                     let evidence = finding.evidence();
-                    add_delivery_unit_bytes(&mut budget, evidence.delivery_unit())?;
-                    add_scope_bytes(&mut budget, evidence.resolved_scope())?;
-                    add_optional_reason_bytes(&mut budget, evidence.reason())?;
-                    add_optional_origin_bytes(&mut budget, evidence.origin())?;
+                    add_reference_analysis_bytes(
+                        &mut budget,
+                        finding.subject().reference(),
+                        evidence.delivery_unit(),
+                        evidence.resolved_scope(),
+                        None,
+                        evidence.reason(),
+                        evidence.origin(),
+                    )?;
                 }
                 DegradedAnalysisFinding::PartialCompleteness(finding) => {
                     add_scope_bytes(&mut budget, finding.subject().resolved_scope())?;
@@ -1021,6 +1058,25 @@ fn limit_error(counter: LinkLimitCounter, limit: u64, attempted: u64) -> LinkOpe
         Ok(evidence) => LinkOperationalError::Limit(evidence),
         Err(_) => LinkOperationalError::InternalInvariant,
     }
+}
+
+fn add_reference_analysis_bytes(
+    budget: &mut SemanticByteBudget,
+    reference: &ReferenceRecordIdentity,
+    delivery_unit: &DeliveryUnitId,
+    scope: &ResolvedCatalogScopeId,
+    selector: Option<&MessageSelector>,
+    reason: Option<&ReasonText>,
+    origin: Option<&SourceOrigin>,
+) -> Result<(), LinkOperationalError> {
+    add_reference_identity_bytes(budget, reference)?;
+    add_delivery_unit_bytes(budget, delivery_unit)?;
+    add_scope_bytes(budget, scope)?;
+    if let Some(selector) = selector {
+        add_selector_bytes(budget, selector)?;
+    }
+    add_optional_reason_bytes(budget, reason)?;
+    add_optional_origin_bytes(budget, origin)
 }
 
 fn add_scope_bytes(
