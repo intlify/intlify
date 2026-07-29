@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+blake3 = "=1.8.5"
 intlify_contract = { path = "../intlify_contract" }
 # 0.75.0 is the final OXC release in this series whose declared MSRV is 1.85.0.
 # Keep the exact pins aligned: 0.75.1 raises the OXC MSRV to Rust 1.86.0.
@@ -19,3 +20,6 @@ oxc_ast = "=0.75.0"
 oxc_ast_visit = "=0.75.0"
 oxc_parser = { version = "=0.75.0", default-features = false }
 oxc_span = "=0.75.0"
+
+[build-dependencies]
+blake3 = "=1.8.5"

@@ -27,8 +27,8 @@ use crate::static_eval::{evaluate_static_string, StaticString};
 /// Fixed inclusive byte ceiling for one selected source snapshot.
 pub const SOURCE_BYTES_LIMIT: u64 = 64 * 1024 * 1024;
 
-const DYNAMIC_LOOKUP_REASON: &str = "lookup argument is not statically known";
-const BOUNDED_SET_REASON: &str = "bounded set declared by configured recognizer";
+pub(crate) const DYNAMIC_LOOKUP_REASON: &str = "lookup argument is not statically known";
+pub(crate) const BOUNDED_SET_REASON: &str = "bounded set declared by configured recognizer";
 
 /// Complete deterministic output of one admitted source snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +55,10 @@ impl JsSourceScan {
     #[must_use]
     pub const fn references(&self) -> &[MessageReference] {
         &self.references
+    }
+
+    pub(crate) fn into_references(self) -> Vec<MessageReference> {
+        self.references.into_vec()
     }
 }
 
