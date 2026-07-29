@@ -190,6 +190,30 @@ fn zero_reference_cache_miss_hit_and_disabled_paths_are_identical() {
 }
 
 #[test]
+fn reference_cache_miss_hit_and_disabled_paths_are_identical() {
+    let limits = LinkLimits::default();
+    let recognizers = lookup("t");
+    let selected = || vec![group(&[&["src", "app.ts"]], b"t('checkout.title')")];
+    let cache = MemoryCache::default();
+
+    let disabled = produce_reference_artifacts(selected(), &recognizers, &limits).unwrap();
+    let miss =
+        produce_reference_artifacts_with_cache(selected(), &recognizers, &limits, &cache).unwrap();
+    let hit =
+        produce_reference_artifacts_with_cache(selected(), &recognizers, &limits, &cache).unwrap();
+
+    assert_eq!(disabled.artifacts()[0].references().len(), 1);
+    assert_eq!(disabled, miss);
+    assert_eq!(miss, hit);
+    assert_eq!(
+        encoded_artifacts(&disabled, &limits),
+        encoded_artifacts(&hit, &limits)
+    );
+    assert_eq!(cache.store_count(), 1);
+    assert_eq!(cache.load_count(), 3);
+}
+
+#[test]
 fn bounded_script_goal_uses_its_distinct_cache_identity() {
     let limits = LinkLimits::default();
     let recognizers = lookup("t");
