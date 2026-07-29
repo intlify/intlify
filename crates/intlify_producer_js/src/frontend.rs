@@ -158,6 +158,8 @@ fn admit_source_bytes(
     observed: u64,
 ) -> Result<(), JsProducerError> {
     if observed > SOURCE_BYTES_LIMIT {
+        // Public evidence identifies the first rejected byte so known-length
+        // and streaming snapshots select the same deterministic observation.
         return Err(JsProducerFailure::with_limit(
             JsProducerFailureReason::SourceBytesLimit,
             source.clone(),

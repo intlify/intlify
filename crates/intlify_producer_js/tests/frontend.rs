@@ -653,7 +653,9 @@ fn known_invalid_and_dynamic_set_selectors_have_distinct_failures() {
 #[test]
 fn cancellation_after_a_rejected_module_attempt_does_not_retry_as_script() {
     let probes = AtomicUsize::new(0);
-    let cancellation = || probes.fetch_add(1, Ordering::SeqCst) >= 1;
+    // Admit the module parse and its rejected result, then cancel at the
+    // script retry's pre-parse probe.
+    let cancellation = || probes.fetch_add(1, Ordering::SeqCst) >= 2;
     let error = scan_source_with_cancellation(
         &source("src/cancel.js"),
         b"var await = t('legacy')",
@@ -662,6 +664,7 @@ fn cancellation_after_a_rejected_module_attempt_does_not_retry_as_script() {
     )
     .unwrap_err();
     assert_eq!(error, JsProducerError::Cancelled);
+    assert_eq!(probes.load(Ordering::SeqCst), 3);
 }
 
 #[test]
