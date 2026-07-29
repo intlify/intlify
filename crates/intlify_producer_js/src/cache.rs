@@ -295,8 +295,8 @@ const fn key_syntax_tag(value: JsKeySyntax) -> u8 {
 mod tests {
     use intlify_contract::{
         ArtifactNamespace, ArtifactVersion, CatalogKeyDomain, CatalogScopeId, CatalogScopeName,
-        DeliveryUnitId, PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity,
-        ProducerRevision, SourceDocumentIdentity,
+        DeliveryUnitId, DeliveryUnitSegment, PortablePathSegment, PortableRelativePath, ProducerId,
+        ProducerIdentity, ProducerRevision, SourceDocumentIdentity,
     };
 
     use super::{
@@ -347,15 +347,36 @@ mod tests {
         version: ArtifactVersion,
         callee: &str,
     ) -> super::JsProducerCacheKey {
+        cache_key_with_profile_goal_and_delivery(
+            bytes,
+            revision,
+            version,
+            callee,
+            JsSourceProfile::from_filename("app.ts").unwrap(),
+            JsSelectedSourceGoal::Module,
+            &DeliveryUnitId::main(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn cache_key_with_profile_goal_and_delivery(
+        bytes: &[u8],
+        revision: &str,
+        version: ArtifactVersion,
+        callee: &str,
+        profile: JsSourceProfile,
+        selected_goal: JsSelectedSourceGoal,
+        delivery_unit: &DeliveryUnitId,
+    ) -> super::JsProducerCacheKey {
         let group = JsPhysicalSourceGroup::try_new(vec![source("app.ts")], bytes.to_vec()).unwrap();
         key_for_group(super::CacheKeyContext {
             version,
             producer: &producer(revision),
             group: &group,
-            profile: JsSourceProfile::from_source(group.primary()).unwrap(),
-            selected_goal: JsSelectedSourceGoal::Module,
+            profile,
+            selected_goal,
             recognizers: &recognizers(callee),
-            delivery_unit: &DeliveryUnitId::main(),
+            delivery_unit,
             fingerprint: SourceFingerprint::for_bytes(bytes),
         })
     }
@@ -364,6 +385,10 @@ mod tests {
     fn every_output_affecting_component_changes_cache_identity() {
         let base = cache_key(b"t('a')", "1.0.0+src.aaa", ArtifactVersion::DRAFT_V0_1, "t");
         assert_eq!(base.schema_revision(), CACHE_SCHEMA_REVISION);
+        assert_eq!(
+            base,
+            cache_key(b"t('a')", "1.0.0+src.aaa", ArtifactVersion::DRAFT_V0_1, "t")
+        );
         assert_ne!(
             base,
             cache_key(b"t('b')", "1.0.0+src.aaa", ArtifactVersion::DRAFT_V0_1, "t")
@@ -403,19 +428,61 @@ mod tests {
         });
         assert_ne!(base, alias_key);
 
-        let script_group =
-            JsPhysicalSourceGroup::try_new(vec![source("app.ts")], b"t('a')".to_vec()).unwrap();
-        let script_key = key_for_group(super::CacheKeyContext {
-            version: ArtifactVersion::DRAFT_V0_1,
-            producer: &producer("1.0.0+src.aaa"),
-            group: &script_group,
-            profile: JsSourceProfile::from_source(script_group.primary()).unwrap(),
-            selected_goal: JsSelectedSourceGoal::Script,
-            recognizers: &recognizers("t"),
-            delivery_unit: &DeliveryUnitId::main(),
-            fingerprint: SourceFingerprint::for_bytes(b"t('a')"),
-        });
-        assert_ne!(base, script_key);
+        let javascript_profile = JsSourceProfile::from_filename("app.js").unwrap();
+        assert_ne!(
+            base,
+            cache_key_with_profile_goal_and_delivery(
+                b"t('a')",
+                "1.0.0+src.aaa",
+                ArtifactVersion::DRAFT_V0_1,
+                "t",
+                javascript_profile,
+                JsSelectedSourceGoal::Module,
+                &DeliveryUnitId::main(),
+            )
+        );
+
+        let fixed_module_profile = JsSourceProfile::from_filename("app.mts").unwrap();
+        assert_ne!(
+            base,
+            cache_key_with_profile_goal_and_delivery(
+                b"t('a')",
+                "1.0.0+src.aaa",
+                ArtifactVersion::DRAFT_V0_1,
+                "t",
+                fixed_module_profile,
+                JsSelectedSourceGoal::Module,
+                &DeliveryUnitId::main(),
+            )
+        );
+        assert_ne!(
+            base,
+            cache_key_with_profile_goal_and_delivery(
+                b"t('a')",
+                "1.0.0+src.aaa",
+                ArtifactVersion::DRAFT_V0_1,
+                "t",
+                JsSourceProfile::from_filename("app.ts").unwrap(),
+                JsSelectedSourceGoal::Script,
+                &DeliveryUnitId::main(),
+            )
+        );
+
+        let secondary_delivery_unit =
+            DeliveryUnitId::try_new(vec![DeliveryUnitSegment::try_new("secondary").unwrap()])
+                .unwrap();
+        assert_ne!(
+            base,
+            cache_key_with_profile_goal_and_delivery(
+                b"t('a')",
+                "1.0.0+src.aaa",
+                ArtifactVersion::DRAFT_V0_1,
+                "t",
+                JsSourceProfile::from_filename("app.ts").unwrap(),
+                JsSelectedSourceGoal::Module,
+                &secondary_delivery_unit,
+            )
+        );
     }
 
     #[test]

@@ -195,6 +195,8 @@ where
     if let Some(global_failure) = admission.invocation_failure {
         return Ok(global_failure_outcome(global_failure, producer_scopes));
     }
+    debug_assert_eq!(group_contracts.len(), groups.len());
+    debug_assert_eq!(admission.per_group_failures.len(), groups.len());
 
     // Group execution remains source-local. Cache candidates stay private
     // until every group has reached a deterministic terminal outcome.
@@ -592,7 +594,7 @@ where
             return Ok(CacheMissOutcome::Failed(artifact_error(
                 group.primary(),
                 &error,
-                false,
+                ArtifactFailureContext::Construction,
             )?));
         }
     };
@@ -602,7 +604,7 @@ where
             return Ok(CacheMissOutcome::Failed(artifact_error(
                 group.primary(),
                 &error,
-                true,
+                ArtifactFailureContext::Encoding,
             )?));
         }
     };
@@ -685,10 +687,16 @@ fn identity_error(
     }
 }
 
+#[derive(Clone, Copy)]
+enum ArtifactFailureContext {
+    Construction,
+    Encoding,
+}
+
 fn artifact_error(
     source: &SourceDocumentIdentity,
     error: &ArtifactContractError,
-    encoding: bool,
+    context: ArtifactFailureContext,
 ) -> Result<JsProducerFailure, JsProducerError> {
     match error {
         ArtifactContractError::Limit(evidence) => match evidence.observation() {
@@ -702,10 +710,13 @@ fn artifact_error(
         },
         ArtifactContractError::InvalidArtifact(_)
         | ArtifactContractError::UnsupportedVersion(_) => Ok(JsProducerFailure::without_optional(
-            if encoding {
-                JsProducerFailureReason::CanonicalEncodingFailed
-            } else {
-                JsProducerFailureReason::OutputContractInvalid
+            match context {
+                ArtifactFailureContext::Construction => {
+                    JsProducerFailureReason::OutputContractInvalid
+                }
+                ArtifactFailureContext::Encoding => {
+                    JsProducerFailureReason::CanonicalEncodingFailed
+                }
             },
             source.clone(),
         )),

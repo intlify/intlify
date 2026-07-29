@@ -3,12 +3,15 @@
 
 //! Deterministic JavaScript and TypeScript message-reference extraction.
 //!
-//! The crate accepts host-grouped physical source snapshots, parses each once
-//! under an exact suffix profile, recognizes only explicitly configured static
-//! callees, and emits checked [`intlify_contract::MessageReferenceArtifact`]
-//! values. It is reentrant and safe for caller-owned parallel scheduling.
-//! Filesystem discovery, physical identity, snapshots, completeness mapping,
-//! and project linker policy remain outside this crate.
+//! The crate accepts host-grouped physical source snapshots and scans each
+//! physical group once under an exact suffix profile. Fixed-goal sources use
+//! one parse attempt; bounded-unambiguous sources may retry the same bytes once
+//! as script after a module grammar rejection. It recognizes only explicitly
+//! configured static callees and emits checked
+//! [`intlify_contract::MessageReferenceArtifact`] values. It is reentrant and
+//! safe for caller-owned parallel scheduling. Filesystem discovery, physical
+//! identity, snapshots, completeness mapping, and project linker policy remain
+//! outside this crate.
 
 mod cache;
 mod error;

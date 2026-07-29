@@ -40,8 +40,15 @@ fn main() {
             .strip_prefix(workspace_dir)
             .expect("every revision input is workspace-relative");
         let relative = relative
-            .to_str()
-            .expect("workspace source paths are valid UTF-8");
+            .components()
+            .map(|component| {
+                component
+                    .as_os_str()
+                    .to_str()
+                    .expect("workspace source paths are valid UTF-8")
+            })
+            .collect::<Vec<_>>()
+            .join("/");
         let bytes = fs::read(&path).expect("revision inputs remain readable during the build");
         hash_field(&mut hasher, relative.as_bytes());
         hash_field(&mut hasher, &bytes);
