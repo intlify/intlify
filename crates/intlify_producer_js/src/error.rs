@@ -243,7 +243,11 @@ impl JsProducerFailure {
         self.limit
     }
 
-    /// Return the exact attempted observation paired with `limit`.
+    /// Return the deterministic observed evidence paired with `limit`.
+    ///
+    /// Most limit failures retain the exact attempted observation. A bounded
+    /// streaming-style admission may instead retain the first rejected value
+    /// (`limit + 1`) when that sentinel is fixed by its public contract.
     #[must_use]
     pub const fn observed(&self) -> Option<u64> {
         self.observed
