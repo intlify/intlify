@@ -4,9 +4,14 @@
   "definitions": {
     "CatalogConfig": {
       "additionalProperties": false,
+      "dependencies": {
+        "locale": ["scope"],
+        "scope": ["locale"]
+      },
       "description": "One validated resource catalog definition.",
       "properties": {
         "exclude": {
+          "default": [],
           "description": "Project-relative patterns removed from this definition's include set.",
           "items": {
             "type": "string"
@@ -14,6 +19,7 @@
           "type": "array"
         },
         "format": {
+          "default": null,
           "description": "Optional shipped host-format override.",
           "enum": ["json"],
           "type": "string"
@@ -25,6 +31,45 @@
           },
           "minItems": 1,
           "type": "array"
+        },
+        "locale": {
+          "default": null,
+          "description": "Optional path or fixed locale binding. Must be paired with scope.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "from": {
+                  "const": "path"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              },
+              "required": ["from", "pattern"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "from": {
+                  "const": "fixed"
+                },
+                "value": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": ["from", "value"],
+              "type": "object"
+            }
+          ]
+        },
+        "scope": {
+          "default": null,
+          "description": "Optional exact linker-participating scope. Must be paired with locale.",
+          "minLength": 1,
+          "type": "string"
         }
       },
       "required": ["include"],
@@ -61,6 +106,263 @@
       "enum": ["standard", "preserve"],
       "type": "string"
     },
+    "MessageCatalogKeyDomain": {
+      "description": "Normalized catalog-key domain token used by roots and recognizers.",
+      "oneOf": [
+        {
+          "const": "json-pointer",
+          "description": "RFC 6901 JSON Pointer.",
+          "type": "string"
+        },
+        {
+          "const": "yaml-typed-path",
+          "description": "YAML Core-Schema typed path.",
+          "type": "string"
+        },
+        {
+          "const": "xliff-1.2",
+          "description": "XLIFF 1.2 hierarchy.",
+          "type": "string"
+        },
+        {
+          "const": "xliff-2",
+          "description": "XLIFF 2.x hierarchy.",
+          "type": "string"
+        }
+      ]
+    },
+    "MessageDynamicReferenceMode": {
+      "description": "Normalized exact dynamic-reference mode.",
+      "oneOf": [
+        {
+          "const": "compat",
+          "description": "Retain conservative reachability and report non-blocking degradation.",
+          "type": "string"
+        },
+        {
+          "const": "strict",
+          "description": "Treat unbounded dynamic evidence as blocking.",
+          "type": "string"
+        }
+      ]
+    },
+    "MessageJsCallKind": {
+      "description": "Normalized built-in JS recognizer call kind.",
+      "oneOf": [
+        {
+          "const": "lookup",
+          "description": "One ordinary message lookup.",
+          "type": "string"
+        },
+        {
+          "const": "set",
+          "description": "One explicit finite set declaration.",
+          "type": "string"
+        }
+      ]
+    },
+    "MessageJsKeySyntax": {
+      "description": "Normalized JS source-facing key syntax.",
+      "oneOf": [
+        {
+          "const": "canonical",
+          "description": "The source string is already canonical.",
+          "type": "string"
+        },
+        {
+          "const": "literal",
+          "description": "The source string is one literal JSON Pointer segment.",
+          "type": "string"
+        },
+        {
+          "const": "dot-path",
+          "description": "The source string uses the fixed dot-path grammar.",
+          "type": "string"
+        }
+      ]
+    },
+    "MessageJsRecognizerConfig": {
+      "additionalProperties": false,
+      "description": "One normalized built-in JS recognizer binding.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/MessageCatalogKeyDomain"
+        },
+        "keySyntax": {
+          "$ref": "#/definitions/MessageJsKeySyntax"
+        },
+        "kind": {
+          "$ref": "#/definitions/MessageJsCallKind"
+        },
+        "scope": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["kind", "scope", "domain", "keySyntax"],
+      "type": "object"
+    },
+    "MessageProducersConfig": {
+      "additionalProperties": false,
+      "description": "Normalized producer declarations.",
+      "properties": {
+        "artifacts": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "js": {
+          "additionalProperties": false,
+          "description": "Normalized built-in JS producer configuration.",
+          "properties": {
+            "include": {
+              "description": "Non-empty JS/TS source membership patterns.",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "recognizers": {
+              "additionalProperties": {
+                "$ref": "#/definitions/MessageJsRecognizerConfig"
+              },
+              "minProperties": 1,
+              "type": "object"
+            }
+          },
+          "required": ["include", "recognizers"],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "MessageRootConfig": {
+      "additionalProperties": false,
+      "description": "One normalized configured root.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/MessageCatalogKeyDomain"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/definitions/MessageSelectorConfig"
+        }
+      },
+      "required": ["scope", "domain", "selector"],
+      "type": "object"
+    },
+    "MessageSelectorConfig": {
+      "description": "Normalized configured-root selector.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One exact canonical key.",
+          "properties": {
+            "key": {
+              "description": "Canonical key spelling.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "exact",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "key"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One canonical structural prefix.",
+          "properties": {
+            "kind": {
+              "const": "prefix",
+              "type": "string"
+            },
+            "prefix": {
+              "description": "Canonical prefix spelling.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": ["kind", "prefix"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One bounded canonical structural pattern.",
+          "properties": {
+            "kind": {
+              "const": "pattern",
+              "type": "string"
+            },
+            "pattern": {
+              "description": "Canonical pattern spelling.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": ["kind", "pattern"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Every key in the configured scope-domain pair.",
+          "properties": {
+            "kind": {
+              "const": "all-in-scope",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "MessagesConfig": {
+      "additionalProperties": false,
+      "description": "Validated normalized `messages` section.",
+      "properties": {
+        "dynamicReferences": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MessageDynamicReferenceMode"
+            }
+          ],
+          "default": "compat"
+        },
+        "locales": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1024,
+          "minItems": 1,
+          "type": "array"
+        },
+        "producers": {
+          "$ref": "#/definitions/MessageProducersConfig"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/definitions/MessageRootConfig"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        }
+      },
+      "required": ["locales"],
+      "type": "object"
+    },
     "ResourcesConfig": {
       "additionalProperties": false,
       "description": "Validated project resource configuration.",
@@ -88,6 +390,10 @@
     "lint": {
       "$ref": "#/definitions/EmptyConfig",
       "description": "Linter configuration. Phase 3C accepts only an empty object."
+    },
+    "messages": {
+      "$ref": "#/definitions/MessagesConfig",
+      "description": "Message-link policy and reference-producer configuration."
     },
     "resources": {
       "$ref": "#/definitions/ResourcesConfig",

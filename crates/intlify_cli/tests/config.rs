@@ -9,6 +9,7 @@ use intlify_cli::config::{
     load_project_config, slash_normalize_path, ConfigSource, EmptyConfig, FormatterConfig,
     FormatterMode, LoadedProjectConfig, ProjectConfig,
 };
+use intlify_linker::DynamicReferenceMode;
 use intlify_resource::{
     CatalogPolicyState, CatalogResolution, HostFormat, HostFormatClassification,
     ProjectRelativeResourcePath, ResourcesConfig,
@@ -37,13 +38,15 @@ fn assert_default_config(loaded: &LoadedProjectConfig) {
         ProjectConfig {
             fmt: FormatterConfig::default(),
             lint: EmptyConfig {},
-            resources: ResourcesConfig::default()
+            resources: ResourcesConfig::default(),
+            messages: None,
         }
     );
     assert_eq!(
         loaded.resolved_resources.policy_state(),
         CatalogPolicyState::Absent
     );
+    assert!(loaded.resolved_messages.is_none());
 }
 
 #[test]
@@ -348,6 +351,156 @@ fn parses_resource_config_and_retains_one_resolved_policy() {
 }
 
 #[test]
+fn parses_messages_config_and_retains_checked_policy_and_producers() {
+    let root = temp_root("messages-config");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{
+  "resources": {
+    "catalogs": [
+      {
+        "include": ["locales/*.json"],
+        "scope": "app",
+        "locale": { "from": "path", "pattern": "locales/{locale}.json" }
+      }
+    ]
+  },
+  "messages": {
+    "locales": ["ja", "en"],
+    "dynamicReferences": "strict",
+    "roots": [
+      {
+        "scope": "app",
+        "domain": "json-pointer",
+        "selector": { "kind": "exact", "key": "/legal/notice" }
+      }
+    ],
+    "producers": {
+      "js": {
+        "include": ["src/**/*.ts"],
+        "recognizers": {
+          "i18n.t": {
+            "kind": "lookup",
+            "scope": "app",
+            "domain": "json-pointer",
+            "keySyntax": "dot-path"
+          }
+        }
+      },
+      "artifacts": ["generated/references.json"]
+    }
+  }
+}"#,
+    );
+
+    let loaded = load_project_config(&root, None).expect("messages config should load");
+    let normalized = loaded.config.messages.as_ref().expect("messages present");
+    assert_eq!(normalized.locales(), ["en", "ja"]);
+
+    let resolved = loaded
+        .resolved_messages
+        .as_ref()
+        .expect("resolved messages present");
+    assert_eq!(
+        resolved.policy().dynamic_references(),
+        DynamicReferenceMode::Strict
+    );
+    assert_eq!(resolved.policy().configured_roots().len(), 1);
+    assert_eq!(
+        resolved.producers().js().unwrap().recognizers().bindings()[0].callee(),
+        "i18n.t"
+    );
+    assert_eq!(resolved.producers().artifacts().len(), 1);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn maps_messages_validation_evidence_into_the_existing_config_envelope() {
+    let cases = [
+        (
+            r#"{"messages":null}"#,
+            "/messages",
+            "invalid_messages_section_shape",
+        ),
+        (
+            r#"{"messages":{}}"#,
+            "/messages/locales",
+            "invalid_message_locales",
+        ),
+        (
+            r#"{"messages":{"locales":["en"],"dynamicReferences":null}}"#,
+            "/messages/dynamicReferences",
+            "invalid_message_dynamic_references",
+        ),
+        (
+            r#"{"messages":{"locales":["en"],"roots":{}}}"#,
+            "/messages/roots",
+            "invalid_message_roots",
+        ),
+        (
+            r#"{"messages":{"locales":["en"],"producers":{"artifacts":[]}}}"#,
+            "/messages/producers/artifacts",
+            "invalid_message_producers",
+        ),
+        (
+            r#"{"messages":{"locales":["en"],"fallback":null}}"#,
+            "/messages/fallback",
+            "unknown_field",
+        ),
+    ];
+
+    for (fixture, pointer, reason) in cases {
+        let root = temp_root("messages-evidence");
+        write(&root.join("intlify.config.json"), fixture);
+
+        let error = load_project_config(&root, None).expect_err("invalid messages should fail");
+        let details = error.details.expect("validation details");
+        assert_eq!(error.code, "config_validation_failed");
+        assert_eq!(details["pointer"], pointer);
+        assert_eq!(details["reason"], reason);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    let root = temp_root("messages-duplicate-locale");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{"messages":{"locales":["en","ja","en"]}}"#,
+    );
+    let error = load_project_config(&root, None).expect_err("duplicate locale should fail");
+    let details = error.details.expect("validation details");
+    assert_eq!(details["pointer"], "/messages/locales/2");
+    assert_eq!(details["firstPointer"], "/messages/locales/0");
+    assert!(details.get("value").is_none());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn validates_fixed_catalog_locale_membership_before_discovery() {
+    let root = temp_root("fixed-locale-membership");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{
+  "resources": {
+    "catalogs": [{
+      "include": ["vendor/*.json"],
+      "scope": "vendor",
+      "locale": { "from": "fixed", "value": "en" }
+    }]
+  },
+  "messages": { "locales": ["ja"] }
+}"#,
+    );
+
+    let error = load_project_config(&root, None).expect_err("out-of-set fixed locale should fail");
+    let details = error.details.expect("validation details");
+    assert_eq!(details["reason"], "catalog_locale_not_production");
+    assert_eq!(details["pointer"], "/resources/catalogs/0/locale/value");
+    assert_eq!(details["scope"], "vendor");
+    assert_eq!(details["locale"], "en");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn distinguishes_absent_and_explicit_empty_resource_policy() {
     for (name, fixture, catalogs_present, policy) in [
         (
@@ -459,32 +612,37 @@ fn maps_resource_validation_evidence_into_the_existing_config_envelope() {
 }
 
 #[test]
-fn validates_root_fmt_lint_and_resources_in_fixed_order() {
+fn validates_root_fmt_lint_resources_and_messages_in_fixed_order() {
     let cases = [
         (
-            r#"{"zeta":true,"alpha":true,"fmt":null,"resources":null}"#,
+            r#"{"zeta":true,"alpha":true,"fmt":null,"resources":null,"messages":null}"#,
             "/alpha",
             "unknown_field",
         ),
         (
-            r#"{"$schema":false,"fmt":null,"resources":null}"#,
+            r#"{"$schema":false,"fmt":null,"resources":null,"messages":null}"#,
             "/$schema",
             "expected_string",
         ),
         (
-            r#"{"fmt":null,"lint":null,"resources":null}"#,
+            r#"{"fmt":null,"lint":null,"resources":null,"messages":null}"#,
             "/fmt",
             "expected_object",
         ),
         (
-            r#"{"fmt":{},"lint":null,"resources":null}"#,
+            r#"{"fmt":{},"lint":null,"resources":null,"messages":null}"#,
             "/lint",
             "expected_object",
         ),
         (
-            r#"{"fmt":{},"lint":{},"resources":null}"#,
+            r#"{"fmt":{},"lint":{},"resources":null,"messages":null}"#,
             "/resources",
             "invalid_section_shape",
+        ),
+        (
+            r#"{"fmt":{},"lint":{},"resources":{},"messages":null}"#,
+            "/messages",
+            "invalid_messages_section_shape",
         ),
     ];
 

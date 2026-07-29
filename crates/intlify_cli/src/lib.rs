@@ -7,6 +7,7 @@ pub mod config;
 mod error;
 mod fmt;
 mod input;
+pub mod messages;
 mod output;
 mod resource;
 pub mod schema;

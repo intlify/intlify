@@ -19,10 +19,15 @@ fn generated_config_schema_matches_design_contract() {
     assert!(json["definitions"].get("FormatterMode").is_some());
     assert!(json["definitions"].get("ResourcesConfig").is_some());
     assert!(json["definitions"].get("CatalogConfig").is_some());
+    assert!(json["definitions"].get("MessagesConfig").is_some());
+    assert!(json["definitions"].get("MessageSelectorConfig").is_some());
 
     let resources = &json["properties"]["resources"];
     assert_eq!(resources["$ref"], "#/definitions/ResourcesConfig");
     assert!(resources.get("anyOf").is_none());
+    let messages = &json["properties"]["messages"];
+    assert_eq!(messages["$ref"], "#/definitions/MessagesConfig");
+    assert!(messages.get("anyOf").is_none());
 
     let catalogs = &json["definitions"]["ResourcesConfig"]["properties"]["catalogs"];
     assert_eq!(catalogs["type"], "array");
@@ -42,6 +47,52 @@ fn generated_config_schema_matches_design_contract() {
         serde_json::json!(["json"])
     );
     assert!(catalog["properties"]["format"].get("anyOf").is_none());
+
+    assert_eq!(catalog["properties"]["scope"]["type"], "string");
+    assert_eq!(catalog["properties"]["scope"]["minLength"], 1);
+    assert!(catalog["properties"]["scope"].get("anyOf").is_none());
+    assert!(catalog["properties"]["locale"].get("oneOf").is_some());
+    assert!(catalog["properties"]["locale"].get("anyOf").is_none());
+    assert_eq!(
+        catalog["dependencies"]["scope"],
+        serde_json::json!(["locale"])
+    );
+    assert_eq!(
+        catalog["dependencies"]["locale"],
+        serde_json::json!(["scope"])
+    );
+
+    let messages = &json["definitions"]["MessagesConfig"];
+    assert_eq!(messages["required"], serde_json::json!(["locales"]));
+    assert_eq!(messages["properties"]["locales"]["minItems"], 1);
+    assert_eq!(messages["properties"]["locales"]["maxItems"], 1024);
+    assert_eq!(messages["properties"]["locales"]["items"]["minLength"], 1);
+    assert_eq!(messages["properties"]["roots"]["maxItems"], 4096);
+    assert!(messages["properties"].get("fallback").is_none());
+    assert!(messages["properties"].get("coverageBaseline").is_none());
+    assert!(messages["properties"].get("delivery").is_none());
+
+    let producers = &json["definitions"]["MessageProducersConfig"];
+    let js = &producers["properties"]["js"];
+    assert!(js.get("anyOf").is_none());
+    assert_eq!(js["properties"]["include"]["minItems"], 1);
+    assert_eq!(js["properties"]["recognizers"]["minProperties"], 1);
+    assert_eq!(producers["properties"]["artifacts"]["minItems"], 1);
+
+    let root = &json["definitions"]["MessageRootConfig"];
+    assert_eq!(root["properties"]["reason"]["type"], "string");
+    assert!(root["properties"]["reason"].get("anyOf").is_none());
+
+    let selector_kinds = json["definitions"]["MessageSelectorConfig"]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|selector| selector["properties"]["kind"]["const"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        selector_kinds,
+        ["exact", "prefix", "pattern", "all-in-scope"]
+    );
     assert!(schema.ends_with('\n'));
 }
 
