@@ -468,10 +468,11 @@ fn has_windows_drive_prefix(source: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        CatalogBindingValueError, CatalogScopeName, LocaleCaptureError, LocaleCapturePattern,
-        ResolvedLocale,
+        CatalogBindingValueError, CatalogScopeName, LocaleBindingConfig, LocaleCaptureError,
+        LocaleCapturePattern, ResolvedLocale,
     };
     use crate::ProjectRelativeResourcePath;
+    use serde_json::json;
 
     fn path(value: &str) -> ProjectRelativeResourcePath {
         ProjectRelativeResourcePath::try_from(value).unwrap()
@@ -494,6 +495,31 @@ mod tests {
             Err(CatalogBindingValueError::Bytes {
                 limit: 255,
                 observed: 256,
+            })
+        );
+    }
+
+    #[test]
+    fn locale_bindings_serialize_to_the_tagged_config_shape() {
+        let path = LocaleBindingConfig::Path {
+            pattern: LocaleCapturePattern::parse("locales/{locale}.json").unwrap(),
+        };
+        assert_eq!(
+            serde_json::to_value(path).unwrap(),
+            json!({
+                "from": "path",
+                "pattern": "locales/{locale}.json"
+            })
+        );
+
+        let fixed = LocaleBindingConfig::Fixed {
+            value: ResolvedLocale::try_new("EN_us").unwrap(),
+        };
+        assert_eq!(
+            serde_json::to_value(fixed).unwrap(),
+            json!({
+                "from": "fixed",
+                "value": "EN_us"
             })
         );
     }

@@ -11,7 +11,10 @@ use intlify_contract::{
     Locale, MessageSelector, PortablePathSegment, PortableRelativePath, ReasonText,
     ValueConstructionError,
 };
-use intlify_linker::{ConfiguredRoot, DynamicReferenceMode, LinkPolicy, PlacementPolicy};
+use intlify_linker::{
+    ConfiguredRoot, DynamicReferenceMode, InvalidRequestError, LinkOperationalError, LinkPolicy,
+    PlacementPolicy,
+};
 use intlify_producer_js::{
     JsKeySyntax, JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet,
 };
@@ -577,14 +580,7 @@ pub fn validate_messages_config(
         PlacementPolicy::Duplicate,
         &limits,
     )
-    .map_err(|_| {
-        MessagesConfigViolation::invalid(
-            MessagesConfigReason::InvalidMessageRoots,
-            "/messages/roots",
-            None,
-            CONFIG_EVIDENCE_BYTES,
-        )
-    })?;
+    .map_err(policy_config_violation)?;
 
     let production = policy
         .production_locales()
@@ -768,42 +764,12 @@ fn validate_roots(
         }
 
         let scope_pointer = pointer_property(&root_pointer, "scope");
-        let scope = required_string(
+        let (scope, scope_id) = validate_linker_scope(
             object,
-            "scope",
             &scope_pointer,
             MessagesConfigReason::InvalidMessageRoots,
-            SCOPE_BYTES_LIMIT,
+            resources,
         )?;
-        if scope.len() > SCOPE_BYTES_LIMIT {
-            return Err(MessagesConfigViolation::with_limit(
-                MessagesConfigReason::InvalidMessageRoots,
-                scope_pointer,
-                SCOPE_BYTES_LIMIT as u64,
-                scope.len() as u64,
-            ));
-        }
-        let scope_name = ContractCatalogScopeName::try_new(scope).map_err(|_| {
-            MessagesConfigViolation::invalid(
-                MessagesConfigReason::InvalidMessageRoots,
-                scope_pointer.clone(),
-                object.get("scope"),
-                SCOPE_BYTES_LIMIT,
-            )
-        })?;
-        if !resources
-            .linker_scopes()
-            .iter()
-            .any(|candidate| candidate.as_str() == scope)
-        {
-            return Err(MessagesConfigViolation::invalid(
-                MessagesConfigReason::InvalidMessageRoots,
-                scope_pointer,
-                object.get("scope"),
-                SCOPE_BYTES_LIMIT,
-            ));
-        }
-        let scope_id = CatalogScopeId::new(ArtifactNamespace::Project, scope_name);
 
         let domain_pointer = pointer_property(&root_pointer, "domain");
         let domain_token = required_string(
@@ -1274,42 +1240,12 @@ fn validate_js_recognizer(
     };
 
     let scope_pointer = pointer_property(pointer, "scope");
-    let scope = required_string(
+    let (scope, scope_id) = validate_linker_scope(
         object,
-        "scope",
         &scope_pointer,
         MessagesConfigReason::InvalidMessageProducers,
-        SCOPE_BYTES_LIMIT,
+        resources,
     )?;
-    if scope.len() > SCOPE_BYTES_LIMIT {
-        return Err(MessagesConfigViolation::with_limit(
-            MessagesConfigReason::InvalidMessageProducers,
-            scope_pointer,
-            SCOPE_BYTES_LIMIT as u64,
-            scope.len() as u64,
-        ));
-    }
-    let scope_name = ContractCatalogScopeName::try_new(scope).map_err(|_| {
-        MessagesConfigViolation::invalid(
-            MessagesConfigReason::InvalidMessageProducers,
-            scope_pointer.clone(),
-            object.get("scope"),
-            SCOPE_BYTES_LIMIT,
-        )
-    })?;
-    if !resources
-        .linker_scopes()
-        .iter()
-        .any(|candidate| candidate.as_str() == scope)
-    {
-        return Err(MessagesConfigViolation::invalid(
-            MessagesConfigReason::InvalidMessageProducers,
-            scope_pointer,
-            object.get("scope"),
-            SCOPE_BYTES_LIMIT,
-        ));
-    }
-    let scope_id = CatalogScopeId::new(ArtifactNamespace::Project, scope_name);
 
     let domain_pointer = pointer_property(pointer, "domain");
     let domain = parse_domain(required_string(
@@ -1519,6 +1455,67 @@ fn required_string<'a>(
     })
 }
 
+fn validate_linker_scope<'a>(
+    object: &'a Map<String, Value>,
+    pointer: &str,
+    reason: MessagesConfigReason,
+    resources: &ResolvedResources,
+) -> Result<(&'a str, CatalogScopeId), MessagesConfigViolation> {
+    let scope = required_string(object, "scope", pointer, reason, SCOPE_BYTES_LIMIT)?;
+    if scope.len() > SCOPE_BYTES_LIMIT {
+        return Err(MessagesConfigViolation::with_limit(
+            reason,
+            pointer,
+            SCOPE_BYTES_LIMIT as u64,
+            scope.len() as u64,
+        ));
+    }
+    let scope_name = ContractCatalogScopeName::try_new(scope).map_err(|_| {
+        MessagesConfigViolation::invalid(reason, pointer, object.get("scope"), SCOPE_BYTES_LIMIT)
+    })?;
+    if resources
+        .linker_scopes()
+        .binary_search_by(|candidate| candidate.as_str().as_bytes().cmp(scope.as_bytes()))
+        .is_err()
+    {
+        return Err(MessagesConfigViolation::invalid(
+            reason,
+            pointer,
+            object.get("scope"),
+            SCOPE_BYTES_LIMIT,
+        ));
+    }
+    Ok((
+        scope,
+        CatalogScopeId::new(ArtifactNamespace::Project, scope_name),
+    ))
+}
+
+fn policy_config_violation(error: LinkOperationalError) -> MessagesConfigViolation {
+    let locale_failure = match error {
+        LinkOperationalError::InvalidRequest(
+            InvalidRequestError::EmptyProductionLocales
+            | InvalidRequestError::DuplicateProductionLocale(_),
+        ) => true,
+        LinkOperationalError::Limit(evidence) => matches!(
+            evidence.counter(),
+            LinkLimitCounter::ProductionLocales | LinkLimitCounter::LocaleBytes
+        ),
+        LinkOperationalError::InvalidRequest(_)
+        | LinkOperationalError::UnsupportedContract(_)
+        | LinkOperationalError::InternalInvariant => false,
+    };
+    let (reason, pointer) = if locale_failure {
+        (
+            MessagesConfigReason::InvalidMessageLocales,
+            "/messages/locales",
+        )
+    } else {
+        (MessagesConfigReason::InvalidMessageRoots, "/messages/roots")
+    };
+    MessagesConfigViolation::invalid(reason, pointer, None, CONFIG_EVIDENCE_BYTES)
+}
+
 fn construction_violation(
     reason: MessagesConfigReason,
     pointer: String,
@@ -1584,13 +1581,17 @@ fn has_windows_drive_prefix(source: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use intlify_linker::DynamicReferenceMode;
+    use intlify_contract::{LinkLimitCounter, LinkLimits, Locale};
+    use intlify_linker::{
+        DynamicReferenceMode, InvalidRequestError, LinkOperationalError, LinkPolicy,
+        PlacementPolicy,
+    };
     use intlify_resource::ResourcesConfig;
     use serde_json::{json, Value};
 
     use super::{
-        validate_messages_config, MessageCatalogKeyDomain, MessagesConfigError,
-        MessagesConfigReason,
+        policy_config_violation, validate_messages_config, validate_roots, MessageCatalogKeyDomain,
+        MessagesConfigError, MessagesConfigReason,
     };
 
     fn resources(value: &Value) -> intlify_resource::ResolvedResources {
@@ -1661,6 +1662,63 @@ mod tests {
         assert!(resolved.policy().configured_roots().is_empty());
         assert!(resolved.producers().js().is_none());
         assert!(resolved.producers().artifacts().is_empty());
+    }
+
+    #[test]
+    fn policy_failures_are_attributed_to_the_owning_config_field() {
+        let empty_locales = policy_config_violation(LinkOperationalError::InvalidRequest(
+            InvalidRequestError::EmptyProductionLocales,
+        ));
+        assert_eq!(
+            empty_locales.reason(),
+            MessagesConfigReason::InvalidMessageLocales
+        );
+        assert_eq!(empty_locales.pointer(), "/messages/locales");
+
+        let locale_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::ProductionLocales, 0)
+            .unwrap();
+        let locale_limit = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &locale_limits,
+        )
+        .unwrap_err();
+        let locale_limit = policy_config_violation(locale_limit);
+        assert_eq!(
+            locale_limit.reason(),
+            MessagesConfigReason::InvalidMessageLocales
+        );
+        assert_eq!(locale_limit.pointer(), "/messages/locales");
+
+        let (_, roots) = validate_roots(
+            Some(&json!([{
+                "scope": "app",
+                "domain": "json-pointer",
+                "selector": { "kind": "all-in-scope" }
+            }])),
+            &app_resources(),
+        )
+        .unwrap();
+        let root_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::ConfiguredRoots, 0)
+            .unwrap();
+        let root_failure = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            roots,
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &root_limits,
+        )
+        .unwrap_err();
+        let root_failure = policy_config_violation(root_failure);
+        assert_eq!(
+            root_failure.reason(),
+            MessagesConfigReason::InvalidMessageRoots
+        );
+        assert_eq!(root_failure.pointer(), "/messages/roots");
     }
 
     #[test]

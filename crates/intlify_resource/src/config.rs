@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 
+use schemars::consts::meta_schemas;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -201,8 +202,17 @@ impl JsonSchema for CatalogConfig {
             "description".to_owned(),
             Value::String("One validated resource catalog definition.".to_owned()),
         );
+        // The committed CLI schema is explicitly draft-07, while callers using
+        // `schema_for!` receive Schemars' draft-2020-12 default. Preserve the
+        // same mutual-presence constraint in both dialects.
+        let dependency_keyword =
+            if generator.settings().meta_schema.as_deref() == Some(meta_schemas::DRAFT07) {
+                "dependencies"
+            } else {
+                "dependentRequired"
+            };
         schema.insert(
-            "dependencies".to_owned(),
+            dependency_keyword.to_owned(),
             serde_json::json!({
                 "scope": ["locale"],
                 "locale": ["scope"]
@@ -351,6 +361,7 @@ fn catalog_scope_schema(_: &mut SchemaGenerator) -> Schema {
     schemars::json_schema!({
         "type": "string",
         "minLength": 1,
+        "maxLength": 255,
     })
 }
 
@@ -372,7 +383,11 @@ fn locale_binding_schema(_: &mut SchemaGenerator) -> Schema {
                 "required": ["from", "value"],
                 "properties": {
                     "from": { "const": "fixed" },
-                    "value": { "type": "string", "minLength": 1 }
+                    "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                    }
                 }
             }
         ]
@@ -1517,6 +1532,7 @@ fn resolve_layer(
 
 #[cfg(test)]
 mod tests {
+    use schemars::generate::SchemaSettings;
     use schemars::schema_for;
     use serde_json::{json, Value};
 
@@ -1847,6 +1863,26 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["a-vendor", "z-app"]
         );
+
+        let fixed_policy_failure = resolved
+            .first_fixed_locale_not_production(|locale| locale == "ja")
+            .expect("the first fixed non-production locale should be retained");
+        assert_eq!(fixed_policy_failure.definition_index(), 2);
+        assert_eq!(fixed_policy_failure.scope().as_str(), "a-vendor");
+        assert_eq!(fixed_policy_failure.locale().as_str(), "EN_us");
+
+        let LinkerCatalogResolution::Matched(assignment) = resolved
+            .resolve_linker_path(&path("vendor/messages.json"))
+            .unwrap()
+        else {
+            panic!("the fixed linker catalog should resolve");
+        };
+        let concrete_policy_failure = assignment
+            .validate_production_locale(|locale| locale == "ja")
+            .expect_err("the fixed catalog locale is outside the production set");
+        assert_eq!(concrete_policy_failure.definition_index(), 2);
+        assert_eq!(concrete_policy_failure.scope().as_str(), "a-vendor");
+        assert_eq!(concrete_policy_failure.locale().as_str(), "EN_us");
     }
 
     #[test]
@@ -2359,12 +2395,32 @@ mod tests {
 
         let catalog = &schema["$defs"]["CatalogConfig"];
         assert_eq!(catalog["properties"]["scope"]["type"], "string");
+        assert_eq!(catalog["properties"]["scope"]["maxLength"], 255);
         assert!(catalog["properties"]["scope"].get("anyOf").is_none());
         assert!(catalog["properties"]["locale"].get("oneOf").is_some());
+        assert_eq!(
+            catalog["properties"]["locale"]["oneOf"][1]["properties"]["value"]["maxLength"],
+            255
+        );
+        assert_eq!(catalog["dependentRequired"]["scope"], json!(["locale"]));
+        assert_eq!(catalog["dependentRequired"]["locale"], json!(["scope"]));
+        assert!(catalog.get("dependencies").is_none());
+
+        let draft07 = SchemaSettings::draft07()
+            .into_generator()
+            .into_root_schema_for::<ResourcesConfig>();
+        let draft07 = serde_json::to_value(draft07).unwrap();
+        let draft07_catalog = &draft07["definitions"]["CatalogConfig"];
+        assert_eq!(draft07_catalog["dependencies"]["scope"], json!(["locale"]));
+        assert_eq!(draft07_catalog["dependencies"]["locale"], json!(["scope"]));
+        assert!(draft07_catalog.get("dependentRequired").is_none());
 
         let overlay = serde_json::to_value(schema_for!(CatalogOverlayConfig)).unwrap();
-        let overlay_schema = overlay.to_string();
-        assert!(!overlay_schema.contains("\"scope\""));
-        assert!(!overlay_schema.contains("\"locale\""));
+        let overlay_properties = overlay
+            .pointer("/$defs/CatalogOverlaySchemaDefinition/properties")
+            .and_then(Value::as_object)
+            .expect("the overlay item definition has an object property map");
+        assert!(!overlay_properties.contains_key("scope"));
+        assert!(!overlay_properties.contains_key("locale"));
     }
 }

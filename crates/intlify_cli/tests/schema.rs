@@ -50,9 +50,14 @@ fn generated_config_schema_matches_design_contract() {
 
     assert_eq!(catalog["properties"]["scope"]["type"], "string");
     assert_eq!(catalog["properties"]["scope"]["minLength"], 1);
+    assert_eq!(catalog["properties"]["scope"]["maxLength"], 255);
     assert!(catalog["properties"]["scope"].get("anyOf").is_none());
     assert!(catalog["properties"]["locale"].get("oneOf").is_some());
     assert!(catalog["properties"]["locale"].get("anyOf").is_none());
+    assert_eq!(
+        catalog["properties"]["locale"]["oneOf"][1]["properties"]["value"]["maxLength"],
+        255
+    );
     assert_eq!(
         catalog["dependencies"]["scope"],
         serde_json::json!(["locale"])
