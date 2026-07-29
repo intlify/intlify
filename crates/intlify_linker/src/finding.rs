@@ -338,6 +338,9 @@ impl MissingTranslationEvidence {
 }
 
 /// One non-blocking fallback coverage finding.
+///
+/// This record is reserved in the closed finding vocabulary for fallback-aware
+/// resolution. The current fallback-blind linker does not construct it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MissingTranslationFinding {
     subject: MissingTranslationSubject,
@@ -415,6 +418,9 @@ impl OrphanedTranslationEvidence {
 }
 
 /// One non-blocking orphaned-translation finding.
+///
+/// This record is reserved in the closed finding vocabulary for coverage
+/// baseline analysis. The current fallback-blind linker does not construct it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct OrphanedTranslationFinding {
     subject: OrphanedTranslationSubject,
