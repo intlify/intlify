@@ -12,6 +12,8 @@ mod config;
 #[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
 mod physical;
+#[allow(dead_code)] // Consumed when project-link orchestration is wired.
+pub(crate) mod reference;
 
 pub use config::{
     validate_messages_config, MessageCatalogKeyDomain, MessageDynamicReferenceMode,

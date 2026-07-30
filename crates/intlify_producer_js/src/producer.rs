@@ -133,6 +133,28 @@ where
     produce_impl(groups, recognizers, limits, Some(cache), cancelled)
 }
 
+/// Admit the invocation-wide physical-group count before source snapshots.
+///
+/// Filesystem-owning integrations call this after canonical physical grouping
+/// and before reading source contents. The producer retains ownership of the
+/// fixed ceiling, canonical first-over source selection, and failure evidence.
+pub fn preflight_source_group_count(
+    mut primary_sources: Vec<SourceDocumentIdentity>,
+) -> Result<(), JsProducerFailure> {
+    primary_sources.sort();
+    let source_group_count =
+        u64::try_from(primary_sources.len()).unwrap_or(SOURCE_GROUPS_LIMIT.saturating_add(1));
+    if source_group_count <= SOURCE_GROUPS_LIMIT {
+        return Ok(());
+    }
+    Err(JsProducerFailure::with_limit(
+        JsProducerFailureReason::SourceCountLimit,
+        primary_sources[SOURCE_GROUPS_LIMIT as usize].clone(),
+        SOURCE_GROUPS_LIMIT,
+        SOURCE_GROUPS_LIMIT + 1,
+    ))
+}
+
 fn produce_impl<S, C>(
     mut groups: Vec<JsPhysicalSourceGroup>,
     recognizers: &JsRecognizerSet,
@@ -154,19 +176,10 @@ where
     groups.sort_by(|left, right| left.primary().cmp(right.primary()));
     let producer_scopes = producer_scopes(recognizers);
 
-    let source_group_count =
-        u64::try_from(groups.len()).unwrap_or(SOURCE_GROUPS_LIMIT.saturating_add(1));
-    if source_group_count > SOURCE_GROUPS_LIMIT {
-        let source = groups[SOURCE_GROUPS_LIMIT as usize].primary().clone();
-        return Ok(global_failure_outcome(
-            JsProducerFailure::with_limit(
-                JsProducerFailureReason::SourceCountLimit,
-                source,
-                SOURCE_GROUPS_LIMIT,
-                SOURCE_GROUPS_LIMIT + 1,
-            ),
-            producer_scopes,
-        ));
+    if let Err(failure) =
+        preflight_source_group_count(groups.iter().map(|group| group.primary().clone()).collect())
+    {
+        return Ok(global_failure_outcome(failure, producer_scopes));
     }
     reject_repeated_logical_sources(&groups)?;
 

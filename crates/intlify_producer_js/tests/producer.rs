@@ -12,10 +12,10 @@ use intlify_contract::{
     PortableRelativePath, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
 use intlify_producer_js::{
-    produce_reference_artifacts, produce_reference_artifacts_with_cache, JsKeySyntax,
-    JsPhysicalSourceGroup, JsProducerCache, JsProducerCacheIoError, JsProducerCacheKey,
-    JsProducerFailureReason, JsProducerOutcome, JsRecognizerBinding, JsRecognizerCallKind,
-    JsRecognizerSet, SOURCE_GROUPS_LIMIT,
+    preflight_source_group_count, produce_reference_artifacts,
+    produce_reference_artifacts_with_cache, JsKeySyntax, JsPhysicalSourceGroup, JsProducerCache,
+    JsProducerCacheIoError, JsProducerCacheKey, JsProducerFailureReason, JsProducerOutcome,
+    JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet, SOURCE_GROUPS_LIMIT,
 };
 
 fn source(path: &[&str]) -> SourceDocumentIdentity {
@@ -457,7 +457,17 @@ fn source_group_ceiling_discards_all_artifacts_and_cache_publication() {
             let name = format!("{ordinal:05}.ts");
             group(&[&["src", name.as_str()]], b"")
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let preflight_failure =
+        preflight_source_group_count(groups.iter().map(|group| group.primary().clone()).collect())
+            .unwrap_err();
+    assert_eq!(
+        preflight_failure.reason(),
+        JsProducerFailureReason::SourceCountLimit
+    );
+    assert_eq!(preflight_failure.limit(), Some(SOURCE_GROUPS_LIMIT));
+    assert_eq!(preflight_failure.observed(), Some(SOURCE_GROUPS_LIMIT + 1));
+
     let outcome = produce_reference_artifacts_with_cache(
         groups,
         &lookup("t"),
