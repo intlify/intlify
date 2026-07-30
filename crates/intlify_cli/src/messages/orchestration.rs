@@ -410,6 +410,14 @@ mod tests {
         .unwrap()
     }
 
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn project_link_results_and_errors_are_thread_transferable() {
+        assert_send_sync::<super::ProjectLinkExecution>();
+        assert_send_sync::<super::ProjectLinkError>();
+    }
+
     #[test]
     fn representative_project_is_deterministic_across_cache_and_creation_order() {
         let first_root = TempRoot::new("representative-first");

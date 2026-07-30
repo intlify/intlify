@@ -563,7 +563,7 @@ fn produce_external_inventory(
         };
 
         let cache_key = ExternalArtifactCacheKey::for_snapshot(primary.clone(), &snapshot);
-        let artifact = cache
+        let cached = cache
             // Typed revalidation cannot recover the original wire charge. The
             // authoritative current snapshot must independently pass it before
             // a cached decoded value can participate.
@@ -571,9 +571,13 @@ fn produce_external_inventory(
                 cache_key.byte_length
                     <= limits.effective_limit(LinkLimitCounter::ReferenceArtifactWireBytes)
             })
-            .and_then(|cache| cache.load_external(&cache_key, limits))
-            .map_or_else(|| decode_reference_artifact(&snapshot, limits), Ok);
-        match artifact {
+            .and_then(|cache| cache.load_external(&cache_key, limits));
+        if let Some(artifact) = cached {
+            artifacts.push(artifact);
+            continue;
+        }
+
+        match decode_reference_artifact(&snapshot, limits) {
             Ok(artifact) => {
                 if let Some(cache) = cache {
                     cache.store_external(cache_key, artifact.clone());
@@ -723,6 +727,16 @@ mod tests {
             .iter()
             .map(ReferenceArtifactSegment::as_str)
             .collect()
+    }
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn reference_inventory_and_cache_values_are_thread_transferable() {
+        assert_send_sync::<super::MessageLinkCache>();
+        assert_send_sync::<super::ReferenceInventory>();
+        assert_send_sync::<super::ReferenceInventoryError>();
+        assert_send_sync::<super::ReferenceSourceFailure>();
     }
 
     #[test]
