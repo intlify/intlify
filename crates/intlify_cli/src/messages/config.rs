@@ -41,6 +41,16 @@ type ValidatedRoots = (
     Vec<ConfiguredRoot>,
     Vec<ResolvedMessageDomainDeclaration>,
 );
+type ValidatedProducers = (
+    MessageProducersConfig,
+    ResolvedMessageProducers,
+    Vec<ResolvedMessageDomainDeclaration>,
+);
+type ValidatedJsProducer = (
+    MessageJsProducerConfig,
+    ResolvedJsProducerConfig,
+    Vec<ResolvedMessageDomainDeclaration>,
+);
 
 /// Stable message-configuration validation reasons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1074,14 +1084,7 @@ fn root_config_order(left: &MessageRootConfig, right: &MessageRootConfig) -> std
 fn validate_producers(
     value: Option<&Value>,
     resources: &ResolvedResources,
-) -> Result<
-    (
-        MessageProducersConfig,
-        ResolvedMessageProducers,
-        Vec<ResolvedMessageDomainDeclaration>,
-    ),
-    MessagesConfigViolation,
-> {
+) -> Result<ValidatedProducers, MessagesConfigViolation> {
     let Some(value) = value else {
         return Ok((
             MessageProducersConfig::default(),
@@ -1133,14 +1136,7 @@ fn validate_js_producer(
     value: &Value,
     pointer: &str,
     resources: &ResolvedResources,
-) -> Result<
-    (
-        MessageJsProducerConfig,
-        ResolvedJsProducerConfig,
-        Vec<ResolvedMessageDomainDeclaration>,
-    ),
-    MessagesConfigViolation,
-> {
+) -> Result<ValidatedJsProducer, MessagesConfigViolation> {
     let object = value.as_object().ok_or_else(|| {
         MessagesConfigViolation::invalid(
             MessagesConfigReason::InvalidMessageProducers,

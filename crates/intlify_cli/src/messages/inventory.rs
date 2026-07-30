@@ -118,6 +118,11 @@ struct Discovery {
     failures: Vec<PendingFailure>,
 }
 
+struct DiscoveryDirectory {
+    directory: PathBuf,
+    entries: std::vec::IntoIter<io::Result<fs::DirEntry>>,
+}
+
 #[derive(Debug)]
 struct LogicalCandidate {
     relative: ProjectRelativeResourcePath,
@@ -342,28 +347,33 @@ fn discover_project_candidates(project_root: &Path, scopes: &[CatalogScopeId]) -
 
 fn discover_directory(
     project_root: &Path,
-    directory: &Path,
+    root_directory: &Path,
     scopes: &[CatalogScopeId],
     discovery: &mut Discovery,
 ) {
-    let entries = match fs::read_dir(directory) {
-        Ok(entries) => entries,
-        Err(error) => {
-            let label = project_relative_label(project_root, directory);
-            discovery.failures.push(PendingFailure {
-                order_path: label.clone(),
-                failure: all_scope_failure(scopes, directory_read_error(label.as_deref(), &error)),
-            });
-            return;
-        }
+    let Some(root) = open_discovery_directory(project_root, root_directory, scopes, discovery)
+    else {
+        return;
     };
+    let mut work = vec![root];
 
-    let mut entries = entries.collect::<Vec<_>>();
-    entries.sort_by(compare_directory_results);
-    for entry in entries {
+    while !work.is_empty() {
+        let entry = work
+            .last_mut()
+            .expect("the discovery worklist is non-empty")
+            .entries
+            .next();
+        let Some(entry) = entry else {
+            work.pop();
+            continue;
+        };
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
+                let directory = &work
+                    .last()
+                    .expect("the current discovery directory remains present")
+                    .directory;
                 let label = project_relative_label(project_root, directory);
                 discovery.failures.push(PendingFailure {
                     order_path: label.clone(),
@@ -385,9 +395,14 @@ fn discover_directory(
         };
 
         if file_type.is_dir() {
-            discover_directory(project_root, &path, scopes, discovery);
+            // The child frame is processed before the current frame resumes,
+            // retaining deterministic depth-first order without recursion.
+            if let Some(child) = open_discovery_directory(project_root, &path, scopes, discovery) {
+                work.push(child);
+            }
             continue;
         }
+
         if file_type.is_symlink() {
             match fs::metadata(&path) {
                 Ok(metadata) if metadata.is_dir() => {
@@ -423,6 +438,31 @@ fn discover_directory(
             absolute: path,
         });
     }
+}
+
+fn open_discovery_directory(
+    project_root: &Path,
+    directory: &Path,
+    scopes: &[CatalogScopeId],
+    discovery: &mut Discovery,
+) -> Option<DiscoveryDirectory> {
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) => {
+            let label = project_relative_label(project_root, directory);
+            discovery.failures.push(PendingFailure {
+                order_path: label.clone(),
+                failure: all_scope_failure(scopes, directory_read_error(label.as_deref(), &error)),
+            });
+            return None;
+        }
+    };
+    let mut entries = entries.collect::<Vec<_>>();
+    entries.sort_by(compare_directory_results);
+    Some(DiscoveryDirectory {
+        directory: directory.to_owned(),
+        entries: entries.into_iter(),
+    })
 }
 
 fn record_discovery_path_failure(
@@ -542,13 +582,13 @@ fn prepare_group(
 
     preflight_first_over_limit(
         LinkLimitCounter::CatalogScopeNameBytes,
-        scope.name().as_str().len() as u64,
+        usize_u64(scope.name().as_str().len()),
         limits,
     )
     .and_then(|()| {
         preflight_first_over_limit(
             LinkLimitCounter::LocaleBytes,
-            locale.as_str().len() as u64,
+            usize_u64(locale.as_str().len()),
             limits,
         )
     })
@@ -716,12 +756,13 @@ fn admit_catalog_domains(
 ) -> Result<BTreeMap<CatalogScopeId, ContractCatalogKeyDomain>, DefinitionInventoryError> {
     let mut observations = Vec::new();
     for extraction in extractions {
+        let domains = distinct_catalog_domains(&extraction.catalog);
         for target in &extraction.prepared.group.targets {
             for definition in target.assignment.participating_definitions() {
-                for (entry_order, entry) in extraction.catalog.entries().iter().enumerate() {
+                for &(entry_order, domain) in &domains {
                     observations.push(DomainObservation {
                         scope: extraction.prepared.scope.clone(),
-                        domain: entry.catalog_key_domain(),
+                        domain,
                         definition: *definition,
                         target_path: target.path().to_owned(),
                         entry_order,
@@ -731,6 +772,23 @@ fn admit_catalog_domains(
         }
     }
     admit_domain_observations(observations, config_path)
+}
+
+fn distinct_catalog_domains(
+    catalog: &intlify_resource::ExtractedCatalog,
+) -> Vec<(usize, ResourceCatalogKeyDomain)> {
+    let mut first_entry_by_domain = BTreeMap::new();
+    for (entry_order, entry) in catalog.entries().iter().enumerate() {
+        first_entry_by_domain
+            .entry(entry.catalog_key_domain())
+            .or_insert(entry_order);
+    }
+    let mut domains = first_entry_by_domain
+        .into_iter()
+        .map(|(domain, entry_order)| (entry_order, domain))
+        .collect::<Vec<_>>();
+    domains.sort_by_key(|(entry_order, _)| *entry_order);
+    domains
 }
 
 fn admit_domain_observations(
@@ -1593,20 +1651,21 @@ mod tests {
     use std::fs;
     use std::ops::Deref;
     use std::path::{Path, PathBuf};
+    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use intlify_contract::{LinkLimitCounter, LinkLimits};
     use intlify_resource::{
-        CatalogAssignmentOrigin, HostFormatRegistry, LinkerCatalogResolution,
-        ProjectRelativeResourcePath, ResourcesConfig,
+        CatalogAssignmentOrigin, CatalogKeyDomain as ResourceCatalogKeyDomain, HostFormatRegistry,
+        LinkerCatalogResolution, ProjectRelativeResourcePath, ResourcesConfig,
     };
     use serde_json::{json, Value};
 
     use super::{
         acquire_snapshot, admit_domain_observations, compare_portable_path_str, contract_scope_id,
-        discover_project_candidates, group_physical_targets, prepare_group,
-        produce_definition_inventory, DefinitionInventory, DomainObservation, LogicalTarget,
-        RESOURCE_DEFINITION_PRODUCER_ID, RESOURCE_DEFINITION_PRODUCER_REVISION,
+        discover_project_candidates, distinct_catalog_domains, group_physical_targets,
+        prepare_group, produce_definition_inventory, DefinitionInventory, DomainObservation,
+        LogicalTarget, RESOURCE_DEFINITION_PRODUCER_ID, RESOURCE_DEFINITION_PRODUCER_REVISION,
     };
     use crate::messages::validate_messages_config;
 
@@ -1825,6 +1884,23 @@ mod tests {
         assert_eq!(definitions[1].source().structural_path().as_str(), "/hello");
         assert_eq!(definitions[0].source().occurrence(), 0);
         assert_eq!(definitions[1].source().occurrence(), 1);
+    }
+
+    #[test]
+    fn catalog_domain_observations_retain_only_the_first_entry_per_domain() {
+        let registry = HostFormatRegistry::new();
+        let resolved = registry.resolve_direct_extension(".json").unwrap();
+        let catalog = registry
+            .extract(
+                resolved,
+                Arc::from(r#"{"first":"one","second":"two","third":"three"}"#),
+            )
+            .unwrap();
+
+        assert_eq!(
+            distinct_catalog_domains(&catalog),
+            vec![(0, ResourceCatalogKeyDomain::JsonPointer)]
+        );
     }
 
     #[test]
@@ -2335,6 +2411,8 @@ mod tests {
         let second = run(&root, &resources, &locales(&["en"]));
         let first_digest = digest_hex(&first.artifacts()[0]);
         assert_eq!(first_digest, digest_hex(&second.artifacts()[0]));
+        // Cross-version framing vector: update only with an intentional
+        // fingerprint framing change and corresponding version bump.
         assert_eq!(
             first_digest,
             "a0fdf954bcdd85c7596d509b852cbdb14db45552e0178f2d9a079ef3267ca9b4"
