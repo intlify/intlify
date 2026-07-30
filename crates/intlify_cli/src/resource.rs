@@ -2,6 +2,11 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Shared CLI projection for resource-layer identities and failures.
+//!
+//! This module converts structured resource errors, entry identities, and host
+//! byte offsets into CLI operational evidence, including line/column details.
+//! Resource extraction, offset-map construction, and write-back remain owned by
+//! `intlify_resource`.
 
 use intlify_resource::{
     DeclaredFormat, EntryKey, ResourceError, ResourceErrorDetails, ResourceErrorSite,

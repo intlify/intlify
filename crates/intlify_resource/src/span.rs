@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Consumer-neutral UTF-8 byte span primitive.
+//!
+//! This module owns the half-open `u32` range representation shared across
+//! resource errors, entries, and offset maps. Construction preserves caller
+//! endpoint order so each semantic boundary can report its own stable error.
+
 use std::ops::Range;
 
 /// A half-open UTF-8 byte range.

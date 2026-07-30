@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Checked project-relative resource glob grammar and matcher.
+//!
+//! This module parses canonical `/`-separated patterns into bounded segment
+//! tokens and evaluates them against normalized logical paths. Filesystem
+//! traversal, ignore policy, and catalog overlap resolution are owned by
+//! higher-level modules.
+
 use std::fmt;
 use std::sync::Arc;
 

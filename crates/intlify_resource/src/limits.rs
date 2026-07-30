@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Fixed resource representation ceilings and admission helpers.
+//!
+//! This module owns the closed limit vocabulary, protocol ceiling values, and
+//! exact first-over evidence used before host allocation or during artifact
+//! construction. It does not choose command scheduling or recovery policy.
+
 use crate::{ResourceError, ResourceErrorSite, ResourcePhase};
 
 /// Inclusive maximum complete host-document byte length.

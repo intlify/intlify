@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Checked mapping from decoded message offsets to raw host-document spans.
+//!
+//! This module represents identity, escape, and raw-only segments and provides
+//! the construction-only builder that enforces ordering, UTF-8 boundaries, and
+//! segment limits. Consumers use the immutable map for diagnostics and
+//! write-back evidence without knowing host escaping rules.
+
 use std::fmt;
 use std::sync::Arc;
 

@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Internal host-format adapter contract.
+//!
+//! This module defines the extraction, measured re-escaping, and materialization
+//! boundary implemented by each shipped host format. Adapter-specific parsed
+//! state remains opaque and thread-safe; registry selection, artifact
+//! validation, and public write-back orchestration stay with their owners.
+
 use std::any::Any;
 use std::sync::Arc;
 

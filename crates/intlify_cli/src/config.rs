@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Unified project-configuration discovery, decoding, and validation.
+//!
+//! This module owns project-root and config-path resolution, duplicate-aware
+//! JSON/JSONC decoding, cross-section validation order, and construction of the
+//! immutable loaded configuration. Command input discovery and execution occur
+//! only after this boundary succeeds.
+
 use std::cell::Cell;
 use std::fmt;
 use std::fs;

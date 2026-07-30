@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Raw and resolved models for the unified `messages` configuration section.
+//!
+//! This module owns bounded section-local validation, cross-checks against the
+//! resource-owned scope/locale inventory, and checked construction of linker
+//! policy, configured roots, JS recognizers, and external artifact paths. It
+//! performs no filesystem discovery, artifact decoding, production, or linking.
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::sync::Arc;

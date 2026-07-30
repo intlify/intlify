@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Resource catalog configuration validation and canonical resolution.
+//!
+//! This module owns project and overlay schema models, stable validation
+//! evidence, include/exclude overlap semantics, format assignments, and the
+//! resolved linker scope/locale registry. It classifies logical paths but does
+//! not enumerate the filesystem or extract host documents.
+
 use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;

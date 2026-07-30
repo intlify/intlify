@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Built-in RFC 8259 JSON host adapter.
+//!
+//! This module composes the JSON frontend and string decoder to extract every
+//! string leaf as a JSON-pointer entry with an exact offset map. It also owns
+//! measured JSON-string re-escaping and materialization for validated
+//! write-back, but never parses or formats MF2 message syntax.
+
 mod frontend;
 mod string;
 

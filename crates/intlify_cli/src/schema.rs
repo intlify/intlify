@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Deterministic generation and freshness checking for the CLI config schema.
+//!
+//! This module derives the Draft 7 artifact from the runtime config types,
+//! normalizes generator-only metadata and formatting, and writes or compares the
+//! committed schema bytes. Runtime configuration validation remains in
+//! `config` and its section owners.
+
 use std::fs;
 use std::io;
 use std::path::Path;

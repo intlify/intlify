@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! CLI-owned error vocabulary and domain-error projection.
+//!
+//! This module normalizes argument, configuration, formatter, and resource
+//! failures into the stable [`OperationalError`] shape consumed by reporters.
+//! Rendering and process stream I/O are owned by `output` and the binary entry
+//! point respectively.
+
 use serde::Serialize;
 use serde_json::{json, Value};
 

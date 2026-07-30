@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Library facade and top-level routing for the `intlify` CLI.
+//!
+//! This crate root owns help/version precedence, command dispatch, and the
+//! environment/stdin adaptation used by the binary. Commands return an owned
+//! [`CliRunResult`]; writing process streams and selecting the OS exit status
+//! remain the binary entry point's responsibility.
+
 mod args;
 mod command;
 pub mod config;
