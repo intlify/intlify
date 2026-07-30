@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Host-format classification, adapter selection, and extraction facade.
+//!
+//! This module distinguishes shipped, known-but-unshipped, and unrecognized
+//! formats; resolves explicit or direct-extension assignments; and dispatches
+//! extraction to the selected adapter. Catalog membership policy and
+//! command-level filesystem discovery remain outside the registry.
+
 use std::fmt;
 use std::sync::Arc;
 

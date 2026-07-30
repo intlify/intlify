@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Unified project-configuration discovery, decoding, and validation.
+//!
+//! This module owns project-root and config-path resolution, duplicate-aware
+//! JSON/JSONC decoding, cross-section validation order, and construction of the
+//! immutable loaded configuration. Command input discovery and execution occur
+//! only after this boundary succeeds.
+
 use std::cell::Cell;
 use std::fmt;
 use std::fs;
@@ -14,6 +21,11 @@ use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::messages::{
+    validate_messages_config, MessagesConfig, MessagesConfigError, MessagesConfigViolation,
+    ResolvedMessagesConfig,
+};
+
 const CONFIG_JSON: &str = "intlify.config.json";
 const CONFIG_JSONC: &str = "intlify.config.jsonc";
 const SUPPORTED_EXTENSIONS: [&str; 2] = [".json", ".jsonc"];
@@ -23,6 +35,8 @@ pub struct ProjectConfig {
     pub fmt: FormatterConfig,
     pub lint: EmptyConfig,
     pub resources: ResourcesConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub messages: Option<MessagesConfig>,
 }
 
 impl Default for ProjectConfig {
@@ -31,6 +45,7 @@ impl Default for ProjectConfig {
             fmt: FormatterConfig::default(),
             lint: EmptyConfig {},
             resources: ResourcesConfig::default(),
+            messages: None,
         }
     }
 }
@@ -98,20 +113,31 @@ pub(crate) struct ProjectConfigFile {
         description = "Resource catalog configuration."
     )]
     pub(crate) resources: Option<Value>,
+    #[schemars(
+        with = "Option<MessagesConfig>",
+        description = "Message-link policy and reference-producer configuration."
+    )]
+    pub(crate) messages: Option<Value>,
 }
 
 impl ProjectConfigFile {
-    fn into_project_config(self, resources: ResourcesConfig) -> ProjectConfig {
+    fn into_project_config(
+        self,
+        resources: ResourcesConfig,
+        messages: Option<MessagesConfig>,
+    ) -> ProjectConfig {
         let Self {
             schema: _,
             fmt,
             lint,
             resources: _,
+            messages: _,
         } = self;
         ProjectConfig {
             fmt: fmt.unwrap_or_default(),
             lint: lint.unwrap_or_default(),
             resources,
+            messages,
         }
     }
 }
@@ -123,11 +149,13 @@ pub struct LoadedProjectConfig {
     pub source: ConfigSource,
     pub config: ProjectConfig,
     pub resolved_resources: ResolvedResources,
+    pub resolved_messages: Option<ResolvedMessagesConfig>,
 }
 
 struct LoadedConfigBody {
     config: ProjectConfig,
     resolved_resources: ResolvedResources,
+    resolved_messages: Option<ResolvedMessagesConfig>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,6 +215,7 @@ pub fn load_project_config(
         let LoadedConfigBody {
             config,
             resolved_resources,
+            resolved_messages,
         } = load_config_file(&project_root, &path)?;
         return Ok(LoadedProjectConfig {
             project_root,
@@ -194,6 +223,7 @@ pub fn load_project_config(
             source: ConfigSource::Explicit,
             config,
             resolved_resources,
+            resolved_messages,
         });
     }
 
@@ -201,6 +231,7 @@ pub fn load_project_config(
         let LoadedConfigBody {
             config,
             resolved_resources,
+            resolved_messages,
         } = load_config_file(&project_root, &path)?;
         return Ok(LoadedProjectConfig {
             project_root,
@@ -208,6 +239,7 @@ pub fn load_project_config(
             source: ConfigSource::Discovered,
             config,
             resolved_resources,
+            resolved_messages,
         });
     }
 
@@ -219,6 +251,7 @@ pub fn load_project_config(
         source: ConfigSource::Default,
         config,
         resolved_resources,
+        resolved_messages: None,
     })
 }
 
@@ -343,7 +376,12 @@ fn parse_json_config(
         )
     })?;
 
-    let resources = validate_config_value(&value, path_label)?;
+    let ValidatedConfigSections {
+        resources,
+        resolved_resources,
+        messages,
+        resolved_messages,
+    } = validate_config_value(&value, path_label)?;
 
     let file = serde_json::from_value::<ProjectConfigFile>(value).map_err(|error| {
         ConfigError::new(
@@ -358,10 +396,10 @@ fn parse_json_config(
         )
     })?;
 
-    let resolved_resources = resources.clone().resolve();
     Ok(LoadedConfigBody {
-        config: file.into_project_config(resources),
+        config: file.into_project_config(resources, messages),
         resolved_resources,
+        resolved_messages,
     })
 }
 
@@ -555,12 +593,23 @@ fn line_and_byte_column(source: &str, byte_offset: usize) -> (usize, usize) {
     (line, prefix.len() - line_start)
 }
 
-fn validate_config_value(value: &Value, path_label: &str) -> Result<ResourcesConfig, ConfigError> {
+struct ValidatedConfigSections {
+    resources: ResourcesConfig,
+    resolved_resources: ResolvedResources,
+    messages: Option<MessagesConfig>,
+    resolved_messages: Option<ResolvedMessagesConfig>,
+}
+
+fn validate_config_value(
+    value: &Value,
+    path_label: &str,
+) -> Result<ValidatedConfigSections, ConfigError> {
     let Some(root) = value.as_object() else {
         return validation_error(path_label, "", "expected_object");
     };
 
-    if let Some(key) = first_unknown_key(root, &["$schema", "fmt", "lint", "resources"]) {
+    if let Some(key) = first_unknown_key(root, &["$schema", "fmt", "lint", "resources", "messages"])
+    {
         return validation_error(path_label, &json_pointer(&[key]), "unknown_field");
     }
     if let Some(schema) = root.get("$schema") {
@@ -575,8 +624,19 @@ fn validate_config_value(value: &Value, path_label: &str) -> Result<ResourcesCon
         validate_empty_section(path_label, "lint", linter)?;
     }
 
-    ResourcesConfig::validate(root.get("resources"))
-        .map_err(|violation| resource_validation_error(path_label, &violation))
+    let resources = ResourcesConfig::validate(root.get("resources"))
+        .map_err(|violation| resource_validation_error(path_label, &violation))?;
+    let resolved_resources = resources.clone().resolve();
+    let messages = validate_messages_config(root.get("messages"), &resolved_resources)
+        .map_err(|error| messages_validation_error(path_label, &error))?;
+    let (messages, resolved_messages) = messages.unzip();
+
+    Ok(ValidatedConfigSections {
+        resources,
+        resolved_resources,
+        messages,
+        resolved_messages,
+    })
 }
 
 fn validate_formatter_section(path_label: &str, value: &Value) -> Result<(), ConfigError> {
@@ -678,6 +738,59 @@ fn resource_validation_error(path_label: &str, violation: &ResourceConfigViolati
     }
     if let Some(value) = violation.value() {
         details.insert("value".to_owned(), value.clone());
+    }
+
+    ConfigError::new(
+        "config_validation_failed",
+        format!("Config file is not valid: {path_label}"),
+        Some(path_label.to_owned()),
+        Some(Value::Object(details)),
+    )
+}
+
+fn messages_validation_error(path_label: &str, error: &MessagesConfigError) -> ConfigError {
+    match error {
+        MessagesConfigError::Section(violation) => {
+            messages_section_validation_error(path_label, violation)
+        }
+        MessagesConfigError::CatalogLocaleNotProduction(violation) => ConfigError::new(
+            "config_validation_failed",
+            format!("Config file is not valid: {path_label}"),
+            Some(path_label.to_owned()),
+            Some(json!({
+                "pointer": format!(
+                    "/resources/catalogs/{}/locale/value",
+                    violation.definition_index()
+                ),
+                "reason": "catalog_locale_not_production",
+                "scope": violation.scope().as_str(),
+                "locale": violation.locale().as_str()
+            })),
+        ),
+    }
+}
+
+fn messages_section_validation_error(
+    path_label: &str,
+    violation: &MessagesConfigViolation,
+) -> ConfigError {
+    let mut details = serde_json::Map::new();
+    details.insert("pointer".to_owned(), json!(violation.pointer()));
+    details.insert("reason".to_owned(), json!(violation.reason().as_str()));
+    if let Some(field) = violation.field() {
+        details.insert("field".to_owned(), json!(field));
+    }
+    if let Some(value) = violation.value() {
+        details.insert("value".to_owned(), value.clone());
+    }
+    if let Some(first_pointer) = violation.first_pointer() {
+        details.insert("firstPointer".to_owned(), json!(first_pointer));
+    }
+    if let Some(limit) = violation.limit() {
+        details.insert("limit".to_owned(), json!(limit));
+    }
+    if let Some(observed) = violation.observed() {
+        details.insert("observed".to_owned(), json!(observed));
     }
 
     ConfigError::new(

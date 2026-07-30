@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Bounded JSON lexical and structural frontend.
+//!
+//! This module validates complete JSON syntax and builds a raw-order tape with
+//! exact spans, parent links, and object/array path steps. It enforces nesting
+//! limits without decoding string contents or deciding which values are
+//! resource entries.
+
 use crate::{Utf8ByteSpan, MAX_NESTING_DEPTH};
 
 const NO_PARENT: u32 = u32::MAX;

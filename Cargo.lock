@@ -525,7 +525,10 @@ version = "0.14.0-alpha.11"
 dependencies = [
  "file-id",
  "glob",
+ "intlify_contract",
  "intlify_format",
+ "intlify_linker",
+ "intlify_producer_js",
  "intlify_resource",
  "ox_mf2_parser",
  "schemars",

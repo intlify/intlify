@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Resource entry identities and artifact-local handles.
+//!
+//! This module owns structural and catalog keys, duplicate occurrence
+//! disambiguation, allocation of process-unique artifact identities, and
+//! interning that binds [`EntryHandle`] values to one artifact. It contains no
+//! path discovery or host-format parsing.
+
 use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};

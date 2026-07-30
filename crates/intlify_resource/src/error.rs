@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Closed operational-error contract for the resource pipeline.
+//!
+//! This module owns stable phases, codes, structured reason details, bounded
+//! source/entry sites, and constructors used by registry, adapters, mapping,
+//! and write-back. Consumer-specific rendering and transport are deliberately
+//! outside the resource crate.
+
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;

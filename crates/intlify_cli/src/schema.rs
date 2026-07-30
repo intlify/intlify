@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Deterministic generation and freshness checking for the CLI config schema.
+//!
+//! This module derives the Draft 7 artifact from the runtime config types,
+//! normalizes generator-only metadata and formatting, and writes or compares the
+//! committed schema bytes. Runtime configuration validation remains in
+//! `config` and its section owners.
+
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -102,6 +109,7 @@ fn remove_nullable_schema_metadata(value: &mut Value) {
     remove_property_null_variant(properties, "fmt");
     remove_property_null_variant(properties, "lint");
     remove_property_null_variant(properties, "resources");
+    remove_property_null_variant(properties, "messages");
 }
 
 fn remove_property_null_variant(properties: &mut serde_json::Map<String, Value>, property: &str) {
@@ -136,7 +144,7 @@ fn compact_string_arrays(output: &str) -> String {
 
     while let Some(line) = lines.get(index) {
         let trimmed = line.trim_start();
-        if matches!(trimmed, "\"enum\": [" | "\"required\": [") {
+        if trimmed.starts_with('"') && trimmed.ends_with(": [") {
             if let Some((next_index, compacted_line)) = compact_string_array_lines(&lines, index) {
                 compacted.push(compacted_line);
                 index = next_index;

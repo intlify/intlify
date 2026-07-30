@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Operating-system process boundary for the `intlify` executable.
+//!
+//! The binary delegates all CLI semantics to `intlify_cli`, writes the returned
+//! stdout/stderr bytes, and converts the logical result into an [`ExitCode`].
+//! It intentionally contains no argument, configuration, or command logic.
+
 use std::io::{self, Write};
 use std::process::ExitCode;
 

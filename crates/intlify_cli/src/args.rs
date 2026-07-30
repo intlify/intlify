@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Top-level CLI argument recognition and precedence.
+//!
+//! This module owns global-option parsing, reserved-command recognition,
+//! first-error selection, and the reporter pre-scan needed for machine-readable
+//! argument failures. It performs no configuration I/O or command execution.
+
 use std::collections::HashSet;
 
 use crate::error::CliError;

@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Static command metadata and user-facing help text.
+//!
+//! This module owns the reserved command vocabulary, temporary availability
+//! requirements, and canonical help strings. Argument parsing and command
+//! execution remain with their respective modules.
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ReservedCommand {
     pub(crate) name: &'static str,

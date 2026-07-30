@@ -1,6 +1,12 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Reporter-neutral command results and reporter-specific serialization.
+//!
+//! This module owns stable text/JSON error rendering, JSON envelope ordering,
+//! schema/version metadata, and logical exit codes. It builds owned output
+//! buffers but never writes process stdout or stderr.
+
 use std::path::Path;
 
 use serde::Serialize;

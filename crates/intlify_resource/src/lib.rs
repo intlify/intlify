@@ -11,6 +11,7 @@
 
 mod adapter;
 mod artifact;
+mod binding;
 mod config;
 mod error;
 mod glob;
@@ -27,18 +28,26 @@ pub use artifact::{
 #[cfg(feature = "benchmark")]
 #[doc(hidden)]
 pub use artifact::{ProfiledWriteBack, WriteBackBenchmarkProfile};
+pub use binding::{
+    CatalogBindingValueError, CatalogScopeName, InvalidLocaleCapturePattern, LocaleBindingConfig,
+    LocaleCaptureError, LocaleCapturePattern, ResolvedLocale,
+};
 pub use config::{
-    CatalogAssignmentConflict, CatalogAssignmentOrigin, CatalogConfig, CatalogDefinitionRef,
-    CatalogOverlayConfig, CatalogPolicyState, CatalogResolution, LayeredCatalogMatch,
-    LayeredCatalogResolution, ProjectRelativeResourcePath, ProjectRelativeResourcePathError,
-    ResolvedCatalogOverlay, ResolvedResources, ResourceConfigReason, ResourceConfigViolation,
-    ResourcesConfig,
+    CatalogAssignmentConflict, CatalogAssignmentOrigin, CatalogBindingConflict,
+    CatalogBindingConflictField, CatalogConfig, CatalogDefinitionRef, CatalogLocaleAssignmentError,
+    CatalogLocaleNotProduction, CatalogOverlayConfig, CatalogPolicyState, CatalogResolution,
+    LayeredCatalogMatch, LayeredCatalogResolution, LinkerCatalogAssignmentError,
+    LinkerCatalogResolution, ProjectRelativeResourcePath, ProjectRelativeResourcePathError,
+    ResolvedCatalogBinding, ResolvedCatalogDefinition, ResolvedCatalogOverlay,
+    ResolvedLinkerCatalogAssignment, ResolvedResources, ResourceConfigReason,
+    ResourceConfigViolation, ResourcesConfig,
 };
 pub use error::{
     DeclaredFormat, DocumentUnsupportedFeature, EntryUnsupportedReason, FormatClassificationSource,
     InternalResourceErrorReason, ResourceError, ResourceErrorCode, ResourceErrorDetails,
     ResourceErrorSite, ResourcePhase,
 };
+pub use glob::{InvalidResourceGlob, ResourceGlob};
 pub use identity::{CatalogKey, CatalogKeyDomain, EntryHandle, EntryKey, StructuralPathKey};
 pub use limits::{
     preflight_host_bytes, ResourceLimit, MAX_ENTRIES, MAX_HOST_BYTES, MAX_IDENTITY_BYTES,
@@ -54,10 +63,12 @@ pub use span::Utf8ByteSpan;
 #[cfg(test)]
 mod tests {
     use super::{
-        CatalogKey, CatalogOverlayConfig, EntryHandle, EntryKey, ExtractedCatalog,
-        HostFormatRegistry, MessageOffsetMap, ResolvedCatalogOverlay, ResolvedHostFormat,
-        ResolvedResources, ResourceError, ResourceErrorSite, ResourcesConfig, StructuralPathKey,
-        Utf8ByteSpan, ValidatedWriteBack, WriteBackOutcome,
+        CatalogKey, CatalogOverlayConfig, CatalogScopeName, EntryHandle, EntryKey,
+        ExtractedCatalog, HostFormatRegistry, LocaleBindingConfig, LocaleCapturePattern,
+        MessageOffsetMap, ResolvedCatalogBinding, ResolvedCatalogDefinition,
+        ResolvedCatalogOverlay, ResolvedHostFormat, ResolvedLinkerCatalogAssignment,
+        ResolvedLocale, ResolvedResources, ResourceError, ResourceErrorSite, ResourcesConfig,
+        StructuralPathKey, Utf8ByteSpan, ValidatedWriteBack, WriteBackOutcome,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -81,5 +92,12 @@ mod tests {
         assert_send_sync::<ResolvedResources>();
         assert_send_sync::<CatalogOverlayConfig>();
         assert_send_sync::<ResolvedCatalogOverlay>();
+        assert_send_sync::<CatalogScopeName>();
+        assert_send_sync::<ResolvedLocale>();
+        assert_send_sync::<LocaleCapturePattern>();
+        assert_send_sync::<LocaleBindingConfig>();
+        assert_send_sync::<ResolvedCatalogBinding>();
+        assert_send_sync::<ResolvedCatalogDefinition>();
+        assert_send_sync::<ResolvedLinkerCatalogAssignment>();
     }
 }

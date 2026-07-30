@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! JSON string decoding, JSON-pointer construction, and offset-map projection.
+//!
+//! This module measures before allocation, decodes escapes and surrogate pairs,
+//! and records how decoded message bytes correspond to raw host spans. Complete
+//! JSON syntax validation and output string serialization belong to the sibling
+//! frontend and adapter modules.
+
 use std::fmt::Write as _;
 
 use super::frontend::{JsonPathStep, JsonSyntaxTape};

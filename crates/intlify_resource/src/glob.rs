@@ -1,34 +1,53 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Checked project-relative resource glob grammar and matcher.
+//!
+//! This module parses canonical `/`-separated patterns into bounded segment
+//! tokens and evaluates them against normalized logical paths. Filesystem
+//! traversal, ignore policy, and catalog overlap resolution are owned by
+//! higher-level modules.
+
+use std::fmt;
 use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
 
+/// Checked project-relative resource-membership glob.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResourceGlob {
+pub struct ResourceGlob {
     source: Arc<str>,
     segments: Arc<[GlobSegment]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum GlobSegment {
+pub(crate) enum GlobSegment {
     Recursive,
     Pattern(Arc<[GlobToken]>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GlobToken {
+pub(crate) enum GlobToken {
     Literal(char),
     AnyOne,
     AnyMany,
 }
 
+/// Invalid resource-membership glob spelling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct InvalidResourceGlob;
+pub struct InvalidResourceGlob;
+
+impl fmt::Display for InvalidResourceGlob {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("invalid resource-membership glob")
+    }
+}
+
+impl std::error::Error for InvalidResourceGlob {}
 
 impl ResourceGlob {
-    pub(crate) fn parse(source: &str) -> Result<Self, InvalidResourceGlob> {
+    /// Parse one exact resource-membership glob.
+    pub fn parse(source: &str) -> Result<Self, InvalidResourceGlob> {
         if source.is_empty()
             || source.starts_with('/')
             || source.starts_with("\\\\")
@@ -55,11 +74,15 @@ impl ResourceGlob {
         })
     }
 
-    pub(crate) fn source(&self) -> &str {
+    /// Return the exact submitted pattern spelling.
+    #[must_use]
+    pub fn source(&self) -> &str {
         &self.source
     }
 
-    pub(crate) fn is_match(&self, path: &str) -> bool {
+    /// Return whether one slash-normalized project-relative path matches.
+    #[must_use]
+    pub fn is_match(&self, path: &str) -> bool {
         let path_segments = path.split('/').collect::<Vec<_>>();
         let mut previous = vec![false; path_segments.len() + 1];
         previous[0] = true;
@@ -101,7 +124,7 @@ fn has_windows_drive_prefix(source: &str) -> bool {
     bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
 }
 
-fn parse_segment(segment: &str) -> Result<Arc<[GlobToken]>, InvalidResourceGlob> {
+pub(crate) fn parse_segment(segment: &str) -> Result<Arc<[GlobToken]>, InvalidResourceGlob> {
     let mut tokens = Vec::new();
     let mut literal = String::with_capacity(segment.len());
     let mut has_wildcard = false;
@@ -147,7 +170,7 @@ fn parse_segment(segment: &str) -> Result<Arc<[GlobToken]>, InvalidResourceGlob>
     Ok(Arc::from(tokens))
 }
 
-fn matches_segment(tokens: &[GlobToken], segment: &str) -> bool {
+pub(crate) fn matches_segment(tokens: &[GlobToken], segment: &str) -> bool {
     let characters = segment.chars().collect::<Vec<_>>();
     let mut previous = vec![false; characters.len() + 1];
     previous[0] = true;

@@ -1,6 +1,14 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Extracted catalog construction and fail-complete write-back.
+//!
+//! This module owns entry admission, occurrence-aware identities, immutable
+//! extracted artifacts, candidate-message admission, and the measured
+//! re-escape/materialize/validate pipeline. Host syntax details are delegated
+//! to adapters, while consumers remain responsible for message-level parsing
+//! and formatting.
+
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;

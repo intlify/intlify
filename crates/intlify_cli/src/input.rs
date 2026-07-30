@@ -1,6 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! Command-facing input discovery, classification, and physical grouping.
+//!
+//! This module owns operand expansion, directory/glob traversal, standalone
+//! versus catalog classification, ignore admission, and symlink/hard-link
+//! deduplication into deterministic execution units. It does not read source
+//! contents or run resource/message processors.
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;

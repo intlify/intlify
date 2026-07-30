@@ -1,6 +1,14 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+//! End-to-end orchestration for the `intlify fmt` command.
+//!
+//! This module owns formatter-specific argv validation, config composition,
+//! input selection, bounded file/stdin I/O, resource extraction, MF2 formatting,
+//! validated host write-back, and command result aggregation. Parsing,
+//! formatting, and host-format semantics remain delegated to their owning
+//! crates.
+
 use std::borrow::Cow;
 use std::fs;
 use std::io::{self, Read};
