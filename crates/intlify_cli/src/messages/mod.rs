@@ -9,6 +9,8 @@
 //! linking.
 
 mod config;
+#[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
+mod inventory;
 
 pub use config::{
     validate_messages_config, MessageCatalogKeyDomain, MessageDynamicReferenceMode,

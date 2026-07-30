@@ -523,6 +523,7 @@ dependencies = [
 name = "intlify_cli"
 version = "0.14.0-alpha.11"
 dependencies = [
+ "blake3",
  "file-id",
  "glob",
  "intlify_contract",

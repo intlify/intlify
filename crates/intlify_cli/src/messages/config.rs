@@ -36,6 +36,22 @@ const SCOPE_BYTES_LIMIT: usize = 255;
 const PRODUCTION_LOCALES_LIMIT: usize = 1_024;
 const CONFIGURED_ROOTS_LIMIT: usize = 4_096;
 
+type ValidatedRoots = (
+    Vec<MessageRootConfig>,
+    Vec<ConfiguredRoot>,
+    Vec<ResolvedMessageDomainDeclaration>,
+);
+type ValidatedProducers = (
+    MessageProducersConfig,
+    ResolvedMessageProducers,
+    Vec<ResolvedMessageDomainDeclaration>,
+);
+type ValidatedJsProducer = (
+    MessageJsProducerConfig,
+    ResolvedJsProducerConfig,
+    Vec<ResolvedMessageDomainDeclaration>,
+);
+
 /// Stable message-configuration validation reasons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MessagesConfigReason {
@@ -510,11 +526,44 @@ impl ResolvedMessageProducers {
     }
 }
 
+/// One checked scope/domain declaration retained with its configuration pointer.
+///
+/// Definition production uses these declarations only after the complete
+/// catalog extraction attempt. Recognizers precede configured roots, preserving
+/// the domain-admission order independently of policy canonicalization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedMessageDomainDeclaration {
+    scope: CatalogScopeId,
+    domain: CatalogKeyDomain,
+    pointer: Arc<str>,
+}
+
+impl ResolvedMessageDomainDeclaration {
+    /// Return the exact declared project scope.
+    #[must_use]
+    pub(crate) const fn scope(&self) -> &CatalogScopeId {
+        &self.scope
+    }
+
+    /// Return the declared catalog-key comparison domain.
+    #[must_use]
+    pub(crate) const fn domain(&self) -> CatalogKeyDomain {
+        self.domain
+    }
+
+    /// Return the narrowest configuration pointer for the domain declaration.
+    #[must_use]
+    pub(crate) fn pointer(&self) -> &str {
+        &self.pointer
+    }
+}
+
 /// Immutable linker policy and producer configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedMessagesConfig {
     policy: LinkPolicy,
     producers: ResolvedMessageProducers,
+    domain_declarations: Arc<[ResolvedMessageDomainDeclaration]>,
 }
 
 impl ResolvedMessagesConfig {
@@ -528,6 +577,12 @@ impl ResolvedMessagesConfig {
     #[must_use]
     pub const fn producers(&self) -> &ResolvedMessageProducers {
         &self.producers
+    }
+
+    /// Return recognizer declarations followed by roots in admission order.
+    #[must_use]
+    pub(crate) fn domain_declarations(&self) -> &[ResolvedMessageDomainDeclaration] {
+        &self.domain_declarations
     }
 
     /// Return whether an exact resource-resolved locale is in the production set.
@@ -576,8 +631,11 @@ pub fn validate_messages_config(
 
     let (locales, resolved_locales) = validate_locales(section.get("locales"))?;
     let dynamic_references = validate_dynamic_references(section.get("dynamicReferences"))?;
-    let (mut roots, resolved_roots) = validate_roots(section.get("roots"), resources)?;
-    let (producers, resolved_producers) = validate_producers(section.get("producers"), resources)?;
+    let (mut roots, resolved_roots, root_domains) =
+        validate_roots(section.get("roots"), resources)?;
+    let (producers, resolved_producers, mut domain_declarations) =
+        validate_producers(section.get("producers"), resources)?;
+    domain_declarations.extend(root_domains);
 
     let limits = LinkLimits::default();
     let policy = LinkPolicy::try_new(
@@ -611,6 +669,7 @@ pub fn validate_messages_config(
         ResolvedMessagesConfig {
             policy,
             producers: resolved_producers,
+            domain_declarations: Arc::from(domain_declarations),
         },
     )))
 }
@@ -725,9 +784,9 @@ fn validate_dynamic_references(
 fn validate_roots(
     value: Option<&Value>,
     resources: &ResolvedResources,
-) -> Result<(Vec<MessageRootConfig>, Vec<ConfiguredRoot>), MessagesConfigViolation> {
+) -> Result<ValidatedRoots, MessagesConfigViolation> {
     let Some(value) = value else {
-        return Ok((Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
     };
     let pointer = "/messages/roots";
     let values = value.as_array().ok_or_else(|| {
@@ -749,6 +808,7 @@ fn validate_roots(
 
     let mut normalized = Vec::with_capacity(values.len());
     let mut resolved = Vec::with_capacity(values.len());
+    let mut declarations = Vec::with_capacity(values.len());
     let mut first_occurrences = HashMap::with_capacity(values.len());
     for (index, value) in values.iter().enumerate() {
         let root_pointer = pointer_index(pointer, index);
@@ -789,7 +849,7 @@ fn validate_roots(
         let domain = parse_domain(domain_token).ok_or_else(|| {
             MessagesConfigViolation::invalid(
                 MessagesConfigReason::InvalidMessageRoots,
-                domain_pointer,
+                domain_pointer.clone(),
                 object.get("domain"),
                 CONFIG_EVIDENCE_BYTES,
             )
@@ -856,10 +916,15 @@ fn validate_roots(
             selector: selector_config,
             reason: normalized_reason,
         });
+        declarations.push(ResolvedMessageDomainDeclaration {
+            scope: root.scope().clone(),
+            domain: root.domain(),
+            pointer: Arc::from(domain_pointer),
+        });
         resolved.push(root);
     }
 
-    Ok((normalized, resolved))
+    Ok((normalized, resolved, declarations))
 }
 
 fn validate_root_selector(
@@ -1019,11 +1084,12 @@ fn root_config_order(left: &MessageRootConfig, right: &MessageRootConfig) -> std
 fn validate_producers(
     value: Option<&Value>,
     resources: &ResolvedResources,
-) -> Result<(MessageProducersConfig, ResolvedMessageProducers), MessagesConfigViolation> {
+) -> Result<ValidatedProducers, MessagesConfigViolation> {
     let Some(value) = value else {
         return Ok((
             MessageProducersConfig::default(),
             ResolvedMessageProducers::default(),
+            Vec::new(),
         ));
     };
     let pointer = "/messages/producers";
@@ -1043,12 +1109,12 @@ fn validate_producers(
         ));
     }
 
-    let (js, resolved_js) = match object.get("js") {
-        None => (None, None),
+    let (js, resolved_js, declarations) = match object.get("js") {
+        None => (None, None, Vec::new()),
         Some(value) => {
-            let (normalized, resolved) =
+            let (normalized, resolved, declarations) =
                 validate_js_producer(value, "/messages/producers/js", resources)?;
-            (Some(normalized), Some(resolved))
+            (Some(normalized), Some(resolved), declarations)
         }
     };
     let (artifacts, resolved_artifacts) = match object.get("artifacts") {
@@ -1062,6 +1128,7 @@ fn validate_producers(
             js: resolved_js,
             artifacts: resolved_artifacts,
         },
+        declarations,
     ))
 }
 
@@ -1069,7 +1136,7 @@ fn validate_js_producer(
     value: &Value,
     pointer: &str,
     resources: &ResolvedResources,
-) -> Result<(MessageJsProducerConfig, ResolvedJsProducerConfig), MessagesConfigViolation> {
+) -> Result<ValidatedJsProducer, MessagesConfigViolation> {
     let object = value.as_object().ok_or_else(|| {
         MessagesConfigViolation::invalid(
             MessagesConfigReason::InvalidMessageProducers,
@@ -1173,12 +1240,18 @@ fn validate_js_producer(
     recognizer_names.sort_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
     let mut normalized_recognizers = BTreeMap::new();
     let mut resolved_recognizers = Vec::with_capacity(recognizer_names.len());
+    let mut declarations = Vec::with_capacity(recognizer_names.len());
     for callee in recognizer_names {
         let binding_pointer = pointer_property(&recognizers_pointer, callee);
         let binding_value = &recognizer_values[callee];
         let (normalized, resolved) =
             validate_js_recognizer(callee, binding_value, &binding_pointer, resources)?;
         normalized_recognizers.insert(callee.clone(), normalized);
+        declarations.push(ResolvedMessageDomainDeclaration {
+            scope: resolved.scope().clone(),
+            domain: resolved.domain(),
+            pointer: Arc::from(pointer_property(&binding_pointer, "domain")),
+        });
         resolved_recognizers.push(resolved);
     }
     let recognizers = JsRecognizerSet::try_new(resolved_recognizers).map_err(|_| {
@@ -1199,6 +1272,7 @@ fn validate_js_producer(
             include: Arc::from(include),
             recognizers,
         },
+        declarations,
     ))
 }
 
@@ -1700,7 +1774,7 @@ mod tests {
         );
         assert_eq!(locale_limit.pointer(), "/messages/locales");
 
-        let (_, roots) = validate_roots(
+        let (_, roots, _) = validate_roots(
             Some(&json!([{
                 "scope": "app",
                 "domain": "json-pointer",
