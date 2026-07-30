@@ -10,24 +10,18 @@
 //! selection, apply ignore files, scan reference sources, construct a
 //! `LinkRequest`, or invoke the linker.
 
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
-use std::fs::{self, File, Metadata};
-use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
-use std::time::SystemTime;
 
-use file_id::FileId;
 use intlify_contract::{
     ArtifactContractError, ArtifactLimitEvidence, ArtifactNamespace, ArtifactVersion, CatalogKey,
     CatalogKeyDomain as ContractCatalogKeyDomain, CatalogScopeId,
     CatalogScopeName as ContractCatalogScopeName, EntryReference, EntryStructuralPath,
     FingerprintAlgorithm, FingerprintDigest, InputFingerprint, LinkLimitCounter,
     LinkLimitObservation, LinkLimits, Locale, MessageDefinition, MessageDefinitionArtifact,
-    MessagePayload, PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity,
-    ProducerRevision, SourceDocumentIdentity, ValueConstructionError,
+    MessagePayload, PortableRelativePath, ProducerId, ProducerIdentity, ProducerRevision,
+    SourceDocumentIdentity, ValueConstructionError,
 };
 use intlify_resource::{
     preflight_host_bytes, CatalogBindingConflictField, CatalogDefinitionRef,
@@ -36,9 +30,14 @@ use intlify_resource::{
     ResolvedHostFormat, ResolvedLinkerCatalogAssignment, ResolvedResources, ResourcePhase,
     MAX_HOST_BYTES,
 };
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use super::config::ResolvedMessagesConfig;
+use super::physical::{
+    acquire_physical_snapshot, compare_optional_paths, compare_portable_path_str,
+    discover_project_files, group_physical_files, portable_path, PhysicalFileGroup,
+    ProjectFileCandidate, ProjectFileTarget,
+};
 use crate::error::OperationalError;
 use crate::resource::resource_error;
 
@@ -114,25 +113,14 @@ impl DefinitionInventoryError {
 
 #[derive(Debug)]
 struct Discovery {
-    candidates: Vec<LogicalCandidate>,
+    candidates: Vec<ProjectFileCandidate>,
     failures: Vec<PendingFailure>,
-}
-
-struct DiscoveryDirectory {
-    directory: PathBuf,
-    entries: std::vec::IntoIter<io::Result<fs::DirEntry>>,
-}
-
-#[derive(Debug)]
-struct LogicalCandidate {
-    relative: ProjectRelativeResourcePath,
-    absolute: PathBuf,
 }
 
 #[derive(Debug)]
 struct LogicalTarget {
     relative: ProjectRelativeResourcePath,
-    absolute: PathBuf,
+    absolute: std::path::PathBuf,
     assignment: ResolvedLinkerCatalogAssignment,
 }
 
@@ -147,25 +135,17 @@ impl LogicalTarget {
     }
 }
 
-#[derive(Debug)]
-struct PhysicalGroup {
-    identity: FileId,
-    targets: Vec<LogicalTarget>,
-}
-
-impl PhysicalGroup {
-    fn primary(&self) -> &LogicalTarget {
-        &self.targets[0]
+impl ProjectFileTarget for LogicalTarget {
+    fn project_path(&self) -> &str {
+        self.path()
     }
 
-    fn primary_path(&self) -> &str {
-        self.primary().path()
-    }
-
-    fn scope_id(&self) -> CatalogScopeId {
-        self.primary().scope_id()
+    fn absolute_path(&self) -> &Path {
+        &self.absolute
     }
 }
+
+type PhysicalGroup = PhysicalFileGroup<LogicalTarget>;
 
 #[derive(Debug)]
 struct PreparedGroup {
@@ -331,187 +311,38 @@ pub(crate) fn produce_definition_inventory(
 }
 
 fn discover_project_candidates(project_root: &Path, scopes: &[CatalogScopeId]) -> Discovery {
-    let mut discovery = Discovery {
-        candidates: Vec::new(),
-        failures: Vec::new(),
-    };
-    discover_directory(project_root, project_root, scopes, &mut discovery);
-    discovery.candidates.sort_by(|left, right| {
-        compare_portable_path_str(left.relative.as_str(), right.relative.as_str())
-    });
-    discovery
-        .candidates
-        .dedup_by(|left, right| left.relative == right.relative);
-    discovery
-}
-
-fn discover_directory(
-    project_root: &Path,
-    root_directory: &Path,
-    scopes: &[CatalogScopeId],
-    discovery: &mut Discovery,
-) {
-    let Some(root) = open_discovery_directory(project_root, root_directory, scopes, discovery)
-    else {
-        return;
-    };
-    let mut work = vec![root];
-
-    while !work.is_empty() {
-        let entry = work
-            .last_mut()
-            .expect("the discovery worklist is non-empty")
-            .entries
-            .next();
-        let Some(entry) = entry else {
-            work.pop();
-            continue;
-        };
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                let directory = &work
-                    .last()
-                    .expect("the current discovery directory remains present")
-                    .directory;
-                let label = project_relative_label(project_root, directory);
-                discovery.failures.push(PendingFailure {
-                    order_path: label.clone(),
-                    failure: all_scope_failure(
-                        scopes,
-                        directory_read_error(label.as_deref(), &error),
-                    ),
-                });
-                continue;
-            }
-        };
-        let path = entry.path();
-        let file_type = match entry.file_type() {
-            Ok(file_type) => file_type,
-            Err(error) => {
-                record_discovery_path_failure(project_root, &path, scopes, &error, discovery);
-                continue;
-            }
-        };
-
-        if file_type.is_dir() {
-            // The child frame is processed before the current frame resumes,
-            // retaining deterministic depth-first order without recursion.
-            if let Some(child) = open_discovery_directory(project_root, &path, scopes, discovery) {
-                work.push(child);
-            }
-            continue;
-        }
-
-        if file_type.is_symlink() {
-            match fs::metadata(&path) {
-                Ok(metadata) if metadata.is_dir() => {
-                    // Directory symlinks never enter project traversal.
-                    continue;
-                }
-                Ok(metadata) if metadata.is_file() => {}
-                Ok(_) => continue,
-                Err(_) => {
-                    // Keep a broken selected file symlink as a candidate so
-                    // assignment can decide whether it is authoritative.
-                }
-            }
-        } else if !file_type.is_file() {
-            continue;
-        }
-
-        let Some(relative) = project_relative_resource_path(project_root, &path) else {
-            discovery.failures.push(PendingFailure {
-                order_path: project_relative_label(
-                    project_root,
-                    path.parent().unwrap_or(project_root),
-                ),
-                failure: all_scope_failure(
-                    scopes,
-                    unrepresentable_discovery_error(project_root, &path),
-                ),
-            });
-            continue;
-        };
-        discovery.candidates.push(LogicalCandidate {
-            relative,
-            absolute: path,
-        });
+    let discovery = discover_project_files(project_root);
+    Discovery {
+        candidates: discovery.candidates,
+        failures: discovery
+            .issues
+            .into_iter()
+            .map(|issue| PendingFailure {
+                order_path: issue.order_path,
+                failure: all_scope_failure(scopes, issue.error),
+            })
+            .collect(),
     }
-}
-
-fn open_discovery_directory(
-    project_root: &Path,
-    directory: &Path,
-    scopes: &[CatalogScopeId],
-    discovery: &mut Discovery,
-) -> Option<DiscoveryDirectory> {
-    let entries = match fs::read_dir(directory) {
-        Ok(entries) => entries,
-        Err(error) => {
-            let label = project_relative_label(project_root, directory);
-            discovery.failures.push(PendingFailure {
-                order_path: label.clone(),
-                failure: all_scope_failure(scopes, directory_read_error(label.as_deref(), &error)),
-            });
-            return None;
-        }
-    };
-    let mut entries = entries.collect::<Vec<_>>();
-    entries.sort_by(compare_directory_results);
-    Some(DiscoveryDirectory {
-        directory: directory.to_owned(),
-        entries: entries.into_iter(),
-    })
-}
-
-fn record_discovery_path_failure(
-    project_root: &Path,
-    path: &Path,
-    scopes: &[CatalogScopeId],
-    error: &io::Error,
-    discovery: &mut Discovery,
-) {
-    let label = project_relative_label(project_root, path);
-    discovery.failures.push(PendingFailure {
-        order_path: label.clone(),
-        failure: all_scope_failure(scopes, metadata_error(label.as_deref(), error)),
-    });
 }
 
 fn group_physical_targets(
     targets: Vec<LogicalTarget>,
     config_path: Option<&Path>,
 ) -> Result<(Vec<PhysicalGroup>, Vec<PendingFailure>), DefinitionInventoryError> {
-    let mut grouped = BTreeMap::<FileId, Vec<LogicalTarget>>::new();
-    let mut failures = Vec::new();
-
-    for target in targets {
-        match inspect_physical_identity(&target.absolute) {
-            Ok(identity) => grouped.entry(identity).or_default().push(target),
-            Err(error) => {
-                let path = target.path().to_owned();
-                failures.push(PendingFailure {
-                    order_path: Some(path.clone()),
-                    failure: DefinitionSourceFailure {
-                        affected_scopes: vec![target.scope_id()].into_boxed_slice(),
-                        error: metadata_error(Some(&path), &error),
-                    },
-                });
-            }
-        }
-    }
-
-    let mut groups = grouped
+    let (groups, metadata_failures) = group_physical_files(targets);
+    let failures = metadata_failures
         .into_iter()
-        .map(|(identity, mut targets)| {
-            targets.sort_by(|left, right| compare_portable_path_str(left.path(), right.path()));
-            PhysicalGroup { identity, targets }
+        .map(|failure| {
+            let path = failure.target.path().to_owned();
+            PendingFailure {
+                order_path: Some(path),
+                failure: DefinitionSourceFailure {
+                    affected_scopes: vec![failure.target.scope_id()].into_boxed_slice(),
+                    error: failure.error,
+                },
+            }
         })
         .collect::<Vec<_>>();
-    groups.sort_by(|left, right| {
-        compare_portable_path_str(left.primary_path(), right.primary_path())
-    });
 
     for group in &groups {
         admit_group_bindings(group, config_path)?;
@@ -671,83 +502,15 @@ fn extract_group(
 }
 
 fn acquire_snapshot(prepared: &PreparedGroup) -> Result<Arc<str>, OperationalError> {
-    if !group_identity_is_current(&prepared.group) {
-        return Err(source_changed_error(prepared.primary_path()));
-    }
-
-    let primary = prepared.group.primary();
-    let mut file =
-        File::open(&primary.absolute).map_err(|error| input_read_error(primary.path(), &error))?;
-    let before = file
-        .metadata()
-        .map_err(|error| input_read_error(primary.path(), &error))?;
-    if !before.is_file() {
-        return Err(source_changed_error(primary.path()));
-    }
-    let before = FileState::from_metadata(&before);
-
-    let mut bytes = Vec::new();
-    (&mut file)
-        .take(MAX_HOST_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|error| input_read_error(primary.path(), &error))?;
+    let bytes = acquire_physical_snapshot(&prepared.group, MAX_HOST_BYTES)?;
     if let Err(error) = preflight_host_bytes(bytes.len(), ResourcePhase::Extract) {
-        return Err(resource_error(primary.path(), None, &error));
+        return Err(resource_error(prepared.primary_path(), None, &error));
     }
 
-    let after = file
-        .metadata()
-        .map_err(|_| source_changed_error(primary.path()))?;
-    if before != FileState::from_metadata(&after) || !group_identity_is_current(&prepared.group) {
-        return Err(source_changed_error(primary.path()));
-    }
-
-    let source = String::from_utf8(bytes)
-        .map_err(|error| invalid_utf8_error(primary.path(), error.utf8_error().valid_up_to()))?;
+    let source = String::from_utf8(bytes.into_vec()).map_err(|error| {
+        invalid_utf8_error(prepared.primary_path(), error.utf8_error().valid_up_to())
+    })?;
     Ok(Arc::from(source))
-}
-
-fn group_identity_is_current(group: &PhysicalGroup) -> bool {
-    group.targets.iter().all(|target| {
-        inspect_physical_identity(&target.absolute).is_ok_and(|identity| identity == group.identity)
-    })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FileState {
-    len: u64,
-    modified: Option<SystemTime>,
-    #[cfg(unix)]
-    modified_nanos: i128,
-    #[cfg(unix)]
-    changed_nanos: i128,
-}
-
-impl FileState {
-    fn from_metadata(metadata: &Metadata) -> Self {
-        Self {
-            len: metadata.len(),
-            modified: metadata.modified().ok(),
-            #[cfg(unix)]
-            modified_nanos: unix_modified_nanos(metadata),
-            #[cfg(unix)]
-            changed_nanos: unix_changed_nanos(metadata),
-        }
-    }
-}
-
-#[cfg(unix)]
-fn unix_modified_nanos(metadata: &Metadata) -> i128 {
-    use std::os::unix::fs::MetadataExt;
-
-    i128::from(metadata.mtime()) * 1_000_000_000 + i128::from(metadata.mtime_nsec())
-}
-
-#[cfg(unix)]
-fn unix_changed_nanos(metadata: &Metadata) -> i128 {
-    use std::os::unix::fs::MetadataExt;
-
-    i128::from(metadata.ctime()) * 1_000_000_000 + i128::from(metadata.ctime_nsec())
 }
 
 fn admit_catalog_domains(
@@ -1068,14 +831,6 @@ fn contract_scope_id(value: &str) -> Result<CatalogScopeId, ValueConstructionErr
     ))
 }
 
-fn portable_path(path: &str) -> Result<PortableRelativePath, ValueConstructionError> {
-    PortableRelativePath::try_new(
-        path.split('/')
-            .map(PortablePathSegment::try_new)
-            .collect::<Result<Vec<_>, _>>()?,
-    )
-}
-
 fn preflight_first_over_limit(
     counter: LinkLimitCounter,
     observed: u64,
@@ -1107,123 +862,6 @@ fn project_format_ref(target: &LogicalTarget) -> CatalogDefinitionRef {
         .first()
         .copied()
         .unwrap_or_else(|| project_definition_ref(target))
-}
-
-fn inspect_physical_identity(path: &Path) -> io::Result<FileId> {
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_file() {
-        return Err(io::Error::new(
-            io::ErrorKind::IsADirectory,
-            "selected project inventory participant is not a file",
-        ));
-    }
-    file_id::get_file_id(path)
-}
-
-fn project_relative_resource_path(
-    project_root: &Path,
-    path: &Path,
-) -> Option<ProjectRelativeResourcePath> {
-    let relative = path.strip_prefix(project_root).ok()?;
-    let label = exact_slash_path(relative)?;
-    ProjectRelativeResourcePath::try_from(label.as_str()).ok()
-}
-
-fn project_relative_label(project_root: &Path, path: &Path) -> Option<String> {
-    let relative = path.strip_prefix(project_root).ok()?;
-    if relative.as_os_str().is_empty() {
-        return Some(".".to_owned());
-    }
-    exact_slash_path(relative)
-}
-
-fn exact_slash_path(path: &Path) -> Option<String> {
-    let mut normalized = String::new();
-    for component in path.components() {
-        use std::path::Component;
-        match component {
-            Component::Prefix(prefix) => {
-                normalized.push_str(&prefix.as_os_str().to_str()?.replace('\\', "/"));
-            }
-            Component::RootDir => {
-                if !normalized.ends_with('/') {
-                    normalized.push('/');
-                }
-            }
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if !normalized.is_empty() && !normalized.ends_with('/') {
-                    normalized.push('/');
-                }
-                normalized.push_str("..");
-            }
-            Component::Normal(part) => {
-                if !normalized.is_empty() && !normalized.ends_with('/') {
-                    normalized.push('/');
-                }
-                normalized.push_str(part.to_str()?);
-            }
-        }
-    }
-    Some(normalized)
-}
-
-fn compare_portable_path_str(left: &str, right: &str) -> Ordering {
-    let mut left = left.split('/');
-    let mut right = right.split('/');
-    loop {
-        match (left.next(), right.next()) {
-            (Some(left), Some(right)) => {
-                let order = left.as_bytes().cmp(right.as_bytes());
-                if !order.is_eq() {
-                    return order;
-                }
-            }
-            (None, Some(_)) => return Ordering::Less,
-            (Some(_), None) => return Ordering::Greater,
-            (None, None) => return Ordering::Equal,
-        }
-    }
-}
-
-fn compare_optional_paths(left: Option<&str>, right: Option<&str>) -> Ordering {
-    match (left, right) {
-        (Some(left), Some(right)) => compare_portable_path_str(left, right),
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (None, None) => Ordering::Equal,
-    }
-}
-
-fn compare_directory_results(
-    left: &Result<fs::DirEntry, io::Error>,
-    right: &Result<fs::DirEntry, io::Error>,
-) -> Ordering {
-    match (left, right) {
-        (Ok(left), Ok(right)) => compare_native_os_str(&left.file_name(), &right.file_name()),
-        (Ok(_), Err(_)) => Ordering::Less,
-        (Err(_), Ok(_)) => Ordering::Greater,
-        (Err(_), Err(_)) => Ordering::Equal,
-    }
-}
-
-#[cfg(unix)]
-fn compare_native_os_str(left: &OsStr, right: &OsStr) -> Ordering {
-    use std::os::unix::ffi::OsStrExt;
-
-    left.as_bytes().cmp(right.as_bytes())
-}
-
-#[cfg(windows)]
-fn compare_native_os_str(left: &OsStr, right: &OsStr) -> Ordering {
-    use std::os::windows::ffi::OsStrExt;
-
-    left.encode_wide().cmp(right.encode_wide())
-}
-
-#[cfg(not(any(unix, windows)))]
-fn compare_native_os_str(left: &OsStr, right: &OsStr) -> Ordering {
-    left.as_encoded_bytes().cmp(right.as_encoded_bytes())
 }
 
 fn all_scope_failure(
@@ -1540,40 +1178,6 @@ fn artifact_production_error(path: &str, error: &ArtifactContractError) -> Opera
     }
 }
 
-fn directory_read_error(path: Option<&str>, error: &io::Error) -> OperationalError {
-    let mut details = io_details(error);
-    details.insert("reason".to_owned(), json!("directory_read_failed"));
-    OperationalError {
-        kind: "io",
-        code: "input_read_failed",
-        message: "Project inventory directory could not be read.".to_owned(),
-        path: path.map(str::to_owned),
-        details: Some(Value::Object(details)),
-    }
-}
-
-fn metadata_error(path: Option<&str>, error: &io::Error) -> OperationalError {
-    let mut details = io_details(error);
-    details.insert("reason".to_owned(), json!("metadata_failed"));
-    OperationalError {
-        kind: "io",
-        code: "input_read_failed",
-        message: "Project inventory file metadata could not be inspected.".to_owned(),
-        path: path.map(str::to_owned),
-        details: Some(Value::Object(details)),
-    }
-}
-
-fn input_read_error(path: &str, error: &io::Error) -> OperationalError {
-    OperationalError {
-        kind: "io",
-        code: "input_read_failed",
-        message: format!("Project inventory file could not be read: {path}"),
-        path: Some(path.to_owned()),
-        details: Some(Value::Object(io_details(error))),
-    }
-}
-
 fn invalid_utf8_error(path: &str, valid_up_to: usize) -> OperationalError {
     OperationalError {
         kind: "io",
@@ -1584,54 +1188,6 @@ fn invalid_utf8_error(path: &str, valid_up_to: usize) -> OperationalError {
             "reason": "invalid_utf8",
             "validUpTo": valid_up_to
         })),
-    }
-}
-
-fn source_changed_error(path: &str) -> OperationalError {
-    OperationalError {
-        kind: "io",
-        code: "input_read_failed",
-        message: format!("Project inventory source changed during acquisition: {path}"),
-        path: Some(path.to_owned()),
-        details: Some(json!({
-            "reason": "source_changed"
-        })),
-    }
-}
-
-fn unrepresentable_discovery_error(project_root: &Path, path: &Path) -> OperationalError {
-    OperationalError {
-        kind: "input",
-        code: "input_path_unrepresentable",
-        message: "A discovered project inventory path is not valid Unicode.".to_owned(),
-        path: None,
-        details: Some(json!({
-            "reason": "non_unicode_path",
-            "source": "discovery",
-            "parentPath": project_relative_label(
-                project_root,
-                path.parent().unwrap_or(project_root)
-            )
-        })),
-    }
-}
-
-fn io_details(error: &io::Error) -> Map<String, Value> {
-    let mut details = Map::new();
-    details.insert("ioKind".to_owned(), json!(normalized_io_kind(error)));
-    if let Some(raw_os_error) = error.raw_os_error() {
-        details.insert("rawOsError".to_owned(), json!(raw_os_error));
-    }
-    details
-}
-
-fn normalized_io_kind(error: &io::Error) -> &'static str {
-    match error.kind() {
-        io::ErrorKind::NotFound => "not_found",
-        io::ErrorKind::PermissionDenied => "permission_denied",
-        io::ErrorKind::IsADirectory => "not_file",
-        io::ErrorKind::NotADirectory => "not_directory",
-        _ => "unknown",
     }
 }
 
