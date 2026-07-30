@@ -1863,6 +1863,43 @@ mod tests {
     }
 
     #[test]
+    fn entry_level_only_catalogs_do_not_enter_definition_inventory() {
+        let root = TempRoot::new("entry-level-only");
+        // Invalid host syntax proves that entry-level-only inputs are excluded
+        // before the linker inventory attempts extraction.
+        write(&root, "entry-only/messages.json", "{ broken");
+        write(
+            &root,
+            "linked/messages.json",
+            r#"{"included":"linker input"}"#,
+        );
+
+        let inventory = run(
+            &root,
+            &json!({
+                "catalogs": [
+                    {
+                        "include": ["entry-only/*.json"]
+                    },
+                    {
+                        "scope": "app",
+                        "include": ["linked/*.json"],
+                        "locale": { "from": "fixed", "value": "en" }
+                    }
+                ]
+            }),
+            &locales(&["en"]),
+        );
+
+        assert_eq!(inventory.artifacts().len(), 1);
+        assert_eq!(
+            artifact_path(&inventory.artifacts()[0]),
+            "linked/messages.json"
+        );
+        assert!(inventory.failures().is_empty());
+    }
+
+    #[test]
     fn duplicate_structural_paths_preserve_raw_entry_occurrences() {
         let root = TempRoot::new("duplicate-entry");
         write(
@@ -2127,6 +2164,50 @@ mod tests {
         let details = error.operational_error().details.as_ref().unwrap();
         assert_eq!(details["reason"], "catalog_binding_conflict");
         assert_eq!(details["field"], "scope");
+        assert_eq!(details["targetPath"], "two/messages.json");
+        assert_eq!(details["conflictingTargetPath"], "one/messages.json");
+    }
+
+    #[test]
+    fn physical_alias_locale_conflict_is_configuration_failure() {
+        let root = TempRoot::new("locale-conflict");
+        write(&root, "one/messages.json", r#"{"hello":"Hello"}"#);
+        fs::create_dir_all(root.join("two")).unwrap();
+        fs::hard_link(
+            root.join("one/messages.json"),
+            root.join("two/messages.json"),
+        )
+        .unwrap();
+        let (resources, messages) = resolved(
+            &json!({
+                "catalogs": [
+                    {
+                        "scope": "app",
+                        "include": ["one/*.json"],
+                        "locale": { "from": "fixed", "value": "en" }
+                    },
+                    {
+                        "scope": "app",
+                        "include": ["two/*.json"],
+                        "locale": { "from": "fixed", "value": "ja" }
+                    }
+                ]
+            }),
+            &locales(&["en", "ja"]),
+        );
+
+        let error = produce_definition_inventory(
+            &root,
+            Some(&root.join("intlify.config.json")),
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+        )
+        .unwrap_err();
+        let details = error.operational_error().details.as_ref().unwrap();
+        assert_eq!(details["reason"], "catalog_binding_conflict");
+        assert_eq!(details["field"], "locale");
         assert_eq!(details["targetPath"], "two/messages.json");
         assert_eq!(details["conflictingTargetPath"], "one/messages.json");
     }
@@ -2397,6 +2478,91 @@ mod tests {
     }
 
     #[test]
+    fn lower_alias_limit_fails_before_catalog_extraction() {
+        let root = TempRoot::new("alias-limit");
+        write(&root, "one/messages.json", "{ broken");
+        fs::create_dir_all(root.join("two")).unwrap();
+        fs::hard_link(
+            root.join("one/messages.json"),
+            root.join("two/messages.json"),
+        )
+        .unwrap();
+        let (resources, messages) = resolved(
+            &json!({
+                "catalogs": [{
+                    "scope": "app",
+                    "include": ["one/*.json", "two/*.json"],
+                    "locale": { "from": "fixed", "value": "en" }
+                }]
+            }),
+            &locales(&["en"]),
+        );
+        let limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::LogicalAliases, 0)
+            .unwrap();
+
+        let inventory = produce_definition_inventory(
+            &root,
+            Some(&root.join("intlify.config.json")),
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &limits,
+        )
+        .unwrap();
+        assert!(inventory.artifacts().is_empty());
+        assert_eq!(inventory.failures().len(), 1);
+        let error = inventory.failures()[0].error();
+        assert_eq!(error.code, "message_artifact_failed");
+        assert_eq!(
+            error.details.as_ref().unwrap()["evidence"]["counter"],
+            "logical_aliases"
+        );
+    }
+
+    #[test]
+    fn projection_limit_failure_returns_no_partial_artifact() {
+        let root = TempRoot::new("projection-limit");
+        write(&root, "catalogs/messages.json", r#"{"hello":"Hello"}"#);
+        let (resources, messages) = resolved(
+            &json!({
+                "catalogs": [{
+                    "scope": "app",
+                    "include": ["catalogs/*.json"],
+                    "locale": { "from": "fixed", "value": "en" }
+                }]
+            }),
+            &locales(&["en"]),
+        );
+        let limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::Definitions, 0)
+            .unwrap();
+
+        let inventory = produce_definition_inventory(
+            &root,
+            Some(&root.join("intlify.config.json")),
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &limits,
+        )
+        .unwrap();
+        assert!(inventory.artifacts().is_empty());
+        assert_eq!(inventory.failures().len(), 1);
+        let failure = &inventory.failures()[0];
+        assert_eq!(failure.affected_scopes().len(), 1);
+        assert_eq!(
+            failure.error().path.as_deref(),
+            Some("catalogs/messages.json")
+        );
+        assert_eq!(failure.error().code, "message_artifact_failed");
+        assert_eq!(
+            failure.error().details.as_ref().unwrap()["evidence"]["counter"],
+            "definitions"
+        );
+    }
+
+    #[test]
     fn fingerprint_is_deterministic_and_covers_exact_host_bytes() {
         let root = TempRoot::new("fingerprint");
         let resources = json!({
@@ -2465,6 +2631,81 @@ mod tests {
         assert_ne!(base_digest, digest_hex(&different_scope.artifacts()[0]));
         assert_ne!(base_digest, digest_hex(&different_locale.artifacts()[0]));
         assert_ne!(base_digest, digest_hex(&with_alias.artifacts()[0]));
+    }
+
+    #[test]
+    fn fingerprint_ignores_project_root_and_include_spelling() {
+        let first_root = TempRoot::new("fingerprint-root-one");
+        let second_root = TempRoot::new("fingerprint-root-two");
+        write(
+            &first_root,
+            "catalogs/messages.json",
+            r#"{"hello":"Hello"}"#,
+        );
+        write(
+            &second_root,
+            "catalogs/messages.json",
+            r#"{"hello":"Hello"}"#,
+        );
+        let resources = |include: &str| {
+            json!({
+                "catalogs": [{
+                    "scope": "app",
+                    "include": [include],
+                    "locale": { "from": "fixed", "value": "en" }
+                }]
+            })
+        };
+
+        let first = run(
+            &first_root,
+            &resources("catalogs/*.json"),
+            &locales(&["en"]),
+        );
+        let second = run(
+            &second_root,
+            &resources("**/messages.json"),
+            &locales(&["en"]),
+        );
+
+        assert_eq!(
+            digest_hex(&first.artifacts()[0]),
+            digest_hex(&second.artifacts()[0])
+        );
+    }
+
+    #[test]
+    fn alias_input_permutation_preserves_artifact_identity_and_fingerprint() {
+        let root = TempRoot::new("alias-order");
+        write(&root, "a/messages.json", r#"{"hello":"Hello"}"#);
+        fs::create_dir_all(root.join("z")).unwrap();
+        fs::hard_link(root.join("a/messages.json"), root.join("z/messages.json")).unwrap();
+        let resources = |includes: &[&str]| {
+            json!({
+                "catalogs": [{
+                    "scope": "app",
+                    "include": includes,
+                    "locale": { "from": "fixed", "value": "en" }
+                }]
+            })
+        };
+
+        let forward = run(
+            &root,
+            &resources(&["a/*.json", "z/*.json"]),
+            &locales(&["en"]),
+        );
+        let reverse = run(
+            &root,
+            &resources(&["z/*.json", "a/*.json"]),
+            &locales(&["en"]),
+        );
+
+        assert_eq!(forward.artifacts()[0], reverse.artifacts()[0]);
+        assert_eq!(
+            digest_hex(&forward.artifacts()[0]),
+            digest_hex(&reverse.artifacts()[0])
+        );
     }
 
     #[test]
