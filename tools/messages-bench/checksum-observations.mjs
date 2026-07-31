@@ -89,6 +89,16 @@ const semanticFieldsByBoundaryId = Object.freeze({
     'canonicalReferenceArtifacts',
     'checkedRequestObservation',
     'canonicalLinkOutcome'
+  ]),
+  coverage_baseline_selection: Object.freeze([
+    'canonicalResolvedBaselines',
+    'canonicalProductionUnionKeys',
+    'selectedBaselineDefinitionIdentities'
+  ]),
+  typed_key_model_construction: Object.freeze([
+    'canonicalTypedKeyModels',
+    'privateBaselineDefinitionRelations',
+    'checkedAdmissionOutcome'
   ])
 })
 

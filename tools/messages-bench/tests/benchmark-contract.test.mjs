@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vite-plus/test'
 import {
   BoundaryRecorder,
   MESSAGE_BENCHMARK_BOUNDARIES,
+  MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY,
   MESSAGE_BENCHMARK_PHASES,
   assertValidBoundaryRegistry,
   resource_host_parse_and_entry_extraction
@@ -20,7 +21,10 @@ import {
   aggregateRepeatedChecksum,
   checksumOccurrenceSequence
 } from '../checksum-observations.mjs'
-import { assertValidMessageBenchmarkResult } from '../result-schema.mjs'
+import {
+  MESSAGE_BENCH_RESULT_SCHEMA_VERSION,
+  assertValidMessageBenchmarkResult
+} from '../result-schema.mjs'
 import { resource_host_parse_and_entry_extraction as ownedResourceDescriptor } from '../../resource-bench/benchmark-phases.mjs'
 
 const fixtures = JSON.parse(
@@ -48,6 +52,32 @@ test('generated fixture profiles declare their exact checked Rust generator', ()
       id: profile.shape
     })
   }
+})
+
+test('typed-key model costs activate the exact generated scales and sibling boundaries', () => {
+  expect(MESSAGE_BENCHMARK_PHASES.find(phase => phase.name === 'message_typed_key_model')).toEqual({
+    name: 'message_typed_key_model',
+    costs: ['coverage_baseline_selection', 'typed_key_model_construction']
+  })
+  const fixture = fixtures.profiles.find(profile => profile.shape === 'typed_key_model')
+  expect(fixture.scales).toEqual([16, 64, 256])
+  const required = MESSAGE_BENCHMARK_REQUIRED_CASES.filter(
+    record => record.phase === 'message_typed_key_model'
+  )
+  expect(required).toHaveLength(6)
+  expect(new Set(required.map(record => record.scale))).toEqual(new Set(fixture.scales))
+  expect(new Set(required.map(record => record.cost))).toEqual(
+    new Set(['coverage_baseline_selection', 'typed_key_model_construction'])
+  )
+  expect(
+    MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY.filter(
+      edge =>
+        edge.parentBoundaryId === 'project_link_e2e' &&
+        ['coverage_baseline_selection', 'typed_key_model_construction'].includes(
+          edge.childBoundaryId
+        )
+    )
+  ).toHaveLength(2)
 })
 
 test('JavaScript occurrence checksum matches the shared Rust vectors', () => {
@@ -110,6 +140,30 @@ describe('boundary recorder', () => {
     recorder.stop('js_cache_miss_production', 'src/app.mts')
     recorder.stop('project_link_e2e', 'project')
     expect(() => recorder.finish()).not.toThrow()
+  })
+
+  test('accepts typed-key model siblings and rejects nesting one inside the other', () => {
+    const recorder = new BoundaryRecorder({
+      project_link_e2e: ['project'],
+      coverage_baseline_selection: ['link-request'],
+      typed_key_model_construction: ['link-request']
+    })
+    recorder.start('project_link_e2e', 'project')
+    recorder.start('coverage_baseline_selection', 'link-request')
+    recorder.stop('coverage_baseline_selection', 'link-request')
+    recorder.start('typed_key_model_construction', 'link-request')
+    recorder.stop('typed_key_model_construction', 'link-request')
+    recorder.stop('project_link_e2e', 'project')
+    expect(() => recorder.finish()).not.toThrow()
+
+    const nested = new BoundaryRecorder({
+      coverage_baseline_selection: ['link-request'],
+      typed_key_model_construction: ['link-request']
+    })
+    nested.start('coverage_baseline_selection', 'link-request')
+    expect(() => nested.start('typed_key_model_construction', 'link-request')).toThrow(
+      /undeclared nesting/
+    )
   })
 
   test('rejects undeclared nesting, crossing, duplicate start and stop', () => {
@@ -257,7 +311,7 @@ function validResult() {
     [fixtures.projectFixture.name, fixtures.projectFixture]
   ])
   return {
-    schemaVersion: '0',
+    schemaVersion: MESSAGE_BENCH_RESULT_SCHEMA_VERSION,
     benchmarkProfileRevision: MESSAGE_BENCHMARK_PROFILE_REVISION,
     tool: 'intlify-messages-bench',
     version: '0.0.0',

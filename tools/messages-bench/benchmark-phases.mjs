@@ -35,7 +35,8 @@ export const MESSAGE_BENCHMARK_PHASES = Object.freeze([
     'finding_and_plan_materialization'
   ]),
   phase('message_link_peak_memory', ['link_core_peak_live_memory']),
-  phase('message_project_link_e2e', ['complete_workflow'])
+  phase('message_project_link_e2e', ['complete_workflow']),
+  phase('message_typed_key_model', ['coverage_baseline_selection', 'typed_key_model_construction'])
 ])
 
 function phase(name, costs) {
@@ -210,6 +211,20 @@ const messagesOwnedDescriptors = [
     'project_link_e2e',
     'duration',
     PER_WORKFLOW
+  ),
+  boundary(
+    'message_typed_key_model',
+    'coverage_baseline_selection',
+    'coverage_baseline_selection',
+    'duration',
+    PER_WORKFLOW
+  ),
+  boundary(
+    'message_typed_key_model',
+    'typed_key_model_construction',
+    'typed_key_model_construction',
+    'duration',
+    PER_WORKFLOW
   )
 ]
 
@@ -234,6 +249,8 @@ export const MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY = Object.freeze([
     'reference_artifact_decode',
     'link_request_validation_scope_mapping',
     'link_semantic_index_construction',
+    'coverage_baseline_selection',
+    'typed_key_model_construction',
     'link_selector_resolution',
     'link_reachability_placement',
     'link_finding_plan_materialization'

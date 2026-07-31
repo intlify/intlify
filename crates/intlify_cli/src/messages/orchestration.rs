@@ -447,6 +447,12 @@ const fn message_stage_for_link(stage: BenchmarkLinkStage) -> MessageBenchmarkSt
         BenchmarkLinkStage::SemanticIndexConstruction => {
             MessageBenchmarkStage::SemanticIndexConstruction
         }
+        BenchmarkLinkStage::CoverageBaselineSelection => {
+            MessageBenchmarkStage::CoverageBaselineSelection
+        }
+        BenchmarkLinkStage::TypedKeyModelConstruction => {
+            MessageBenchmarkStage::TypedKeyModelConstruction
+        }
         BenchmarkLinkStage::SelectorExpansionAndReferenceResolution => {
             MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
         }
@@ -964,6 +970,8 @@ mod tests {
             MessageBenchmarkStage::DefinitionProjection,
             MessageBenchmarkStage::RequestValidationAndScopeMapping,
             MessageBenchmarkStage::SemanticIndexConstruction,
+            MessageBenchmarkStage::CoverageBaselineSelection,
+            MessageBenchmarkStage::TypedKeyModelConstruction,
             MessageBenchmarkStage::SelectorExpansionAndReferenceResolution,
             MessageBenchmarkStage::ReachabilityAndPlacement,
             MessageBenchmarkStage::FindingAndPlanMaterialization,

@@ -5,7 +5,7 @@ import {
   resource_host_parse_and_entry_extraction
 } from './benchmark-phases.mjs'
 
-export const MESSAGE_BENCHMARK_PROFILE_REVISION = 1
+export const MESSAGE_BENCHMARK_PROFILE_REVISION = 2
 
 const selection = JSON.parse(
   readFileSync(new URL('./fixture-selection.json', import.meta.url), 'utf8')
@@ -18,6 +18,7 @@ const descriptorByPair = new Map(
 )
 const project = selection.projectFixture
 const dense = selection.profiles.find(profile => profile.shape === 'exact_reference_dense')
+const typedKeyModel = selection.profiles.find(profile => profile.shape === 'typed_key_model')
 
 const projectPairs = [
   ['message_project_input_io', 'inventory_metadata_io'],
@@ -83,18 +84,34 @@ export const MESSAGE_BENCHMARK_REQUIRED_CASES = Object.freeze([
     operation: 'js_cache_hit_access',
     metric: 'duration'
   }),
-  ...selection.profiles.flatMap(profile =>
-    profile.scales.map(scale =>
-      requiredCase({
-        phase: 'message_link_peak_memory',
-        cost: 'link_core_peak_live_memory',
-        fixture: profile.name,
-        variant: profile.shape,
+  ...selection.profiles
+    .filter(profile => profile.shape !== 'typed_key_model')
+    .flatMap(profile =>
+      profile.scales.map(scale =>
+        requiredCase({
+          phase: 'message_link_peak_memory',
+          cost: 'link_core_peak_live_memory',
+          fixture: profile.name,
+          variant: profile.shape,
+          scale,
+          operation: 'link_core_peak_live_memory',
+          metric: 'peak_live_memory'
+        })
+      )
+    ),
+  ...typedKeyModel.scales.flatMap(scale =>
+    ['coverage_baseline_selection', 'typed_key_model_construction'].map(cost => {
+      const descriptor = descriptorFor('message_typed_key_model', cost)
+      return requiredCase({
+        phase: 'message_typed_key_model',
+        cost,
+        fixture: typedKeyModel.name,
+        variant: 'typed_key_model',
         scale,
-        operation: 'link_core_peak_live_memory',
-        metric: 'peak_live_memory'
+        operation: descriptor.boundaryId,
+        metric: descriptor.metric
       })
-    )
+    })
   )
 ])
 
