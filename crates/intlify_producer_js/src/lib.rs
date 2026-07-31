@@ -31,7 +31,8 @@ pub use error::{
 pub use frontend::{scan_source, scan_source_with_cancellation, JsSourceScan, SOURCE_BYTES_LIMIT};
 pub use group::{JsPhysicalSourceGroup, JsPhysicalSourceGroupError};
 pub use producer::{
-    produce_reference_artifacts, produce_reference_artifacts_with_cache,
+    preflight_source_group_count, produce_reference_artifacts,
+    produce_reference_artifacts_with_cache,
     produce_reference_artifacts_with_cache_and_cancellation,
     produce_reference_artifacts_with_cancellation, JsProducerOutcome, SOURCE_BYTES_TOTAL_LIMIT,
     SOURCE_GROUPS_LIMIT,

@@ -8,9 +8,15 @@
 //! It performs no filesystem discovery, source parsing, artifact loading, or
 //! linking.
 
+mod completeness;
 mod config;
 #[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
+#[allow(dead_code)] // Reused by later message commands without exposing an M0 CLI leaf.
+pub(crate) mod orchestration;
+mod physical;
+#[allow(dead_code)] // Consumed when project-link orchestration is wired.
+pub(crate) mod reference;
 
 pub use config::{
     validate_messages_config, MessageCatalogKeyDomain, MessageDynamicReferenceMode,
