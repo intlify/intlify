@@ -30,7 +30,7 @@ const checksumVectors = JSON.parse(
   readFileSync(new URL('../checksum-vectors.json', import.meta.url), 'utf8')
 )
 
-test('active M0 boundaries cover every phase/cost and import the 013 descriptor by identity', () => {
+test('active project-link boundaries cover every phase/cost and import the 013 descriptor by identity', () => {
   expect(() => assertValidBoundaryRegistry()).not.toThrow()
   expect(resource_host_parse_and_entry_extraction).toBe(ownedResourceDescriptor)
   expect(MESSAGE_BENCHMARK_BOUNDARIES).toHaveLength(

@@ -347,7 +347,6 @@ pub(crate) struct DiagnosticSink<'a> {
     pub labels: &'a mut Vec<DiagnosticLabelRecord>,
 }
 
-#[allow(dead_code)] // hot-path consumer wires in with Milestone 6/7.
 impl<'a> DiagnosticSink<'a> {
     pub fn new(
         records: &'a mut Vec<DiagnosticRecord>,
@@ -361,6 +360,7 @@ impl<'a> DiagnosticSink<'a> {
             .push(DiagnosticRecord::from_code(source, span, code));
     }
 
+    #[allow(dead_code)] // Retained for diagnostics that need a secondary span.
     pub fn push_with_label(
         &mut self,
         source: SourceId,

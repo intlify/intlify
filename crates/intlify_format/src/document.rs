@@ -7,8 +7,8 @@ use ox_mf2_parser::Span;
 
 /// Fixed group rendering mode.
 ///
-/// Phase 3B keeps group decisions deterministic. The enum exists now so the
-/// formatter can model future line wrapping without changing traversal output.
+/// Group decisions remain explicit and deterministic. The enum also allows
+/// line wrapping to evolve without changing document traversal output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GroupMode {
     Flat,

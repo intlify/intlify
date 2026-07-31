@@ -14,9 +14,9 @@
 //! stays direct. Each helper expects the cursor positioned at its first
 //! significant byte and leaves the cursor positioned at the next byte.
 //!
-//! Recovery (Milestone 7) snapshots the cursor + builder lengths and rolls
-//! back on failure; the resulting CST always has a root and surviving
-//! malformed input is held in `Error` / `Missing` nodes.
+//! Recovery snapshots the cursor and builder lengths, then rolls back on
+//! failure. The resulting CST always has a root, and surviving malformed input
+//! is held in `Error` / `Missing` nodes.
 
 #![allow(clippy::while_let_loop)] // explicit loop {} + Some(_) else-break is
                                   // clearer than nested while-let across the
@@ -347,9 +347,9 @@ impl Parser<'_, '_> {
         let start = self.cursor.offset();
         let pending = self.builder.start_node(SyntaxKind::Placeholder, start);
 
-        // We do not yet recognise markup; the parser routes everything
-        // through `parse_expression`. Markup support lands later in this
-        // milestone after the core expression grammar is in.
+        // Every placeholder shares the expression parser, which classifies
+        // variable, function, literal, and markup forms from the first
+        // significant byte.
         let inner = self.parse_expression();
         self.builder.push_node_edge(inner);
         let end = self.cursor.offset();

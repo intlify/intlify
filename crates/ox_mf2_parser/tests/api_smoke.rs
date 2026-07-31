@@ -3,8 +3,8 @@
 
 //! End-to-end smoke tests for the public parse API.
 //!
-//! These do not assert on grammar — the grammar lands in Milestone 6 — they
-//! just lock in the API shape, lifetime contracts, and batch ordering.
+//! These focus on API shape, lifetime contracts, and batch ordering. Grammar
+//! behavior is covered by the dedicated parser grammar tests.
 
 use ox_mf2_parser::{
     ox_mf2_error_code_name, parse_batch, parse_message, parse_source, parse_source_session,

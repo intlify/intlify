@@ -10,9 +10,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ReservedCommand {
     pub(crate) name: &'static str,
-    // NOTE: Temporary Phase 3A metadata for reserved-command diagnostics;
-    // remove this field once the real command implementations make phase hints
-    // obsolete.
+    // Temporary metadata for explaining why a reserved command is unavailable.
+    // Remove it when concrete command implementations replace the placeholder.
     pub(crate) required_phase: &'static str,
     pub(crate) requires: &'static [&'static str],
 }

@@ -252,8 +252,8 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
             })
         }
         "ox-mf2-parse" => {
-            // Phase 1 parser entry point equivalent to mf2-tools-parse — no
-            // semantic lowering, default options.
+            // Parser entry point equivalent to mf2-tools-parse: default
+            // options and no semantic lowering.
             let result = ox_mf2_parser::parse_message(black_box(source))
                 .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
             Ok(TargetResult {

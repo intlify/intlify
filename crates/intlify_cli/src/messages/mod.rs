@@ -16,7 +16,7 @@ mod config;
 #[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
 mod observation;
-#[allow(dead_code)] // Reused by later message commands without exposing an M0 CLI leaf.
+#[allow(dead_code)] // Kept internal until a user-facing message command consumes it.
 pub(crate) mod orchestration;
 mod physical;
 #[allow(dead_code)] // Consumed when project-link orchestration is wired.

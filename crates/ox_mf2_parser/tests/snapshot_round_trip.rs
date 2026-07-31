@@ -3,8 +3,8 @@
 
 //! End-to-end Binary AST snapshot round-trip tests.
 //!
-//! Exercises the public Phase 2 snapshot API: parse → snapshot → decode
-//! → traverse. The lower-level wire format is locked down by
+//! Exercises the public snapshot API: parse → snapshot → decode → traverse.
+//! The lower-level wire format is locked down by
 //! `crates/ox_mf2_parser/src/snapshot/*.rs` unit tests; these tests
 //! cover the API contract and that decoded views match parser output.
 
@@ -56,7 +56,7 @@ fn snapshot_preserves_token_text_via_source_id_plus_span() {
     let snap = parse_result_to_snapshot(&sources, &result, SnapshotOptions::default()).unwrap();
     let view = decode_snapshot(&snap.bytes).unwrap();
 
-    // For a single-input snapshot the writer remaps Phase 1 `id` to
+    // For a single-input snapshot the writer remaps the parser `id` to
     // snapshot-local source 0 — assert that explicitly so a future
     // source-remapping regression cannot quietly pass this test on
     // span-based recovery alone.
@@ -591,7 +591,7 @@ fn diagnostic_source_is_collapsed_to_root_source_per_v01_policy() {
     // writer emits diagnostics and labels using the root's
     // snapshot-local `SourceRecord`. Even when a caller-supplied
     // `ParseResult` carries a `Diagnostic` (or its label) whose
-    // `source` names a different Phase 1 `SourceId`, the encoded
+    // `source` names a different parser `SourceId`, the encoded
     // record references the root source. This lock-in test
     // documents the policy so a regression would fail loudly.
     let mut sources = SourceStore::new();
@@ -648,8 +648,8 @@ fn diagnostic_source_is_collapsed_to_root_source_per_v01_policy() {
 
 #[test]
 fn batch_result_to_snapshot_rejects_item_source_result_source_mismatch() {
-    // Phase 1 `parse_batch` always sets `item.source ==
-    // item.result.source`, but `BatchParseResult` / `BatchParseItem`
+    // `parse_batch` always sets `item.source == item.result.source`, but
+    // `BatchParseResult` / `BatchParseItem`
     // are public, `Clone`, and constructible with struct literals.
     // A hand-crafted item that swaps the two would otherwise
     // produce a snapshot whose `SourceRecord` (path / locale /
@@ -689,7 +689,7 @@ fn batch_result_to_snapshot_rejects_item_source_result_source_mismatch() {
 #[test]
 fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one_id_repeats() {
     // `BatchParseResult` is a public struct, so a caller can craft
-    // one where two items share the same Phase 1 `SourceId`. The
+    // one where two items share the same parser `SourceId`. The
     // v0.1 writer must still emit one `SourceRecord` per root (see
     // design/003 §"Source Section"), so root count == source count
     // and each root's snapshot-local `source_id` is distinct.
@@ -733,7 +733,7 @@ fn batch_result_to_snapshot_emits_one_source_record_per_root_even_when_phase_one
     let source0 = view.source(root0.source_id()).unwrap();
     let source1 = view.source(root1.source_id()).unwrap();
     // Both records carry the same metadata because the underlying
-    // Phase 1 source is the same.
+    // parser source is the same.
     assert_eq!(source0.path(), Some("greeting.mf2"));
     assert_eq!(source1.path(), Some("greeting.mf2"));
     assert_eq!(source0.id().raw(), 0);

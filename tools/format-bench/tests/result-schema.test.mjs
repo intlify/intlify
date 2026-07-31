@@ -9,7 +9,7 @@ import { expect, test } from 'vite-plus/test'
 import { FORMAT_BENCHMARK_PHASE_NAMES, FORMAT_BENCHMARK_PHASES } from '../benchmark-phases.mjs'
 import { assertValidFormatBenchmarkResult } from '../result-schema.mjs'
 
-test('formatter benchmark phases match the Phase 3B design names', () => {
+test('formatter benchmark phases match the canonical design names', () => {
   expect(FORMAT_BENCHMARK_PHASE_NAMES).toEqual([
     'format_standard',
     'format_preserve',

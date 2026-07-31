@@ -3,8 +3,9 @@
 
 //! Flat indexed CST tables: nodes / edges / tokens / trivia.
 //!
-//! Phase 1 represents the CST as four `Vec`s of fixed-size records, addressed
-//! by `u32` indexes. Spans live inline in node, token, and trivia records.
+//! The parser represents the CST as four `Vec`s of fixed-size records,
+//! addressed by `u32` indexes. Spans live inline in node, token, and trivia
+//! records.
 //! Child relationships are stored as a contiguous `[first_child, first_child +
 //! child_count)` range into the edge table; each edge identifies whether it
 //! points at a node or a token.
@@ -85,7 +86,7 @@ pub(crate) struct PendingNode {
     pub edge_start: u32,
 }
 
-/// Flat indexed CST tables — the Phase 1 parser's primary output.
+/// Flat indexed CST tables — the parser's primary output.
 #[derive(Debug, Default, Clone)]
 pub struct CstTables {
     pub(crate) nodes: Vec<CstNodeRecord>,

@@ -456,7 +456,7 @@ impl<'a> SourceView<'a> {
     ///
     /// The external text is explicit rather than looked up through a
     /// `SourceStore`: snapshot `SourceId`s are local to the emitted
-    /// snapshot and do not have to match Phase 1 `SourceStore` ids.
+    /// snapshot and do not have to match parser-side `SourceStore` ids.
     /// When snapshot-embedded text exists, it is preferred so this
     /// method has the same behaviour as [`Self::source_slice`].
     pub fn source_slice_with_external_text(

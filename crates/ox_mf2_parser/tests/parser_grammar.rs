@@ -1,13 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Coarse-grained grammar tests for the Phase 1 parser.
+//! Coarse-grained parser grammar tests.
 //!
 //! Each test exercises a vertical slice from `design/002` and the WG spec
 //! grammar in `refers/message-format-wg/spec/message.abnf`. Tests inspect
 //! root kind, child counts, and a flat traversal of `SyntaxKind` so a
-//! regression in the parser shape shows up here before fixture snapshots
-//! land in Milestone 10.
+//! regression in the parser shape shows up here independently of snapshot
+//! fixture coverage.
 
 use ox_mf2_parser::{
     parse_source, CstChild, CstNodeView, CstView, DiagnosticCode, ParseOptions, SourceFileInput,

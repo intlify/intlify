@@ -46,7 +46,7 @@ test('parseBatch preserves root and source order', () => {
   expect(result.sources.map(source => source.messageId())).toEqual(['one', 'two'])
 })
 
-test('parallel batch request degrades to sequential in Phase 2', () => {
+test('parallel batch request reports sequential fallback', () => {
   const result = parseBatch([{ source: 'One' }, { source: 'Two' }], {
     batchExecution: 'parallel'
   })

@@ -3,8 +3,8 @@
 
 //! `SyntaxKind` enum shared by parser, tables, diagnostics, and snapshots.
 //!
-//! Numeric values are part of the Phase 2 Binary AST snapshot wire format
-//! contract. Do not reorder, reuse, or change their meaning incompatibly.
+//! Numeric values are part of the Binary AST snapshot wire-format contract.
+//! Do not reorder, reuse, or change their meaning incompatibly.
 //! New kinds get new values; obsolete kinds become reserved holes.
 //!
 //! Categories are based on the MF2 grammar productions in

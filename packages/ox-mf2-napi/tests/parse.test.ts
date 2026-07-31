@@ -46,7 +46,7 @@ test.runIf(hasNativeBinding)('parseBatch preserves root and source order', () =>
   expect(result.sources[1]?.sourceSlice({ start: 0, end: 3 })).toBe('Two')
 })
 
-test.runIf(hasNativeBinding)('parallel batch request degrades to sequential in Phase 2', () => {
+test.runIf(hasNativeBinding)('parallel batch request reports sequential fallback', () => {
   const result = parseBatch([{ source: 'One' }, { source: 'Two' }], {
     batchExecution: 'parallel'
   })

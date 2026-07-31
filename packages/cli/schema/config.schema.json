@@ -391,7 +391,7 @@
     },
     "lint": {
       "$ref": "#/definitions/EmptyConfig",
-      "description": "Linter configuration. Phase 3C accepts only an empty object."
+      "description": "Linter configuration. Currently accepts only an empty object."
     },
     "messages": {
       "$ref": "#/definitions/MessagesConfig",

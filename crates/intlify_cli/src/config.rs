@@ -106,7 +106,7 @@ pub(crate) struct ProjectConfigFile {
     pub(crate) schema: Option<String>,
     #[schemars(description = "Formatter configuration.")]
     pub(crate) fmt: Option<FormatterConfig>,
-    #[schemars(description = "Linter configuration. Phase 3C accepts only an empty object.")]
+    #[schemars(description = "Linter configuration. Currently accepts only an empty object.")]
     pub(crate) lint: Option<EmptyConfig>,
     #[schemars(
         with = "Option<ResourcesConfig>",

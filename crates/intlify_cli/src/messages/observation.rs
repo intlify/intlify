@@ -10,7 +10,7 @@
 #[cfg(feature = "benchmark")]
 use std::time::Duration;
 
-/// One exact M0 project-workflow measurement boundary.
+/// One exact project-link workflow measurement boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(not(feature = "benchmark"), allow(dead_code))]
 pub enum MessageBenchmarkStage {

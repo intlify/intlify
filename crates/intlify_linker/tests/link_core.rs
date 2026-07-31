@@ -336,7 +336,7 @@ fn exact_resolution_retains_exact_locale_snapshots_and_reports_unused_definition
         assert_eq!(
             plan.messages()[0].definition_locale(),
             plan.locale(),
-            "M0 retains only the exact locale snapshot in each requested-locale plan"
+            "each requested-locale plan retains its exact selected locale snapshot"
         );
     }
     assert_eq!(plans[0].messages()[0].message().as_str(), "Hello");

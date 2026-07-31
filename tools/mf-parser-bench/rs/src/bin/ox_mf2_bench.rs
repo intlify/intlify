@@ -205,7 +205,7 @@ fn parse_phase(name: &str) -> Result<Phase, String> {
 }
 
 fn print_help() {
-    println!("ox-mf2-bench — Phase 1 ox_mf2_parser benchmark CLI");
+    println!("ox-mf2-bench — ox_mf2_parser benchmark CLI");
     println!();
     println!("Usage: ox-mf2-bench --phase <PHASE> [options]");
     println!();
@@ -234,7 +234,7 @@ fn print_help() {
         "  parse_batch_sequential       owned parse_batch over --corpus (clone + materialise)"
     );
     println!();
-    println!("Phases (Phase 2 Binary AST snapshot):");
+    println!("Binary AST snapshot phases:");
     println!("  encode_snapshot              parse once, encode snapshot N times");
     println!("  parse_cst_and_encode_snapshot parse + encode each iteration (combined)");
     println!("  decode_snapshot              encode once, borrowed decode N times");
@@ -748,7 +748,7 @@ fn run_parse_batch_sequential(args: &Args) -> Result<PhaseSummary, String> {
     })
 }
 
-// ── Phase 2 Binary AST snapshot phases ───────────────────────────────
+// ── Binary AST snapshot benchmark phases ─────────────────────────────
 
 fn snapshot_options(args: &Args) -> SnapshotOptions {
     let mut opts = SnapshotOptions::default();

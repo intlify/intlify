@@ -179,8 +179,8 @@ fn record_config_value(
     seen_options: &mut HashSet<&'static str>,
     value: &str,
 ) {
-    // Store the path even though Phase 3A reserved commands do not load config;
-    // Phase 3B/3C can thread this through without changing parser behavior.
+    // Preserve the explicit path even for reserved commands. Their eventual
+    // implementations can reuse the parsed value without changing argv rules.
     if !seen_options.insert("--config") {
         record_first_error(parsed, CliError::duplicate_option("--config"));
         return;

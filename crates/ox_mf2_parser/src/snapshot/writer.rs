@@ -1,8 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Phase 1 `ParseResult` / `BatchParseResult` → Binary AST snapshot
-//! encoder.
+//! `ParseResult` / `BatchParseResult` → Binary AST snapshot encoder.
 //!
 //! The writer first builds section-local byte buffers, then hands them
 //! to [`crate::snapshot::sections::SnapshotAssembler`] for final layout
@@ -250,8 +249,8 @@ pub fn parse_batch_result_to_snapshot(
     for item in &result.items {
         require_collected_trivia(item.result.trivia_collected, options)?;
     }
-    // Phase 1 `parse_batch` guarantees `item.source ==
-    // item.result.source`, but `BatchParseResult` / `BatchParseItem`
+    // `parse_batch` guarantees `item.source == item.result.source`, but
+    // `BatchParseResult` / `BatchParseItem`
     // are public + `Clone` + struct-literal-constructible, so a
     // hand-crafted batch can mismatch the two. Encoding such an
     // item would attach the source metadata named by `item.source`
@@ -348,7 +347,7 @@ struct PendingRoot {
 }
 
 /// Per-snapshot-local-source metadata `StringId`s, captured by
-/// `intern_source` the first time a Phase 1 source is registered
+/// `intern_source` the first time a parser source is registered
 /// so `finish` can emit `SourceRecord` wire bytes without a second
 /// `StringTableBuilder::intern_optional` lookup per field.
 #[derive(Debug, Clone, Copy)]
@@ -361,12 +360,12 @@ struct SourceMetaIds {
 struct SnapshotWriter {
     options: SnapshotOptions,
     string_table: StringTableBuilder,
-    /// Phase 1 `SourceId` per snapshot-local `SourceId` (the
+    /// Parser `SourceId` per snapshot-local `SourceId` (the
     /// `Vec` index is the snapshot-local id). Parallel to
     /// `source_meta`. v0.1 writer does NOT deduplicate
     /// `SourceRecord`s — see `design/003` §"Source Section".
     /// Each `add_root` call appends one entry, even when the
-    /// Phase 1 source matches an earlier root.
+    /// parser source matches an earlier root.
     source_phase_one: Vec<PhaseOneSourceId>,
     /// Parallel to `source_phase_one`: metadata `StringId` triple
     /// captured by `allocate_root_source` so `finish` can copy
@@ -429,9 +428,9 @@ impl SnapshotWriter {
 
     /// Allocate a fresh snapshot-local `SourceId` for `root_source`
     /// and cache its metadata `StringId` triple. v0.1 writer does
-    /// NOT deduplicate `SourceRecord`s by Phase 1 source id — see
+    /// NOT deduplicate `SourceRecord`s by parser source id — see
     /// `design/003` §"Source Section". Every `add_root` call gets
-    /// its own slot, even when the Phase 1 source matches an
+    /// its own slot, even when the parser source matches an
     /// earlier root, so root identity in the snapshot is 1:1 with
     /// the input root order.
     fn allocate_root_source(
@@ -467,7 +466,7 @@ impl SnapshotWriter {
     ///
     /// Source slot allocation happens later inside `add_root` via
     /// `allocate_root_source`; this method only touches the string
-    /// table, so repeated Phase 1 source ids are interned
+    /// table, so repeated parser source ids are interned
     /// idempotently and never cost extra string table entries.
     fn pre_intern_root_sources<I>(
         &mut self,
@@ -494,7 +493,7 @@ impl SnapshotWriter {
         cst: &CstTables,
         diagnostics: &[Diagnostic],
     ) -> Result<(), SnapshotWriteError> {
-        // Reserve section byte buffers from the Phase 1 CST counts
+        // Reserve section byte buffers from the parser CST counts
         // so the per-record `write_*` calls below don't grow the
         // underlying `Vec`s mid-loop. Diagnostics / labels are
         // skipped when `include_diagnostics = false` so the writer
@@ -518,7 +517,7 @@ impl SnapshotWriter {
         }
 
         // Allocate a fresh SourceRecord slot for THIS root (no
-        // dedup by Phase 1 SourceId — see `design/003` §"Source
+        // dedup by parser SourceId — see `design/003` §"Source
         // Section"). `emit_*` below all reference this slot
         // directly so every token / trivia / diagnostic in this
         // root points at this root's snapshot-local SourceId.
@@ -689,7 +688,7 @@ impl SnapshotWriter {
                         write_u32_le(&mut self.edges_bytes, snap_id);
                     }
                     _ => {
-                        // Phase 1 builder never produces other edge
+                        // The parser builder never produces other edge
                         // kinds; treat as an internal invariant
                         // violation by remapping the edge as a token
                         // reference. (Decoder will reject if reached.)
@@ -726,10 +725,10 @@ impl SnapshotWriter {
         // `DiagnosticRecord` / `DiagnosticLabelRecord` so a future
         // writer can opt into multi-source diagnostics within a
         // single root, but v0.1 always emits the root's snapshot-
-        // local source. Phase 1 only generates diagnostics against
+        // local source. The parser only generates diagnostics against
         // the parsed source anyway; a caller-supplied
         // `Diagnostic.source` or `DiagnosticLabel.source` that
-        // names a different Phase 1 source is intentionally
+        // names a different parser source is intentionally
         // collapsed here — the snapshot is single-source per root.
         let source_local = root_source_local;
         let _ = diagnostic.source; // intentional: collapsed (see policy above)
@@ -1016,7 +1015,7 @@ impl SnapshotWriter {
     }
 }
 
-#[allow(dead_code)] // accept Phase 1 catalog sentinel so the writer can
+#[allow(dead_code)] // Accept the parser catalog sentinel so the writer can
                     // intern catalog message strings later if needed.
 fn diagnostic_catalog_str(code: DiagnosticCode) -> &'static str {
     code.static_message()

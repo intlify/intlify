@@ -60,7 +60,7 @@ export const RUST_TARGETS = [
     name: 'ox-mf2-parse',
     runtime: 'rust',
     format: 'mf2',
-    description: 'ox_mf2_parser::parse_message(source) — Phase 1 CST only'
+    description: 'ox_mf2_parser::parse_message(source) — CST only, without semantic lowering'
   },
   {
     name: 'ox-mf2-parse-session',

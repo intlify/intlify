@@ -88,8 +88,8 @@ fn run_with_stdin_input(raw_args: &[String], cwd: &Path, stdin: StdinInput<'_>) 
         return render_operational_error(error.into(), parsed.reporter, COMMAND, &project_root);
     }
 
-    // CLI argument shape is resolved before config I/O, matching the Phase 3A
-    // help/error precedence and keeping argv-only failures file-independent.
+    // Resolve argv-only failures before config I/O so help/error precedence
+    // stays deterministic and independent of filesystem state.
     let loaded = match config::load_project_config(cwd, parsed.config_path.as_deref()) {
         Ok(loaded) => loaded,
         Err(error) => {

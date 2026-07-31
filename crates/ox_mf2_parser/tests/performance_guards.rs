@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Performance regression guards for Phase 1.
+//! Parser performance regression guards.
 //!
 //! These tests do not measure wall-clock time — they sit alongside the
 //! benchmark harness (`tools/mf-parser-bench/scripts/ox-mf2-phase-hyperfine.sh`)

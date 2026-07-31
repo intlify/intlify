@@ -44,8 +44,8 @@ impl ParseCapacity {
     /// hint is provided.
     pub fn for_source_len(source_len: usize) -> Self {
         // Conservative coefficients tuned for typical MF2 messages (mostly
-        // short text + a handful of placeholders). Better numbers can drop
-        // out of Milestone 11 benchmarks.
+        // short text plus a handful of placeholders). Benchmark evidence can
+        // refine these estimates without changing the capacity contract.
         let token_estimate = source_len / 4 + 4;
         Self {
             nodes: token_estimate / 2,

@@ -26,7 +26,7 @@ use super::reference::MessageLinkCache;
 
 pub use super::observation::MessageBenchmarkStage;
 
-/// One completed M0 workflow-stage occurrence.
+/// One completed project-link workflow-stage occurrence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BenchmarkMessageMeasurement {
     stage: MessageBenchmarkStage,

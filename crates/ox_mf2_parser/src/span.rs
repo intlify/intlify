@@ -3,7 +3,7 @@
 
 //! ID newtypes, [`Span`], and the optional-reference sentinel.
 //!
-//! The Phase 1 identifier model uses `u32` indexes. `0` is a valid index for
+//! In-memory table identifiers use `u32` indexes. `0` is a valid index for
 //! every table, so [`NONE_U32`] (=`u32::MAX`) is reserved for optional
 //! references. Required references must not use this sentinel value.
 

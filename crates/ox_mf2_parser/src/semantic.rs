@@ -9,7 +9,7 @@
 //! `NodeId` + `Span` so consumers can jump between the semantic model and the
 //! CST without copying source text.
 //!
-//! Phase 1 deliberately keeps the model thin:
+//! The model deliberately remains thin:
 //!
 //! - Raw spans only — cooked values / NFC comparison keys belong to the
 //!   semantic validation path, not parse hot paths.

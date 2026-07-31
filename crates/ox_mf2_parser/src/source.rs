@@ -126,8 +126,8 @@ impl SourceStoreError {
     }
 }
 
-/// Source ownership for single parse, batch parse, diagnostics, and Phase 2
-/// snapshot roots.
+/// Source ownership for single parses, batch parses, diagnostics, and Binary
+/// AST snapshot roots.
 #[derive(Debug, Default, Clone)]
 pub struct SourceStore {
     files: Vec<SourceFile>,

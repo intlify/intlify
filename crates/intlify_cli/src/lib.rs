@@ -93,8 +93,8 @@ fn run_with_slice(raw_args: &[String], cwd: &Path, stdin: &[u8]) -> CliRunResult
     }
 
     let project_root = config::discover_project_root(cwd);
-    // Phase 3A records the explicit config path for the future loader but
-    // reserved commands stop before config discovery, parsing, or validation.
+    // Retain the resolved explicit path for future command implementations,
+    // while reserved commands stop before config discovery or validation.
     let _explicit_config_path = parsed
         .config_path
         .as_deref()

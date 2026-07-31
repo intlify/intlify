@@ -306,8 +306,7 @@ fn local_declaration_variable_requires_dollar_sigil() {
 // `input-declaration = input o variable-expression` — a literal, function,
 // or markup placeholder after `.input` is a syntax error. The placeholder
 // subtree is still kept so tooling can inspect the offending value. This
-// backs the zero-diagnostic guarantee that the Phase 3B formatter strict
-// policy relies on.
+// backs the zero-diagnostic guarantee required by strict formatter mode.
 
 #[test]
 fn input_declaration_with_literal_expression_emits_diagnostic() {

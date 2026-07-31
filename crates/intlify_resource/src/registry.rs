@@ -102,9 +102,9 @@ impl HostFormatClassification {
 
 /// Validated catalog-membership output consumed by the registry.
 ///
-/// The resource resolver introduced in Milestone 9 is the only production
-/// constructor. Keeping the fields private prevents consumers from bypassing
-/// overlap and membership resolution.
+/// Project or overlay catalog resolution is the only production construction
+/// path. Private fields prevent consumers from bypassing overlap and
+/// membership checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedCatalogAssignment {
     classification: HostFormatClassification,

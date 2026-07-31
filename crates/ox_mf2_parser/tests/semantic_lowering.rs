@@ -3,8 +3,8 @@
 
 //! Semantic lowering tests.
 //!
-//! Covers the Milestone 8 acceptance criteria in
-//! `.plans/002-ox-mf2-phase-1-rust-parser-implementation.md`:
+//! Covers the semantic-lowering contract described in
+//! `design/002-ox-mf2-phase-1-rust-parser-design.md`:
 
 #![allow(clippy::field_reassign_with_default, clippy::doc_markdown)]
 //!

@@ -107,10 +107,10 @@ fn parses_jsonc_comments_and_trailing_commas() {
     write(
         &root.join("intlify.config.jsonc"),
         r#"{
-  // Formatter options are added in Phase 3B.
+  // Formatter configuration remains valid inside JSONC.
   "fmt": {},
   /*
-   * Linter options are added in Phase 3C.
+   * Linter configuration also accepts block comments.
    */
   "lint": {},
 }"#,

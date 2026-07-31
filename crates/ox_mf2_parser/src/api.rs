@@ -8,7 +8,8 @@
 //! reuses a borrowed [`crate::ParseWorkspace`] and returns a
 //! [`ParseSessionResult`] tied to the workspace lifetime.
 //!
-//! Concrete parsing behaviour is filled in by Milestones 5, 6, 7, 8, and 9.
+//! Every entry point uses the same parser pipeline; they differ only in result
+//! ownership, workspace reuse, and single-source versus batch orchestration.
 
 use crate::diagnostic::{Diagnostic, DiagnosticView};
 use crate::error::{BatchParseError, ParseError, ParseResource};
@@ -77,28 +78,28 @@ pub struct ParseInput<'a> {
     pub base_offset: Option<u32>,
 }
 
-/// Batch execution mode. Phase 1 only implements [`BatchExecution::Sequential`];
+/// Batch execution mode. The current implementation executes sequentially;
 /// requesting any other mode returns a [`BatchParseResult`] whose
 /// [`BatchParseResult::execution`] is `Sequential` and whose
 /// [`BatchParseResult::degraded`] flag is set so callers can observe the
-/// fallback. The `Parallel` variant is reserved for a future milestone.
+/// fallback. The `Parallel` variant reserves the future parallel contract.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BatchExecution {
     #[default]
     Sequential,
-    /// Reserved for Phase 2. Today this falls back to [`Self::Sequential`]
-    /// at run time and the result is marked `degraded`.
+    /// Reserved for parallel batch execution. Today this falls back to
+    /// [`Self::Sequential`] and marks the result as `degraded`.
     Parallel,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BatchParseOptions {
     pub execution: BatchExecution,
-    /// Reserved for Phase 2 parallel execution. Currently ignored.
+    /// Maximum worker count for parallel execution. Currently ignored.
     pub max_threads: Option<usize>,
-    /// Reserved for Phase 2 parallel execution. Currently ignored — the
-    /// sequential path always preserves input order.
+    /// Requested result ordering for parallel execution. Currently ignored
+    /// because the sequential path always preserves input order.
     pub preserve_order: bool,
     pub parse: ParseOptions,
 }
@@ -118,12 +119,12 @@ impl Default for BatchParseOptions {
 pub struct BatchParseResult {
     pub sources: SourceStore,
     pub items: Vec<BatchParseItem>,
-    /// The execution mode that actually ran. Phase 1 always returns
-    /// [`BatchExecution::Sequential`] regardless of the request.
+    /// The execution mode that actually ran. The current implementation always
+    /// returns [`BatchExecution::Sequential`] regardless of the request.
     pub execution: BatchExecution,
-    /// `true` when the requested execution mode was not honoured (Phase 1
-    /// downgrades [`BatchExecution::Parallel`] to sequential). Inspect this
-    /// before relying on parallel-only assumptions.
+    /// `true` when the requested execution mode was not honoured. A
+    /// [`BatchExecution::Parallel`] request currently degrades to sequential;
+    /// inspect this before relying on parallel-only assumptions.
     pub degraded: bool,
 }
 
@@ -218,10 +219,10 @@ pub fn parse_source_session<'a>(
 
 /// Parse `inputs` sequentially and return owned results in input order.
 ///
-/// Phase 1 only supports [`BatchExecution::Sequential`]. Requesting
-/// [`BatchExecution::Parallel`] falls back to the sequential path and sets
-/// [`BatchParseResult::degraded`] so callers can detect the downgrade.
-/// `max_threads` and `preserve_order` are reserved for Phase 2 and
+/// The current implementation supports only [`BatchExecution::Sequential`].
+/// Requesting [`BatchExecution::Parallel`] falls back to the sequential path
+/// and sets [`BatchParseResult::degraded`] so callers can detect the downgrade.
+/// `max_threads` and `preserve_order` are reserved for parallel execution and
 /// currently ignored.
 pub fn parse_batch(
     inputs: &[ParseInput<'_>],

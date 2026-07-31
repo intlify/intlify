@@ -203,8 +203,8 @@ pub(crate) fn is_simple_start_char(c: char) -> bool {
     )
 }
 
-/// `escaped-char` second byte — `\\`, `{`, `|`, `}`. Used by the M7
-/// `InvalidEscape` recovery diagnostic.
+/// Return whether a byte is a valid `escaped-char` target: `\\`, `{`, `|`, or
+/// `}`.
 #[allow(dead_code)]
 #[inline]
 pub(crate) fn is_escape_target(b: u8) -> bool {

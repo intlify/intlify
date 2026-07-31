@@ -3,7 +3,7 @@
 
 //! Batch-parse contract tests.
 //!
-//! Covers the Milestone 9 acceptance criteria:
+//! Covers the batch parser contract:
 
 #![allow(clippy::field_reassign_with_default, dead_code)]
 //!
@@ -135,11 +135,11 @@ fn batch_parallel_request_falls_back_to_sequential_and_is_marked_degraded() {
     assert_eq!(
         result.execution,
         BatchExecution::Sequential,
-        "Phase 1 only implements sequential execution"
+        "the batch parser currently implements sequential execution"
     );
     assert!(
         result.degraded,
-        "Parallel request must be reported as degraded until Phase 2 lands"
+        "a parallel request must report its sequential fallback as degraded"
     );
     // Order must still be preserved even when the caller asked for parallel.
     assert_eq!(result.items[0].result.source, result.items[0].source);

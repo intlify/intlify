@@ -31,7 +31,7 @@ workspace = true
 
 [features]
 default = []
-# Reserved for Phase 1 follow-up:
+# Reserved for a future parallel batch implementation:
 # rayon = ["dep:rayon"]
 
 [dependencies]

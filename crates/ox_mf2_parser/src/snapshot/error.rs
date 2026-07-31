@@ -107,16 +107,15 @@ pub enum SnapshotWriteError {
     SectionTooLarge,
     /// Parser produced no root node — writer refuses to synthesise one.
     MissingRoot,
-    /// A record referenced a Phase 1 `SourceId` that does not exist in
-    /// the supplied `SourceStore`.
+    /// A record referenced a parser `SourceId` that does not exist in the
+    /// supplied `SourceStore`.
     InvalidSourceId,
     /// A batch item exposed `item.source != item.result.source`. The
-    /// Phase 1 `parse_batch` contract is that the two agree; a
-    /// mismatch can only come from a caller hand-crafting a
-    /// `BatchParseResult`, and encoding it would attach the
-    /// item's `source` metadata to a CST parsed against a
-    /// different source (the spans would no longer match the
-    /// `SourceRecord`'s source text or metadata).
+    /// `parse_batch` contract is that the two agree; a mismatch can only come
+    /// from a caller hand-crafting a `BatchParseResult`, and encoding it would
+    /// attach the item's `source` metadata to a CST parsed against a different
+    /// source (the spans would no longer match the `SourceRecord`'s source text
+    /// or metadata).
     InconsistentSourceId,
     /// Trivia encoding was requested for a parse result produced with
     /// `collect_trivia = false`.

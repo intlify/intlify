@@ -820,8 +820,8 @@ fn syntax_kind_is_unknown(value: u16) -> bool {
     matches!(value, 0) || syntax_kind_from_u16(value).is_none()
 }
 
-/// Wire-value → [`SyntaxKind`] mapping. Returns `None` for any value
-/// not currently emitted by the Phase 1 parser.
+/// Wire-value → [`SyntaxKind`] mapping. Returns `None` for any value not
+/// currently emitted by the parser.
 pub(crate) fn syntax_kind_from_u16(value: u16) -> Option<SyntaxKind> {
     Some(match value {
         v if v == SyntaxKind::Root.as_u16() => SyntaxKind::Root,
@@ -887,8 +887,8 @@ fn diagnostic_code_is_unknown(value: u16) -> bool {
     diagnostic_code_from_u16_strict(value).is_none()
 }
 
-/// Strict variant of the Phase 1 diagnostic-code lookup: returns `None`
-/// for values that have not been assigned to a known v0.1 diagnostic.
+/// Strict parser diagnostic-code lookup: returns `None` for values that have
+/// not been assigned to a known v0.1 diagnostic.
 pub(crate) fn diagnostic_code_from_u16_strict(value: u16) -> Option<DiagnosticCode> {
     Some(match value {
         v if v == DiagnosticCode::Unspecified.as_u16() => DiagnosticCode::Unspecified,

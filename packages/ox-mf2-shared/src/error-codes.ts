@@ -72,7 +72,7 @@ export const OxMf2ErrorCode = {
   SourceTextSpanOutOfBounds: 3001,
   SourceTextTooLarge: 3002,
   SourceTextCountMismatch: 3003,
-  // Reserved; Phase 2 input validation throws TypeError instead.
+  // Reserved; binding input validation throws TypeError instead.
   SourceTextUnpairedSurrogate: 3004,
 
   // Parse (4000..4999)
