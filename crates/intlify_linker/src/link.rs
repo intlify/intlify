@@ -20,7 +20,7 @@ use intlify_contract::{
 
 #[cfg(feature = "benchmark")]
 use crate::benchmark::{BenchmarkLinkExecution, BenchmarkLinkStage, BenchmarkLinkStageMeasurement};
-use crate::model::{BaselineDefinitionSnapshot, TypedKeyModelSnapshotRelation};
+use crate::model::{BaselineDefinitionSnapshot, TypedKeyModelBatch, TypedKeyModelSnapshotRelation};
 use crate::{
     AmbiguousMessageDefinitionFinding, CompletenessContributor, CompletenessSide,
     DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, InvalidRequestError,
@@ -84,6 +84,13 @@ struct DefinitionAnalysis {
     unique_definitions: UniqueDefinitions,
 }
 
+struct CoverageBaselineSelection<'a> {
+    scope: ResolvedCatalogScopeId,
+    baseline_locale: Locale,
+    baseline_definitions: BTreeMap<CatalogKey, &'a DefinitionSnapshot>,
+    production_union: BTreeMap<CatalogKey, Locale>,
+}
+
 struct AmbiguityFact {
     identity: DefinitionIdentity,
     definitions: Vec<DefinitionLocation>,
@@ -143,6 +150,14 @@ trait LinkObserver {
     fn finish_semantic_index(&mut self, _index: &SemanticIndex, _definitions: &DefinitionAnalysis) {
     }
 
+    fn finish_coverage_baseline_selection(
+        &mut self,
+        _selections: &[CoverageBaselineSelection<'_>],
+    ) {
+    }
+
+    fn finish_typed_key_model_construction(&mut self, _models: &TypedKeyModelBatch) {}
+
     fn finish_selector_resolution(&mut self, _resolutions: &[ReferenceResolution]) {}
 
     fn finish_reachability(&mut self, _reachability: &Reachability) {}
@@ -157,6 +172,8 @@ impl LinkObserver for NoopLinkObserver {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LinkStage {
     SemanticIndexConstruction,
+    CoverageBaselineSelection,
+    TypedKeyModelConstruction,
     SelectorExpansionAndReferenceResolution,
     ReachabilityAndPlacement,
     FindingAndPlanMaterialization,
@@ -174,8 +191,14 @@ where
     let definitions = analyze_definitions(&index);
     observer.finish_semantic_index(&index, &definitions);
 
-    let (typed_key_models, typed_key_model_snapshots) =
-        build_typed_key_models(request, &definitions)?;
+    observer.begin(LinkStage::CoverageBaselineSelection);
+    let coverage_baseline_selections = select_coverage_baselines(request, &definitions)?;
+    observer.finish_coverage_baseline_selection(&coverage_baseline_selections);
+
+    observer.begin(LinkStage::TypedKeyModelConstruction);
+    let typed_key_models =
+        construct_typed_key_models(coverage_baseline_selections, request.resolved_policy())?;
+    observer.finish_typed_key_model_construction(&typed_key_models);
 
     observer.begin(LinkStage::SelectorExpansionAndReferenceResolution);
     let mut pattern_budget = PatternWorkBudget::new(request);
@@ -207,13 +230,7 @@ where
         )?)
     };
 
-    let outcome = LinkOutcome::try_new(
-        findings,
-        bundle_plans,
-        typed_key_models,
-        typed_key_model_snapshots,
-        request.resolved_policy(),
-    )?;
+    let outcome = LinkOutcome::try_new(findings, bundle_plans, typed_key_models)?;
     observer.finish_outcome(&outcome);
     Ok(outcome)
 }
@@ -246,8 +263,8 @@ impl BenchmarkLinkObserver {
     fn new() -> Self {
         Self {
             active: None,
-            stages: Vec::with_capacity(4),
-            observed: Vec::with_capacity(4),
+            stages: Vec::with_capacity(6),
+            observed: Vec::with_capacity(6),
             observation_overhead: Duration::ZERO,
             invariant_failed: false,
         }
@@ -302,7 +319,7 @@ impl BenchmarkLinkObserver {
     ) -> Result<(Vec<BenchmarkLinkStageMeasurement>, Duration), LinkOperationalError> {
         if self.invariant_failed
             || self.active.is_some()
-            || self.stages.len() != 4
+            || self.stages.len() != 6
             || self.observed.len() != self.stages.len()
             || self.observed.iter().any(|observed| !observed)
             || self
@@ -311,6 +328,8 @@ impl BenchmarkLinkObserver {
                 .map(BenchmarkLinkStageMeasurement::stage)
                 .ne([
                     BenchmarkLinkStage::SemanticIndexConstruction,
+                    BenchmarkLinkStage::CoverageBaselineSelection,
+                    BenchmarkLinkStage::TypedKeyModelConstruction,
                     BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
                     BenchmarkLinkStage::ReachabilityAndPlacement,
                     BenchmarkLinkStage::FindingAndPlanMaterialization,
@@ -335,6 +354,18 @@ impl LinkObserver for BenchmarkLinkObserver {
         self.observe_with(measurement, || checksum_semantic_index(index, definitions));
     }
 
+    fn finish_coverage_baseline_selection(&mut self, selections: &[CoverageBaselineSelection<'_>]) {
+        let measurement = self.complete(LinkStage::CoverageBaselineSelection);
+        self.observe_with(measurement, || {
+            checksum_coverage_baseline_selections(selections)
+        });
+    }
+
+    fn finish_typed_key_model_construction(&mut self, models: &TypedKeyModelBatch) {
+        let measurement = self.complete(LinkStage::TypedKeyModelConstruction);
+        self.observe_with(measurement, || checksum_typed_key_models(models));
+    }
+
     fn finish_selector_resolution(&mut self, resolutions: &[ReferenceResolution]) {
         let measurement = self.complete(LinkStage::SelectorExpansionAndReferenceResolution);
         self.observe_with(measurement, || checksum_resolutions(resolutions));
@@ -355,6 +386,8 @@ impl LinkObserver for BenchmarkLinkObserver {
 const fn benchmark_stage(stage: LinkStage) -> BenchmarkLinkStage {
     match stage {
         LinkStage::SemanticIndexConstruction => BenchmarkLinkStage::SemanticIndexConstruction,
+        LinkStage::CoverageBaselineSelection => BenchmarkLinkStage::CoverageBaselineSelection,
+        LinkStage::TypedKeyModelConstruction => BenchmarkLinkStage::TypedKeyModelConstruction,
         LinkStage::SelectorExpansionAndReferenceResolution => {
             BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
         }
@@ -390,6 +423,51 @@ fn checksum_semantic_index(index: &SemanticIndex, definitions: &DefinitionAnalys
     }
     checksum.write_u64(0x0b, definitions.ambiguities.len() as u64);
     checksum.write_u64(0x0c, definitions.unique_definitions.len() as u64);
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_coverage_baseline_selections(selections: &[CoverageBaselineSelection<'_>]) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-coverage-baseline-selection-v1");
+    checksum.write_u64(0x01, selections.len() as u64);
+    for selection in selections {
+        checksum.write_resolved_scope(0x02, &selection.scope);
+        checksum.write_str(0x03, selection.baseline_locale.as_str());
+        checksum.write_u64(0x04, selection.production_union.len() as u64);
+        for (key, locale) in &selection.production_union {
+            checksum.write_catalog_key(0x05, key);
+            checksum.write_str(0x06, locale.as_str());
+        }
+        checksum.write_u64(0x07, selection.baseline_definitions.len() as u64);
+        for (key, snapshot) in &selection.baseline_definitions {
+            checksum.write_catalog_key(0x08, key);
+            checksum.write_selected_definition_identity(0x09, snapshot);
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_typed_key_models(batch: &TypedKeyModelBatch) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-typed-key-model-construction-v1");
+    checksum.write_u64(0x01, batch.models().len() as u64);
+    for (model, relation) in batch.models().iter().zip(batch.relations()) {
+        checksum.write_resolved_scope(0x02, model.resolved_scope());
+        checksum.write_u64(0x03, model.keys().len() as u64);
+        for key in model.keys() {
+            checksum.write_catalog_key(0x04, key);
+        }
+        checksum.write_resolved_scope(0x05, relation.resolved_scope());
+        checksum.write_str(0x06, relation.baseline_locale().as_str());
+        checksum.write_u64(0x07, relation.snapshots().len() as u64);
+        for snapshot in relation.snapshots() {
+            checksum.write_resolved_scope(0x08, snapshot.resolved_scope());
+            checksum.write_catalog_key(0x09, snapshot.key());
+            checksum.write_str(0x0a, snapshot.locale().as_str());
+            checksum.write_str(0x0b, snapshot.message().as_str());
+            checksum.write_definition_location(0x0c, snapshot.location());
+        }
+    }
     checksum.finish()
 }
 
@@ -532,6 +610,14 @@ impl BenchmarkChecksum {
         self.write_field(tag, &nested.finish().to_be_bytes());
     }
 
+    fn write_selected_definition_identity(&mut self, tag: u8, value: &DefinitionSnapshot) {
+        let mut nested = Self::new(b"selected-definition-identity");
+        nested.write_logical_identity(0x01, &value.logical);
+        nested.write_str(0x02, value.locale.as_str());
+        nested.write_definition_location(0x03, &value.location);
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
     fn write_definition_snapshot(&mut self, tag: u8, value: &DefinitionSnapshot) {
         let mut nested = Self::new(b"definition-snapshot");
         nested.write_logical_identity(0x01, &value.logical);
@@ -569,6 +655,13 @@ impl BenchmarkChecksum {
 
     fn write_resolved_scope(&mut self, tag: u8, value: &ResolvedCatalogScopeId) {
         self.write_scope(tag, value.as_catalog_scope());
+    }
+
+    fn write_catalog_key(&mut self, tag: u8, value: &CatalogKey) {
+        let mut nested = Self::new(b"catalog-key");
+        nested.write_str(0x01, value.domain().as_str());
+        nested.write_str(0x02, value.as_str());
+        self.write_field(tag, &nested.finish().to_be_bytes());
     }
 
     fn write_scope(&mut self, tag: u8, value: &intlify_contract::CatalogScopeId) {
@@ -729,13 +822,11 @@ fn analyze_definitions(index: &SemanticIndex) -> DefinitionAnalysis {
     }
 }
 
-fn build_typed_key_models(
+fn select_coverage_baselines<'a>(
     request: &LinkRequest<'_>,
-    definitions: &DefinitionAnalysis,
-) -> Result<(Vec<TypedKeyModel>, Vec<TypedKeyModelSnapshotRelation>), LinkOperationalError> {
-    let mut models = Vec::with_capacity(request.resolved_policy().coverage_baselines().len());
-    let mut relations = Vec::with_capacity(models.capacity());
-
+    definitions: &'a DefinitionAnalysis,
+) -> Result<Vec<CoverageBaselineSelection<'a>>, LinkOperationalError> {
+    let mut selections = Vec::with_capacity(request.resolved_policy().coverage_baselines().len());
     for coverage_baseline in request.resolved_policy().coverage_baselines() {
         let scope = coverage_baseline.scope();
         let completeness = request
@@ -779,11 +870,37 @@ fn build_typed_key_models(
             }
         }
 
+        selections.push(CoverageBaselineSelection {
+            scope: scope.clone(),
+            baseline_locale: coverage_baseline.locale().clone(),
+            baseline_definitions,
+            production_union,
+        });
+    }
+
+    Ok(selections)
+}
+
+fn construct_typed_key_models(
+    selections: Vec<CoverageBaselineSelection<'_>>,
+    resolved_policy: &crate::ResolvedLinkPolicy,
+) -> Result<TypedKeyModelBatch, LinkOperationalError> {
+    let mut models = Vec::with_capacity(selections.len());
+    let mut relations = Vec::with_capacity(selections.len());
+
+    for selection in selections {
+        let CoverageBaselineSelection {
+            scope,
+            baseline_locale,
+            baseline_definitions,
+            production_union,
+        } = selection;
+
         for (key, defined_locale) in production_union {
             if !baseline_definitions.contains_key(&key) {
                 return Err(InvalidRequestError::CoverageBaselineMissingKey {
                     scope: scope.clone(),
-                    baseline: coverage_baseline.locale().clone(),
+                    baseline: baseline_locale.clone(),
                     domain: key.domain(),
                     key,
                     defined_locale,
@@ -799,20 +916,20 @@ fn build_typed_key_models(
             snapshots.push(BaselineDefinitionSnapshot::new(
                 scope.clone(),
                 key,
-                coverage_baseline.locale().clone(),
+                baseline_locale.clone(),
                 snapshot.message.clone(),
                 snapshot.location.clone(),
             ));
         }
         models.push(TypedKeyModel::new(scope.clone(), keys));
         relations.push(TypedKeyModelSnapshotRelation::new(
-            scope.clone(),
-            coverage_baseline.locale().clone(),
+            scope,
+            baseline_locale,
             snapshots,
         ));
     }
 
-    Ok((models, relations))
+    TypedKeyModelBatch::try_new(models, relations, resolved_policy)
 }
 
 fn resolve_references(

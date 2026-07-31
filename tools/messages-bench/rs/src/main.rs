@@ -26,9 +26,10 @@ use intlify_contract::{
     ReferenceArtifactSegment, SourceDocumentIdentity,
 };
 use intlify_linker::{
-    link, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkPolicy, LinkRequest,
-    PlacementPolicy, ScopeCompleteness, ScopeCompletenessTable, ScopeMappingTable,
+    link, CoverageBaseline, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkPolicy,
+    LinkRequest, PlacementPolicy, ScopeCompleteness, ScopeCompletenessTable, ScopeMappingTable,
 };
+use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_producer_js::benchmark::{
     benchmark_produce_reference_artifacts_with_cache, BenchmarkJsStage,
 };
@@ -80,6 +81,7 @@ fn run() -> Result<(), String> {
         &selection,
         options.warmup_iterations,
     )?);
+    results.extend(measure_typed_key_models(&selection, &options)?);
 
     let output = CoreOutput { results };
     println!(
@@ -162,6 +164,7 @@ impl FixtureSelection {
             FixtureShape::DefinitionDenseSparseReference,
             FixtureShape::BoundedSelector,
             FixtureShape::FindingDense,
+            FixtureShape::TypedKeyModel,
         ];
         for shape in expected {
             let profile = self
@@ -222,6 +225,7 @@ enum FixtureShape {
     DefinitionDenseSparseReference,
     BoundedSelector,
     FindingDense,
+    TypedKeyModel,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1040,7 +1044,11 @@ fn measure_link_peak_memory(
     warmup_iterations: u64,
 ) -> Result<Vec<Measurement>, String> {
     let mut results = Vec::new();
-    for profile in &selection.profiles {
+    for profile in selection
+        .profiles
+        .iter()
+        .filter(|profile| profile.shape != FixtureShape::TypedKeyModel)
+    {
         for &scale in &profile.scales {
             let fixture = GeneratedLinkFixture::new(profile.shape, scale)?;
             for _ in 0..warmup_iterations {
@@ -1071,6 +1079,221 @@ fn measure_link_peak_memory(
     Ok(results)
 }
 
+fn measure_typed_key_models(
+    selection: &FixtureSelection,
+    options: &Options,
+) -> Result<Vec<Measurement>, String> {
+    let profile = selection
+        .profiles
+        .iter()
+        .find(|profile| profile.shape == FixtureShape::TypedKeyModel)
+        .ok_or("typed-key-model profile is missing")?;
+    let mut results = Vec::with_capacity(profile.scales.len().saturating_mul(2));
+
+    for &scale in &profile.scales {
+        let fixture = TypedKeyModelFixture::new(scale)?;
+        for _ in 0..options.warmup_iterations {
+            black_box(benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?);
+        }
+
+        let mut aggregates = BTreeMap::<MessageBenchmarkStage, TypedKeyModelStageAggregate>::new();
+        for _ in 0..options.iterations {
+            let execution = benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?;
+            let stages = execution
+                .stages()
+                .iter()
+                .filter_map(|measurement| {
+                    typed_key_model_message_stage(measurement.stage())
+                        .map(|stage| (stage, measurement))
+                })
+                .collect::<Vec<_>>();
+            if stages
+                .iter()
+                .map(|(stage, _)| *stage)
+                .ne([
+                    MessageBenchmarkStage::CoverageBaselineSelection,
+                    MessageBenchmarkStage::TypedKeyModelConstruction,
+                ])
+            {
+                return Err("typed-key model benchmark stages are incomplete or reordered".to_owned());
+            }
+            let models = execution.outcome().typed_key_models();
+            if models.len() != 1 || models[0].keys().len() != scale {
+                return Err("typed-key model benchmark produced an unexpected model".to_owned());
+            }
+
+            for (stage, measurement) in stages {
+                let checksum = checksum_observation_sequence(
+                    stage.cost(),
+                    std::iter::once(("link-request", measurement.checksum())),
+                );
+                let aggregate = aggregates.entry(stage).or_default();
+                if aggregate
+                    .per_iteration_checksum
+                    .replace(checksum)
+                    .is_some_and(|expected| expected != checksum)
+                {
+                    return Err(format!(
+                        "{}/{} changed across repetitions",
+                        stage.phase(),
+                        stage.cost()
+                    ));
+                }
+                aggregate.elapsed = aggregate.elapsed.saturating_add(measurement.elapsed());
+                aggregate.repeated_checksum = aggregate.repeated_checksum.wrapping_add(checksum);
+            }
+            black_box(execution);
+        }
+
+        if aggregates.len() != 2 {
+            return Err("typed-key model benchmark did not retain both costs".to_owned());
+        }
+        for (stage, aggregate) in aggregates {
+            results.push(duration_record(DurationRecord {
+                stage,
+                fixture: &profile.name,
+                fixture_revision: profile.revision,
+                variant: "typed_key_model",
+                scale,
+                operation: stage.boundary_id(),
+                input_count: fixture.input_count(),
+                output_count: fixture.output_count(),
+                physical_group_count: None,
+                host_byte_count: None,
+                entry_count: None,
+                iterations: options.iterations,
+                elapsed: aggregate.elapsed,
+                checksum: aggregate.repeated_checksum,
+            }));
+        }
+    }
+    Ok(results)
+}
+
+#[derive(Debug, Default)]
+struct TypedKeyModelStageAggregate {
+    elapsed: Duration,
+    per_iteration_checksum: Option<u32>,
+    repeated_checksum: u32,
+}
+
+const fn typed_key_model_message_stage(
+    stage: BenchmarkLinkStage,
+) -> Option<MessageBenchmarkStage> {
+    match stage {
+        BenchmarkLinkStage::CoverageBaselineSelection => {
+            Some(MessageBenchmarkStage::CoverageBaselineSelection)
+        }
+        BenchmarkLinkStage::TypedKeyModelConstruction => {
+            Some(MessageBenchmarkStage::TypedKeyModelConstruction)
+        }
+        BenchmarkLinkStage::SemanticIndexConstruction
+        | BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
+        | BenchmarkLinkStage::ReachabilityAndPlacement
+        | BenchmarkLinkStage::FindingAndPlanMaterialization => None,
+    }
+}
+
+struct TypedKeyModelFixture {
+    references: Vec<MessageReferenceArtifact>,
+    definitions: Vec<MessageDefinitionArtifact>,
+    policy: LinkPolicy,
+    mappings: ScopeMappingTable,
+    completeness: ScopeCompletenessTable,
+    graph: DeliveryUnitGraph,
+    limits: LinkLimits,
+    scale: usize,
+}
+
+impl TypedKeyModelFixture {
+    fn new(scale: usize) -> Result<Self, String> {
+        let scope = app_scope();
+        let limits = LinkLimits::default();
+        let baseline_locale = Locale::try_new("en").map_err(|error| error.to_string())?;
+        let secondary_locale = Locale::try_new("ja").map_err(|error| error.to_string())?;
+        let baseline_definitions = (0..scale)
+            .map(|index| {
+                let key = definition_key(FixtureShape::TypedKeyModel, index);
+                definition_for_locale(
+                    scope.clone(),
+                    &key,
+                    baseline_locale.clone(),
+                    format!("Baseline {index}"),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let secondary_definitions = (0..scale)
+            .map(|index| {
+                let key = definition_key(FixtureShape::TypedKeyModel, index);
+                definition_for_locale(
+                    scope.clone(),
+                    &key,
+                    secondary_locale.clone(),
+                    format!("Secondary {index}"),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let definitions = vec![
+            definition_artifact_at("typed-en.json", baseline_definitions, &limits)?,
+            definition_artifact_at("typed-ja.json", secondary_definitions, &limits)?,
+        ];
+        let policy = LinkPolicy::try_new(
+            vec![secondary_locale, baseline_locale.clone()],
+            Vec::new(),
+            vec![CoverageBaseline::new(scope.clone(), baseline_locale)],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &limits,
+        )
+        .map_err(|error| error.to_string())?;
+        let mappings = ScopeMappingTable::empty(std::slice::from_ref(&scope), &limits)
+            .map_err(|error| error.to_string())?;
+        let completeness = ScopeCompletenessTable::try_new(
+            std::slice::from_ref(&scope),
+            vec![ScopeCompleteness::try_new(
+                scope.clone(),
+                InputCompleteness::Closed,
+                InputCompleteness::Closed,
+            )
+            .map_err(|error| error.to_string())?],
+            &limits,
+        )
+        .map_err(|error| error.to_string())?;
+        let graph = DeliveryUnitGraph::single_main(&limits).map_err(|error| error.to_string())?;
+        Ok(Self {
+            references: Vec::new(),
+            definitions,
+            policy,
+            mappings,
+            completeness,
+            graph,
+            limits,
+            scale,
+        })
+    }
+
+    fn request(&self) -> Result<LinkRequest<'_>, String> {
+        LinkRequest::try_new(
+            &self.references,
+            &self.definitions,
+            &self.policy,
+            &self.mappings,
+            &self.completeness,
+            &self.graph,
+            &self.limits,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    fn input_count(&self) -> u64 {
+        u64::try_from(self.scale.saturating_mul(2)).expect("supported fixture scale fits u64")
+    }
+
+    fn output_count(&self) -> u64 {
+        u64::try_from(self.scale).expect("supported fixture scale fits u64")
+    }
+}
+
 struct GeneratedLinkFixture {
     references: Vec<MessageReferenceArtifact>,
     definitions: Vec<MessageDefinitionArtifact>,
@@ -1086,6 +1309,9 @@ impl GeneratedLinkFixture {
         let scope = app_scope();
         let definitions = match shape {
             FixtureShape::FindingDense => Vec::new(),
+            FixtureShape::TypedKeyModel => {
+                return Err("typed-key model fixtures use their dedicated generator".to_owned());
+            }
             _ => (0..scale)
                 .map(|index| definition(scope.clone(), &definition_key(shape, index), index))
                 .collect::<Result<Vec<_>, _>>()?,
@@ -1118,6 +1344,9 @@ impl GeneratedLinkFixture {
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
+            FixtureShape::TypedKeyModel => {
+                return Err("typed-key model fixtures use their dedicated generator".to_owned());
+            }
         };
         let limits = LinkLimits::default();
         let definition_artifacts = vec![definition_artifact(definitions, &limits)?];
@@ -1189,6 +1418,7 @@ type ProjectMeasurementOutput = (
 fn definition_key(shape: FixtureShape, index: usize) -> String {
     match shape {
         FixtureShape::BoundedSelector => format!("/group/{index:08}"),
+        FixtureShape::TypedKeyModel => format!("/typed/{index:08}"),
         _ => format!("/key/{index:08}"),
     }
 }
@@ -1209,12 +1439,26 @@ fn definition(
     key_value: &str,
     index: usize,
 ) -> Result<MessageDefinition, String> {
+    definition_for_locale(
+        scope,
+        key_value,
+        Locale::try_new("en").map_err(|error| error.to_string())?,
+        format!("Message {index}"),
+    )
+}
+
+fn definition_for_locale(
+    scope: CatalogScopeId,
+    key_value: &str,
+    locale: Locale,
+    message: String,
+) -> Result<MessageDefinition, String> {
     MessageDefinition::try_new(
         scope,
         DOMAIN,
         catalog_key(key_value)?,
-        Locale::try_new("en").map_err(|error| error.to_string())?,
-        MessagePayload::try_new(format!("Message {index}")).map_err(|error| error.to_string())?,
+        locale,
+        MessagePayload::try_new(message).map_err(|error| error.to_string())?,
         EntryReference::new(
             EntryStructuralPath::try_new(key_value).map_err(|error| error.to_string())?,
             0,
@@ -1239,10 +1483,18 @@ fn definition_artifact(
     definitions: Vec<MessageDefinition>,
     limits: &LinkLimits,
 ) -> Result<MessageDefinitionArtifact, String> {
+    definition_artifact_at("definitions.json", definitions, limits)
+}
+
+fn definition_artifact_at(
+    file_name: &str,
+    definitions: Vec<MessageDefinition>,
+    limits: &LinkLimits,
+) -> Result<MessageDefinitionArtifact, String> {
     MessageDefinitionArtifact::try_new(
         ArtifactVersion::DRAFT_V0_1,
         producer_identity(),
-        source_identity(&["generated", "definitions.json"]),
+        source_identity(&["generated", file_name]),
         Vec::new(),
         InputFingerprint::new(
             FingerprintAlgorithm::Blake3_256,
@@ -1384,6 +1636,7 @@ const fn fixture_variant(shape: FixtureShape) -> &'static str {
         FixtureShape::DefinitionDenseSparseReference => "definition_dense_sparse_reference",
         FixtureShape::BoundedSelector => "bounded_selector",
         FixtureShape::FindingDense => "finding_dense",
+        FixtureShape::TypedKeyModel => "typed_key_model",
     }
 }
 

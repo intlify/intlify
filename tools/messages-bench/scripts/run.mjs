@@ -10,7 +10,10 @@ import {
   MESSAGE_BENCHMARK_REQUIRED_CASES,
   benchmarkCaseKey
 } from '../benchmark-profile.mjs'
-import { assertValidMessageBenchmarkResult } from '../result-schema.mjs'
+import {
+  MESSAGE_BENCH_RESULT_SCHEMA_VERSION,
+  assertValidMessageBenchmarkResult
+} from '../result-schema.mjs'
 
 const packageRoot = resolve(import.meta.dirname, '..')
 const repoRoot = resolve(packageRoot, '../..')
@@ -79,7 +82,7 @@ core.results.sort(
 const packageVersion = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf8')).version
 const fixtures = JSON.parse(await readFile(fixtureSelectionPath, 'utf8'))
 const result = {
-  schemaVersion: '0',
+  schemaVersion: MESSAGE_BENCH_RESULT_SCHEMA_VERSION,
   benchmarkProfileRevision: MESSAGE_BENCHMARK_PROFILE_REVISION,
   tool: 'intlify-messages-bench',
   version: packageVersion,

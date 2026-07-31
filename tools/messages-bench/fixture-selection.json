@@ -1,5 +1,5 @@
 {
-  "revision": 1,
+  "revision": 2,
   "profiles": [
     {
       "name": "exact-reference-dense",
@@ -43,6 +43,17 @@
         "id": "finding_dense"
       },
       "variants": ["finding_dense"],
+      "scales": [16, 64, 256]
+    },
+    {
+      "name": "typed-key-model",
+      "revision": 1,
+      "shape": "typed_key_model",
+      "generator": {
+        "kind": "rust",
+        "id": "typed_key_model"
+      },
+      "variants": ["typed_key_model"],
       "scales": [16, 64, 256]
     }
   ],

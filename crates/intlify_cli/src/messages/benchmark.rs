@@ -306,6 +306,8 @@ impl BenchmarkRecorder {
                     | MessageBenchmarkStage::ReferenceArtifactDecode
                     | MessageBenchmarkStage::RequestValidationAndScopeMapping
                     | MessageBenchmarkStage::SemanticIndexConstruction
+                    | MessageBenchmarkStage::CoverageBaselineSelection
+                    | MessageBenchmarkStage::TypedKeyModelConstruction
                     | MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
                     | MessageBenchmarkStage::ReachabilityAndPlacement
                     | MessageBenchmarkStage::FindingAndPlanMaterialization

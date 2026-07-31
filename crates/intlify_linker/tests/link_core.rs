@@ -255,7 +255,12 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
         "en.json",
         vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
     )];
-    let policy = policy(&["en"], Vec::new(), DynamicReferenceMode::Compat);
+    let policy = policy_with_baselines(
+        &["en"],
+        Vec::new(),
+        vec![CoverageBaseline::new(app.clone(), locale("en"))],
+        DynamicReferenceMode::Compat,
+    );
     let completeness = closed_completeness(std::slice::from_ref(&app));
     let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
     let limits = LinkLimits::default();
@@ -285,6 +290,8 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
             .collect::<Vec<_>>(),
         [
             BenchmarkLinkStage::SemanticIndexConstruction,
+            BenchmarkLinkStage::CoverageBaselineSelection,
+            BenchmarkLinkStage::TypedKeyModelConstruction,
             BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
             BenchmarkLinkStage::ReachabilityAndPlacement,
             BenchmarkLinkStage::FindingAndPlanMaterialization,
@@ -305,6 +312,63 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
             .map(|stage| (stage.stage(), stage.checksum()))
             .collect::<Vec<_>>()
     );
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn typed_key_benchmark_checksums_observe_each_stage_contract() {
+    let app = scope("app");
+    let policy = policy_with_baselines(
+        &["en"],
+        Vec::new(),
+        vec![CoverageBaseline::new(app.clone(), locale("en"))],
+        DynamicReferenceMode::Compat,
+    );
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let mapping = mappings(std::slice::from_ref(&app), Vec::new());
+
+    let checksums = |source: &str, message: &str| {
+        let definitions = vec![definition_artifact(
+            source,
+            vec![definition(app.clone(), "/hello", "en", message, 0)],
+        )];
+        let request = LinkRequest::try_new(
+            &[],
+            &definitions,
+            &policy,
+            &mapping,
+            &completeness,
+            &graph,
+            &limits,
+        )
+        .unwrap();
+        let execution = benchmark_link(&request).unwrap();
+        let checksum = |stage| {
+            execution
+                .stages()
+                .iter()
+                .find(|measurement| measurement.stage() == stage)
+                .unwrap()
+                .checksum()
+        };
+        [
+            checksum(BenchmarkLinkStage::CoverageBaselineSelection),
+            checksum(BenchmarkLinkStage::TypedKeyModelConstruction),
+        ]
+    };
+
+    let baseline = checksums("en.json", "Hello");
+    let payload_changed = checksums("en.json", "Changed");
+    let location_changed = checksums("moved.json", "Hello");
+
+    // Selection records the selected definition identity, not its payload.
+    assert_eq!(baseline[0], payload_changed[0]);
+    assert_ne!(baseline[0], location_changed[0]);
+    // Construction records the exact private payload and source relation.
+    assert_ne!(baseline[1], payload_changed[1]);
+    assert_ne!(baseline[1], location_changed[1]);
 }
 
 #[test]

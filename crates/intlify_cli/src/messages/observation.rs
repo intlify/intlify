@@ -33,6 +33,8 @@ pub enum MessageBenchmarkStage {
     DefinitionProjection,
     RequestValidationAndScopeMapping,
     SemanticIndexConstruction,
+    CoverageBaselineSelection,
+    TypedKeyModelConstruction,
     SelectorExpansionAndReferenceResolution,
     ReachabilityAndPlacement,
     FindingAndPlanMaterialization,
@@ -70,6 +72,9 @@ impl MessageBenchmarkStage {
             | Self::SelectorExpansionAndReferenceResolution
             | Self::ReachabilityAndPlacement
             | Self::FindingAndPlanMaterialization => "message_link_core",
+            Self::CoverageBaselineSelection | Self::TypedKeyModelConstruction => {
+                "message_typed_key_model"
+            }
             Self::LinkCorePeakLiveMemory => "message_link_peak_memory",
             Self::ProjectLinkE2e => "message_project_link_e2e",
         }
@@ -98,6 +103,8 @@ impl MessageBenchmarkStage {
             Self::DefinitionProjection => "definition_projection",
             Self::RequestValidationAndScopeMapping => "request_validation_and_scope_mapping",
             Self::SemanticIndexConstruction => "semantic_index_construction",
+            Self::CoverageBaselineSelection => "coverage_baseline_selection",
+            Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => {
                 "selector_expansion_and_reference_resolution"
             }
@@ -132,6 +139,8 @@ impl MessageBenchmarkStage {
             Self::DefinitionProjection => "definition_projection",
             Self::RequestValidationAndScopeMapping => "link_request_validation_scope_mapping",
             Self::SemanticIndexConstruction => "link_semantic_index_construction",
+            Self::CoverageBaselineSelection => "coverage_baseline_selection",
+            Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => "link_selector_resolution",
             Self::ReachabilityAndPlacement => "link_reachability_placement",
             Self::FindingAndPlanMaterialization => "link_finding_plan_materialization",

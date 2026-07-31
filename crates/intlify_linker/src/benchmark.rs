@@ -17,6 +17,10 @@ use crate::{LinkOperationalError, LinkOutcome, LinkRequest};
 pub enum BenchmarkLinkStage {
     /// Canonical definition, candidate, and reference index construction.
     SemanticIndexConstruction,
+    /// Canonical baseline and production-union selection facts.
+    CoverageBaselineSelection,
+    /// Checked public models and their private source relation.
+    TypedKeyModelConstruction,
     /// Selector expansion and locale-independent reference resolution.
     SelectorExpansionAndReferenceResolution,
     /// Root reachability and duplicate placement.
@@ -31,6 +35,8 @@ impl BenchmarkLinkStage {
     pub const fn cost(self) -> &'static str {
         match self {
             Self::SemanticIndexConstruction => "semantic_index_construction",
+            Self::CoverageBaselineSelection => "coverage_baseline_selection",
+            Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => {
                 "selector_expansion_and_reference_resolution"
             }
@@ -44,6 +50,8 @@ impl BenchmarkLinkStage {
     pub const fn boundary_id(self) -> &'static str {
         match self {
             Self::SemanticIndexConstruction => "link_semantic_index_construction",
+            Self::CoverageBaselineSelection => "coverage_baseline_selection",
+            Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => "link_selector_resolution",
             Self::ReachabilityAndPlacement => "link_reachability_placement",
             Self::FindingAndPlanMaterialization => "link_finding_plan_materialization",
@@ -114,7 +122,7 @@ impl BenchmarkLinkExecution {
         &self.outcome
     }
 
-    /// Return the four semantic stages in their exact execution order.
+    /// Return the semantic stages in their exact execution order.
     #[must_use]
     pub const fn stages(&self) -> &[BenchmarkLinkStageMeasurement] {
         &self.stages
