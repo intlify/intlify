@@ -297,7 +297,7 @@ fn request_observation(request: &LinkRequest<'_>) -> Result<Vec<Vec<u8>>, Artifa
     }
     if !request.policy().coverage_baselines().is_empty() {
         // Preserve the established baseline-absent observation byte-for-byte,
-        // while framing the additive semantic policy when M1 is selected.
+        // while framing the additive policy whenever coverage baselines are selected.
         fields.push(b"coverage-baselines".to_vec());
         fields.push(count_bytes(request.policy().coverage_baselines().len()));
         for baseline in request.policy().coverage_baselines() {
