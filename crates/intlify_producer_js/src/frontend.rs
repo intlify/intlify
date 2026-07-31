@@ -273,15 +273,21 @@ where
     if cancelled() {
         return Err(JsProducerError::Cancelled);
     }
-    if parsed.panicked && parsed.errors.is_empty() {
+    if parsed.panicked && parsed.diagnostics.is_empty() {
         return Err(JsProducerError::InternalInvariant);
     }
-    if !parsed.errors.is_empty() {
+    if !parsed.diagnostics.is_empty() {
         let span = parsed
-            .errors
+            .diagnostics
             .iter()
-            .flat_map(|diagnostic| diagnostic.labels.iter().flatten())
-            .filter_map(|label| safe_diagnostic_span(source_text, label.offset(), label.len()))
+            .flat_map(|diagnostic| diagnostic.labels.iter())
+            .filter_map(|label| {
+                safe_diagnostic_span(
+                    source_text,
+                    usize::try_from(label.offset()).ok()?,
+                    usize::try_from(label.len()).ok()?,
+                )
+            })
             .min();
         observer.finish(FrontendStage::SourceParse);
         if observer.enabled() {

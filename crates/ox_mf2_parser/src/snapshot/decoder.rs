@@ -143,7 +143,7 @@ pub(crate) fn validate_and_build_index(bytes: &[u8]) -> Result<SectionIndex, Dec
         }
 
         // Alignment.
-        if (offset % SECTION_ALIGNMENT) != 0 {
+        if !offset.is_multiple_of(SECTION_ALIGNMENT) {
             return Err(DecodeError::new(DecodeErrorCode::InvalidSectionAlignment)
                 .with_section(kind)
                 .with_offset(offset));
