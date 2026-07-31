@@ -22,7 +22,7 @@ intlify_contract = { path = "../intlify_contract" }
 oxc_allocator = "=0.75.0"
 oxc_ast = "=0.75.0"
 oxc_ast_visit = "=0.75.0"
-oxc_parser = { version = "=0.75.0", default-features = false }
+oxc_parser = { version = "=0.141.0", default-features = false }
 oxc_span = "=0.75.0"
 
 [build-dependencies]
