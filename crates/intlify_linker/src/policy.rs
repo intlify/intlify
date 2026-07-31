@@ -3,9 +3,10 @@
 
 //! Checked link policy and post-mapping policy canonicalization.
 //!
-//! This module owns production locales, configured roots, dynamic-reference
-//! behavior, and duplicate placement. It deliberately contains no fallback
-//! member, raw configuration parser, exporter options, or environment lookup.
+//! This module owns production locales, configured roots, coverage baselines,
+//! dynamic-reference behavior, and duplicate placement. It deliberately
+//! contains no fallback member, raw configuration parser, exporter options, or
+//! environment lookup.
 
 use std::error::Error;
 use std::fmt;
@@ -17,7 +18,7 @@ use intlify_contract::{
 
 use crate::error::ConfiguredRootIdentity;
 use crate::scope::{ResolvedCatalogScopeId, ScopeMappingTable};
-use crate::validation::{check_first_over, usize_count};
+use crate::validation::{check_exact, check_first_over, usize_count};
 use crate::{InvalidRequestError, LinkOperationalError};
 
 /// Treatment of an unbounded dynamic reference.
@@ -117,11 +118,39 @@ impl ConfiguredRoot {
     }
 }
 
+/// One declared-scope locale selected as the coverage and typed-key baseline.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CoverageBaseline {
+    scope: CatalogScopeId,
+    locale: Locale,
+}
+
+impl CoverageBaseline {
+    /// Compose one baseline from independently checked scope and locale values.
+    #[must_use]
+    pub const fn new(scope: CatalogScopeId, locale: Locale) -> Self {
+        Self { scope, locale }
+    }
+
+    /// Return the declared catalog scope.
+    #[must_use]
+    pub const fn scope(&self) -> &CatalogScopeId {
+        &self.scope
+    }
+
+    /// Return the selected production locale.
+    #[must_use]
+    pub const fn locale(&self) -> &Locale {
+        &self.locale
+    }
+}
+
 /// Immutable, canonical policy supplied to one link request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkPolicy {
     production_locales: Box<[Locale]>,
     configured_roots: Box<[ConfiguredRoot]>,
+    coverage_baselines: Box<[CoverageBaseline]>,
     dynamic_references: DynamicReferenceMode,
     placement: PlacementPolicy,
 }
@@ -131,6 +160,7 @@ impl LinkPolicy {
     pub fn try_new(
         production_locales: Vec<Locale>,
         configured_roots: Vec<ConfiguredRoot>,
+        coverage_baselines: Vec<CoverageBaseline>,
         dynamic_references: DynamicReferenceMode,
         placement: PlacementPolicy,
         limits: &LinkLimits,
@@ -158,9 +188,32 @@ impl LinkPolicy {
             return Err(InvalidRequestError::DuplicateConfiguredRoot(root[0].identity()).into());
         }
 
+        validate_coverage_baseline_limits(&coverage_baselines, limits)?;
+        let mut coverage_baselines = coverage_baselines;
+        coverage_baselines.sort();
+        if let Some(baseline) = coverage_baselines
+            .iter()
+            .find(|baseline| production_locales.binary_search(baseline.locale()).is_err())
+        {
+            return Err(InvalidRequestError::CoverageBaselineLocaleNotProduction {
+                scope: baseline.scope().clone(),
+                locale: baseline.locale().clone(),
+            }
+            .into());
+        }
+        if let Some(pair) = coverage_baselines
+            .windows(2)
+            .find(|pair| pair[0].scope() == pair[1].scope())
+        {
+            return Err(
+                InvalidRequestError::DuplicateCoverageBaseline(pair[0].scope().clone()).into(),
+            );
+        }
+
         Ok(Self {
             production_locales: production_locales.into_boxed_slice(),
             configured_roots: configured_roots.into_boxed_slice(),
+            coverage_baselines: coverage_baselines.into_boxed_slice(),
             dynamic_references,
             placement,
         })
@@ -178,6 +231,12 @@ impl LinkPolicy {
         &self.configured_roots
     }
 
+    /// Return declared coverage baselines in canonical scope order.
+    #[must_use]
+    pub const fn coverage_baselines(&self) -> &[CoverageBaseline] {
+        &self.coverage_baselines
+    }
+
     /// Return the exact dynamic-reference mode.
     #[must_use]
     pub const fn dynamic_references(&self) -> DynamicReferenceMode {
@@ -193,7 +252,8 @@ impl LinkPolicy {
     pub(crate) fn revalidate(&self, limits: &LinkLimits) -> Result<(), LinkOperationalError> {
         validate_policy_counts(&self.production_locales, &self.configured_roots, limits)?;
         validate_production_locale_limits(&self.production_locales, limits)?;
-        validate_configured_root_limits(&self.configured_roots, limits)
+        validate_configured_root_limits(&self.configured_roots, limits)?;
+        validate_coverage_baseline_limits(&self.coverage_baselines, limits)
     }
 }
 
@@ -240,11 +300,33 @@ impl ResolvedConfiguredRoot {
     }
 }
 
+/// One coverage baseline after uniform one-hop scope mapping.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ResolvedCoverageBaseline {
+    scope: ResolvedCatalogScopeId,
+    locale: Locale,
+}
+
+impl ResolvedCoverageBaseline {
+    /// Return the resolved semantic scope.
+    #[must_use]
+    pub const fn scope(&self) -> &ResolvedCatalogScopeId {
+        &self.scope
+    }
+
+    /// Return the selected production locale.
+    #[must_use]
+    pub const fn locale(&self) -> &Locale {
+        &self.locale
+    }
+}
+
 /// Canonical policy after scope mapping.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedLinkPolicy {
     production_locales: Box<[Locale]>,
     configured_roots: Box<[ResolvedConfiguredRoot]>,
+    coverage_baselines: Box<[ResolvedCoverageBaseline]>,
     dynamic_references: DynamicReferenceMode,
     placement: PlacementPolicy,
 }
@@ -282,9 +364,43 @@ impl ResolvedLinkPolicy {
             configured_roots.push(root);
         }
 
+        let mut submitted = policy
+            .coverage_baselines()
+            .iter()
+            .map(|baseline| ResolvedCoverageBaseline {
+                scope: mappings.resolve(baseline.scope()),
+                locale: baseline.locale().clone(),
+            })
+            .collect::<Vec<_>>();
+        submitted.sort_by(|left, right| {
+            left.scope
+                .cmp(&right.scope)
+                .then_with(|| left.locale.cmp(&right.locale))
+        });
+
+        let mut coverage_baselines =
+            Vec::<ResolvedCoverageBaseline>::with_capacity(submitted.len());
+        for baseline in submitted {
+            if let Some(previous) = coverage_baselines.last() {
+                if previous.scope == baseline.scope {
+                    if previous.locale != baseline.locale {
+                        return Err(InvalidRequestError::ResolvedCoverageBaselineConflict {
+                            scope: baseline.scope,
+                            first: previous.locale.clone(),
+                            second: baseline.locale,
+                        }
+                        .into());
+                    }
+                    continue;
+                }
+            }
+            coverage_baselines.push(baseline);
+        }
+
         Ok(Self {
             production_locales: policy.production_locales.to_vec().into_boxed_slice(),
             configured_roots: configured_roots.into_boxed_slice(),
+            coverage_baselines: coverage_baselines.into_boxed_slice(),
             dynamic_references: policy.dynamic_references,
             placement: policy.placement,
         })
@@ -300,6 +416,12 @@ impl ResolvedLinkPolicy {
     #[must_use]
     pub const fn configured_roots(&self) -> &[ResolvedConfiguredRoot] {
         &self.configured_roots
+    }
+
+    /// Return canonical post-mapping coverage baselines.
+    #[must_use]
+    pub const fn coverage_baselines(&self) -> &[ResolvedCoverageBaseline] {
+        &self.coverage_baselines
     }
 
     /// Return the exact dynamic-reference mode.
@@ -367,6 +489,53 @@ fn validate_configured_root_limits(
     Ok(())
 }
 
+fn validate_coverage_baseline_limits(
+    coverage_baselines: &[CoverageBaseline],
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    let subject = LinkLimitSubject::ResolvedPolicy;
+    check_first_over(
+        LinkLimitCounter::CoverageBaselines,
+        subject.clone(),
+        usize_count(coverage_baselines.len()),
+        limits,
+    )?;
+
+    let mut canonical = coverage_baselines.iter().collect::<Vec<_>>();
+    canonical.sort();
+    for baseline in &canonical {
+        check_first_over(
+            LinkLimitCounter::CatalogScopeNameBytes,
+            subject.clone(),
+            usize_count(baseline.scope().name().as_str().len()),
+            limits,
+        )?;
+    }
+    for baseline in &canonical {
+        check_first_over(
+            LinkLimitCounter::LocaleBytes,
+            subject.clone(),
+            usize_count(baseline.locale().as_str().len()),
+            limits,
+        )?;
+    }
+
+    let mut total = 0_u64;
+    for baseline in canonical {
+        total = total
+            .checked_add(usize_count(baseline.scope().name().as_str().len()))
+            .and_then(|value| value.checked_add(usize_count(baseline.locale().as_str().len())))
+            .ok_or(LinkOperationalError::InternalInvariant)?;
+        check_exact(
+            LinkLimitCounter::CoverageBaselineBytesTotal,
+            subject.clone(),
+            total,
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
 fn first_equal_adjacent<T: PartialEq>(values: &[T]) -> Option<&T> {
     values
         .windows(2)
@@ -382,10 +551,13 @@ mod tests {
     };
 
     use super::{
-        ConfiguredRoot, ConfiguredRootConstructionError, DynamicReferenceMode, LinkPolicy,
-        PlacementPolicy,
+        ConfiguredRoot, ConfiguredRootConstructionError, CoverageBaseline, DynamicReferenceMode,
+        LinkPolicy, PlacementPolicy,
     };
-    use crate::{InvalidRequestError, LinkOperationalError};
+    use crate::{
+        InvalidRequestError, LinkOperationalError, ResolvedLinkPolicy, ScopeMapping,
+        ScopeMappingTable,
+    };
 
     fn scope(name: &str) -> CatalogScopeId {
         CatalogScopeId::new(
@@ -406,6 +578,10 @@ mod tests {
         .unwrap()
     }
 
+    fn baseline(name: &str, locale: &str) -> CoverageBaseline {
+        CoverageBaseline::new(scope(name), Locale::try_new(locale).unwrap())
+    }
+
     #[test]
     fn policy_canonicalizes_sets_without_fallback_state() {
         let policy = LinkPolicy::try_new(
@@ -414,6 +590,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
             ],
             vec![root("z", "/b"), root("a", "/a")],
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &LinkLimits::default(),
@@ -436,6 +613,7 @@ mod tests {
         let empty = LinkPolicy::try_new(
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &LinkLimits::default(),
@@ -452,6 +630,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
             ],
             Vec::new(),
+            Vec::new(),
             DynamicReferenceMode::Strict,
             PlacementPolicy::Duplicate,
             &LinkLimits::default(),
@@ -467,6 +646,7 @@ mod tests {
             LinkPolicy::try_new(
                 vec![Locale::try_new("en").unwrap()],
                 vec![duplicate_root.clone(), duplicate_root],
+                Vec::new(),
                 DynamicReferenceMode::Compat,
                 PlacementPolicy::Duplicate,
                 &LinkLimits::default(),
@@ -487,6 +667,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
                 Locale::try_new("en").unwrap(),
             ],
+            Vec::new(),
             Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -511,6 +692,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
             ],
             vec![root("app", "/a")],
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &limits,
@@ -542,6 +724,201 @@ mod tests {
                 None,
             ),
             Err(ConfiguredRootConstructionError::SelectorDomainMismatch)
+        );
+    }
+
+    #[test]
+    fn policy_canonicalizes_and_validates_declared_coverage_baselines() {
+        let policy = LinkPolicy::try_new(
+            vec![
+                Locale::try_new("ja").unwrap(),
+                Locale::try_new("en").unwrap(),
+            ],
+            Vec::new(),
+            vec![baseline("vendor", "en"), baseline("app", "ja")],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            policy
+                .coverage_baselines()
+                .iter()
+                .map(|value| (value.scope().name().as_str(), value.locale().as_str()))
+                .collect::<Vec<_>>(),
+            [("app", "ja"), ("vendor", "en")]
+        );
+
+        let duplicate = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            vec![baseline("app", "en"), baseline("app", "en")],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            duplicate,
+            LinkOperationalError::InvalidRequest(InvalidRequestError::DuplicateCoverageBaseline(
+                scope("app")
+            ))
+        );
+
+        let outside_production = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            vec![baseline("app", "ja")],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            outside_production,
+            LinkOperationalError::InvalidRequest(
+                InvalidRequestError::CoverageBaselineLocaleNotProduction {
+                    scope: scope("app"),
+                    locale: Locale::try_new("ja").unwrap(),
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn coverage_baseline_limits_precede_semantic_validation() {
+        let count_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CoverageBaselines, 1)
+            .unwrap();
+        let error = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            vec![baseline("app", "ja"), baseline("app", "ja")],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &count_limits,
+        )
+        .unwrap_err();
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected count limit evidence");
+        };
+        assert_eq!(evidence.counter(), LinkLimitCounter::CoverageBaselines);
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+
+        let byte_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CoverageBaselineBytesTotal, 4)
+            .unwrap();
+        let error = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            vec![baseline("app", "en")],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &byte_limits,
+        )
+        .unwrap_err();
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected aggregate byte limit evidence");
+        };
+        assert_eq!(
+            evidence.counter(),
+            LinkLimitCounter::CoverageBaselineBytesTotal
+        );
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(5));
+    }
+
+    #[test]
+    fn exact_coverage_baseline_limits_do_not_change_policy_identity() {
+        let inputs = || vec![baseline("app", "en")];
+        let defaults = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            inputs(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        let exact_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::CoverageBaselines, 1)
+            .unwrap()
+            .try_with_limit(LinkLimitCounter::CoverageBaselineBytesTotal, 5)
+            .unwrap();
+        let exact = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            inputs(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &exact_limits,
+        )
+        .unwrap();
+
+        assert_eq!(defaults, exact);
+        assert!(exact.revalidate(&exact_limits).is_ok());
+    }
+
+    #[test]
+    fn resolved_coverage_baselines_merge_equal_locales_and_reject_conflicts() {
+        let app = scope("app");
+        let vendor = scope("vendor");
+        let shared = scope("shared");
+        let declared = vec![app.clone(), vendor.clone(), shared.clone()];
+        let mappings = ScopeMappingTable::try_new(
+            &declared,
+            vec![
+                ScopeMapping::new(app.clone(), shared.clone()),
+                ScopeMapping::new(vendor.clone(), shared.clone()),
+            ],
+            &LinkLimits::default(),
+        )
+        .unwrap();
+
+        let equal = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            vec![
+                CoverageBaseline::new(app.clone(), Locale::try_new("en").unwrap()),
+                CoverageBaseline::new(vendor.clone(), Locale::try_new("en").unwrap()),
+            ],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        let equal = ResolvedLinkPolicy::resolve(&equal, &mappings).unwrap();
+        assert_eq!(equal.coverage_baselines().len(), 1);
+        assert_eq!(
+            equal.coverage_baselines()[0].scope().as_catalog_scope(),
+            &shared
+        );
+        assert_eq!(equal.coverage_baselines()[0].locale().as_str(), "en");
+
+        let conflict = LinkPolicy::try_new(
+            vec![
+                Locale::try_new("ja").unwrap(),
+                Locale::try_new("en").unwrap(),
+            ],
+            Vec::new(),
+            vec![
+                CoverageBaseline::new(app, Locale::try_new("ja").unwrap()),
+                CoverageBaseline::new(vendor, Locale::try_new("en").unwrap()),
+            ],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            ResolvedLinkPolicy::resolve(&conflict, &mappings).unwrap_err(),
+            LinkOperationalError::InvalidRequest(
+                InvalidRequestError::ResolvedCoverageBaselineConflict {
+                    scope: mappings.resolve(&shared),
+                    first: Locale::try_new("en").unwrap(),
+                    second: Locale::try_new("ja").unwrap(),
+                }
+            )
         );
     }
 }

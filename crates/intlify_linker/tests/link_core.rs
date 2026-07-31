@@ -13,10 +13,11 @@ use intlify_contract::{
 #[cfg(feature = "benchmark")]
 use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_linker::{
-    link, ConfiguredRoot, DegradedAnalysisFinding, DeliveryUnitEdge, DeliveryUnitGraph,
-    DynamicReferenceMode, InputCompleteness, LinkFinding, LinkFindingKind, LinkFindingRecord,
-    LinkOperationalError, LinkOutcome, LinkPolicy, LinkRequest, PartialReason, PlacementPolicy,
-    ScopeCompleteness, ScopeCompletenessTable, ScopeMapping, ScopeMappingTable,
+    link, ConfiguredRoot, CoverageBaseline, DegradedAnalysisFinding, DeliveryUnitEdge,
+    DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, InvalidRequestError, LinkFinding,
+    LinkFindingKind, LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkPolicy, LinkRequest,
+    PartialReason, PlacementPolicy, ScopeCompleteness, ScopeCompletenessTable, ScopeMapping,
+    ScopeMappingTable,
 };
 
 const DOMAIN: CatalogKeyDomain = CatalogKeyDomain::JsonPointer;
@@ -54,10 +55,21 @@ fn definition(
     message: &str,
     occurrence: u32,
 ) -> MessageDefinition {
+    definition_in_domain(scope, DOMAIN, key_value, locale_value, message, occurrence)
+}
+
+fn definition_in_domain(
+    scope: CatalogScopeId,
+    domain: CatalogKeyDomain,
+    key_value: &str,
+    locale_value: &str,
+    message: &str,
+    occurrence: u32,
+) -> MessageDefinition {
     MessageDefinition::try_new(
         scope,
-        DOMAIN,
-        key(key_value),
+        domain,
+        CatalogKey::try_new(domain, key_value).unwrap(),
         locale(locale_value),
         MessagePayload::try_new(message).unwrap(),
         EntryReference::new(EntryStructuralPath::try_new(key_value).unwrap(), occurrence),
@@ -115,9 +127,19 @@ fn policy(
     roots: Vec<ConfiguredRoot>,
     dynamic_mode: DynamicReferenceMode,
 ) -> LinkPolicy {
+    policy_with_baselines(locales, roots, Vec::new(), dynamic_mode)
+}
+
+fn policy_with_baselines(
+    locales: &[&str],
+    roots: Vec<ConfiguredRoot>,
+    coverage_baselines: Vec<CoverageBaseline>,
+    dynamic_mode: DynamicReferenceMode,
+) -> LinkPolicy {
     LinkPolicy::try_new(
         locales.iter().map(|value| locale(value)).collect(),
         roots,
+        coverage_baselines,
         dynamic_mode,
         PlacementPolicy::Duplicate,
         &LinkLimits::default(),
@@ -459,6 +481,91 @@ fn semantic_result_is_independent_of_artifact_and_definition_enumeration_order()
             .map(|message| message.key().as_str())
             .collect::<Vec<_>>(),
         ["/a", "/b"]
+    );
+}
+
+#[test]
+fn typed_key_models_are_invariant_to_mapping_policy_and_artifact_order() {
+    let app = scope("app");
+    let shared = scope("shared");
+    let vendor = scope("vendor");
+    let scopes = vec![app.clone(), shared.clone(), vendor.clone()];
+
+    let app_en = definition_artifact(
+        "app-en.json",
+        vec![
+            definition(app.clone(), "/z", "en", "Z", 0),
+            definition(app.clone(), "/a", "en", "A", 0),
+        ],
+    );
+    let app_ja = definition_artifact(
+        "app-ja.json",
+        vec![definition(app.clone(), "/a", "ja", "A-ja", 0)],
+    );
+    let vendor_en = definition_artifact(
+        "vendor-en.json",
+        vec![definition(vendor.clone(), "/vendor", "en", "Vendor", 0)],
+    );
+    let vendor_ja = definition_artifact(
+        "vendor-ja.json",
+        vec![definition(vendor.clone(), "/vendor", "ja", "Vendor-ja", 0)],
+    );
+
+    let run = |mapping_entries, definitions, locales: &[&str], baselines| {
+        do_link_multi_scopes(
+            &scopes,
+            mapping_entries,
+            Vec::new(),
+            definitions,
+            policy_with_baselines(locales, Vec::new(), baselines, DynamicReferenceMode::Compat),
+            closed_completeness(&scopes),
+            DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+            LinkLimits::default(),
+        )
+        .unwrap()
+    };
+
+    let forward = run(
+        vec![
+            ScopeMapping::new(app.clone(), shared.clone()),
+            ScopeMapping::new(vendor.clone(), shared.clone()),
+        ],
+        vec![
+            app_en.clone(),
+            app_ja.clone(),
+            vendor_en.clone(),
+            vendor_ja.clone(),
+        ],
+        &["ja", "en"],
+        vec![
+            CoverageBaseline::new(vendor.clone(), locale("en")),
+            CoverageBaseline::new(app.clone(), locale("en")),
+        ],
+    );
+    let reverse = run(
+        vec![
+            ScopeMapping::new(vendor.clone(), shared.clone()),
+            ScopeMapping::new(app.clone(), shared.clone()),
+        ],
+        vec![vendor_ja, vendor_en, app_ja, app_en],
+        &["en", "ja"],
+        vec![
+            CoverageBaseline::new(app, locale("en")),
+            CoverageBaseline::new(vendor, locale("en")),
+        ],
+    );
+
+    assert_eq!(forward, reverse);
+    assert_eq!(forward.typed_key_models().len(), 1);
+    let model = &forward.typed_key_models()[0];
+    assert_eq!(model.resolved_scope().as_catalog_scope(), &shared);
+    assert_eq!(
+        model
+            .keys()
+            .iter()
+            .map(CatalogKey::as_str)
+            .collect::<Vec<_>>(),
+        ["/a", "/vendor", "/z"]
     );
 }
 
@@ -1110,7 +1217,12 @@ fn independent_calls_are_reentrant_across_threads() {
         "messages.json",
         vec![definition(app.clone(), "/message", "en", "Message", 0)],
     )];
-    let policy = policy(&["en"], Vec::new(), DynamicReferenceMode::Compat);
+    let policy = policy_with_baselines(
+        &["en"],
+        Vec::new(),
+        vec![CoverageBaseline::new(app.clone(), locale("en"))],
+        DynamicReferenceMode::Compat,
+    );
     let mappings = mappings(std::slice::from_ref(&app), Vec::new());
     let completeness = closed_completeness(std::slice::from_ref(&app));
     let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
@@ -1126,6 +1238,7 @@ fn independent_calls_are_reentrant_across_threads() {
     )
     .unwrap();
     let expected = link(&request).unwrap();
+    assert_eq!(expected.typed_key_models().len(), 1);
 
     std::thread::scope(|scope| {
         let handles = (0..4)
@@ -1172,5 +1285,315 @@ fn outcome_owns_payload_and_location_after_every_request_input_is_dropped() {
     assert_eq!(
         message.definition().entry().structural_path().as_str(),
         "/message"
+    );
+}
+
+#[test]
+fn typed_key_model_uses_the_exact_canonical_baseline_key_set() {
+    let app = scope("app");
+    let outcome = do_link(
+        app.clone(),
+        Vec::new(),
+        vec![definition_artifact(
+            "messages.json",
+            vec![
+                definition(app.clone(), "/z", "en", "PRIVATE-Z-PAYLOAD", 0),
+                definition(app.clone(), "/a", "ja", "A-ja", 0),
+                definition(app.clone(), "/a", "en", "PRIVATE-A-PAYLOAD", 1),
+            ],
+        )],
+        policy_with_baselines(
+            &["ja", "en"],
+            Vec::new(),
+            vec![CoverageBaseline::new(app.clone(), locale("en"))],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+
+    assert_eq!(outcome.typed_key_models().len(), 1);
+    let model = &outcome.typed_key_models()[0];
+    assert_eq!(model.resolved_scope().as_catalog_scope(), &app);
+    assert_eq!(
+        model
+            .keys()
+            .iter()
+            .map(CatalogKey::as_str)
+            .collect::<Vec<_>>(),
+        ["/a", "/z"]
+    );
+    let debug = format!("{outcome:?}");
+    assert!(!debug.contains("PRIVATE-A-PAYLOAD"));
+    assert!(!debug.contains("PRIVATE-Z-PAYLOAD"));
+}
+
+#[test]
+fn models_order_scopes_and_keep_equal_key_spellings_domain_qualified() {
+    let app = scope("app");
+    let vendor = scope("vendor");
+    let scopes = vec![app.clone(), vendor.clone()];
+    let outcome = do_link_multi_scopes(
+        &scopes,
+        Vec::new(),
+        Vec::new(),
+        vec![
+            definition_artifact(
+                "vendor.json",
+                vec![definition_in_domain(
+                    vendor.clone(),
+                    CatalogKeyDomain::YamlTypedPath,
+                    "",
+                    "en",
+                    "YAML root",
+                    0,
+                )],
+            ),
+            definition_artifact(
+                "app.json",
+                vec![definition_in_domain(
+                    app.clone(),
+                    CatalogKeyDomain::JsonPointer,
+                    "",
+                    "en",
+                    "JSON root",
+                    0,
+                )],
+            ),
+        ],
+        policy_with_baselines(
+            &["en"],
+            Vec::new(),
+            vec![
+                CoverageBaseline::new(vendor.clone(), locale("en")),
+                CoverageBaseline::new(app.clone(), locale("en")),
+            ],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(&scopes),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+
+    assert_eq!(outcome.typed_key_models().len(), 2);
+    assert_eq!(
+        outcome.typed_key_models()[0]
+            .resolved_scope()
+            .as_catalog_scope(),
+        &app
+    );
+    assert_eq!(
+        outcome.typed_key_models()[1]
+            .resolved_scope()
+            .as_catalog_scope(),
+        &vendor
+    );
+    assert_eq!(outcome.typed_key_models()[0].keys().len(), 1);
+    assert_eq!(outcome.typed_key_models()[0].keys()[0].as_str(), "");
+    assert_eq!(
+        outcome.typed_key_models()[0].keys()[0].domain(),
+        CatalogKeyDomain::JsonPointer
+    );
+    assert_eq!(outcome.typed_key_models()[1].keys()[0].as_str(), "");
+    assert_eq!(
+        outcome.typed_key_models()[1].keys()[0].domain(),
+        CatalogKeyDomain::YamlTypedPath
+    );
+}
+
+#[test]
+fn omitted_and_closed_empty_baselines_remain_distinct() {
+    let app = scope("app");
+    let without_baseline = do_link(
+        app.clone(),
+        Vec::new(),
+        Vec::new(),
+        policy(&["en"], Vec::new(), DynamicReferenceMode::Compat),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    assert!(without_baseline.typed_key_models().is_empty());
+
+    let empty_model = do_link(
+        app.clone(),
+        Vec::new(),
+        Vec::new(),
+        policy_with_baselines(
+            &["en"],
+            Vec::new(),
+            vec![CoverageBaseline::new(app.clone(), locale("en"))],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(empty_model.typed_key_models().len(), 1);
+    assert!(empty_model.typed_key_models()[0].keys().is_empty());
+}
+
+#[test]
+fn non_baseline_only_key_fails_before_returning_an_outcome() {
+    let app = scope("app");
+    let error = do_link(
+        app.clone(),
+        Vec::new(),
+        vec![definition_artifact(
+            "messages.json",
+            vec![
+                definition(app.clone(), "/baseline", "en", "Baseline", 0),
+                definition(app.clone(), "/missing", "ja", "Missing", 0),
+            ],
+        )],
+        policy_with_baselines(
+            &["ja", "en"],
+            Vec::new(),
+            vec![CoverageBaseline::new(app.clone(), locale("en"))],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        LinkOperationalError::InvalidRequest(InvalidRequestError::CoverageBaselineMissingKey {
+            scope: mappings(std::slice::from_ref(&app), Vec::new()).resolve(&app),
+            baseline: locale("en"),
+            domain: DOMAIN,
+            key: key("/missing"),
+            defined_locale: locale("ja"),
+        })
+    );
+}
+
+#[test]
+fn request_revalidates_coverage_baselines_under_current_lower_limits() {
+    let app = scope("app");
+    let selected_policy = policy_with_baselines(
+        &["en"],
+        Vec::new(),
+        vec![CoverageBaseline::new(app.clone(), locale("en"))],
+        DynamicReferenceMode::Compat,
+    );
+    let limits = LinkLimits::default()
+        .try_with_limit(LinkLimitCounter::CoverageBaselines, 0)
+        .unwrap();
+
+    assert_limit(
+        do_link(
+            app.clone(),
+            Vec::new(),
+            Vec::new(),
+            selected_policy,
+            closed_completeness(std::slice::from_ref(&app)),
+            DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+            limits,
+        )
+        .unwrap_err(),
+        LinkLimitCounter::CoverageBaselines,
+        LinkLimitObservation::Exact(1),
+    );
+}
+
+#[test]
+fn partial_or_ambiguous_definition_worlds_do_not_publish_models() {
+    let app = scope("app");
+    let selected_policy = || {
+        policy_with_baselines(
+            &["en"],
+            Vec::new(),
+            vec![CoverageBaseline::new(app.clone(), locale("en"))],
+            DynamicReferenceMode::Compat,
+        )
+    };
+    let partial = do_link(
+        app.clone(),
+        Vec::new(),
+        Vec::new(),
+        selected_policy(),
+        completeness(
+            std::slice::from_ref(&app),
+            vec![(
+                app.clone(),
+                InputCompleteness::Partial(PartialReason::SourceFailed),
+                InputCompleteness::Closed,
+            )],
+        ),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    assert!(partial.typed_key_models().is_empty());
+    assert!(partial.generation_blocked());
+
+    let ambiguous = do_link(
+        app.clone(),
+        Vec::new(),
+        vec![
+            definition_artifact(
+                "a.json",
+                vec![definition(app.clone(), "/message", "en", "A", 0)],
+            ),
+            definition_artifact(
+                "b.json",
+                vec![definition(app.clone(), "/message", "en", "B", 0)],
+            ),
+        ],
+        selected_policy(),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    assert!(ambiguous.typed_key_models().is_empty());
+    assert!(ambiguous.generation_blocked());
+}
+
+#[test]
+fn unrelated_blocking_findings_do_not_erase_an_admitted_model() {
+    let app = scope("app");
+    let vendor = scope("vendor");
+    let scopes = vec![app.clone(), vendor.clone()];
+    let outcome = do_link_multi_scopes(
+        &scopes,
+        Vec::new(),
+        vec![reference_artifact(
+            "vendor-entry",
+            DeliveryUnitId::main(),
+            vec![reference(
+                vendor.clone(),
+                MessageSelector::Exact(key("/missing")),
+            )],
+        )],
+        vec![definition_artifact(
+            "app.json",
+            vec![definition(app.clone(), "/message", "en", "Message", 0)],
+        )],
+        policy_with_baselines(
+            &["en"],
+            Vec::new(),
+            vec![CoverageBaseline::new(app.clone(), locale("en"))],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(&scopes),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    assert!(outcome.generation_blocked());
+    assert_eq!(outcome.typed_key_models().len(), 1);
+    assert_eq!(
+        outcome.typed_key_models()[0]
+            .resolved_scope()
+            .as_catalog_scope(),
+        &app
     );
 }

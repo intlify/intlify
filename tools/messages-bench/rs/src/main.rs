@@ -1125,6 +1125,7 @@ impl GeneratedLinkFixture {
         let policy = LinkPolicy::try_new(
             vec![Locale::try_new("en").map_err(|error| error.to_string())?],
             Vec::new(),
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &limits,

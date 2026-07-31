@@ -414,6 +414,9 @@ fn validate_scope_bindings(
     for root in policy.configured_roots() {
         uses.push((root.scope(), ScopeUse::ConfiguredRoot));
     }
+    for baseline in policy.coverage_baselines() {
+        uses.push((baseline.scope(), ScopeUse::CoverageBaseline));
+    }
     uses.sort_by(|left, right| left.0.cmp(right.0).then(left.1.cmp(&right.1)));
 
     if let Some((scope, usage)) = uses
@@ -578,6 +581,7 @@ mod tests {
         LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             roots,
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &LinkLimits::default(),
