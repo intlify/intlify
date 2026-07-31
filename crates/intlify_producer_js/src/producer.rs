@@ -9,7 +9,11 @@
 //! snapshot acquisition, scheduling, completeness mapping, and linker policy
 //! remain caller responsibilities.
 
+#[cfg(feature = "benchmark")]
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+#[cfg(feature = "benchmark")]
+use std::time::{Duration, Instant};
 
 use intlify_contract::{
     decode_reference_artifact, encode_reference_artifact, ArtifactContractError, ArtifactNamespace,
@@ -19,12 +23,20 @@ use intlify_contract::{
     ValueConstructionError,
 };
 
+#[cfg(feature = "benchmark")]
+use crate::benchmark::{
+    BenchmarkJsProducerExecution, BenchmarkJsStage, BenchmarkJsStageMeasurement,
+};
 use crate::cache::{
     decode_cache_entry, encode_cache_entry, key_for_group, CacheKeyContext, JsProducerCache,
     JsProducerCacheIoError, JsProducerCacheKey, SourceFingerprint,
 };
 use crate::error::{JsProducerError, JsProducerFailure, JsProducerFailureReason};
-use crate::frontend::{scan_source_with_cancellation, BOUNDED_SET_REASON, DYNAMIC_LOOKUP_REASON};
+#[cfg(feature = "benchmark")]
+use crate::frontend::FrontendStage;
+use crate::frontend::{
+    scan_source_with_observer, FrontendObserver, BOUNDED_SET_REASON, DYNAMIC_LOOKUP_REASON,
+};
 use crate::group::JsPhysicalSourceGroup;
 use crate::profile::{JsSelectedSourceGoal, JsSourceGoal, JsSourceProfile};
 use crate::provenance::js_producer_identity;
@@ -89,7 +101,14 @@ pub fn produce_reference_artifacts(
     recognizers: &JsRecognizerSet,
     limits: &LinkLimits,
 ) -> Result<JsProducerOutcome, JsProducerError> {
-    produce_impl::<DisabledCache, _>(groups, recognizers, limits, None, &|| false)
+    produce_impl::<DisabledCache, _, _>(
+        groups,
+        recognizers,
+        limits,
+        None,
+        &|| false,
+        &mut NoopProducerObserver,
+    )
 }
 
 /// Produce checked artifacts without a cache and with caller-owned cancellation.
@@ -102,7 +121,14 @@ pub fn produce_reference_artifacts_with_cancellation<C>(
 where
     C: Fn() -> bool + ?Sized,
 {
-    produce_impl::<DisabledCache, _>(groups, recognizers, limits, None, cancelled)
+    produce_impl::<DisabledCache, _, _>(
+        groups,
+        recognizers,
+        limits,
+        None,
+        cancelled,
+        &mut NoopProducerObserver,
+    )
 }
 
 /// Produce checked artifacts with an optional-performance cache.
@@ -115,7 +141,14 @@ pub fn produce_reference_artifacts_with_cache<S>(
 where
     S: JsProducerCache + ?Sized,
 {
-    produce_impl(groups, recognizers, limits, Some(cache), &|| false)
+    produce_impl(
+        groups,
+        recognizers,
+        limits,
+        Some(cache),
+        &|| false,
+        &mut NoopProducerObserver,
+    )
 }
 
 /// Produce checked artifacts with cache reuse and caller-owned cancellation.
@@ -130,7 +163,14 @@ where
     S: JsProducerCache + ?Sized,
     C: Fn() -> bool + ?Sized,
 {
-    produce_impl(groups, recognizers, limits, Some(cache), cancelled)
+    produce_impl(
+        groups,
+        recognizers,
+        limits,
+        Some(cache),
+        cancelled,
+        &mut NoopProducerObserver,
+    )
 }
 
 /// Admit the invocation-wide physical-group count before source snapshots.
@@ -155,16 +195,494 @@ pub fn preflight_source_group_count(
     ))
 }
 
-fn produce_impl<S, C>(
+trait ProducerObserver: FrontendObserver {
+    fn enter_source(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn leave_source(&mut self) {}
+
+    fn begin_cache_access(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn pause_cache_miss(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn resume_cache_publication(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn abandon_cache_access(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn finish_cache_hit(
+        &mut self,
+        _source: &SourceDocumentIdentity,
+        _key: &JsProducerCacheKey,
+        _artifact: &MessageReferenceArtifact,
+    ) {
+    }
+
+    fn finish_cache_miss(
+        &mut self,
+        _source: &SourceDocumentIdentity,
+        _key: &JsProducerCacheKey,
+        _artifact: &MessageReferenceArtifact,
+    ) {
+    }
+
+    fn begin_artifact_construction(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn finish_artifact_construction(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn observe_artifact_construction(
+        &mut self,
+        _source: &SourceDocumentIdentity,
+        _artifact_bytes: &[u8],
+    ) {
+    }
+}
+
+struct NoopProducerObserver;
+
+impl FrontendObserver for NoopProducerObserver {}
+impl ProducerObserver for NoopProducerObserver {}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn benchmark_produce<S>(
+    groups: Vec<JsPhysicalSourceGroup>,
+    recognizers: &JsRecognizerSet,
+    limits: &LinkLimits,
+    cache: Option<&S>,
+) -> Result<BenchmarkJsProducerExecution, JsProducerError>
+where
+    S: JsProducerCache + ?Sized,
+{
+    let mut observer = BenchmarkProducerObserver::new(limits);
+    let outcome = produce_impl(groups, recognizers, limits, cache, &|| false, &mut observer)?;
+    let (stages, observation_overhead) = observer.finish()?;
+    Ok(BenchmarkJsProducerExecution::new(
+        outcome,
+        stages,
+        observation_overhead,
+    ))
+}
+
+#[cfg(feature = "benchmark")]
+struct BenchmarkProducerObserver<'limits> {
+    limits: &'limits LinkLimits,
+    current_source: Option<SourceDocumentIdentity>,
+    frontend_active: Option<(FrontendStage, Instant)>,
+    artifact_active: Option<(SourceDocumentIdentity, Instant)>,
+    cache_active: BTreeMap<SourceDocumentIdentity, Instant>,
+    cache_excluded: BTreeMap<SourceDocumentIdentity, Duration>,
+    cache_accumulated: BTreeMap<SourceDocumentIdentity, Duration>,
+    stages: Vec<BenchmarkJsStageMeasurement>,
+    observed: Vec<bool>,
+    observation_started: Vec<Option<Instant>>,
+    observation_overhead: Duration,
+    invariant_failed: bool,
+}
+
+#[cfg(feature = "benchmark")]
+impl<'limits> BenchmarkProducerObserver<'limits> {
+    fn new(limits: &'limits LinkLimits) -> Self {
+        Self {
+            limits,
+            current_source: None,
+            frontend_active: None,
+            artifact_active: None,
+            cache_active: BTreeMap::new(),
+            cache_excluded: BTreeMap::new(),
+            cache_accumulated: BTreeMap::new(),
+            stages: Vec::new(),
+            observed: Vec::new(),
+            observation_started: Vec::new(),
+            observation_overhead: Duration::ZERO,
+            invariant_failed: false,
+        }
+    }
+
+    fn push(
+        &mut self,
+        source: SourceDocumentIdentity,
+        stage: BenchmarkJsStage,
+        elapsed: Duration,
+        observation_started: Instant,
+    ) -> usize {
+        self.stages
+            .push(BenchmarkJsStageMeasurement::new(source, stage, elapsed, 0));
+        self.observed.push(false);
+        self.observation_started.push(Some(observation_started));
+        self.stages.len() - 1
+    }
+
+    fn observe(&mut self, index: Option<usize>, checksum: u32) {
+        let Some(index) = index else {
+            return;
+        };
+        if self.observed.get(index).copied() != Some(false) {
+            self.invariant_failed = true;
+            return;
+        }
+        let Some(observation_started) = self
+            .observation_started
+            .get_mut(index)
+            .and_then(Option::take)
+        else {
+            self.invariant_failed = true;
+            return;
+        };
+        let source = self.stages[index].source().clone();
+        let stage = self.stages[index].stage();
+        let elapsed = self.stages[index].elapsed();
+        self.stages[index] =
+            BenchmarkJsStageMeasurement::new(source.clone(), stage, elapsed, checksum);
+        self.observed[index] = true;
+        let observation_elapsed = observation_started.elapsed();
+        self.observation_overhead = self
+            .observation_overhead
+            .saturating_add(observation_elapsed);
+        for excluded in self.cache_excluded.values_mut() {
+            *excluded = excluded.saturating_add(observation_elapsed);
+        }
+    }
+
+    fn finish_cache(
+        &mut self,
+        source: &SourceDocumentIdentity,
+        stage: BenchmarkJsStage,
+        key: &JsProducerCacheKey,
+        artifact: &MessageReferenceArtifact,
+    ) {
+        let Some(started) = self.cache_active.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        let Some(excluded) = self.cache_excluded.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        let accumulated = match stage {
+            BenchmarkJsStage::CacheMissProduction => {
+                let Some(accumulated) = self.cache_accumulated.remove(source) else {
+                    self.invariant_failed = true;
+                    return;
+                };
+                accumulated
+            }
+            BenchmarkJsStage::CacheHitValidationAndAccess => {
+                if self.cache_accumulated.remove(source).is_some() {
+                    self.invariant_failed = true;
+                    return;
+                }
+                Duration::ZERO
+            }
+            _ => {
+                self.invariant_failed = true;
+                return;
+            }
+        };
+        let finished = Instant::now();
+        let elapsed = accumulated.saturating_add(
+            finished
+                .saturating_duration_since(started)
+                .saturating_sub(excluded),
+        );
+        let index = self.push(source.clone(), stage, elapsed, finished);
+        let Ok(bytes) = encode_reference_artifact(artifact, self.limits) else {
+            self.invariant_failed = true;
+            return;
+        };
+        let checksum = benchmark_checksum_fields(
+            stage.cost().as_bytes(),
+            [
+                stage.cost().as_bytes(),
+                key.semantic_frame(),
+                bytes.as_ref(),
+            ],
+        );
+        self.observe(Some(index), checksum);
+    }
+
+    fn finish(self) -> Result<(Vec<BenchmarkJsStageMeasurement>, Duration), JsProducerError> {
+        if self.invariant_failed
+            || self.current_source.is_some()
+            || self.frontend_active.is_some()
+            || self.artifact_active.is_some()
+            || !self.cache_active.is_empty()
+            || !self.cache_excluded.is_empty()
+            || !self.cache_accumulated.is_empty()
+            || self.observed.len() != self.stages.len()
+            || self.observation_started.len() != self.stages.len()
+            || self.observed.iter().any(|observed| !observed)
+            || self.observation_started.iter().any(Option::is_some)
+        {
+            return Err(JsProducerError::InternalInvariant);
+        }
+        Ok((self.stages, self.observation_overhead))
+    }
+}
+
+#[cfg(feature = "benchmark")]
+impl FrontendObserver for BenchmarkProducerObserver<'_> {
+    fn enabled(&self) -> bool {
+        true
+    }
+
+    fn begin(&mut self, stage: FrontendStage) {
+        if self
+            .frontend_active
+            .replace((stage, Instant::now()))
+            .is_some()
+        {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn finish(&mut self, stage: FrontendStage) {
+        let Some((active, started)) = self.frontend_active.take() else {
+            self.invariant_failed = true;
+            return;
+        };
+        let Some(source) = self.current_source.clone() else {
+            self.invariant_failed = true;
+            return;
+        };
+        if active != stage {
+            self.invariant_failed = true;
+            return;
+        }
+        let finished = Instant::now();
+        let _ = self.push(
+            source,
+            benchmark_frontend_stage(stage),
+            finished.saturating_duration_since(started),
+            finished,
+        );
+    }
+
+    fn observe(&mut self, stage: FrontendStage, checksum: u32) {
+        let Some(source) = self.current_source.as_ref() else {
+            self.invariant_failed = true;
+            return;
+        };
+        let expected = benchmark_frontend_stage(stage);
+        let Some(index) = self
+            .stages
+            .iter()
+            .enumerate()
+            .rposition(|(index, measurement)| {
+                measurement.source() == source
+                    && measurement.stage() == expected
+                    && !self.observed[index]
+            })
+        else {
+            self.invariant_failed = true;
+            return;
+        };
+        BenchmarkProducerObserver::observe(self, Some(index), checksum);
+    }
+}
+
+#[cfg(feature = "benchmark")]
+impl ProducerObserver for BenchmarkProducerObserver<'_> {
+    fn enter_source(&mut self, source: &SourceDocumentIdentity) {
+        if self.current_source.replace(source.clone()).is_some() {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn leave_source(&mut self) {
+        if self.current_source.take().is_none() {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn begin_cache_access(&mut self, source: &SourceDocumentIdentity) {
+        if self.cache_active.contains_key(source)
+            || self.cache_excluded.contains_key(source)
+            || self.cache_accumulated.contains_key(source)
+        {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_active.insert(source.clone(), Instant::now());
+        self.cache_excluded.insert(source.clone(), Duration::ZERO);
+    }
+
+    fn pause_cache_miss(&mut self, source: &SourceDocumentIdentity) {
+        let Some(started) = self.cache_active.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        let Some(excluded) = self.cache_excluded.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        if self.cache_accumulated.contains_key(source) {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_accumulated
+            .insert(source.clone(), started.elapsed().saturating_sub(excluded));
+    }
+
+    fn resume_cache_publication(&mut self, source: &SourceDocumentIdentity) {
+        if !self.cache_accumulated.contains_key(source)
+            || self.cache_active.contains_key(source)
+            || self.cache_excluded.contains_key(source)
+        {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_active.insert(source.clone(), Instant::now());
+        self.cache_excluded.insert(source.clone(), Duration::ZERO);
+    }
+
+    fn abandon_cache_access(&mut self, source: &SourceDocumentIdentity) {
+        let active = self.cache_active.remove(source);
+        let excluded = self.cache_excluded.remove(source);
+        let accumulated = self.cache_accumulated.remove(source);
+        let active_interval = active.is_some() && excluded.is_some() && accumulated.is_none();
+        let paused_interval = active.is_none() && excluded.is_none() && accumulated.is_some();
+        if !active_interval && !paused_interval {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn finish_cache_hit(
+        &mut self,
+        source: &SourceDocumentIdentity,
+        key: &JsProducerCacheKey,
+        artifact: &MessageReferenceArtifact,
+    ) {
+        self.finish_cache(
+            source,
+            BenchmarkJsStage::CacheHitValidationAndAccess,
+            key,
+            artifact,
+        );
+    }
+
+    fn finish_cache_miss(
+        &mut self,
+        source: &SourceDocumentIdentity,
+        key: &JsProducerCacheKey,
+        artifact: &MessageReferenceArtifact,
+    ) {
+        self.finish_cache(source, BenchmarkJsStage::CacheMissProduction, key, artifact);
+    }
+
+    fn begin_artifact_construction(&mut self, source: &SourceDocumentIdentity) {
+        if self
+            .artifact_active
+            .replace((source.clone(), Instant::now()))
+            .is_some()
+        {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn finish_artifact_construction(&mut self, source: &SourceDocumentIdentity) {
+        let Some((active_source, started)) = self.artifact_active.take() else {
+            self.invariant_failed = true;
+            return;
+        };
+        if active_source != *source {
+            self.invariant_failed = true;
+            return;
+        }
+        let finished = Instant::now();
+        let _ = self.push(
+            source.clone(),
+            BenchmarkJsStage::ReferenceArtifactConstruction,
+            finished.saturating_duration_since(started),
+            finished,
+        );
+    }
+
+    fn observe_artifact_construction(
+        &mut self,
+        source: &SourceDocumentIdentity,
+        artifact_bytes: &[u8],
+    ) {
+        let Some(index) = self
+            .stages
+            .iter()
+            .enumerate()
+            .rposition(|(index, measurement)| {
+                measurement.source() == source
+                    && measurement.stage() == BenchmarkJsStage::ReferenceArtifactConstruction
+                    && !self.observed[index]
+            })
+        else {
+            self.invariant_failed = true;
+            return;
+        };
+        let checksum = benchmark_checksum(
+            BenchmarkJsStage::ReferenceArtifactConstruction
+                .cost()
+                .as_bytes(),
+            artifact_bytes,
+        );
+        BenchmarkProducerObserver::observe(self, Some(index), checksum);
+    }
+}
+
+#[cfg(feature = "benchmark")]
+const fn benchmark_frontend_stage(stage: FrontendStage) -> BenchmarkJsStage {
+    match stage {
+        FrontendStage::SourceParse => BenchmarkJsStage::SourceParse,
+        FrontendStage::RecognizerMatchAndStaticEvaluation => {
+            BenchmarkJsStage::RecognizerMatchAndStaticEvaluation
+        }
+        FrontendStage::KeyAndProvenanceConstruction => {
+            BenchmarkJsStage::KeyAndProvenanceConstruction
+        }
+    }
+}
+
+#[cfg(feature = "benchmark")]
+fn benchmark_checksum(domain: &[u8], bytes: &[u8]) -> u32 {
+    let mut checksum = 2_166_136_261_u32;
+    for byte in domain
+        .iter()
+        .copied()
+        .chain([0, 0x01])
+        .chain(
+            u64::try_from(bytes.len())
+                .expect("supported benchmark observations fit u64")
+                .to_be_bytes(),
+        )
+        .chain(bytes.iter().copied())
+    {
+        checksum ^= u32::from(byte);
+        checksum = checksum.wrapping_mul(16_777_619);
+    }
+    checksum
+}
+
+#[cfg(feature = "benchmark")]
+fn benchmark_checksum_fields<'a>(domain: &[u8], fields: impl IntoIterator<Item = &'a [u8]>) -> u32 {
+    let mut framed = Vec::new();
+    for field in fields {
+        framed.push(0x01);
+        framed.extend_from_slice(
+            &u64::try_from(field.len())
+                .expect("supported benchmark observations fit u64")
+                .to_be_bytes(),
+        );
+        framed.extend_from_slice(field);
+    }
+    benchmark_checksum(domain, &framed)
+}
+
+fn produce_impl<S, C, O>(
     mut groups: Vec<JsPhysicalSourceGroup>,
     recognizers: &JsRecognizerSet,
     limits: &LinkLimits,
     cache: Option<&S>,
     cancelled: &C,
+    observer: &mut O,
 ) -> Result<JsProducerOutcome, JsProducerError>
 where
     S: JsProducerCache + ?Sized,
     C: Fn() -> bool + ?Sized,
+    O: ProducerObserver + ?Sized,
 {
     if cancelled() {
         return Err(JsProducerError::Cancelled);
@@ -248,6 +766,7 @@ where
             &delivery_unit,
             cache,
             cancelled,
+            observer,
         )? {
             GroupOutcome::Artifact {
                 artifact,
@@ -282,7 +801,13 @@ where
 
     if let Some(cache) = cache {
         for publication in pending_cache {
+            observer.resume_cache_publication(&publication.source);
             let _ = cache.store(&publication.key, &publication.value);
+            observer.finish_cache_miss(
+                &publication.source,
+                &publication.key,
+                &publication.artifact,
+            );
         }
     }
 
@@ -387,7 +912,7 @@ fn reject_repeated_logical_sources(
 enum GroupOutcome {
     Artifact {
         artifact: MessageReferenceArtifact,
-        cache_publication: Option<CachePublication>,
+        cache_publication: Option<Box<CachePublication>>,
     },
     Failed(JsProducerFailure),
 }
@@ -401,8 +926,10 @@ enum GroupContractAdmission {
 }
 
 struct CachePublication {
+    source: SourceDocumentIdentity,
     key: JsProducerCacheKey,
     value: Box<[u8]>,
+    artifact: MessageReferenceArtifact,
 }
 
 struct ProducedCacheMiss {
@@ -417,7 +944,7 @@ enum CacheMissOutcome {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn produce_group<S, C>(
+fn produce_group<S, C, O>(
     group: &JsPhysicalSourceGroup,
     profile: JsSourceProfile,
     identity: ReferenceArtifactIdentity,
@@ -427,10 +954,12 @@ fn produce_group<S, C>(
     delivery_unit: &DeliveryUnitId,
     cache: Option<&S>,
     cancelled: &C,
+    observer: &mut O,
 ) -> Result<GroupOutcome, JsProducerError>
 where
     S: JsProducerCache + ?Sized,
     C: Fn() -> bool + ?Sized,
+    O: ProducerObserver + ?Sized,
 {
     let Ok(source_text) = std::str::from_utf8(group.source_bytes()) else {
         return Ok(GroupOutcome::Failed(JsProducerFailure::without_optional(
@@ -438,10 +967,13 @@ where
             group.primary().clone(),
         )));
     };
+    if cache.is_some() {
+        observer.begin_cache_access(group.primary());
+    }
     let fingerprint = cache.map(|_| SourceFingerprint::for_bytes(group.source_bytes()));
 
     if let (Some(cache), Some(fingerprint)) = (cache, fingerprint) {
-        if let Some(artifact) = try_load_cached_artifact(
+        if let Some((artifact, key)) = try_load_cached_artifact(
             cache,
             group,
             profile,
@@ -454,6 +986,7 @@ where
             source_text,
             cancelled,
         )? {
+            observer.finish_cache_hit(group.primary(), &key, &artifact);
             return Ok(GroupOutcome::Artifact {
                 artifact,
                 cache_publication: None,
@@ -470,9 +1003,15 @@ where
         producer,
         delivery_unit,
         cancelled,
+        observer,
     )? {
         CacheMissOutcome::Produced(produced) => produced,
-        CacheMissOutcome::Failed(failure) => return Ok(GroupOutcome::Failed(failure)),
+        CacheMissOutcome::Failed(failure) => {
+            if cache.is_some() {
+                observer.abandon_cache_access(group.primary());
+            }
+            return Ok(GroupOutcome::Failed(failure));
+        }
     };
 
     let cache_publication = fingerprint.map(|fingerprint| {
@@ -486,11 +1025,16 @@ where
             delivery_unit,
             fingerprint,
         });
-        CachePublication {
+        Box::new(CachePublication {
+            source: group.primary().clone(),
             value: encode_cache_entry(&key, &produced.artifact_bytes),
             key,
-        }
+            artifact: produced.artifact.clone(),
+        })
     });
+    if cache_publication.is_some() {
+        observer.pause_cache_miss(group.primary());
+    }
     Ok(GroupOutcome::Artifact {
         artifact: produced.artifact,
         cache_publication,
@@ -527,7 +1071,7 @@ fn try_load_cached_artifact<S, C>(
     delivery_unit: &DeliveryUnitId,
     source_text: &str,
     cancelled: &C,
-) -> Result<Option<MessageReferenceArtifact>, JsProducerError>
+) -> Result<Option<(MessageReferenceArtifact, JsProducerCacheKey)>, JsProducerError>
 where
     S: JsProducerCache + ?Sized,
     C: Fn() -> bool + ?Sized,
@@ -562,14 +1106,14 @@ where
             recognizers,
             limits,
         ) {
-            return Ok(Some(artifact));
+            return Ok(Some((artifact, key)));
         }
     }
     Ok(None)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn produce_cache_miss<C>(
+fn produce_cache_miss<C, O>(
     group: &JsPhysicalSourceGroup,
     profile: JsSourceProfile,
     identity: ReferenceArtifactIdentity,
@@ -578,22 +1122,30 @@ fn produce_cache_miss<C>(
     producer: &ProducerIdentity,
     delivery_unit: &DeliveryUnitId,
     cancelled: &C,
+    observer: &mut O,
 ) -> Result<CacheMissOutcome, JsProducerError>
 where
     C: Fn() -> bool + ?Sized,
+    O: ProducerObserver + ?Sized,
 {
-    let scan = match scan_source_with_cancellation(
+    observer.enter_source(group.primary());
+    let scan = match scan_source_with_observer(
         group.primary(),
         group.source_bytes(),
         recognizers,
         cancelled,
+        observer,
     ) {
         Ok(scan) => scan,
-        Err(JsProducerError::Failed(failure)) => return Ok(CacheMissOutcome::Failed(failure)),
+        Err(JsProducerError::Failed(failure)) => {
+            observer.leave_source();
+            return Ok(CacheMissOutcome::Failed(failure));
+        }
         Err(other) => return Err(other),
     };
     debug_assert_eq!(scan.profile(), profile);
     let selected_goal = scan.selected_goal();
+    observer.begin_artifact_construction(group.primary());
     let artifact = match MessageReferenceArtifact::try_new(
         ArtifactVersion::DRAFT_V0_1,
         producer.clone(),
@@ -602,8 +1154,12 @@ where
         scan.into_references(),
         limits,
     ) {
-        Ok(artifact) => artifact,
+        Ok(artifact) => {
+            observer.finish_artifact_construction(group.primary());
+            artifact
+        }
         Err(error) => {
+            observer.leave_source();
             return Ok(CacheMissOutcome::Failed(artifact_error(
                 group.primary(),
                 &error,
@@ -614,6 +1170,7 @@ where
     let artifact_bytes = match encode_reference_artifact(&artifact, limits) {
         Ok(artifact_bytes) => artifact_bytes,
         Err(error) => {
+            observer.leave_source();
             return Ok(CacheMissOutcome::Failed(artifact_error(
                 group.primary(),
                 &error,
@@ -621,6 +1178,8 @@ where
             )?));
         }
     };
+    observer.observe_artifact_construction(group.primary(), &artifact_bytes);
+    observer.leave_source();
 
     Ok(CacheMissOutcome::Produced(ProducedCacheMiss {
         artifact,
@@ -867,17 +1426,18 @@ mod tests {
     };
 
     use super::{
-        build_artifact_identity, preflight_source_bytes, produce_reference_artifacts,
-        produce_reference_artifacts_with_cache, SourceAdmissionLimits,
+        build_artifact_identity, preflight_source_bytes, produce_impl, produce_reference_artifacts,
+        produce_reference_artifacts_with_cache, DisabledCache, ProducerObserver,
+        SourceAdmissionLimits,
     };
     use crate::cache::{
         encode_cache_entry, key_for_group, CacheKeyContext, JsProducerCache,
         JsProducerCacheIoError, JsProducerCacheKey, SourceFingerprint,
     };
     use crate::{
-        js_producer_identity, JsKeySyntax, JsPhysicalSourceGroup, JsProducerFailureReason,
-        JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet, JsSelectedSourceGoal,
-        JsSourceProfile,
+        frontend::FrontendObserver, js_producer_identity, JsKeySyntax, JsPhysicalSourceGroup,
+        JsProducerFailureReason, JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet,
+        JsSelectedSourceGoal, JsSourceProfile,
     };
 
     fn group(name: &str, bytes: usize) -> JsPhysicalSourceGroup {
@@ -930,6 +1490,83 @@ mod tests {
         assert_eq!(failure.limit(), Some(10));
         assert_eq!(failure.observed(), Some(11));
         assert_eq!(failure.source(), groups[1].primary());
+    }
+
+    #[derive(Default)]
+    struct CacheBoundaryTrace {
+        events: Vec<(&'static str, SourceDocumentIdentity)>,
+    }
+
+    impl FrontendObserver for CacheBoundaryTrace {}
+
+    impl ProducerObserver for CacheBoundaryTrace {
+        fn begin_cache_access(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("begin", source.clone()));
+        }
+
+        fn pause_cache_miss(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("pause", source.clone()));
+        }
+
+        fn resume_cache_publication(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("resume", source.clone()));
+        }
+
+        fn finish_cache_miss(
+            &mut self,
+            source: &SourceDocumentIdentity,
+            _key: &JsProducerCacheKey,
+            _artifact: &MessageReferenceArtifact,
+        ) {
+            self.events.push(("finish", source.clone()));
+        }
+    }
+
+    #[test]
+    fn cache_miss_measurement_pauses_between_source_work_and_publication() {
+        let first = group("a.ts", 0);
+        let second = group("b.ts", 0);
+        let first_source = first.primary().clone();
+        let second_source = second.primary().clone();
+        let scope = CatalogScopeId::new(
+            ArtifactNamespace::Project,
+            CatalogScopeName::try_new("app").unwrap(),
+        );
+        let recognizers = JsRecognizerSet::try_new(vec![JsRecognizerBinding::try_new(
+            "t",
+            JsRecognizerCallKind::Lookup,
+            scope,
+            CatalogKeyDomain::JsonPointer,
+            JsKeySyntax::Literal,
+        )
+        .unwrap()])
+        .unwrap();
+        let mut observer = CacheBoundaryTrace::default();
+
+        let outcome = produce_impl(
+            vec![second, first],
+            &recognizers,
+            &LinkLimits::default(),
+            Some(&DisabledCache),
+            &|| false,
+            &mut observer,
+        )
+        .unwrap();
+
+        assert!(outcome.is_complete());
+        assert_eq!(
+            observer.events,
+            [
+                ("begin", first_source.clone()),
+                ("pause", first_source.clone()),
+                ("begin", second_source.clone()),
+                ("pause", second_source.clone()),
+                ("resume", first_source.clone()),
+                ("finish", first_source),
+                ("resume", second_source.clone()),
+                ("finish", second_source),
+            ]
+        );
     }
 
     struct SingleEntryCache {

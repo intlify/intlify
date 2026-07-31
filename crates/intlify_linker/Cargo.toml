@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+default = []
+benchmark = []
+
 [lints]
 workspace = true
 

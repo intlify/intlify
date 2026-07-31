@@ -37,6 +37,35 @@ export const RESOURCE_BENCHMARK_PHASES = [
   }
 ]
 
+/**
+ * Resource-owned interval descriptor imported unchanged by messages-bench.
+ *
+ * The marker vocabulary is checked harness state and is intentionally not
+ * serialized into benchmark result documents.
+ */
+export const resource_host_parse_and_entry_extraction = Object.freeze({
+  phase: 'resource_extract',
+  cost: 'host_parse_and_entry_extraction',
+  boundaryId: 'resource_host_parse_and_entry_extraction',
+  metric: 'duration',
+  occurrencePolicy: 'per_planned_physical_source_group_sequential',
+  firstMarker: 'before_host_format_registry_extract',
+  finalMarker: 'complete_checked_extracted_catalog_retained',
+  includedMarkers: Object.freeze([
+    'host_format_registry_extract',
+    'checked_extracted_catalog_construction'
+  ]),
+  excludedMarkers: Object.freeze([
+    'inventory_discovery',
+    'physical_grouping',
+    'source_snapshot_read',
+    'pre_extraction_admission',
+    'definition_projection',
+    'checksum_observation',
+    'result_aggregation'
+  ])
+})
+
 export const RESOURCE_BENCHMARK_PHASE_NAMES = RESOURCE_BENCHMARK_PHASES.map(phase => phase.name)
 
 export const RESOURCE_BENCHMARK_CORE_PHASE_NAMES = RESOURCE_BENCHMARK_PHASE_NAMES.slice(0, 4)

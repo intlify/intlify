@@ -15,8 +15,8 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use intlify_contract::{
-    ArtifactContractError, ArtifactLimitEvidence, ArtifactNamespace, ArtifactVersion, CatalogKey,
-    CatalogKeyDomain as ContractCatalogKeyDomain, CatalogScopeId,
+    encode_definition_artifact, ArtifactContractError, ArtifactLimitEvidence, ArtifactNamespace,
+    ArtifactVersion, CatalogKey, CatalogKeyDomain as ContractCatalogKeyDomain, CatalogScopeId,
     CatalogScopeName as ContractCatalogScopeName, EntryReference, EntryStructuralPath,
     FingerprintAlgorithm, FingerprintDigest, InputFingerprint, LinkLimitCounter,
     LinkLimitObservation, LinkLimits, Locale, MessageDefinition, MessageDefinitionArtifact,
@@ -33,6 +33,10 @@ use intlify_resource::{
 use serde_json::{json, Value};
 
 use super::config::ResolvedMessagesConfig;
+use super::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
 use super::physical::{
     acquire_physical_snapshot, compare_optional_paths, compare_portable_path_str,
     discover_project_files, group_physical_files, portable_path, PhysicalFileGroup,
@@ -171,6 +175,12 @@ struct SuccessfulExtraction {
 }
 
 #[derive(Debug)]
+struct SnapshottedGroup {
+    prepared: PreparedGroup,
+    snapshot: Arc<str>,
+}
+
+#[derive(Debug)]
 struct PendingFailure {
     order_path: Option<String>,
     failure: DefinitionSourceFailure,
@@ -204,6 +214,32 @@ pub(crate) fn produce_definition_inventory(
     registry: &HostFormatRegistry,
     limits: &LinkLimits,
 ) -> Result<DefinitionInventory, DefinitionInventoryError> {
+    produce_definition_inventory_with_observer(
+        project_root,
+        config_path,
+        resources,
+        messages,
+        registry,
+        limits,
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+/// Produce definitions through the ordinary pipeline while reporting opaque
+/// benchmark stages to the non-default observer.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn produce_definition_inventory_with_observer<O>(
+    project_root: &Path,
+    config_path: Option<&Path>,
+    resources: &ResolvedResources,
+    messages: &ResolvedMessagesConfig,
+    registry: &HostFormatRegistry,
+    limits: &LinkLimits,
+    observer: &mut O,
+) -> Result<DefinitionInventory, DefinitionInventoryError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
     let target_scopes = resources
         .linker_scopes()
         .iter()
@@ -220,6 +256,10 @@ pub(crate) fn produce_definition_inventory(
         });
     }
 
+    observer.begin(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "definition-inventory",
+    );
     let Discovery {
         candidates,
         failures: mut pending_failures,
@@ -248,18 +288,112 @@ pub(crate) fn produce_definition_inventory(
 
     let (groups, metadata_failures) = group_physical_targets(targets, config_path)?;
     pending_failures.extend(metadata_failures);
+    observer.finish(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "definition-inventory",
+    );
+    if observer.enabled() {
+        let observation_fields = definition_inventory_observation(&groups);
+        observer.observe(
+            MessageBenchmarkStage::InventoryMetadataIo,
+            "definition-inventory",
+            observation_checksum(
+                MessageBenchmarkStage::InventoryMetadataIo.cost().as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
 
     let mut prepared_groups = Vec::new();
     for group in groups {
-        match prepare_group(group, registry, limits) {
+        let identity = group.primary_path().to_owned();
+        observer.begin(MessageBenchmarkStage::PreExtractionAdmission, &identity);
+        let prepared = prepare_group(group, registry, limits);
+        observer.finish(MessageBenchmarkStage::PreExtractionAdmission, &identity);
+        if observer.enabled() {
+            let observation_fields = pre_extraction_observation(&prepared, &identity);
+            observer.observe(
+                MessageBenchmarkStage::PreExtractionAdmission,
+                &identity,
+                observation_checksum(
+                    MessageBenchmarkStage::PreExtractionAdmission
+                        .cost()
+                        .as_bytes(),
+                    observation_fields.iter().map(Vec::as_slice),
+                ),
+            );
+        }
+        match prepared {
             Ok(prepared) => prepared_groups.push(prepared),
             Err(failure) => pending_failures.push(*failure),
         }
     }
 
-    let mut successful = Vec::new();
+    observer.begin(
+        MessageBenchmarkStage::DefinitionSnapshotRead,
+        "definition-snapshots",
+    );
+    let mut snapshotted_groups = Vec::new();
     for prepared in prepared_groups {
-        match extract_group(prepared, registry) {
+        match acquire_group_snapshot(prepared) {
+            Ok(snapshotted) => snapshotted_groups.push(snapshotted),
+            Err(failure) => pending_failures.push(*failure),
+        }
+    }
+    observer.finish(
+        MessageBenchmarkStage::DefinitionSnapshotRead,
+        "definition-snapshots",
+    );
+    if observer.enabled() {
+        let observation_fields = definition_snapshot_observation(&snapshotted_groups);
+        observer.observe(
+            MessageBenchmarkStage::DefinitionSnapshotRead,
+            "definition-snapshots",
+            observation_checksum(
+                MessageBenchmarkStage::DefinitionSnapshotRead
+                    .cost()
+                    .as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
+
+    let mut successful = Vec::new();
+    for snapshotted in snapshotted_groups {
+        let identity = snapshotted.prepared.primary_path().to_owned();
+        observer.begin(
+            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+            &identity,
+        );
+        let extraction = extract_group(snapshotted, registry);
+        match &extraction {
+            Ok(extraction) => {
+                observer.finish(
+                    MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+                    &identity,
+                );
+                if observer.enabled() {
+                    observer.observe(
+                        MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+                        &identity,
+                        observation_checksum(
+                            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
+                                .cost()
+                                .as_bytes(),
+                            [
+                                extraction.prepared.primary_path().as_bytes(),
+                                extraction.snapshot.as_bytes(),
+                            ],
+                        ),
+                    );
+                }
+            }
+            Err(_) => observer.abandon(
+                MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+                &identity,
+            ),
+        }
+        match extraction {
             Ok(extraction) => {
                 if extraction.catalog.entries().iter().any(|entry| {
                     entry.catalog_key_domain() == ResourceCatalogKeyDomain::StandaloneMf2
@@ -279,6 +413,10 @@ pub(crate) fn produce_definition_inventory(
     let observed_domains = admit_catalog_domains(&successful, config_path)?;
     admit_declared_domains(messages, &observed_domains, config_path)?;
 
+    observer.begin(
+        MessageBenchmarkStage::DefinitionProjection,
+        "definition-projection",
+    );
     let mut artifacts = Vec::new();
     for extraction in successful {
         let order_path = extraction.prepared.primary_path().to_owned();
@@ -294,6 +432,27 @@ pub(crate) fn produce_definition_inventory(
             }),
         }
     }
+    observer.finish(
+        MessageBenchmarkStage::DefinitionProjection,
+        "definition-projection",
+    );
+    if observer.enabled() {
+        let encoded = artifacts
+            .iter()
+            .map(|artifact| encode_definition_artifact(artifact, limits))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| internal_inventory_error(config_path))?;
+        observer.observe(
+            MessageBenchmarkStage::DefinitionProjection,
+            "definition-projection",
+            observation_checksum(
+                MessageBenchmarkStage::DefinitionProjection
+                    .cost()
+                    .as_bytes(),
+                encoded.iter().map(Box::as_ref),
+            ),
+        );
+    }
 
     pending_failures.sort_by(|left, right| {
         compare_optional_paths(left.order_path.as_deref(), right.order_path.as_deref())
@@ -308,6 +467,97 @@ pub(crate) fn produce_definition_inventory(
             .map(|pending| pending.failure)
             .collect(),
     })
+}
+
+fn definition_inventory_observation(groups: &[PhysicalGroup]) -> Vec<Vec<u8>> {
+    let mut fields = Vec::new();
+    for group in groups {
+        for target in &group.targets {
+            fields.push(b"logical-source".to_vec());
+            fields.push(b"definition-catalog".to_vec());
+            fields.push(target.path().as_bytes().to_vec());
+        }
+    }
+    for group in groups {
+        fields.push(b"physical-group".to_vec());
+        fields.push(
+            u64::try_from(group.targets.len())
+                .expect("supported physical alias counts fit u64")
+                .to_be_bytes()
+                .to_vec(),
+        );
+        fields.extend(
+            group
+                .targets
+                .iter()
+                .map(|target| target.path().as_bytes().to_vec()),
+        );
+    }
+    fields
+}
+
+fn definition_snapshot_observation(groups: &[SnapshottedGroup]) -> Vec<Vec<u8>> {
+    let mut fields = Vec::new();
+    for group in groups {
+        fields.push(b"definition-snapshot".to_vec());
+        fields.push(
+            u64::try_from(group.prepared.group.targets.len())
+                .expect("supported physical alias counts fit u64")
+                .to_be_bytes()
+                .to_vec(),
+        );
+        fields.extend(
+            group
+                .prepared
+                .group
+                .targets
+                .iter()
+                .map(|target| target.path().as_bytes().to_vec()),
+        );
+        fields.push(group.snapshot.as_bytes().to_vec());
+    }
+    fields
+}
+
+fn pre_extraction_observation(
+    prepared: &Result<PreparedGroup, Box<PendingFailure>>,
+    identity: &str,
+) -> Vec<Vec<u8>> {
+    match prepared {
+        Ok(prepared) => {
+            let mut fields = vec![b"admitted".to_vec()];
+            fields.push(
+                u64::try_from(prepared.group.targets.len())
+                    .expect("supported physical alias counts fit u64")
+                    .to_be_bytes()
+                    .to_vec(),
+            );
+            fields.extend(
+                prepared
+                    .group
+                    .targets
+                    .iter()
+                    .map(|target| target.path().as_bytes().to_vec()),
+            );
+            fields.push(
+                prepared
+                    .resolved_format
+                    .format()
+                    .as_str()
+                    .as_bytes()
+                    .to_vec(),
+            );
+            fields.push(prepared.scope.namespace().as_str().as_bytes().to_vec());
+            fields.push(prepared.scope.name().as_str().as_bytes().to_vec());
+            fields.push(prepared.locale.as_str().as_bytes().to_vec());
+            fields
+        }
+        Err(failure) => vec![
+            b"rejected".to_vec(),
+            identity.as_bytes().to_vec(),
+            failure.failure.error.code.as_bytes().to_vec(),
+        ],
+    }
 }
 
 fn discover_project_candidates(project_root: &Path, scopes: &[CatalogScopeId]) -> Discovery {
@@ -468,10 +718,9 @@ fn prepare_group(
     })
 }
 
-fn extract_group(
+fn acquire_group_snapshot(
     prepared: PreparedGroup,
-    registry: &HostFormatRegistry,
-) -> Result<SuccessfulExtraction, Box<PendingFailure>> {
+) -> Result<SnapshottedGroup, Box<PendingFailure>> {
     let primary_path = prepared.primary_path().to_owned();
     let scope = prepared.scope.clone();
     let snapshot = acquire_snapshot(&prepared).map_err(|error| {
@@ -483,6 +732,15 @@ fn extract_group(
             },
         })
     })?;
+    Ok(SnapshottedGroup { prepared, snapshot })
+}
+
+fn extract_group(
+    snapshotted: SnapshottedGroup,
+    registry: &HostFormatRegistry,
+) -> Result<SuccessfulExtraction, Box<PendingFailure>> {
+    let SnapshottedGroup { prepared, snapshot } = snapshotted;
+    let primary_path = prepared.primary_path().to_owned();
     let catalog = registry
         .extract(prepared.resolved_format.clone(), Arc::clone(&snapshot))
         .map_err(|error| {

@@ -24,6 +24,10 @@ mod provenance;
 mod recognizer;
 mod static_eval;
 
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub mod benchmark;
+
 pub use cache::{JsProducerCache, JsProducerCacheIoError, JsProducerCacheKey};
 pub use error::{
     JsProducerError, JsProducerFailure, JsProducerFailureReason, JsProducerFailureStage,

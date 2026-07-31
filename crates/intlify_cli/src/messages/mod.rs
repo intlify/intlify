@@ -8,10 +8,14 @@
 //! It performs no filesystem discovery, source parsing, artifact loading, or
 //! linking.
 
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub mod benchmark;
 mod completeness;
 mod config;
 #[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
+mod observation;
 #[allow(dead_code)] // Reused by later message commands without exposing an M0 CLI leaf.
 pub(crate) mod orchestration;
 mod physical;

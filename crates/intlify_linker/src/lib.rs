@@ -21,6 +21,10 @@ mod request;
 mod scope;
 mod validation;
 
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub mod benchmark;
+
 pub use error::{
     ArtifactContractSubject, ArtifactKind, ConfiguredRootIdentity, DeliveryEdgeEndpoint,
     InvalidRequestError, LinkOperationalError, ScopeEndpoint, ScopeUse, UnsupportedContractError,

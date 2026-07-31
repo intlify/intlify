@@ -101,6 +101,14 @@ jobs:
           VITE_LOG: vite_task=trace
         run: vpr --no-cache -v test
 
+      - name: Run message benchmark smoke
+        if: runner.os == 'Linux'
+        run: vp run bench:messages:smoke
+
+      - name: Validate message benchmark result
+        if: runner.os == 'Linux'
+        run: vp run bench:messages:validate
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

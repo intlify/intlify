@@ -22,13 +22,38 @@ use crate::error::{JsProducerError, JsProducerFailure, JsProducerFailureReason};
 use crate::key::convert_static_selector;
 use crate::profile::{JsSelectedSourceGoal, JsSourceGoal, JsSourceProfile};
 use crate::recognizer::{JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet};
-use crate::static_eval::{evaluate_static_string, StaticString};
+use crate::static_eval::{
+    capture_static_expression, evaluate_static_expression, StaticExpressionView, StaticString,
+};
 
 /// Fixed inclusive byte ceiling for one selected source snapshot.
 pub const SOURCE_BYTES_LIMIT: u64 = 64 * 1024 * 1024;
 
 pub(crate) const DYNAMIC_LOOKUP_REASON: &str = "lookup argument is not statically known";
 pub(crate) const BOUNDED_SET_REASON: &str = "bounded set declared by configured recognizer";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FrontendStage {
+    SourceParse,
+    RecognizerMatchAndStaticEvaluation,
+    KeyAndProvenanceConstruction,
+}
+
+pub(crate) trait FrontendObserver {
+    fn enabled(&self) -> bool {
+        false
+    }
+
+    fn begin(&mut self, _stage: FrontendStage) {}
+
+    fn finish(&mut self, _stage: FrontendStage) {}
+
+    fn observe(&mut self, _stage: FrontendStage, _checksum: u32) {}
+}
+
+pub(crate) struct NoopFrontendObserver;
+
+impl FrontendObserver for NoopFrontendObserver {}
 
 /// Complete deterministic output of one admitted source snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +93,13 @@ pub fn scan_source(
     source_bytes: &[u8],
     recognizers: &JsRecognizerSet,
 ) -> Result<JsSourceScan, JsProducerError> {
-    scan_source_with_cancellation(source, source_bytes, recognizers, &|| false)
+    scan_source_with_observer(
+        source,
+        source_bytes,
+        recognizers,
+        &|| false,
+        &mut NoopFrontendObserver,
+    )
 }
 
 /// Scan one exact source snapshot with a caller-owned cancellation probe.
@@ -85,6 +116,26 @@ pub fn scan_source_with_cancellation<C>(
 ) -> Result<JsSourceScan, JsProducerError>
 where
     C: Fn() -> bool + ?Sized,
+{
+    scan_source_with_observer(
+        source,
+        source_bytes,
+        recognizers,
+        cancelled,
+        &mut NoopFrontendObserver,
+    )
+}
+
+pub(crate) fn scan_source_with_observer<C, O>(
+    source: &SourceDocumentIdentity,
+    source_bytes: &[u8],
+    recognizers: &JsRecognizerSet,
+    cancelled: &C,
+    observer: &mut O,
+) -> Result<JsSourceScan, JsProducerError>
+where
+    C: Fn() -> bool + ?Sized,
+    O: FrontendObserver + ?Sized,
 {
     let profile = JsSourceProfile::from_source(source).map_err(|_| {
         JsProducerFailure::without_optional(
@@ -107,6 +158,7 @@ where
                 profile,
                 JsSelectedSourceGoal::Module,
                 cancelled,
+                observer,
             )?,
         ),
         JsSourceGoal::CommonJs => finish_fixed_attempt(
@@ -118,6 +170,7 @@ where
                 profile,
                 JsSelectedSourceGoal::Script,
                 cancelled,
+                observer,
             )?,
         ),
         JsSourceGoal::BoundedUnambiguous => {
@@ -128,6 +181,7 @@ where
                 profile,
                 JsSelectedSourceGoal::Module,
                 cancelled,
+                observer,
             )?;
             match module {
                 ParseAttempt::Admitted(scan) => Ok(scan),
@@ -139,6 +193,7 @@ where
                         profile,
                         JsSelectedSourceGoal::Script,
                         cancelled,
+                        observer,
                     )?;
                     match script {
                         ParseAttempt::Admitted(scan) => Ok(scan),
@@ -195,21 +250,24 @@ fn finish_fixed_attempt(
     }
 }
 
-fn parse_and_scan<C>(
+fn parse_and_scan<C, O>(
     source: &SourceDocumentIdentity,
     source_text: &str,
     recognizers: &JsRecognizerSet,
     profile: JsSourceProfile,
     selected_goal: JsSelectedSourceGoal,
     cancelled: &C,
+    observer: &mut O,
 ) -> Result<ParseAttempt, JsProducerError>
 where
     C: Fn() -> bool + ?Sized,
+    O: FrontendObserver + ?Sized,
 {
     if cancelled() {
         return Err(JsProducerError::Cancelled);
     }
 
+    observer.begin(FrontendStage::SourceParse);
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source_text, profile.source_type(selected_goal)).parse();
     if cancelled() {
@@ -225,6 +283,13 @@ where
             .flat_map(|diagnostic| diagnostic.labels.iter().flatten())
             .filter_map(|label| safe_diagnostic_span(source_text, label.offset(), label.len()))
             .min();
+        observer.finish(FrontendStage::SourceParse);
+        if observer.enabled() {
+            observer.observe(
+                FrontendStage::SourceParse,
+                checksum_parse_failure(profile, selected_goal, source_text, span),
+            );
+        }
         // OXC diagnostics and recovery state are dependency-owned. The frontend
         // rejects the entire AST and intentionally retains neither diagnostic
         // text nor recovery identifiers in its output contract. Only the
@@ -232,15 +297,43 @@ where
         return Ok(ParseAttempt::SyntaxRejected(span));
     }
 
-    let mut scanner = ReferenceScanner::new(source, source_text, recognizers, cancelled);
-    scanner.visit_program(&parsed.program);
-    if scanner.cancelled {
+    let mut collector = CallEventCollector::new(source_text, cancelled);
+    collector.visit_program(&parsed.program);
+    if collector.cancelled {
         return Err(JsProducerError::Cancelled);
     }
-    if scanner.invariant_failed {
+    if collector.invariant_failed {
         return Err(JsProducerError::InternalInvariant);
     }
-    if let Some(failure) = scanner
+    observer.finish(FrontendStage::SourceParse);
+    if observer.enabled() {
+        observer.observe(
+            FrontendStage::SourceParse,
+            checksum_syntax_events(profile, selected_goal, source_text, &collector.events),
+        );
+    }
+
+    observer.begin(FrontendStage::RecognizerMatchAndStaticEvaluation);
+    let evaluation = evaluate_recognizer_events(source, recognizers, collector.events, cancelled)?;
+    observer.finish(FrontendStage::RecognizerMatchAndStaticEvaluation);
+    if observer.enabled() {
+        observer.observe(
+            FrontendStage::RecognizerMatchAndStaticEvaluation,
+            checksum_recognizer_evaluation(&evaluation),
+        );
+    }
+
+    observer.begin(FrontendStage::KeyAndProvenanceConstruction);
+    let construction = construct_references(source, evaluation, cancelled)?;
+    observer.finish(FrontendStage::KeyAndProvenanceConstruction);
+    if observer.enabled() {
+        observer.observe(
+            FrontendStage::KeyAndProvenanceConstruction,
+            checksum_reference_construction(&construction),
+        );
+    }
+
+    if let Some(failure) = construction
         .failures
         .into_iter()
         .min_by(JsProducerFailure::cmp_within_source)
@@ -248,8 +341,9 @@ where
         return Err(failure.into());
     }
 
-    scanner.references.sort_by(compare_references_by_origin);
-    if scanner.references.windows(2).any(|pair| {
+    let mut references = construction.references;
+    references.sort_by(compare_references_by_origin);
+    if references.windows(2).any(|pair| {
         pair[0].origin().map(SourceOrigin::span) == pair[1].origin().map(SourceOrigin::span)
     }) {
         return Err(JsProducerError::InternalInvariant);
@@ -258,127 +352,50 @@ where
     Ok(ParseAttempt::Admitted(JsSourceScan {
         profile,
         selected_goal,
-        references: scanner.references.into_boxed_slice(),
+        references: references.into_boxed_slice(),
     }))
 }
 
-struct ReferenceScanner<'source, 'config, 'cancel, C: ?Sized> {
-    source: &'source SourceDocumentIdentity,
+enum CallArgument {
+    Missing,
+    Spread(Option<SourceUtf8Span>),
+    Expression {
+        span: Option<SourceUtf8Span>,
+        view: StaticExpressionView,
+    },
+    Invalid,
+}
+
+struct CallSyntaxEvent {
+    callee: String,
+    call_span: Option<SourceUtf8Span>,
+    argument: CallArgument,
+}
+
+struct CallEventCollector<'source, 'cancel, C: ?Sized> {
     source_text: &'source str,
-    recognizers: &'config JsRecognizerSet,
     cancelled_probe: &'cancel C,
-    references: Vec<MessageReference>,
-    failures: Vec<JsProducerFailure>,
+    events: Vec<CallSyntaxEvent>,
     cancelled: bool,
     invariant_failed: bool,
 }
 
-impl<'source, 'config, 'cancel, C> ReferenceScanner<'source, 'config, 'cancel, C>
+impl<'source, 'cancel, C> CallEventCollector<'source, 'cancel, C>
 where
     C: Fn() -> bool + ?Sized,
 {
-    fn new(
-        source: &'source SourceDocumentIdentity,
-        source_text: &'source str,
-        recognizers: &'config JsRecognizerSet,
-        cancelled_probe: &'cancel C,
-    ) -> Self {
+    fn new(source_text: &'source str, cancelled_probe: &'cancel C) -> Self {
         Self {
-            source,
             source_text,
-            recognizers,
             cancelled_probe,
-            references: Vec::new(),
-            failures: Vec::new(),
+            events: Vec::new(),
             cancelled: false,
             invariant_failed: false,
         }
     }
-
-    fn process_call(&mut self, call: &CallExpression<'_>, binding: &JsRecognizerBinding) {
-        let Some(argument) = call.arguments.first() else {
-            self.fail(
-                JsProducerFailureReason::SelectorArgumentMissing,
-                safe_span(self.source_text, call.span),
-            );
-            return;
-        };
-        if let Argument::SpreadElement(spread) = argument {
-            self.fail(
-                JsProducerFailureReason::SelectorArgumentSpread,
-                safe_span(self.source_text, spread.span),
-            );
-            return;
-        }
-        let Some(expression) = argument.as_expression() else {
-            self.invariant_failed = true;
-            return;
-        };
-        let Some(span) = safe_span(self.source_text, expression.span()) else {
-            self.invariant_failed = true;
-            return;
-        };
-
-        let (selector, reason) = match evaluate_static_string(expression) {
-            StaticString::Known(value) => {
-                let Ok(selector) = convert_static_selector(binding, value) else {
-                    self.fail(selector_invalid_reason(binding.kind()), Some(span));
-                    return;
-                };
-                let reason = match binding.kind() {
-                    JsRecognizerCallKind::Lookup => None,
-                    JsRecognizerCallKind::Set => Some(reason_text(BOUNDED_SET_REASON)),
-                };
-                (selector, reason)
-            }
-            StaticString::KnownInvalid => {
-                self.fail(selector_invalid_reason(binding.kind()), Some(span));
-                return;
-            }
-            StaticString::Dynamic => match binding.kind() {
-                JsRecognizerCallKind::Lookup => (
-                    MessageSelector::UnboundedDynamic,
-                    Some(reason_text(DYNAMIC_LOOKUP_REASON)),
-                ),
-                JsRecognizerCallKind::Set => {
-                    self.fail(JsProducerFailureReason::SetSelectorDynamic, Some(span));
-                    return;
-                }
-            },
-        };
-        self.push_reference(binding, selector, reason, span);
-    }
-
-    fn push_reference(
-        &mut self,
-        binding: &JsRecognizerBinding,
-        selector: MessageSelector,
-        reason: Option<ReasonText>,
-        span: SourceUtf8Span,
-    ) {
-        let origin = SourceOrigin::new(self.source.clone(), span);
-        match MessageReference::try_new(
-            binding.scope().clone(),
-            binding.domain(),
-            selector,
-            reason,
-            Some(origin),
-        ) {
-            Ok(reference) => self.references.push(reference),
-            Err(_) => self.invariant_failed = true,
-        }
-    }
-
-    fn fail(&mut self, reason: JsProducerFailureReason, span: Option<SourceUtf8Span>) {
-        self.failures.push(JsProducerFailure::with_span(
-            reason,
-            self.source.clone(),
-            span,
-        ));
-    }
 }
 
-impl<'ast, C> Visit<'ast> for ReferenceScanner<'_, '_, '_, C>
+impl<'ast, C> Visit<'ast> for CallEventCollector<'ast, '_, C>
 where
     C: Fn() -> bool + ?Sized,
 {
@@ -392,12 +409,385 @@ where
         }
         if !call.optional {
             if let Some(callee) = static_callee(&call.callee) {
-                if let Some(binding) = self.recognizers.find(&callee) {
-                    self.process_call(call, binding);
-                }
+                let argument = match call.arguments.first() {
+                    None => CallArgument::Missing,
+                    Some(Argument::SpreadElement(spread)) => {
+                        CallArgument::Spread(safe_span(self.source_text, spread.span))
+                    }
+                    Some(argument) => match argument.as_expression() {
+                        Some(expression) => CallArgument::Expression {
+                            span: safe_span(self.source_text, expression.span()),
+                            view: capture_static_expression(expression),
+                        },
+                        None => CallArgument::Invalid,
+                    },
+                };
+                self.events.push(CallSyntaxEvent {
+                    callee,
+                    call_span: safe_span(self.source_text, call.span),
+                    argument,
+                });
             }
         }
         walk::walk_call_expression(self, call);
+    }
+}
+
+enum EvaluatedStaticString {
+    Known(Box<str>),
+    KnownInvalid,
+    Dynamic,
+}
+
+struct RecognizerMatchFact {
+    binding: JsRecognizerBinding,
+    value: EvaluatedStaticString,
+    span: SourceUtf8Span,
+}
+
+struct RecognizerEvaluation {
+    matches: Vec<RecognizerMatchFact>,
+    failures: Vec<JsProducerFailure>,
+}
+
+fn evaluate_recognizer_events<C>(
+    source: &SourceDocumentIdentity,
+    recognizers: &JsRecognizerSet,
+    events: Vec<CallSyntaxEvent>,
+    cancelled: &C,
+) -> Result<RecognizerEvaluation, JsProducerError>
+where
+    C: Fn() -> bool + ?Sized,
+{
+    let mut matches = Vec::new();
+    let mut failures = Vec::new();
+    for event in events {
+        if cancelled() {
+            return Err(JsProducerError::Cancelled);
+        }
+        let Some(binding) = recognizers.find(&event.callee) else {
+            continue;
+        };
+        let (view, span) = match event.argument {
+            CallArgument::Missing => {
+                failures.push(JsProducerFailure::with_span(
+                    JsProducerFailureReason::SelectorArgumentMissing,
+                    source.clone(),
+                    event.call_span,
+                ));
+                continue;
+            }
+            CallArgument::Spread(span) => {
+                failures.push(JsProducerFailure::with_span(
+                    JsProducerFailureReason::SelectorArgumentSpread,
+                    source.clone(),
+                    span,
+                ));
+                continue;
+            }
+            CallArgument::Expression {
+                span: Some(span),
+                view,
+            } => (view, span),
+            CallArgument::Expression { span: None, .. } | CallArgument::Invalid => {
+                return Err(JsProducerError::InternalInvariant);
+            }
+        };
+        let value = match evaluate_static_expression(&view) {
+            StaticString::Known(value) => EvaluatedStaticString::Known(value.into()),
+            StaticString::KnownInvalid => EvaluatedStaticString::KnownInvalid,
+            StaticString::Dynamic => EvaluatedStaticString::Dynamic,
+        };
+        matches.push(RecognizerMatchFact {
+            binding: binding.clone(),
+            value,
+            span,
+        });
+    }
+    Ok(RecognizerEvaluation { matches, failures })
+}
+
+struct ReferenceConstruction {
+    references: Vec<MessageReference>,
+    failures: Vec<JsProducerFailure>,
+}
+
+fn construct_references<C>(
+    source: &SourceDocumentIdentity,
+    evaluation: RecognizerEvaluation,
+    cancelled: &C,
+) -> Result<ReferenceConstruction, JsProducerError>
+where
+    C: Fn() -> bool + ?Sized,
+{
+    let mut references = Vec::new();
+    let mut failures = evaluation.failures;
+    for fact in evaluation.matches {
+        if cancelled() {
+            return Err(JsProducerError::Cancelled);
+        }
+        let (selector, reason) = match fact.value {
+            EvaluatedStaticString::Known(value) => {
+                let Ok(selector) = convert_static_selector(&fact.binding, &value) else {
+                    failures.push(JsProducerFailure::with_span(
+                        selector_invalid_reason(fact.binding.kind()),
+                        source.clone(),
+                        Some(fact.span),
+                    ));
+                    continue;
+                };
+                let reason = match fact.binding.kind() {
+                    JsRecognizerCallKind::Lookup => None,
+                    JsRecognizerCallKind::Set => Some(reason_text(BOUNDED_SET_REASON)),
+                };
+                (selector, reason)
+            }
+            EvaluatedStaticString::KnownInvalid => {
+                failures.push(JsProducerFailure::with_span(
+                    selector_invalid_reason(fact.binding.kind()),
+                    source.clone(),
+                    Some(fact.span),
+                ));
+                continue;
+            }
+            EvaluatedStaticString::Dynamic => match fact.binding.kind() {
+                JsRecognizerCallKind::Lookup => (
+                    MessageSelector::UnboundedDynamic,
+                    Some(reason_text(DYNAMIC_LOOKUP_REASON)),
+                ),
+                JsRecognizerCallKind::Set => {
+                    failures.push(JsProducerFailure::with_span(
+                        JsProducerFailureReason::SetSelectorDynamic,
+                        source.clone(),
+                        Some(fact.span),
+                    ));
+                    continue;
+                }
+            },
+        };
+        let origin = SourceOrigin::new(source.clone(), fact.span);
+        match MessageReference::try_new(
+            fact.binding.scope().clone(),
+            fact.binding.domain(),
+            selector,
+            reason,
+            Some(origin),
+        ) {
+            Ok(reference) => references.push(reference),
+            Err(_) => return Err(JsProducerError::InternalInvariant),
+        }
+    }
+    Ok(ReferenceConstruction {
+        references,
+        failures,
+    })
+}
+
+fn checksum_parse_failure(
+    profile: JsSourceProfile,
+    selected_goal: JsSelectedSourceGoal,
+    source_text: &str,
+    span: Option<SourceUtf8Span>,
+) -> u32 {
+    let mut checksum = FrontendChecksum::new(b"intlify-js-source-parse-v1");
+    checksum.write_profile(0x01, profile, selected_goal);
+    checksum.write_bytes(0x02, source_text.as_bytes());
+    checksum.write_str(0x03, "syntax-invalid");
+    checksum.write_optional_span(0x04, span);
+    checksum.finish()
+}
+
+fn checksum_syntax_events(
+    profile: JsSourceProfile,
+    selected_goal: JsSelectedSourceGoal,
+    source_text: &str,
+    events: &[CallSyntaxEvent],
+) -> u32 {
+    let mut checksum = FrontendChecksum::new(b"intlify-js-source-parse-v1");
+    checksum.write_profile(0x01, profile, selected_goal);
+    checksum.write_bytes(0x02, source_text.as_bytes());
+    checksum.write_u64(0x03, events.len() as u64);
+    for event in events {
+        checksum.write_str(0x04, &event.callee);
+        checksum.write_optional_span(0x05, event.call_span);
+        match event.argument {
+            CallArgument::Missing => checksum.write_str(0x06, "missing"),
+            CallArgument::Spread(span) => {
+                checksum.write_str(0x06, "spread");
+                checksum.write_optional_span(0x07, span);
+            }
+            CallArgument::Expression { span, .. } => {
+                checksum.write_str(0x06, "expression");
+                checksum.write_optional_span(0x07, span);
+            }
+            CallArgument::Invalid => checksum.write_str(0x06, "invalid"),
+        }
+    }
+    checksum.finish()
+}
+
+fn checksum_recognizer_evaluation(evaluation: &RecognizerEvaluation) -> u32 {
+    let mut checksum = FrontendChecksum::new(b"intlify-js-recognizer-static-evaluation-v1");
+    checksum.write_u64(0x01, evaluation.matches.len() as u64);
+    for fact in &evaluation.matches {
+        checksum.write_binding(0x02, &fact.binding);
+        checksum.write_optional_span(0x03, Some(fact.span));
+        match &fact.value {
+            EvaluatedStaticString::Known(value) => {
+                checksum.write_str(0x04, "known");
+                checksum.write_str(0x05, value.as_ref());
+            }
+            EvaluatedStaticString::KnownInvalid => checksum.write_str(0x04, "known-invalid"),
+            EvaluatedStaticString::Dynamic => checksum.write_str(0x04, "dynamic"),
+        }
+    }
+    checksum.write_u64(0x06, evaluation.failures.len() as u64);
+    for failure in &evaluation.failures {
+        checksum.write_failure(0x07, failure);
+    }
+    checksum.finish()
+}
+
+fn checksum_reference_construction(construction: &ReferenceConstruction) -> u32 {
+    let mut checksum = FrontendChecksum::new(b"intlify-js-key-provenance-v1");
+    checksum.write_u64(0x01, construction.references.len() as u64);
+    for reference in &construction.references {
+        checksum.write_scope(0x02, reference.scope());
+        checksum.write_str(0x03, reference.domain().as_str());
+        checksum.write_str(0x04, reference.selector().kind_str());
+        match reference.selector() {
+            MessageSelector::Exact(key) => checksum.write_str(0x05, key.as_str()),
+            MessageSelector::Prefix(prefix) => checksum.write_str(0x05, prefix.as_str()),
+            MessageSelector::Pattern(pattern) => checksum.write_str(0x05, pattern.as_str()),
+            MessageSelector::AllInScope | MessageSelector::UnboundedDynamic => {}
+        }
+        match reference.reason() {
+            Some(reason) => {
+                checksum.write_bool(0x06, true);
+                checksum.write_str(0x07, reason.as_str());
+            }
+            None => checksum.write_bool(0x06, false),
+        }
+        match reference.origin() {
+            Some(origin) => {
+                checksum.write_bool(0x08, true);
+                checksum.write_source(0x09, origin.source());
+                checksum.write_optional_span(0x0a, Some(origin.span()));
+            }
+            None => checksum.write_bool(0x08, false),
+        }
+    }
+    checksum.write_u64(0x0b, construction.failures.len() as u64);
+    for failure in &construction.failures {
+        checksum.write_failure(0x0c, failure);
+    }
+    checksum.finish()
+}
+
+struct FrontendChecksum {
+    state: u32,
+}
+
+impl FrontendChecksum {
+    const OFFSET_BASIS: u32 = 2_166_136_261;
+    const MULTIPLIER: u32 = 16_777_619;
+
+    fn new(domain: &[u8]) -> Self {
+        let mut checksum = Self {
+            state: Self::OFFSET_BASIS,
+        };
+        checksum.update(domain);
+        checksum.update(&[0]);
+        checksum
+    }
+
+    const fn finish(self) -> u32 {
+        self.state
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.state ^= u32::from(*byte);
+            self.state = self.state.wrapping_mul(Self::MULTIPLIER);
+        }
+    }
+
+    fn write_bytes(&mut self, tag: u8, value: &[u8]) {
+        self.update(&[tag]);
+        self.update(&(value.len() as u64).to_be_bytes());
+        self.update(value);
+    }
+
+    fn write_str(&mut self, tag: u8, value: &str) {
+        self.write_bytes(tag, value.as_bytes());
+    }
+
+    fn write_u64(&mut self, tag: u8, value: u64) {
+        self.write_bytes(tag, &value.to_be_bytes());
+    }
+
+    fn write_bool(&mut self, tag: u8, value: bool) {
+        self.write_bytes(tag, &[u8::from(value)]);
+    }
+
+    fn write_optional_span(&mut self, tag: u8, span: Option<SourceUtf8Span>) {
+        match span {
+            Some(span) => {
+                self.write_bool(tag, true);
+                self.write_u64(tag.saturating_add(1), u64::from(span.start()));
+                self.write_u64(tag.saturating_add(2), u64::from(span.end()));
+            }
+            None => self.write_bool(tag, false),
+        }
+    }
+
+    fn write_profile(
+        &mut self,
+        tag: u8,
+        profile: JsSourceProfile,
+        selected_goal: JsSelectedSourceGoal,
+    ) {
+        let grammar = match profile.grammar() {
+            crate::JsGrammarProfile::JavaScript => "javascript",
+            crate::JsGrammarProfile::JavaScriptJsx => "javascript-jsx",
+            crate::JsGrammarProfile::TypeScript => "typescript",
+            crate::JsGrammarProfile::TypeScriptJsx => "typescript-jsx",
+            crate::JsGrammarProfile::TypeScriptDeclaration => "typescript-declaration",
+        };
+        let goal = match selected_goal {
+            JsSelectedSourceGoal::Module => "module",
+            JsSelectedSourceGoal::Script => "script",
+        };
+        self.write_str(tag, grammar);
+        self.write_str(tag.saturating_add(1), goal);
+    }
+
+    fn write_binding(&mut self, tag: u8, binding: &JsRecognizerBinding) {
+        self.write_str(tag, binding.callee());
+        self.write_str(tag.saturating_add(1), binding.kind().as_str());
+        self.write_scope(tag.saturating_add(2), binding.scope());
+        self.write_str(tag.saturating_add(3), binding.domain().as_str());
+        self.write_str(tag.saturating_add(4), binding.key_syntax().as_str());
+    }
+
+    fn write_scope(&mut self, tag: u8, scope: &intlify_contract::CatalogScopeId) {
+        self.write_str(tag, scope.namespace().as_str());
+        self.write_str(tag.saturating_add(1), scope.name().as_str());
+    }
+
+    fn write_source(&mut self, tag: u8, source: &SourceDocumentIdentity) {
+        self.write_str(tag, source.namespace().as_str());
+        self.write_u64(tag.saturating_add(1), source.path().segments().len() as u64);
+        for segment in source.path().segments() {
+            self.write_str(tag.saturating_add(2), segment.as_str());
+        }
+    }
+
+    fn write_failure(&mut self, tag: u8, failure: &JsProducerFailure) {
+        self.write_str(tag, failure.stage().as_str());
+        self.write_str(tag.saturating_add(1), failure.reason().as_str());
+        self.write_source(tag.saturating_add(2), failure.source());
+        self.write_optional_span(tag.saturating_add(3), failure.span());
     }
 }
 

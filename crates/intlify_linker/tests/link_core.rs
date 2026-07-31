@@ -10,6 +10,8 @@ use intlify_contract::{
     MessageSelector, PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity,
     ProducerRevision, ReferenceArtifactIdentity, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+#[cfg(feature = "benchmark")]
+use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_linker::{
     link, ConfiguredRoot, DegradedAnalysisFinding, DeliveryUnitEdge, DeliveryUnitGraph,
     DynamicReferenceMode, InputCompleteness, LinkFinding, LinkFindingKind, LinkFindingRecord,
@@ -213,6 +215,74 @@ fn assert_limit(
     };
     assert_eq!(evidence.counter(), counter);
     assert_eq!(evidence.observation(), observation);
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
+    let app = scope("app");
+    let references = vec![reference_artifact(
+        "app",
+        DeliveryUnitId::main(),
+        vec![reference(
+            app.clone(),
+            MessageSelector::Exact(key("/hello")),
+        )],
+    )];
+    let definitions = vec![definition_artifact(
+        "en.json",
+        vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
+    )];
+    let policy = policy(&["en"], Vec::new(), DynamicReferenceMode::Compat);
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let mapping = mappings(std::slice::from_ref(&app), Vec::new());
+    let request = LinkRequest::try_new(
+        &references,
+        &definitions,
+        &policy,
+        &mapping,
+        &completeness,
+        &graph,
+        &limits,
+    )
+    .unwrap();
+
+    let ordinary = link(&request).unwrap();
+    let measured = benchmark_link(&request).unwrap();
+    let repeated = benchmark_link(&request).unwrap();
+
+    assert_eq!(measured.outcome(), &ordinary);
+    assert_eq!(repeated.outcome(), &ordinary);
+    assert_eq!(
+        measured
+            .stages()
+            .iter()
+            .map(intlify_linker::benchmark::BenchmarkLinkStageMeasurement::stage)
+            .collect::<Vec<_>>(),
+        [
+            BenchmarkLinkStage::SemanticIndexConstruction,
+            BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
+            BenchmarkLinkStage::ReachabilityAndPlacement,
+            BenchmarkLinkStage::FindingAndPlanMaterialization,
+        ]
+    );
+    assert!(measured.stages().iter().all(|stage| {
+        !stage.stage().cost().is_empty() && !stage.stage().boundary_id().contains("_v")
+    }));
+    assert_eq!(
+        measured
+            .stages()
+            .iter()
+            .map(|stage| (stage.stage(), stage.checksum()))
+            .collect::<Vec<_>>(),
+        repeated
+            .stages()
+            .iter()
+            .map(|stage| (stage.stage(), stage.checksum()))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
