@@ -101,6 +101,14 @@ jobs:
           VITE_LOG: vite_task=trace
         run: vpr --no-cache -v test
 
+      - name: Run message benchmark smoke
+        if: runner.os == 'Linux'
+        run: vp run bench:messages:smoke
+
+      - name: Validate message benchmark result
+        if: runner.os == 'Linux'
+        run: vp run bench:messages:validate
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})
@@ -268,38 +276,3 @@ jobs:
 
       - name: Run binding benchmark E2E smoke
         run: vp run bench:bindings:e2e:smoke
-
-  message-benchmark-smoke:
-    runs-on: ubuntu-latest
-    name: Message benchmark smoke
-    timeout-minutes: 20
-    steps:
-      - name: Checkout codes
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
-        with:
-          node-version: 24
-          cache: true
-          run-install: false
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-        with:
-          toolchain: '1.97.1'
-
-      - name: Install dependencies
-        run: vp install --frozen-lockfile
-
-      - name: Setup cargo cache
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
-
-      - name: Run message benchmark smoke
-        run: vp run bench:messages:smoke
-
-      - name: Validate message benchmark result
-        run: vp run bench:messages:validate
