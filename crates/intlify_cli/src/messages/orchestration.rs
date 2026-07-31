@@ -15,8 +15,8 @@ use std::fmt;
 use std::path::Path;
 
 use intlify_contract::{
-    encode_definition_artifact, encode_reference_artifact, CatalogScopeId, LinkLimits,
-    MessageSelector,
+    encode_definition_artifact, encode_reference_artifact, ArtifactContractError, CatalogScopeId,
+    LinkLimits, MessageSelector,
 };
 #[cfg(feature = "benchmark")]
 use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
@@ -238,17 +238,19 @@ where
         "link-request",
     );
     if observer.enabled() {
-        let observation_fields = request_observation(&request);
-        observer.observe(
-            MessageBenchmarkStage::RequestValidationAndScopeMapping,
-            "link-request",
-            observation_checksum(
-                MessageBenchmarkStage::RequestValidationAndScopeMapping
-                    .cost()
-                    .as_bytes(),
-                observation_fields.iter().map(Vec::as_slice),
+        match request_observation(&request) {
+            Ok(observation_fields) => observer.observe(
+                MessageBenchmarkStage::RequestValidationAndScopeMapping,
+                "link-request",
+                observation_checksum(
+                    MessageBenchmarkStage::RequestValidationAndScopeMapping
+                        .cost()
+                        .as_bytes(),
+                    observation_fields.iter().map(Vec::as_slice),
+                ),
             ),
-        );
+            Err(_) => observer.invalidate(),
+        }
     }
     let outcome = run_semantic_link(&request, observer)?;
 
@@ -259,24 +261,20 @@ where
     })
 }
 
-fn request_observation(request: &LinkRequest<'_>) -> Vec<Vec<u8>> {
+fn request_observation(request: &LinkRequest<'_>) -> Result<Vec<Vec<u8>>, ArtifactContractError> {
     let mut fields = Vec::new();
 
     fields.push(b"reference-artifacts".to_vec());
     fields.push(count_bytes(request.reference_artifacts().len()));
-    fields.extend(request.reference_artifacts().iter().map(|artifact| {
-        encode_reference_artifact(artifact, request.limits())
-            .expect("a request-admitted reference artifact re-encodes canonically")
-            .into_vec()
-    }));
+    for artifact in request.reference_artifacts() {
+        fields.push(encode_reference_artifact(artifact, request.limits())?.into_vec());
+    }
 
     fields.push(b"definition-artifacts".to_vec());
     fields.push(count_bytes(request.definition_artifacts().len()));
-    fields.extend(request.definition_artifacts().iter().map(|artifact| {
-        encode_definition_artifact(artifact, request.limits())
-            .expect("a request-admitted definition artifact re-encodes canonically")
-            .into_vec()
-    }));
+    for artifact in request.definition_artifacts() {
+        fields.push(encode_definition_artifact(artifact, request.limits())?.into_vec());
+    }
 
     fields.push(b"policy".to_vec());
     fields.push(count_bytes(request.policy().production_locales().len()));
@@ -341,7 +339,7 @@ fn request_observation(request: &LinkRequest<'_>) -> Vec<Vec<u8>> {
         push_delivery_unit(&mut fields, root);
     }
     fields.push(b"admitted".to_vec());
-    fields
+    Ok(fields)
 }
 
 fn count_bytes(count: usize) -> Vec<u8> {
@@ -869,6 +867,34 @@ mod tests {
                 "reference-external-inventory"
             ]
         );
+    }
+
+    #[cfg(feature = "benchmark")]
+    #[test]
+    fn benchmark_project_path_discards_a_failed_resource_extraction_boundary() {
+        use crate::messages::benchmark::{benchmark_project_link, MessageBenchmarkStage};
+
+        let root = TempRoot::new("resource-extraction-failure-benchmark");
+        create_representative_project(&root, false);
+        write(&root, "locales/en.json", r#"{"title":"#);
+        let (resources, messages) = resolved(&messages_value("strict"));
+        let ordinary = execute(&root, "strict", None);
+
+        let observed = benchmark_project_link(
+            &root,
+            None,
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+        )
+        .unwrap();
+
+        assert_eq!(observed.outcome(), ordinary.outcome());
+        assert!(observed.measurements().iter().all(|measurement| {
+            measurement.stage() != MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
+                || measurement.identity() != "locales/en.json"
+        }));
     }
 
     #[test]

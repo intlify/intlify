@@ -50,6 +50,9 @@ const processResult = spawnSync(
     maxBuffer: 64 * 1024 * 1024
   }
 )
+if (processResult.error) {
+  throw new Error(`failed to launch messages benchmark runner: ${processResult.error.message}`)
+}
 if (processResult.status !== 0) {
   throw new Error(
     processResult.stderr || `${binaryPath} exited with status ${String(processResult.status)}`

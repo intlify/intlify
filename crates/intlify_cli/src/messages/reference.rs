@@ -879,18 +879,19 @@ fn produce_external_inventory<O>(
         );
         if let Ok(artifact) = &decoded {
             if observer.enabled() {
-                let bytes = encode_reference_artifact(artifact, limits)
-                    .expect("a decoded reference artifact re-encodes canonically");
-                observer.observe(
-                    MessageBenchmarkStage::ReferenceArtifactDecode,
-                    &snapshot.primary_label,
-                    observation_checksum(
-                        MessageBenchmarkStage::ReferenceArtifactDecode
-                            .cost()
-                            .as_bytes(),
-                        [bytes.as_ref()],
+                match encode_reference_artifact(artifact, limits) {
+                    Ok(bytes) => observer.observe(
+                        MessageBenchmarkStage::ReferenceArtifactDecode,
+                        &snapshot.primary_label,
+                        observation_checksum(
+                            MessageBenchmarkStage::ReferenceArtifactDecode
+                                .cost()
+                                .as_bytes(),
+                            [bytes.as_ref()],
+                        ),
                     ),
-                );
+                    Err(_) => observer.invalidate(),
+                }
             }
         }
         match decoded {

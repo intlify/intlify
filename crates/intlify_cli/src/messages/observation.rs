@@ -151,6 +151,10 @@ pub(crate) trait MessageBenchmarkObserver {
 
     fn finish(&mut self, _stage: MessageBenchmarkStage, _identity: &str) {}
 
+    fn abandon(&mut self, _stage: MessageBenchmarkStage, _identity: &str) {}
+
+    fn invalidate(&mut self) {}
+
     fn observe(&mut self, _stage: MessageBenchmarkStage, _identity: &str, _checksum: u32) {}
 
     #[cfg(feature = "benchmark")]

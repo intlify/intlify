@@ -388,6 +388,20 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
         self.push_completed(stage, identity, elapsed, None, Some(finished));
     }
 
+    fn abandon(&mut self, stage: MessageBenchmarkStage, identity: &str) {
+        let Some(active) = self.active.pop() else {
+            self.invariant_failed = true;
+            return;
+        };
+        if active.stage != stage || active.identity.as_ref() != identity {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn invalidate(&mut self) {
+        self.invariant_failed = true;
+    }
+
     fn observe(&mut self, stage: MessageBenchmarkStage, identity: &str, checksum: u32) {
         let Some(index) = self.completed.iter().rposition(|measurement| {
             measurement.stage == stage
@@ -473,6 +487,34 @@ mod tests {
         let mut recorder = BenchmarkRecorder::default();
         recorder.begin(MessageBenchmarkStage::InventoryMetadataIo, "inventory");
         recorder.finish(MessageBenchmarkStage::InventoryMetadataIo, "inventory");
+
+        assert!(recorder.finish_recording().is_err());
+    }
+
+    #[test]
+    fn recorder_discards_an_abandoned_child_boundary() {
+        let mut recorder = BenchmarkRecorder::default();
+        recorder.begin(MessageBenchmarkStage::ProjectLinkE2e, "project-link");
+        recorder.begin(
+            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+            "locales/en.json",
+        );
+        recorder.abandon(
+            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+            "locales/en.json",
+        );
+        recorder.finish(MessageBenchmarkStage::ProjectLinkE2e, "project-link");
+        recorder.observe(MessageBenchmarkStage::ProjectLinkE2e, "project-link", 1);
+
+        let completed = recorder.finish_recording().unwrap();
+        assert_eq!(completed.len(), 1);
+        assert_eq!(completed[0].stage(), MessageBenchmarkStage::ProjectLinkE2e);
+    }
+
+    #[test]
+    fn recorder_rejects_an_explicitly_invalidated_observation() {
+        let mut recorder = BenchmarkRecorder::default();
+        recorder.invalidate();
 
         assert!(recorder.finish_recording().is_err());
     }

@@ -202,6 +202,12 @@ trait ProducerObserver: FrontendObserver {
 
     fn begin_cache_access(&mut self, _source: &SourceDocumentIdentity) {}
 
+    fn pause_cache_miss(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn resume_cache_publication(&mut self, _source: &SourceDocumentIdentity) {}
+
+    fn abandon_cache_access(&mut self, _source: &SourceDocumentIdentity) {}
+
     fn finish_cache_hit(
         &mut self,
         _source: &SourceDocumentIdentity,
@@ -263,6 +269,7 @@ struct BenchmarkProducerObserver<'limits> {
     artifact_active: Option<(SourceDocumentIdentity, Instant)>,
     cache_active: BTreeMap<SourceDocumentIdentity, Instant>,
     cache_excluded: BTreeMap<SourceDocumentIdentity, Duration>,
+    cache_accumulated: BTreeMap<SourceDocumentIdentity, Duration>,
     stages: Vec<BenchmarkJsStageMeasurement>,
     observed: Vec<bool>,
     observation_started: Vec<Option<Instant>>,
@@ -280,6 +287,7 @@ impl<'limits> BenchmarkProducerObserver<'limits> {
             artifact_active: None,
             cache_active: BTreeMap::new(),
             cache_excluded: BTreeMap::new(),
+            cache_accumulated: BTreeMap::new(),
             stages: Vec::new(),
             observed: Vec::new(),
             observation_started: Vec::new(),
@@ -348,10 +356,32 @@ impl<'limits> BenchmarkProducerObserver<'limits> {
             self.invariant_failed = true;
             return;
         };
+        let accumulated = match stage {
+            BenchmarkJsStage::CacheMissProduction => {
+                let Some(accumulated) = self.cache_accumulated.remove(source) else {
+                    self.invariant_failed = true;
+                    return;
+                };
+                accumulated
+            }
+            BenchmarkJsStage::CacheHitValidationAndAccess => {
+                if self.cache_accumulated.remove(source).is_some() {
+                    self.invariant_failed = true;
+                    return;
+                }
+                Duration::ZERO
+            }
+            _ => {
+                self.invariant_failed = true;
+                return;
+            }
+        };
         let finished = Instant::now();
-        let elapsed = finished
-            .saturating_duration_since(started)
-            .saturating_sub(excluded);
+        let elapsed = accumulated.saturating_add(
+            finished
+                .saturating_duration_since(started)
+                .saturating_sub(excluded),
+        );
         let index = self.push(source.clone(), stage, elapsed, finished);
         let Ok(bytes) = encode_reference_artifact(artifact, self.limits) else {
             self.invariant_failed = true;
@@ -375,6 +405,7 @@ impl<'limits> BenchmarkProducerObserver<'limits> {
             || self.artifact_active.is_some()
             || !self.cache_active.is_empty()
             || !self.cache_excluded.is_empty()
+            || !self.cache_accumulated.is_empty()
             || self.observed.len() != self.stages.len()
             || self.observation_started.len() != self.stages.len()
             || self.observed.iter().any(|observed| !observed)
@@ -462,15 +493,53 @@ impl ProducerObserver for BenchmarkProducerObserver<'_> {
     }
 
     fn begin_cache_access(&mut self, source: &SourceDocumentIdentity) {
-        if self
-            .cache_active
-            .insert(source.clone(), Instant::now())
-            .is_some()
-            || self
-                .cache_excluded
-                .insert(source.clone(), Duration::ZERO)
-                .is_some()
+        if self.cache_active.contains_key(source)
+            || self.cache_excluded.contains_key(source)
+            || self.cache_accumulated.contains_key(source)
         {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_active.insert(source.clone(), Instant::now());
+        self.cache_excluded.insert(source.clone(), Duration::ZERO);
+    }
+
+    fn pause_cache_miss(&mut self, source: &SourceDocumentIdentity) {
+        let Some(started) = self.cache_active.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        let Some(excluded) = self.cache_excluded.remove(source) else {
+            self.invariant_failed = true;
+            return;
+        };
+        if self.cache_accumulated.contains_key(source) {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_accumulated
+            .insert(source.clone(), started.elapsed().saturating_sub(excluded));
+    }
+
+    fn resume_cache_publication(&mut self, source: &SourceDocumentIdentity) {
+        if !self.cache_accumulated.contains_key(source)
+            || self.cache_active.contains_key(source)
+            || self.cache_excluded.contains_key(source)
+        {
+            self.invariant_failed = true;
+            return;
+        }
+        self.cache_active.insert(source.clone(), Instant::now());
+        self.cache_excluded.insert(source.clone(), Duration::ZERO);
+    }
+
+    fn abandon_cache_access(&mut self, source: &SourceDocumentIdentity) {
+        let active = self.cache_active.remove(source);
+        let excluded = self.cache_excluded.remove(source);
+        let accumulated = self.cache_accumulated.remove(source);
+        let active_interval = active.is_some() && excluded.is_some() && accumulated.is_none();
+        let paused_interval = active.is_none() && excluded.is_none() && accumulated.is_some();
+        if !active_interval && !paused_interval {
             self.invariant_failed = true;
         }
     }
@@ -732,6 +801,7 @@ where
 
     if let Some(cache) = cache {
         for publication in pending_cache {
+            observer.resume_cache_publication(&publication.source);
             let _ = cache.store(&publication.key, &publication.value);
             observer.finish_cache_miss(
                 &publication.source,
@@ -936,7 +1006,12 @@ where
         observer,
     )? {
         CacheMissOutcome::Produced(produced) => produced,
-        CacheMissOutcome::Failed(failure) => return Ok(GroupOutcome::Failed(failure)),
+        CacheMissOutcome::Failed(failure) => {
+            if cache.is_some() {
+                observer.abandon_cache_access(group.primary());
+            }
+            return Ok(GroupOutcome::Failed(failure));
+        }
     };
 
     let cache_publication = fingerprint.map(|fingerprint| {
@@ -957,6 +1032,9 @@ where
             artifact: produced.artifact.clone(),
         })
     });
+    if cache_publication.is_some() {
+        observer.pause_cache_miss(group.primary());
+    }
     Ok(GroupOutcome::Artifact {
         artifact: produced.artifact,
         cache_publication,
@@ -1348,17 +1426,18 @@ mod tests {
     };
 
     use super::{
-        build_artifact_identity, preflight_source_bytes, produce_reference_artifacts,
-        produce_reference_artifacts_with_cache, SourceAdmissionLimits,
+        build_artifact_identity, preflight_source_bytes, produce_impl, produce_reference_artifacts,
+        produce_reference_artifacts_with_cache, DisabledCache, ProducerObserver,
+        SourceAdmissionLimits,
     };
     use crate::cache::{
         encode_cache_entry, key_for_group, CacheKeyContext, JsProducerCache,
         JsProducerCacheIoError, JsProducerCacheKey, SourceFingerprint,
     };
     use crate::{
-        js_producer_identity, JsKeySyntax, JsPhysicalSourceGroup, JsProducerFailureReason,
-        JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet, JsSelectedSourceGoal,
-        JsSourceProfile,
+        frontend::FrontendObserver, js_producer_identity, JsKeySyntax, JsPhysicalSourceGroup,
+        JsProducerFailureReason, JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet,
+        JsSelectedSourceGoal, JsSourceProfile,
     };
 
     fn group(name: &str, bytes: usize) -> JsPhysicalSourceGroup {
@@ -1411,6 +1490,83 @@ mod tests {
         assert_eq!(failure.limit(), Some(10));
         assert_eq!(failure.observed(), Some(11));
         assert_eq!(failure.source(), groups[1].primary());
+    }
+
+    #[derive(Default)]
+    struct CacheBoundaryTrace {
+        events: Vec<(&'static str, SourceDocumentIdentity)>,
+    }
+
+    impl FrontendObserver for CacheBoundaryTrace {}
+
+    impl ProducerObserver for CacheBoundaryTrace {
+        fn begin_cache_access(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("begin", source.clone()));
+        }
+
+        fn pause_cache_miss(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("pause", source.clone()));
+        }
+
+        fn resume_cache_publication(&mut self, source: &SourceDocumentIdentity) {
+            self.events.push(("resume", source.clone()));
+        }
+
+        fn finish_cache_miss(
+            &mut self,
+            source: &SourceDocumentIdentity,
+            _key: &JsProducerCacheKey,
+            _artifact: &MessageReferenceArtifact,
+        ) {
+            self.events.push(("finish", source.clone()));
+        }
+    }
+
+    #[test]
+    fn cache_miss_measurement_pauses_between_source_work_and_publication() {
+        let first = group("a.ts", 0);
+        let second = group("b.ts", 0);
+        let first_source = first.primary().clone();
+        let second_source = second.primary().clone();
+        let scope = CatalogScopeId::new(
+            ArtifactNamespace::Project,
+            CatalogScopeName::try_new("app").unwrap(),
+        );
+        let recognizers = JsRecognizerSet::try_new(vec![JsRecognizerBinding::try_new(
+            "t",
+            JsRecognizerCallKind::Lookup,
+            scope,
+            CatalogKeyDomain::JsonPointer,
+            JsKeySyntax::Literal,
+        )
+        .unwrap()])
+        .unwrap();
+        let mut observer = CacheBoundaryTrace::default();
+
+        let outcome = produce_impl(
+            vec![second, first],
+            &recognizers,
+            &LinkLimits::default(),
+            Some(&DisabledCache),
+            &|| false,
+            &mut observer,
+        )
+        .unwrap();
+
+        assert!(outcome.is_complete());
+        assert_eq!(
+            observer.events,
+            [
+                ("begin", first_source.clone()),
+                ("pause", first_source.clone()),
+                ("begin", second_source.clone()),
+                ("pause", second_source.clone()),
+                ("resume", first_source.clone()),
+                ("finish", first_source),
+                ("resume", second_source.clone()),
+                ("finish", second_source),
+            ]
+        );
     }
 
     struct SingleEntryCache {

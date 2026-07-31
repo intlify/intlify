@@ -366,26 +366,32 @@ where
             &identity,
         );
         let extraction = extract_group(snapshotted, registry);
-        observer.finish(
-            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
-            &identity,
-        );
-        if let Ok(extraction) = &extraction {
-            if observer.enabled() {
-                observer.observe(
+        match &extraction {
+            Ok(extraction) => {
+                observer.finish(
                     MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
                     &identity,
-                    observation_checksum(
-                        MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
-                            .cost()
-                            .as_bytes(),
-                        [
-                            extraction.prepared.primary_path().as_bytes(),
-                            extraction.snapshot.as_bytes(),
-                        ],
-                    ),
                 );
+                if observer.enabled() {
+                    observer.observe(
+                        MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+                        &identity,
+                        observation_checksum(
+                            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
+                                .cost()
+                                .as_bytes(),
+                            [
+                                extraction.prepared.primary_path().as_bytes(),
+                                extraction.snapshot.as_bytes(),
+                            ],
+                        ),
+                    );
+                }
             }
+            Err(_) => observer.abandon(
+                MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+                &identity,
+            ),
         }
         match extraction {
             Ok(extraction) => {

@@ -238,6 +238,29 @@ fn benchmark_distinguishes_cache_miss_production_from_cache_hit_access() {
         .all(|measurement| !measurement.stage().boundary_id().contains("_v")));
 }
 
+#[cfg(feature = "benchmark")]
+#[test]
+fn benchmark_preserves_a_cached_source_local_failure() {
+    let limits = LinkLimits::default();
+    let cache = MemoryCache::default();
+
+    let execution = benchmark_produce_reference_artifacts_with_cache(
+        vec![group(&[&["src", "invalid.ts"]], b"t(")],
+        &lookup("t"),
+        &limits,
+        &cache,
+    )
+    .unwrap();
+
+    assert!(execution.outcome().artifacts().is_empty());
+    assert_eq!(execution.outcome().source_failures().len(), 1);
+    assert_eq!(
+        execution.outcome().source_failures()[0].reason(),
+        JsProducerFailureReason::SyntaxInvalid
+    );
+    assert_eq!(cache.store_count(), 0);
+}
+
 #[test]
 fn physical_alias_group_emits_one_primary_owned_artifact() {
     let outcome = produce_reference_artifacts(
