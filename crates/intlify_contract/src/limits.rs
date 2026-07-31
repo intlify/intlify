@@ -188,6 +188,10 @@ pub enum LinkLimitCounter {
     ReferenceRecords,
     /// Submitted definition records in one definition artifact.
     Definitions,
+    /// Submitted declared-scope coverage-baseline occurrences.
+    CoverageBaselines,
+    /// Aggregate coverage-baseline scope-name and locale bytes.
+    CoverageBaselineBytesTotal,
 }
 
 // This registry is the single source of truth for counter names, ceilings,
@@ -652,6 +656,24 @@ const LINK_LIMIT_COUNTER_METADATA: &[LinkLimitCounterMetadata] = &[
         FirstOver,
         ArtifactAndLink,
         [DefinitionArtifactGroup]
+    ),
+    counter_metadata!(
+        CoverageBaselines,
+        "coverage_baselines",
+        4_096,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [ResolvedPolicy]
+    ),
+    counter_metadata!(
+        CoverageBaselineBytesTotal,
+        "coverage_baseline_bytes_total",
+        2_088_960,
+        Active,
+        Exact,
+        LinkOnly,
+        [ResolvedPolicy]
     ),
 ];
 
@@ -1137,6 +1159,8 @@ mod tests {
             "delivery_unit_bytes",
             "reference_records",
             "definitions",
+            "coverage_baselines",
+            "coverage_baseline_bytes_total",
         ];
         let expected_ceilings = [
             65_536,
@@ -1188,6 +1212,8 @@ mod tests {
             4_096,
             1_000_000,
             100_000,
+            4_096,
+            2_088_960,
         ];
         assert_eq!(LinkLimitCounter::ALL.len(), expected.len());
         assert_eq!(LinkLimitCounter::ALL.len(), expected_ceilings.len());
@@ -1243,6 +1269,7 @@ mod tests {
             Counter::DeliveryUnitSegments,
             Counter::ReferenceRecords,
             Counter::Definitions,
+            Counter::CoverageBaselines,
         ];
         let arithmetic_overflow = [
             Counter::ReferenceIdentityBytesTotal,
@@ -1397,6 +1424,8 @@ mod tests {
                     Counter::ConfiguredRoots,
                     Counter::LocaleBytes,
                     Counter::CatalogScopeNameBytes,
+                    Counter::CoverageBaselines,
+                    Counter::CoverageBaselineBytesTotal,
                 ],
             ),
             (
@@ -1571,6 +1600,38 @@ mod tests {
             .unwrap_err(),
             LinkLimitEvidenceConstructionError::ArithmeticOverflowUnavailable
         );
+
+        assert_eq!(
+            LinkLimitEvidence::try_new(
+                LinkLimitCounter::CoverageBaselineBytesTotal,
+                LinkLimitSubject::ResolvedPolicy,
+                4,
+                LinkLimitObservation::ArithmeticOverflow,
+            )
+            .unwrap_err(),
+            LinkLimitEvidenceConstructionError::ArithmeticOverflowUnavailable
+        );
+    }
+
+    #[test]
+    fn coverage_baseline_counters_are_policy_only() {
+        for counter in [
+            LinkLimitCounter::CoverageBaselines,
+            LinkLimitCounter::CoverageBaselineBytesTotal,
+        ] {
+            assert_eq!(
+                ArtifactLimitEvidence::try_new(counter, 0, LinkLimitObservation::Exact(1))
+                    .unwrap_err(),
+                LinkLimitEvidenceConstructionError::CounterOutsideArtifactBoundary
+            );
+            assert!(LinkLimitEvidence::try_new(
+                counter,
+                LinkLimitSubject::ResolvedPolicy,
+                0,
+                LinkLimitObservation::Exact(1),
+            )
+            .is_ok());
+        }
     }
 
     #[test]

@@ -19,8 +19,8 @@ use intlify_contract::{
     ValueConstructionError,
 };
 use intlify_linker::{
-    ConfiguredRoot, DynamicReferenceMode, InvalidRequestError, LinkOperationalError, LinkPolicy,
-    PlacementPolicy,
+    ConfiguredRoot, CoverageBaseline, DynamicReferenceMode, InvalidRequestError,
+    LinkOperationalError, LinkPolicy, PlacementPolicy,
 };
 use intlify_producer_js::{
     JsKeySyntax, JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet,
@@ -35,6 +35,8 @@ const LOCALE_BYTES_LIMIT: usize = 255;
 const SCOPE_BYTES_LIMIT: usize = 255;
 const PRODUCTION_LOCALES_LIMIT: usize = 1_024;
 const CONFIGURED_ROOTS_LIMIT: usize = 4_096;
+const COVERAGE_BASELINES_LIMIT: usize = 4_096;
+const COVERAGE_BASELINE_BYTES_TOTAL_LIMIT: u64 = 2_088_960;
 
 type ValidatedRoots = (
     Vec<MessageRootConfig>,
@@ -67,6 +69,8 @@ pub enum MessagesConfigReason {
     InvalidMessageRoots,
     /// Built-in or external producer configuration is malformed.
     InvalidMessageProducers,
+    /// Coverage-baseline mapping is malformed or contradicts scope/locale policy.
+    InvalidMessageCoverageBaseline,
 }
 
 impl MessagesConfigReason {
@@ -80,6 +84,7 @@ impl MessagesConfigReason {
             Self::InvalidMessageDynamicReferences => "invalid_message_dynamic_references",
             Self::InvalidMessageRoots => "invalid_message_roots",
             Self::InvalidMessageProducers => "invalid_message_producers",
+            Self::InvalidMessageCoverageBaseline => "invalid_message_coverage_baseline",
         }
     }
 }
@@ -419,6 +424,9 @@ pub struct MessagesConfig {
     roots: Vec<MessageRootConfig>,
     #[serde(default, skip_serializing_if = "is_default_producers")]
     producers: MessageProducersConfig,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(default, schema_with = "coverage_baseline_schema")]
+    coverage_baseline: BTreeMap<String, String>,
 }
 
 impl MessagesConfig {
@@ -444,6 +452,12 @@ impl MessagesConfig {
     #[must_use]
     pub const fn producers(&self) -> &MessageProducersConfig {
         &self.producers
+    }
+
+    /// Return canonical declared-scope coverage-baseline spellings.
+    #[must_use]
+    pub const fn coverage_baseline(&self) -> &BTreeMap<String, String> {
+        &self.coverage_baseline
     }
 }
 
@@ -482,6 +496,24 @@ fn recognizers_schema(generator: &mut SchemaGenerator) -> Schema {
     let mut schema = BTreeMap::<String, MessageJsRecognizerConfig>::json_schema(generator);
     schema.insert("minProperties".to_owned(), Value::from(1));
     schema
+}
+
+fn coverage_baseline_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "object",
+        "minProperties": 1,
+        "maxProperties": 4096,
+        "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+        },
+        "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+        }
+    })
 }
 
 /// Immutable resolved built-in JS producer inputs.
@@ -619,7 +651,13 @@ pub fn validate_messages_config(
 
     if let Some((field, rejected)) = first_unknown_field(
         section,
-        &["locales", "dynamicReferences", "roots", "producers"],
+        &[
+            "locales",
+            "dynamicReferences",
+            "roots",
+            "producers",
+            "coverageBaseline",
+        ],
     ) {
         return Err(MessagesConfigViolation::unknown(
             pointer_property("/messages", field),
@@ -636,11 +674,17 @@ pub fn validate_messages_config(
     let (producers, resolved_producers, mut domain_declarations) =
         validate_producers(section.get("producers"), resources)?;
     domain_declarations.extend(root_domains);
+    let (coverage_baseline, resolved_coverage_baselines) = validate_coverage_baseline(
+        section.get("coverageBaseline"),
+        resources,
+        &resolved_locales,
+    )?;
 
     let limits = LinkLimits::default();
     let policy = LinkPolicy::try_new(
         resolved_locales,
         resolved_roots,
+        resolved_coverage_baselines,
         dynamic_references.resolved(),
         PlacementPolicy::Duplicate,
         &limits,
@@ -665,6 +709,7 @@ pub fn validate_messages_config(
             dynamic_references,
             roots,
             producers,
+            coverage_baseline,
         },
         ResolvedMessagesConfig {
             policy,
@@ -779,6 +824,145 @@ fn validate_dynamic_references(
             CONFIG_EVIDENCE_BYTES,
         )),
     }
+}
+
+fn validate_coverage_baseline(
+    value: Option<&Value>,
+    resources: &ResolvedResources,
+    production_locales: &[Locale],
+) -> Result<(BTreeMap<String, String>, Vec<CoverageBaseline>), MessagesConfigViolation> {
+    let Some(value) = value else {
+        return Ok((BTreeMap::new(), Vec::new()));
+    };
+    let pointer = "/messages/coverageBaseline";
+    let object = value.as_object().ok_or_else(|| {
+        MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageCoverageBaseline,
+            pointer,
+            Some(value),
+            CONFIG_EVIDENCE_BYTES,
+        )
+    })?;
+    if object.is_empty() {
+        return Err(MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageCoverageBaseline,
+            pointer,
+            Some(value),
+            CONFIG_EVIDENCE_BYTES,
+        ));
+    }
+    if object.len() > COVERAGE_BASELINES_LIMIT {
+        return Err(MessagesConfigViolation::with_limit(
+            MessagesConfigReason::InvalidMessageCoverageBaseline,
+            pointer,
+            COVERAGE_BASELINES_LIMIT as u64,
+            object.len() as u64,
+        ));
+    }
+
+    let mut members = object.iter().collect::<Vec<_>>();
+    members.sort_by(|(left, _), (right, _)| left.as_bytes().cmp(right.as_bytes()));
+
+    let mut checked_scopes = Vec::with_capacity(members.len());
+    for (scope, _) in &members {
+        if scope.len() > SCOPE_BYTES_LIMIT {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                pointer,
+                SCOPE_BYTES_LIMIT as u64,
+                scope.len() as u64,
+            ));
+        }
+        let scope_name = ContractCatalogScopeName::try_new(scope.as_str()).map_err(|_| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                pointer_property(pointer, scope),
+                None,
+                CONFIG_EVIDENCE_BYTES,
+            )
+        })?;
+        checked_scopes.push(CatalogScopeId::new(ArtifactNamespace::Project, scope_name));
+    }
+
+    let mut checked_locales = Vec::with_capacity(members.len());
+    for (scope, value) in &members {
+        let member_pointer = pointer_property(pointer, scope);
+        let locale = value.as_str().ok_or_else(|| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                member_pointer.clone(),
+                Some(value),
+                LOCALE_BYTES_LIMIT,
+            )
+        })?;
+        if locale.len() > LOCALE_BYTES_LIMIT {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                member_pointer,
+                LOCALE_BYTES_LIMIT as u64,
+                locale.len() as u64,
+            ));
+        }
+        checked_locales.push(Locale::try_new(locale).map_err(|_| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                member_pointer,
+                Some(value),
+                LOCALE_BYTES_LIMIT,
+            )
+        })?);
+    }
+
+    let mut total = 0_u64;
+    for ((scope, _), locale) in members.iter().zip(&checked_locales) {
+        total = total
+            .checked_add(scope.len() as u64)
+            .and_then(|value| value.checked_add(locale.as_str().len() as u64))
+            .expect("bounded coverage-baseline members cannot overflow u64");
+        if total > COVERAGE_BASELINE_BYTES_TOTAL_LIMIT {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                pointer,
+                COVERAGE_BASELINE_BYTES_TOTAL_LIMIT,
+                total,
+            ));
+        }
+    }
+
+    for (scope, _) in &members {
+        if resources
+            .linker_scopes()
+            .binary_search_by(|candidate| candidate.as_str().as_bytes().cmp(scope.as_bytes()))
+            .is_err()
+        {
+            return Err(MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                pointer_property(pointer, scope),
+                None,
+                CONFIG_EVIDENCE_BYTES,
+            ));
+        }
+    }
+    for ((scope, value), locale) in members.iter().zip(&checked_locales) {
+        if production_locales.binary_search(locale).is_err() {
+            return Err(MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageCoverageBaseline,
+                pointer_property(pointer, scope),
+                Some(value),
+                LOCALE_BYTES_LIMIT,
+            ));
+        }
+    }
+
+    let mut normalized = BTreeMap::new();
+    let mut resolved = Vec::with_capacity(members.len());
+    for (((scope, _), scope_id), locale) in
+        members.into_iter().zip(checked_scopes).zip(checked_locales)
+    {
+        normalized.insert(scope.to_owned(), locale.as_str().to_owned());
+        resolved.push(CoverageBaseline::new(scope_id, locale));
+    }
+    Ok((normalized, resolved))
 }
 
 fn validate_roots(
@@ -1573,6 +1757,21 @@ fn validate_linker_scope<'a>(
 }
 
 fn policy_config_violation(error: LinkOperationalError) -> MessagesConfigViolation {
+    let coverage_baseline_failure = match &error {
+        LinkOperationalError::InvalidRequest(
+            InvalidRequestError::DuplicateCoverageBaseline(_)
+            | InvalidRequestError::CoverageBaselineLocaleNotProduction { .. }
+            | InvalidRequestError::ResolvedCoverageBaselineConflict { .. }
+            | InvalidRequestError::CoverageBaselineMissingKey { .. },
+        ) => true,
+        LinkOperationalError::Limit(evidence) => matches!(
+            evidence.counter(),
+            LinkLimitCounter::CoverageBaselines | LinkLimitCounter::CoverageBaselineBytesTotal
+        ),
+        LinkOperationalError::InvalidRequest(_)
+        | LinkOperationalError::UnsupportedContract(_)
+        | LinkOperationalError::InternalInvariant => false,
+    };
     let locale_failure = match error {
         LinkOperationalError::InvalidRequest(
             InvalidRequestError::EmptyProductionLocales
@@ -1586,7 +1785,12 @@ fn policy_config_violation(error: LinkOperationalError) -> MessagesConfigViolati
         | LinkOperationalError::UnsupportedContract(_)
         | LinkOperationalError::InternalInvariant => false,
     };
-    let (reason, pointer) = if locale_failure {
+    let (reason, pointer) = if coverage_baseline_failure {
+        (
+            MessagesConfigReason::InvalidMessageCoverageBaseline,
+            "/messages/coverageBaseline",
+        )
+    } else if locale_failure {
         (
             MessagesConfigReason::InvalidMessageLocales,
             "/messages/locales",
@@ -1672,7 +1876,7 @@ mod tests {
 
     use super::{
         policy_config_violation, validate_messages_config, validate_roots, MessageCatalogKeyDomain,
-        MessagesConfigError, MessagesConfigReason,
+        MessagesConfigError, MessagesConfigReason, COVERAGE_BASELINES_LIMIT, SCOPE_BYTES_LIMIT,
     };
 
     fn resources(value: &Value) -> intlify_resource::ResolvedResources {
@@ -1741,6 +1945,8 @@ mod tests {
             DynamicReferenceMode::Compat
         );
         assert!(resolved.policy().configured_roots().is_empty());
+        assert!(resolved.policy().coverage_baselines().is_empty());
+        assert!(normalized.coverage_baseline().is_empty());
         assert!(resolved.producers().js().is_none());
         assert!(resolved.producers().artifacts().is_empty());
     }
@@ -1761,6 +1967,7 @@ mod tests {
             .unwrap();
         let locale_limit = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -1789,6 +1996,7 @@ mod tests {
         let root_failure = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             roots,
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &root_limits,
@@ -1834,19 +2042,12 @@ mod tests {
         assert_eq!(shape.pointer(), "/messages");
         assert!(shape.value().is_none());
 
-        let unknown = section_error(
-            &json!({ "locales": null, "fallback": null, "coverageBaseline": {} }),
-            &resource,
-        );
+        let unknown = section_error(&json!({ "locales": null, "fallback": null }), &resource);
         assert_eq!(unknown.reason(), MessagesConfigReason::UnknownField);
-        assert_eq!(unknown.pointer(), "/messages/coverageBaseline");
-        assert_eq!(unknown.field(), Some("coverageBaseline"));
+        assert_eq!(unknown.pointer(), "/messages/fallback");
+        assert_eq!(unknown.field(), Some("fallback"));
 
-        for (field, placeholder) in [
-            ("coverageBaseline", json!({})),
-            ("fallback", Value::Null),
-            ("delivery", json!({})),
-        ] {
+        for (field, placeholder) in [("fallback", Value::Null), ("delivery", json!({}))] {
             let error = section_error(
                 &json!({ "locales": ["en"], (field): placeholder }),
                 &resource,
@@ -1855,6 +2056,119 @@ mod tests {
             assert_eq!(error.pointer(), format!("/messages/{field}"));
             assert_eq!(error.field(), Some(field));
         }
+    }
+
+    #[test]
+    fn validates_and_canonicalizes_coverage_baseline_mapping() {
+        let resources = app_resources();
+        let (normalized, resolved) = validate_messages_config(
+            Some(&json!({
+                "locales": ["ja", "en"],
+                "coverageBaseline": {
+                    "vendor": "en",
+                    "app": "ja"
+                }
+            })),
+            &resources,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            normalized
+                .coverage_baseline()
+                .iter()
+                .map(|(scope, locale)| (scope.as_str(), locale.as_str()))
+                .collect::<Vec<_>>(),
+            [("app", "ja"), ("vendor", "en")]
+        );
+        assert_eq!(
+            resolved
+                .policy()
+                .coverage_baselines()
+                .iter()
+                .map(|value| (value.scope().name().as_str(), value.locale().as_str()))
+                .collect::<Vec<_>>(),
+            [("app", "ja"), ("vendor", "en")]
+        );
+    }
+
+    #[test]
+    fn coverage_baseline_rejects_shape_empty_and_count_before_members() {
+        let resources = app_resources();
+        for value in [Value::Null, json!([]), json!({})] {
+            let error = section_error(
+                &json!({ "locales": ["en"], "coverageBaseline": value }),
+                &resources,
+            );
+            assert_eq!(
+                error.reason(),
+                MessagesConfigReason::InvalidMessageCoverageBaseline
+            );
+            assert_eq!(error.pointer(), "/messages/coverageBaseline");
+        }
+
+        let mut members = serde_json::Map::new();
+        for index in 0..=COVERAGE_BASELINES_LIMIT {
+            members.insert(format!("scope-{index:04}"), Value::String("en".to_owned()));
+        }
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "coverageBaseline": Value::Object(members)
+            }),
+            &resources,
+        );
+        assert_eq!(
+            error.reason(),
+            MessagesConfigReason::InvalidMessageCoverageBaseline
+        );
+        assert_eq!(error.pointer(), "/messages/coverageBaseline");
+        assert_eq!(error.limit(), Some(COVERAGE_BASELINES_LIMIT as u64));
+        assert_eq!(
+            error.observed(),
+            Some((COVERAGE_BASELINES_LIMIT + 1) as u64)
+        );
+    }
+
+    #[test]
+    fn coverage_baseline_uses_bounded_member_evidence_and_fixed_membership_order() {
+        let resources = app_resources();
+        let overlong_scope = "s".repeat(SCOPE_BYTES_LIMIT + 1);
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "coverageBaseline": { (overlong_scope): "en" }
+            }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/coverageBaseline");
+        assert_eq!(error.limit(), Some(SCOPE_BYTES_LIMIT as u64));
+        assert_eq!(error.observed(), Some((SCOPE_BYTES_LIMIT + 1) as u64));
+        assert!(error.value().is_none());
+
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "coverageBaseline": { "missing~scope/name": "en" }
+            }),
+            &resources,
+        );
+        assert_eq!(
+            error.pointer(),
+            "/messages/coverageBaseline/missing~0scope~1name"
+        );
+        assert!(error.value().is_none());
+
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "coverageBaseline": { "app": "ja" }
+            }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/coverageBaseline/app");
+        assert_eq!(error.value(), Some(&json!("ja")));
     }
 
     #[test]

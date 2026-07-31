@@ -5,15 +5,17 @@
 //!
 //! This crate owns checked link policy, scope mapping and completeness, delivery
 //! graphs, one immutable request boundary over `intlify_contract` artifacts,
-//! deterministic selector resolution, findings, reachability, and bundle plans.
-//! It intentionally performs no filesystem I/O, resource or source-language
-//! parsing, CLI orchestration, exporting, or process-global scheduling.
+//! deterministic selector resolution, findings, reachability, bundle plans,
+//! and language-neutral typed-key models. It intentionally performs no
+//! filesystem I/O, resource or source-language parsing, CLI orchestration,
+//! exporting, or process-global scheduling.
 
 mod error;
 mod finding;
 mod graph;
 mod link;
 mod location;
+mod model;
 mod outcome;
 mod plan;
 mod policy;
@@ -44,11 +46,13 @@ pub use finding::{
 pub use graph::{DeliveryUnitEdge, DeliveryUnitGraph};
 pub use link::link;
 pub use location::DefinitionLocation;
+pub use model::TypedKeyModel;
 pub use outcome::LinkOutcome;
 pub use plan::{MessageBundlePlan, ResolvedMessage};
 pub use policy::{
-    ConfiguredRoot, ConfiguredRootConstructionError, DynamicReferenceMode, LinkPolicy,
-    PlacementPolicy, ResolvedConfiguredRoot, ResolvedLinkPolicy,
+    ConfiguredRoot, ConfiguredRootConstructionError, CoverageBaseline, DynamicReferenceMode,
+    LinkPolicy, PlacementPolicy, ResolvedConfiguredRoot, ResolvedCoverageBaseline,
+    ResolvedLinkPolicy,
 };
 pub use request::LinkRequest;
 pub use scope::{
@@ -63,7 +67,7 @@ mod tests {
     use super::{
         DeliveryUnitGraph, LinkFinding, LinkFindingKind, LinkOperationalError, LinkOutcome,
         LinkPolicy, LinkRequest, MessageBundlePlan, ResolvedMessage,
-        ResolvedScopeCompletenessTable, ScopeCompletenessTable, ScopeMappingTable,
+        ResolvedScopeCompletenessTable, ScopeCompletenessTable, ScopeMappingTable, TypedKeyModel,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -79,6 +83,7 @@ mod tests {
         assert_send_sync::<LinkOperationalError>();
         assert_send_sync::<LinkFinding>();
         assert_send_sync::<LinkOutcome>();
+        assert_send_sync::<TypedKeyModel>();
         assert_send_sync::<MessageBundlePlan>();
         assert_send_sync::<ResolvedMessage>();
     }

@@ -20,14 +20,15 @@ use intlify_contract::{
 
 #[cfg(feature = "benchmark")]
 use crate::benchmark::{BenchmarkLinkExecution, BenchmarkLinkStage, BenchmarkLinkStageMeasurement};
+use crate::model::{BaselineDefinitionSnapshot, TypedKeyModelSnapshotRelation};
 use crate::{
     AmbiguousMessageDefinitionFinding, CompletenessContributor, CompletenessSide,
-    DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, LinkFinding,
-    LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkRequest, MessageBundlePlan,
-    PartialCompletenessDegradation, PlacementPolicy, ResolutionFailure, ResolvedCatalogScopeId,
-    ResolvedInputCompleteness, ResolvedMessage, ResolvedScopeCompleteness,
-    UnboundedDynamicReferenceFinding, UnresolvedMessageFinding, UnusedMessageFinding,
-    WideSelectorDegradation,
+    DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, InvalidRequestError,
+    LinkFinding, LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkRequest,
+    MessageBundlePlan, PartialCompletenessDegradation, PlacementPolicy, ResolutionFailure,
+    ResolvedCatalogScopeId, ResolvedInputCompleteness, ResolvedMessage, ResolvedScopeCompleteness,
+    TypedKeyModel, UnboundedDynamicReferenceFinding, UnresolvedMessageFinding,
+    UnusedMessageFinding, WideSelectorDegradation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -173,6 +174,9 @@ where
     let definitions = analyze_definitions(&index);
     observer.finish_semantic_index(&index, &definitions);
 
+    let (typed_key_models, typed_key_model_snapshots) =
+        build_typed_key_models(request, &definitions)?;
+
     observer.begin(LinkStage::SelectorExpansionAndReferenceResolution);
     let mut pattern_budget = PatternWorkBudget::new(request);
     let resolutions = resolve_references(request, &index, &mut pattern_budget)?;
@@ -203,7 +207,13 @@ where
         )?)
     };
 
-    let outcome = LinkOutcome::try_new(findings, bundle_plans)?;
+    let outcome = LinkOutcome::try_new(
+        findings,
+        bundle_plans,
+        typed_key_models,
+        typed_key_model_snapshots,
+        request.resolved_policy(),
+    )?;
     observer.finish_outcome(&outcome);
     Ok(outcome)
 }
@@ -717,6 +727,92 @@ fn analyze_definitions(index: &SemanticIndex) -> DefinitionAnalysis {
         ambiguous_logical,
         unique_definitions,
     }
+}
+
+fn build_typed_key_models(
+    request: &LinkRequest<'_>,
+    definitions: &DefinitionAnalysis,
+) -> Result<(Vec<TypedKeyModel>, Vec<TypedKeyModelSnapshotRelation>), LinkOperationalError> {
+    let mut models = Vec::with_capacity(request.resolved_policy().coverage_baselines().len());
+    let mut relations = Vec::with_capacity(models.capacity());
+
+    for coverage_baseline in request.resolved_policy().coverage_baselines() {
+        let scope = coverage_baseline.scope();
+        let completeness = request
+            .resolved_scope_completeness()
+            .get(scope)
+            .ok_or(LinkOperationalError::InternalInvariant)?;
+        if matches!(
+            completeness.definitions(),
+            ResolvedInputCompleteness::Partial(_)
+        ) {
+            continue;
+        }
+        if definitions
+            .ambiguous_logical
+            .iter()
+            .any(|identity| &identity.scope == scope)
+        {
+            continue;
+        }
+
+        let mut baseline_definitions = BTreeMap::<CatalogKey, &DefinitionSnapshot>::new();
+        let mut production_union = BTreeMap::<CatalogKey, Locale>::new();
+        for (logical, definitions_by_locale) in &definitions.unique_definitions {
+            if &logical.scope != scope {
+                continue;
+            }
+            for (locale, snapshot) in definitions_by_locale {
+                if request
+                    .resolved_policy()
+                    .production_locales()
+                    .binary_search(locale)
+                    .is_ok()
+                {
+                    production_union
+                        .entry(logical.key.clone())
+                        .or_insert_with(|| locale.clone());
+                }
+                if locale == coverage_baseline.locale() {
+                    baseline_definitions.insert(logical.key.clone(), snapshot);
+                }
+            }
+        }
+
+        for (key, defined_locale) in production_union {
+            if !baseline_definitions.contains_key(&key) {
+                return Err(InvalidRequestError::CoverageBaselineMissingKey {
+                    scope: scope.clone(),
+                    baseline: coverage_baseline.locale().clone(),
+                    domain: key.domain(),
+                    key,
+                    defined_locale,
+                }
+                .into());
+            }
+        }
+
+        let mut keys = Vec::with_capacity(baseline_definitions.len());
+        let mut snapshots = Vec::with_capacity(baseline_definitions.len());
+        for (key, snapshot) in baseline_definitions {
+            keys.push(key.clone());
+            snapshots.push(BaselineDefinitionSnapshot::new(
+                scope.clone(),
+                key,
+                coverage_baseline.locale().clone(),
+                snapshot.message.clone(),
+                snapshot.location.clone(),
+            ));
+        }
+        models.push(TypedKeyModel::new(scope.clone(), keys));
+        relations.push(TypedKeyModelSnapshotRelation::new(
+            scope.clone(),
+            coverage_baseline.locale().clone(),
+            snapshots,
+        ));
+    }
+
+    Ok((models, relations))
 }
 
 fn resolve_references(

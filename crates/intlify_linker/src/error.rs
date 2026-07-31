@@ -11,8 +11,9 @@ use std::error::Error;
 use std::fmt;
 
 use intlify_contract::{
-    ArtifactVersionEvidence, ArtifactViolation, CatalogKeyDomain, CatalogScopeId, DeliveryUnitId,
-    LinkLimitEvidence, Locale, MessageSelector, ReferenceArtifactIdentity, SourceDocumentIdentity,
+    ArtifactVersionEvidence, ArtifactViolation, CatalogKey, CatalogKeyDomain, CatalogScopeId,
+    DeliveryUnitId, LinkLimitEvidence, Locale, MessageSelector, ReferenceArtifactIdentity,
+    SourceDocumentIdentity,
 };
 
 use crate::ResolvedCatalogScopeId;
@@ -72,6 +73,8 @@ pub enum ScopeUse {
     Definition,
     /// Scope declared by a configured root.
     ConfiguredRoot,
+    /// Scope declared by a coverage baseline.
+    CoverageBaseline,
 }
 
 /// Endpoint role inside one checked scope mapping.
@@ -101,6 +104,15 @@ pub enum InvalidRequestError {
     DuplicateProductionLocale(Locale),
     /// One checked configured-root identity occurs more than once.
     DuplicateConfiguredRoot(ConfiguredRootIdentity),
+    /// One declared scope has more than one coverage-baseline occurrence.
+    DuplicateCoverageBaseline(CatalogScopeId),
+    /// A coverage baseline selects a locale outside the production set.
+    CoverageBaselineLocaleNotProduction {
+        /// Declared scope selecting the rejected locale.
+        scope: CatalogScopeId,
+        /// Exact rejected locale.
+        locale: Locale,
+    },
     /// The declared scope inventory contains an equal duplicate.
     DuplicateDeclaredScope(CatalogScopeId),
     /// One mapping endpoint is absent from the declared scope inventory.
@@ -164,6 +176,28 @@ pub enum InvalidRequestError {
     MappingInventoryMismatch,
     /// Distinct declared roots collapse to one resolved identity with unequal reasons.
     ResolvedConfiguredRootConflict(ConfiguredRootIdentity),
+    /// Distinct declared baselines collapse to one scope with unequal locales.
+    ResolvedCoverageBaselineConflict {
+        /// Resolved semantic scope.
+        scope: ResolvedCatalogScopeId,
+        /// Canonically first conflicting locale.
+        first: Locale,
+        /// Canonically second conflicting locale.
+        second: Locale,
+    },
+    /// A production-locale key is absent from the selected baseline locale.
+    CoverageBaselineMissingKey {
+        /// Resolved semantic scope.
+        scope: ResolvedCatalogScopeId,
+        /// Configured baseline locale.
+        baseline: Locale,
+        /// Catalog-key comparison domain.
+        domain: CatalogKeyDomain,
+        /// First canonical key absent from the baseline.
+        key: CatalogKey,
+        /// First canonical non-baseline locale defining the key.
+        defined_locale: Locale,
+    },
     /// A reference artifact names no node in the checked delivery graph.
     MissingReferenceDeliveryUnit {
         /// Logical reference artifact identity.

@@ -334,6 +334,21 @@
       "additionalProperties": false,
       "description": "Validated normalized `messages` section.",
       "properties": {
+        "coverageBaseline": {
+          "additionalProperties": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxProperties": 4096,
+          "minProperties": 1,
+          "propertyNames": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "object"
+        },
         "dynamicReferences": {
           "allOf": [
             {
