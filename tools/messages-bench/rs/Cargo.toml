@@ -1,0 +1,27 @@
+[package]
+name = "intlify-messages-bench"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "intlify-messages-bench"
+path = "src/main.rs"
+
+[workspace]
+
+[dependencies]
+allocation-counter = "0.8.1"
+intlify_cli = { path = "../../../crates/intlify_cli", features = ["benchmark"] }
+intlify_contract = { path = "../../../crates/intlify_contract" }
+intlify_linker = { path = "../../../crates/intlify_linker", features = ["benchmark"] }
+intlify_producer_js = { path = "../../../crates/intlify_producer_js", features = ["benchmark"] }
+intlify_resource = { path = "../../../crates/intlify_resource" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

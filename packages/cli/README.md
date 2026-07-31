@@ -103,3 +103,17 @@ vp run bench:resource
 vp run bench:resource:smoke
 vp run bench:resource:validate
 ```
+
+## Message Linker Benchmarks
+
+The internal M0 project-link path has a separate release-profile benchmark under `tools/messages-bench`:
+
+```sh
+vp run bench:messages
+vp run bench:messages:smoke
+vp run bench:messages:validate
+```
+
+It measures project input I/O, JavaScript/TypeScript reference production and cache hit/miss paths, artifact codecs, resource-to-definition projection, semantic-link stages, allocator-observed link peak memory, and the complete in-process workflow. Tier 1 extraction in the E2E case retains its separate resource-owned measurement.
+
+The non-default Rust benchmark features are enabled only by the non-published runner. They do not add a user-facing message command or enable linker-backed lint, exporter, or artifact-size behavior. CI checks buildability, required-case coverage, result structure, boundary/companion integrity, and within-run determinism; timing and memory magnitudes remain observational.

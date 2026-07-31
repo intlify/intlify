@@ -1,0 +1,56 @@
+{
+  "revision": 1,
+  "profiles": [
+    {
+      "name": "exact-reference-dense",
+      "revision": 1,
+      "shape": "exact_reference_dense",
+      "generator": {
+        "kind": "rust",
+        "id": "exact_reference_dense"
+      },
+      "variants": ["exact_reference_dense", "cache_hit"],
+      "scales": [16, 64, 256]
+    },
+    {
+      "name": "definition-dense-sparse-reference",
+      "revision": 1,
+      "shape": "definition_dense_sparse_reference",
+      "generator": {
+        "kind": "rust",
+        "id": "definition_dense_sparse_reference"
+      },
+      "variants": ["definition_dense_sparse_reference"],
+      "scales": [16, 64, 256]
+    },
+    {
+      "name": "bounded-selector",
+      "revision": 1,
+      "shape": "bounded_selector",
+      "generator": {
+        "kind": "rust",
+        "id": "bounded_selector"
+      },
+      "variants": ["bounded_selector"],
+      "scales": [16, 64, 256]
+    },
+    {
+      "name": "finding-dense",
+      "revision": 1,
+      "shape": "finding_dense",
+      "generator": {
+        "kind": "rust",
+        "id": "finding_dense"
+      },
+      "variants": ["finding_dense"],
+      "scales": [16, 64, 256]
+    }
+  ],
+  "projectFixture": {
+    "name": "representative-project",
+    "revision": 1,
+    "variants": ["representative_project", "cache_miss", "canonical_json"],
+    "scales": [1],
+    "sources": ["locales/en.json", "src/app.mts", "artifacts/external.json"]
+  }
+}

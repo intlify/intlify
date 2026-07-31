@@ -8,6 +8,8 @@
 //! plans. It treats message payloads as opaque checked strings.
 
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "benchmark")]
+use std::time::{Duration, Instant};
 
 use intlify_contract::{
     CatalogKey, CatalogKeyDomain, DeliveryUnitId, EntryReference, LinkLimitCounter,
@@ -16,6 +18,8 @@ use intlify_contract::{
     SourceOrigin,
 };
 
+#[cfg(feature = "benchmark")]
+use crate::benchmark::{BenchmarkLinkExecution, BenchmarkLinkStage, BenchmarkLinkStageMeasurement};
 use crate::{
     AmbiguousMessageDefinitionFinding, CompletenessContributor, CompletenessSide,
     DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, LinkFinding,
@@ -129,10 +133,52 @@ impl ReferenceResolution {
 
 /// Link one completely admitted immutable request.
 pub fn link(request: &LinkRequest<'_>) -> Result<LinkOutcome, LinkOperationalError> {
+    link_with_observer(request, &mut NoopLinkObserver)
+}
+
+trait LinkObserver {
+    fn begin(&mut self, _stage: LinkStage) {}
+
+    fn finish_semantic_index(&mut self, _index: &SemanticIndex, _definitions: &DefinitionAnalysis) {
+    }
+
+    fn finish_selector_resolution(&mut self, _resolutions: &[ReferenceResolution]) {}
+
+    fn finish_reachability(&mut self, _reachability: &Reachability) {}
+
+    fn finish_outcome(&mut self, _outcome: &LinkOutcome) {}
+}
+
+struct NoopLinkObserver;
+
+impl LinkObserver for NoopLinkObserver {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkStage {
+    SemanticIndexConstruction,
+    SelectorExpansionAndReferenceResolution,
+    ReachabilityAndPlacement,
+    FindingAndPlanMaterialization,
+}
+
+fn link_with_observer<O>(
+    request: &LinkRequest<'_>,
+    observer: &mut O,
+) -> Result<LinkOutcome, LinkOperationalError>
+where
+    O: LinkObserver,
+{
+    observer.begin(LinkStage::SemanticIndexConstruction);
     let index = build_semantic_index(request)?;
     let definitions = analyze_definitions(&index);
+    observer.finish_semantic_index(&index, &definitions);
+
+    observer.begin(LinkStage::SelectorExpansionAndReferenceResolution);
     let mut pattern_budget = PatternWorkBudget::new(request);
     let resolutions = resolve_references(request, &index, &mut pattern_budget)?;
+    observer.finish_selector_resolution(&resolutions);
+
+    observer.begin(LinkStage::ReachabilityAndPlacement);
     let reachability = match request.resolved_policy().placement() {
         PlacementPolicy::Duplicate => build_duplicate_reachability(
             request,
@@ -142,6 +188,9 @@ pub fn link(request: &LinkRequest<'_>) -> Result<LinkOutcome, LinkOperationalErr
             &mut pattern_budget,
         )?,
     };
+    observer.finish_reachability(&reachability);
+
+    observer.begin(LinkStage::FindingAndPlanMaterialization);
     let findings = materialize_findings(request, &definitions, &resolutions, &reachability)?;
 
     let bundle_plans = if findings.iter().any(LinkFinding::blocking) {
@@ -154,7 +203,420 @@ pub fn link(request: &LinkRequest<'_>) -> Result<LinkOutcome, LinkOperationalErr
         )?)
     };
 
-    LinkOutcome::try_new(findings, bundle_plans)
+    let outcome = LinkOutcome::try_new(findings, bundle_plans)?;
+    observer.finish_outcome(&outcome);
+    Ok(outcome)
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn benchmark_link(
+    request: &LinkRequest<'_>,
+) -> Result<BenchmarkLinkExecution, LinkOperationalError> {
+    let mut observer = BenchmarkLinkObserver::new();
+    let outcome = link_with_observer(request, &mut observer)?;
+    let (stages, observation_overhead) = observer.finish()?;
+    Ok(BenchmarkLinkExecution::new(
+        outcome,
+        stages,
+        observation_overhead,
+    ))
+}
+
+#[cfg(feature = "benchmark")]
+struct BenchmarkLinkObserver {
+    active: Option<(LinkStage, Instant)>,
+    stages: Vec<BenchmarkLinkStageMeasurement>,
+    observed: Vec<bool>,
+    observation_overhead: Duration,
+    invariant_failed: bool,
+}
+
+#[cfg(feature = "benchmark")]
+impl BenchmarkLinkObserver {
+    fn new() -> Self {
+        Self {
+            active: None,
+            stages: Vec::with_capacity(4),
+            observed: Vec::with_capacity(4),
+            observation_overhead: Duration::ZERO,
+            invariant_failed: false,
+        }
+    }
+
+    fn complete(&mut self, expected: LinkStage) -> Option<usize> {
+        let Some((active, started)) = self.active.take() else {
+            self.invariant_failed = true;
+            return None;
+        };
+        if active != expected {
+            self.invariant_failed = true;
+            return None;
+        }
+        self.stages.push(BenchmarkLinkStageMeasurement::new(
+            benchmark_stage(expected),
+            started.elapsed(),
+            0,
+        ));
+        self.observed.push(false);
+        Some(self.stages.len() - 1)
+    }
+
+    fn observe(&mut self, index: Option<usize>, checksum: u32) {
+        let Some(index) = index else {
+            return;
+        };
+        if self.observed.get(index).copied() != Some(false) {
+            self.invariant_failed = true;
+            return;
+        }
+        let measurement = &self.stages[index];
+        self.stages[index] = BenchmarkLinkStageMeasurement::new(
+            measurement.stage(),
+            measurement.elapsed(),
+            checksum,
+        );
+        self.observed[index] = true;
+    }
+
+    fn observe_with(&mut self, index: Option<usize>, checksum: impl FnOnce() -> u32) {
+        let observation_started = Instant::now();
+        let checksum = checksum();
+        self.observe(index, checksum);
+        self.observation_overhead = self
+            .observation_overhead
+            .saturating_add(observation_started.elapsed());
+    }
+
+    fn finish(
+        self,
+    ) -> Result<(Vec<BenchmarkLinkStageMeasurement>, Duration), LinkOperationalError> {
+        if self.invariant_failed
+            || self.active.is_some()
+            || self.stages.len() != 4
+            || self.observed.len() != self.stages.len()
+            || self.observed.iter().any(|observed| !observed)
+            || self
+                .stages
+                .iter()
+                .map(BenchmarkLinkStageMeasurement::stage)
+                .ne([
+                    BenchmarkLinkStage::SemanticIndexConstruction,
+                    BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
+                    BenchmarkLinkStage::ReachabilityAndPlacement,
+                    BenchmarkLinkStage::FindingAndPlanMaterialization,
+                ])
+        {
+            return Err(LinkOperationalError::InternalInvariant);
+        }
+        Ok((self.stages, self.observation_overhead))
+    }
+}
+
+#[cfg(feature = "benchmark")]
+impl LinkObserver for BenchmarkLinkObserver {
+    fn begin(&mut self, stage: LinkStage) {
+        if self.active.replace((stage, Instant::now())).is_some() {
+            self.invariant_failed = true;
+        }
+    }
+
+    fn finish_semantic_index(&mut self, index: &SemanticIndex, definitions: &DefinitionAnalysis) {
+        let measurement = self.complete(LinkStage::SemanticIndexConstruction);
+        self.observe_with(measurement, || checksum_semantic_index(index, definitions));
+    }
+
+    fn finish_selector_resolution(&mut self, resolutions: &[ReferenceResolution]) {
+        let measurement = self.complete(LinkStage::SelectorExpansionAndReferenceResolution);
+        self.observe_with(measurement, || checksum_resolutions(resolutions));
+    }
+
+    fn finish_reachability(&mut self, reachability: &Reachability) {
+        let measurement = self.complete(LinkStage::ReachabilityAndPlacement);
+        self.observe_with(measurement, || checksum_reachability(reachability));
+    }
+
+    fn finish_outcome(&mut self, outcome: &LinkOutcome) {
+        let measurement = self.complete(LinkStage::FindingAndPlanMaterialization);
+        self.observe_with(measurement, || checksum_outcome(outcome));
+    }
+}
+
+#[cfg(feature = "benchmark")]
+const fn benchmark_stage(stage: LinkStage) -> BenchmarkLinkStage {
+    match stage {
+        LinkStage::SemanticIndexConstruction => BenchmarkLinkStage::SemanticIndexConstruction,
+        LinkStage::SelectorExpansionAndReferenceResolution => {
+            BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
+        }
+        LinkStage::ReachabilityAndPlacement => BenchmarkLinkStage::ReachabilityAndPlacement,
+        LinkStage::FindingAndPlanMaterialization => {
+            BenchmarkLinkStage::FindingAndPlanMaterialization
+        }
+    }
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_semantic_index(index: &SemanticIndex, definitions: &DefinitionAnalysis) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-semantic-index-v1");
+    checksum.write_u64(0x01, index.definitions.len() as u64);
+    for (identity, snapshots) in &index.definitions {
+        checksum.write_definition_identity(0x02, identity);
+        checksum.write_u64(0x03, snapshots.len() as u64);
+        for snapshot in snapshots {
+            checksum.write_definition_snapshot(0x04, snapshot);
+        }
+    }
+    checksum.write_u64(0x05, index.candidates.len() as u64);
+    for (scope_domain, keys) in &index.candidates {
+        checksum.write_scope_domain(0x06, scope_domain);
+        checksum.write_u64(0x07, keys.len() as u64);
+        for key in keys {
+            checksum.write_str(0x08, key.as_str());
+        }
+    }
+    checksum.write_u64(0x09, index.references.len() as u64);
+    for reference in &index.references {
+        checksum.write_reference_fact(0x0a, reference);
+    }
+    checksum.write_u64(0x0b, definitions.ambiguities.len() as u64);
+    checksum.write_u64(0x0c, definitions.unique_definitions.len() as u64);
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_resolutions(resolutions: &[ReferenceResolution]) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-selector-resolution-v1");
+    checksum.write_u64(0x01, resolutions.len() as u64);
+    for resolution in resolutions {
+        checksum.write_reference_fact(0x02, &resolution.reference);
+        checksum.write_bool(0x03, resolution.unresolved);
+        checksum.write_u64(0x04, resolution.selected.len() as u64);
+        for selected in &resolution.selected {
+            checksum.write_logical_identity(0x05, selected);
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_reachability(reachability: &Reachability) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-reachability-placement-v1");
+    checksum.write_u64(0x01, reachability.by_delivery_unit.len() as u64);
+    for (delivery_unit, identities) in &reachability.by_delivery_unit {
+        checksum.write_delivery_unit(0x02, delivery_unit);
+        checksum.write_u64(0x03, identities.len() as u64);
+        for identity in identities {
+            checksum.write_logical_identity(0x04, identity);
+        }
+    }
+    checksum.write_u64(0x05, reachability.reachable.len() as u64);
+    for identity in &reachability.reachable {
+        checksum.write_logical_identity(0x06, identity);
+    }
+    checksum.write_u64(0x07, reachability.unbounded_scope_domains.len() as u64);
+    for scope_domain in &reachability.unbounded_scope_domains {
+        checksum.write_scope_domain(0x08, scope_domain);
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_outcome(outcome: &LinkOutcome) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-finding-plan-v1");
+    checksum.write_u64(0x01, outcome.findings().len() as u64);
+    for finding in outcome.findings() {
+        checksum.write_u64(0x02, u64::from(finding.kind().precedence()));
+        checksum.write_bool(0x03, finding.blocking());
+        checksum.write_resolved_scope(0x04, finding.resolved_scope());
+    }
+    match outcome.bundle_plans() {
+        None => checksum.write_bool(0x05, false),
+        Some(plans) => {
+            checksum.write_bool(0x05, true);
+            checksum.write_u64(0x06, plans.len() as u64);
+            for plan in plans {
+                checksum.write_delivery_unit(0x07, plan.delivery_unit());
+                checksum.write_str(0x08, plan.locale().as_str());
+                checksum.write_u64(0x09, plan.messages().len() as u64);
+                for message in plan.messages() {
+                    checksum.write_resolved_scope(0x0a, message.resolved_scope());
+                    checksum.write_str(0x0b, message.domain().as_str());
+                    checksum.write_str(0x0c, message.key().as_str());
+                    checksum.write_str(0x0d, message.definition_locale().as_str());
+                    checksum.write_str(0x0e, message.message().as_str());
+                    checksum.write_definition_location(0x0f, message.definition());
+                }
+            }
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+struct BenchmarkChecksum {
+    state: u32,
+}
+
+#[cfg(feature = "benchmark")]
+impl BenchmarkChecksum {
+    const OFFSET_BASIS: u32 = 2_166_136_261;
+    const MULTIPLIER: u32 = 16_777_619;
+
+    fn new(domain: &[u8]) -> Self {
+        let mut checksum = Self {
+            state: Self::OFFSET_BASIS,
+        };
+        checksum.update(domain);
+        checksum.update(&[0]);
+        checksum
+    }
+
+    fn finish(self) -> u32 {
+        self.state
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.state ^= u32::from(*byte);
+            self.state = self.state.wrapping_mul(Self::MULTIPLIER);
+        }
+    }
+
+    fn write_field(&mut self, tag: u8, payload: &[u8]) {
+        self.update(&[tag]);
+        self.update(&(payload.len() as u64).to_be_bytes());
+        self.update(payload);
+    }
+
+    fn write_str(&mut self, tag: u8, value: &str) {
+        self.write_field(tag, value.as_bytes());
+    }
+
+    fn write_u64(&mut self, tag: u8, value: u64) {
+        self.write_field(tag, &value.to_be_bytes());
+    }
+
+    fn write_bool(&mut self, tag: u8, value: bool) {
+        self.write_field(tag, &[u8::from(value)]);
+    }
+
+    fn write_scope_domain(&mut self, tag: u8, value: &ScopeDomain) {
+        let mut nested = Self::new(b"scope-domain");
+        nested.write_resolved_scope(0x01, &value.scope);
+        nested.write_str(0x02, value.domain.as_str());
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_logical_identity(&mut self, tag: u8, value: &LogicalMessageIdentity) {
+        let mut nested = Self::new(b"logical-message-identity");
+        nested.write_resolved_scope(0x01, &value.scope);
+        nested.write_str(0x02, value.domain.as_str());
+        nested.write_str(0x03, value.key.as_str());
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_definition_identity(&mut self, tag: u8, value: &DefinitionIdentity) {
+        let mut nested = Self::new(b"definition-identity");
+        nested.write_logical_identity(0x01, &value.logical);
+        nested.write_str(0x02, value.locale.as_str());
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_definition_snapshot(&mut self, tag: u8, value: &DefinitionSnapshot) {
+        let mut nested = Self::new(b"definition-snapshot");
+        nested.write_logical_identity(0x01, &value.logical);
+        nested.write_str(0x02, value.locale.as_str());
+        nested.write_str(0x03, value.message.as_str());
+        nested.write_definition_location(0x04, &value.location);
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_reference_fact(&mut self, tag: u8, value: &ReferenceFact) {
+        let mut nested = Self::new(b"reference-fact");
+        nested.write_reference_identity(0x01, &value.identity);
+        nested.write_delivery_unit(0x02, &value.delivery_unit);
+        nested.write_resolved_scope(0x03, &value.scope);
+        nested.write_str(0x04, value.domain.as_str());
+        nested.write_selector(0x05, &value.selector);
+        match &value.reason {
+            Some(reason) => {
+                nested.write_bool(0x06, true);
+                nested.write_str(0x07, reason.as_str());
+            }
+            None => nested.write_bool(0x06, false),
+        }
+        match &value.origin {
+            Some(origin) => {
+                nested.write_bool(0x08, true);
+                nested.write_source_identity(0x09, origin.source());
+                nested.write_u64(0x0a, u64::from(origin.span().start()));
+                nested.write_u64(0x0b, u64::from(origin.span().end()));
+            }
+            None => nested.write_bool(0x08, false),
+        }
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_resolved_scope(&mut self, tag: u8, value: &ResolvedCatalogScopeId) {
+        self.write_scope(tag, value.as_catalog_scope());
+    }
+
+    fn write_scope(&mut self, tag: u8, value: &intlify_contract::CatalogScopeId) {
+        let mut nested = Self::new(b"catalog-scope");
+        nested.write_str(0x01, value.namespace().as_str());
+        nested.write_str(0x02, value.name().as_str());
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_reference_identity(&mut self, tag: u8, value: &ReferenceRecordIdentity) {
+        let mut nested = Self::new(b"reference-record-identity");
+        nested.write_str(0x01, value.artifact().namespace().as_str());
+        nested.write_u64(0x02, value.artifact().segments().len() as u64);
+        for segment in value.artifact().segments() {
+            nested.write_str(0x03, segment.as_str());
+        }
+        nested.write_u64(0x04, u64::from(value.ordinal()));
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_delivery_unit(&mut self, tag: u8, value: &DeliveryUnitId) {
+        let mut nested = Self::new(b"delivery-unit");
+        nested.write_u64(0x01, value.segments().len() as u64);
+        for segment in value.segments() {
+            nested.write_str(0x02, segment.as_str());
+        }
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_selector(&mut self, tag: u8, value: &MessageSelector) {
+        let mut nested = Self::new(b"message-selector");
+        nested.write_str(0x01, value.kind_str());
+        match value {
+            MessageSelector::Exact(key) => nested.write_str(0x02, key.as_str()),
+            MessageSelector::Prefix(prefix) => nested.write_str(0x02, prefix.as_str()),
+            MessageSelector::Pattern(pattern) => nested.write_str(0x02, pattern.as_str()),
+            MessageSelector::AllInScope | MessageSelector::UnboundedDynamic => {}
+        }
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_source_identity(&mut self, tag: u8, value: &SourceDocumentIdentity) {
+        let mut nested = Self::new(b"source-document-identity");
+        nested.write_str(0x01, value.namespace().as_str());
+        nested.write_u64(0x02, value.path().segments().len() as u64);
+        for segment in value.path().segments() {
+            nested.write_str(0x03, segment.as_str());
+        }
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
+
+    fn write_definition_location(&mut self, tag: u8, value: &DefinitionLocation) {
+        let mut nested = Self::new(b"definition-location");
+        nested.write_source_identity(0x01, value.source());
+        nested.write_str(0x02, value.entry().structural_path().as_str());
+        nested.write_u64(0x03, u64::from(value.entry().occurrence()));
+        self.write_field(tag, &nested.finish().to_be_bytes());
+    }
 }
 
 fn build_semantic_index(request: &LinkRequest<'_>) -> Result<SemanticIndex, LinkOperationalError> {

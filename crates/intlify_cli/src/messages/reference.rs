@@ -18,18 +18,27 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use intlify_contract::{
-    decode_reference_artifact, ArtifactContractError, ArtifactNamespace, CatalogScopeId,
-    LinkLimitCounter, LinkLimits, MessageReferenceArtifact, PortableRelativePath,
+    decode_reference_artifact, encode_reference_artifact, ArtifactContractError, ArtifactNamespace,
+    CatalogScopeId, LinkLimitCounter, LinkLimits, MessageReferenceArtifact, PortableRelativePath,
     SourceDocumentIdentity, ValueConstructionError,
+};
+#[cfg(feature = "benchmark")]
+use intlify_producer_js::benchmark::{
+    benchmark_produce_reference_artifacts, benchmark_produce_reference_artifacts_with_cache,
+    BenchmarkJsStage,
 };
 use intlify_producer_js::{
     preflight_source_group_count, produce_reference_artifacts,
-    produce_reference_artifacts_with_cache, JsPhysicalSourceGroup, JsProducerCache,
-    JsProducerCacheIoError, JsProducerCacheKey, JsProducerError, JsProducerFailure,
-    JsRecognizerSet, SOURCE_BYTES_LIMIT,
+    produce_reference_artifacts_with_cache, JsGrammarProfile, JsPhysicalSourceGroup,
+    JsProducerCache, JsProducerCacheIoError, JsProducerCacheKey, JsProducerError,
+    JsProducerFailure, JsRecognizerSet, JsSourceGoal, JsSourceProfile, SOURCE_BYTES_LIMIT,
 };
 
 use super::config::{ResolvedJsProducerConfig, ResolvedMessageProducers};
+use super::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
 use super::physical::{
     acquire_physical_snapshot, compare_optional_paths, discover_project_files,
     group_physical_files, portable_path, PhysicalFileGroup, ProjectFileTarget,
@@ -275,6 +284,13 @@ struct ExternalArtifactTarget {
     absolute: PathBuf,
 }
 
+struct ExternalArtifactSnapshot {
+    primary: PortableRelativePath,
+    primary_label: String,
+    logical_paths: Option<Box<[String]>>,
+    bytes: Box<[u8]>,
+}
+
 impl ProjectFileTarget for ExternalArtifactTarget {
     fn project_path(&self) -> &str {
         &self.label
@@ -299,6 +315,29 @@ pub(crate) fn produce_reference_inventory(
     limits: &LinkLimits,
     cache: Option<&MessageLinkCache>,
 ) -> Result<ReferenceInventory, ReferenceInventoryError> {
+    produce_reference_inventory_with_observer(
+        project_root,
+        target_scopes,
+        producers,
+        limits,
+        cache,
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+/// Produce references through the ordinary pipeline while reporting opaque
+/// benchmark stages to the non-default observer.
+pub(crate) fn produce_reference_inventory_with_observer<O>(
+    project_root: &Path,
+    target_scopes: &[CatalogScopeId],
+    producers: &ResolvedMessageProducers,
+    limits: &LinkLimits,
+    cache: Option<&MessageLinkCache>,
+    observer: &mut O,
+) -> Result<ReferenceInventory, ReferenceInventoryError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
     let mut artifacts = Vec::new();
     let mut pending_failures = Vec::new();
 
@@ -310,6 +349,7 @@ pub(crate) fn produce_reference_inventory(
             cache,
             &mut artifacts,
             &mut pending_failures,
+            observer,
         )?;
     }
 
@@ -321,6 +361,7 @@ pub(crate) fn produce_reference_inventory(
         cache,
         &mut artifacts,
         &mut pending_failures,
+        observer,
     );
 
     artifacts.sort_by(|left, right| left.identity().cmp(right.identity()));
@@ -338,15 +379,23 @@ pub(crate) fn produce_reference_inventory(
     })
 }
 
-fn produce_js_inventory(
+fn produce_js_inventory<O>(
     project_root: &Path,
     js: &ResolvedJsProducerConfig,
     limits: &LinkLimits,
     cache: Option<&MessageLinkCache>,
     artifacts: &mut Vec<MessageReferenceArtifact>,
     pending_failures: &mut Vec<PendingReferenceFailure>,
-) -> Result<(), ReferenceInventoryError> {
+    observer: &mut O,
+) -> Result<(), ReferenceInventoryError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
     let producer_scopes = recognizer_scopes(js.recognizers());
+    observer.begin(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "reference-js-inventory",
+    );
     let discovery = discover_project_files(project_root);
     pending_failures.extend(
         discovery
@@ -405,6 +454,25 @@ fn produce_js_inventory(
             }),
         }
     }
+    observer.finish(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "reference-js-inventory",
+    );
+    if observer.enabled() {
+        let groups = admitted_groups
+            .iter()
+            .map(|(group, _)| group)
+            .collect::<Vec<_>>();
+        let observation_fields = inventory_observation(b"reference-js", &groups);
+        observer.observe(
+            MessageBenchmarkStage::InventoryMetadataIo,
+            "reference-js-inventory",
+            observation_checksum(
+                MessageBenchmarkStage::InventoryMetadataIo.cost().as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
 
     if let Err(failure) = preflight_source_group_count(
         admitted_groups
@@ -416,6 +484,10 @@ fn produce_js_inventory(
         return Ok(());
     }
 
+    observer.begin(
+        MessageBenchmarkStage::ReferenceSnapshotRead,
+        "reference-snapshots",
+    );
     let mut producer_groups = Vec::with_capacity(admitted_groups.len());
     for (group, identities) in admitted_groups {
         match acquire_physical_snapshot(&group, SOURCE_BYTES_LIMIT) {
@@ -435,14 +507,25 @@ fn produce_js_inventory(
             }),
         }
     }
-
-    let outcome = match cache {
-        Some(cache) => {
-            produce_reference_artifacts_with_cache(producer_groups, js.recognizers(), limits, cache)
-        }
-        None => produce_reference_artifacts(producer_groups, js.recognizers(), limits),
+    observer.finish(
+        MessageBenchmarkStage::ReferenceSnapshotRead,
+        "reference-snapshots",
+    );
+    if observer.enabled() {
+        let observation_fields = reference_snapshot_observation(&producer_groups);
+        observer.observe(
+            MessageBenchmarkStage::ReferenceSnapshotRead,
+            "reference-snapshots",
+            observation_checksum(
+                MessageBenchmarkStage::ReferenceSnapshotRead
+                    .cost()
+                    .as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
     }
-    .map_err(ReferenceInventoryError::Producer)?;
+
+    let outcome = produce_js_groups(producer_groups, js.recognizers(), limits, cache, observer)?;
 
     artifacts.extend(outcome.artifacts().iter().cloned());
     pending_failures.extend(outcome.source_failures().iter().cloned().map(|failure| {
@@ -458,6 +541,142 @@ fn produce_js_inventory(
         ));
     }
     Ok(())
+}
+
+fn produce_js_groups<O>(
+    groups: Vec<JsPhysicalSourceGroup>,
+    recognizers: &JsRecognizerSet,
+    limits: &LinkLimits,
+    cache: Option<&MessageLinkCache>,
+    observer: &mut O,
+) -> Result<intlify_producer_js::JsProducerOutcome, ReferenceInventoryError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
+    #[cfg(not(feature = "benchmark"))]
+    let _ = &observer;
+
+    #[cfg(feature = "benchmark")]
+    if observer.enabled() {
+        let execution = match cache {
+            Some(cache) => {
+                benchmark_produce_reference_artifacts_with_cache(groups, recognizers, limits, cache)
+            }
+            None => benchmark_produce_reference_artifacts(groups, recognizers, limits),
+        }
+        .map_err(ReferenceInventoryError::Producer)?;
+        observer.exclude_observation_overhead(execution.observation_overhead());
+        for measurement in execution.stages() {
+            let identity = source_path_label(measurement.source());
+            observer.record(
+                message_stage_for_js(measurement.stage()),
+                &identity,
+                measurement.elapsed(),
+                measurement.checksum(),
+            );
+        }
+        return Ok(execution.into_outcome());
+    }
+
+    match cache {
+        Some(cache) => produce_reference_artifacts_with_cache(groups, recognizers, limits, cache),
+        None => produce_reference_artifacts(groups, recognizers, limits),
+    }
+    .map_err(ReferenceInventoryError::Producer)
+}
+
+#[cfg(feature = "benchmark")]
+const fn message_stage_for_js(stage: BenchmarkJsStage) -> MessageBenchmarkStage {
+    match stage {
+        BenchmarkJsStage::SourceParse => MessageBenchmarkStage::SourceParse,
+        BenchmarkJsStage::RecognizerMatchAndStaticEvaluation => {
+            MessageBenchmarkStage::RecognizerMatchAndStaticEvaluation
+        }
+        BenchmarkJsStage::KeyAndProvenanceConstruction => {
+            MessageBenchmarkStage::KeyAndProvenanceConstruction
+        }
+        BenchmarkJsStage::ReferenceArtifactConstruction => {
+            MessageBenchmarkStage::ReferenceArtifactConstruction
+        }
+        BenchmarkJsStage::CacheMissProduction => MessageBenchmarkStage::CacheMissProduction,
+        BenchmarkJsStage::CacheHitValidationAndAccess => {
+            MessageBenchmarkStage::CacheHitValidationAndAccess
+        }
+    }
+}
+
+fn inventory_observation<T>(source_kind: &[u8], groups: &[&PhysicalFileGroup<T>]) -> Vec<Vec<u8>>
+where
+    T: ProjectFileTarget,
+{
+    let mut fields = Vec::new();
+    for group in groups {
+        for target in &group.targets {
+            fields.push(b"logical-source".to_vec());
+            fields.push(source_kind.to_vec());
+            fields.push(target.project_path().as_bytes().to_vec());
+        }
+    }
+    for group in groups {
+        fields.push(b"physical-group".to_vec());
+        fields.push(
+            u64::try_from(group.targets.len())
+                .expect("supported physical alias counts fit u64")
+                .to_be_bytes()
+                .to_vec(),
+        );
+        fields.extend(
+            group
+                .targets
+                .iter()
+                .map(|target| target.project_path().as_bytes().to_vec()),
+        );
+    }
+    fields
+}
+
+fn reference_snapshot_observation(groups: &[JsPhysicalSourceGroup]) -> Vec<Vec<u8>> {
+    let mut fields = Vec::new();
+    for group in groups {
+        fields.push(b"reference-snapshot".to_vec());
+        fields.push(
+            u64::try_from(group.aliases().len() + 1)
+                .expect("supported physical alias counts fit u64")
+                .to_be_bytes()
+                .to_vec(),
+        );
+        fields.push(source_path_label(group.primary()).into_bytes());
+        fields.extend(
+            group
+                .aliases()
+                .iter()
+                .map(|source| source_path_label(source).into_bytes()),
+        );
+        let (grammar, goal) = JsSourceProfile::from_source(group.primary()).map_or(
+            (b"unsupported".as_slice(), b"unsupported".as_slice()),
+            source_profile_observation,
+        );
+        fields.push(grammar.to_vec());
+        fields.push(goal.to_vec());
+        fields.push(group.source_bytes().to_vec());
+    }
+    fields
+}
+
+const fn source_profile_observation(profile: JsSourceProfile) -> (&'static [u8], &'static [u8]) {
+    let grammar: &'static [u8] = match profile.grammar() {
+        JsGrammarProfile::JavaScript => b"javascript",
+        JsGrammarProfile::JavaScriptJsx => b"javascript-jsx",
+        JsGrammarProfile::TypeScript => b"typescript",
+        JsGrammarProfile::TypeScriptJsx => b"typescript-jsx",
+        JsGrammarProfile::TypeScriptDeclaration => b"typescript-declaration",
+    };
+    let goal: &'static [u8] = match profile.goal() {
+        JsSourceGoal::BoundedUnambiguous => b"bounded-unambiguous",
+        JsSourceGoal::Module => b"module",
+        JsSourceGoal::CommonJs => b"commonjs",
+    };
+    (grammar, goal)
 }
 
 fn source_identities(
@@ -499,7 +718,8 @@ fn recognizer_scopes(recognizers: &JsRecognizerSet) -> Box<[CatalogScopeId]> {
         .into_boxed_slice()
 }
 
-fn produce_external_inventory(
+#[allow(clippy::too_many_arguments)]
+fn produce_external_inventory<O>(
     project_root: &Path,
     target_scopes: &[CatalogScopeId],
     configured_paths: &[PortableRelativePath],
@@ -507,7 +727,14 @@ fn produce_external_inventory(
     cache: Option<&MessageLinkCache>,
     artifacts: &mut Vec<MessageReferenceArtifact>,
     pending_failures: &mut Vec<PendingReferenceFailure>,
-) {
+    observer: &mut O,
+) where
+    O: MessageBenchmarkObserver + ?Sized,
+{
+    observer.begin(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "reference-external-inventory",
+    );
     let targets = configured_paths
         .iter()
         .cloned()
@@ -539,10 +766,48 @@ fn produce_external_inventory(
             },
         }
     }));
+    observer.finish(
+        MessageBenchmarkStage::InventoryMetadataIo,
+        "reference-external-inventory",
+    );
+    if observer.enabled() {
+        let groups = groups.iter().collect::<Vec<_>>();
+        let observation_fields = inventory_observation(b"reference-external", &groups);
+        observer.observe(
+            MessageBenchmarkStage::InventoryMetadataIo,
+            "reference-external-inventory",
+            observation_checksum(
+                MessageBenchmarkStage::InventoryMetadataIo.cost().as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
 
+    let mut logical_paths = observer
+        .enabled()
+        .then(|| {
+            groups
+                .iter()
+                .map(|group| {
+                    group
+                        .targets
+                        .iter()
+                        .map(|target| target.label.clone())
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice()
+                })
+                .collect::<Vec<_>>()
+        })
+        .map(Vec::into_iter);
+    observer.begin(
+        MessageBenchmarkStage::ExternalArtifactRead,
+        "external-artifact-snapshots",
+    );
+    let mut snapshots = Vec::new();
     for group in groups {
         let primary = group.primary().relative.clone();
         let primary_label = group.primary_path().to_owned();
+        let observed_paths = logical_paths.as_mut().and_then(Iterator::next);
         let snapshot = match acquire_physical_snapshot(
             &group,
             limits.effective_limit(LinkLimitCounter::ReferenceArtifactWireBytes),
@@ -561,8 +826,34 @@ fn produce_external_inventory(
                 continue;
             }
         };
+        snapshots.push(ExternalArtifactSnapshot {
+            primary,
+            primary_label,
+            logical_paths: observed_paths,
+            bytes: snapshot,
+        });
+    }
+    observer.finish(
+        MessageBenchmarkStage::ExternalArtifactRead,
+        "external-artifact-snapshots",
+    );
+    if observer.enabled() {
+        let observation_fields = external_snapshot_observation(&snapshots);
+        observer.observe(
+            MessageBenchmarkStage::ExternalArtifactRead,
+            "external-artifact-snapshots",
+            observation_checksum(
+                MessageBenchmarkStage::ExternalArtifactRead
+                    .cost()
+                    .as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
 
-        let cache_key = ExternalArtifactCacheKey::for_snapshot(primary.clone(), &snapshot);
+    for snapshot in snapshots {
+        let cache_key =
+            ExternalArtifactCacheKey::for_snapshot(snapshot.primary.clone(), &snapshot.bytes);
         let cached = cache
             // Typed revalidation cannot recover the original wire charge. The
             // authoritative current snapshot must independently pass it before
@@ -577,7 +868,32 @@ fn produce_external_inventory(
             continue;
         }
 
-        match decode_reference_artifact(&snapshot, limits) {
+        observer.begin(
+            MessageBenchmarkStage::ReferenceArtifactDecode,
+            &snapshot.primary_label,
+        );
+        let decoded = decode_reference_artifact(&snapshot.bytes, limits);
+        observer.finish(
+            MessageBenchmarkStage::ReferenceArtifactDecode,
+            &snapshot.primary_label,
+        );
+        if let Ok(artifact) = &decoded {
+            if observer.enabled() {
+                let bytes = encode_reference_artifact(artifact, limits)
+                    .expect("a decoded reference artifact re-encodes canonically");
+                observer.observe(
+                    MessageBenchmarkStage::ReferenceArtifactDecode,
+                    &snapshot.primary_label,
+                    observation_checksum(
+                        MessageBenchmarkStage::ReferenceArtifactDecode
+                            .cost()
+                            .as_bytes(),
+                        [bytes.as_ref()],
+                    ),
+                );
+            }
+        }
+        match decoded {
             Ok(artifact) => {
                 if let Some(cache) = cache {
                     cache.store_external(cache_key, artifact.clone());
@@ -585,16 +901,45 @@ fn produce_external_inventory(
                 artifacts.push(artifact);
             }
             Err(error) => pending_failures.push(PendingReferenceFailure {
-                order_path: Some(primary_label),
+                order_path: Some(snapshot.primary_label),
                 rank: 4,
                 failure: ReferenceSourceFailure::ExternalArtifact {
                     affected_scopes: target_scopes.to_vec().into_boxed_slice(),
-                    host_primary: primary,
+                    host_primary: snapshot.primary,
                     error,
                 },
             }),
         }
     }
+}
+
+fn external_snapshot_observation(snapshots: &[ExternalArtifactSnapshot]) -> Vec<Vec<u8>> {
+    let mut fields = Vec::new();
+    for snapshot in snapshots {
+        fields.push(b"external-artifact-snapshot".to_vec());
+        fields.push(
+            u64::try_from(
+                snapshot
+                    .logical_paths
+                    .as_ref()
+                    .expect("enabled observations retain external logical paths")
+                    .len(),
+            )
+            .expect("supported physical alias counts fit u64")
+            .to_be_bytes()
+            .to_vec(),
+        );
+        fields.extend(
+            snapshot
+                .logical_paths
+                .as_ref()
+                .expect("enabled observations retain external logical paths")
+                .iter()
+                .map(|path| path.as_bytes().to_vec()),
+        );
+        fields.push(snapshot.bytes.to_vec());
+    }
+    fields
 }
 
 fn portable_path_label(path: &PortableRelativePath) -> String {

@@ -1,0 +1,37 @@
+{
+  "revision": 1,
+  "vectors": [
+    {
+      "name": "empty occurrence sequence",
+      "domain": "complete_workflow",
+      "occurrences": [],
+      "expected": 1298552569
+    },
+    {
+      "name": "single ASCII occurrence",
+      "domain": "source_parse",
+      "occurrences": [
+        {
+          "identity": "src/app.mts",
+          "checksum": 305419896
+        }
+      ],
+      "expected": 1045557292
+    },
+    {
+      "name": "ordered Unicode and empty identities",
+      "domain": "definition_projection",
+      "occurrences": [
+        {
+          "identity": "locales/ja/挨拶.json",
+          "checksum": 4294967295
+        },
+        {
+          "identity": "",
+          "checksum": 0
+        }
+      ],
+      "expected": 1139300
+    }
+  ]
+}

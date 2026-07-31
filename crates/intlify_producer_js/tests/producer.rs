@@ -11,6 +11,11 @@ use intlify_contract::{
     CatalogScopeName, DeliveryUnitSegment, LinkLimitCounter, LinkLimits, PortablePathSegment,
     PortableRelativePath, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+#[cfg(feature = "benchmark")]
+use intlify_producer_js::benchmark::{
+    benchmark_produce_reference_artifacts, benchmark_produce_reference_artifacts_with_cache,
+    BenchmarkJsStage,
+};
 use intlify_producer_js::{
     preflight_source_group_count, produce_reference_artifacts,
     produce_reference_artifacts_with_cache, JsKeySyntax, JsPhysicalSourceGroup, JsProducerCache,
@@ -120,6 +125,117 @@ impl JsProducerCache for FailingCache {
     ) -> Result<(), JsProducerCacheIoError> {
         Err(io::Error::other("cache write unavailable").into())
     }
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn benchmark_observes_the_ordinary_producer_pipeline_without_changing_its_result() {
+    let limits = LinkLimits::default();
+    let recognizers = lookup("t");
+    let selected = || {
+        vec![group(
+            &[&["src", "app.mts"]],
+            b"export const title = t('checkout.title')",
+        )]
+    };
+
+    let ordinary = produce_reference_artifacts(selected(), &recognizers, &limits).unwrap();
+    let benchmark =
+        benchmark_produce_reference_artifacts(selected(), &recognizers, &limits).unwrap();
+    let repeated =
+        benchmark_produce_reference_artifacts(selected(), &recognizers, &limits).unwrap();
+
+    assert_eq!(benchmark.outcome(), &ordinary);
+    assert_eq!(repeated.outcome(), &ordinary);
+    assert_eq!(
+        benchmark
+            .stages()
+            .iter()
+            .map(intlify_producer_js::benchmark::BenchmarkJsStageMeasurement::stage)
+            .collect::<Vec<_>>(),
+        [
+            BenchmarkJsStage::SourceParse,
+            BenchmarkJsStage::RecognizerMatchAndStaticEvaluation,
+            BenchmarkJsStage::KeyAndProvenanceConstruction,
+            BenchmarkJsStage::ReferenceArtifactConstruction,
+        ]
+    );
+    assert!(benchmark.stages().iter().all(|measurement| {
+        measurement.source() == &source(&["src", "app.mts"])
+            && !measurement.stage().boundary_id().contains("_v")
+    }));
+    assert_eq!(
+        benchmark
+            .stages()
+            .iter()
+            .map(|measurement| {
+                (
+                    measurement.source(),
+                    measurement.stage(),
+                    measurement.checksum(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        repeated
+            .stages()
+            .iter()
+            .map(|measurement| {
+                (
+                    measurement.source(),
+                    measurement.stage(),
+                    measurement.checksum(),
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn benchmark_distinguishes_cache_miss_production_from_cache_hit_access() {
+    let limits = LinkLimits::default();
+    let recognizers = lookup("t");
+    let selected = || {
+        vec![group(
+            &[&["src", "app.mts"]],
+            b"export const title = t('checkout.title')",
+        )]
+    };
+    let cache = MemoryCache::default();
+
+    let miss =
+        benchmark_produce_reference_artifacts_with_cache(selected(), &recognizers, &limits, &cache)
+            .unwrap();
+    let hit =
+        benchmark_produce_reference_artifacts_with_cache(selected(), &recognizers, &limits, &cache)
+            .unwrap();
+
+    assert_eq!(miss.outcome(), hit.outcome());
+    assert_eq!(
+        miss.stages()
+            .iter()
+            .map(intlify_producer_js::benchmark::BenchmarkJsStageMeasurement::stage)
+            .collect::<Vec<_>>(),
+        [
+            BenchmarkJsStage::SourceParse,
+            BenchmarkJsStage::RecognizerMatchAndStaticEvaluation,
+            BenchmarkJsStage::KeyAndProvenanceConstruction,
+            BenchmarkJsStage::ReferenceArtifactConstruction,
+            BenchmarkJsStage::CacheMissProduction,
+        ]
+    );
+    assert_eq!(
+        hit.stages()
+            .iter()
+            .map(intlify_producer_js::benchmark::BenchmarkJsStageMeasurement::stage)
+            .collect::<Vec<_>>(),
+        [BenchmarkJsStage::CacheHitValidationAndAccess]
+    );
+    assert!(miss
+        .stages()
+        .iter()
+        .chain(hit.stages())
+        .all(|measurement| !measurement.stage().boundary_id().contains("_v")));
 }
 
 #[test]

@@ -14,21 +14,31 @@ use std::error::Error;
 use std::fmt;
 use std::path::Path;
 
-use intlify_contract::LinkLimits;
+use intlify_contract::{
+    encode_definition_artifact, encode_reference_artifact, CatalogScopeId, LinkLimits,
+    MessageSelector,
+};
+#[cfg(feature = "benchmark")]
+use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_linker::{
-    link, DeliveryUnitGraph, LinkOperationalError, LinkOutcome, LinkRequest, ScopeMappingTable,
+    link, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkOperationalError,
+    LinkOutcome, LinkRequest, PartialReason, PlacementPolicy, ScopeMappingTable,
 };
 use intlify_resource::{HostFormatRegistry, ResolvedResources};
 
 use super::completeness::build_scope_completeness;
 use super::config::ResolvedMessagesConfig;
 use super::inventory::{
-    produce_definition_inventory, DefinitionInventory, DefinitionInventoryError,
+    produce_definition_inventory_with_observer, DefinitionInventory, DefinitionInventoryError,
     DefinitionSourceFailure,
 };
+use super::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
 use super::reference::{
-    produce_reference_inventory, MessageLinkCache, ReferenceInventory, ReferenceInventoryError,
-    ReferenceSourceFailure,
+    produce_reference_inventory_with_observer, MessageLinkCache, ReferenceInventory,
+    ReferenceInventoryError, ReferenceSourceFailure,
 };
 
 /// One successful complete project-link invocation.
@@ -63,6 +73,12 @@ impl ProjectLinkExecution {
     /// Return reference artifacts admitted by this invocation.
     pub(crate) fn reference_artifacts(&self) -> &[intlify_contract::MessageReferenceArtifact] {
         self.references.artifacts()
+    }
+
+    /// Consume the workflow result into its ordinary semantic outcome.
+    #[cfg(feature = "benchmark")]
+    pub(crate) fn into_outcome(self) -> LinkOutcome {
+        self.outcome
     }
 }
 
@@ -128,27 +144,60 @@ pub(crate) fn link_project(
     limits: &LinkLimits,
     cache: Option<&MessageLinkCache>,
 ) -> Result<ProjectLinkExecution, ProjectLinkError> {
-    // Configuration-derived definition gates deliberately precede every
-    // reference-source scan. They must never be downgraded into partial input.
-    let definitions = produce_definition_inventory(
+    link_project_with_observer(
         project_root,
         config_path,
         resources,
         messages,
         registry,
         limits,
+        cache,
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+/// Run the ordinary workflow with the private benchmark observation seam.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn link_project_with_observer<O>(
+    project_root: &Path,
+    config_path: Option<&Path>,
+    resources: &ResolvedResources,
+    messages: &ResolvedMessagesConfig,
+    registry: &HostFormatRegistry,
+    limits: &LinkLimits,
+    cache: Option<&MessageLinkCache>,
+    observer: &mut O,
+) -> Result<ProjectLinkExecution, ProjectLinkError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
+    // Configuration-derived definition gates deliberately precede every
+    // reference-source scan. They must never be downgraded into partial input.
+    let definitions = produce_definition_inventory_with_observer(
+        project_root,
+        config_path,
+        resources,
+        messages,
+        registry,
+        limits,
+        observer,
     )
     .map_err(ProjectLinkError::DefinitionInventory)?;
 
-    let references = produce_reference_inventory(
+    let references = produce_reference_inventory_with_observer(
         project_root,
         definitions.target_scopes(),
         messages.producers(),
         limits,
         cache,
+        observer,
     )
     .map_err(ProjectLinkError::ReferenceInventory)?;
 
+    observer.begin(
+        MessageBenchmarkStage::RequestValidationAndScopeMapping,
+        "link-request",
+    );
     let scope_mappings =
         ScopeMappingTable::empty(definitions.target_scopes(), limits).map_err(|error| {
             ProjectLinkError::Linker {
@@ -184,16 +233,222 @@ pub(crate) fn link_project(
         stage: ProjectLinkStage::RequestAdmission,
         error,
     })?;
-    let outcome = link(&request).map_err(|error| ProjectLinkError::Linker {
-        stage: ProjectLinkStage::SemanticLink,
-        error,
-    })?;
+    observer.finish(
+        MessageBenchmarkStage::RequestValidationAndScopeMapping,
+        "link-request",
+    );
+    if observer.enabled() {
+        let observation_fields = request_observation(&request);
+        observer.observe(
+            MessageBenchmarkStage::RequestValidationAndScopeMapping,
+            "link-request",
+            observation_checksum(
+                MessageBenchmarkStage::RequestValidationAndScopeMapping
+                    .cost()
+                    .as_bytes(),
+                observation_fields.iter().map(Vec::as_slice),
+            ),
+        );
+    }
+    let outcome = run_semantic_link(&request, observer)?;
 
     Ok(ProjectLinkExecution {
         outcome,
         definitions,
         references,
     })
+}
+
+fn request_observation(request: &LinkRequest<'_>) -> Vec<Vec<u8>> {
+    let mut fields = Vec::new();
+
+    fields.push(b"reference-artifacts".to_vec());
+    fields.push(count_bytes(request.reference_artifacts().len()));
+    fields.extend(request.reference_artifacts().iter().map(|artifact| {
+        encode_reference_artifact(artifact, request.limits())
+            .expect("a request-admitted reference artifact re-encodes canonically")
+            .into_vec()
+    }));
+
+    fields.push(b"definition-artifacts".to_vec());
+    fields.push(count_bytes(request.definition_artifacts().len()));
+    fields.extend(request.definition_artifacts().iter().map(|artifact| {
+        encode_definition_artifact(artifact, request.limits())
+            .expect("a request-admitted definition artifact re-encodes canonically")
+            .into_vec()
+    }));
+
+    fields.push(b"policy".to_vec());
+    fields.push(count_bytes(request.policy().production_locales().len()));
+    fields.extend(
+        request
+            .policy()
+            .production_locales()
+            .iter()
+            .map(|locale| locale.as_str().as_bytes().to_vec()),
+    );
+    fields.push(count_bytes(request.policy().configured_roots().len()));
+    for root in request.policy().configured_roots() {
+        push_scope(&mut fields, root.scope());
+        fields.push(root.domain().as_str().as_bytes().to_vec());
+        push_selector(&mut fields, root.selector());
+        push_optional_text(
+            &mut fields,
+            root.reason().map(intlify_contract::ReasonText::as_str),
+        );
+    }
+    fields.push(
+        match request.policy().dynamic_references() {
+            DynamicReferenceMode::Compat => b"compat".as_slice(),
+            DynamicReferenceMode::Strict => b"strict".as_slice(),
+        }
+        .to_vec(),
+    );
+    fields.push(
+        match request.policy().placement() {
+            PlacementPolicy::Duplicate => b"duplicate".as_slice(),
+        }
+        .to_vec(),
+    );
+
+    fields.push(b"scope-mappings".to_vec());
+    fields.push(count_bytes(request.scope_mappings().mappings().len()));
+    for mapping in request.scope_mappings().mappings() {
+        push_scope(&mut fields, mapping.source());
+        push_scope(&mut fields, mapping.target());
+    }
+
+    fields.push(b"scope-completeness".to_vec());
+    fields.push(count_bytes(request.scope_completeness().entries().len()));
+    for entry in request.scope_completeness().entries() {
+        push_scope(&mut fields, entry.scope());
+        fields.push(completeness_token(entry.definitions()).to_vec());
+        fields.push(completeness_token(entry.references()).to_vec());
+    }
+
+    fields.push(b"delivery-graph".to_vec());
+    fields.push(count_bytes(request.delivery_graph().nodes().len()));
+    for node in request.delivery_graph().nodes() {
+        push_delivery_unit(&mut fields, node);
+    }
+    fields.push(count_bytes(request.delivery_graph().edges().len()));
+    for edge in request.delivery_graph().edges() {
+        push_delivery_unit(&mut fields, edge.parent());
+        push_delivery_unit(&mut fields, edge.child());
+    }
+    fields.push(count_bytes(request.delivery_graph().roots().len()));
+    for root in request.delivery_graph().roots() {
+        push_delivery_unit(&mut fields, root);
+    }
+    fields.push(b"admitted".to_vec());
+    fields
+}
+
+fn count_bytes(count: usize) -> Vec<u8> {
+    u64::try_from(count)
+        .expect("supported benchmark observation counts fit u64")
+        .to_be_bytes()
+        .to_vec()
+}
+
+fn push_scope(fields: &mut Vec<Vec<u8>>, scope: &CatalogScopeId) {
+    fields.push(scope.namespace().as_str().as_bytes().to_vec());
+    fields.push(scope.name().as_str().as_bytes().to_vec());
+}
+
+fn push_delivery_unit(fields: &mut Vec<Vec<u8>>, unit: &intlify_contract::DeliveryUnitId) {
+    fields.push(count_bytes(unit.segments().len()));
+    fields.extend(
+        unit.segments()
+            .iter()
+            .map(|segment| segment.as_str().as_bytes().to_vec()),
+    );
+}
+
+fn push_selector(fields: &mut Vec<Vec<u8>>, selector: &MessageSelector) {
+    fields.push(selector.kind_str().as_bytes().to_vec());
+    match selector {
+        MessageSelector::Exact(key) => fields.push(key.as_str().as_bytes().to_vec()),
+        MessageSelector::Prefix(prefix) => fields.push(prefix.as_str().as_bytes().to_vec()),
+        MessageSelector::Pattern(pattern) => fields.push(pattern.as_str().as_bytes().to_vec()),
+        MessageSelector::AllInScope | MessageSelector::UnboundedDynamic => {}
+    }
+}
+
+fn push_optional_text(fields: &mut Vec<Vec<u8>>, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            fields.push(b"present".to_vec());
+            fields.push(value.as_bytes().to_vec());
+        }
+        None => fields.push(b"absent".to_vec()),
+    }
+}
+
+const fn completeness_token(completeness: InputCompleteness) -> &'static [u8] {
+    match completeness {
+        InputCompleteness::Closed => b"closed",
+        InputCompleteness::Partial(reason) => match reason {
+            PartialReason::OpenEditorWorld => b"partial:open-editor-world",
+            PartialReason::SourceOmitted => b"partial:source-omitted",
+            PartialReason::SourceFailed => b"partial:source-failed",
+            PartialReason::ProducerOmitted => b"partial:producer-omitted",
+            PartialReason::ProducerFailed => b"partial:producer-failed",
+            PartialReason::ExternalArtifactUnverified => b"partial:external-artifact-unverified",
+        },
+    }
+}
+
+fn run_semantic_link<O>(
+    request: &LinkRequest<'_>,
+    observer: &mut O,
+) -> Result<LinkOutcome, ProjectLinkError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
+    #[cfg(not(feature = "benchmark"))]
+    let _ = &observer;
+
+    #[cfg(feature = "benchmark")]
+    if observer.enabled() {
+        let execution = benchmark_link(request).map_err(|error| ProjectLinkError::Linker {
+            stage: ProjectLinkStage::SemanticLink,
+            error,
+        })?;
+        observer.exclude_observation_overhead(execution.observation_overhead());
+        for measurement in execution.stages() {
+            observer.record(
+                message_stage_for_link(measurement.stage()),
+                "link-request",
+                measurement.elapsed(),
+                measurement.checksum(),
+            );
+        }
+        return Ok(execution.into_outcome());
+    }
+
+    link(request).map_err(|error| ProjectLinkError::Linker {
+        stage: ProjectLinkStage::SemanticLink,
+        error,
+    })
+}
+
+#[cfg(feature = "benchmark")]
+const fn message_stage_for_link(stage: BenchmarkLinkStage) -> MessageBenchmarkStage {
+    match stage {
+        BenchmarkLinkStage::SemanticIndexConstruction => {
+            MessageBenchmarkStage::SemanticIndexConstruction
+        }
+        BenchmarkLinkStage::SelectorExpansionAndReferenceResolution => {
+            MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
+        }
+        BenchmarkLinkStage::ReachabilityAndPlacement => {
+            MessageBenchmarkStage::ReachabilityAndPlacement
+        }
+        BenchmarkLinkStage::FindingAndPlanMaterialization => {
+            MessageBenchmarkStage::FindingAndPlanMaterialization
+        }
+    }
 }
 
 #[cfg(test)]
@@ -497,6 +752,123 @@ mod tests {
         let stats = cache.stats();
         assert!(stats.js_hits > 0);
         assert!(stats.external_hits > 0);
+    }
+
+    #[cfg(feature = "benchmark")]
+    #[test]
+    fn benchmark_project_path_preserves_the_ordinary_outcome_and_stage_contract() {
+        use crate::messages::benchmark::{benchmark_project_link, MessageBenchmarkStage};
+
+        let root = TempRoot::new("representative-benchmark");
+        create_representative_project(&root, false);
+        let (resources, messages) = resolved(&messages_value("strict"));
+        let ordinary = execute(&root, "strict", None);
+        let observed = benchmark_project_link(
+            &root,
+            None,
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        let repeated = benchmark_project_link(
+            &root,
+            None,
+            &resources,
+            &messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+        )
+        .unwrap();
+
+        assert_eq!(observed.outcome(), ordinary.outcome());
+        assert_eq!(repeated.outcome(), ordinary.outcome());
+        assert_eq!(
+            observed.definition_artifact_count(),
+            ordinary.definition_artifacts().len()
+        );
+        assert_eq!(
+            observed.reference_artifact_count(),
+            ordinary.reference_artifacts().len()
+        );
+        assert!(observed
+            .measurements()
+            .iter()
+            .all(|measurement| !measurement
+                .stage()
+                .boundary_id()
+                .rsplit_once("_v")
+                .is_some_and(|(_, suffix)| {
+                    !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+                })));
+        assert_eq!(
+            observed
+                .measurements()
+                .iter()
+                .map(|measurement| {
+                    (
+                        measurement.stage(),
+                        measurement.identity(),
+                        measurement.checksum(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            repeated
+                .measurements()
+                .iter()
+                .map(|measurement| {
+                    (
+                        measurement.stage(),
+                        measurement.identity(),
+                        measurement.checksum(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        let stages = observed
+            .measurements()
+            .iter()
+            .map(crate::messages::benchmark::BenchmarkMessageMeasurement::stage)
+            .collect::<std::collections::BTreeSet<_>>();
+        for required in [
+            MessageBenchmarkStage::InventoryMetadataIo,
+            MessageBenchmarkStage::DefinitionSnapshotRead,
+            MessageBenchmarkStage::ReferenceSnapshotRead,
+            MessageBenchmarkStage::ExternalArtifactRead,
+            MessageBenchmarkStage::SourceParse,
+            MessageBenchmarkStage::RecognizerMatchAndStaticEvaluation,
+            MessageBenchmarkStage::KeyAndProvenanceConstruction,
+            MessageBenchmarkStage::ReferenceArtifactConstruction,
+            MessageBenchmarkStage::CacheMissProduction,
+            MessageBenchmarkStage::ReferenceArtifactDecode,
+            MessageBenchmarkStage::PreExtractionAdmission,
+            MessageBenchmarkStage::ResourceHostParseAndEntryExtraction,
+            MessageBenchmarkStage::DefinitionProjection,
+            MessageBenchmarkStage::RequestValidationAndScopeMapping,
+            MessageBenchmarkStage::SemanticIndexConstruction,
+            MessageBenchmarkStage::SelectorExpansionAndReferenceResolution,
+            MessageBenchmarkStage::ReachabilityAndPlacement,
+            MessageBenchmarkStage::FindingAndPlanMaterialization,
+            MessageBenchmarkStage::ProjectLinkE2e,
+        ] {
+            assert!(stages.contains(&required), "missing {required:?}");
+        }
+        assert_eq!(
+            observed
+                .measurements()
+                .iter()
+                .filter(|measurement| {
+                    measurement.stage() == MessageBenchmarkStage::InventoryMetadataIo
+                })
+                .map(crate::messages::benchmark::BenchmarkMessageMeasurement::identity)
+                .collect::<Vec<_>>(),
+            [
+                "definition-inventory",
+                "reference-js-inventory",
+                "reference-external-inventory"
+            ]
+        );
     }
 
     #[test]

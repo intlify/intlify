@@ -58,6 +58,11 @@ impl JsProducerCacheKey {
     pub const fn lookup_digest(&self) -> &[u8; 32] {
         &self.lookup_digest
     }
+
+    #[cfg(feature = "benchmark")]
+    pub(crate) fn semantic_frame(&self) -> &[u8] {
+        &self.frame
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
