@@ -74,7 +74,14 @@ fn generated_config_schema_matches_design_contract() {
     assert_eq!(messages["properties"]["locales"]["items"]["minLength"], 1);
     assert_eq!(messages["properties"]["roots"]["maxItems"], 4096);
     assert!(messages["properties"].get("fallback").is_none());
-    assert!(messages["properties"].get("coverageBaseline").is_none());
+    let coverage_baseline = &messages["properties"]["coverageBaseline"];
+    assert_eq!(coverage_baseline["type"], "object");
+    assert_eq!(coverage_baseline["minProperties"], 1);
+    assert_eq!(coverage_baseline["maxProperties"], 4096);
+    assert_eq!(coverage_baseline["propertyNames"]["minLength"], 1);
+    assert_eq!(coverage_baseline["propertyNames"]["maxLength"], 255);
+    assert_eq!(coverage_baseline["additionalProperties"]["minLength"], 1);
+    assert_eq!(coverage_baseline["additionalProperties"]["maxLength"], 255);
     assert!(messages["properties"].get("delivery").is_none());
 
     let producers = &json["definitions"]["MessageProducersConfig"];

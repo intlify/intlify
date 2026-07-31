@@ -295,6 +295,16 @@ fn request_observation(request: &LinkRequest<'_>) -> Result<Vec<Vec<u8>>, Artifa
             root.reason().map(intlify_contract::ReasonText::as_str),
         );
     }
+    if !request.policy().coverage_baselines().is_empty() {
+        // Preserve the established baseline-absent observation byte-for-byte,
+        // while framing the additive semantic policy when M1 is selected.
+        fields.push(b"coverage-baselines".to_vec());
+        fields.push(count_bytes(request.policy().coverage_baselines().len()));
+        for baseline in request.policy().coverage_baselines() {
+            push_scope(&mut fields, baseline.scope());
+            fields.push(baseline.locale().as_str().as_bytes().to_vec());
+        }
+    }
     fields.push(
         match request.policy().dynamic_references() {
             DynamicReferenceMode::Compat => b"compat".as_slice(),
@@ -457,7 +467,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use intlify_contract::{LinkLimits, MessageSelector};
-    use intlify_linker::{DynamicReferenceMode, LinkFindingKind};
+    use intlify_linker::{DynamicReferenceMode, LinkFindingKind, LinkOperationalError};
     use intlify_resource::{HostFormatRegistry, ResourcesConfig};
     use serde_json::{json, Value};
 
@@ -650,6 +660,14 @@ mod tests {
         messages_value: &Value,
         cache: Option<&MessageLinkCache>,
     ) -> ProjectLinkExecution {
+        try_execute_messages(root, messages_value, cache).unwrap()
+    }
+
+    fn try_execute_messages(
+        root: &Path,
+        messages_value: &Value,
+        cache: Option<&MessageLinkCache>,
+    ) -> Result<ProjectLinkExecution, ProjectLinkError> {
         let (resources, messages) = resolved(messages_value);
         link_project(
             root,
@@ -660,7 +678,6 @@ mod tests {
             &LinkLimits::default(),
             cache,
         )
-        .unwrap()
     }
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -750,6 +767,108 @@ mod tests {
         let stats = cache.stats();
         assert!(stats.js_hits > 0);
         assert!(stats.external_hits > 0);
+    }
+
+    #[test]
+    fn coverage_baseline_workflow_returns_current_models_without_stale_fallback() {
+        let root = TempRoot::new("coverage-baseline");
+        write(
+            &root,
+            "locales/en.json",
+            r#"{"title":"Title","extra":"Extra"}"#,
+        );
+        write(&root, "locales/ja.json", r#"{"title":"タイトル"}"#);
+        fs::create_dir_all(root.join("aliases")).unwrap();
+        fs::hard_link(root.join("locales/en.json"), root.join("aliases/en.json")).unwrap();
+        let messages = json!({
+            "locales": ["ja", "en"],
+            "coverageBaseline": { "app": "en" }
+        });
+
+        let admitted = execute_messages(&root, &messages, None);
+        assert_eq!(admitted.outcome().typed_key_models().len(), 1);
+        assert_eq!(
+            admitted.outcome().typed_key_models()[0]
+                .keys()
+                .iter()
+                .map(intlify_contract::CatalogKey::as_str)
+                .collect::<Vec<_>>(),
+            ["/extra", "/title"]
+        );
+
+        write(
+            &root,
+            "locales/ja.json",
+            r#"{"title":"タイトル","onlyJa":"日本語のみ"}"#,
+        );
+        let mismatch = try_execute_messages(&root, &messages, None).unwrap_err();
+        assert!(matches!(
+            mismatch,
+            ProjectLinkError::Linker {
+                stage: ProjectLinkStage::SemanticLink,
+                error: LinkOperationalError::InvalidRequest(
+                    intlify_linker::InvalidRequestError::CoverageBaselineMissingKey { .. }
+                )
+            }
+        ));
+        assert_eq!(admitted.outcome().typed_key_models().len(), 1);
+
+        write(&root, "locales/ja.json", "{");
+        let partial = execute_messages(&root, &messages, None);
+        assert!(partial.outcome().typed_key_models().is_empty());
+        assert!(partial.outcome().generation_blocked());
+
+        write(&root, "locales/ja.json", r#"{"title":"タイトル"}"#);
+        write(
+            &root,
+            "locales/en.json",
+            r#"{"title":"First","title":"Second"}"#,
+        );
+        let ambiguous = execute_messages(&root, &messages, None);
+        assert!(ambiguous.outcome().typed_key_models().is_empty());
+        assert!(ambiguous.outcome().generation_blocked());
+        assert_eq!(admitted.outcome().typed_key_models().len(), 1);
+    }
+
+    #[test]
+    fn coverage_baseline_changes_semantic_results_without_invalidating_producer_cache() {
+        let root = TempRoot::new("coverage-baseline-cache");
+        write(&root, "locales/en.json", r#"{"title":"Title"}"#);
+        write(&root, "src/app.ts", "t('/title')");
+        let without_baseline = json!({
+            "locales": ["en"],
+            "producers": {
+                "js": {
+                    "include": ["src/**/*.ts"],
+                    "recognizers": {
+                        "t": {
+                            "kind": "lookup",
+                            "scope": "app",
+                            "domain": "json-pointer",
+                            "keySyntax": "canonical"
+                        }
+                    }
+                }
+            }
+        });
+        let mut with_baseline = without_baseline.clone();
+        with_baseline
+            .as_object_mut()
+            .unwrap()
+            .insert("coverageBaseline".to_owned(), json!({ "app": "en" }));
+        let cache = MessageLinkCache::default();
+
+        let first = execute_messages(&root, &without_baseline, Some(&cache));
+        let first_stats = cache.stats();
+        let second = execute_messages(&root, &with_baseline, Some(&cache));
+        let second_stats = cache.stats();
+
+        assert!(first.outcome().typed_key_models().is_empty());
+        assert_eq!(second.outcome().typed_key_models().len(), 1);
+        assert_eq!(first.reference_artifacts(), second.reference_artifacts());
+        assert_eq!(first.definition_artifacts(), second.definition_artifacts());
+        assert_eq!(second_stats.js_loads, first_stats.js_loads + 1);
+        assert_eq!(second_stats.js_hits, first_stats.js_hits + 1);
     }
 
     #[cfg(feature = "benchmark")]

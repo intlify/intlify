@@ -375,6 +375,7 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
         "selector": { "kind": "exact", "key": "/legal/notice" }
       }
     ],
+    "coverageBaseline": { "app": "en" },
     "producers": {
       "js": {
         "include": ["src/**/*.ts"],
@@ -396,6 +397,13 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
     let loaded = load_project_config(&root, None).expect("messages config should load");
     let normalized = loaded.config.messages.as_ref().expect("messages present");
     assert_eq!(normalized.locales(), ["en", "ja"]);
+    assert_eq!(
+        normalized
+            .coverage_baseline()
+            .get("app")
+            .map(String::as_str),
+        Some("en")
+    );
 
     let resolved = loaded
         .resolved_messages
@@ -406,6 +414,7 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
         DynamicReferenceMode::Strict
     );
     assert_eq!(resolved.policy().configured_roots().len(), 1);
+    assert_eq!(resolved.policy().coverage_baselines().len(), 1);
     assert_eq!(
         resolved.producers().js().unwrap().recognizers().bindings()[0].callee(),
         "i18n.t"
@@ -441,6 +450,11 @@ fn maps_messages_validation_evidence_into_the_existing_config_envelope() {
             r#"{"messages":{"locales":["en"],"producers":{"artifacts":[]}}}"#,
             "/messages/producers/artifacts",
             "invalid_message_producers",
+        ),
+        (
+            r#"{"messages":{"locales":["en"],"coverageBaseline":{}}}"#,
+            "/messages/coverageBaseline",
+            "invalid_message_coverage_baseline",
         ),
         (
             r#"{"messages":{"locales":["en"],"fallback":null}}"#,
@@ -799,6 +813,21 @@ fn rejects_duplicate_object_members_at_the_second_key_token() {
   }
 }"#,
             5,
+            6,
+        ),
+        (
+            "message-coverage-baseline",
+            "json",
+            r#"{
+  "messages": {
+    "locales": ["en"],
+    "coverageBaseline": {
+      "app": "en",
+      "app": "en"
+    }
+  }
+}"#,
+            6,
             6,
         ),
         (
