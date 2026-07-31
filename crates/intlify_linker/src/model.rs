@@ -259,4 +259,72 @@ mod tests {
             Err(LinkOperationalError::InternalInvariant)
         ));
     }
+
+    #[test]
+    fn private_model_scopes_must_be_strictly_increasing() {
+        let app = scope("app");
+        let vendor = scope("vendor");
+        let locale = Locale::try_new("en").unwrap();
+        let limits = LinkLimits::default();
+        let mappings = ScopeMappingTable::empty(&[app.clone(), vendor.clone()], &limits).unwrap();
+        let policy = LinkPolicy::try_new(
+            vec![locale.clone()],
+            Vec::new(),
+            vec![
+                CoverageBaseline::new(app.clone(), locale.clone()),
+                CoverageBaseline::new(vendor.clone(), locale.clone()),
+            ],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &limits,
+        )
+        .unwrap();
+        let resolved_policy = ResolvedLinkPolicy::resolve(&policy, &mappings).unwrap();
+        let resolved_app = mappings.resolve(&app);
+        let resolved_vendor = mappings.resolve(&vendor);
+        let models = vec![
+            TypedKeyModel::new(resolved_vendor.clone(), Vec::new()),
+            TypedKeyModel::new(resolved_app.clone(), Vec::new()),
+        ];
+        let relations = vec![
+            TypedKeyModelSnapshotRelation::new(resolved_vendor, locale.clone(), Vec::new()),
+            TypedKeyModelSnapshotRelation::new(resolved_app, locale, Vec::new()),
+        ];
+
+        assert!(matches!(
+            TypedKeyModelBatch::try_new(models, relations, &resolved_policy),
+            Err(LinkOperationalError::InternalInvariant)
+        ));
+    }
+
+    #[test]
+    fn private_model_scope_must_have_a_resolved_coverage_baseline() {
+        let app = scope("app");
+        let vendor = scope("vendor");
+        let locale = Locale::try_new("en").unwrap();
+        let limits = LinkLimits::default();
+        let mappings = ScopeMappingTable::empty(&[app.clone(), vendor.clone()], &limits).unwrap();
+        let policy = LinkPolicy::try_new(
+            vec![locale.clone()],
+            Vec::new(),
+            vec![CoverageBaseline::new(app, locale.clone())],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &limits,
+        )
+        .unwrap();
+        let resolved_policy = ResolvedLinkPolicy::resolve(&policy, &mappings).unwrap();
+        let resolved_vendor = mappings.resolve(&vendor);
+        let models = vec![TypedKeyModel::new(resolved_vendor.clone(), Vec::new())];
+        let relations = vec![TypedKeyModelSnapshotRelation::new(
+            resolved_vendor,
+            locale,
+            Vec::new(),
+        )];
+
+        assert!(matches!(
+            TypedKeyModelBatch::try_new(models, relations, &resolved_policy),
+            Err(LinkOperationalError::InternalInvariant)
+        ));
+    }
 }

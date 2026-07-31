@@ -1213,9 +1213,10 @@ impl TypedKeyModelFixture {
         let secondary_locale = Locale::try_new("ja").map_err(|error| error.to_string())?;
         let baseline_definitions = (0..scale)
             .map(|index| {
+                let key = definition_key(FixtureShape::TypedKeyModel, index);
                 definition_for_locale(
                     scope.clone(),
-                    &format!("/typed/{index:08}"),
+                    &key,
                     baseline_locale.clone(),
                     format!("Baseline {index}"),
                 )
@@ -1223,9 +1224,10 @@ impl TypedKeyModelFixture {
             .collect::<Result<Vec<_>, _>>()?;
         let secondary_definitions = (0..scale)
             .map(|index| {
+                let key = definition_key(FixtureShape::TypedKeyModel, index);
                 definition_for_locale(
                     scope.clone(),
-                    &format!("/typed/{index:08}"),
+                    &key,
                     secondary_locale.clone(),
                     format!("Secondary {index}"),
                 )
