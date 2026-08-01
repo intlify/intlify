@@ -253,14 +253,25 @@ impl LinkPolicy {
     }
 
     pub(crate) fn revalidate(&self, limits: &LinkLimits) -> Result<(), LinkOperationalError> {
-        validate_and_canonicalize_policy(
-            self.production_locales.to_vec(),
-            self.fallbacks.to_vec(),
-            self.configured_roots.to_vec(),
-            self.coverage_baselines.to_vec(),
+        // Construction already established every relational invariant and the
+        // canonical collection order. Revalidation only reapplies caller-selected
+        // lower limits in the same phase order without cloning or sorting policy data.
+        validate_policy_collection_limits(
+            &self.production_locales,
+            &self.fallbacks,
+            &self.configured_roots,
+            &self.coverage_baselines,
             limits,
-        )
-        .map(|_| ())
+        )?;
+        validate_locale_byte_limits(self.production_locales.iter(), limits)?;
+        validate_locale_byte_limits(self.fallbacks.iter().map(LocaleFallback::source), limits)?;
+        validate_fallback_target_count_limits(&self.fallbacks, limits)?;
+        validate_locale_byte_limits(
+            self.fallbacks.iter().flat_map(LocaleFallback::targets),
+            limits,
+        )?;
+        validate_configured_root_scope_limits(&self.configured_roots, limits)?;
+        validate_coverage_baseline_limits(&self.coverage_baselines, limits)
     }
 }
 
@@ -467,18 +478,14 @@ type CanonicalPolicyInputs = (
     Vec<CoverageBaseline>,
 );
 
-/// Apply the public policy admission phases in their compatibility-stable order.
-fn validate_and_canonicalize_policy(
-    production_locales: Vec<Locale>,
-    fallbacks: Vec<LocaleFallback>,
-    configured_roots: Vec<ConfiguredRoot>,
-    coverage_baselines: Vec<CoverageBaseline>,
+fn validate_policy_collection_limits(
+    production_locales: &[Locale],
+    fallbacks: &[LocaleFallback],
+    configured_roots: &[ConfiguredRoot],
+    coverage_baselines: &[CoverageBaseline],
     limits: &LinkLimits,
-) -> Result<CanonicalPolicyInputs, LinkOperationalError> {
+) -> Result<(), LinkOperationalError> {
     let subject = LinkLimitSubject::ResolvedPolicy;
-
-    // Counts are occurrence preserving. In particular, a duplicate cannot hide
-    // an over-limit submitted collection by being removed during canonicalization.
     check_first_over(
         LinkLimitCounter::ProductionLocales,
         subject.clone(),
@@ -499,12 +506,18 @@ fn validate_and_canonicalize_policy(
     )?;
     check_first_over(
         LinkLimitCounter::CoverageBaselines,
-        subject.clone(),
+        subject,
         usize_count(coverage_baselines.len()),
         limits,
-    )?;
+    )
+}
 
-    for locale in &production_locales {
+fn validate_locale_byte_limits<'a>(
+    locales: impl IntoIterator<Item = &'a Locale>,
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    let subject = LinkLimitSubject::ResolvedPolicy;
+    for locale in locales {
         check_first_over(
             LinkLimitCounter::LocaleBytes,
             subject.clone(),
@@ -512,6 +525,92 @@ fn validate_and_canonicalize_policy(
             limits,
         )?;
     }
+    Ok(())
+}
+
+fn validate_fallback_target_count_limits(
+    fallbacks: &[LocaleFallback],
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    for fallback in fallbacks {
+        check_first_over(
+            LinkLimitCounter::FallbackTargetsPerSource,
+            LinkLimitSubject::FallbackSource(fallback.source().clone()),
+            usize_count(fallback.targets().len()),
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_configured_root_scope_limits(
+    configured_roots: &[ConfiguredRoot],
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    let subject = LinkLimitSubject::ResolvedPolicy;
+    for root in configured_roots {
+        check_first_over(
+            LinkLimitCounter::CatalogScopeNameBytes,
+            subject.clone(),
+            usize_count(root.scope().name().as_str().len()),
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_coverage_baseline_limits(
+    coverage_baselines: &[CoverageBaseline],
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    let subject = LinkLimitSubject::ResolvedPolicy;
+    for baseline in coverage_baselines {
+        check_first_over(
+            LinkLimitCounter::CatalogScopeNameBytes,
+            subject.clone(),
+            usize_count(baseline.scope().name().as_str().len()),
+            limits,
+        )?;
+    }
+    validate_locale_byte_limits(
+        coverage_baselines.iter().map(CoverageBaseline::locale),
+        limits,
+    )?;
+
+    let mut total = 0_u64;
+    for baseline in coverage_baselines {
+        total = total
+            .checked_add(usize_count(baseline.scope().name().as_str().len()))
+            .and_then(|value| value.checked_add(usize_count(baseline.locale().as_str().len())))
+            .ok_or(LinkOperationalError::InternalInvariant)?;
+        check_exact(
+            LinkLimitCounter::CoverageBaselineBytesTotal,
+            subject.clone(),
+            total,
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
+/// Apply the public policy admission phases in their compatibility-stable order.
+fn validate_and_canonicalize_policy(
+    production_locales: Vec<Locale>,
+    fallbacks: Vec<LocaleFallback>,
+    configured_roots: Vec<ConfiguredRoot>,
+    coverage_baselines: Vec<CoverageBaseline>,
+    limits: &LinkLimits,
+) -> Result<CanonicalPolicyInputs, LinkOperationalError> {
+    // Counts are occurrence preserving. In particular, a duplicate cannot hide
+    // an over-limit submitted collection by being removed during canonicalization.
+    validate_policy_collection_limits(
+        &production_locales,
+        &fallbacks,
+        &configured_roots,
+        &coverage_baselines,
+        limits,
+    )?;
+    validate_locale_byte_limits(&production_locales, limits)?;
 
     if production_locales.is_empty() {
         return Err(InvalidRequestError::EmptyProductionLocales.into());
@@ -522,14 +621,7 @@ fn validate_and_canonicalize_policy(
         return Err(InvalidRequestError::DuplicateProductionLocale(locale.clone()).into());
     }
 
-    for fallback in &fallbacks {
-        check_first_over(
-            LinkLimitCounter::LocaleBytes,
-            subject.clone(),
-            usize_count(fallback.source().as_str().len()),
-            limits,
-        )?;
-    }
+    validate_locale_byte_limits(fallbacks.iter().map(LocaleFallback::source), limits)?;
 
     let mut fallbacks = fallbacks;
     fallbacks.sort_by(|left, right| left.source().cmp(right.source()));
@@ -550,25 +642,8 @@ fn validate_and_canonicalize_policy(
         );
     }
 
-    for fallback in &fallbacks {
-        check_first_over(
-            LinkLimitCounter::FallbackTargetsPerSource,
-            LinkLimitSubject::FallbackSource(fallback.source().clone()),
-            usize_count(fallback.targets().len()),
-            limits,
-        )?;
-    }
-
-    for fallback in &fallbacks {
-        for target in fallback.targets() {
-            check_first_over(
-                LinkLimitCounter::LocaleBytes,
-                subject.clone(),
-                usize_count(target.as_str().len()),
-                limits,
-            )?;
-        }
-    }
+    validate_fallback_target_count_limits(&fallbacks, limits)?;
+    validate_locale_byte_limits(fallbacks.iter().flat_map(LocaleFallback::targets), limits)?;
 
     for fallback in &fallbacks {
         if let Some(target) = fallback
@@ -607,14 +682,7 @@ fn validate_and_canonicalize_policy(
         }
     }
 
-    for root in &configured_roots {
-        check_first_over(
-            LinkLimitCounter::CatalogScopeNameBytes,
-            subject.clone(),
-            usize_count(root.scope().name().as_str().len()),
-            limits,
-        )?;
-    }
+    validate_configured_root_scope_limits(&configured_roots, limits)?;
     let mut configured_roots = configured_roots;
     configured_roots.sort_by_key(ConfiguredRoot::identity);
     if let Some(root) = configured_roots
@@ -624,41 +692,9 @@ fn validate_and_canonicalize_policy(
         return Err(InvalidRequestError::DuplicateConfiguredRoot(root[0].identity()).into());
     }
 
-    let mut canonical_baselines = coverage_baselines.iter().collect::<Vec<_>>();
-    canonical_baselines.sort();
-    for baseline in &canonical_baselines {
-        check_first_over(
-            LinkLimitCounter::CatalogScopeNameBytes,
-            subject.clone(),
-            usize_count(baseline.scope().name().as_str().len()),
-            limits,
-        )?;
-    }
-    for baseline in &canonical_baselines {
-        check_first_over(
-            LinkLimitCounter::LocaleBytes,
-            subject.clone(),
-            usize_count(baseline.locale().as_str().len()),
-            limits,
-        )?;
-    }
-
-    let mut total = 0_u64;
-    for baseline in canonical_baselines {
-        total = total
-            .checked_add(usize_count(baseline.scope().name().as_str().len()))
-            .and_then(|value| value.checked_add(usize_count(baseline.locale().as_str().len())))
-            .ok_or(LinkOperationalError::InternalInvariant)?;
-        check_exact(
-            LinkLimitCounter::CoverageBaselineBytesTotal,
-            subject.clone(),
-            total,
-            limits,
-        )?;
-    }
-
     let mut coverage_baselines = coverage_baselines;
     coverage_baselines.sort();
+    validate_coverage_baseline_limits(&coverage_baselines, limits)?;
     if let Some(baseline) = coverage_baselines
         .iter()
         .find(|baseline| production_locales.binary_search(baseline.locale()).is_err())
@@ -891,11 +927,29 @@ mod tests {
             &source_limit,
         )
         .unwrap_err();
+        assert_eq!(defaults.revalidate(&source_limit).unwrap_err(), error);
         let LinkOperationalError::Limit(evidence) = error else {
             panic!("expected fallback source limit evidence");
         };
         assert_eq!(evidence.counter(), LinkLimitCounter::FallbackSources);
         assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+
+        let target_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackTargetsPerSource, 0)
+            .unwrap();
+        let LinkOperationalError::Limit(evidence) = defaults.revalidate(&target_limit).unwrap_err()
+        else {
+            panic!("expected fallback target limit evidence");
+        };
+        assert_eq!(
+            evidence.counter(),
+            LinkLimitCounter::FallbackTargetsPerSource
+        );
+        assert_eq!(
+            evidence.subject(),
+            &LinkLimitSubject::FallbackSource(Locale::try_new("en").unwrap())
+        );
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(1));
     }
 
     #[test]
