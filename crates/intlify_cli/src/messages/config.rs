@@ -20,7 +20,7 @@ use intlify_contract::{
 };
 use intlify_linker::{
     ConfiguredRoot, CoverageBaseline, DynamicReferenceMode, InvalidRequestError,
-    LinkOperationalError, LinkPolicy, PlacementPolicy,
+    LinkOperationalError, LinkPolicy, LocaleFallback, PlacementPolicy,
 };
 use intlify_producer_js::{
     JsKeySyntax, JsRecognizerBinding, JsRecognizerCallKind, JsRecognizerSet,
@@ -37,7 +37,10 @@ const PRODUCTION_LOCALES_LIMIT: usize = 1_024;
 const CONFIGURED_ROOTS_LIMIT: usize = 4_096;
 const COVERAGE_BASELINES_LIMIT: usize = 4_096;
 const COVERAGE_BASELINE_BYTES_TOTAL_LIMIT: u64 = 2_088_960;
+const FALLBACK_SOURCES_LIMIT: usize = 1_024;
+const FALLBACK_TARGETS_PER_SOURCE_LIMIT: usize = 64;
 
+type ValidatedFallbacks = (BTreeMap<String, Vec<String>>, Vec<LocaleFallback>);
 type ValidatedRoots = (
     Vec<MessageRootConfig>,
     Vec<ConfiguredRoot>,
@@ -71,6 +74,8 @@ pub enum MessagesConfigReason {
     InvalidMessageProducers,
     /// Coverage-baseline mapping is malformed or contradicts scope/locale policy.
     InvalidMessageCoverageBaseline,
+    /// Locale fallback mapping is malformed or contradicts production locale policy.
+    InvalidMessageFallback,
 }
 
 impl MessagesConfigReason {
@@ -85,6 +90,7 @@ impl MessagesConfigReason {
             Self::InvalidMessageRoots => "invalid_message_roots",
             Self::InvalidMessageProducers => "invalid_message_producers",
             Self::InvalidMessageCoverageBaseline => "invalid_message_coverage_baseline",
+            Self::InvalidMessageFallback => "invalid_message_fallback",
         }
     }
 }
@@ -427,6 +433,9 @@ pub struct MessagesConfig {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(default, schema_with = "coverage_baseline_schema")]
     coverage_baseline: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(default, schema_with = "fallback_schema")]
+    fallback: BTreeMap<String, Vec<String>>,
 }
 
 impl MessagesConfig {
@@ -458,6 +467,12 @@ impl MessagesConfig {
     #[must_use]
     pub const fn coverage_baseline(&self) -> &BTreeMap<String, String> {
         &self.coverage_baseline
+    }
+
+    /// Return canonical fallback sources with semantic target order preserved.
+    #[must_use]
+    pub const fn fallback(&self) -> &BTreeMap<String, Vec<String>> {
+        &self.fallback
     }
 }
 
@@ -512,6 +527,29 @@ fn coverage_baseline_schema(_: &mut SchemaGenerator) -> Schema {
             "type": "string",
             "minLength": 1,
             "maxLength": 255
+        }
+    })
+}
+
+fn fallback_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "object",
+        "maxProperties": 1024,
+        "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+        },
+        "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+            }
         }
     })
 }
@@ -657,6 +695,7 @@ pub fn validate_messages_config(
             "roots",
             "producers",
             "coverageBaseline",
+            "fallback",
         ],
     ) {
         return Err(MessagesConfigViolation::unknown(
@@ -679,10 +718,13 @@ pub fn validate_messages_config(
         resources,
         &resolved_locales,
     )?;
+    let (fallback, resolved_fallbacks) =
+        validate_fallback(section.get("fallback"), &resolved_locales)?;
 
     let limits = LinkLimits::default();
     let policy = LinkPolicy::try_new(
         resolved_locales,
+        resolved_fallbacks,
         resolved_roots,
         resolved_coverage_baselines,
         dynamic_references.resolved(),
@@ -710,6 +752,7 @@ pub fn validate_messages_config(
             roots,
             producers,
             coverage_baseline,
+            fallback,
         },
         ResolvedMessagesConfig {
             policy,
@@ -961,6 +1004,186 @@ fn validate_coverage_baseline(
     {
         normalized.insert(scope.to_owned(), locale.as_str().to_owned());
         resolved.push(CoverageBaseline::new(scope_id, locale));
+    }
+    Ok((normalized, resolved))
+}
+
+fn validate_fallback(
+    value: Option<&Value>,
+    production_locales: &[Locale],
+) -> Result<ValidatedFallbacks, MessagesConfigViolation> {
+    let Some(value) = value else {
+        return Ok((BTreeMap::new(), Vec::new()));
+    };
+    let pointer = "/messages/fallback";
+    let object = value.as_object().ok_or_else(|| {
+        MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageFallback,
+            pointer,
+            Some(value),
+            CONFIG_EVIDENCE_BYTES,
+        )
+    })?;
+    if object.len() > FALLBACK_SOURCES_LIMIT {
+        return Err(MessagesConfigViolation::with_limit(
+            MessagesConfigReason::InvalidMessageFallback,
+            pointer,
+            FALLBACK_SOURCES_LIMIT as u64,
+            object.len() as u64,
+        ));
+    }
+
+    // Decode every source before inspecting members so source-policy failures
+    // have stable precedence over malformed target arrays.
+    let mut sources = Vec::with_capacity(object.len());
+    for (source, targets) in object {
+        let source_pointer = pointer_property(pointer, source);
+        if source.len() > LOCALE_BYTES_LIMIT {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageFallback,
+                pointer,
+                LOCALE_BYTES_LIMIT as u64,
+                source.len() as u64,
+            ));
+        }
+        let locale = Locale::try_new(source.as_str()).map_err(|_| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageFallback,
+                source_pointer,
+                None,
+                LOCALE_BYTES_LIMIT,
+            )
+        })?;
+        sources.push((source, locale, targets));
+    }
+    for (source, locale, _) in &sources {
+        if production_locales.binary_search(locale).is_err() {
+            return Err(MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageFallback,
+                pointer_property(pointer, source),
+                None,
+                LOCALE_BYTES_LIMIT,
+            ));
+        }
+    }
+
+    sources.sort_by(|left, right| left.1.cmp(&right.1));
+    let mut arrays = Vec::with_capacity(sources.len());
+    for (source, source_locale, value) in sources {
+        let source_pointer = pointer_property(pointer, source);
+        let values = value.as_array().ok_or_else(|| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageFallback,
+                source_pointer.clone(),
+                Some(value),
+                CONFIG_EVIDENCE_BYTES,
+            )
+        })?;
+        arrays.push((source, source_locale, values));
+    }
+    for (source, _, values) in &arrays {
+        if values.len() > FALLBACK_TARGETS_PER_SOURCE_LIMIT {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageFallback,
+                pointer_property(pointer, source),
+                FALLBACK_TARGETS_PER_SOURCE_LIMIT as u64,
+                values.len() as u64,
+            ));
+        }
+    }
+
+    let mut decoded = Vec::with_capacity(arrays.len());
+    for (source, source_locale, values) in arrays {
+        let source_pointer = pointer_property(pointer, source);
+        let mut targets = Vec::with_capacity(values.len());
+        for (index, value) in values.iter().enumerate() {
+            let target_pointer = pointer_index(&source_pointer, index);
+            let target = value.as_str().ok_or_else(|| {
+                MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageFallback,
+                    target_pointer.clone(),
+                    Some(value),
+                    LOCALE_BYTES_LIMIT,
+                )
+            })?;
+            if target.len() > LOCALE_BYTES_LIMIT {
+                return Err(MessagesConfigViolation::with_limit(
+                    MessagesConfigReason::InvalidMessageFallback,
+                    target_pointer,
+                    LOCALE_BYTES_LIMIT as u64,
+                    target.len() as u64,
+                ));
+            }
+            let locale = Locale::try_new(target).map_err(|_| {
+                MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageFallback,
+                    target_pointer,
+                    Some(value),
+                    LOCALE_BYTES_LIMIT,
+                )
+            })?;
+            targets.push((target.to_owned(), locale));
+        }
+        decoded.push((source.to_owned(), source_locale, targets));
+    }
+
+    for (source, _, targets) in &decoded {
+        let source_pointer = pointer_property(pointer, source);
+        for (index, (target_spelling, target)) in targets.iter().enumerate() {
+            if production_locales.binary_search(target).is_err() {
+                let rejected = Value::String(target_spelling.clone());
+                return Err(MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageFallback,
+                    pointer_index(&source_pointer, index),
+                    Some(&rejected),
+                    LOCALE_BYTES_LIMIT,
+                ));
+            }
+        }
+    }
+    if let Some((source, _, _)) = decoded.iter().find(|(_, _, targets)| targets.is_empty()) {
+        return Err(MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageFallback,
+            pointer_property(pointer, source),
+            None,
+            CONFIG_EVIDENCE_BYTES,
+        ));
+    }
+    for (source, source_locale, targets) in &decoded {
+        if let Some((index, (target_spelling, _))) = targets
+            .iter()
+            .enumerate()
+            .find(|(_, (_, target))| target == source_locale)
+        {
+            let rejected = Value::String(target_spelling.clone());
+            return Err(MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageFallback,
+                pointer_index(&pointer_property(pointer, source), index),
+                Some(&rejected),
+                LOCALE_BYTES_LIMIT,
+            ));
+        }
+    }
+    for (source, _, targets) in &decoded {
+        let source_pointer = pointer_property(pointer, source);
+        let mut first_occurrences = HashMap::with_capacity(targets.len());
+        for (index, (_, target)) in targets.iter().enumerate() {
+            if let Some(first_index) = first_occurrences.insert(target.clone(), index) {
+                return Err(MessagesConfigViolation::duplicate(
+                    MessagesConfigReason::InvalidMessageFallback,
+                    pointer_index(&source_pointer, index),
+                    pointer_index(&source_pointer, first_index),
+                ));
+            }
+        }
+    }
+
+    let mut normalized = BTreeMap::new();
+    let mut resolved = Vec::with_capacity(decoded.len());
+    for (source, source_locale, targets) in decoded {
+        let (target_spellings, target_locales): (Vec<_>, Vec<_>) = targets.into_iter().unzip();
+        normalized.insert(source, target_spellings);
+        resolved.push(LocaleFallback::new(source_locale, target_locales));
     }
     Ok((normalized, resolved))
 }
@@ -1761,12 +1984,28 @@ fn policy_config_violation(error: LinkOperationalError) -> MessagesConfigViolati
         LinkOperationalError::InvalidRequest(
             InvalidRequestError::DuplicateCoverageBaseline(_)
             | InvalidRequestError::CoverageBaselineLocaleNotProduction { .. }
-            | InvalidRequestError::ResolvedCoverageBaselineConflict { .. }
-            | InvalidRequestError::CoverageBaselineMissingKey { .. },
+            | InvalidRequestError::ResolvedCoverageBaselineConflict { .. },
         ) => true,
         LinkOperationalError::Limit(evidence) => matches!(
             evidence.counter(),
             LinkLimitCounter::CoverageBaselines | LinkLimitCounter::CoverageBaselineBytesTotal
+        ),
+        LinkOperationalError::InvalidRequest(_)
+        | LinkOperationalError::UnsupportedContract(_)
+        | LinkOperationalError::InternalInvariant => false,
+    };
+    let fallback_failure = match &error {
+        LinkOperationalError::InvalidRequest(
+            InvalidRequestError::DuplicateFallbackSource(_)
+            | InvalidRequestError::FallbackSourceNotProduction(_)
+            | InvalidRequestError::EmptyFallbackSequence(_)
+            | InvalidRequestError::FallbackTargetNotProduction { .. }
+            | InvalidRequestError::FallbackSelfReference(_)
+            | InvalidRequestError::DuplicateFallbackTarget { .. },
+        ) => true,
+        LinkOperationalError::Limit(evidence) => matches!(
+            evidence.counter(),
+            LinkLimitCounter::FallbackSources | LinkLimitCounter::FallbackTargetsPerSource
         ),
         LinkOperationalError::InvalidRequest(_)
         | LinkOperationalError::UnsupportedContract(_)
@@ -1789,6 +2028,11 @@ fn policy_config_violation(error: LinkOperationalError) -> MessagesConfigViolati
         (
             MessagesConfigReason::InvalidMessageCoverageBaseline,
             "/messages/coverageBaseline",
+        )
+    } else if fallback_failure {
+        (
+            MessagesConfigReason::InvalidMessageFallback,
+            "/messages/fallback",
         )
     } else if locale_failure {
         (
@@ -1876,7 +2120,8 @@ mod tests {
 
     use super::{
         policy_config_violation, validate_messages_config, validate_roots, MessageCatalogKeyDomain,
-        MessagesConfigError, MessagesConfigReason, COVERAGE_BASELINES_LIMIT, SCOPE_BYTES_LIMIT,
+        MessagesConfigError, MessagesConfigReason, COVERAGE_BASELINES_LIMIT,
+        FALLBACK_SOURCES_LIMIT, FALLBACK_TARGETS_PER_SOURCE_LIMIT, SCOPE_BYTES_LIMIT,
     };
 
     fn resources(value: &Value) -> intlify_resource::ResolvedResources {
@@ -1947,6 +2192,8 @@ mod tests {
         assert!(resolved.policy().configured_roots().is_empty());
         assert!(resolved.policy().coverage_baselines().is_empty());
         assert!(normalized.coverage_baseline().is_empty());
+        assert!(resolved.policy().fallbacks().is_empty());
+        assert!(normalized.fallback().is_empty());
         assert!(resolved.producers().js().is_none());
         assert!(resolved.producers().artifacts().is_empty());
     }
@@ -1967,6 +2214,7 @@ mod tests {
             .unwrap();
         let locale_limit = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             DynamicReferenceMode::Compat,
@@ -1995,6 +2243,7 @@ mod tests {
             .unwrap();
         let root_failure = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             roots,
             Vec::new(),
             DynamicReferenceMode::Compat,
@@ -2021,7 +2270,8 @@ mod tests {
                 "locales": ["en"],
                 "dynamicReferences": "compat",
                 "roots": [],
-                "producers": {}
+                "producers": {},
+                "fallback": {}
             })),
             &resources,
         )
@@ -2042,12 +2292,12 @@ mod tests {
         assert_eq!(shape.pointer(), "/messages");
         assert!(shape.value().is_none());
 
-        let unknown = section_error(&json!({ "locales": null, "fallback": null }), &resource);
+        let unknown = section_error(&json!({ "locales": null, "delivery": null }), &resource);
         assert_eq!(unknown.reason(), MessagesConfigReason::UnknownField);
-        assert_eq!(unknown.pointer(), "/messages/fallback");
-        assert_eq!(unknown.field(), Some("fallback"));
+        assert_eq!(unknown.pointer(), "/messages/delivery");
+        assert_eq!(unknown.field(), Some("delivery"));
 
-        for (field, placeholder) in [("fallback", Value::Null), ("delivery", json!({}))] {
+        for (field, placeholder) in [("delivery", Value::Null), ("exporter", json!({}))] {
             let error = section_error(
                 &json!({ "locales": ["en"], (field): placeholder }),
                 &resource,
@@ -2090,6 +2340,161 @@ mod tests {
                 .map(|value| (value.scope().name().as_str(), value.locale().as_str()))
                 .collect::<Vec<_>>(),
             [("app", "ja"), ("vendor", "en")]
+        );
+    }
+
+    #[test]
+    fn validates_fallbacks_with_canonical_sources_and_ordered_targets() {
+        let resources = app_resources();
+        let (normalized, resolved) = validate_messages_config(
+            Some(&json!({
+                "locales": ["ja", "en-US", "en"],
+                "fallback": {
+                    "ja": ["en"],
+                    "en-US": ["en", "ja"]
+                }
+            })),
+            &resources,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            normalized
+                .fallback()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["en-US", "ja"]
+        );
+        assert_eq!(normalized.fallback()["en-US"], ["en", "ja"]);
+        assert_eq!(normalized.fallback()["ja"], ["en"]);
+        assert_eq!(resolved.policy().fallbacks()[0].source().as_str(), "en-US");
+        assert_eq!(
+            resolved.policy().fallbacks()[0]
+                .targets()
+                .iter()
+                .map(Locale::as_str)
+                .collect::<Vec<_>>(),
+            ["en", "ja"]
+        );
+    }
+
+    #[test]
+    fn omitted_and_explicitly_empty_fallbacks_have_the_same_checked_identity() {
+        let resources = app_resources();
+        let omitted =
+            validate_messages_config(Some(&json!({ "locales": ["ja", "en"] })), &resources)
+                .unwrap()
+                .unwrap();
+        let explicit = validate_messages_config(
+            Some(&json!({ "locales": ["ja", "en"], "fallback": {} })),
+            &resources,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(omitted, explicit);
+        assert!(omitted.1.policy().fallbacks().is_empty());
+    }
+
+    #[test]
+    fn fallback_rejects_shape_counts_and_relations_with_precise_pointers() {
+        let resources = app_resources();
+        let error = section_error(&json!({ "locales": ["en"], "fallback": [] }), &resources);
+        assert_eq!(error.reason(), MessagesConfigReason::InvalidMessageFallback);
+        assert_eq!(error.pointer(), "/messages/fallback");
+
+        let first_overlong_source = format!("z{}", "z".repeat(255));
+        let second_overlong_source = format!("a{}", "a".repeat(256));
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "fallback": {
+                    (first_overlong_source): ["en"],
+                    (second_overlong_source): ["en"]
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback");
+        assert_eq!(error.observed(), Some(256));
+
+        let mut sources = serde_json::Map::new();
+        for index in 0..=FALLBACK_SOURCES_LIMIT {
+            sources.insert(format!("locale-{index:04}"), json!(["en"]));
+        }
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "fallback": Value::Object(sources)
+            }),
+            &resources,
+        );
+        assert_eq!(error.limit(), Some(FALLBACK_SOURCES_LIMIT as u64));
+        assert_eq!(error.observed(), Some((FALLBACK_SOURCES_LIMIT + 1) as u64));
+
+        let oversized_targets = vec!["en"; FALLBACK_TARGETS_PER_SOURCE_LIMIT + 1];
+        let error = section_error(
+            &json!({
+                "locales": ["en", "a", "z"],
+                "fallback": {
+                    "a": oversized_targets,
+                    "z": null
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback/z");
+
+        let error = section_error(
+            &json!({ "locales": ["en"], "fallback": { "ja": [] } }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback/ja");
+
+        let error = section_error(
+            &json!({ "locales": ["ja", "en"], "fallback": { "ja": [] } }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback/ja");
+
+        let error = section_error(
+            &json!({ "locales": ["ja", "en"], "fallback": { "ja": ["fr"] } }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback/ja/0");
+        assert_eq!(error.value(), Some(&json!("fr")));
+
+        let error = section_error(
+            &json!({ "locales": ["ja", "en"], "fallback": { "ja": ["ja"] } }),
+            &resources,
+        );
+        assert_eq!(error.pointer(), "/messages/fallback/ja/0");
+        assert_eq!(error.value(), Some(&json!("ja")));
+
+        let duplicate = section_error(
+            &json!({ "locales": ["ja", "en"], "fallback": { "ja": ["en", "en"] } }),
+            &resources,
+        );
+        assert_eq!(duplicate.pointer(), "/messages/fallback/ja/1");
+        assert_eq!(duplicate.first_pointer(), Some("/messages/fallback/ja/0"));
+
+        let too_many_targets = vec!["en"; FALLBACK_TARGETS_PER_SOURCE_LIMIT + 1];
+        let error = section_error(
+            &json!({
+                "locales": ["ja", "en"],
+                "fallback": { "ja": too_many_targets }
+            }),
+            &resources,
+        );
+        assert_eq!(
+            error.limit(),
+            Some(FALLBACK_TARGETS_PER_SOURCE_LIMIT as u64)
+        );
+        assert_eq!(
+            error.observed(),
+            Some((FALLBACK_TARGETS_PER_SOURCE_LIMIT + 1) as u64)
         );
     }
 

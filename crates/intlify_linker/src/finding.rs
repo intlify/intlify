@@ -109,18 +109,18 @@ impl AmbiguousMessageDefinitionFinding {
     }
 }
 
-/// One requested locale and the exact locales probed without success.
+/// Selector-level failure for one unmatched non-exact selector and locale.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ResolutionFailure {
+pub struct SelectorResolutionFailure {
     requested_locale: Locale,
     probed_locales: Box<[Locale]>,
 }
 
-impl ResolutionFailure {
-    pub(crate) fn fallback_blind(locale: Locale) -> Self {
+impl SelectorResolutionFailure {
+    fn new(requested_locale: Locale, probed_locales: Vec<Locale>) -> Self {
         Self {
-            probed_locales: vec![locale.clone()].into_boxed_slice(),
-            requested_locale: locale,
+            requested_locale,
+            probed_locales: probed_locales.into_boxed_slice(),
         }
     }
 
@@ -134,6 +134,90 @@ impl ResolutionFailure {
     #[must_use]
     pub const fn probed_locales(&self) -> &[Locale] {
         &self.probed_locales
+    }
+}
+
+/// Key-level failure for one requested locale after complete chain probing.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MessageResolutionFailure {
+    key: CatalogKey,
+    requested_locale: Locale,
+    probed_locales: Box<[Locale]>,
+}
+
+impl MessageResolutionFailure {
+    fn new(key: CatalogKey, requested_locale: Locale, probed_locales: Vec<Locale>) -> Self {
+        Self {
+            key,
+            requested_locale,
+            probed_locales: probed_locales.into_boxed_slice(),
+        }
+    }
+
+    /// Return the unresolved logical key.
+    #[must_use]
+    pub const fn key(&self) -> &CatalogKey {
+        &self.key
+    }
+
+    /// Return the requested production locale.
+    #[must_use]
+    pub const fn requested_locale(&self) -> &Locale {
+        &self.requested_locale
+    }
+
+    /// Return the complete non-empty locale probe sequence.
+    #[must_use]
+    pub const fn probed_locales(&self) -> &[Locale] {
+        &self.probed_locales
+    }
+}
+
+/// Closed selector- or message-level locale-resolution failure evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ResolutionFailure {
+    /// One non-exact selector matched no logical key.
+    Selector(SelectorResolutionFailure),
+    /// One selected logical key had no definition along the complete chain.
+    Message(MessageResolutionFailure),
+}
+
+impl ResolutionFailure {
+    pub(crate) fn selector(requested_locale: Locale, probed_locales: Vec<Locale>) -> Self {
+        Self::Selector(SelectorResolutionFailure::new(
+            requested_locale,
+            probed_locales,
+        ))
+    }
+
+    pub(crate) fn message(
+        key: CatalogKey,
+        requested_locale: Locale,
+        probed_locales: Vec<Locale>,
+    ) -> Self {
+        Self::Message(MessageResolutionFailure::new(
+            key,
+            requested_locale,
+            probed_locales,
+        ))
+    }
+
+    /// Return the requested production locale.
+    #[must_use]
+    pub const fn requested_locale(&self) -> &Locale {
+        match self {
+            Self::Selector(failure) => failure.requested_locale(),
+            Self::Message(failure) => failure.requested_locale(),
+        }
+    }
+
+    /// Return the complete non-empty locale probe sequence.
+    #[must_use]
+    pub const fn probed_locales(&self) -> &[Locale] {
+        match self {
+            Self::Selector(failure) => failure.probed_locales(),
+            Self::Message(failure) => failure.probed_locales(),
+        }
     }
 }
 
@@ -339,8 +423,6 @@ impl MissingTranslationEvidence {
 
 /// One non-blocking fallback coverage finding.
 ///
-/// This record is reserved in the closed finding vocabulary for fallback-aware
-/// resolution. The current fallback-blind linker does not construct it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MissingTranslationFinding {
     subject: MissingTranslationSubject,
@@ -348,6 +430,37 @@ pub struct MissingTranslationFinding {
 }
 
 impl MissingTranslationFinding {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
+        reference: ReferenceRecordIdentity,
+        requested_locale: Locale,
+        key: CatalogKey,
+        delivery_unit: DeliveryUnitId,
+        resolved_scope: ResolvedCatalogScopeId,
+        domain: CatalogKeyDomain,
+        probed_locales: Vec<Locale>,
+        selected_locale: Locale,
+        definition: DefinitionLocation,
+        origin: Option<SourceOrigin>,
+    ) -> Self {
+        Self {
+            subject: MissingTranslationSubject {
+                reference,
+                requested_locale,
+                key,
+            },
+            evidence: MissingTranslationEvidence {
+                delivery_unit,
+                resolved_scope,
+                domain,
+                probed_locales: probed_locales.into_boxed_slice(),
+                selected_locale,
+                definition,
+                origin,
+            },
+        }
+    }
+
     /// Return the exact reference-locale-key subject.
     #[must_use]
     pub const fn subject(&self) -> &MissingTranslationSubject {
@@ -419,8 +532,6 @@ impl OrphanedTranslationEvidence {
 
 /// One non-blocking orphaned-translation finding.
 ///
-/// This record is reserved in the closed finding vocabulary for coverage
-/// baseline analysis. The current fallback-blind linker does not construct it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct OrphanedTranslationFinding {
     subject: OrphanedTranslationSubject,
@@ -428,6 +539,28 @@ pub struct OrphanedTranslationFinding {
 }
 
 impl OrphanedTranslationFinding {
+    pub(crate) const fn new(
+        resolved_scope: ResolvedCatalogScopeId,
+        domain: CatalogKeyDomain,
+        key: CatalogKey,
+        locale: Locale,
+        baseline_locale: Locale,
+        definition: DefinitionLocation,
+    ) -> Self {
+        Self {
+            subject: OrphanedTranslationSubject {
+                resolved_scope,
+                domain,
+                key,
+                locale,
+            },
+            evidence: OrphanedTranslationEvidence {
+                baseline_locale,
+                definition,
+            },
+        }
+    }
+
     /// Return the exact definition identity.
     #[must_use]
     pub const fn subject(&self) -> &OrphanedTranslationSubject {
@@ -1090,9 +1223,7 @@ fn compare_unresolved(
 }
 
 fn compare_resolution_failure(left: &ResolutionFailure, right: &ResolutionFailure) -> Ordering {
-    left.requested_locale
-        .cmp(&right.requested_locale)
-        .then_with(|| left.probed_locales.cmp(&right.probed_locales))
+    left.cmp(right)
 }
 
 fn compare_missing_translation(

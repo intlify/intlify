@@ -23,12 +23,12 @@ use crate::benchmark::{BenchmarkLinkExecution, BenchmarkLinkStage, BenchmarkLink
 use crate::model::{BaselineDefinitionSnapshot, TypedKeyModelBatch, TypedKeyModelSnapshotRelation};
 use crate::{
     AmbiguousMessageDefinitionFinding, CompletenessContributor, CompletenessSide,
-    DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, InvalidRequestError,
-    LinkFinding, LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkRequest,
-    MessageBundlePlan, PartialCompletenessDegradation, PlacementPolicy, ResolutionFailure,
-    ResolvedCatalogScopeId, ResolvedInputCompleteness, ResolvedMessage, ResolvedScopeCompleteness,
-    TypedKeyModel, UnboundedDynamicReferenceFinding, UnresolvedMessageFinding,
-    UnusedMessageFinding, WideSelectorDegradation,
+    DefinitionLocation, DegradedAnalysisFinding, DynamicReferenceMode, LinkFinding,
+    LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkRequest, MessageBundlePlan,
+    MissingTranslationFinding, OrphanedTranslationFinding, PartialCompletenessDegradation,
+    PlacementPolicy, ResolutionFailure, ResolvedCatalogScopeId, ResolvedInputCompleteness,
+    ResolvedMessage, ResolvedScopeCompleteness, TypedKeyModel, UnboundedDynamicReferenceFinding,
+    UnresolvedMessageFinding, UnusedMessageFinding, WideSelectorDegradation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -88,7 +88,28 @@ struct CoverageBaselineSelection<'a> {
     scope: ResolvedCatalogScopeId,
     baseline_locale: Locale,
     baseline_definitions: BTreeMap<CatalogKey, &'a DefinitionSnapshot>,
+    #[cfg_attr(not(feature = "benchmark"), allow(dead_code))]
     production_union: BTreeMap<CatalogKey, Locale>,
+}
+
+struct CoverageAnalysis<'a> {
+    scope: ResolvedCatalogScopeId,
+    state: CoverageAnalysisState<'a>,
+}
+
+enum CoverageAnalysisState<'a> {
+    NotSelected,
+    Partial {
+        #[cfg_attr(not(feature = "benchmark"), allow(dead_code))]
+        baseline_locale: Locale,
+    },
+    Model(CoverageBaselineSelection<'a>),
+    ModelUnavailable {
+        baseline_locale: Locale,
+        #[cfg_attr(not(feature = "benchmark"), allow(dead_code))]
+        ambiguous_keys: BTreeSet<CatalogKey>,
+        difference: BTreeSet<CatalogKey>,
+    },
 }
 
 struct AmbiguityFact {
@@ -99,7 +120,20 @@ struct AmbiguityFact {
 struct ReferenceResolution {
     reference: ReferenceFact,
     selected: BTreeSet<LogicalMessageIdentity>,
-    unresolved: bool,
+    unmatched_non_exact: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LocaleResolutionFact {
+    probed_len: usize,
+    selected_chain_index: Option<usize>,
+}
+
+struct ResolutionAnalysis {
+    references: Vec<ReferenceResolution>,
+    root_selected: BTreeSet<LogicalMessageIdentity>,
+    chains: BTreeMap<Locale, Box<[Locale]>>,
+    facts: BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, LocaleResolutionFact>>,
 }
 
 struct Reachability {
@@ -126,10 +160,6 @@ impl ReferenceFact {
 }
 
 impl ReferenceResolution {
-    const fn is_unresolved(&self) -> bool {
-        self.unresolved
-    }
-
     fn is_unbounded_dynamic(&self) -> bool {
         self.reference.is_unbounded_dynamic()
     }
@@ -150,15 +180,11 @@ trait LinkObserver {
     fn finish_semantic_index(&mut self, _index: &SemanticIndex, _definitions: &DefinitionAnalysis) {
     }
 
-    fn finish_coverage_baseline_selection(
-        &mut self,
-        _selections: &[CoverageBaselineSelection<'_>],
-    ) {
-    }
+    fn finish_coverage_baseline_selection(&mut self, _analysis: &[CoverageAnalysis<'_>]) {}
 
     fn finish_typed_key_model_construction(&mut self, _models: &TypedKeyModelBatch) {}
 
-    fn finish_selector_resolution(&mut self, _resolutions: &[ReferenceResolution]) {}
+    fn finish_selector_resolution(&mut self, _resolution: &ResolutionAnalysis) {}
 
     fn finish_reachability(&mut self, _reachability: &Reachability) {}
 
@@ -192,33 +218,37 @@ where
     observer.finish_semantic_index(&index, &definitions);
 
     observer.begin(LinkStage::CoverageBaselineSelection);
-    let coverage_baseline_selections = select_coverage_baselines(request, &definitions)?;
-    observer.finish_coverage_baseline_selection(&coverage_baseline_selections);
+    let coverage_analysis = analyze_coverage(request, &definitions);
+    observer.finish_coverage_baseline_selection(&coverage_analysis);
 
     observer.begin(LinkStage::TypedKeyModelConstruction);
     let typed_key_models =
-        construct_typed_key_models(coverage_baseline_selections, request.resolved_policy())?;
+        construct_typed_key_models(&coverage_analysis, request.resolved_policy())?;
     observer.finish_typed_key_model_construction(&typed_key_models);
 
     observer.begin(LinkStage::SelectorExpansionAndReferenceResolution);
+    let chains = build_resolution_chains(request);
     let mut pattern_budget = PatternWorkBudget::new(request);
-    let resolutions = resolve_references(request, &index, &mut pattern_budget)?;
-    observer.finish_selector_resolution(&resolutions);
+    let resolution =
+        resolve_references(request, &index, &definitions, chains, &mut pattern_budget)?;
+    observer.finish_selector_resolution(&resolution);
 
     observer.begin(LinkStage::ReachabilityAndPlacement);
     let reachability = match request.resolved_policy().placement() {
-        PlacementPolicy::Duplicate => build_duplicate_reachability(
-            request,
-            &index,
-            &definitions.ambiguous_logical,
-            &resolutions,
-            &mut pattern_budget,
-        )?,
+        PlacementPolicy::Duplicate => {
+            build_duplicate_reachability(request, &definitions.ambiguous_logical, &resolution)?
+        }
     };
     observer.finish_reachability(&reachability);
 
     observer.begin(LinkStage::FindingAndPlanMaterialization);
-    let findings = materialize_findings(request, &definitions, &resolutions, &reachability)?;
+    let findings = materialize_findings(
+        request,
+        &definitions,
+        &coverage_analysis,
+        &resolution,
+        &reachability,
+    )?;
 
     let bundle_plans = if findings.iter().any(LinkFinding::blocking) {
         None
@@ -226,6 +256,7 @@ where
         Some(materialize_plans(
             request,
             &definitions.unique_definitions,
+            &resolution,
             &reachability.by_delivery_unit,
         )?)
     };
@@ -354,11 +385,9 @@ impl LinkObserver for BenchmarkLinkObserver {
         self.observe_with(measurement, || checksum_semantic_index(index, definitions));
     }
 
-    fn finish_coverage_baseline_selection(&mut self, selections: &[CoverageBaselineSelection<'_>]) {
+    fn finish_coverage_baseline_selection(&mut self, analysis: &[CoverageAnalysis<'_>]) {
         let measurement = self.complete(LinkStage::CoverageBaselineSelection);
-        self.observe_with(measurement, || {
-            checksum_coverage_baseline_selections(selections)
-        });
+        self.observe_with(measurement, || checksum_coverage_analysis(analysis));
     }
 
     fn finish_typed_key_model_construction(&mut self, models: &TypedKeyModelBatch) {
@@ -366,9 +395,9 @@ impl LinkObserver for BenchmarkLinkObserver {
         self.observe_with(measurement, || checksum_typed_key_models(models));
     }
 
-    fn finish_selector_resolution(&mut self, resolutions: &[ReferenceResolution]) {
+    fn finish_selector_resolution(&mut self, resolution: &ResolutionAnalysis) {
         let measurement = self.complete(LinkStage::SelectorExpansionAndReferenceResolution);
-        self.observe_with(measurement, || checksum_resolutions(resolutions));
+        self.observe_with(measurement, || checksum_resolution_analysis(resolution));
     }
 
     fn finish_reachability(&mut self, reachability: &Reachability) {
@@ -427,21 +456,47 @@ fn checksum_semantic_index(index: &SemanticIndex, definitions: &DefinitionAnalys
 }
 
 #[cfg(feature = "benchmark")]
-fn checksum_coverage_baseline_selections(selections: &[CoverageBaselineSelection<'_>]) -> u32 {
+fn checksum_coverage_analysis(analysis: &[CoverageAnalysis<'_>]) -> u32 {
     let mut checksum = BenchmarkChecksum::new(b"intlify-link-coverage-baseline-selection-v1");
-    checksum.write_u64(0x01, selections.len() as u64);
-    for selection in selections {
-        checksum.write_resolved_scope(0x02, &selection.scope);
-        checksum.write_str(0x03, selection.baseline_locale.as_str());
-        checksum.write_u64(0x04, selection.production_union.len() as u64);
-        for (key, locale) in &selection.production_union {
-            checksum.write_catalog_key(0x05, key);
-            checksum.write_str(0x06, locale.as_str());
-        }
-        checksum.write_u64(0x07, selection.baseline_definitions.len() as u64);
-        for (key, snapshot) in &selection.baseline_definitions {
-            checksum.write_catalog_key(0x08, key);
-            checksum.write_selected_definition_identity(0x09, snapshot);
+    checksum.write_u64(0x01, analysis.len() as u64);
+    for entry in analysis {
+        checksum.write_resolved_scope(0x02, &entry.scope);
+        match &entry.state {
+            CoverageAnalysisState::NotSelected => checksum.write_u64(0x03, 0),
+            CoverageAnalysisState::Partial { baseline_locale } => {
+                checksum.write_u64(0x03, 1);
+                checksum.write_str(0x04, baseline_locale.as_str());
+            }
+            CoverageAnalysisState::Model(selection) => {
+                checksum.write_u64(0x03, 2);
+                checksum.write_str(0x04, selection.baseline_locale.as_str());
+                checksum.write_u64(0x05, selection.production_union.len() as u64);
+                for (key, locale) in &selection.production_union {
+                    checksum.write_catalog_key(0x06, key);
+                    checksum.write_str(0x07, locale.as_str());
+                }
+                checksum.write_u64(0x08, selection.baseline_definitions.len() as u64);
+                for (key, snapshot) in &selection.baseline_definitions {
+                    checksum.write_catalog_key(0x09, key);
+                    checksum.write_selected_definition_identity(0x0a, snapshot);
+                }
+            }
+            CoverageAnalysisState::ModelUnavailable {
+                baseline_locale,
+                ambiguous_keys,
+                difference,
+            } => {
+                checksum.write_u64(0x03, 3);
+                checksum.write_str(0x04, baseline_locale.as_str());
+                checksum.write_u64(0x0b, ambiguous_keys.len() as u64);
+                for key in ambiguous_keys {
+                    checksum.write_catalog_key(0x0c, key);
+                }
+                checksum.write_u64(0x0d, difference.len() as u64);
+                for key in difference {
+                    checksum.write_catalog_key(0x0e, key);
+                }
+            }
         }
     }
     checksum.finish()
@@ -472,15 +527,47 @@ fn checksum_typed_key_models(batch: &TypedKeyModelBatch) -> u32 {
 }
 
 #[cfg(feature = "benchmark")]
-fn checksum_resolutions(resolutions: &[ReferenceResolution]) -> u32 {
+fn checksum_resolution_analysis(resolution: &ResolutionAnalysis) -> u32 {
     let mut checksum = BenchmarkChecksum::new(b"intlify-link-selector-resolution-v1");
-    checksum.write_u64(0x01, resolutions.len() as u64);
-    for resolution in resolutions {
-        checksum.write_reference_fact(0x02, &resolution.reference);
-        checksum.write_bool(0x03, resolution.unresolved);
-        checksum.write_u64(0x04, resolution.selected.len() as u64);
-        for selected in &resolution.selected {
+    checksum.write_u64(0x01, resolution.references.len() as u64);
+    for reference in &resolution.references {
+        checksum.write_reference_fact(0x02, &reference.reference);
+        checksum.write_bool(0x03, reference.unmatched_non_exact);
+        checksum.write_u64(0x04, reference.selected.len() as u64);
+        for selected in &reference.selected {
             checksum.write_logical_identity(0x05, selected);
+        }
+    }
+    checksum.write_u64(0x06, resolution.root_selected.len() as u64);
+    for selected in &resolution.root_selected {
+        checksum.write_logical_identity(0x07, selected);
+    }
+    checksum.write_u64(0x08, resolution.facts.len() as u64);
+    for (logical, by_locale) in &resolution.facts {
+        checksum.write_logical_identity(0x09, logical);
+        checksum.write_u64(0x0a, by_locale.len() as u64);
+        for (requested_locale, fact) in by_locale {
+            let chain = resolution
+                .chains
+                .get(requested_locale)
+                .expect("resolution fact must retain its canonical chain");
+            checksum.write_str(0x0b, requested_locale.as_str());
+            checksum.write_u64(0x0c, fact.probed_len as u64);
+            for locale in &chain[..fact.probed_len] {
+                checksum.write_str(0x0d, locale.as_str());
+            }
+            checksum.write_bool(0x0e, fact.selected_chain_index.is_some());
+            if let Some(index) = fact.selected_chain_index {
+                checksum.write_str(0x0f, chain[index].as_str());
+            }
+        }
+    }
+    checksum.write_u64(0x10, resolution.chains.len() as u64);
+    for (source, chain) in &resolution.chains {
+        checksum.write_str(0x11, source.as_str());
+        checksum.write_u64(0x12, chain.len() as u64);
+        for locale in chain {
+            checksum.write_str(0x13, locale.as_str());
         }
     }
     checksum.finish()
@@ -822,30 +909,47 @@ fn analyze_definitions(index: &SemanticIndex) -> DefinitionAnalysis {
     }
 }
 
-fn select_coverage_baselines<'a>(
+fn analyze_coverage<'a>(
     request: &LinkRequest<'_>,
     definitions: &'a DefinitionAnalysis,
-) -> Result<Vec<CoverageBaselineSelection<'a>>, LinkOperationalError> {
-    let mut selections = Vec::with_capacity(request.resolved_policy().coverage_baselines().len());
-    for coverage_baseline in request.resolved_policy().coverage_baselines() {
-        let scope = coverage_baseline.scope();
-        let completeness = request
-            .resolved_scope_completeness()
-            .get(scope)
-            .ok_or(LinkOperationalError::InternalInvariant)?;
+) -> Vec<CoverageAnalysis<'a>> {
+    let policy = request.resolved_policy();
+    let mut analysis = Vec::with_capacity(request.resolved_scope_completeness().entries().len());
+
+    for completeness in request.resolved_scope_completeness().entries() {
+        let scope = completeness.scope();
+        let baseline = policy
+            .coverage_baselines()
+            .binary_search_by(|candidate| candidate.scope().cmp(scope))
+            .ok()
+            .map(|index| &policy.coverage_baselines()[index]);
+        let Some(coverage_baseline) = baseline else {
+            analysis.push(CoverageAnalysis {
+                scope: scope.clone(),
+                state: CoverageAnalysisState::NotSelected,
+            });
+            continue;
+        };
+
         if matches!(
             completeness.definitions(),
             ResolvedInputCompleteness::Partial(_)
         ) {
+            analysis.push(CoverageAnalysis {
+                scope: scope.clone(),
+                state: CoverageAnalysisState::Partial {
+                    baseline_locale: coverage_baseline.locale().clone(),
+                },
+            });
             continue;
         }
-        if definitions
+
+        let ambiguous_keys = definitions
             .ambiguous_logical
             .iter()
-            .any(|identity| &identity.scope == scope)
-        {
-            continue;
-        }
+            .filter(|identity| &identity.scope == scope)
+            .map(|identity| identity.key.clone())
+            .collect::<BTreeSet<_>>();
 
         let mut baseline_definitions = BTreeMap::<CatalogKey, &DefinitionSnapshot>::new();
         let mut production_union = BTreeMap::<CatalogKey, Locale>::new();
@@ -870,61 +974,63 @@ fn select_coverage_baselines<'a>(
             }
         }
 
-        selections.push(CoverageBaselineSelection {
+        let difference = production_union
+            .keys()
+            .filter(|key| !baseline_definitions.contains_key(*key))
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let selection = CoverageBaselineSelection {
             scope: scope.clone(),
             baseline_locale: coverage_baseline.locale().clone(),
             baseline_definitions,
             production_union,
+        };
+        let state = if ambiguous_keys.is_empty() && difference.is_empty() {
+            CoverageAnalysisState::Model(selection)
+        } else {
+            CoverageAnalysisState::ModelUnavailable {
+                baseline_locale: coverage_baseline.locale().clone(),
+                ambiguous_keys,
+                difference,
+            }
+        };
+        analysis.push(CoverageAnalysis {
+            scope: scope.clone(),
+            state,
         });
     }
 
-    Ok(selections)
+    analysis
 }
 
 fn construct_typed_key_models(
-    selections: Vec<CoverageBaselineSelection<'_>>,
+    analysis: &[CoverageAnalysis<'_>],
     resolved_policy: &crate::ResolvedLinkPolicy,
 ) -> Result<TypedKeyModelBatch, LinkOperationalError> {
-    let mut models = Vec::with_capacity(selections.len());
-    let mut relations = Vec::with_capacity(selections.len());
+    let mut models = Vec::new();
+    let mut relations = Vec::new();
 
-    for selection in selections {
-        let CoverageBaselineSelection {
-            scope,
-            baseline_locale,
-            baseline_definitions,
-            production_union,
-        } = selection;
+    for entry in analysis {
+        let CoverageAnalysisState::Model(selection) = &entry.state else {
+            continue;
+        };
 
-        for (key, defined_locale) in production_union {
-            if !baseline_definitions.contains_key(&key) {
-                return Err(InvalidRequestError::CoverageBaselineMissingKey {
-                    scope: scope.clone(),
-                    baseline: baseline_locale.clone(),
-                    domain: key.domain(),
-                    key,
-                    defined_locale,
-                }
-                .into());
-            }
-        }
-
-        let mut keys = Vec::with_capacity(baseline_definitions.len());
-        let mut snapshots = Vec::with_capacity(baseline_definitions.len());
-        for (key, snapshot) in baseline_definitions {
+        let mut keys = Vec::with_capacity(selection.baseline_definitions.len());
+        let mut snapshots = Vec::with_capacity(selection.baseline_definitions.len());
+        for (key, snapshot) in &selection.baseline_definitions {
             keys.push(key.clone());
             snapshots.push(BaselineDefinitionSnapshot::new(
-                scope.clone(),
-                key,
-                baseline_locale.clone(),
+                selection.scope.clone(),
+                key.clone(),
+                selection.baseline_locale.clone(),
                 snapshot.message.clone(),
                 snapshot.location.clone(),
             ));
         }
-        models.push(TypedKeyModel::new(scope.clone(), keys));
+        models.push(TypedKeyModel::new(selection.scope.clone(), keys));
         relations.push(TypedKeyModelSnapshotRelation::new(
-            scope,
-            baseline_locale,
+            selection.scope.clone(),
+            selection.baseline_locale.clone(),
             snapshots,
         ));
     }
@@ -935,8 +1041,10 @@ fn construct_typed_key_models(
 fn resolve_references(
     request: &LinkRequest<'_>,
     index: &SemanticIndex,
+    definitions: &DefinitionAnalysis,
+    chains: BTreeMap<Locale, Box<[Locale]>>,
     pattern_budget: &mut PatternWorkBudget,
-) -> Result<Vec<ReferenceResolution>, LinkOperationalError> {
+) -> Result<ResolutionAnalysis, LinkOperationalError> {
     let mut resolutions = Vec::with_capacity(index.references.len());
 
     for reference in &index.references {
@@ -950,17 +1058,127 @@ fn resolve_references(
             select_reference_candidates(reference, index, pattern_budget)?
         };
 
-        let unresolved = !unbounded_dynamic
+        let unmatched_non_exact = is_non_exact_bounded(&reference.selector)
             && selected.is_empty()
             && definition_side_closed(request, &reference.scope)?;
         resolutions.push(ReferenceResolution {
             reference: reference.clone(),
             selected,
-            unresolved,
+            unmatched_non_exact,
         });
     }
 
-    Ok(resolutions)
+    let mut root_selected = BTreeSet::new();
+    for root in request.resolved_policy().configured_roots() {
+        let scope_domain = ScopeDomain {
+            scope: root.scope().clone(),
+            domain: root.domain(),
+        };
+        root_selected.extend(select_candidates(
+            &scope_domain,
+            root.selector(),
+            index,
+            pattern_budget,
+        )?);
+    }
+
+    let mut demands = BTreeSet::new();
+    for logical in resolutions
+        .iter()
+        .flat_map(|resolution| resolution.selected.iter())
+        .chain(root_selected.iter())
+    {
+        if !definitions.ambiguous_logical.contains(logical)
+            && definition_side_closed(request, &logical.scope)?
+        {
+            demands.insert(logical.clone());
+        }
+    }
+    preflight_locale_resolution_facts(request, &demands, &resolutions)?;
+
+    let mut facts = BTreeMap::new();
+    for logical in demands {
+        let mut by_locale = BTreeMap::new();
+        for requested_locale in request.resolved_policy().production_locales() {
+            let chain = chains
+                .get(requested_locale)
+                .ok_or(LinkOperationalError::InternalInvariant)?;
+            let mut probed_len = chain.len();
+            let mut selected_chain_index = None;
+            for (index, locale) in chain.iter().enumerate() {
+                if exact_definition(&definitions.unique_definitions, &logical, locale).is_some() {
+                    probed_len = index + 1;
+                    selected_chain_index = Some(index);
+                    break;
+                }
+            }
+            by_locale.insert(
+                requested_locale.clone(),
+                LocaleResolutionFact {
+                    probed_len,
+                    selected_chain_index,
+                },
+            );
+        }
+        facts.insert(logical, by_locale);
+    }
+
+    Ok(ResolutionAnalysis {
+        references: resolutions,
+        root_selected,
+        chains,
+        facts,
+    })
+}
+
+fn is_non_exact_bounded(selector: &MessageSelector) -> bool {
+    matches!(
+        selector,
+        MessageSelector::Prefix(_) | MessageSelector::Pattern(_) | MessageSelector::AllInScope
+    )
+}
+
+fn build_resolution_chains(request: &LinkRequest<'_>) -> BTreeMap<Locale, Box<[Locale]>> {
+    request
+        .resolved_policy()
+        .production_locales()
+        .iter()
+        .map(|source| {
+            let mut chain =
+                Vec::with_capacity(1 + request.resolved_policy().fallback_targets(source).len());
+            chain.push(source.clone());
+            chain.extend_from_slice(request.resolved_policy().fallback_targets(source));
+            (source.clone(), chain.into_boxed_slice())
+        })
+        .collect()
+}
+
+fn preflight_locale_resolution_facts(
+    request: &LinkRequest<'_>,
+    demands: &BTreeSet<LogicalMessageIdentity>,
+    resolutions: &[ReferenceResolution],
+) -> Result<(), LinkOperationalError> {
+    let mut count = 0_u64;
+    for _ in demands {
+        for _ in request.resolved_policy().production_locales() {
+            count = count
+                .checked_add(1)
+                .ok_or(LinkOperationalError::InternalInvariant)?;
+            preflight_first_over(LinkLimitCounter::LocaleResolutionFactsTotal, count, request)?;
+        }
+    }
+    for _ in resolutions
+        .iter()
+        .filter(|resolution| resolution.unmatched_non_exact)
+    {
+        for _ in request.resolved_policy().production_locales() {
+            count = count
+                .checked_add(1)
+                .ok_or(LinkOperationalError::InternalInvariant)?;
+            preflight_first_over(LinkLimitCounter::LocaleResolutionFactsTotal, count, request)?;
+        }
+    }
+    Ok(())
 }
 
 fn select_reference_candidates(
@@ -978,6 +1196,13 @@ fn select_candidates(
     index: &SemanticIndex,
     pattern_budget: &mut PatternWorkBudget,
 ) -> Result<BTreeSet<LogicalMessageIdentity>, LinkOperationalError> {
+    if let MessageSelector::Exact(key) = selector {
+        return Ok(BTreeSet::from([LogicalMessageIdentity {
+            scope: scope_domain.scope.clone(),
+            domain: scope_domain.domain,
+            key: key.clone(),
+        }]));
+    }
     let Some(candidates) = index.candidates.get(scope_domain) else {
         return Ok(BTreeSet::new());
     };
@@ -985,7 +1210,7 @@ fn select_candidates(
     let mut selected = BTreeSet::new();
     for candidate in candidates {
         let matches = match selector {
-            MessageSelector::Exact(key) => key == candidate,
+            MessageSelector::Exact(_) => return Err(LinkOperationalError::InternalInvariant),
             MessageSelector::Prefix(prefix) => candidate.tokens().starts_with(prefix.tokens()),
             MessageSelector::Pattern(pattern) => {
                 let (matches, states) = match_pattern(pattern.tokens(), candidate.tokens())?;
@@ -1028,10 +1253,8 @@ fn all_candidates(
 
 fn build_duplicate_reachability(
     request: &LinkRequest<'_>,
-    index: &SemanticIndex,
     ambiguous: &BTreeSet<LogicalMessageIdentity>,
-    resolutions: &[ReferenceResolution],
-    pattern_budget: &mut PatternWorkBudget,
+    resolution: &ResolutionAnalysis,
 ) -> Result<Reachability, LinkOperationalError> {
     let mut by_delivery_unit = request
         .delivery_graph()
@@ -1041,25 +1264,18 @@ fn build_duplicate_reachability(
         .map(|unit| (unit, BTreeSet::new()))
         .collect::<BTreeMap<_, _>>();
 
-    for resolution in resolutions {
-        let Some(messages) = by_delivery_unit.get_mut(&resolution.reference.delivery_unit) else {
+    for reference in &resolution.references {
+        let Some(messages) = by_delivery_unit.get_mut(&reference.reference.delivery_unit) else {
             return Err(LinkOperationalError::InternalInvariant);
         };
-        extend_unambiguous(messages, &resolution.selected, ambiguous);
+        extend_unambiguous(messages, &reference.selected, ambiguous);
     }
 
-    for root in request.resolved_policy().configured_roots() {
-        let scope_domain = ScopeDomain {
-            scope: root.scope().clone(),
-            domain: root.domain(),
+    for unit in request.delivery_graph().roots() {
+        let Some(messages) = by_delivery_unit.get_mut(unit) else {
+            return Err(LinkOperationalError::InternalInvariant);
         };
-        let selected = select_candidates(&scope_domain, root.selector(), index, pattern_budget)?;
-        for unit in request.delivery_graph().roots() {
-            let Some(messages) = by_delivery_unit.get_mut(unit) else {
-                return Err(LinkOperationalError::InternalInvariant);
-            };
-            extend_unambiguous(messages, &selected, ambiguous);
-        }
+        extend_unambiguous(messages, &resolution.root_selected, ambiguous);
     }
 
     let reachable = by_delivery_unit
@@ -1067,10 +1283,11 @@ fn build_duplicate_reachability(
         .flat_map(BTreeSet::iter)
         .cloned()
         .collect();
-    let unbounded_scope_domains = resolutions
+    let unbounded_scope_domains = resolution
+        .references
         .iter()
-        .filter(|resolution| resolution.is_unbounded_dynamic())
-        .map(|resolution| resolution.reference.scope_domain())
+        .filter(|reference| reference.is_unbounded_dynamic())
+        .map(|reference| reference.reference.scope_domain())
         .collect();
     Ok(Reachability {
         by_delivery_unit,
@@ -1095,48 +1312,144 @@ fn extend_unambiguous(
 fn materialize_findings(
     request: &LinkRequest<'_>,
     definitions: &DefinitionAnalysis,
-    resolutions: &[ReferenceResolution],
+    coverage_analysis: &[CoverageAnalysis<'_>],
+    resolution: &ResolutionAnalysis,
     reachability: &Reachability,
 ) -> Result<Vec<LinkFinding>, LinkOperationalError> {
-    let finding_count = count_findings(request, definitions, resolutions, reachability)?;
+    let finding_count = count_findings(
+        request,
+        definitions,
+        coverage_analysis,
+        resolution,
+        reachability,
+    )?;
     let capacity =
         usize::try_from(finding_count).map_err(|_| LinkOperationalError::InternalInvariant)?;
     let mut findings = Vec::with_capacity(capacity);
+    let mut finding_budget = SemanticByteBudget::new(LinkLimitCounter::FindingBytesTotal, request);
 
     for ambiguity in &definitions.ambiguities {
-        findings.push(LinkFinding::new(
-            LinkFindingRecord::AmbiguousMessageDefinition(AmbiguousMessageDefinitionFinding::new(
-                ambiguity.identity.logical.scope.clone(),
-                ambiguity.identity.logical.domain,
-                ambiguity.identity.logical.key.clone(),
-                ambiguity.identity.locale.clone(),
-                ambiguity.definitions.clone(),
+        retain_finding(
+            &mut findings,
+            &mut finding_budget,
+            LinkFinding::new(LinkFindingRecord::AmbiguousMessageDefinition(
+                AmbiguousMessageDefinitionFinding::new(
+                    ambiguity.identity.logical.scope.clone(),
+                    ambiguity.identity.logical.domain,
+                    ambiguity.identity.logical.key.clone(),
+                    ambiguity.identity.locale.clone(),
+                    ambiguity.definitions.clone(),
+                ),
             )),
-        ));
+        )?;
     }
 
-    for resolution in resolutions
-        .iter()
-        .filter(|resolution| resolution.is_unresolved())
-    {
+    for reference in &resolution.references {
+        if !reference_has_resolution_failure(reference, resolution) {
+            continue;
+        }
+        add_reference_analysis_bytes(
+            &mut finding_budget,
+            &reference.reference.identity,
+            &reference.reference.delivery_unit,
+            &reference.reference.scope,
+            Some(&reference.reference.selector),
+            reference.reference.reason.as_ref(),
+            reference.reference.origin.as_ref(),
+        )?;
+        let failures = reference_resolution_failures(reference, resolution, &mut finding_budget)?;
+        if failures.is_empty() {
+            return Err(LinkOperationalError::InternalInvariant);
+        }
         findings.push(LinkFinding::new(LinkFindingRecord::UnresolvedMessage(
             UnresolvedMessageFinding::new(
-                resolution.reference.identity.clone(),
-                resolution.reference.delivery_unit.clone(),
-                resolution.reference.scope.clone(),
-                resolution.reference.domain,
-                resolution.reference.selector.clone(),
-                resolution.reference.reason.clone(),
-                resolution.reference.origin.clone(),
-                request
-                    .resolved_policy()
-                    .production_locales()
-                    .iter()
-                    .cloned()
-                    .map(ResolutionFailure::fallback_blind)
-                    .collect(),
+                reference.reference.identity.clone(),
+                reference.reference.delivery_unit.clone(),
+                reference.reference.scope.clone(),
+                reference.reference.domain,
+                reference.reference.selector.clone(),
+                reference.reference.reason.clone(),
+                reference.reference.origin.clone(),
+                failures,
             ),
         )));
+    }
+
+    for reference in &resolution.references {
+        for requested_locale in request.resolved_policy().production_locales() {
+            for logical in &reference.selected {
+                let Some(fact) = resolution_fact(&resolution.facts, logical, requested_locale)
+                else {
+                    continue;
+                };
+                let Some((snapshot, probed_locales)) = resolved_selection(
+                    &definitions.unique_definitions,
+                    resolution,
+                    logical,
+                    requested_locale,
+                    fact,
+                )?
+                else {
+                    continue;
+                };
+                if &snapshot.locale == requested_locale {
+                    continue;
+                }
+                retain_finding(
+                    &mut findings,
+                    &mut finding_budget,
+                    LinkFinding::new(LinkFindingRecord::MissingTranslation(
+                        MissingTranslationFinding::new(
+                            reference.reference.identity.clone(),
+                            requested_locale.clone(),
+                            logical.key.clone(),
+                            reference.reference.delivery_unit.clone(),
+                            logical.scope.clone(),
+                            logical.domain,
+                            probed_locales.to_vec(),
+                            snapshot.locale.clone(),
+                            snapshot.location.clone(),
+                            reference.reference.origin.clone(),
+                        ),
+                    )),
+                )?;
+            }
+        }
+    }
+
+    for entry in coverage_analysis {
+        let CoverageAnalysisState::ModelUnavailable {
+            baseline_locale,
+            difference,
+            ..
+        } = &entry.state
+        else {
+            continue;
+        };
+        for (logical, definitions_by_locale) in &definitions.unique_definitions {
+            if logical.scope != entry.scope || !difference.contains(&logical.key) {
+                continue;
+            }
+            for snapshot in definitions_by_locale
+                .values()
+                .filter(|snapshot| &snapshot.locale != baseline_locale)
+            {
+                retain_finding(
+                    &mut findings,
+                    &mut finding_budget,
+                    LinkFinding::new(LinkFindingRecord::OrphanedTranslation(
+                        OrphanedTranslationFinding::new(
+                            logical.scope.clone(),
+                            logical.domain,
+                            logical.key.clone(),
+                            snapshot.locale.clone(),
+                            baseline_locale.clone(),
+                            snapshot.location.clone(),
+                        ),
+                    )),
+                )?;
+            }
+        }
     }
 
     for (logical, definitions_by_locale) in &definitions.unique_definitions {
@@ -1144,63 +1457,79 @@ fn materialize_findings(
             continue;
         }
         for snapshot in definitions_by_locale.values() {
-            findings.push(LinkFinding::new(LinkFindingRecord::UnusedMessage(
-                UnusedMessageFinding::new(
+            retain_finding(
+                &mut findings,
+                &mut finding_budget,
+                LinkFinding::new(LinkFindingRecord::UnusedMessage(UnusedMessageFinding::new(
                     logical.scope.clone(),
                     logical.domain,
                     logical.key.clone(),
                     snapshot.locale.clone(),
                     snapshot.location.clone(),
-                ),
-            )));
+                ))),
+            )?;
         }
     }
 
-    for resolution in resolutions
+    for resolution in resolution
+        .references
         .iter()
         .filter(|resolution| resolution.is_unbounded_dynamic())
     {
-        findings.push(LinkFinding::new(
-            LinkFindingRecord::UnboundedDynamicReference(UnboundedDynamicReferenceFinding::new(
-                resolution.reference.identity.clone(),
-                resolution.reference.delivery_unit.clone(),
-                resolution.reference.scope.clone(),
-                resolution.reference.domain,
-                resolution.reference.reason.clone(),
-                resolution.reference.origin.clone(),
-                request.resolved_policy().dynamic_references(),
+        retain_finding(
+            &mut findings,
+            &mut finding_budget,
+            LinkFinding::new(LinkFindingRecord::UnboundedDynamicReference(
+                UnboundedDynamicReferenceFinding::new(
+                    resolution.reference.identity.clone(),
+                    resolution.reference.delivery_unit.clone(),
+                    resolution.reference.scope.clone(),
+                    resolution.reference.domain,
+                    resolution.reference.reason.clone(),
+                    resolution.reference.origin.clone(),
+                    request.resolved_policy().dynamic_references(),
+                ),
             )),
-        ));
+        )?;
     }
 
-    for resolution in resolutions
+    for resolution in resolution
+        .references
         .iter()
         .filter(|resolution| resolution.is_wide_selector())
     {
-        findings.push(LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
-            DegradedAnalysisFinding::WideSelector(WideSelectorDegradation::new(
-                resolution.reference.identity.clone(),
-                resolution.reference.delivery_unit.clone(),
-                resolution.reference.scope.clone(),
-                resolution.reference.domain,
-                resolution.reference.reason.clone(),
-                resolution.reference.origin.clone(),
+        retain_finding(
+            &mut findings,
+            &mut finding_budget,
+            LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
+                DegradedAnalysisFinding::WideSelector(WideSelectorDegradation::new(
+                    resolution.reference.identity.clone(),
+                    resolution.reference.delivery_unit.clone(),
+                    resolution.reference.scope.clone(),
+                    resolution.reference.domain,
+                    resolution.reference.reason.clone(),
+                    resolution.reference.origin.clone(),
+                )),
             )),
-        )));
+        )?;
     }
 
     for completeness in request.resolved_scope_completeness().entries() {
         for (side, value) in completeness_sides(completeness) {
             if let ResolvedInputCompleteness::Partial(contributors) = value {
-                findings.push(LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
-                    DegradedAnalysisFinding::PartialCompleteness(
-                        PartialCompletenessDegradation::new(
-                            completeness.scope().clone(),
-                            side,
-                            contributors.to_vec(),
+                retain_finding(
+                    &mut findings,
+                    &mut finding_budget,
+                    LinkFinding::new(LinkFindingRecord::DegradedAnalysis(
+                        DegradedAnalysisFinding::PartialCompleteness(
+                            PartialCompletenessDegradation::new(
+                                completeness.scope().clone(),
+                                side,
+                                contributors.to_vec(),
+                            ),
                         ),
-                    ),
-                )));
+                    )),
+                )?;
             }
         }
     }
@@ -1208,15 +1537,14 @@ fn materialize_findings(
     if findings.len() != capacity {
         return Err(LinkOperationalError::InternalInvariant);
     }
-    findings.sort();
-    account_finding_bytes(request, &findings)?;
     Ok(findings)
 }
 
 fn count_findings(
     request: &LinkRequest<'_>,
     definitions: &DefinitionAnalysis,
-    resolutions: &[ReferenceResolution],
+    coverage_analysis: &[CoverageAnalysis<'_>],
+    resolution: &ResolutionAnalysis,
     reachability: &Reachability,
 ) -> Result<u64, LinkOperationalError> {
     let mut count = u64::try_from(definitions.ambiguities.len())
@@ -1225,12 +1553,51 @@ fn count_findings(
 
     add_count(
         &mut count,
-        resolutions
+        resolution
+            .references
             .iter()
-            .filter(|resolution| resolution.is_unresolved())
+            .filter(|reference| reference_has_resolution_failure(reference, resolution))
             .count(),
         request,
     )?;
+
+    for reference in &resolution.references {
+        for logical in &reference.selected {
+            let Some(by_locale) = resolution.facts.get(logical) else {
+                continue;
+            };
+            for (requested_locale, fact) in by_locale {
+                if selected_locale(resolution, requested_locale, fact)?
+                    .is_some_and(|selected| selected != requested_locale)
+                {
+                    add_count(&mut count, 1, request)?;
+                }
+            }
+        }
+    }
+
+    for entry in coverage_analysis {
+        let CoverageAnalysisState::ModelUnavailable {
+            baseline_locale,
+            difference,
+            ..
+        } = &entry.state
+        else {
+            continue;
+        };
+        for (logical, definitions_by_locale) in &definitions.unique_definitions {
+            if logical.scope == entry.scope && difference.contains(&logical.key) {
+                add_count(
+                    &mut count,
+                    definitions_by_locale
+                        .values()
+                        .filter(|snapshot| &snapshot.locale != baseline_locale)
+                        .count(),
+                    request,
+                )?;
+            }
+        }
+    }
 
     for (logical, definitions_by_locale) in &definitions.unique_definitions {
         if !should_report_unused(request, definitions, reachability, logical)? {
@@ -1241,7 +1608,8 @@ fn count_findings(
 
     add_count(
         &mut count,
-        resolutions
+        resolution
+            .references
             .iter()
             .filter(|resolution| resolution.is_unbounded_dynamic())
             .count(),
@@ -1249,7 +1617,8 @@ fn count_findings(
     )?;
     add_count(
         &mut count,
-        resolutions
+        resolution
+            .references
             .iter()
             .filter(|resolution| resolution.is_wide_selector())
             .count(),
@@ -1265,6 +1634,77 @@ fn count_findings(
     }
 
     Ok(count)
+}
+
+fn reference_has_resolution_failure(
+    reference: &ReferenceResolution,
+    resolution: &ResolutionAnalysis,
+) -> bool {
+    if reference.is_unbounded_dynamic() {
+        return false;
+    }
+    reference.unmatched_non_exact
+        || reference.selected.iter().any(|logical| {
+            resolution.facts.get(logical).is_some_and(|by_locale| {
+                by_locale
+                    .values()
+                    .any(|fact| fact.selected_chain_index.is_none())
+            })
+        })
+}
+
+fn reference_resolution_failures(
+    reference: &ReferenceResolution,
+    resolution: &ResolutionAnalysis,
+    budget: &mut SemanticByteBudget,
+) -> Result<Vec<ResolutionFailure>, LinkOperationalError> {
+    if reference.is_unbounded_dynamic() {
+        return Ok(Vec::new());
+    }
+    if reference.unmatched_non_exact {
+        let mut failures = Vec::with_capacity(resolution.chains.len());
+        for (requested_locale, chain) in &resolution.chains {
+            budget.add(requested_locale.as_str().len())?;
+            for locale in chain {
+                budget.add(locale.as_str().len())?;
+            }
+            failures.push(ResolutionFailure::selector(
+                requested_locale.clone(),
+                chain.to_vec(),
+            ));
+        }
+        return Ok(failures);
+    }
+
+    let mut failures = Vec::new();
+    for logical in &reference.selected {
+        let Some(by_locale) = resolution.facts.get(logical) else {
+            continue;
+        };
+        for (requested_locale, fact) in by_locale
+            .iter()
+            .filter(|(_, fact)| fact.selected_chain_index.is_none())
+        {
+            let chain = resolution
+                .chains
+                .get(requested_locale)
+                .ok_or(LinkOperationalError::InternalInvariant)?;
+            let probed_locales = chain
+                .get(..fact.probed_len)
+                .ok_or(LinkOperationalError::InternalInvariant)?;
+            budget.add(logical.key.as_str().len())?;
+            budget.add(requested_locale.as_str().len())?;
+            for locale in probed_locales {
+                budget.add(locale.as_str().len())?;
+            }
+            failures.push(ResolutionFailure::message(
+                logical.key.clone(),
+                requested_locale.clone(),
+                probed_locales.to_vec(),
+            ));
+        }
+    }
+    Ok(failures)
 }
 
 fn should_report_unused(
@@ -1331,6 +1771,7 @@ fn check_finding_count(count: u64, request: &LinkRequest<'_>) -> Result<(), Link
 fn materialize_plans(
     request: &LinkRequest<'_>,
     definitions: &UniqueDefinitions,
+    resolution: &ResolutionAnalysis,
     reachability: &DeliveryUnitReachability,
 ) -> Result<Vec<MessageBundlePlan>, LinkOperationalError> {
     let node_count = u64::try_from(request.delivery_graph().nodes().len())
@@ -1349,7 +1790,9 @@ fn materialize_plans(
             .ok_or(LinkOperationalError::InternalInvariant)?;
         for locale in request.resolved_policy().production_locales() {
             for logical in selected {
-                if exact_definition(definitions, logical, locale).is_some() {
+                let fact = resolution_fact(&resolution.facts, logical, locale)
+                    .ok_or(LinkOperationalError::InternalInvariant)?;
+                if selected_definition(definitions, resolution, logical, locale, fact)?.is_some() {
                     resolved_count = resolved_count
                         .checked_add(1)
                         .ok_or(LinkOperationalError::InternalInvariant)?;
@@ -1363,7 +1806,7 @@ fn materialize_plans(
         }
     }
 
-    account_plan_bytes(request, definitions, reachability)?;
+    account_plan_bytes(request, definitions, resolution, reachability)?;
 
     let capacity =
         usize::try_from(plan_count).map_err(|_| LinkOperationalError::InternalInvariant)?;
@@ -1373,20 +1816,24 @@ fn materialize_plans(
             .get(unit)
             .ok_or(LinkOperationalError::InternalInvariant)?;
         for locale in request.resolved_policy().production_locales() {
-            let messages = selected
-                .iter()
-                .filter_map(|logical| exact_definition(definitions, logical, locale))
-                .map(|snapshot| {
-                    ResolvedMessage::new(
-                        snapshot.logical.scope.clone(),
-                        snapshot.logical.domain,
-                        snapshot.logical.key.clone(),
-                        snapshot.locale.clone(),
-                        snapshot.message.clone(),
-                        snapshot.location.clone(),
-                    )
-                })
-                .collect();
+            let mut messages = Vec::new();
+            for logical in selected {
+                let fact = resolution_fact(&resolution.facts, logical, locale)
+                    .ok_or(LinkOperationalError::InternalInvariant)?;
+                let Some(snapshot) =
+                    selected_definition(definitions, resolution, logical, locale, fact)?
+                else {
+                    continue;
+                };
+                messages.push(ResolvedMessage::new(
+                    snapshot.logical.scope.clone(),
+                    snapshot.logical.domain,
+                    snapshot.logical.key.clone(),
+                    snapshot.locale.clone(),
+                    snapshot.message.clone(),
+                    snapshot.location.clone(),
+                ));
+            }
             plans.push(MessageBundlePlan::new(
                 unit.clone(),
                 locale.clone(),
@@ -1400,6 +1847,7 @@ fn materialize_plans(
 fn account_plan_bytes(
     request: &LinkRequest<'_>,
     definitions: &UniqueDefinitions,
+    resolution: &ResolutionAnalysis,
     reachability: &DeliveryUnitReachability,
 ) -> Result<(), LinkOperationalError> {
     let mut budget = SemanticByteBudget::new(LinkLimitCounter::BundlePlanBytesTotal, request);
@@ -1412,7 +1860,11 @@ fn account_plan_bytes(
             add_delivery_unit_bytes(&mut budget, unit)?;
             budget.add(locale.as_str().len())?;
             for logical in selected {
-                let Some(snapshot) = exact_definition(definitions, logical, locale) else {
+                let fact = resolution_fact(&resolution.facts, logical, locale)
+                    .ok_or(LinkOperationalError::InternalInvariant)?;
+                let Some(snapshot) =
+                    selected_definition(definitions, resolution, logical, locale, fact)?
+                else {
                     continue;
                 };
                 add_scope_bytes(&mut budget, &snapshot.logical.scope)?;
@@ -1425,6 +1877,75 @@ fn account_plan_bytes(
         }
     }
     Ok(())
+}
+
+fn resolution_fact<'a>(
+    facts: &'a BTreeMap<LogicalMessageIdentity, BTreeMap<Locale, LocaleResolutionFact>>,
+    logical: &LogicalMessageIdentity,
+    requested_locale: &Locale,
+) -> Option<&'a LocaleResolutionFact> {
+    facts
+        .get(logical)
+        .and_then(|by_locale| by_locale.get(requested_locale))
+}
+
+fn selected_locale<'a>(
+    resolution: &'a ResolutionAnalysis,
+    requested_locale: &Locale,
+    fact: &LocaleResolutionFact,
+) -> Result<Option<&'a Locale>, LinkOperationalError> {
+    let chain = resolution
+        .chains
+        .get(requested_locale)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    let Some(index) = fact.selected_chain_index else {
+        if fact.probed_len != chain.len() {
+            return Err(LinkOperationalError::InternalInvariant);
+        }
+        return Ok(None);
+    };
+    if fact.probed_len != index + 1 {
+        return Err(LinkOperationalError::InternalInvariant);
+    }
+    chain
+        .get(index)
+        .map(Some)
+        .ok_or(LinkOperationalError::InternalInvariant)
+}
+
+fn resolved_selection<'d, 'r>(
+    definitions: &'d UniqueDefinitions,
+    resolution: &'r ResolutionAnalysis,
+    logical: &LogicalMessageIdentity,
+    requested_locale: &Locale,
+    fact: &LocaleResolutionFact,
+) -> Result<Option<(&'d DefinitionSnapshot, &'r [Locale])>, LinkOperationalError> {
+    let Some(selected_locale) = selected_locale(resolution, requested_locale, fact)? else {
+        return Ok(None);
+    };
+    let chain = resolution
+        .chains
+        .get(requested_locale)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    let probed_locales = chain
+        .get(..fact.probed_len)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    let snapshot = exact_definition(definitions, logical, selected_locale)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    Ok(Some((snapshot, probed_locales)))
+}
+
+fn selected_definition<'a>(
+    definitions: &'a UniqueDefinitions,
+    resolution: &ResolutionAnalysis,
+    logical: &LogicalMessageIdentity,
+    requested_locale: &Locale,
+    fact: &LocaleResolutionFact,
+) -> Result<Option<&'a DefinitionSnapshot>, LinkOperationalError> {
+    Ok(
+        resolved_selection(definitions, resolution, logical, requested_locale, fact)?
+            .map(|(snapshot, _)| snapshot),
+    )
 }
 
 fn exact_definition<'a>(
@@ -1581,74 +2102,98 @@ fn match_pattern(
     Err(LinkOperationalError::InternalInvariant)
 }
 
-fn account_finding_bytes(
-    request: &LinkRequest<'_>,
-    findings: &[LinkFinding],
+fn retain_finding(
+    findings: &mut Vec<LinkFinding>,
+    budget: &mut SemanticByteBudget,
+    finding: LinkFinding,
 ) -> Result<(), LinkOperationalError> {
-    let mut budget = SemanticByteBudget::new(LinkLimitCounter::FindingBytesTotal, request);
-    for finding in findings {
-        match finding.record() {
-            LinkFindingRecord::AmbiguousMessageDefinition(finding) => {
-                let subject = finding.subject();
-                add_scope_bytes(&mut budget, subject.resolved_scope())?;
-                budget.add(subject.key().as_str().len())?;
-                budget.add(subject.locale().as_str().len())?;
-                for definition in finding.evidence().definitions() {
-                    add_definition_location_bytes(&mut budget, definition)?;
-                }
+    account_finding_bytes(budget, &finding)?;
+    findings.push(finding);
+    Ok(())
+}
+
+fn account_finding_bytes(
+    budget: &mut SemanticByteBudget,
+    finding: &LinkFinding,
+) -> Result<(), LinkOperationalError> {
+    match finding.record() {
+        LinkFindingRecord::AmbiguousMessageDefinition(finding) => {
+            let subject = finding.subject();
+            add_scope_bytes(budget, subject.resolved_scope())?;
+            budget.add(subject.key().as_str().len())?;
+            budget.add(subject.locale().as_str().len())?;
+            for definition in finding.evidence().definitions() {
+                add_definition_location_bytes(budget, definition)?;
             }
-            LinkFindingRecord::UnresolvedMessage(finding) => {
-                let evidence = finding.evidence();
-                add_reference_analysis_bytes(
-                    &mut budget,
-                    finding.subject().reference(),
-                    evidence.delivery_unit(),
-                    evidence.resolved_scope(),
-                    Some(evidence.selector()),
-                    evidence.reason(),
-                    evidence.origin(),
-                )?;
-                for failure in evidence.failures() {
-                    budget.add(failure.requested_locale().as_str().len())?;
-                    for locale in failure.probed_locales() {
-                        budget.add(locale.as_str().len())?;
-                    }
+        }
+        LinkFindingRecord::UnresolvedMessage(finding) => {
+            let evidence = finding.evidence();
+            add_reference_analysis_bytes(
+                budget,
+                finding.subject().reference(),
+                evidence.delivery_unit(),
+                evidence.resolved_scope(),
+                Some(evidence.selector()),
+                evidence.reason(),
+                evidence.origin(),
+            )?;
+            for failure in evidence.failures() {
+                if let ResolutionFailure::Message(failure) = failure {
+                    budget.add(failure.key().as_str().len())?;
                 }
-            }
-            LinkFindingRecord::MissingTranslation(finding) => {
-                let subject = finding.subject();
-                add_reference_identity_bytes(&mut budget, subject.reference())?;
-                budget.add(subject.requested_locale().as_str().len())?;
-                budget.add(subject.key().as_str().len())?;
-                let evidence = finding.evidence();
-                add_delivery_unit_bytes(&mut budget, evidence.delivery_unit())?;
-                add_scope_bytes(&mut budget, evidence.resolved_scope())?;
-                for locale in evidence.probed_locales() {
+                budget.add(failure.requested_locale().as_str().len())?;
+                for locale in failure.probed_locales() {
                     budget.add(locale.as_str().len())?;
                 }
-                budget.add(evidence.selected_locale().as_str().len())?;
-                add_definition_location_bytes(&mut budget, evidence.definition())?;
-                add_optional_origin_bytes(&mut budget, evidence.origin())?;
             }
-            LinkFindingRecord::OrphanedTranslation(finding) => {
-                let subject = finding.subject();
-                add_scope_bytes(&mut budget, subject.resolved_scope())?;
-                budget.add(subject.key().as_str().len())?;
-                budget.add(subject.locale().as_str().len())?;
-                budget.add(finding.evidence().baseline_locale().as_str().len())?;
-                add_definition_location_bytes(&mut budget, finding.evidence().definition())?;
+        }
+        LinkFindingRecord::MissingTranslation(finding) => {
+            let subject = finding.subject();
+            add_reference_identity_bytes(budget, subject.reference())?;
+            budget.add(subject.requested_locale().as_str().len())?;
+            budget.add(subject.key().as_str().len())?;
+            let evidence = finding.evidence();
+            add_delivery_unit_bytes(budget, evidence.delivery_unit())?;
+            add_scope_bytes(budget, evidence.resolved_scope())?;
+            for locale in evidence.probed_locales() {
+                budget.add(locale.as_str().len())?;
             }
-            LinkFindingRecord::UnusedMessage(finding) => {
-                let subject = finding.subject();
-                add_scope_bytes(&mut budget, subject.resolved_scope())?;
-                budget.add(subject.key().as_str().len())?;
-                budget.add(subject.locale().as_str().len())?;
-                add_definition_location_bytes(&mut budget, finding.evidence().definition())?;
-            }
-            LinkFindingRecord::UnboundedDynamicReference(finding) => {
+            budget.add(evidence.selected_locale().as_str().len())?;
+            add_definition_location_bytes(budget, evidence.definition())?;
+            add_optional_origin_bytes(budget, evidence.origin())?;
+        }
+        LinkFindingRecord::OrphanedTranslation(finding) => {
+            let subject = finding.subject();
+            add_scope_bytes(budget, subject.resolved_scope())?;
+            budget.add(subject.key().as_str().len())?;
+            budget.add(subject.locale().as_str().len())?;
+            budget.add(finding.evidence().baseline_locale().as_str().len())?;
+            add_definition_location_bytes(budget, finding.evidence().definition())?;
+        }
+        LinkFindingRecord::UnusedMessage(finding) => {
+            let subject = finding.subject();
+            add_scope_bytes(budget, subject.resolved_scope())?;
+            budget.add(subject.key().as_str().len())?;
+            budget.add(subject.locale().as_str().len())?;
+            add_definition_location_bytes(budget, finding.evidence().definition())?;
+        }
+        LinkFindingRecord::UnboundedDynamicReference(finding) => {
+            let evidence = finding.evidence();
+            add_reference_analysis_bytes(
+                budget,
+                finding.subject().reference(),
+                evidence.delivery_unit(),
+                evidence.resolved_scope(),
+                None,
+                evidence.reason(),
+                evidence.origin(),
+            )?;
+        }
+        LinkFindingRecord::DegradedAnalysis(finding) => match finding {
+            DegradedAnalysisFinding::WideSelector(finding) => {
                 let evidence = finding.evidence();
                 add_reference_analysis_bytes(
-                    &mut budget,
+                    budget,
                     finding.subject().reference(),
                     evidence.delivery_unit(),
                     evidence.resolved_scope(),
@@ -1657,27 +2202,13 @@ fn account_finding_bytes(
                     evidence.origin(),
                 )?;
             }
-            LinkFindingRecord::DegradedAnalysis(finding) => match finding {
-                DegradedAnalysisFinding::WideSelector(finding) => {
-                    let evidence = finding.evidence();
-                    add_reference_analysis_bytes(
-                        &mut budget,
-                        finding.subject().reference(),
-                        evidence.delivery_unit(),
-                        evidence.resolved_scope(),
-                        None,
-                        evidence.reason(),
-                        evidence.origin(),
-                    )?;
+            DegradedAnalysisFinding::PartialCompleteness(finding) => {
+                add_scope_bytes(budget, finding.subject().resolved_scope())?;
+                for contributor in finding.evidence().contributors() {
+                    add_contributor_bytes(budget, contributor)?;
                 }
-                DegradedAnalysisFinding::PartialCompleteness(finding) => {
-                    add_scope_bytes(&mut budget, finding.subject().resolved_scope())?;
-                    for contributor in finding.evidence().contributors() {
-                        add_contributor_bytes(&mut budget, contributor)?;
-                    }
-                }
-            },
-        }
+            }
+        },
     }
     Ok(())
 }

@@ -3,10 +3,10 @@
 
 //! Checked link policy and post-mapping policy canonicalization.
 //!
-//! This module owns production locales, configured roots, coverage baselines,
-//! dynamic-reference behavior, and duplicate placement. It deliberately
-//! contains no fallback member, raw configuration parser, exporter options, or
-//! environment lookup.
+//! This module owns production locales, ordered non-recursive fallback chains,
+//! configured roots, coverage baselines, dynamic-reference behavior, and
+//! duplicate placement. It deliberately contains no raw configuration parser,
+//! exporter options, runtime locale negotiation, or environment lookup.
 
 use std::error::Error;
 use std::fmt;
@@ -145,10 +145,41 @@ impl CoverageBaseline {
     }
 }
 
+/// One occurrence-preserving fallback source and its ordered direct targets.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LocaleFallback {
+    source: Locale,
+    targets: Box<[Locale]>,
+}
+
+impl LocaleFallback {
+    /// Compose one fallback declaration for checked policy admission.
+    #[must_use]
+    pub fn new(source: Locale, targets: Vec<Locale>) -> Self {
+        Self {
+            source,
+            targets: targets.into_boxed_slice(),
+        }
+    }
+
+    /// Return the locale whose resolution chain owns these direct targets.
+    #[must_use]
+    pub const fn source(&self) -> &Locale {
+        &self.source
+    }
+
+    /// Return direct targets in semantic probe-priority order.
+    #[must_use]
+    pub const fn targets(&self) -> &[Locale] {
+        &self.targets
+    }
+}
+
 /// Immutable, canonical policy supplied to one link request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkPolicy {
     production_locales: Box<[Locale]>,
+    fallbacks: Box<[LocaleFallback]>,
     configured_roots: Box<[ConfiguredRoot]>,
     coverage_baselines: Box<[CoverageBaseline]>,
     dynamic_references: DynamicReferenceMode,
@@ -159,59 +190,25 @@ impl LinkPolicy {
     /// Validate occurrence-preserving policy inputs and retain canonical sets.
     pub fn try_new(
         production_locales: Vec<Locale>,
+        fallbacks: Vec<LocaleFallback>,
         configured_roots: Vec<ConfiguredRoot>,
         coverage_baselines: Vec<CoverageBaseline>,
         dynamic_references: DynamicReferenceMode,
         placement: PlacementPolicy,
         limits: &LinkLimits,
     ) -> Result<Self, LinkOperationalError> {
-        validate_policy_counts(&production_locales, &configured_roots, limits)?;
-        validate_production_locale_limits(&production_locales, limits)?;
-
-        if production_locales.is_empty() {
-            return Err(InvalidRequestError::EmptyProductionLocales.into());
-        }
-
-        let mut production_locales = production_locales;
-        production_locales.sort();
-        if let Some(locale) = first_equal_adjacent(&production_locales) {
-            return Err(InvalidRequestError::DuplicateProductionLocale(locale.clone()).into());
-        }
-
-        validate_configured_root_limits(&configured_roots, limits)?;
-        let mut configured_roots = configured_roots;
-        configured_roots.sort_by_key(ConfiguredRoot::identity);
-        if let Some(root) = configured_roots
-            .windows(2)
-            .find(|pair| pair[0].identity() == pair[1].identity())
-        {
-            return Err(InvalidRequestError::DuplicateConfiguredRoot(root[0].identity()).into());
-        }
-
-        validate_coverage_baseline_limits(&coverage_baselines, limits)?;
-        let mut coverage_baselines = coverage_baselines;
-        coverage_baselines.sort();
-        if let Some(baseline) = coverage_baselines
-            .iter()
-            .find(|baseline| production_locales.binary_search(baseline.locale()).is_err())
-        {
-            return Err(InvalidRequestError::CoverageBaselineLocaleNotProduction {
-                scope: baseline.scope().clone(),
-                locale: baseline.locale().clone(),
-            }
-            .into());
-        }
-        if let Some(pair) = coverage_baselines
-            .windows(2)
-            .find(|pair| pair[0].scope() == pair[1].scope())
-        {
-            return Err(
-                InvalidRequestError::DuplicateCoverageBaseline(pair[0].scope().clone()).into(),
-            );
-        }
+        let (production_locales, fallbacks, configured_roots, coverage_baselines) =
+            validate_and_canonicalize_policy(
+                production_locales,
+                fallbacks,
+                configured_roots,
+                coverage_baselines,
+                limits,
+            )?;
 
         Ok(Self {
             production_locales: production_locales.into_boxed_slice(),
+            fallbacks: fallbacks.into_boxed_slice(),
             configured_roots: configured_roots.into_boxed_slice(),
             coverage_baselines: coverage_baselines.into_boxed_slice(),
             dynamic_references,
@@ -223,6 +220,12 @@ impl LinkPolicy {
     #[must_use]
     pub const fn production_locales(&self) -> &[Locale] {
         &self.production_locales
+    }
+
+    /// Return fallback declarations in canonical source-locale order.
+    #[must_use]
+    pub const fn fallbacks(&self) -> &[LocaleFallback] {
+        &self.fallbacks
     }
 
     /// Return configured roots in canonical identity order.
@@ -250,9 +253,24 @@ impl LinkPolicy {
     }
 
     pub(crate) fn revalidate(&self, limits: &LinkLimits) -> Result<(), LinkOperationalError> {
-        validate_policy_counts(&self.production_locales, &self.configured_roots, limits)?;
-        validate_production_locale_limits(&self.production_locales, limits)?;
-        validate_configured_root_limits(&self.configured_roots, limits)?;
+        // Construction already established every relational invariant and the
+        // canonical collection order. Revalidation only reapplies caller-selected
+        // lower limits in the same phase order without cloning or sorting policy data.
+        validate_policy_collection_limits(
+            &self.production_locales,
+            &self.fallbacks,
+            &self.configured_roots,
+            &self.coverage_baselines,
+            limits,
+        )?;
+        validate_locale_byte_limits(self.production_locales.iter(), limits)?;
+        validate_locale_byte_limits(self.fallbacks.iter().map(LocaleFallback::source), limits)?;
+        validate_fallback_target_count_limits(&self.fallbacks, limits)?;
+        validate_locale_byte_limits(
+            self.fallbacks.iter().flat_map(LocaleFallback::targets),
+            limits,
+        )?;
+        validate_configured_root_scope_limits(&self.configured_roots, limits)?;
         validate_coverage_baseline_limits(&self.coverage_baselines, limits)
     }
 }
@@ -325,6 +343,7 @@ impl ResolvedCoverageBaseline {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedLinkPolicy {
     production_locales: Box<[Locale]>,
+    fallbacks: Box<[LocaleFallback]>,
     configured_roots: Box<[ResolvedConfiguredRoot]>,
     coverage_baselines: Box<[ResolvedCoverageBaseline]>,
     dynamic_references: DynamicReferenceMode,
@@ -399,6 +418,7 @@ impl ResolvedLinkPolicy {
 
         Ok(Self {
             production_locales: policy.production_locales.to_vec().into_boxed_slice(),
+            fallbacks: policy.fallbacks.to_vec().into_boxed_slice(),
             configured_roots: configured_roots.into_boxed_slice(),
             coverage_baselines: coverage_baselines.into_boxed_slice(),
             dynamic_references: policy.dynamic_references,
@@ -410,6 +430,20 @@ impl ResolvedLinkPolicy {
     #[must_use]
     pub const fn production_locales(&self) -> &[Locale] {
         &self.production_locales
+    }
+
+    /// Return fallback declarations in canonical source-locale order.
+    #[must_use]
+    pub const fn fallbacks(&self) -> &[LocaleFallback] {
+        &self.fallbacks
+    }
+
+    /// Return direct fallback targets for one source, or an empty slice.
+    #[must_use]
+    pub fn fallback_targets(&self, source: &Locale) -> &[Locale] {
+        self.fallbacks
+            .binary_search_by(|candidate| candidate.source().cmp(source))
+            .map_or(&[], |index| self.fallbacks[index].targets())
     }
 
     /// Return canonical post-mapping roots.
@@ -437,9 +471,18 @@ impl ResolvedLinkPolicy {
     }
 }
 
-fn validate_policy_counts(
+type CanonicalPolicyInputs = (
+    Vec<Locale>,
+    Vec<LocaleFallback>,
+    Vec<ConfiguredRoot>,
+    Vec<CoverageBaseline>,
+);
+
+fn validate_policy_collection_limits(
     production_locales: &[Locale],
+    fallbacks: &[LocaleFallback],
     configured_roots: &[ConfiguredRoot],
+    coverage_baselines: &[CoverageBaseline],
     limits: &LinkLimits,
 ) -> Result<(), LinkOperationalError> {
     let subject = LinkLimitSubject::ResolvedPolicy;
@@ -450,19 +493,31 @@ fn validate_policy_counts(
         limits,
     )?;
     check_first_over(
+        LinkLimitCounter::FallbackSources,
+        subject.clone(),
+        usize_count(fallbacks.len()),
+        limits,
+    )?;
+    check_first_over(
         LinkLimitCounter::ConfiguredRoots,
         subject.clone(),
         usize_count(configured_roots.len()),
         limits,
+    )?;
+    check_first_over(
+        LinkLimitCounter::CoverageBaselines,
+        subject,
+        usize_count(coverage_baselines.len()),
+        limits,
     )
 }
 
-fn validate_production_locale_limits(
-    production_locales: &[Locale],
+fn validate_locale_byte_limits<'a>(
+    locales: impl IntoIterator<Item = &'a Locale>,
     limits: &LinkLimits,
 ) -> Result<(), LinkOperationalError> {
     let subject = LinkLimitSubject::ResolvedPolicy;
-    for locale in production_locales {
+    for locale in locales {
         check_first_over(
             LinkLimitCounter::LocaleBytes,
             subject.clone(),
@@ -473,7 +528,22 @@ fn validate_production_locale_limits(
     Ok(())
 }
 
-fn validate_configured_root_limits(
+fn validate_fallback_target_count_limits(
+    fallbacks: &[LocaleFallback],
+    limits: &LinkLimits,
+) -> Result<(), LinkOperationalError> {
+    for fallback in fallbacks {
+        check_first_over(
+            LinkLimitCounter::FallbackTargetsPerSource,
+            LinkLimitSubject::FallbackSource(fallback.source().clone()),
+            usize_count(fallback.targets().len()),
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_configured_root_scope_limits(
     configured_roots: &[ConfiguredRoot],
     limits: &LinkLimits,
 ) -> Result<(), LinkOperationalError> {
@@ -494,16 +564,7 @@ fn validate_coverage_baseline_limits(
     limits: &LinkLimits,
 ) -> Result<(), LinkOperationalError> {
     let subject = LinkLimitSubject::ResolvedPolicy;
-    check_first_over(
-        LinkLimitCounter::CoverageBaselines,
-        subject.clone(),
-        usize_count(coverage_baselines.len()),
-        limits,
-    )?;
-
-    let mut canonical = coverage_baselines.iter().collect::<Vec<_>>();
-    canonical.sort();
-    for baseline in &canonical {
+    for baseline in coverage_baselines {
         check_first_over(
             LinkLimitCounter::CatalogScopeNameBytes,
             subject.clone(),
@@ -511,17 +572,13 @@ fn validate_coverage_baseline_limits(
             limits,
         )?;
     }
-    for baseline in &canonical {
-        check_first_over(
-            LinkLimitCounter::LocaleBytes,
-            subject.clone(),
-            usize_count(baseline.locale().as_str().len()),
-            limits,
-        )?;
-    }
+    validate_locale_byte_limits(
+        coverage_baselines.iter().map(CoverageBaseline::locale),
+        limits,
+    )?;
 
     let mut total = 0_u64;
-    for baseline in canonical {
+    for baseline in coverage_baselines {
         total = total
             .checked_add(usize_count(baseline.scope().name().as_str().len()))
             .and_then(|value| value.checked_add(usize_count(baseline.locale().as_str().len())))
@@ -536,6 +593,133 @@ fn validate_coverage_baseline_limits(
     Ok(())
 }
 
+/// Apply the public policy admission phases in their compatibility-stable order.
+fn validate_and_canonicalize_policy(
+    production_locales: Vec<Locale>,
+    fallbacks: Vec<LocaleFallback>,
+    configured_roots: Vec<ConfiguredRoot>,
+    coverage_baselines: Vec<CoverageBaseline>,
+    limits: &LinkLimits,
+) -> Result<CanonicalPolicyInputs, LinkOperationalError> {
+    // Counts are occurrence preserving. In particular, a duplicate cannot hide
+    // an over-limit submitted collection by being removed during canonicalization.
+    validate_policy_collection_limits(
+        &production_locales,
+        &fallbacks,
+        &configured_roots,
+        &coverage_baselines,
+        limits,
+    )?;
+    validate_locale_byte_limits(&production_locales, limits)?;
+
+    if production_locales.is_empty() {
+        return Err(InvalidRequestError::EmptyProductionLocales.into());
+    }
+    let mut production_locales = production_locales;
+    production_locales.sort();
+    if let Some(locale) = first_equal_adjacent(&production_locales) {
+        return Err(InvalidRequestError::DuplicateProductionLocale(locale.clone()).into());
+    }
+
+    validate_locale_byte_limits(fallbacks.iter().map(LocaleFallback::source), limits)?;
+
+    let mut fallbacks = fallbacks;
+    fallbacks.sort_by(|left, right| left.source().cmp(right.source()));
+    if let Some(fallback) = fallbacks
+        .iter()
+        .find(|fallback| production_locales.binary_search(fallback.source()).is_err())
+    {
+        return Err(
+            InvalidRequestError::FallbackSourceNotProduction(fallback.source().clone()).into(),
+        );
+    }
+    if let Some(fallback) = fallbacks
+        .windows(2)
+        .find(|pair| pair[0].source() == pair[1].source())
+    {
+        return Err(
+            InvalidRequestError::DuplicateFallbackSource(fallback[0].source().clone()).into(),
+        );
+    }
+
+    validate_fallback_target_count_limits(&fallbacks, limits)?;
+    validate_locale_byte_limits(fallbacks.iter().flat_map(LocaleFallback::targets), limits)?;
+
+    for fallback in &fallbacks {
+        if let Some(target) = fallback
+            .targets()
+            .iter()
+            .find(|target| production_locales.binary_search(target).is_err())
+        {
+            return Err(InvalidRequestError::FallbackTargetNotProduction {
+                source: fallback.source().clone(),
+                target: target.clone(),
+            }
+            .into());
+        }
+    }
+    if let Some(fallback) = fallbacks
+        .iter()
+        .find(|fallback| fallback.targets().is_empty())
+    {
+        return Err(InvalidRequestError::EmptyFallbackSequence(fallback.source().clone()).into());
+    }
+    if let Some(fallback) = fallbacks
+        .iter()
+        .find(|fallback| fallback.targets().contains(fallback.source()))
+    {
+        return Err(InvalidRequestError::FallbackSelfReference(fallback.source().clone()).into());
+    }
+    for fallback in &fallbacks {
+        for (index, target) in fallback.targets().iter().enumerate() {
+            if fallback.targets()[..index].contains(target) {
+                return Err(InvalidRequestError::DuplicateFallbackTarget {
+                    source: fallback.source().clone(),
+                    target: target.clone(),
+                }
+                .into());
+            }
+        }
+    }
+
+    validate_configured_root_scope_limits(&configured_roots, limits)?;
+    let mut configured_roots = configured_roots;
+    configured_roots.sort_by_key(ConfiguredRoot::identity);
+    if let Some(root) = configured_roots
+        .windows(2)
+        .find(|pair| pair[0].identity() == pair[1].identity())
+    {
+        return Err(InvalidRequestError::DuplicateConfiguredRoot(root[0].identity()).into());
+    }
+
+    let mut coverage_baselines = coverage_baselines;
+    coverage_baselines.sort();
+    validate_coverage_baseline_limits(&coverage_baselines, limits)?;
+    if let Some(baseline) = coverage_baselines
+        .iter()
+        .find(|baseline| production_locales.binary_search(baseline.locale()).is_err())
+    {
+        return Err(InvalidRequestError::CoverageBaselineLocaleNotProduction {
+            scope: baseline.scope().clone(),
+            locale: baseline.locale().clone(),
+        }
+        .into());
+    }
+    if let Some(pair) = coverage_baselines
+        .windows(2)
+        .find(|pair| pair[0].scope() == pair[1].scope())
+    {
+        return Err(InvalidRequestError::DuplicateCoverageBaseline(pair[0].scope().clone()).into());
+    }
+
+    Ok((
+        production_locales,
+        fallbacks,
+        configured_roots,
+        coverage_baselines,
+    ))
+}
+
 fn first_equal_adjacent<T: PartialEq>(values: &[T]) -> Option<&T> {
     values
         .windows(2)
@@ -547,12 +731,13 @@ fn first_equal_adjacent<T: PartialEq>(values: &[T]) -> Option<&T> {
 mod tests {
     use intlify_contract::{
         ArtifactNamespace, CatalogKey, CatalogKeyDomain, CatalogScopeId, CatalogScopeName,
-        LinkLimitCounter, LinkLimitObservation, LinkLimits, Locale, MessageSelector,
+        LinkLimitCounter, LinkLimitObservation, LinkLimitSubject, LinkLimits, Locale,
+        MessageSelector,
     };
 
     use super::{
         ConfiguredRoot, ConfiguredRootConstructionError, CoverageBaseline, DynamicReferenceMode,
-        LinkPolicy, PlacementPolicy,
+        LinkPolicy, LocaleFallback, PlacementPolicy,
     };
     use crate::{
         InvalidRequestError, LinkOperationalError, ResolvedLinkPolicy, ScopeMapping,
@@ -582,13 +767,25 @@ mod tests {
         CoverageBaseline::new(scope(name), Locale::try_new(locale).unwrap())
     }
 
+    fn fallback(source: &str, targets: &[&str]) -> LocaleFallback {
+        LocaleFallback::new(
+            Locale::try_new(source).unwrap(),
+            targets
+                .iter()
+                .map(|target| Locale::try_new(*target).unwrap())
+                .collect(),
+        )
+    }
+
     #[test]
-    fn policy_canonicalizes_sets_without_fallback_state() {
+    fn policy_canonicalizes_sets_and_preserves_fallback_target_order() {
         let policy = LinkPolicy::try_new(
             vec![
                 Locale::try_new("ja").unwrap(),
                 Locale::try_new("en").unwrap(),
+                Locale::try_new("en-US").unwrap(),
             ],
+            vec![fallback("ja", &["en"]), fallback("en-US", &["en", "ja"])],
             vec![root("z", "/b"), root("a", "/a")],
             Vec::new(),
             DynamicReferenceMode::Compat,
@@ -603,14 +800,344 @@ mod tests {
                 .iter()
                 .map(Locale::as_str)
                 .collect::<Vec<_>>(),
-            ["en", "ja"]
+            ["en", "en-US", "ja"]
         );
         assert_eq!(policy.configured_roots()[0].scope().name().as_str(), "a");
+        assert_eq!(policy.fallbacks()[0].source().as_str(), "en-US");
+        assert_eq!(
+            policy.fallbacks()[0]
+                .targets()
+                .iter()
+                .map(Locale::as_str)
+                .collect::<Vec<_>>(),
+            ["en", "ja"]
+        );
+    }
+
+    #[test]
+    fn policy_rejects_every_invalid_fallback_relation() {
+        let construct = |fallbacks| {
+            LinkPolicy::try_new(
+                vec![
+                    Locale::try_new("en").unwrap(),
+                    Locale::try_new("ja").unwrap(),
+                ],
+                fallbacks,
+                Vec::new(),
+                Vec::new(),
+                DynamicReferenceMode::Compat,
+                PlacementPolicy::Duplicate,
+                &LinkLimits::default(),
+            )
+            .unwrap_err()
+        };
+
+        assert_eq!(
+            construct(vec![fallback("fr", &["en"])]),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::FallbackSourceNotProduction(
+                Locale::try_new("fr").unwrap()
+            ))
+        );
+        assert_eq!(
+            construct(vec![fallback("ja", &["fr"])]),
+            LinkOperationalError::InvalidRequest(
+                InvalidRequestError::FallbackTargetNotProduction {
+                    source: Locale::try_new("ja").unwrap(),
+                    target: Locale::try_new("fr").unwrap(),
+                }
+            )
+        );
+        assert_eq!(
+            construct(vec![fallback("ja", &[])]),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::EmptyFallbackSequence(
+                Locale::try_new("ja").unwrap()
+            ))
+        );
+        assert_eq!(
+            construct(vec![fallback("ja", &["ja"])]),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::FallbackSelfReference(
+                Locale::try_new("ja").unwrap()
+            ))
+        );
+        assert_eq!(
+            construct(vec![fallback("ja", &["en", "en"])]),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::DuplicateFallbackTarget {
+                source: Locale::try_new("ja").unwrap(),
+                target: Locale::try_new("en").unwrap(),
+            })
+        );
+        assert_eq!(
+            construct(vec![fallback("ja", &["en"]), fallback("ja", &["en"])]),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::DuplicateFallbackSource(
+                Locale::try_new("ja").unwrap()
+            ))
+        );
+    }
+
+    #[test]
+    fn fallback_limits_are_revalidated_without_changing_policy_identity() {
+        let fallbacks = || vec![fallback("ja", &["en"]), fallback("en", &["ja"])];
+        let defaults = LinkPolicy::try_new(
+            vec![
+                Locale::try_new("ja").unwrap(),
+                Locale::try_new("en").unwrap(),
+            ],
+            fallbacks(),
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        let exact_limits = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackSources, 2)
+            .unwrap()
+            .try_with_limit(LinkLimitCounter::FallbackTargetsPerSource, 1)
+            .unwrap();
+        let exact = LinkPolicy::try_new(
+            vec![
+                Locale::try_new("ja").unwrap(),
+                Locale::try_new("en").unwrap(),
+            ],
+            fallbacks(),
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &exact_limits,
+        )
+        .unwrap();
+        assert_eq!(defaults, exact);
+        assert!(exact.revalidate(&exact_limits).is_ok());
+
+        let source_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackSources, 1)
+            .unwrap();
+        let error = LinkPolicy::try_new(
+            vec![
+                Locale::try_new("ja").unwrap(),
+                Locale::try_new("en").unwrap(),
+            ],
+            fallbacks(),
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &source_limit,
+        )
+        .unwrap_err();
+        assert_eq!(defaults.revalidate(&source_limit).unwrap_err(), error);
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected fallback source limit evidence");
+        };
+        assert_eq!(evidence.counter(), LinkLimitCounter::FallbackSources);
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+
+        let target_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackTargetsPerSource, 0)
+            .unwrap();
+        let LinkOperationalError::Limit(evidence) = defaults.revalidate(&target_limit).unwrap_err()
+        else {
+            panic!("expected fallback target limit evidence");
+        };
+        assert_eq!(
+            evidence.counter(),
+            LinkLimitCounter::FallbackTargetsPerSource
+        );
+        assert_eq!(
+            evidence.subject(),
+            &LinkLimitSubject::FallbackSource(Locale::try_new("en").unwrap())
+        );
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(1));
+    }
+
+    #[test]
+    fn fallback_admission_precedence_and_canonical_identity_are_stable() {
+        let locales = || {
+            vec![
+                Locale::try_new("en").unwrap(),
+                Locale::try_new("fr").unwrap(),
+                Locale::try_new("ja").unwrap(),
+            ]
+        };
+        let duplicate_before_target_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackTargetsPerSource, 1)
+            .unwrap();
+        let error = LinkPolicy::try_new(
+            locales(),
+            vec![fallback("ja", &["en", "fr"]), fallback("ja", &["en"])],
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &duplicate_before_target_limit,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            LinkOperationalError::InvalidRequest(InvalidRequestError::DuplicateFallbackSource(_))
+        ));
+
+        let error = LinkPolicy::try_new(
+            locales(),
+            vec![fallback("ja", &["en", "fr"]), fallback("en", &["ja", "fr"])],
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &duplicate_before_target_limit,
+        )
+        .unwrap_err();
+        let LinkOperationalError::Limit(evidence) = error else {
+            panic!("expected target limit evidence");
+        };
+        assert_eq!(
+            evidence.subject(),
+            &LinkLimitSubject::FallbackSource(Locale::try_new("en").unwrap())
+        );
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+
+        let construct = |fallbacks| {
+            LinkPolicy::try_new(
+                locales(),
+                fallbacks,
+                Vec::new(),
+                Vec::new(),
+                DynamicReferenceMode::Compat,
+                PlacementPolicy::Duplicate,
+                &LinkLimits::default(),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            construct(vec![fallback("ja", &["en"]), fallback("fr", &["en"])]),
+            construct(vec![fallback("fr", &["en"]), fallback("ja", &["en"])])
+        );
+        assert_ne!(
+            construct(vec![fallback("ja", &["en", "fr"])]),
+            construct(vec![fallback("ja", &["fr", "en"])])
+        );
+    }
+
+    #[test]
+    fn fallback_relational_failures_follow_canonical_complete_passes() {
+        let construct = |fallbacks, limits: &LinkLimits| {
+            LinkPolicy::try_new(
+                vec![
+                    Locale::try_new("en").unwrap(),
+                    Locale::try_new("fr").unwrap(),
+                    Locale::try_new("ja").unwrap(),
+                ],
+                fallbacks,
+                Vec::new(),
+                Vec::new(),
+                DynamicReferenceMode::Compat,
+                PlacementPolicy::Duplicate,
+                limits,
+            )
+            .unwrap_err()
+        };
+
+        assert_eq!(
+            construct(
+                vec![fallback("z", &["en"]), fallback("a", &["en"])],
+                &LinkLimits::default(),
+            ),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::FallbackSourceNotProduction(
+                Locale::try_new("a").unwrap(),
+            )),
+            "source membership selects the first canonical invalid source"
+        );
+
+        assert_eq!(
+            construct(
+                vec![fallback("en", &[]), fallback("ja", &["missing"])],
+                &LinkLimits::default(),
+            ),
+            LinkOperationalError::InvalidRequest(
+                InvalidRequestError::FallbackTargetNotProduction {
+                    source: Locale::try_new("ja").unwrap(),
+                    target: Locale::try_new("missing").unwrap(),
+                }
+            ),
+            "the complete membership pass precedes empty-sequence rejection"
+        );
+
+        assert_eq!(
+            construct(
+                vec![fallback("en", &["fr", "fr"]), fallback("ja", &["ja"])],
+                &LinkLimits::default(),
+            ),
+            LinkOperationalError::InvalidRequest(InvalidRequestError::FallbackSelfReference(
+                Locale::try_new("ja").unwrap(),
+            )),
+            "self-reference rejection precedes duplicate-target rejection"
+        );
+
+        let source_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackSources, 1)
+            .unwrap();
+        let LinkOperationalError::Limit(evidence) = construct(
+            vec![fallback("ja", &["en"]), fallback("ja", &["en"])],
+            &source_limit,
+        ) else {
+            panic!("expected occurrence-preserving source count evidence");
+        };
+        assert_eq!(evidence.counter(), LinkLimitCounter::FallbackSources);
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+
+        let target_limit = LinkLimits::default()
+            .try_with_limit(LinkLimitCounter::FallbackTargetsPerSource, 1)
+            .unwrap();
+        let LinkOperationalError::Limit(evidence) =
+            construct(vec![fallback("ja", &["en", "en"])], &target_limit)
+        else {
+            panic!("expected occurrence-preserving target count evidence");
+        };
+        assert_eq!(
+            evidence.subject(),
+            &LinkLimitSubject::FallbackSource(Locale::try_new("ja").unwrap())
+        );
+        assert_eq!(evidence.observation(), LinkLimitObservation::Exact(2));
+    }
+
+    #[test]
+    fn protocol_boundaries_accept_all_sources_with_sixty_four_targets_each() {
+        let locales = (0..1_024)
+            .map(|index| Locale::try_new(format!("l{index:04}")).unwrap())
+            .collect::<Vec<_>>();
+        let fallbacks = locales
+            .iter()
+            .enumerate()
+            .map(|(source_index, source)| {
+                let targets = (1..=64)
+                    .map(|offset| locales[(source_index + offset) % locales.len()].clone())
+                    .collect();
+                LocaleFallback::new(source.clone(), targets)
+            })
+            .collect();
+        let policy = LinkPolicy::try_new(
+            locales,
+            fallbacks,
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(policy.fallbacks().len(), 1_024);
+        assert!(policy
+            .fallbacks()
+            .iter()
+            .all(|fallback| fallback.targets().len() == 64));
     }
 
     #[test]
     fn policy_rejects_empty_and_duplicate_semantic_sets() {
         let empty = LinkPolicy::try_new(
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -631,6 +1158,7 @@ mod tests {
             ],
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             DynamicReferenceMode::Strict,
             PlacementPolicy::Duplicate,
             &LinkLimits::default(),
@@ -645,6 +1173,7 @@ mod tests {
         assert!(matches!(
             LinkPolicy::try_new(
                 vec![Locale::try_new("en").unwrap()],
+                Vec::new(),
                 vec![duplicate_root.clone(), duplicate_root],
                 Vec::new(),
                 DynamicReferenceMode::Compat,
@@ -669,6 +1198,7 @@ mod tests {
             ],
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
             &limits,
@@ -691,6 +1221,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
                 Locale::try_new("en").unwrap(),
             ],
+            Vec::new(),
             vec![root("app", "/a")],
             Vec::new(),
             DynamicReferenceMode::Compat,
@@ -735,6 +1266,7 @@ mod tests {
                 Locale::try_new("en").unwrap(),
             ],
             Vec::new(),
+            Vec::new(),
             vec![baseline("vendor", "en"), baseline("app", "ja")],
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -753,6 +1285,7 @@ mod tests {
         let duplicate = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             Vec::new(),
+            Vec::new(),
             vec![baseline("app", "en"), baseline("app", "en")],
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -768,6 +1301,7 @@ mod tests {
 
         let outside_production = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             Vec::new(),
             vec![baseline("app", "ja")],
             DynamicReferenceMode::Compat,
@@ -794,6 +1328,7 @@ mod tests {
         let error = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             Vec::new(),
+            Vec::new(),
             vec![baseline("app", "ja"), baseline("app", "ja")],
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -811,6 +1346,7 @@ mod tests {
             .unwrap();
         let error = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             Vec::new(),
             vec![baseline("app", "en")],
             DynamicReferenceMode::Compat,
@@ -834,6 +1370,7 @@ mod tests {
         let defaults = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             Vec::new(),
+            Vec::new(),
             inputs(),
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -847,6 +1384,7 @@ mod tests {
             .unwrap();
         let exact = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             Vec::new(),
             inputs(),
             DynamicReferenceMode::Compat,
@@ -878,6 +1416,7 @@ mod tests {
         let equal = LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
             Vec::new(),
+            Vec::new(),
             vec![
                 CoverageBaseline::new(app.clone(), Locale::try_new("en").unwrap()),
                 CoverageBaseline::new(vendor.clone(), Locale::try_new("en").unwrap()),
@@ -900,6 +1439,7 @@ mod tests {
                 Locale::try_new("ja").unwrap(),
                 Locale::try_new("en").unwrap(),
             ],
+            Vec::new(),
             Vec::new(),
             vec![
                 CoverageBaseline::new(app, Locale::try_new("ja").unwrap()),

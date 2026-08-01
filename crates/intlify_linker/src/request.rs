@@ -580,6 +580,7 @@ mod tests {
     fn policy(roots: Vec<crate::ConfiguredRoot>) -> LinkPolicy {
         LinkPolicy::try_new(
             vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
             roots,
             Vec::new(),
             DynamicReferenceMode::Compat,

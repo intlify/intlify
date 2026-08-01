@@ -14,10 +14,10 @@ use intlify_contract::{
 use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_linker::{
     link, ConfiguredRoot, CoverageBaseline, DegradedAnalysisFinding, DeliveryUnitEdge,
-    DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, InvalidRequestError, LinkFinding,
-    LinkFindingKind, LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkPolicy, LinkRequest,
-    PartialReason, PlacementPolicy, ScopeCompleteness, ScopeCompletenessTable, ScopeMapping,
-    ScopeMappingTable,
+    DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkFinding, LinkFindingKind,
+    LinkFindingRecord, LinkOperationalError, LinkOutcome, LinkPolicy, LinkRequest, LocaleFallback,
+    PartialReason, PlacementPolicy, ResolutionFailure, ScopeCompleteness, ScopeCompletenessTable,
+    ScopeMapping, ScopeMappingTable,
 };
 
 const DOMAIN: CatalogKeyDomain = CatalogKeyDomain::JsonPointer;
@@ -138,8 +138,34 @@ fn policy_with_baselines(
 ) -> LinkPolicy {
     LinkPolicy::try_new(
         locales.iter().map(|value| locale(value)).collect(),
+        Vec::new(),
         roots,
         coverage_baselines,
+        dynamic_mode,
+        PlacementPolicy::Duplicate,
+        &LinkLimits::default(),
+    )
+    .unwrap()
+}
+
+fn policy_with_fallbacks(
+    locales: &[&str],
+    fallbacks: &[(&str, &[&str])],
+    dynamic_mode: DynamicReferenceMode,
+) -> LinkPolicy {
+    LinkPolicy::try_new(
+        locales.iter().map(|value| locale(value)).collect(),
+        fallbacks
+            .iter()
+            .map(|(source, targets)| {
+                LocaleFallback::new(
+                    locale(source),
+                    targets.iter().map(|target| locale(target)).collect(),
+                )
+            })
+            .collect(),
+        Vec::new(),
+        Vec::new(),
         dynamic_mode,
         PlacementPolicy::Duplicate,
         &LinkLimits::default(),
@@ -430,7 +456,7 @@ fn exact_resolution_retains_exact_locale_snapshots_and_reports_unused_definition
 }
 
 #[test]
-fn fallback_blind_union_resolution_does_not_invent_a_requested_locale_snapshot() {
+fn missing_requested_locale_without_fallback_blocks_bundle_plans() {
     let app = scope("app");
     let outcome = do_link(
         app.clone(),
@@ -452,16 +478,213 @@ fn fallback_blind_union_resolution_does_not_invent_a_requested_locale_snapshot()
         LinkLimits::default(),
     )
     .unwrap();
-    assert!(outcome.findings().is_empty());
+    assert!(outcome.generation_blocked());
+    assert!(outcome.bundle_plans().is_none());
+    let LinkFindingRecord::UnresolvedMessage(unresolved) = outcome.findings()[0].record() else {
+        panic!("expected unresolved-message");
+    };
+    assert_eq!(unresolved.evidence().failures().len(), 1);
+    assert_eq!(
+        unresolved.evidence().failures()[0]
+            .requested_locale()
+            .as_str(),
+        "ja"
+    );
+}
+
+#[test]
+fn ordered_fallback_selects_one_definition_for_the_requested_locale_plan() {
+    let app = scope("app");
+    let outcome = do_link(
+        app.clone(),
+        vec![reference_artifact(
+            "entry",
+            DeliveryUnitId::main(),
+            vec![reference(
+                app.clone(),
+                MessageSelector::Exact(key("/message")),
+            )],
+        )],
+        vec![definition_artifact(
+            "en.json",
+            vec![definition(app.clone(), "/message", "en", "English", 0)],
+        )],
+        policy_with_fallbacks(
+            &["ja", "en"],
+            &[("ja", &["en"])],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+
+    assert!(!outcome.generation_blocked());
+    assert_eq!(outcome.findings().len(), 1);
+    let LinkFindingRecord::MissingTranslation(missing) = outcome.findings()[0].record() else {
+        panic!("expected missing-translation");
+    };
+    assert_eq!(missing.subject().requested_locale().as_str(), "ja");
+    assert_eq!(missing.subject().key().as_str(), "/message");
+    assert_eq!(
+        missing
+            .evidence()
+            .probed_locales()
+            .iter()
+            .map(Locale::as_str)
+            .collect::<Vec<_>>(),
+        ["ja", "en"]
+    );
+    assert_eq!(missing.evidence().selected_locale().as_str(), "en");
+
     let plans = outcome.bundle_plans().unwrap();
     assert_eq!(plans.len(), 2);
-    assert_eq!(plans[0].locale().as_str(), "en");
-    assert_eq!(plans[0].messages().len(), 1);
-    assert_eq!(plans[0].messages()[0].definition_locale().as_str(), "en");
-    assert_eq!(plans[1].locale().as_str(), "ja");
-    assert!(
-        plans[1].messages().is_empty(),
-        "fallback-blind linking must not copy the English snapshot into the Japanese plan"
+    for plan in plans {
+        assert_eq!(plan.messages().len(), 1);
+        assert_eq!(plan.messages()[0].message().as_str(), "English");
+        assert_eq!(plan.messages()[0].definition_locale().as_str(), "en");
+    }
+}
+
+#[test]
+fn fallback_target_order_selects_the_first_available_definition() {
+    let app = scope("app");
+    let link_with_targets = |targets: &[&str]| {
+        do_link(
+            app.clone(),
+            vec![reference_artifact(
+                "entry",
+                DeliveryUnitId::main(),
+                vec![reference(
+                    app.clone(),
+                    MessageSelector::Exact(key("/message")),
+                )],
+            )],
+            vec![definition_artifact(
+                "messages.json",
+                vec![
+                    definition(app.clone(), "/message", "en", "English", 0),
+                    definition(app.clone(), "/message", "fr", "Français", 1),
+                ],
+            )],
+            policy_with_fallbacks(
+                &["ja", "en", "fr"],
+                &[("ja", targets)],
+                DynamicReferenceMode::Compat,
+            ),
+            closed_completeness(std::slice::from_ref(&app)),
+            DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+            LinkLimits::default(),
+        )
+        .unwrap()
+    };
+
+    let french_first = link_with_targets(&["fr", "en"]);
+    let english_first = link_with_targets(&["en", "fr"]);
+    let selected_locale = |outcome: &LinkOutcome| {
+        outcome
+            .bundle_plans()
+            .unwrap()
+            .iter()
+            .find(|plan| plan.locale().as_str() == "ja")
+            .unwrap()
+            .messages()[0]
+            .definition_locale()
+            .as_str()
+            .to_owned()
+    };
+
+    assert_eq!(selected_locale(&french_first), "fr");
+    assert_eq!(selected_locale(&english_first), "en");
+    assert_ne!(french_first, english_first);
+}
+
+#[test]
+fn configured_root_uses_fallback_without_synthesizing_reference_findings() {
+    let app = scope("app");
+    let policy = LinkPolicy::try_new(
+        vec![locale("ja"), locale("en")],
+        vec![LocaleFallback::new(locale("ja"), vec![locale("en")])],
+        vec![configured_root(
+            app.clone(),
+            MessageSelector::Exact(key("/message")),
+        )],
+        Vec::new(),
+        DynamicReferenceMode::Compat,
+        PlacementPolicy::Duplicate,
+        &LinkLimits::default(),
+    )
+    .unwrap();
+    let outcome = do_link(
+        app.clone(),
+        Vec::new(),
+        vec![definition_artifact(
+            "en.json",
+            vec![definition(app.clone(), "/message", "en", "English", 0)],
+        )],
+        policy,
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+
+    assert!(outcome.findings().is_empty());
+    let japanese = outcome
+        .bundle_plans()
+        .unwrap()
+        .iter()
+        .find(|plan| plan.locale().as_str() == "ja")
+        .unwrap();
+    assert_eq!(japanese.messages()[0].definition_locale().as_str(), "en");
+}
+
+#[test]
+fn fallback_sequences_are_direct_and_never_expand_another_source_sequence() {
+    let app = scope("app");
+    let outcome = do_link(
+        app.clone(),
+        vec![reference_artifact(
+            "entry",
+            DeliveryUnitId::main(),
+            vec![reference(
+                app.clone(),
+                MessageSelector::Exact(key("/message")),
+            )],
+        )],
+        vec![definition_artifact(
+            "en.json",
+            vec![definition(app.clone(), "/message", "en", "English", 0)],
+        )],
+        policy_with_fallbacks(
+            &["ja-JP", "ja", "en"],
+            &[("ja-JP", &["ja"]), ("ja", &["en"])],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+
+    assert!(outcome.generation_blocked());
+    let unresolved = outcome
+        .findings()
+        .iter()
+        .find_map(|finding| match finding.record() {
+            LinkFindingRecord::UnresolvedMessage(finding) => Some(finding),
+            _ => None,
+        })
+        .expect("ja-JP must remain unresolved");
+    assert_eq!(unresolved.evidence().failures().len(), 1);
+    assert_eq!(
+        unresolved.evidence().failures()[0]
+            .probed_locales()
+            .iter()
+            .map(Locale::as_str)
+            .collect::<Vec<_>>(),
+        ["ja-JP", "ja"]
     );
 }
 
@@ -492,9 +715,147 @@ fn unresolved_reference_retains_one_failure_per_canonical_production_locale() {
     };
     assert_eq!(unresolved.evidence().failures().len(), 2);
     for (failure, expected_locale) in unresolved.evidence().failures().iter().zip(["en", "ja"]) {
+        assert!(matches!(failure, ResolutionFailure::Message(_)));
         assert_eq!(failure.requested_locale().as_str(), expected_locale);
         assert_eq!(failure.probed_locales(), [locale(expected_locale)]);
     }
+}
+
+#[test]
+fn unmatched_non_exact_selector_uses_selector_level_failure_evidence() {
+    let app = scope("app");
+    let outcome = do_link(
+        app.clone(),
+        vec![reference_artifact(
+            "entry",
+            DeliveryUnitId::main(),
+            vec![reference(
+                app.clone(),
+                MessageSelector::Prefix(CatalogKeyPrefix::try_new(DOMAIN, "/missing").unwrap()),
+            )],
+        )],
+        Vec::new(),
+        policy_with_fallbacks(
+            &["ja", "en"],
+            &[("ja", &["en"])],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        LinkLimits::default(),
+    )
+    .unwrap();
+    let LinkFindingRecord::UnresolvedMessage(unresolved) = outcome.findings()[0].record() else {
+        panic!("expected unresolved-message");
+    };
+    assert!(unresolved
+        .evidence()
+        .failures()
+        .iter()
+        .all(|failure| matches!(failure, ResolutionFailure::Selector(_))));
+    assert_eq!(
+        unresolved.evidence().failures()[1]
+            .probed_locales()
+            .iter()
+            .map(Locale::as_str)
+            .collect::<Vec<_>>(),
+        ["ja", "en"]
+    );
+}
+
+#[test]
+fn locale_resolution_fact_limit_is_applied_before_chain_probing() {
+    let app = scope("app");
+    let limits = LinkLimits::default()
+        .try_with_limit(LinkLimitCounter::LocaleResolutionFactsTotal, 1)
+        .unwrap();
+    assert_limit(
+        do_link(
+            app.clone(),
+            vec![reference_artifact(
+                "entry",
+                DeliveryUnitId::main(),
+                vec![reference(
+                    app.clone(),
+                    MessageSelector::Exact(key("/message")),
+                )],
+            )],
+            vec![definition_artifact(
+                "en.json",
+                vec![definition(app.clone(), "/message", "en", "English", 0)],
+            )],
+            policy(&["ja", "en"], Vec::new(), DynamicReferenceMode::Compat),
+            closed_completeness(std::slice::from_ref(&app)),
+            DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+            limits,
+        )
+        .unwrap_err(),
+        LinkLimitCounter::LocaleResolutionFactsTotal,
+        LinkLimitObservation::Exact(2),
+    );
+}
+
+#[test]
+fn locale_resolution_fact_limit_counts_shared_demands_once() {
+    let app = scope("app");
+    let limits = LinkLimits::default()
+        .try_with_limit(LinkLimitCounter::LocaleResolutionFactsTotal, 2)
+        .unwrap();
+    let outcome = do_link(
+        app.clone(),
+        vec![reference_artifact(
+            "entry",
+            DeliveryUnitId::main(),
+            vec![
+                reference(app.clone(), MessageSelector::Exact(key("/message"))),
+                reference(app.clone(), MessageSelector::Exact(key("/message"))),
+            ],
+        )],
+        vec![definition_artifact(
+            "en.json",
+            vec![definition(app.clone(), "/message", "en", "English", 0)],
+        )],
+        policy_with_fallbacks(
+            &["ja", "en"],
+            &[("ja", &["en"])],
+            DynamicReferenceMode::Compat,
+        ),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        limits,
+    )
+    .unwrap();
+
+    assert_eq!(
+        outcome
+            .findings()
+            .iter()
+            .filter(|finding| finding.kind() == LinkFindingKind::MissingTranslation)
+            .count(),
+        2,
+        "shared resolution work must still project one finding per reference"
+    );
+}
+
+#[test]
+fn zero_locale_resolution_fact_limit_accepts_a_request_without_demands() {
+    let app = scope("app");
+    let limits = LinkLimits::default()
+        .try_with_limit(LinkLimitCounter::LocaleResolutionFactsTotal, 0)
+        .unwrap();
+    let outcome = do_link(
+        app.clone(),
+        Vec::new(),
+        Vec::new(),
+        policy(&["en"], Vec::new(), DynamicReferenceMode::Compat),
+        closed_completeness(std::slice::from_ref(&app)),
+        DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+        limits,
+    )
+    .unwrap();
+
+    assert!(outcome.findings().is_empty());
+    assert_eq!(outcome.bundle_plans().unwrap().len(), 1);
 }
 
 #[test]
@@ -1503,9 +1864,9 @@ fn omitted_and_closed_empty_baselines_remain_distinct() {
 }
 
 #[test]
-fn non_baseline_only_key_fails_before_returning_an_outcome() {
+fn non_baseline_only_key_reports_an_orphan_and_withholds_the_model() {
     let app = scope("app");
-    let error = do_link(
+    let outcome = do_link(
         app.clone(),
         Vec::new(),
         vec![definition_artifact(
@@ -1525,17 +1886,20 @@ fn non_baseline_only_key_fails_before_returning_an_outcome() {
         DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
         LinkLimits::default(),
     )
-    .unwrap_err();
-    assert_eq!(
-        error,
-        LinkOperationalError::InvalidRequest(InvalidRequestError::CoverageBaselineMissingKey {
-            scope: mappings(std::slice::from_ref(&app), Vec::new()).resolve(&app),
-            baseline: locale("en"),
-            domain: DOMAIN,
-            key: key("/missing"),
-            defined_locale: locale("ja"),
+    .unwrap();
+    assert!(outcome.typed_key_models().is_empty());
+    let orphan = outcome
+        .findings()
+        .iter()
+        .find_map(|finding| match finding.record() {
+            LinkFindingRecord::OrphanedTranslation(finding) => Some(finding),
+            _ => None,
         })
-    );
+        .expect("the non-baseline definition must be reported");
+    assert_eq!(orphan.subject().key(), &key("/missing"));
+    assert_eq!(orphan.subject().locale(), &locale("ja"));
+    assert_eq!(orphan.evidence().baseline_locale(), &locale("en"));
+    assert!(outcome.bundle_plans().is_some());
 }
 
 #[test]
@@ -1597,6 +1961,10 @@ fn partial_or_ambiguous_definition_worlds_do_not_publish_models() {
     .unwrap();
     assert!(partial.typed_key_models().is_empty());
     assert!(partial.generation_blocked());
+    assert!(partial
+        .findings()
+        .iter()
+        .all(|finding| finding.kind() != LinkFindingKind::OrphanedTranslation));
 
     let ambiguous = do_link(
         app.clone(),
@@ -1619,6 +1987,10 @@ fn partial_or_ambiguous_definition_worlds_do_not_publish_models() {
     .unwrap();
     assert!(ambiguous.typed_key_models().is_empty());
     assert!(ambiguous.generation_blocked());
+    assert!(ambiguous
+        .findings()
+        .iter()
+        .all(|finding| finding.kind() != LinkFindingKind::OrphanedTranslation));
 }
 
 #[test]
