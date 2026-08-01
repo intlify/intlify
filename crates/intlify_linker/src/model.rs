@@ -229,6 +229,7 @@ mod tests {
                 Locale::try_new("ja").unwrap(),
             ],
             Vec::new(),
+            Vec::new(),
             vec![CoverageBaseline::new(app, Locale::try_new("en").unwrap())],
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -270,6 +271,7 @@ mod tests {
         let policy = LinkPolicy::try_new(
             vec![locale.clone()],
             Vec::new(),
+            Vec::new(),
             vec![
                 CoverageBaseline::new(app.clone(), locale.clone()),
                 CoverageBaseline::new(vendor.clone(), locale.clone()),
@@ -306,6 +308,7 @@ mod tests {
         let mappings = ScopeMappingTable::empty(&[app.clone(), vendor.clone()], &limits).unwrap();
         let policy = LinkPolicy::try_new(
             vec![locale.clone()],
+            Vec::new(),
             Vec::new(),
             vec![CoverageBaseline::new(app, locale.clone())],
             DynamicReferenceMode::Compat,

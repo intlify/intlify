@@ -73,7 +73,16 @@ fn generated_config_schema_matches_design_contract() {
     assert_eq!(messages["properties"]["locales"]["maxItems"], 1024);
     assert_eq!(messages["properties"]["locales"]["items"]["minLength"], 1);
     assert_eq!(messages["properties"]["roots"]["maxItems"], 4096);
-    assert!(messages["properties"].get("fallback").is_none());
+    let fallback = &messages["properties"]["fallback"];
+    assert_eq!(fallback["type"], "object");
+    assert_eq!(fallback["maxProperties"], 1024);
+    assert_eq!(fallback["propertyNames"]["minLength"], 1);
+    assert_eq!(fallback["propertyNames"]["maxLength"], 255);
+    assert_eq!(fallback["additionalProperties"]["minItems"], 1);
+    assert_eq!(fallback["additionalProperties"]["maxItems"], 64);
+    assert_eq!(fallback["additionalProperties"]["uniqueItems"], true);
+    assert_eq!(fallback["additionalProperties"]["items"]["minLength"], 1);
+    assert_eq!(fallback["additionalProperties"]["items"]["maxLength"], 255);
     let coverage_baseline = &messages["properties"]["coverageBaseline"];
     assert_eq!(coverage_baseline["type"], "object");
     assert_eq!(coverage_baseline["minProperties"], 1);

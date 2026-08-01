@@ -11,9 +11,8 @@ use std::error::Error;
 use std::fmt;
 
 use intlify_contract::{
-    ArtifactVersionEvidence, ArtifactViolation, CatalogKey, CatalogKeyDomain, CatalogScopeId,
-    DeliveryUnitId, LinkLimitEvidence, Locale, MessageSelector, ReferenceArtifactIdentity,
-    SourceDocumentIdentity,
+    ArtifactVersionEvidence, ArtifactViolation, CatalogKeyDomain, CatalogScopeId, DeliveryUnitId,
+    LinkLimitEvidence, Locale, MessageSelector, ReferenceArtifactIdentity, SourceDocumentIdentity,
 };
 
 use crate::ResolvedCatalogScopeId;
@@ -102,6 +101,28 @@ pub enum InvalidRequestError {
     EmptyProductionLocales,
     /// One checked locale occurs more than once in the production set.
     DuplicateProductionLocale(Locale),
+    /// One fallback source occurs more than once.
+    DuplicateFallbackSource(Locale),
+    /// A fallback source is outside the production locale set.
+    FallbackSourceNotProduction(Locale),
+    /// One declared fallback sequence has no target.
+    EmptyFallbackSequence(Locale),
+    /// A fallback target is outside the production locale set.
+    FallbackTargetNotProduction {
+        /// Source owning the rejected target.
+        source: Locale,
+        /// Exact rejected target.
+        target: Locale,
+    },
+    /// One fallback sequence names its own source as a target.
+    FallbackSelfReference(Locale),
+    /// One target occurs more than once in a fallback sequence.
+    DuplicateFallbackTarget {
+        /// Source owning the duplicate target.
+        source: Locale,
+        /// Exact duplicate target.
+        target: Locale,
+    },
     /// One checked configured-root identity occurs more than once.
     DuplicateConfiguredRoot(ConfiguredRootIdentity),
     /// One declared scope has more than one coverage-baseline occurrence.
@@ -184,19 +205,6 @@ pub enum InvalidRequestError {
         first: Locale,
         /// Canonically second conflicting locale.
         second: Locale,
-    },
-    /// A production-locale key is absent from the selected baseline locale.
-    CoverageBaselineMissingKey {
-        /// Resolved semantic scope.
-        scope: ResolvedCatalogScopeId,
-        /// Configured baseline locale.
-        baseline: Locale,
-        /// Catalog-key comparison domain.
-        domain: CatalogKeyDomain,
-        /// First canonical key absent from the baseline.
-        key: CatalogKey,
-        /// First canonical non-baseline locale defining the key.
-        defined_locale: Locale,
     },
     /// A reference artifact names no node in the checked delivery graph.
     MissingReferenceDeliveryUnit {

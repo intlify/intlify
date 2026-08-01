@@ -38,6 +38,9 @@ impl LinkOutcome {
         bundle_plans: Option<Vec<MessageBundlePlan>>,
         typed_key_models: TypedKeyModelBatch,
     ) -> Result<Self, LinkOperationalError> {
+        if !findings.is_sorted() {
+            return Err(LinkOperationalError::InternalInvariant);
+        }
         let has_blocking_finding = findings.iter().any(LinkFinding::blocking);
         if bundle_plans.is_none() != has_blocking_finding {
             return Err(LinkOperationalError::InternalInvariant);

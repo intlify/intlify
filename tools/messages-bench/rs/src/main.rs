@@ -1240,6 +1240,7 @@ impl TypedKeyModelFixture {
         let policy = LinkPolicy::try_new(
             vec![secondary_locale, baseline_locale.clone()],
             Vec::new(),
+            Vec::new(),
             vec![CoverageBaseline::new(scope.clone(), baseline_locale)],
             DynamicReferenceMode::Compat,
             PlacementPolicy::Duplicate,
@@ -1353,6 +1354,7 @@ impl GeneratedLinkFixture {
         let reference_artifacts = vec![reference_artifact(references, &limits)?];
         let policy = LinkPolicy::try_new(
             vec![Locale::try_new("en").map_err(|error| error.to_string())?],
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             DynamicReferenceMode::Compat,

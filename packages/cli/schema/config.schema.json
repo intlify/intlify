@@ -357,6 +357,26 @@
           ],
           "default": "compat"
         },
+        "fallback": {
+          "additionalProperties": {
+            "items": {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "maxProperties": 1024,
+          "propertyNames": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "object"
+        },
         "locales": {
           "items": {
             "minLength": 1,

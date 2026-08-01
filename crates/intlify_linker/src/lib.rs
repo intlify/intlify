@@ -34,14 +34,14 @@ pub use error::{
 pub use finding::{
     AmbiguousMessageDefinitionEvidence, AmbiguousMessageDefinitionFinding,
     AmbiguousMessageDefinitionSubject, DegradedAnalysisFinding, LinkFinding, LinkFindingKind,
-    LinkFindingRecord, MissingTranslationEvidence, MissingTranslationFinding,
-    MissingTranslationSubject, OrphanedTranslationEvidence, OrphanedTranslationFinding,
-    OrphanedTranslationSubject, PartialCompletenessDegradation, PartialCompletenessEvidence,
-    PartialCompletenessSubject, ResolutionFailure, UnboundedDynamicReferenceEvidence,
-    UnboundedDynamicReferenceFinding, UnboundedDynamicReferenceSubject, UnresolvedMessageEvidence,
-    UnresolvedMessageFinding, UnresolvedMessageSubject, UnusedMessageEvidence,
-    UnusedMessageFinding, UnusedMessageSubject, WideSelectorDegradation, WideSelectorEvidence,
-    WideSelectorSubject,
+    LinkFindingRecord, MessageResolutionFailure, MissingTranslationEvidence,
+    MissingTranslationFinding, MissingTranslationSubject, OrphanedTranslationEvidence,
+    OrphanedTranslationFinding, OrphanedTranslationSubject, PartialCompletenessDegradation,
+    PartialCompletenessEvidence, PartialCompletenessSubject, ResolutionFailure,
+    SelectorResolutionFailure, UnboundedDynamicReferenceEvidence, UnboundedDynamicReferenceFinding,
+    UnboundedDynamicReferenceSubject, UnresolvedMessageEvidence, UnresolvedMessageFinding,
+    UnresolvedMessageSubject, UnusedMessageEvidence, UnusedMessageFinding, UnusedMessageSubject,
+    WideSelectorDegradation, WideSelectorEvidence, WideSelectorSubject,
 };
 pub use graph::{DeliveryUnitEdge, DeliveryUnitGraph};
 pub use link::link;
@@ -51,7 +51,7 @@ pub use outcome::LinkOutcome;
 pub use plan::{MessageBundlePlan, ResolvedMessage};
 pub use policy::{
     ConfiguredRoot, ConfiguredRootConstructionError, CoverageBaseline, DynamicReferenceMode,
-    LinkPolicy, PlacementPolicy, ResolvedConfiguredRoot, ResolvedCoverageBaseline,
+    LinkPolicy, LocaleFallback, PlacementPolicy, ResolvedConfiguredRoot, ResolvedCoverageBaseline,
     ResolvedLinkPolicy,
 };
 pub use request::LinkRequest;
@@ -66,8 +66,9 @@ pub use scope::{
 mod tests {
     use super::{
         DeliveryUnitGraph, LinkFinding, LinkFindingKind, LinkOperationalError, LinkOutcome,
-        LinkPolicy, LinkRequest, MessageBundlePlan, ResolvedMessage,
-        ResolvedScopeCompletenessTable, ScopeCompletenessTable, ScopeMappingTable, TypedKeyModel,
+        LinkPolicy, LinkRequest, LocaleFallback, MessageBundlePlan, MessageResolutionFailure,
+        ResolvedMessage, ResolvedScopeCompletenessTable, ScopeCompletenessTable, ScopeMappingTable,
+        SelectorResolutionFailure, TypedKeyModel,
     };
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -75,6 +76,7 @@ mod tests {
     #[test]
     fn public_request_foundation_values_are_send_and_sync() {
         assert_send_sync::<LinkPolicy>();
+        assert_send_sync::<LocaleFallback>();
         assert_send_sync::<ScopeMappingTable>();
         assert_send_sync::<ScopeCompletenessTable>();
         assert_send_sync::<ResolvedScopeCompletenessTable>();
@@ -86,6 +88,8 @@ mod tests {
         assert_send_sync::<TypedKeyModel>();
         assert_send_sync::<MessageBundlePlan>();
         assert_send_sync::<ResolvedMessage>();
+        assert_send_sync::<SelectorResolutionFailure>();
+        assert_send_sync::<MessageResolutionFailure>();
     }
 
     #[test]

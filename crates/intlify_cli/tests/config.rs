@@ -376,6 +376,7 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
       }
     ],
     "coverageBaseline": { "app": "en" },
+    "fallback": { "ja": ["en"] },
     "producers": {
       "js": {
         "include": ["src/**/*.ts"],
@@ -404,6 +405,7 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
             .map(String::as_str),
         Some("en")
     );
+    assert_eq!(normalized.fallback()["ja"], ["en"]);
 
     let resolved = loaded
         .resolved_messages
@@ -415,6 +417,8 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
     );
     assert_eq!(resolved.policy().configured_roots().len(), 1);
     assert_eq!(resolved.policy().coverage_baselines().len(), 1);
+    assert_eq!(resolved.policy().fallbacks().len(), 1);
+    assert_eq!(resolved.policy().fallbacks()[0].source().as_str(), "ja");
     assert_eq!(
         resolved.producers().js().unwrap().recognizers().bindings()[0].callee(),
         "i18n.t"
@@ -459,7 +463,7 @@ fn maps_messages_validation_evidence_into_the_existing_config_envelope() {
         (
             r#"{"messages":{"locales":["en"],"fallback":null}}"#,
             "/messages/fallback",
-            "unknown_field",
+            "invalid_message_fallback",
         ),
     ];
 
@@ -824,6 +828,21 @@ fn rejects_duplicate_object_members_at_the_second_key_token() {
     "coverageBaseline": {
       "app": "en",
       "app": "en"
+    }
+  }
+}"#,
+            6,
+            6,
+        ),
+        (
+            "message-fallback",
+            "json",
+            r#"{
+  "messages": {
+    "locales": ["en", "ja"],
+    "fallback": {
+      "ja": ["en"],
+      "ja": ["en"]
     }
   }
 }"#,

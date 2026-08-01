@@ -22,6 +22,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CounterState {
     Active,
+    #[allow(dead_code)] // Retained for additive counters reserved by future revisions.
     Reserved,
 }
 
@@ -112,11 +113,11 @@ pub enum LinkLimitCounter {
     DeliveryGraphIdBytes,
     /// Submitted production-locale occurrences.
     ProductionLocales,
-    /// Reserved fallback-source occurrences.
+    /// Submitted fallback-source occurrences.
     FallbackSources,
     /// Submitted configured-root occurrences.
     ConfiguredRoots,
-    /// Reserved target occurrences for one fallback source.
+    /// Submitted target occurrences for one fallback source.
     FallbackTargetsPerSource,
     /// Decoded bytes in one locale occurrence.
     LocaleBytes,
@@ -192,6 +193,8 @@ pub enum LinkLimitCounter {
     CoverageBaselines,
     /// Aggregate coverage-baseline scope-name and locale bytes.
     CoverageBaselineBytesTotal,
+    /// Unique logical-key/requested-locale and unmatched-selector resolution cells.
+    LocaleResolutionFactsTotal,
 }
 
 // This registry is the single source of truth for counter names, ceilings,
@@ -302,10 +305,10 @@ const LINK_LIMIT_COUNTER_METADATA: &[LinkLimitCounterMetadata] = &[
         FallbackSources,
         "fallback_sources",
         1_024,
-        Reserved,
+        Active,
         FirstOver,
         LinkOnly,
-        []
+        [ResolvedPolicy]
     ),
     counter_metadata!(
         ConfiguredRoots,
@@ -320,7 +323,7 @@ const LINK_LIMIT_COUNTER_METADATA: &[LinkLimitCounterMetadata] = &[
         FallbackTargetsPerSource,
         "fallback_targets_per_source",
         64,
-        Reserved,
+        Active,
         FirstOver,
         LinkOnly,
         [FallbackSource]
@@ -675,6 +678,15 @@ const LINK_LIMIT_COUNTER_METADATA: &[LinkLimitCounterMetadata] = &[
         LinkOnly,
         [ResolvedPolicy]
     ),
+    counter_metadata!(
+        LocaleResolutionFactsTotal,
+        "locale_resolution_facts_total",
+        4_000_000,
+        Active,
+        FirstOver,
+        LinkOnly,
+        [Request]
+    ),
 ];
 
 const COUNTER_COUNT: usize = LINK_LIMIT_COUNTER_METADATA.len();
@@ -910,7 +922,7 @@ pub enum LinkLimitSubject {
     DeliveryUnitGroup(DeliveryUnitId),
     /// Complete resolved link policy.
     ResolvedPolicy,
-    /// Canonical checked fallback source reserved for a future protocol revision.
+    /// Canonical checked fallback source whose ordered target count was rejected.
     FallbackSource(Locale),
     /// Complete scope-mapping table.
     ScopeMappings,
@@ -1161,6 +1173,7 @@ mod tests {
             "definitions",
             "coverage_baselines",
             "coverage_baseline_bytes_total",
+            "locale_resolution_facts_total",
         ];
         let expected_ceilings = [
             65_536,
@@ -1214,6 +1227,7 @@ mod tests {
             100_000,
             4_096,
             2_088_960,
+            4_000_000,
         ];
         assert_eq!(LinkLimitCounter::ALL.len(), expected.len());
         assert_eq!(LinkLimitCounter::ALL.len(), expected_ceilings.len());
@@ -1234,7 +1248,7 @@ mod tests {
     fn counter_registry_keeps_exact_state_observation_and_boundary_contracts() {
         use LinkLimitCounter as Counter;
 
-        let reserved = [Counter::FallbackSources, Counter::FallbackTargetsPerSource];
+        let reserved = [];
         let first_over = [
             Counter::ReferenceArtifacts,
             Counter::DefinitionArtifacts,
@@ -1270,6 +1284,7 @@ mod tests {
             Counter::ReferenceRecords,
             Counter::Definitions,
             Counter::CoverageBaselines,
+            Counter::LocaleResolutionFactsTotal,
         ];
         let arithmetic_overflow = [
             Counter::ReferenceIdentityBytesTotal,
@@ -1348,6 +1363,7 @@ mod tests {
                     Counter::BundlePlansTotal,
                     Counter::ResolvedMessagesTotal,
                     Counter::BundlePlanBytesTotal,
+                    Counter::LocaleResolutionFactsTotal,
                 ],
             ),
             (
@@ -1421,6 +1437,7 @@ mod tests {
                 Subject::ResolvedPolicy,
                 &[
                     Counter::ProductionLocales,
+                    Counter::FallbackSources,
                     Counter::ConfiguredRoots,
                     Counter::LocaleBytes,
                     Counter::CatalogScopeNameBytes,
@@ -1490,18 +1507,18 @@ mod tests {
     }
 
     #[test]
-    fn fallback_counters_are_reserved_and_cannot_be_lowered() {
+    fn fallback_counters_are_active_and_can_be_lowered() {
         for counter in [
             LinkLimitCounter::FallbackSources,
             LinkLimitCounter::FallbackTargetsPerSource,
         ] {
-            assert!(counter.is_reserved());
+            assert!(!counter.is_reserved());
             assert_eq!(
                 LinkLimits::default()
                     .try_with_limit(counter, 0)
-                    .unwrap_err()
-                    .counter(),
-                counter
+                    .unwrap()
+                    .effective_limit(counter),
+                0
             );
         }
     }

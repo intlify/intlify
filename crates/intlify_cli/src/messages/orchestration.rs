@@ -285,6 +285,20 @@ fn request_observation(request: &LinkRequest<'_>) -> Result<Vec<Vec<u8>>, Artifa
             .iter()
             .map(|locale| locale.as_str().as_bytes().to_vec()),
     );
+    if !request.policy().fallbacks().is_empty() {
+        fields.push(b"fallbacks".to_vec());
+        fields.push(count_bytes(request.policy().fallbacks().len()));
+        for fallback in request.policy().fallbacks() {
+            fields.push(fallback.source().as_str().as_bytes().to_vec());
+            fields.push(count_bytes(fallback.targets().len()));
+            fields.extend(
+                fallback
+                    .targets()
+                    .iter()
+                    .map(|locale| locale.as_str().as_bytes().to_vec()),
+            );
+        }
+    }
     fields.push(count_bytes(request.policy().configured_roots().len()));
     for root in request.policy().configured_roots() {
         push_scope(&mut fields, root.scope());
@@ -473,7 +487,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use intlify_contract::{LinkLimits, MessageSelector};
-    use intlify_linker::{DynamicReferenceMode, LinkFindingKind, LinkOperationalError};
+    use intlify_linker::{DynamicReferenceMode, LinkFindingKind};
     use intlify_resource::{HostFormatRegistry, ResourcesConfig};
     use serde_json::{json, Value};
 
@@ -807,16 +821,13 @@ mod tests {
             "locales/ja.json",
             r#"{"title":"タイトル","onlyJa":"日本語のみ"}"#,
         );
-        let mismatch = try_execute_messages(&root, &messages, None).unwrap_err();
-        assert!(matches!(
-            mismatch,
-            ProjectLinkError::Linker {
-                stage: ProjectLinkStage::SemanticLink,
-                error: LinkOperationalError::InvalidRequest(
-                    intlify_linker::InvalidRequestError::CoverageBaselineMissingKey { .. }
-                )
-            }
-        ));
+        let mismatch = execute_messages(&root, &messages, None);
+        assert!(mismatch.outcome().typed_key_models().is_empty());
+        assert!(mismatch
+            .outcome()
+            .findings()
+            .iter()
+            .any(|finding| finding.kind() == LinkFindingKind::OrphanedTranslation));
         assert_eq!(admitted.outcome().typed_key_models().len(), 1);
 
         write(&root, "locales/ja.json", "{");
@@ -1094,6 +1105,56 @@ mod tests {
             resolved(&strict_config).1.policy().dynamic_references(),
             DynamicReferenceMode::Strict
         );
+    }
+
+    #[test]
+    fn fallback_changes_link_results_without_invalidating_reference_artifacts() {
+        let root = TempRoot::new("fallback-policy");
+        write(&root, "locales/en.json", r#"{"title":"Title"}"#);
+        write(&root, "src/app.ts", "t('/title')");
+        let messages = |with_fallback| {
+            let mut value = json!({
+                "locales": ["en", "ja"],
+                "producers": {
+                    "js": {
+                        "include": ["src/**/*.ts"],
+                        "recognizers": {
+                            "t": {
+                                "kind": "lookup",
+                                "scope": "app",
+                                "domain": "json-pointer",
+                                "keySyntax": "canonical"
+                            }
+                        }
+                    }
+                }
+            });
+            if with_fallback {
+                value["fallback"] = json!({ "ja": ["en"] });
+            }
+            value
+        };
+        let cache = MessageLinkCache::default();
+
+        let without_fallback = execute_messages(&root, &messages(false), Some(&cache));
+        let with_fallback = execute_messages(&root, &messages(true), Some(&cache));
+
+        assert!(without_fallback.outcome().generation_blocked());
+        assert!(!with_fallback.outcome().generation_blocked());
+        assert!(with_fallback
+            .outcome()
+            .findings()
+            .iter()
+            .any(|finding| finding.kind() == LinkFindingKind::MissingTranslation));
+        let japanese = with_fallback
+            .outcome()
+            .bundle_plans()
+            .unwrap()
+            .iter()
+            .find(|plan| plan.locale().as_str() == "ja")
+            .unwrap();
+        assert_eq!(japanese.messages()[0].definition_locale().as_str(), "en");
+        assert!(cache.stats().js_hits > 0);
     }
 
     #[test]
