@@ -339,12 +339,25 @@ struct ActiveBenchmarkLinkStage {
 }
 
 #[cfg(feature = "benchmark")]
+const EXPECTED_BENCHMARK_LINK_STAGES: [BenchmarkLinkStage; 9] = [
+    BenchmarkLinkStage::SemanticIndexConstruction,
+    BenchmarkLinkStage::CoverageBaselineSelection,
+    BenchmarkLinkStage::TypedKeyModelConstruction,
+    BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
+    BenchmarkLinkStage::FallbackChainConstruction,
+    BenchmarkLinkStage::LocaleAwareResolution,
+    BenchmarkLinkStage::ReachabilityAndPlacement,
+    BenchmarkLinkStage::FindingAndPlanMaterialization,
+    BenchmarkLinkStage::LocaleFindingMaterialization,
+];
+
+#[cfg(feature = "benchmark")]
 impl BenchmarkLinkObserver {
     fn new() -> Self {
         Self {
             active: Vec::with_capacity(2),
-            stages: Vec::with_capacity(9),
-            observed: Vec::with_capacity(9),
+            stages: Vec::with_capacity(EXPECTED_BENCHMARK_LINK_STAGES.len()),
+            observed: Vec::with_capacity(EXPECTED_BENCHMARK_LINK_STAGES.len()),
             observation_overhead: Duration::ZERO,
             invariant_failed: false,
         }
@@ -398,24 +411,14 @@ impl BenchmarkLinkObserver {
     ) -> Result<(Vec<BenchmarkLinkStageMeasurement>, Duration), LinkOperationalError> {
         if self.invariant_failed
             || !self.active.is_empty()
-            || self.stages.len() != 9
+            || self.stages.len() != EXPECTED_BENCHMARK_LINK_STAGES.len()
             || self.observed.len() != self.stages.len()
             || self.observed.iter().any(|observed| !observed)
             || self
                 .stages
                 .iter()
                 .map(BenchmarkLinkStageMeasurement::stage)
-                .ne([
-                    BenchmarkLinkStage::SemanticIndexConstruction,
-                    BenchmarkLinkStage::CoverageBaselineSelection,
-                    BenchmarkLinkStage::TypedKeyModelConstruction,
-                    BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
-                    BenchmarkLinkStage::FallbackChainConstruction,
-                    BenchmarkLinkStage::LocaleAwareResolution,
-                    BenchmarkLinkStage::ReachabilityAndPlacement,
-                    BenchmarkLinkStage::FindingAndPlanMaterialization,
-                    BenchmarkLinkStage::LocaleFindingMaterialization,
-                ])
+                .ne(EXPECTED_BENCHMARK_LINK_STAGES)
         {
             return Err(LinkOperationalError::InternalInvariant);
         }
@@ -754,13 +757,17 @@ fn checksum_locale_aware_resolution(
         checksum.write_resolved_scope(0x0c, &reference.reference.scope);
         checksum.write_str(0x0d, reference.reference.domain.as_str());
         checksum.write_selector(0x0e, &reference.reference.selector);
+    }
+    if unmatched_selector_count != 0 {
+        // Every unmatched selector fails against the same request-wide chain table. Hash the two
+        // canonical sets once; their cross product is the complete selector-locale failure relation.
+        checksum.write_u64(0x0f, resolution.chains.len() as u64);
         for (requested_locale, chain) in &resolution.chains {
-            checksum.write_str(0x0f, requested_locale.as_str());
-            checksum.write_u64(0x10, chain.len() as u64);
+            checksum.write_str(0x10, requested_locale.as_str());
+            checksum.write_u64(0x11, chain.len() as u64);
             for locale in chain {
-                checksum.write_str(0x11, locale.as_str());
+                checksum.write_str(0x12, locale.as_str());
             }
-            checksum.write_bool(0x12, false);
         }
     }
     checksum.finish()
