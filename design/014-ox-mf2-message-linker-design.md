@@ -772,6 +772,7 @@ pub enum LinkLimitCounter {
     Definitions,
     CoverageBaselines,
     CoverageBaselineBytesTotal,
+    LocaleResolutionFactsTotal,
     // Later owning decisions add explicit variants; there is no custom-string case.
 }
 
@@ -800,7 +801,7 @@ pub struct LinkLimitEvidence {
 }
 ```
 
-The fields are private and exposed read-only through a checked constructor. The fifty-one currently fixed counter variants form a closed set.
+The fields are private and exposed read-only through a checked constructor. The fifty-two currently fixed counter variants form a closed set.
 
 Within the original reference-request, definition-request, delivery-graph, and M0 resolved-policy groups, declaration order matches the non-interleaved local precedence fixed in their owning sections. Later appended variants do not renumber that registry and follow the explicit local phase fixed by their owning milestone.
 
@@ -826,11 +827,13 @@ Their declaration position does not change their owning local precedence. Refere
 
 M1 appends `CoverageBaselines` and `CoverageBaselineBytesTotal` as ordinals 50 and 51 without renumbering the forty-nine existing counters. Their declaration position does not place them after result construction: the resolved-policy phase fixed below runs them after complete M0 policy admission and before scope mapping or semantic analysis.
 
+M2 appends `LocaleResolutionFactsTotal` as ordinal 52 without renumbering the fifty-one existing counters. Its owning semantic preflight runs after selector/root demand construction and suppression but before locale-chain probing or resolution-fact retention. Its declaration position does not place it after finding or plan construction.
+
 The four wire/decoded counter variants' declaration order groups one artifact kind's transport boundaries and does not create cross-artifact-kind precedence. Field-, path-, artifact-, policy-, and result-level variants follow their owning contexts' local phases rather than creating a cross-input group by declaration position.
 
 Declaration order does not silently decide precedence between otherwise independent request-input groups.
 
-Structured adapters use these exact spellings. The common v0.1 counter registry fixes `FallbackSources` and `FallbackTargetsPerSource` ahead of activation so the already documented ordinals of later artifact and selector counters do not shift. They are reserved, unreachable evidence variants in M0/M1: raw configuration cannot name them, `LinkPolicy` has no fallback values, no caller can select a lower value for them, and no M0/M1 operation emits them. M2 activates both counters atomically with the fallback-bearing typed policy, validation, and analysis. This protocol-level ordinal reservation is not acceptance of a dormant configuration field. M1's coverage-baseline counters are additive ordinals 50 and 51 and become active with the coverage-bearing typed policy; M0 cannot select or emit them.
+Structured adapters use these exact spellings. The common v0.1 counter registry fixes `FallbackSources` and `FallbackTargetsPerSource` ahead of activation so the already documented ordinals of later artifact and selector counters do not shift. They are reserved, unreachable evidence variants in M0/M1: raw configuration cannot name them, `LinkPolicy` has no fallback values, no caller can select a lower value for them, and no M0/M1 operation emits them. M2 activates both counters atomically with the fallback-bearing typed policy, validation, and analysis. This protocol-level ordinal reservation is not acceptance of a dormant configuration field. M1's coverage-baseline counters are additive ordinals 50 and 51 and become active with the coverage-bearing typed policy; M0 cannot select or emit them. M2's locale-resolution counter is the additive ordinal 52 and is unavailable before locale-aware resolution activates.
 
 | `LinkLimitCounter` variant            | Structured spelling                       |
 | ------------------------------------- | ----------------------------------------- |
@@ -885,6 +888,7 @@ Structured adapters use these exact spellings. The common v0.1 counter registry 
 | `Definitions`                         | `definitions`                             |
 | `CoverageBaselines`                   | `coverage_baselines`                      |
 | `CoverageBaselineBytesTotal`          | `coverage_baseline_bytes_total`           |
+| `LocaleResolutionFactsTotal`          | `locale_resolution_facts_total`           |
 
 There is no unknown, other, custom, or raw-string counter. Adding a later policy or output counter adds one explicit variant and its ordering/ceiling/subject invariants through the owning compatibility decision rather than accepting an extension string.
 
@@ -894,7 +898,7 @@ There is no unknown, other, custom, or raw-string counter. Adding a later policy
 
 `ArtifactContractError::Limit` is the producer/decoder/checked-constructor boundary for one artifact and carries exactly the same closed `LinkLimitCounter`, effective limit, and `LinkLimitObservation`, but no `LinkLimitSubject`, artifact index, fabricated identity, raw field, or payload excerpt.
 
-Its checked constructor accepts only counters owned by one artifact contract. In particular, `CoverageBaselines` and `CoverageBaselineBytesTotal` are policy-only and are unconstructible as `ArtifactContractError::Limit` even though the shared closed enum contains them.
+Its checked constructor accepts only counters owned by one artifact contract. In particular, `CoverageBaselines`, `CoverageBaselineBytesTotal`, and `LocaleResolutionFactsTotal` are policy/link-only and are unconstructible as `ArtifactContractError::Limit` even though the shared closed enum contains them.
 
 The counter itself identifies the artifact kind and wire-versus-decoded budget. `ReferenceArtifactWireBytes` and `DefinitionArtifactWireBytes` occur only at serialized production/ingestion and never in `LinkLimitEvidence`, because `link` receives typed artifacts and cannot reconstruct an honest wire length.
 
@@ -1337,6 +1341,8 @@ These path counters never accept `Request`, a raw or partial path or segment, an
 
 `ProductionLocales`, `FallbackSources`, `ConfiguredRoots`, `CoverageBaselines`, and `CoverageBaselineBytesTotal` require `LinkLimitSubject::ResolvedPolicy`; `FallbackTargetsPerSource` requires the exact checked and unique `FallbackSource(locale)` selected by the canonical source-order pass.
 
+`LocaleResolutionFactsTotal` requires only `LinkLimitSubject::Request`. It never retains one key, locale, selector, reference record, configured root, chain, definition, or occurrence index as public limit evidence.
+
 `LocaleBytes` requires `DefinitionArtifactGroup(source)` for a definition occurrence and `ResolvedPolicy` for any production, fallback-source, fallback-target, or coverage-baseline occurrence; it never accepts `Request`, `FallbackSource`, a raw locale, or an occurrence index.
 
 A later locale- or scope-bearing context must add its one bounded owning subject explicitly rather than reuse an unrelated subject. Every other mismatched counter/subject pair is unconstructible.
@@ -1386,6 +1392,8 @@ The prior accepted total is at most 100,000,000 and one evaluation contributes a
 `CoverageBaselines` uses the canonical first-over observation `Exact(effective_limit + 1)`. Known-length construction preflights the bounded occurrence vector, streaming construction stops before retaining the first excess occurrence, and its 4,096 ceiling makes `ArithmeticOverflow` unconstructible.
 
 `CoverageBaselineBytesTotal` records the exact checked running total after adding the complete current scope-name plus locale charge. Each occurrence contributes at most 510 bytes and the prior accepted total is at most 2,088,960 bytes, so the first attempted total is at most `2,089,470`; `ArithmeticOverflow` is unconstructible for every valid effective limit.
+
+`LocaleResolutionFactsTotal` uses `Exact(effective_limit + 1)`. Its canonical preflight uses capped checked multiplication and addition and stops as soon as the first logical-demand or unmatched-selector group would cross the effective limit; it never reports the complete potentially much larger product. Its 4,000,000 ceiling makes `ArithmeticOverflow` unconstructible for every valid effective limit.
 
 For other counters, `ArithmeticOverflow` is used only when checked length conversion, group-subtotal addition, or request-total addition cannot produce an exact `u64` attempted value.
 
@@ -3081,7 +3089,7 @@ It never recursively splices in a target locale's own configured sequence; that 
 
 Either case rejects the complete policy after accounting. Reciprocal references across different source arrays are finite and valid under this non-recursive model rather than being a graph cycle: for example, `en: [fr]` and `fr: [en]` each define a separate two-locale resolution order.
 
-M2 performs no global fallback-DAG expansion, cycle breaking, visited-set truncation, or inferred transitive suffix. Omission is the only canonical no-fallback form.
+M2 performs no global fallback-DAG expansion, cycle breaking, visited-set truncation, or inferred transitive suffix. Omission of a source member is the only canonical no-fallback form for that source. At the enclosing configuration-field level, omitted `fallback` and explicit `{}` both construct the same empty canonical table.
 
 A submitted explicit empty fallback array first charges its source occurrence and passes the zero target-count boundary, then rejects the complete policy; it is never accepted, normalized to omission, or retained as a second representation of the same semantics.
 
@@ -3097,7 +3105,7 @@ Every collection ceiling charges submitted occurrences before scalar validation,
 
 A duplicate, malformed, out-of-set, or otherwise later-rejected locale, fallback source, fallback target, or root therefore consumes one unit and receives no deduction from map overwrite, filtering, deduplication, equality, interning, cache reuse, partitioning, or parallel validation.
 
-Configuration decoders must detect and count duplicate object members before a map-like representation could overwrite them, and direct checked construction must expose an occurrence-preserving bounded input rather than accepting an already lossy map.
+Configuration decoders must detect duplicate object members before a map-like representation could overwrite them. The built-in JSON/JSONC route rejects them at the 006-owned parse boundary and does not charge them to policy counters; every other configuration adapter must expose the equivalent parse-boundary failure. Direct checked policy construction is a separate boundary: it accepts occurrence-preserving bounded input and counts every submitted typed occurrence rather than accepting an already lossy map.
 
 Known lengths are preflighted before retaining proportional values; streaming adapters stop before admitting the first occurrence above the applicable effective limit. Each collection supports the common caller-selected lower immutable budget rule.
 
@@ -3221,7 +3229,9 @@ Examples include `ambiguous-message-definition`, `unresolved-message`, strict-mo
 
 It returns neither partial findings nor partial plans. Producer, resource-extraction, configuration-I/O, and exporter failures occur outside this call and remain owned by their respective layers; an integration maps them together with `LinkOperationalError` into its user-facing operational-error surface.
 
-M1's `CoverageBaselineMissingKey` is one such invalid-request result. It returns no `LinkOutcome`, even when an earlier canonical scope could have produced a complete model. No finding, bundle plan, typed-key model, private baseline snapshot, or stale result survives that failed invocation.
+M1's `CoverageBaselineMissingKey` is one such invalid-request result. It returns no `LinkOutcome`, even when an earlier canonical scope could have produced a complete model. No finding, bundle plan, typed-key model, private baseline snapshot, or stale result survives that M1 invocation.
+
+M2 replaces this milestone-specific failure with the complete coverage-analysis result fixed below. A baseline gap then returns successful analysis with no model for the affected scope and exact non-blocking `orphaned-translation` findings. It is no longer an operational error after M2 activation.
 
 ### Finding result limits
 
@@ -3589,9 +3599,9 @@ Every admitted `MessageReference` record is one distinct semantic observation. T
 
 Two call sites that make the same lookup therefore remain two findings. The same rule applies when an origin is absent, as for a stripped native artifact: missing presentation coordinates do not make distinct records equal.
 
-In M2, one reference may fail resolution for several requested locales. It still produces one `unresolved-message`; its typed evidence contains the complete non-empty set of failing requested locales and each exact probed fallback chain in canonical locale order.
+In M2, one reference may fail resolution for several requested locales and, for a bounded selector, several resolved keys. It still produces one `unresolved-message`; its typed evidence contains the complete homogeneous selector-level or key-level failure set and each exact probed fallback chain in the canonical order fixed by the M2 implementation contract.
 
-A locale whose chain resolves is absent from that evidence. The vector is never truncated and is bounded by the admitted finite locale policy.
+A selector or key/locale pair whose chain resolves is absent from that evidence. The vector is never truncated and is bounded by the admitted selector, definition, and finite locale limits together with the M2 locale-resolution-fact work limit.
 
 M0 uses the same one-record/one-finding shape with its one fallback-blind resolution result, so activating M2 does not change finding identity or multiply one call site into locale-specific finding records.
 
@@ -3625,11 +3635,11 @@ When the definition side is `Closed`, the baseline key set is the exact set of a
 
 For typed-key generation, the baseline's canonical key set must contain the union of keys defined by every admitted production locale in the same resolved scope-domain pair.
 
-If another locale contains a key absent from the baseline, M1 model construction for that scope fails complete and returns no stale or partial typed-key model; it never silently omits the runtime-resolvable key or widens the generated surface from the union. Beginning with M3, that failure also prevents the ESM exporter from rendering or registering an accessor module for the scope.
+If another locale contains a key absent from the baseline, M1 model construction for that scope fails complete and returns no stale or partial typed-key model; it never silently omits the runtime-resolvable key or widens the generated surface from the union.
 
 Every `LinkOutcome` describes only its current checked request and never carries forward a typed-key model from an earlier outcome. An integration that previously installed a model must treat current definition-side partiality, definition-input unavailability, an applicable late-gate contradiction, or model-construction failure as model absence rather than serving the stale model. It clears affected installed state before asynchronous replacement when an installed-state event can change a model dependency. The editor's non-reused model-generation token and exact dependency-based retention rules are owned by 009; a successful new installation remains new even when its exposed key bytes equal the prior model.
 
-M1 performs this deterministic baseline-versus-union preflight as a generation gate without publishing an `orphaned-translation` linker finding. M2 reuses the same canonical difference as the subject set for that finding.
+M1 performs this deterministic baseline-versus-union preflight as a generation gate without publishing an `orphaned-translation` linker finding. M2 reuses the same canonical difference as the subject set for that finding, replaces the M1 operational failure with successful analysis, and still returns no typed-key model for the affected scope. M3 cannot render or register an accessor module for a scope whose M2 analysis produced that model absence.
 
 For every admitted model key, the same preflight records exactly one unambiguous definition from the configured baseline locale in private `LinkOutcome` state. It records that definition's exact decoded payload and `DefinitionLocation`; it does not copy either into the public key-only model. A blocking duplicate-definition ambiguity produces no plans or model and therefore never leaves M3 preparation to select a winner.
 
@@ -3761,6 +3771,312 @@ Both descriptors use the ordinary messages boundary framing: `before_<boundaryId
 `project_link_e2e` may contain both boundaries. No other active boundary may contain them, and neither boundary may contain another interval. `coverage_baseline_selection` covers canonical resolved-baseline traversal, completeness/ambiguity gating, and exact selected-definition identity collection. `typed_key_model_construction` covers baseline-versus-union comparison, public model construction, private relation construction, and their checked result admission.
 
 The M1 benchmark profile adds one `typed-key-model` generated fixture with exact variant `typed_key_model` at scales `16`, `64`, and `256`. Each scale contributes one required in-process duration case for each cost. Activating these cases advances both the messages result-schema version and benchmark-profile revision. Timing values remain observational and receive no CI threshold.
+
+### M2 Fallback-Aware Linking Implementation Contract
+
+M2 is one atomic product-contract transition. It activates the fallback policy, locale-aware resolution, locale-aware findings, configuration field, schema, semantic cache identity, and benchmark phase together.
+
+A build cannot expose a fallback-bearing policy while ignoring it during resolution. It also cannot accept raw `messages.fallback`, activate only its reserved counters, or construct locale-aware findings that are unreachable from the ordinary project-link path.
+
+#### M1 coverage-gap transition
+
+M1 treats the first baseline-versus-union difference as `InvalidRequestError::CoverageBaselineMissingKey` and returns no `LinkOutcome`. That behavior is the M1-only milestone boundary, not a second runtime mode retained after M2 activation.
+
+M2 replaces that operational failure with one complete canonical coverage-analysis result per resolved scope. The analysis has exactly one of these states:
+
+- `NotSelected` when the scope has no resolved coverage baseline;
+- `Partial` when definition completeness is `Partial`;
+- `Model` when the closed scope has no ambiguity and its baseline contains the complete production-locale key union; or
+- `ModelUnavailable` for a closed scope, retaining the complete canonical ambiguous-key set and baseline-versus-union difference, with at least one of those sets non-empty.
+
+`ModelUnavailable` excludes every ambiguous logical key from the baseline-versus-union comparison but still computes the complete difference for all other keys. It constructs no typed-key model and no private baseline-source relation for that scope. It never truncates to the first key, widens the model from the union, or returns a model containing only the baseline subset.
+
+The linker continues analysis for every other scope and projects the complete unambiguous difference into `orphaned-translation` findings. An ambiguity suppresses only derivatives of its exact logical key; it does not suppress orphan findings for independent keys in the same closed scope. Models for independent `Model` scopes remain available. Ordinary locale-aware bundle plans remain available when no independently blocking finding exists because coverage findings are non-blocking.
+
+This changes the M1 failure surface without changing M1 model semantics: a scope with a coverage gap still has no model, partial model, or stale model. A later M3 exporter must not render a typed accessor for that scope merely because ordinary locale assets remain plannable.
+
+At the mutable pre-v1 `0.1` Rust boundary, M2 removes `InvalidRequestError::CoverageBaselineMissingKey` rather than retaining an unreachable public compatibility variant. The canonical difference becomes a private checked analysis fact. Existing M1 tests are migrated to assert model absence plus exact orphan findings; M1 success cases and model bytes remain unchanged.
+
+#### Fallback policy API
+
+M2 adds one occurrence-preserving public policy entry:
+
+```rust
+pub struct LocaleFallback {
+    source: Locale,
+    targets: Box<[Locale]>,
+}
+
+impl LocaleFallback {
+    pub fn new(source: Locale, targets: Vec<Locale>) -> Self;
+    pub fn source(&self) -> &Locale;
+    pub fn targets(&self) -> &[Locale];
+}
+```
+
+`LocaleFallback::new` only groups already checked opaque `Locale` values. It does not establish production-set membership, non-empty targets, self-reference freedom, target uniqueness, canonical source order, or policy admission. Those relational checks require the complete submitted policy and remain owned by `LinkPolicy::try_new`.
+
+The M2 constructor boundary is:
+
+```rust
+impl LinkPolicy {
+    pub fn try_new(
+        production_locales: Vec<Locale>,
+        fallbacks: Vec<LocaleFallback>,
+        configured_roots: Vec<ConfiguredRoot>,
+        coverage_baselines: Vec<CoverageBaseline>,
+        dynamic_references: DynamicReferenceMode,
+        placement: PlacementPolicy,
+        limits: &LinkLimits,
+    ) -> Result<Self, LinkOperationalError>;
+
+    pub fn fallbacks(&self) -> &[LocaleFallback];
+}
+
+impl ResolvedLinkPolicy {
+    pub fn fallbacks(&self) -> &[LocaleFallback];
+    pub fn fallback_targets(&self, source: &Locale) -> &[Locale];
+}
+```
+
+The submitted `Vec<LocaleFallback>` is deliberate. A direct caller cannot pass an already lossy map. `LinkPolicy` retains entries only after complete limit and semantic admission, sorts them by exact source-locale bytes, and preserves each target slice exactly in declared priority order.
+
+No fallback entry is changed by scope mapping. `ResolvedLinkPolicy` owns the same canonical semantic table after the existing root and baseline mapping passes. `fallback_targets` returns the stored targets or the same shared empty slice for an omitted source; it does not allocate, prepend the source, recursively expand another entry, or perform locale negotiation.
+
+An empty submitted fallback vector is valid. In unified configuration, omitted `fallback` and explicit `{}` both resolve to that same empty vector, checked policy, request identity, findings, and plans. An explicit source member with an empty target array remains invalid and is never normalized to the empty table.
+
+Canonical policy equality and semantic request/result cache identity include each source followed by its ordered targets. Source-member permutations therefore compare equal after construction. Target-order permutations compare unequal even when they contain the same locales.
+
+Fallback does not enter reference-artifact, definition-artifact, JS producer, resource extraction, or artifact-codec cache identity. Caller-selected lower limits also remain outside semantic identity. Every cached or directly reused policy is revalidated against the current limits before semantic work.
+
+#### Fallback policy failures and admission
+
+M2 adds these bounded typed invalid-request variants:
+
+```rust
+pub enum InvalidRequestError {
+    DuplicateFallbackSource(Locale),
+    FallbackSourceNotProduction(Locale),
+    EmptyFallbackSequence(Locale),
+    FallbackTargetNotProduction { source: Locale, target: Locale },
+    FallbackSelfReference(Locale),
+    DuplicateFallbackTarget { source: Locale, target: Locale },
+    // existing active variants
+}
+```
+
+All retained locales have already passed the shared 255-byte protocol ceiling. These variants retain no source occurrence index, complete target vector, raw configuration member, or worker identity. They return no partial policy, request, finding, plan, or cache entry.
+
+M2 changes the existing `FallbackSources` and `FallbackTargetsPerSource` counter metadata from `Reserved` to `Active` without changing their enum ordinals, structured spellings, or protocol ceilings.
+
+- `FallbackSources` accepts only `LinkLimitSubject::ResolvedPolicy`.
+- `FallbackTargetsPerSource` accepts only the exact checked `LinkLimitSubject::FallbackSource(source)` selected in canonical source order.
+- every policy-owned `LocaleBytes` failure continues to use `ResolvedPolicy`, including fallback sources and targets.
+
+The direct constructor and lower-limit revalidation use the existing eighteen non-interleaved policy phases exactly:
+
+1. preflight production locales;
+2. preflight fallback sources;
+3. preflight configured roots;
+4. preflight coverage baselines;
+5. revalidate all production-locale bytes;
+6. validate the non-empty duplicate-free canonical production set;
+7. revalidate all fallback-source locale bytes;
+8. validate source membership, reject duplicate sources, and establish canonical source order;
+9. preflight every target count in canonical source order;
+10. revalidate target locale bytes in canonical source and declared target order;
+11. validate target membership, non-empty sequences, self-reference freedom, and target uniqueness;
+12. revalidate configured-root scope bytes;
+13. validate and canonicalize configured roots;
+14. revalidate coverage-baseline scope bytes;
+15. revalidate coverage-baseline locale bytes;
+16. account aggregate coverage-baseline bytes;
+17. validate and canonicalize coverage baselines; and
+18. perform remaining policy-dependent request semantics.
+
+Within phase 8, production-set membership is checked for every source in exact checked-locale order before the smallest equal duplicate source is selected. Within phase 11, one complete target-membership pass runs first in canonical source and declared target order. It is followed by the smallest canonical empty source, then the first self-reference, then the first repeated target under the same source/target traversal order. An earlier subpass always wins over a later one.
+
+An over-limit target sequence may be detected with bounded provisional state while ingesting input, but duplicate-source rejection in phase 8 still wins publicly over phase 9. Once sources are unique, phase 9 selects the first failing source in canonical source order and reports exactly `Exact(effective_limit + 1)`.
+
+M2 adds no fallback-entry aggregate counter, generic policy-locale aggregate, complete target-vector evidence, or limit deduction for equal values. Under protocol defaults, the table remains bounded by 1,024 sources, 64 targets per source, 65,536 total target occurrences, and the existing per-occurrence locale-byte ceiling.
+
+#### Resolution-chain construction
+
+One link invocation constructs one private immutable resolution-chain table after semantic-index and M1 coverage analysis and before reference resolution. It visits every canonical production locale exactly once.
+
+For source `S`, the retained chain is `S` followed by the exact stored target slice. A source without an entry retains the one-element chain `[S]`. Every chain is non-empty and contains each locale at most once by policy construction.
+
+The table never follows the target locale's own entry. For example, `ja-JP: [ja, en]` retains exactly `[ja-JP, ja, en]` even when `ja: [en]` is also present. Reciprocal entries remain independent finite chains.
+
+This request-local table is the only chain representation used by reference resolution, finding evidence, and plan selection. Those stages may borrow or immutably share it but cannot rebuild, shorten, reorder, or append to a chain.
+
+#### Logical demands and locale-aware resolution
+
+Selector expansion and locale selection remain separate checked operations.
+
+An `Exact` selector contributes its exact domain-qualified key as a logical demand even when no definition currently exists. `Prefix`, `Pattern`, and `AllInScope` contribute the canonical keys they match in the semantic index. An unmatched non-exact bounded reference selector has one selector-level unresolved result rather than an invented key; the same configured-root selector contributes no key and no reference-owned failure. `UnboundedDynamic` retains its strict/compat behavior and never produces `unresolved-message`.
+
+In compat mode, `UnboundedDynamic` contributes every current unambiguous logical key in its exact scope-domain pair to the shared demand union. Locale resolution may therefore select definitions and emit missing-translation findings for those keys, but a chain failure remains covered only by the record's non-blocking unbounded-dynamic finding. In strict mode the record contributes no logical demand because it does not pretend to resolve a bounded key set and its dedicated finding already withholds every plan.
+
+The linker forms the canonical union of logical keys selected by references and configured roots. Before probing, it applies the M2 `locale_resolution_facts_total` request-work limit:
+
+| `LinkLimits` counter | Counted unit | Initial protocol ceiling | Observation |
+| --- | --- | --: | --- |
+| `locale_resolution_facts_total` | One retained unique `(logical key, requested locale)` cell plus one selector-level failure cell for each unmatched non-exact reference and requested locale. | `4,000,000` | `Exact(effective_limit + 1)` |
+
+Ambiguous keys and definition-partial scopes are suppressed before this count because they retain no locale-resolution fact. Equal logical demands from several references or roots share one key/locale cell. Unmatched non-exact selectors remain reference-local because their eventual unresolved evidence has no logical key to share. Exact absent-key demands participate through their canonical logical identity and can share one failed key/locale cell.
+
+The preflight visits canonical logical identities first and unmatched reference identities second. Within each group, requested locales use canonical policy order. It uses capped checked arithmetic, stops at the first attempted cell above the effective limit, and returns `LocaleResolutionFactsTotal`, `LinkLimitSubject::Request`, and exactly `Exact(effective_limit + 1)` before retaining any cell or probing a chain.
+
+The counter has an independent caller-selected lower limit, is not semantic identity, and is revalidated for cached input. Zero accepts only a request with no retained key/locale or unmatched-selector cells. Dedupe according to the exact cell identity is part of the counted unit; cache reuse, interning, worker partitioning, or equal selected definitions provide no additional deduction.
+
+For each admitted key/locale cell, the linker probes the one retained chain and selects the first unique definition. The private resolution fact retains:
+
+- logical scope, domain, and key;
+- requested locale;
+- the exact non-empty probed prefix;
+- selected definition locale, payload, and `DefinitionLocation` on success; or
+- the complete failed chain on failure.
+
+The same `(logical key, requested locale)` fact is reused by every equal reference demand, reachability placement, missing-translation projection, and bundle-plan projection. Finding and plan stages never repeat winner selection. Facts retain checked identities and indices into immutable request-owned chains/definitions rather than duplicating locale strings, payloads, or locations per cell; public outcomes remain fully owned after final projection.
+
+Configured roots remain explicit reachability policy rather than reference observations. They use the same locale-resolution facts for plan selection but produce no reference-owned `unresolved-message` or `missing-translation`. A root selector that matches no logical key contributes no placement. If one root-selected logical key has no selected definition for a requested chain, that locale plan omits the key; projects that require a diagnostic for an external call site provide a complete external reference artifact rather than a synthetic root identity.
+
+Definition-partial scopes suppress absence-dependent resolution findings. An ambiguous logical key is excluded from successful resolution and suppresses unresolved, missing, orphaned, and unused derivatives for every locale of that key. Neither condition selects a first or last definition.
+
+#### Unresolved failure API and granularity
+
+M2 replaces the M0 struct-only `ResolutionFailure` with a closed typed union so bounded selectors can retain key-specific failures without fabricating a key for an unmatched selector:
+
+```rust
+pub enum ResolutionFailure {
+    Selector(SelectorResolutionFailure),
+    Message(MessageResolutionFailure),
+}
+
+pub struct SelectorResolutionFailure {
+    requested_locale: Locale,
+    probed_locales: Box<[Locale]>,
+}
+
+pub struct MessageResolutionFailure {
+    key: CatalogKey,
+    requested_locale: Locale,
+    probed_locales: Box<[Locale]>,
+}
+```
+
+Each public type has read-only accessors for exactly its fields and no public constructor or setter. `ResolutionFailure` exposes read-only variant access through exhaustive matching; it has no nullable key field, generic payload, custom variant, or deserializer.
+
+One `UnresolvedMessageFinding` still represents at most one reference record. Its failure vector is homogeneous:
+
+- an unmatched non-exact bounded selector contains one `Selector` failure per requested locale; or
+- an exact demand or a selector with matched logical keys contains one `Message` failure per failed `(key, requested locale)` pair.
+
+`Selector` failures are ordered by requested locale. `Message` failures are ordered by canonical key and then requested locale. Every `probed_locales` slice is the exact complete failed chain and begins with `requested_locale`. Successful pairs are absent.
+
+The machine codec adds exact failure token `kind: "selector"` or `kind: "message"`. A message failure places canonical `key` immediately after `kind`; both variants then place `requestedLocale` and `probedLocales`. The parent evidence continues to carry the resolved scope, domain, selector, reason, origin, and delivery unit.
+
+M0 fallback-blind construction migrates to the same union shape: an absent exact key is a one-locale `Message` failure, while an unmatched non-exact selector is a one-locale `Selector` failure. M2 extends only the number and contents of checked locale probes.
+
+#### Missing and orphaned translation findings
+
+A successful reference-key resolution emits `missing-translation` exactly when `selected_locale != requested_locale`. It emits one finding per `(ReferenceRecordIdentity, requested locale, key)` and retains the probed prefix from the requested locale through the selected locale, inclusive.
+
+Exact-locale success emits no missing finding. Several references selecting the same key remain separate. One bounded selector selecting several affected keys emits separate findings. Configured roots do not synthesize a reference identity and therefore do not emit this finding.
+
+For every `ModelUnavailable` scope with a non-empty baseline-versus-union difference, M2 emits one `orphaned-translation` for every exact non-baseline definition whose unambiguous key is absent from the baseline. The subject uses resolved scope, domain, key, and definition locale. Evidence uses the configured baseline locale and exact definition location.
+
+A key defined in several non-baseline locales produces one finding per definition. A scope without a baseline produces none. Partial scopes and every locale of an ambiguous logical key remain suppressed before candidate construction.
+
+Locale-aware candidates join the existing finding union in its already fixed kind order. Suppression occurs before `FindingsTotal` and `FindingBytesTotal` accounting. The builder carries one global budget from preceding ambiguity candidates, accounts each unresolved, missing, and orphaned candidate in canonical order before retaining it, and then passes the budget to later finding kinds. Message failures additionally charge their key bytes; failure-kind tags and enum discriminants charge zero bytes.
+
+The builder never allocates from an unbounded multiplicative estimate. It stops before retaining the first candidate or complete failure element that exceeds either effective limit, drops every internal prefix, and returns no finding vector, plans, models, or stale result. Canonical construction order makes a separate sort of locale candidates unnecessary; final outcome construction still verifies the complete union order.
+
+`missing-translation` and `orphaned-translation` remain non-blocking. `unresolved-message` remains blocking. A successful outcome containing only locale-coverage findings can retain bundle plans; any independently blocking finding withholds the complete plan set.
+
+#### Locale-aware bundle plans
+
+Reachability continues to use logical identities. Plan materialization uses the shared locale-resolution facts to select one definition for every reachable `(logical key, requested locale)` pair.
+
+Each `MessageBundlePlan` remains keyed by delivery unit and requested production locale. Each retained `ResolvedMessage` stores the selected definition's exact locale, payload, and location. A fallback-selected definition is not repartitioned into its source locale's plan.
+
+`ResolvedMessagesTotal` counts every retained plan-message occurrence. Equal fallback selection in two requested-locale plans counts twice. `BundlePlanBytesTotal` charges the requested plan locale and every selected definition field in the existing canonical plan order. Shared immutable storage, equal payloads, equal locations, or cache reuse give no deduction.
+
+Every production locale still receives one plan per delivery unit, including an empty plan. A blocking finding prevents all plan-count and plan-byte work under the existing precedence.
+
+#### Configuration and schema activation
+
+M2 appends optional `messages.fallback` after complete M1 `coverageBaseline` validation. Its raw shape is an object whose property names are source locales and whose values are ordered locale arrays.
+
+- omission and `{}` resolve to the same empty table;
+- the object admits at most 1,024 submitted source members;
+- each target array contains 1 through 64 submitted occurrences;
+- JSON Schema applies `minLength: 1` and `maxLength: 255` to source names and targets as a code-point prefilter;
+- authoritative runtime admission applies the exact UTF-8 byte limit and production-set membership;
+- target arrays use `uniqueItems: true`, while runtime duplicate checks remain authoritative; and
+- `additionalProperties` permits only the target-array schema.
+
+The built-in JSON/JSONC parser rejects duplicate object members, including equal fallback source members, as the existing 006-owned `config_parse_failed` before section-local validation. It does not first/last-win them into a map. Another structured adapter must preserve duplicate occurrences and expose the equivalent parse-boundary failure.
+
+After parse admission, every fallback shape, count, scalar, membership, empty-sequence, self-reference, and repeated-target violation uses `invalid_message_fallback`. The narrowest field-wide failure points to `/messages/fallback`; a source-local failure points to `/messages/fallback/<escaped-source>`; and a target-local failure points to its exact array occurrence.
+
+A source name that has not passed the shared locale-byte ceiling uses the field-wide pointer so an unbounded rejected member name is never copied into JSON Pointer evidence. After the source is checked, source- and target-local pointers are bounded by that identity and array index. Rejected scalar `value`, semantic duplicate `firstPointer`, and limit `limit` / `observed` fields follow the common bounded config-evidence contract above.
+
+Section-local fallback validation uses this complete order:
+
+1. require an object when the field is present;
+2. preflight the submitted source-member count;
+3. decode every source name into `Locale` in exact raw UTF-8 member-name order;
+4. check every source against the canonical production set;
+5. require every member value to be an array in canonical checked-source order;
+6. preflight every target count in that source order;
+7. decode every target scalar and locale bytes in source and array order;
+8. check target production membership;
+9. reject the first canonical empty sequence;
+10. reject the first self-reference; and
+11. reject the first repeated target, selecting its later index and earlier equal index.
+
+An earlier complete pass wins over every later pass. JSON member enumeration, schema property order, map layout, cache state, and worker completion cannot change the selected pointer or evidence.
+
+Configuration validates the complete `messages` field order first: section shape, unknown fields, locales, dynamic references, roots, producers, coverage baseline, then fallback. Only after all fields succeed does checked `LinkPolicy` construction apply its independent eighteen-phase direct-policy precedence. No config or direct-policy failure starts inventory, extraction, production, linking, or cache publication.
+
+The resolved configuration and project-link semantic observation include the canonical fallback table. No new executable command, reporter DTO, plan serialization, filesystem write, `delivery` field, or lint rule becomes active in M2.
+
+#### M2 benchmark boundary
+
+M2 activates three duration costs. Their stable boundary IDs equal their cost tokens, and each uses `one_per_workflow_iteration`:
+
+| Phase / cost | Boundary ID | Prepared input outside the timer | Exact timed work and stopping point |
+| --- | --- | --- | --- |
+| `message_link_fallback` / `fallback_chain_construction` | `fallback_chain_construction` | Checked resolved policy with canonical production locales and fallback entries | Construct every source-prepended immutable resolution chain in canonical production-locale order and retain the complete chain table. Stop before selector expansion or definition lookup. |
+| `message_link_fallback` / `locale_aware_resolution` | `locale_aware_resolution` | Semantic indices, canonical selector/root logical demands, ambiguity/suppression facts, the retained chain table, and effective limits | Apply the canonical `LocaleResolutionFactsTotal` preflight, probe every admitted logical key and requested locale, select exact definitions, and retain complete canonical success/failure facts. Stop before reachability, finding projection, or plan construction. |
+| `message_link_fallback` / `locale_finding_materialization` | `locale_finding_materialization` | Complete locale-resolution facts, coverage-analysis differences, reference identities, suppression facts, and the shared finding budget after ambiguity candidates | Construct unresolved, missing, and orphaned candidates in canonical order, apply their exact `FindingsTotal` and `FindingBytesTotal` contributions, and retain the admitted private candidate vector. Stop before later finding kinds, blocking disposition, or plan construction. |
+
+All three use the ordinary duration framing: `before_<boundaryId>`, `complete_<boundaryId>_output_retained`, the boundary ID as the one included marker, and `fixture_setup`, `warmup`, `checksum_observation`, and `result_aggregation` as excluded markers.
+
+Allowed containment is exact:
+
+- `project_link_e2e` may contain all three M2 boundaries;
+- `link_selector_resolution` may contain `fallback_chain_construction` followed by `locale_aware_resolution` as non-overlapping siblings;
+- `link_finding_plan_materialization` may contain `locale_finding_materialization`; and
+- no M2 boundary may contain another interval or cross either enclosing boundary.
+
+M2 changes `link_selector_resolution` from fallback-blind union resolution to the locale-aware facts above. It also changes M1 `typed_key_model_construction` to retain complete per-scope coverage-analysis results instead of stopping on the first gap. Those versioned boundary and observation changes advance the messages result `schemaVersion` to `2`, `benchmarkProfileRevision` to `3`, and `fixture-selection.json` revision to `3`.
+
+The M2 profile adds generated fixture `locale-fallback-expansion`, revision `1`, exact shape and variant `locale_fallback_expansion`, and scales `16`, `64`, and `256`. Scale `N` creates one canonical baseline locale and `N` non-baseline production locales with one or two explicit targets, closed complete inputs, exact and fallback-selected reference keys, one absent exact key, and one non-baseline-only orphan key. Locale names are fixed-width ASCII so lexical and numeric order agree.
+
+Each scale contributes exactly one required in-process duration case for each M2 cost. The generator creates no ambiguity or partial completeness. It exercises exact hits, first- and second-target hits, complete chain failures, missing findings, and the M2 coverage-gap transition without invoking an exporter or filesystem output.
+
+The three checksum observations are exact:
+
+- `fallback_chain_construction` hashes the canonical production locales followed by every complete source-prepended chain;
+- `locale_aware_resolution` hashes logical key, requested locale, complete probed sequence, and either selected definition locale/source identity or the closed failure tag; and
+- `locale_finding_materialization` hashes the complete typed locale-aware candidate records in canonical finding order.
+
+The updated M1 construction observation hashes each canonical scope's `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and the applicable complete model/relation, ambiguity, and gap identities. It never hashes private allocation layout or human text.
+
+Warmups contribute no timing, counts, or checksums. Every measured repetition must produce the same checksum. Build, execution, active phase/cost table, schema, required tuples, boundary/overlap conformance, checksum codec vectors, and repetition determinism remain CI gates. Elapsed time and memory values remain observational and have no regression threshold.
 
 ### Reachability and unused messages
 
@@ -3920,6 +4236,7 @@ The common component rules are:
 - `DefinitionLocation` compares source-document identity, then entry structural path, then occurrence;
 - locales compare exact UTF-8 bytes;
 - catalog domains and selector variants use their explicit contract precedence before a variant payload;
+- resolution failures order `Selector` before `Message`; selector payloads compare requested locale then probed locales, while message payloads compare key, requested locale, then probed locales;
 - dynamic mode orders `compat` before `strict`;
 - completeness side orders definitions before references; and
 - partial reasons retain their explicit comparison order inside contributor vectors.
@@ -4038,7 +4355,7 @@ The exact subject is the `ReferenceRecordIdentity` object ordered as `artifact` 
 
 The artifact member reuses the exact `ReferenceArtifactIdentity` codec. `ordinal` is the checked zero-based `u32` semantic array position and is serialized here because the finding refers to one record rather than serializing that record inside its parent artifact.
 
-The M3 machine evidence has exact member order `deliveryUnit`, `scope`, `domain`, `selector`, optional `reason`, optional `origin`, then `failures`:
+The M2/M3 machine evidence has exact member order `deliveryUnit`, `scope`, `domain`, `selector`, optional `reason`, optional `origin`, then `failures`:
 
 ```json
 {
@@ -4054,6 +4371,8 @@ The M3 machine evidence has exact member order `deliveryUnit`, `scope`, `domain`
   },
   "failures": [
     {
+      "kind": "message",
+      "key": "/checkout/title",
       "requestedLocale": "ja",
       "probedLocales": ["ja", "en"]
     }
@@ -4063,7 +4382,11 @@ The M3 machine evidence has exact member order `deliveryUnit`, `scope`, `domain`
 
 `scope` is the post-mapping resolved semantic scope. `selector`, and present `reason` or `origin`, reuse the exact checked reference codecs. Absence of either optional is omission, never `null`.
 
-`failures` is non-empty. Its elements are ordered by canonical requested-locale order and contain exactly `requestedLocale` followed by `probedLocales`. Each `probedLocales` array is the complete non-empty fallback chain actually probed, begins with its requested locale, preserves configured fallback priority, and contains no locale that was not probed. Because no definition resolved, it contains no selected definition or location.
+`failures` is non-empty and uses the M2 closed `ResolutionFailure` union. A selector-level element contains exactly `kind: "selector"`, `requestedLocale`, then `probedLocales`. A message-level element contains exactly `kind: "message"`, canonical `key`, `requestedLocale`, then `probedLocales`.
+
+An unmatched non-exact bounded selector uses only selector-level elements in canonical requested-locale order. An exact demand or a bounded selector with matched keys uses only message-level elements in canonical key then requested-locale order. The two variants are never mixed in one finding.
+
+Each `probedLocales` array is the complete non-empty fallback chain actually probed, begins with its requested locale, preserves configured fallback priority, and contains no locale that was not probed. Because no definition resolved for that selector or key, it contains no selected definition or location.
 
 One reference record produces at most one such finding even when several requested locales fail. The vector is complete and never split, truncated, or regrouped by presentation. `blocking` is always `true`.
 
@@ -6458,7 +6781,9 @@ This M3 configuration example contains only the initial supported ESM exporter. 
 
 Whenever the `messages` section is present, `locales` is a required non-empty array and resolves to the one M0 production-locale set. Its accepted count is 1 through 1,024 entries inclusive. There is no omitted default, empty analysis-only mode, catalog-derived inference, or command-specific exception. A project that does not enable the linker omits the complete `messages` section rather than supplying it without `locales`.
 
-M0 and M1 reject `fallback` as an unknown field and their resolved `LinkPolicy` contains no fallback member. M2 adds the field, its occurrence-preserving normalized representation, two fallback-specific counters, validation, cache identity, and fallback-aware analysis atomically.
+M0 and M1 reject `fallback` as an unknown field and their resolved `LinkPolicy` contains no fallback member. M2 adds the field, its occurrence-preserving normalized representation, two fallback-specific policy counters, the locale-resolution work counter, validation, cache identity, and fallback-aware analysis atomically.
+
+At M2, omission and an explicit empty `fallback` object produce the same empty checked table. A present source member still requires a non-empty target array; the empty object is not an alternate representation of an empty source sequence.
 
 Beginning with M2, the production-locale set bounds both emitted locales and every locale that may participate in fallback resolution. A `fallback` member may be present only for a locale in that set, and every locale in its ordered array must also be in the set.
 
@@ -6468,7 +6793,7 @@ The same exact set bounds linker-participating catalog definitions. After both s
 
 At M0, collection limits count submitted `locales` and `roots` before duplicate or semantic validation. M1 additionally counts coverage-baseline occurrences and their aggregate scope-plus-locale bytes. Beginning with M2, they also count fallback-source members and each fallback target array.
 
-Beginning with M2, a JSON/JSONC configuration decoder rejects and charges duplicate `fallback` object members before any ordinary map could overwrite them; another adapter must preserve the same occurrence information through its bounded construction boundary.
+Beginning with M2, a JSON/JSONC configuration decoder rejects duplicate `fallback` object members as `config_parse_failed` before any ordinary map could overwrite them. They never reach fallback-policy counters or `invalid_message_fallback`. Another structured adapter must preserve enough occurrence information to expose an equivalent parse-boundary failure rather than choosing a member.
 
 Every locale spelling in `locales` and, beginning with M2, every fallback source member or fallback target is decoded directly into the shared opaque `Locale` identity and must contain 1 through 255 decoded UTF-8 bytes. Configuration does not trim, canonicalize, validate BCP 47, or rewrite the value before equality and membership checks.
 
@@ -7377,6 +7702,8 @@ Add the `messages.fallback` field, fallback-bearing resolved `LinkPolicy` member
 
 Activate `missing-translation` versus `unresolved-message` and `orphaned-translation` over the locale-bearing M0 artifacts. The orphaned finding reuses M1's canonical baseline-versus-union difference rather than defining a second comparison path.
 
+Promote an M1 baseline gap from the milestone-specific `CoverageBaselineMissingKey` operational error to the complete M2 `ModelUnavailable` analysis state. The affected scope still has no typed-key model, while exact non-blocking orphan findings and independent scope results remain observable.
+
 #### M3 — initial exporter
 
 Establish the initial exporter contract:
@@ -7593,7 +7920,7 @@ The initial M0 duration boundaries are:
 | `message_definition_project` / `definition_projection` | `definition_projection` | Complete successful extraction artifacts after the project-global domain admission stage passes its catalog-domain and recognizer/root-domain gates | Include checked resource-to-contract value conversion, definition-record construction, fingerprint/identity attachment from admitted inputs, and ordinary `MessageDefinitionArtifact` construction. Stop when every projected artifact is retained in canonical primary-source order. |
 | `message_link_core` / `request_validation_and_scope_mapping` | `link_request_validation_scope_mapping` | Complete admitted reference/definition inventories, resolved policy, execution failures, target-scope inventory, effective limits, and the fixed M0 graph/mapping policy | Include empty scope-mapping construction, execution-derived completeness construction, fixed `["main"]` graph construction, aggregate request preflights, artifact/policy admission, scope mapping, and completeness/policy consistency checks. Stop when the complete ordinary checked `LinkRequest` is retained, before the first semantic-index stage marker. |
 | `message_link_core` / `semantic_index_construction` | `link_semantic_index_construction` | Checked mapped request state from the same invocation | Include canonical definition/reference index construction, occurrence accounting, collision/ambiguity fact construction, and required bounded lookup structures. Stop before selector expansion or reference resolution. |
-| `message_link_core` / `selector_expansion_and_reference_resolution` | `link_selector_resolution` | Complete semantic indices from the same invocation | Include bounded selector expansion, exact/prefix/pattern matching, dynamic/degraded classification, locale-independent reference resolution, and canonical resolution facts. Stop before root reachability or placement. |
+| `message_link_core` / `selector_expansion_and_reference_resolution` | `link_selector_resolution` | Complete semantic indices from the same invocation | Include bounded selector expansion, exact/prefix/pattern matching, dynamic/degraded classification, and canonical resolution facts. M0/M1 use fallback-blind union resolution. Beginning with M2, include the nested fallback-chain and locale-aware resolution boundaries fixed above. Stop before root reachability or placement. |
 | `message_link_core` / `reachability_and_placement` | `link_reachability_placement` | Complete canonical resolution facts, configured roots, and admitted delivery graph | Include root expansion, reachability traversal, selected-definition placement, and canonical reachable/placement facts. Stop before finding or bundle-plan materialization. |
 | `message_link_core` / `finding_and_plan_materialization` | `link_finding_plan_materialization` | Complete ambiguity, resolution, degradation, reachability, and placement facts from the same invocation | Include canonical finding construction, blocking disposition, bundle-plan construction or withholding, final limit checks, canonical ordering, and immutable `LinkOutcome` construction. Stop when the ordinary outcome is returned. |
 | `message_project_link_e2e` / `complete_workflow` | `project_link_e2e` | Canonical pre-iteration project snapshot, validated resolved configuration, and empty run-local inventory/cache state | Start before project inventory discovery. Include inventory/metadata I/O, physical grouping, source and external-artifact reads, catalog extraction, definition projection, JS/TS reference production, completeness and request construction, ordinary linking, and deterministic ordered aggregation. Stop when the complete in-process M0 integration result is retained. Exclude configuration loading/validation, snapshot reset, checksum observation, result-schema construction, and reporting. |
@@ -7603,7 +7930,7 @@ M1 appends these duration boundaries:
 | Phase / cost | Boundary ID | Prepared input outside the timer | Exact timed work and stopping point |
 | --- | --- | --- | --- |
 | `message_typed_key_model` / `coverage_baseline_selection` | `coverage_baseline_selection` | Checked mapped request state, complete semantic indices, canonical ambiguity facts, resolved coverage-baseline policy, and definition-side completeness | Include canonical resolved-baseline traversal, completeness and ambiguity gating, construction of the exact baseline and production-union key-set views, and selected baseline-definition identity collection. Stop when the complete canonical selection facts are retained, before set comparison or model allocation. |
-| `message_typed_key_model` / `typed_key_model_construction` | `typed_key_model_construction` | Complete canonical selection facts from the same invocation | Include baseline-versus-union comparison, deterministic offending-key selection, public model construction, private baseline-source relation construction, invariant checks, and checked result admission. Stop when every admitted model and its private relation are retained or the complete fail-without-outcome result is selected. |
+| `message_typed_key_model` / `typed_key_model_construction` | `typed_key_model_construction` | Complete canonical selection facts from the same invocation | Include baseline-versus-union comparison, public model construction, private baseline-source relation construction, invariant checks, and checked result admission. M1 stops when every admitted model/relation is retained or the first complete fail-without-outcome result is selected. Beginning with M2, retain the complete canonical per-scope model or coverage-gap results instead. |
 
 The four input-I/O records expose the file-I/O contribution that the core records deliberately exclude. Output I/O begins at M3 and remains observable through the exact `message_output_register` `staging`, `commit`, and `check_comparison` boundaries; the M3 activation update must distinguish their filesystem operations from capability preflight and path/ownership computation. It does not add a generic platform-I/O subtraction or infer a component by subtracting noisy timings.
 
@@ -7652,15 +7979,15 @@ Public artifacts use their canonical writers or existing product payload fingerp
 | `message_definition_project` / `definition_projection` | Canonical `MessageDefinitionArtifact` bytes for every successfully projected group in canonical primary-source order. |
 | `message_link_core` / `request_validation_and_scope_mapping` | Checked mapped scope table, policy/scope-completeness identities, canonical admitted reference/definition identities, and selected validation outcome. |
 | `message_link_core` / `semantic_index_construction` | Canonical domain-qualified reference and definition index keys, occurrence counts, and ambiguity/collision facts; private table layout and bucket capacity are excluded. |
-| `message_link_core` / `selector_expansion_and_reference_resolution` | Canonical selector expansions and their ordered matched, unresolved, dynamic, and degraded-analysis facts. |
+| `message_link_core` / `selector_expansion_and_reference_resolution` | Canonical selector expansions and their ordered matched, unresolved, dynamic, and degraded-analysis facts. Beginning with M2, matched and unresolved facts include their exact requested-locale resolution observations. |
 | `message_link_core` / `reachability_and_placement` | Canonical reachable key set and ordered `(delivery unit, requested locale, selected definition)` placements. |
 | `message_link_core` / `finding_and_plan_materialization` | Complete canonical `LinkFinding` and `MessageBundlePlan` semantic fields in their product order. |
 | `message_project_link_e2e` / `complete_workflow` | Canonical produced reference and definition artifacts, scope completeness, checked request identity, and final findings/plans. The separately emitted 013 extraction record retains its own checksum and is not rehashed as a nested metric. |
 | `message_typed_key_model` / `coverage_baseline_selection` | Canonical scope/domain baseline selections and their exact selected definition identities. |
-| `message_typed_key_model` / `typed_key_model_construction` | Canonical typed-key model fields and the fixed private model-to-baseline relation required for export preparation. |
+| `message_typed_key_model` / `typed_key_model_construction` | Canonical typed-key model fields and the fixed private model-to-baseline relation required for export preparation. Beginning with M2, each scope first carries its exact `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and every applicable complete model/relation, ambiguity, and gap identity. |
 | `message_link_fallback` / `fallback_chain_construction` | Canonical production locale set and checked ordered fallback chains. |
-| `message_link_fallback` / `locale_aware_resolution` | Canonical requested-locale/key resolutions and selected definition locale/source identities. |
-| `message_link_fallback` / `locale_finding_materialization` | Canonical locale-aware findings and affected identities. |
+| `message_link_fallback` / `locale_aware_resolution` | Canonical logical-key or selector-level identity, requested locale, complete probed sequence, and selected definition locale/source identity or closed failure tag. |
+| `message_link_fallback` / `locale_finding_materialization` | Complete canonical typed locale-aware candidate records and affected identities. |
 | `message_export_prepare` / `selected_message_parse`, `message_semantic_validation` | Canonical selected definition identity followed by parser or semantic outcome category, stable diagnostic code/category/span facts, and successful semantic-model facts consumed by signature derivation. Human diagnostic messages are excluded. |
 | `message_export_prepare` / `portable_diagnostic_mapping` | Canonical portable diagnostics after exact `DefinitionLocation` mapping. |
 | `message_export_prepare` / `argument_signature_derivation` | Canonical model-key argument signatures and their baseline definition identities. |
@@ -7883,7 +8210,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Finding-union fixtures require the exact common field order `kind`, `blocking`, `subject`, and `evidence`; use the outer kind to select one exact closed subject/evidence pair; and reject a nullable superset, opaque maps, redundant nested type or version members, internal Rust serialization, and per-record schema versions.
     - They exercise every per-kind codec with omitted allowed optionals and reject missing, duplicate, unknown, mistyped, cross-kind, and disallowed `null` members. Compatibility is owned only by the command envelope's top-level `schemaVersion`.
     - Ambiguity-codec fixtures require exact resolved `scope`, `domain`, `key`, and `locale` subject order; one evidence member containing at least two complete canonical source-then-entry locations; and `blocking: true`. They reject incomplete or truncated collider sets, a selected winner, payload, fingerprint, producer, alias, host path, span, excerpt, and noncanonical location order.
-    - Unresolved-codec fixtures require exact artifact-then-ordinal reference identity; exact delivery unit, resolved scope, domain, selector, optional reason/origin, then a non-empty failures array; and `blocking: true`. They require one complete canonical failure vector per reference record, requested locale followed by the exact complete probed chain, omission of successful locales, and omission rather than null for absent optionals.
+    - Unresolved-codec fixtures require exact artifact-then-ordinal reference identity; exact delivery unit, resolved scope, domain, selector, optional reason/origin, then a non-empty failures array; and `blocking: true`. They require homogeneous exact `selector` or `message` failure tokens, require canonical key only for `message`, place requested locale before the exact complete probed chain, omit successful pairs, and use omission rather than null for absent optionals.
     - Missing-translation-codec fixtures require one record per reference/requested-locale/resolved-key tuple; exact nested reference, requested locale, and key subject order; exact delivery unit, resolved scope, domain, probed locales, selected locale, and one definition location evidence order; and `blocking: false`.
       - They require the probed vector to begin with the requested locale and end at its unequal first successful locale, require the location's definition locale to equal that selected locale, and reject per-reference aggregation, selector/reason/origin duplication, unprobed fallback suffixes, ambiguous candidate vectors, payload, and a same-locale success.
     - Orphaned-translation-codec fixtures require one record per non-baseline locale definition, exact resolved scope/domain/key/locale subject order, exact baseline locale then one definition location evidence order, unequal subject and baseline locales, and `blocking: false`.
@@ -7926,15 +8253,19 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Schema fixtures require exact object, `minProperties`, `maxProperties`, `propertyNames`, and locale-string constraints in the generated schema and prove that runtime grammar, byte totals, registry membership, and production-locale membership remain mandatory. Evidence fixtures require `invalid_message_coverage_baseline`, the exact field or escaped-member pointer, bounded scalar evidence, and exact limit/observed values, while raw duplicate members remain `config_parse_failed`.
   - Precedence fixtures run complete shape, count, canonical scope-name scalar, canonical locale scalar, aggregate-byte, scope-membership, and locale-membership passes in that order. They permute JSON members, maps, caches, partitions, and worker completion and require the same first violation without partial configuration, discovery, policy, or link work.
   - Direct-policy limit fixtures charge every occurrence before semantic rejection, exercise protocol and lower `CoverageBaselines` and `CoverageBaselineBytesTotal` boundaries, select `ResolvedPolicy`, and require first-over or exact-running-total evidence as applicable. Checked-addition tests prove that both counters remain below arithmetic overflow under protocol and lower ceilings and reject fabricated `ArithmeticOverflow` evidence for either counter.
-  - Policy-error fixtures exercise `DuplicateCoverageBaseline`, `CoverageBaselineLocaleNotProduction`, `ResolvedCoverageBaselineConflict`, and `CoverageBaselineMissingKey` as distinct checked invalid-request variants with bounded typed evidence. They require the configured-root pass to precede baseline mapping, exact locale-byte ordering for a mapped conflict, and top-level `message_link_failed` / `invalid_request` with no outcome.
+  - Policy-error fixtures exercise `DuplicateCoverageBaseline`, `CoverageBaselineLocaleNotProduction`, and `ResolvedCoverageBaselineConflict` as distinct checked invalid-request variants with bounded typed evidence. They require the configured-root pass to precede baseline mapping, exact locale-byte ordering for a mapped conflict, and top-level `message_link_failed` / `invalid_request` with no outcome. M1 milestone goldens retain the historical `CoverageBaselineMissingKey` failure, while the M2 API-surface fixture proves that variant is removed and cannot be emitted after locale-aware analysis activates.
   - Custom-mapping fixtures merge equal baseline locales from different declared scopes only after checked scope resolution and reject unequal locales as one fail-complete linker `invalid_request` before coverage, model construction, findings, or plans. Built-in empty-table fixtures preserve configuration duplicate-member rejection without normalization.
-  - Completeness fixtures route a definition-partial configured scope through the existing blocking `degraded-analysis` result and produce no typed-key model for that scope without a second config or operational error. They accept a definition-closed empty baseline set, fail the ordinary baseline-versus-union gate when another production locale supplies a key, and accept an empty model when every production locale is empty. Integration fixtures clear an affected previously installed model before asynchronous replacement whenever a current definition dependency can change or become unavailable, expose absence after partiality, late-gate contradiction, or construction failure, and never serve the stale model.
-  - Baseline-versus-union fixtures accept equal sets and baseline-only keys, reject every non-baseline-locale-only key fail-complete before constructing a model, preserve canonical offending-key order under input and worker permutations, select the smallest canonical defining non-baseline locale for evidence, and make M2 expose the same difference as `orphaned-translation` without changing M1 model semantics.
+  - Completeness fixtures route a definition-partial configured scope through the existing blocking `degraded-analysis` result and produce no typed-key model for that scope without a second config or operational error. They accept a definition-closed empty baseline set and an empty model when every production locale is empty. M1 goldens fail the ordinary baseline-versus-union gate when another production locale supplies a key; M2 fixtures instead retain complete `ModelUnavailable` analysis, produce no model for that scope, and continue analysis. Integration fixtures clear an affected previously installed model before asynchronous replacement whenever a current definition dependency can change or become unavailable, expose absence after partiality, late-gate contradiction, or a current coverage gap, and never serve the stale model.
+  - Baseline-versus-union fixtures accept equal sets and baseline-only keys. M1 goldens reject the first canonical non-baseline-only key fail-complete. M2 fixtures retain every non-baseline-only key in the same canonical difference, emit one `orphaned-translation` per exact non-baseline definition, construct no affected-scope model, retain independent scope results, and never create a second comparison path.
 - M1 typed-key model fixtures construct one deterministic language-neutral key-only model per canonical resolved scope with a baseline and expose no CLI leaf, generated source bytes, output path, registration operation, or `--check` flag. A resolved scope without a baseline produces no model, error, or finding and is never widened from the definition union, fallback order, locale order, catalog size, or open-document evidence.
   - Cross-platform fixtures prove the model contains only resolved scope plus canonical domain-qualified keys and contains no parsed MF2 state, argument signature, TypeScript module, declaration-merging, path, runtime-binding, destination, or manifest assumptions.
   - Outcome fixtures require one private exact baseline definition snapshot for every admitted model key, reject a missing, extra, or mismatched relation, and prove that neither the model nor another public linker accessor exposes the payload or location.
-  - Determinism fixtures require identical public models and private relations under definition-artifact, locale, scope-mapping, and worker permutations and under producer/cache miss and hit paths. Failure-after-success fixtures clear every prior model when current completeness becomes partial, ambiguity appears, or baseline-versus-union comparison fails; no invocation may return a model prefix, stale relation, finding, or plan alongside `CoverageBaselineMissingKey`.
+  - Determinism fixtures require identical public models and private relations under definition-artifact, locale, scope-mapping, and worker permutations and under producer/cache miss and hit paths. Failure-after-success fixtures clear every prior model when current completeness becomes partial or ambiguity appears. M1 goldens return no result beside `CoverageBaselineMissingKey`; M2 fixtures return no affected-scope model or stale relation, retain complete orphan findings and independent models, and preserve plans when no independently blocking finding exists.
   - Ambiguous baseline definitions produce the existing blocking outcome with no plans or model and never reach export preparation as a first/last-wins source choice.
+- M2 fallback-config fixtures accept field omission and explicit `{}` as the same empty checked table. They accept 1,024 source members and 64 targets per source, reject each first-over boundary, require non-empty target arrays, and preserve target priority while canonicalizing source-member permutations.
+  - Schema fixtures require an object with at most 1,024 properties, 1-through-255-code-point property-name prefilters, 1-through-64-item target arrays, 1-through-255-code-point target prefilters, and `uniqueItems: true`. Runtime fixtures remain authoritative for UTF-8 byte limits, production-set membership, self-reference, duplicate targets, and exact opaque locale equality.
+  - JSON/JSONC duplicate source members remain the 006-owned `config_parse_failed` and never reach a lossy map. Section-local failures use `invalid_message_fallback`, the narrowest escaped source or target pointer, optional earlier `firstPointer`, and exact `limit` / `observed` evidence without starting inventory or policy construction.
+  - Config-order fixtures complete M1 `coverageBaseline` validation before `fallback`, while direct-policy fixtures independently enforce the eighteen-phase production/fallback/root/baseline admission order. The two boundaries never reorder each other's failures.
 - M3 typed-key rendering fixtures emit one explicit scope-bound JS/TS accessor module per admitted M1 model and require explicit imports; reject global or ambient `.d.ts` augmentation, cross-scope merging, partial output after model failure, and treatment of `useMessageSet` as a generated accessor.
   - Signature fixtures derive argument information only after the complete delivery-plus-baseline gate succeeds and expose each model with its bounded immutable signatures through the batch's one typed-output accessor.
   - Transaction fixtures register those modules in the same ESM `ExportArtifactSet`, manifest, write transaction, and `emit --check` comparison as locale and loader artifacts; they reject a separate type-generation write path or CLI leaf.
@@ -7973,7 +8304,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
 - Per-artifact decoded-budget precedence fixtures place one field-specific or shape failure against a decoded-total overrun at every adjacent canonical phase for both artifact kinds.
   - They require the current phase's field check before its decoded addition, an admitted payload's decoded overrun before every later phase, and every unfinished earlier phase before that overrun, independently of JSON member order.
   - Streaming fixtures provisionally observe an overrun, retain no payload beyond the effective budget, continue only the bounded syntax/earlier-phase scan needed to select the public result, and produce the same failure as producer, direct-construction, cache, defensive, partitioned, and parallel routes without allocating past the decoded ceiling.
-- Per-artifact limit-contract fixtures require the fifty-one-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, the linker-result counters unchanged at ordinals 36 through 40, `CatalogKeyTokens` unchanged at ordinal 41, the identity/artifact-local collection counters unchanged at ordinals 42 through 49, and the M1 policy counters appended at ordinals 50 and 51, all with their exact snake-case spellings.
+- Per-artifact limit-contract fixtures require the fifty-two-variant closed set with `ReferenceArtifactWireBytes`, `ReferenceArtifactDecodedBytes`, `DefinitionArtifactWireBytes`, and `DefinitionArtifactDecodedBytes` unchanged at ordinals 32 through 35, the linker-result counters unchanged at ordinals 36 through 40, `CatalogKeyTokens` unchanged at ordinal 41, the identity/artifact-local collection counters unchanged at ordinals 42 through 49, the M1 policy counters appended at ordinals 50 and 51, and the M2 locale-resolution counter appended at ordinal 52, all with their exact snake-case spellings.
   - Pairing fixtures reject `CoverageBaselines` and `CoverageBaselineBytesTotal` in every subject-free `ArtifactContractError::Limit`; those variants are valid only with `ResolvedPolicy` in linker operational evidence.
   - Contract-boundary failures use subject-free `ArtifactContractError::Limit`; linker lower-budget revalidation permits only the matching decoded counter with its established artifact-group subject, wire counters are unconstructible in `LinkLimitEvidence`, and every finding- or plan-result counter is unconstructible at every artifact boundary.
   - Wire observations are exactly `Exact(effective_limit + 1)` and decoded observations are the exact attempted running total after one complete admitted payload; none of the four permits `ArithmeticOverflow`.
@@ -7989,7 +8320,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - They reject every cross-artifact envelope field, undeclared path role or field, whole-path failure mislabeled as a segment, whole-alias failure with a fabricated segment, and known-leaf failure collapsed to its container.
   - They map missing or unknown fields without a valid identity to the containing object, map unpositioned UTF-8/JSON failures to root, and reject raw unknown names, rejected values, JSON Pointers, byte offsets, line/column, excerpts, host paths, unbounded vectors, and route-specific optional detail.
   - Decoder, constructor, cache, defensive, member-permutation, escape, whitespace, slice, and reader fixtures select identical semantic code/location pairs, and enum order never changes failure precedence.
-- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all fifty-one counter tokens, and exact/arithmetic-overflow observation shapes.
+- Structured artifact-error adapter fixtures require the exact internally tagged top-level shapes, canonical member orders, three error-kind tokens, sixteen violation-code tokens, exact/stable-range version-support shapes, all fifty-two counter tokens, and exact/arithmetic-overflow observation shapes.
   - They accept every input object-member permutation but reject missing, duplicate, unknown, or required `null` members, Rust enum ordinals, alternate casing, display messages, parser errors, and source chains; canonical round trips reproduce the exact examples above.
 - Artifact-version-support fixtures admit only the Rust/API names `Exact` and `StableRange` and the structured tags `exact` and `stable_range`; reject `DraftExact`, `Stable`, `Compatible`, aliases, alternate casing, and raw strings; and require the checked evidence/support-table boundary to pair `Exact` only with major zero and `StableRange` only with a nonzero stable major.
   - Exact draft and stable range acceptance follow the same negotiation result in direct construction, both typed decoders, both encoders, cache revalidation, and linker admission.
@@ -8040,7 +8371,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
 
 #### Operational-limit evidence fixtures
 
-- **Counter vocabulary:** require all fifty-one closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
+- **Counter vocabulary:** require all fifty-two closed counter variants and the exact snake-case adapter spellings defined in [Link limit evidence](#link-limit-evidence).
   - The list includes `locale_bytes`, `entry_structural_path_bytes`, `catalog_key_bytes`, `catalog_key_tokens`, `message_bytes`, `total_message_bytes`, `catalog_scope_name_bytes`, and `scope_mapping_entries`.
   - Selector and pattern spellings include `selector_path_bytes`, `selector_pattern_bytes`, `selector_pattern_tokens`, `pattern_match_states_total`, and `reason_bytes`.
   - Path spellings include `path_segments`, `path_segment_bytes`, `path_bytes`, `logical_aliases`, and `source_path_bytes`.
@@ -8061,11 +8392,13 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Use `ReferenceArtifactGroup` for an origin.
   - Permit `LogicalAliases` and `SourcePathBytes` only with `DefinitionArtifactGroup`.
 - **Pattern-work subject:** permit `PatternMatchStatesTotal` only with `Request`.
+- **Locale-resolution subject:** permit `LocaleResolutionFactsTotal` only with `Request`; reject a key, locale, selector, reference identity, root, chain, definition, cell index, or worker as evidence.
 - **Finding-result subjects:** permit `FindingsTotal` and `FindingBytesTotal` only with `Request`; reject finding kind, subject, evidence, canonical position, blocking disposition, target, and reporter detail.
 - **Plan-result subjects:** permit `BundlePlansTotal`, `ResolvedMessagesTotal`, and `BundlePlanBytesTotal` only with `Request`; reject delivery unit, locale, message, definition, payload, plan position, exporter, target, worker, and reporter detail.
 - **Per-value observations:** require the eleven per-value field, selector, catalog-key-token, and path-segment counters, plus `ScopeMappingEntries`, `PathSegments`, and `LogicalAliases`, to carry exactly `Exact(effective_limit + 1)` and never `ArithmeticOverflow`.
 - **Running-sum observations:** require `PathBytes`, `SourcePathBytes`, and `TotalMessageBytes` to carry their exact checked attempted running sums and never `ArithmeticOverflow`.
 - **Pattern-work observations:** require `PatternMatchStatesTotal` to carry the exact attempted total after one complete evaluation, never `effective_limit + 1` or `ArithmeticOverflow`.
+- **Locale-resolution observations:** require `LocaleResolutionFactsTotal` to carry exactly `Exact(effective_limit + 1)` and never the complete multiplicative product or `ArithmeticOverflow`.
 - **Finding-result observations:** require `FindingsTotal` to carry exactly `Exact(effective_limit + 1)` and `FindingBytesTotal` to carry the exact first attempted semantic-payload running total; neither admits `ArithmeticOverflow`.
 - **Plan-result observations:** require `BundlePlansTotal` and `ResolvedMessagesTotal` to carry exactly `Exact(effective_limit + 1)` and `BundlePlanBytesTotal` to carry the exact first attempted semantic-payload running total; none admits `ArithmeticOverflow`.
 - **Other observations:** admit only `Exact(attempted > effective_limit)` or a true `ArithmeticOverflow`.
@@ -8092,12 +8425,13 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Locale-value fixtures accept exact 1-byte and 255-byte occurrences; reject empty and 256-byte values; preserve case, whitespace, control scalars, and canonically equivalent Unicode as distinct exact identities without BCP 47 validation or rewriting; and charge each occurrence independently to enclosing decoded accounting.
   - M0 fixtures prove the 1,024-occurrence and 261,120-byte production-only derived maxima. M1 fixtures prove the 5,120-occurrence and 1,305,600-byte production-plus-baseline maxima while keeping scope-plus-locale accounting on its dedicated counter. M2 fixtures prove the 71,680-occurrence and 18,278,400-byte production-plus-baseline-plus-fallback maxima. All require no generic `policy_locale_bytes_total` counter, lower override, or aggregate-evidence variant.
   - Every milestone rejects an empty production-locale set. M2 accepts an omitted fallback sequence as no fallback and rejects every fallback source or target outside the declared production-locale set without inference or silent removal.
-  - Accounting fixtures preflight every admitted collection length; charge duplicate, malformed, out-of-set, and later-rejected occurrences without overwrite, sorting, filtering, deduplication, interning, cache, partition, or parallel deductions; require duplicate-member detection before map materialization and occurrence-preserving direct construction; and apply independent active lower budgets.
+  - Typed-policy accounting fixtures preflight every admitted collection length and charge duplicate, malformed, out-of-set, and later-rejected occurrences without overwrite, sorting, filtering, deduplication, interning, cache, partition, or parallel deductions. Configuration fixtures detect duplicate JSON/JSONC members at the earlier parse boundary without policy-counter evidence; direct construction remains occurrence-preserving and applies independent active lower budgets.
   - M2 fixtures require the distinct `fallback_sources` counter, derive 65,536 as the structural target maximum, and prove that M2 exposes no `fallback_entries_total` counter or lower override.
   - Every milestone's semantic fixtures reject duplicate checked production locales and roots with equal checked `(scope, domain, selector)` regardless of reason without first/last-wins, normalization, reason selection, or merging. M2 additionally rejects duplicate checked fallback sources, a source appearing in its own sequence, and a repeated target within one sequence.
+  - M2 policy-error fixtures exercise exactly `DuplicateFallbackSource`, `FallbackSourceNotProduction`, `EmptyFallbackSequence`, `FallbackTargetNotProduction`, `FallbackSelfReference`, and `DuplicateFallbackTarget`; require only their bounded checked locale evidence; and reject occurrence indexes, raw members, complete target vectors, normalization, and winner selection.
   - M2 fallback-order fixtures prepend the source exactly once, preserve the complete declared target order, never recursively expand another source's sequence, and accept reciprocal source arrays as separate finite chains.
-  - Counter-registry fixtures retain the exact reserved `fallback_sources` and `fallback_targets_per_source` spellings from M0 so later ordinals remain stable, while proving that M0 resolved-policy construction, lower-limit selection, and operational evidence can use only `production_locales` and `configured_roots`. M1 additionally activates only `coverage_baselines` and `coverage_baseline_bytes_total`; M2 activates the two reserved fallback spellings. Every stage rejects policy-prefixed, config-shaped, aggregate-fallback, alias, and custom alternatives.
-  - M2 empty-chain fixtures charge the source and zero targets before rejecting an explicit empty member and accept omission as the only no-fallback form.
+  - Counter-registry fixtures retain the exact reserved `fallback_sources` and `fallback_targets_per_source` spellings from M0 so later ordinals remain stable, while proving that M0 resolved-policy construction, lower-limit selection, and operational evidence can use only `production_locales` and `configured_roots`. M1 additionally activates only `coverage_baselines` and `coverage_baseline_bytes_total`; M2 activates the two reserved fallback spellings and appends `locale_resolution_facts_total` at ordinal 52. Every stage rejects policy-prefixed, config-shaped, aggregate-fallback, alias, and custom alternatives.
+  - M2 empty-chain fixtures charge the source and zero targets before rejecting an explicit empty member. Field omission and explicit `{}` are the only two configuration forms that construct the same empty checked table; omission of one source member is that locale's only no-fallback form.
   - M0 canonical-order fixtures permute locale, root, and configuration order and require identical checked policies by exact checked-locale/root order. M2 extends them to fallback-source and map enumeration order while proving fallback target permutations remain distinct and are never sorted.
   - M0 admission-precedence fixtures require production/root preflights, the complete production `locale_bytes` pass and validation, root validation, then remaining M0 policy semantics. M1 appends the baseline count, complete canonical scope-name and locale passes, aggregate-byte pass, membership/duplicate checks, canonical construction, and only then remaining M1 semantics.
   - Beginning with M2, fixtures require this order:
@@ -8118,6 +8452,10 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
     - Reject every mismatched pair.
     - Retain no occurrence index, target vector or locale, configuration order, or worker identity.
   - Sequential, partitioned, and parallel paths must select the same counter, subject, effective limit, and observation.
+
+- M2 locale-resolution-work fixtures accept zero and exactly 4,000,000 retained cells and reject the first cell above each effective limit before chain probing or cell retention. They count unique logical-key/locale cells followed by unmatched-selector/reference/locale cells in canonical group order, share only exact equal logical cells, select `Request`, and report exactly `Exact(effective_limit + 1)` without a complete product or `ArithmeticOverflow`.
+  - Exact absent-key demands remain shareable logical cells. An unmatched non-exact reference contributes reference-local selector cells, while an unmatched configured root contributes none and emits no reference-owned failure.
+  - Compat `UnboundedDynamic` contributes every current unambiguous key in its exact scope-domain pair, may produce fallback-selected missing findings, and produces no unresolved failure for a failed chain. Strict `UnboundedDynamic` contributes no logical cell and its dedicated blocking finding withholds plans.
 
 - Pattern candidate-set and ordering fixtures form one set per `Pattern` reference record from the distinct canonical keys in its exact resolved scope-domain pair, evaluate each key once across locale, source, entry, and ambiguity duplicates, and produce zero evaluations for an empty pair.
   - They order records by canonical `ReferenceRecordIdentity` and then candidates by exact canonical `CatalogKey` bytes, charge equal records independently, never multiply evaluations for repeated definition occurrences, and require concurrent execution to reproduce the same accounting and first attempted excess as the serial canonical order.
@@ -8617,10 +8955,11 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Structured round trips preserve array order without serializing a redundant per-record ordinal, while finding subjects, equality, cache keys, structured output, and within-kind ordering use artifact identity followed by ordinal.
 - Reference-finding granularity fixtures emit separate findings for every admitted reference record even when scope, domain, selector, reason, origin, delivery unit, or missing key is equal.
   - They cover distinct `ReferenceRecordIdentity` values with otherwise equal semantic fields, distinct call sites, and origin-less native records without aggregation or deduplication.
-  - M2 fixtures produce one `unresolved-message` per record with the complete canonical non-empty set of only the requested locales whose exact chains fail, rather than one finding per locale; M0 retains the same identity shape.
+  - M2 fixtures produce one `unresolved-message` per record. An unmatched non-exact selector retains homogeneous `Selector` failures in requested-locale order; exact demands and matched bounded selectors retain homogeneous `Message` failures in key-then-requested-locale order. Every element contains its complete failed chain, successful pairs are absent, and M0 migrates to the same union with one-locale probes.
   - Missing-translation fixtures produce one finding for every distinct reference-record, requested-locale, and resolved-key gap. They keep two keys selected by one bounded selector separate, keep two reference records selecting the same key separate, and never aggregate gaps into a location vector merely because their selected locale or fallback chain is equal.
-  - Dynamic fixtures produce one `unbounded-dynamic-reference` per `UnboundedDynamic` record in both modes and no `unresolved-message` or duplicate `degraded-analysis` for it; attach `AllInScope` degradation to its exact reference record; and prove presentation grouping never changes core or machine-result records or counts.
+  - Dynamic fixtures produce one `unbounded-dynamic-reference` per `UnboundedDynamic` record in both modes and no `unresolved-message` or duplicate `degraded-analysis` for it. Compat contributes every current unambiguous key in the exact scope-domain pair to locale resolution and may emit key-specific missing findings; strict contributes no logical demand. They attach `AllInScope` degradation to its exact reference record and prove presentation grouping never changes core or machine-result records or counts.
 - Rust finding-union fixtures admit exactly the seven `LinkFindingRecord` variants and the two closed `DegradedAnalysisFinding` variants, derive one matching `LinkFindingKind`, blocking value, and `ResolvedCatalogScopeId` from every record, and expose only read-only record, resolved-scope, and per-kind subject/evidence access.
+  - Resolution-failure fixtures admit exactly `Selector` and `Message`; require a non-empty homogeneous vector in one unresolved finding; require a key only for `Message`; and reject a nullable key, mixed variants, empty chains, a chain not beginning with its requested locale, generic payloads, deserialization, and custom variants.
   - Compile-fail and API-surface fixtures reject public struct literals, setters, unchecked or generic constructors, independent kind/record pairs, nullable supersets, generic maps, `serde_json::Value`, `Any`, custom/unknown variants, direct deserialization, and every cross-kind subject/evidence pairing.
   - Exhaustive-match fixtures compile complete wildcard-free matches over `LinkFindingKind`, `LinkFindingRecord`, and `DegradedAnalysisFinding`; reject `#[non_exhaustive]`, `Unknown`, `Other`, and `Custom`; and require a promoted variant to make stale exhaustive fixtures fail until every coordinated consumer is updated.
   - Adapter fixtures prove the typed union projects into the exact machine union without serializing Rust discriminants, field layout, debug output, or an intermediate generic value.
@@ -8737,6 +9076,9 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
 ### End-to-end behavior
 
 - Linker semantic goldens: resolution, chain fallback, reachability, placement — deterministic across runs and platforms.
+  - M2 chain fixtures construct one source-prepended chain per canonical production locale, preserve explicit target priority, reuse the same table across equal demands and plan projection, and reject recursive expansion or root/reference-specific chain variants.
+  - Locale-resolution fixtures cover exact-selector absent keys, unmatched prefix/pattern selectors, matched bounded selectors with mixed key/locale success, exact-locale success, first- and later-target success, complete chain failure, configured-root plan selection without synthetic findings, and canonical plan definition provenance.
+  - Cache and permutation fixtures prove fallback changes invalidate semantic link results but not definition/reference production, resource extraction, or artifact codecs; source-member permutation preserves results, while target-priority changes select a different result and checksum.
 - The constructive invariant, executed: every emitted target re-links clean — zero `unresolved-message`, zero `unused-message` when pruned.
 - Degradation tests: reference-record `AllInScope` and each partial completeness side produce their exact `degraded-analysis` variant, while configured roots, `Prefix`, `Pattern`, and unavailable open-world-participant codecs do not.
 - Dynamic-policy fixtures require omitted and explicit `compat` configuration to resolve to the same immutable policy, fingerprint, cache identity, findings, and plans. They consume the same `UnboundedDynamic` artifact in strict and compat modes: strict returns one blocking finding and no valid plan; compat returns the non-blocking finding, retains the exact scope-domain pair, suppresses `unused-message` only there, and does not duplicate `degraded-analysis`. They reject `null`, non-string values, case or whitespace variants, and every unknown token without coercion or fallback to the default.
