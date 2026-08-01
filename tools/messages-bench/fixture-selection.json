@@ -1,5 +1,5 @@
 {
-  "revision": 2,
+  "revision": 3,
   "profiles": [
     {
       "name": "exact-reference-dense",
@@ -54,6 +54,17 @@
         "id": "typed_key_model"
       },
       "variants": ["typed_key_model"],
+      "scales": [16, 64, 256]
+    },
+    {
+      "name": "locale-fallback-expansion",
+      "revision": 1,
+      "shape": "locale_fallback_expansion",
+      "generator": {
+        "kind": "rust",
+        "id": "locale_fallback_expansion"
+      },
+      "variants": ["locale_fallback_expansion"],
       "scales": [16, 64, 256]
     }
   ],

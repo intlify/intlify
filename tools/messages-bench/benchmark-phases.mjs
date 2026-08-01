@@ -36,7 +36,12 @@ export const MESSAGE_BENCHMARK_PHASES = Object.freeze([
   ]),
   phase('message_link_peak_memory', ['link_core_peak_live_memory']),
   phase('message_project_link_e2e', ['complete_workflow']),
-  phase('message_typed_key_model', ['coverage_baseline_selection', 'typed_key_model_construction'])
+  phase('message_typed_key_model', ['coverage_baseline_selection', 'typed_key_model_construction']),
+  phase('message_link_fallback', [
+    'fallback_chain_construction',
+    'locale_aware_resolution',
+    'locale_finding_materialization'
+  ])
 ])
 
 function phase(name, costs) {
@@ -225,6 +230,27 @@ const messagesOwnedDescriptors = [
     'typed_key_model_construction',
     'duration',
     PER_WORKFLOW
+  ),
+  boundary(
+    'message_link_fallback',
+    'fallback_chain_construction',
+    'fallback_chain_construction',
+    'duration',
+    PER_WORKFLOW
+  ),
+  boundary(
+    'message_link_fallback',
+    'locale_aware_resolution',
+    'locale_aware_resolution',
+    'duration',
+    PER_WORKFLOW
+  ),
+  boundary(
+    'message_link_fallback',
+    'locale_finding_materialization',
+    'locale_finding_materialization',
+    'duration',
+    PER_WORKFLOW
   )
 ]
 
@@ -252,8 +278,11 @@ export const MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY = Object.freeze([
     'coverage_baseline_selection',
     'typed_key_model_construction',
     'link_selector_resolution',
+    'fallback_chain_construction',
+    'locale_aware_resolution',
     'link_reachability_placement',
-    'link_finding_plan_materialization'
+    'link_finding_plan_materialization',
+    'locale_finding_materialization'
   ].map(childBoundaryId =>
     Object.freeze({ parentBoundaryId: 'project_link_e2e', childBoundaryId })
   ),
@@ -264,7 +293,14 @@ export const MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY = Object.freeze([
     'js_reference_artifact_construction'
   ].map(childBoundaryId =>
     Object.freeze({ parentBoundaryId: 'js_cache_miss_production', childBoundaryId })
-  )
+  ),
+  ...['fallback_chain_construction', 'locale_aware_resolution'].map(childBoundaryId =>
+    Object.freeze({ parentBoundaryId: 'link_selector_resolution', childBoundaryId })
+  ),
+  Object.freeze({
+    parentBoundaryId: 'link_finding_plan_materialization',
+    childBoundaryId: 'locale_finding_materialization'
+  })
 ])
 
 function boundary(phaseName, cost, boundaryId, metric, occurrencePolicy) {

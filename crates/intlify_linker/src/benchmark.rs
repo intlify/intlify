@@ -23,10 +23,16 @@ pub enum BenchmarkLinkStage {
     TypedKeyModelConstruction,
     /// Selector expansion and locale-independent reference resolution.
     SelectorExpansionAndReferenceResolution,
+    /// Source-prepended immutable fallback-chain construction.
+    FallbackChainConstruction,
+    /// Requested-locale definition probing and resolution-fact construction.
+    LocaleAwareResolution,
     /// Root reachability and duplicate placement.
     ReachabilityAndPlacement,
     /// Finding, plan, and immutable outcome materialization.
     FindingAndPlanMaterialization,
+    /// Unresolved, missing, and orphaned locale-finding construction.
+    LocaleFindingMaterialization,
 }
 
 impl BenchmarkLinkStage {
@@ -40,8 +46,11 @@ impl BenchmarkLinkStage {
             Self::SelectorExpansionAndReferenceResolution => {
                 "selector_expansion_and_reference_resolution"
             }
+            Self::FallbackChainConstruction => "fallback_chain_construction",
+            Self::LocaleAwareResolution => "locale_aware_resolution",
             Self::ReachabilityAndPlacement => "reachability_and_placement",
             Self::FindingAndPlanMaterialization => "finding_and_plan_materialization",
+            Self::LocaleFindingMaterialization => "locale_finding_materialization",
         }
     }
 
@@ -53,8 +62,11 @@ impl BenchmarkLinkStage {
             Self::CoverageBaselineSelection => "coverage_baseline_selection",
             Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => "link_selector_resolution",
+            Self::FallbackChainConstruction => "fallback_chain_construction",
+            Self::LocaleAwareResolution => "locale_aware_resolution",
             Self::ReachabilityAndPlacement => "link_reachability_placement",
             Self::FindingAndPlanMaterialization => "link_finding_plan_materialization",
+            Self::LocaleFindingMaterialization => "locale_finding_materialization",
         }
     }
 }

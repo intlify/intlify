@@ -96,10 +96,22 @@ const semanticFieldsByBoundaryId = Object.freeze({
     'selectedBaselineDefinitionIdentities'
   ]),
   typed_key_model_construction: Object.freeze([
+    'canonicalCoverageAnalysisStates',
     'canonicalTypedKeyModels',
     'privateBaselineDefinitionRelations',
     'checkedAdmissionOutcome'
-  ])
+  ]),
+  fallback_chain_construction: Object.freeze([
+    'canonicalProductionLocales',
+    'canonicalSourcePrependedChains'
+  ]),
+  locale_aware_resolution: Object.freeze([
+    'canonicalLogicalOrSelectorIdentity',
+    'requestedLocale',
+    'completeProbedSequence',
+    'selectedDefinitionIdentityOrClosedFailure'
+  ]),
+  locale_finding_materialization: Object.freeze(['canonicalTypedLocaleAwareCandidateRecords'])
 })
 
 export const MESSAGE_DURATION_OBSERVATIONS = Object.freeze(

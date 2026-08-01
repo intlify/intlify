@@ -470,11 +470,18 @@ const fn message_stage_for_link(stage: BenchmarkLinkStage) -> MessageBenchmarkSt
         BenchmarkLinkStage::SelectorExpansionAndReferenceResolution => {
             MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
         }
+        BenchmarkLinkStage::FallbackChainConstruction => {
+            MessageBenchmarkStage::FallbackChainConstruction
+        }
+        BenchmarkLinkStage::LocaleAwareResolution => MessageBenchmarkStage::LocaleAwareResolution,
         BenchmarkLinkStage::ReachabilityAndPlacement => {
             MessageBenchmarkStage::ReachabilityAndPlacement
         }
         BenchmarkLinkStage::FindingAndPlanMaterialization => {
             MessageBenchmarkStage::FindingAndPlanMaterialization
+        }
+        BenchmarkLinkStage::LocaleFindingMaterialization => {
+            MessageBenchmarkStage::LocaleFindingMaterialization
         }
     }
 }
@@ -984,8 +991,11 @@ mod tests {
             MessageBenchmarkStage::CoverageBaselineSelection,
             MessageBenchmarkStage::TypedKeyModelConstruction,
             MessageBenchmarkStage::SelectorExpansionAndReferenceResolution,
+            MessageBenchmarkStage::FallbackChainConstruction,
+            MessageBenchmarkStage::LocaleAwareResolution,
             MessageBenchmarkStage::ReachabilityAndPlacement,
             MessageBenchmarkStage::FindingAndPlanMaterialization,
+            MessageBenchmarkStage::LocaleFindingMaterialization,
             MessageBenchmarkStage::ProjectLinkE2e,
         ] {
             assert!(stages.contains(&required), "missing {required:?}");

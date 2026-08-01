@@ -36,8 +36,11 @@ pub enum MessageBenchmarkStage {
     CoverageBaselineSelection,
     TypedKeyModelConstruction,
     SelectorExpansionAndReferenceResolution,
+    FallbackChainConstruction,
+    LocaleAwareResolution,
     ReachabilityAndPlacement,
     FindingAndPlanMaterialization,
+    LocaleFindingMaterialization,
     LinkCorePeakLiveMemory,
     ProjectLinkE2e,
 }
@@ -75,6 +78,9 @@ impl MessageBenchmarkStage {
             Self::CoverageBaselineSelection | Self::TypedKeyModelConstruction => {
                 "message_typed_key_model"
             }
+            Self::FallbackChainConstruction
+            | Self::LocaleAwareResolution
+            | Self::LocaleFindingMaterialization => "message_link_fallback",
             Self::LinkCorePeakLiveMemory => "message_link_peak_memory",
             Self::ProjectLinkE2e => "message_project_link_e2e",
         }
@@ -108,8 +114,11 @@ impl MessageBenchmarkStage {
             Self::SelectorExpansionAndReferenceResolution => {
                 "selector_expansion_and_reference_resolution"
             }
+            Self::FallbackChainConstruction => "fallback_chain_construction",
+            Self::LocaleAwareResolution => "locale_aware_resolution",
             Self::ReachabilityAndPlacement => "reachability_and_placement",
             Self::FindingAndPlanMaterialization => "finding_and_plan_materialization",
+            Self::LocaleFindingMaterialization => "locale_finding_materialization",
             Self::LinkCorePeakLiveMemory => "link_core_peak_live_memory",
             Self::ProjectLinkE2e => "complete_workflow",
         }
@@ -142,8 +151,11 @@ impl MessageBenchmarkStage {
             Self::CoverageBaselineSelection => "coverage_baseline_selection",
             Self::TypedKeyModelConstruction => "typed_key_model_construction",
             Self::SelectorExpansionAndReferenceResolution => "link_selector_resolution",
+            Self::FallbackChainConstruction => "fallback_chain_construction",
+            Self::LocaleAwareResolution => "locale_aware_resolution",
             Self::ReachabilityAndPlacement => "link_reachability_placement",
             Self::FindingAndPlanMaterialization => "link_finding_plan_materialization",
+            Self::LocaleFindingMaterialization => "locale_finding_materialization",
             Self::LinkCorePeakLiveMemory => "link_core_peak_live_memory",
             Self::ProjectLinkE2e => "project_link_e2e",
         }
