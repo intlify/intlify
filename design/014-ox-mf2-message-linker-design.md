@@ -3639,13 +3639,15 @@ If another locale contains a key absent from the baseline, M1 model construction
 
 Every `LinkOutcome` describes only its current checked request and never carries forward a typed-key model from an earlier outcome. An integration that previously installed a model must treat current definition-side partiality, definition-input unavailability, an applicable late-gate contradiction, or model-construction failure as model absence rather than serving the stale model. It clears affected installed state before asynchronous replacement when an installed-state event can change a model dependency. The editor's non-reused model-generation token and exact dependency-based retention rules are owned by 009; a successful new installation remains new even when its exposed key bytes equal the prior model.
 
-M1 performs this deterministic baseline-versus-union preflight as a generation gate without publishing an `orphaned-translation` linker finding. M2 reuses the same canonical difference as the subject set for that finding, replaces the M1 operational failure with successful analysis, and still returns no typed-key model for the affected scope. M3 cannot render or register an accessor module for a scope whose M2 analysis produced that model absence.
+M1 performs this deterministic baseline-versus-union preflight as a generation gate without publishing an `orphaned-translation` linker finding. Beginning with M2, the **canonical non-ambiguous baseline-versus-union difference** is the canonical production-locale key union minus the baseline key set and then minus the complete canonical ambiguous-key set for that resolved scope. It is one logical-key set, not a definition-occurrence set. M1 model construction reaches this comparison only with an empty ambiguity set, so the definition preserves the historical M1 gate.
+
+M2 retains that exact filtered difference as the subject set for orphan findings, replaces the M1 operational failure with successful analysis, and still returns no typed-key model for the affected scope. M3 cannot render or register an accessor module for a scope whose M2 analysis produced that model absence.
 
 For every admitted model key, the same preflight records exactly one unambiguous definition from the configured baseline locale in private `LinkOutcome` state. It records that definition's exact decoded payload and `DefinitionLocation`; it does not copy either into the public key-only model. A blocking duplicate-definition ambiguity produces no plans or model and therefore never leaves M3 preparation to select a winner.
 
 Missing keys in a non-baseline locale do not invalidate the baseline key surface; M2 reports them separately as non-blocking `missing-translation` findings under the fixed fallback and baseline analysis.
 
-For each key in the baseline-versus-union difference, M2 emits one `orphaned-translation` for every exact non-baseline locale definition of that key. It does not aggregate several locale entries into one finding.
+For each key in the canonical non-ambiguous baseline-versus-union difference, M2 emits one `orphaned-translation` for every exact non-baseline locale definition of that key. It does not aggregate several locale entries into one finding.
 
 Each finding therefore identifies one independently repairable definition and retains its one exact `DefinitionLocation`. Presentation may group equal scope-domain-key subjects, but the linker result, machine count, and lint accounting remain definition-local.
 
@@ -3787,15 +3789,15 @@ M2 replaces that operational failure with one complete canonical coverage-analys
 - `NotSelected` when the scope has no resolved coverage baseline;
 - `Partial` when definition completeness is `Partial`;
 - `Model` when the closed scope has no ambiguity and its baseline contains the complete production-locale key union; or
-- `ModelUnavailable` for a closed scope, retaining the complete canonical ambiguous-key set and baseline-versus-union difference, with at least one of those sets non-empty.
+- `ModelUnavailable` for a closed scope, retaining the complete canonical ambiguous-key set and the complete canonical non-ambiguous baseline-versus-union difference, with at least one of those sets non-empty.
 
-`ModelUnavailable` excludes every ambiguous logical key from the baseline-versus-union comparison but still computes the complete difference for all other keys. It constructs no typed-key model and no private baseline-source relation for that scope. It never truncates to the first key, widens the model from the union, or returns a model containing only the baseline subset.
+`ModelUnavailable` owns those two distinct canonical sets. The difference uses the exact filtered definition fixed in **Coverage and the baseline locale**, so no ambiguous logical key can also appear in that difference. It constructs no typed-key model and no private baseline-source relation for that scope. It never truncates either set to the first key, widens the model from the union, or returns a model containing only the baseline subset.
 
 The linker continues analysis for every other scope and projects the complete unambiguous difference into `orphaned-translation` findings. An ambiguity suppresses only derivatives of its exact logical key; it does not suppress orphan findings for independent keys in the same closed scope. Models for independent `Model` scopes remain available. Ordinary locale-aware bundle plans remain available when no independently blocking finding exists because coverage findings are non-blocking.
 
 This changes the M1 failure surface without changing M1 model semantics: a scope with a coverage gap still has no model, partial model, or stale model. A later M3 exporter must not render a typed accessor for that scope merely because ordinary locale assets remain plannable.
 
-At the mutable pre-v1 `0.1` Rust boundary, M2 removes `InvalidRequestError::CoverageBaselineMissingKey` rather than retaining an unreachable public compatibility variant. The canonical difference becomes a private checked analysis fact. Existing M1 tests are migrated to assert model absence plus exact orphan findings; M1 success cases and model bytes remain unchanged.
+At the mutable pre-v1 `0.1` Rust boundary, M2 removes `InvalidRequestError::CoverageBaselineMissingKey` rather than retaining an unreachable public compatibility variant. The canonical non-ambiguous difference becomes a private checked analysis fact. Existing M1 tests are migrated to assert model absence plus exact orphan findings; M1 success cases and model bytes remain unchanged.
 
 #### Fallback policy API
 
@@ -3985,7 +3987,7 @@ A successful reference-key resolution emits `missing-translation` exactly when `
 
 Exact-locale success emits no missing finding. Several references selecting the same key remain separate. One bounded selector selecting several affected keys emits separate findings. Configured roots do not synthesize a reference identity and therefore do not emit this finding.
 
-For every `ModelUnavailable` scope with a non-empty baseline-versus-union difference, M2 emits one `orphaned-translation` for every exact non-baseline definition whose unambiguous key is absent from the baseline. The subject uses resolved scope, domain, key, and definition locale. Evidence uses the configured baseline locale and exact definition location.
+For every `ModelUnavailable` scope with a non-empty canonical non-ambiguous baseline-versus-union difference, M2 emits one `orphaned-translation` for every exact non-baseline definition whose key belongs to that difference. The subject uses resolved scope, domain, key, and definition locale. Evidence uses the configured baseline locale and exact definition location.
 
 A key defined in several non-baseline locales produces one finding per definition. A scope without a baseline produces none. Partial scopes and every locale of an ambiguous logical key remain suppressed before candidate construction.
 
@@ -4051,7 +4053,7 @@ M2 activates three duration costs. Their stable boundary IDs equal their cost to
 | --- | --- | --- | --- |
 | `message_link_fallback` / `fallback_chain_construction` | `fallback_chain_construction` | Checked resolved policy with canonical production locales and fallback entries | Construct every source-prepended immutable resolution chain in canonical production-locale order and retain the complete chain table. Stop before selector expansion or definition lookup. |
 | `message_link_fallback` / `locale_aware_resolution` | `locale_aware_resolution` | Semantic indices, canonical selector/root logical demands, ambiguity/suppression facts, the retained chain table, and effective limits | Apply the canonical `LocaleResolutionFactsTotal` preflight, probe every admitted logical key and requested locale, select exact definitions, and retain complete canonical success/failure facts. Stop before reachability, finding projection, or plan construction. |
-| `message_link_fallback` / `locale_finding_materialization` | `locale_finding_materialization` | Complete locale-resolution facts, coverage-analysis differences, reference identities, suppression facts, and the shared finding budget after ambiguity candidates | Construct unresolved, missing, and orphaned candidates in canonical order, apply their exact `FindingsTotal` and `FindingBytesTotal` contributions, and retain the admitted private candidate vector. Stop before later finding kinds, blocking disposition, or plan construction. |
+| `message_link_fallback` / `locale_finding_materialization` | `locale_finding_materialization` | Complete locale-resolution facts, canonical non-ambiguous baseline-versus-union differences, reference identities, suppression facts, and the shared finding budget after ambiguity candidates | Construct unresolved, missing, and orphaned candidates in canonical order, apply their exact `FindingsTotal` and `FindingBytesTotal` contributions, and retain the admitted private candidate vector. Stop before later finding kinds, blocking disposition, or plan construction. |
 
 All three use the ordinary duration framing: `before_<boundaryId>`, `complete_<boundaryId>_output_retained`, the boundary ID as the one included marker, and `fixture_setup`, `warmup`, `checksum_observation`, and `result_aggregation` as excluded markers.
 
@@ -4074,7 +4076,7 @@ The three checksum observations are exact:
 - `locale_aware_resolution` hashes logical key, requested locale, complete probed sequence, and either selected definition locale/source identity or the closed failure tag; and
 - `locale_finding_materialization` hashes the complete typed locale-aware candidate records in canonical finding order.
 
-The updated M1 construction observation hashes each canonical scope's `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and the applicable complete model/relation, ambiguity, and gap identities. It never hashes private allocation layout or human text.
+The updated M1 construction observation hashes each canonical scope's `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and the applicable complete model/relation, complete ambiguous-key set, and complete canonical non-ambiguous baseline-versus-union difference. It never hashes private allocation layout or human text.
 
 Warmups contribute no timing, counts, or checksums. Every measured repetition must produce the same checksum. Build, execution, active phase/cost table, schema, required tuples, boundary/overlap conformance, checksum codec vectors, and repetition determinism remain CI gates. Elapsed time and memory values remain observational and have no regression threshold.
 
@@ -4457,7 +4459,7 @@ The finding contains no selector, reason, payload, or complete fallback suffix a
 
 #### `orphaned-translation` machine codec
 
-One finding represents exactly one non-baseline locale definition whose resolved canonical key is absent from that scope's explicit coverage baseline.
+One finding represents exactly one non-baseline locale definition whose resolved canonical key belongs to that scope's canonical non-ambiguous baseline-versus-union difference.
 
 The exact subject order is `scope`, `domain`, `key`, then `locale`:
 
@@ -4493,7 +4495,7 @@ The exact evidence order is `baselineLocale` then `definition`:
 }
 ```
 
-`baselineLocale` is the explicit checked coverage baseline for the resolved scope and differs from `subject.locale`. The subject key is absent from that baseline inventory, while `definition` is the one exact `DefinitionLocation` whose scope, domain, key, and locale equal the subject.
+`baselineLocale` is the explicit checked coverage baseline for the resolved scope and differs from `subject.locale`. The subject key is absent from that baseline inventory and from the complete canonical ambiguous-key set, while `definition` is the one exact `DefinitionLocation` whose scope, domain, key, and locale equal the subject.
 
 If the same missing baseline key is defined in several non-baseline locales, each definition produces a separate finding. Ambiguous keys and definition-partial scopes are suppressed before this phase. A scope without an explicit baseline produces no orphaned finding. `blocking` is always `false`.
 
@@ -7700,9 +7702,9 @@ The M1 implementation contract above fixes the bounded `coverageBaseline` config
 
 Add the `messages.fallback` field, fallback-bearing resolved `LinkPolicy` member, activation of the two reserved fallback counters, exact validation and cache identity, and per-requested-locale chain analysis atomically. M0 and M1 reject the raw field and expose no fallback-bearing policy constructor.
 
-Activate `missing-translation` versus `unresolved-message` and `orphaned-translation` over the locale-bearing M0 artifacts. The orphaned finding reuses M1's canonical baseline-versus-union difference rather than defining a second comparison path.
+Activate `missing-translation` versus `unresolved-message` and `orphaned-translation` over the locale-bearing M0 artifacts. The orphaned finding uses the canonical non-ambiguous baseline-versus-union difference fixed by the M2 coverage analysis rather than defining a second comparison path.
 
-Promote an M1 baseline gap from the milestone-specific `CoverageBaselineMissingKey` operational error to the complete M2 `ModelUnavailable` analysis state. The affected scope still has no typed-key model, while exact non-blocking orphan findings and independent scope results remain observable.
+Promote an M1 baseline gap from the milestone-specific `CoverageBaselineMissingKey` operational error to the complete M2 `ModelUnavailable` analysis state. That state separately retains the complete ambiguous-key set and complete canonical non-ambiguous baseline-versus-union difference. The affected scope still has no typed-key model, while exact non-blocking orphan findings and independent scope results remain observable.
 
 #### M3 — initial exporter
 
@@ -7984,7 +7986,7 @@ Public artifacts use their canonical writers or existing product payload fingerp
 | `message_link_core` / `finding_and_plan_materialization` | Complete canonical `LinkFinding` and `MessageBundlePlan` semantic fields in their product order. |
 | `message_project_link_e2e` / `complete_workflow` | Canonical produced reference and definition artifacts, scope completeness, checked request identity, and final findings/plans. The separately emitted 013 extraction record retains its own checksum and is not rehashed as a nested metric. |
 | `message_typed_key_model` / `coverage_baseline_selection` | Canonical scope/domain baseline selections and their exact selected definition identities. |
-| `message_typed_key_model` / `typed_key_model_construction` | Canonical typed-key model fields and the fixed private model-to-baseline relation required for export preparation. Beginning with M2, each scope first carries its exact `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and every applicable complete model/relation, ambiguity, and gap identity. |
+| `message_typed_key_model` / `typed_key_model_construction` | Canonical typed-key model fields and the fixed private model-to-baseline relation required for export preparation. Beginning with M2, each scope first carries its exact `NotSelected`, `Partial`, `Model`, or `ModelUnavailable` tag and every applicable complete model/relation, complete ambiguous-key set, and complete canonical non-ambiguous baseline-versus-union difference. |
 | `message_link_fallback` / `fallback_chain_construction` | Canonical production locale set and checked ordered fallback chains. |
 | `message_link_fallback` / `locale_aware_resolution` | Canonical logical-key or selector-level identity, requested locale, complete probed sequence, and selected definition locale/source identity or closed failure tag. |
 | `message_link_fallback` / `locale_finding_materialization` | Complete canonical typed locale-aware candidate records and affected identities. |
@@ -8256,7 +8258,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Policy-error fixtures exercise `DuplicateCoverageBaseline`, `CoverageBaselineLocaleNotProduction`, and `ResolvedCoverageBaselineConflict` as distinct checked invalid-request variants with bounded typed evidence. They require the configured-root pass to precede baseline mapping, exact locale-byte ordering for a mapped conflict, and top-level `message_link_failed` / `invalid_request` with no outcome. M1 milestone goldens retain the historical `CoverageBaselineMissingKey` failure, while the M2 API-surface fixture proves that variant is removed and cannot be emitted after locale-aware analysis activates.
   - Custom-mapping fixtures merge equal baseline locales from different declared scopes only after checked scope resolution and reject unequal locales as one fail-complete linker `invalid_request` before coverage, model construction, findings, or plans. Built-in empty-table fixtures preserve configuration duplicate-member rejection without normalization.
   - Completeness fixtures route a definition-partial configured scope through the existing blocking `degraded-analysis` result and produce no typed-key model for that scope without a second config or operational error. They accept a definition-closed empty baseline set and an empty model when every production locale is empty. M1 goldens fail the ordinary baseline-versus-union gate when another production locale supplies a key; M2 fixtures instead retain complete `ModelUnavailable` analysis, produce no model for that scope, and continue analysis. Integration fixtures clear an affected previously installed model before asynchronous replacement whenever a current definition dependency can change or become unavailable, expose absence after partiality, late-gate contradiction, or a current coverage gap, and never serve the stale model.
-  - Baseline-versus-union fixtures accept equal sets and baseline-only keys. M1 goldens reject the first canonical non-baseline-only key fail-complete. M2 fixtures retain every non-baseline-only key in the same canonical difference, emit one `orphaned-translation` per exact non-baseline definition, construct no affected-scope model, retain independent scope results, and never create a second comparison path.
+  - Baseline-versus-union fixtures accept equal sets and baseline-only keys. M1 goldens reject the first canonical non-baseline-only key fail-complete. M2 fixtures retain every unambiguous non-baseline-only key in the canonical non-ambiguous difference, retain ambiguous keys only in the separate complete ambiguous-key set, emit one `orphaned-translation` per exact non-baseline definition whose key belongs to the difference, construct no affected-scope model, retain independent scope results, and never create a second comparison path. A mixed fixture contains both an ambiguous key and an independent non-baseline-only key and proves that observations, checksums, and findings use the two sets without overlap.
 - M1 typed-key model fixtures construct one deterministic language-neutral key-only model per canonical resolved scope with a baseline and expose no CLI leaf, generated source bytes, output path, registration operation, or `--check` flag. A resolved scope without a baseline produces no model, error, or finding and is never widened from the definition union, fallback order, locale order, catalog size, or open-document evidence.
   - Cross-platform fixtures prove the model contains only resolved scope plus canonical domain-qualified keys and contains no parsed MF2 state, argument signature, TypeScript module, declaration-merging, path, runtime-binding, destination, or manifest assumptions.
   - Outcome fixtures require one private exact baseline definition snapshot for every admitted model key, reject a missing, extra, or mismatched relation, and prove that neither the model nor another public linker accessor exposes the payload or location.
