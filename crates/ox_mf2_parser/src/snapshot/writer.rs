@@ -92,10 +92,19 @@ pub struct BatchSnapshotResult {
 /// text) from `sources.get(result.source)` and trusts the caller to
 /// have kept them in sync.
 ///
-/// A caller that already used [`parse_message`](crate::parse_message) passes
-/// `parsed.sources()` and `parsed.result()` from the same
-/// [`StandaloneParseResult`](crate::StandaloneParseResult). Do not rebuild a
-/// different store or mix accessors from different parses.
+/// A caller that already used [`parse_message`](crate::parse_message) should
+/// pass `parsed.sources()` and `parsed.result()` from the same
+/// [`StandaloneParseResult`](crate::StandaloneParseResult).
+///
+/// # Attachment contract
+///
+/// This function can reject missing sources and invalid ranges, but separate
+/// references do not carry an owner token. A result from one parse and a store
+/// from another parse can therefore appear structurally consistent when their
+/// local source ids and lengths coincide. Mixing independently parsed values
+/// may silently encode the wrong source text or metadata. The caller must
+/// preserve the original source/result attachment and must not combine
+/// accessors from different parses.
 ///
 /// `parse_result_to_snapshot` does not reparse the source.
 pub fn parse_result_to_snapshot(

@@ -227,13 +227,23 @@ fn duplicate_options_are_owner_local_and_nfc_compared() {
             SemanticDiagnosticCode::DuplicateOptionName,
         ]
     );
+    assert_eq!(
+        diagnostics("{{{$x :number min=1 \u{2066}min\u{2069}=2}}}"),
+        vec![SemanticDiagnosticCode::DuplicateOptionName]
+    );
 }
 
 #[test]
-fn duplicate_variants_compare_cooked_nfc_literals() {
+fn duplicate_variants_compare_cooked_literals() {
     assert_eq!(
         diagnostics(
             ".input {$x :string}\n.match $x\né {{first}}\n|e\u{301}| {{second}}\n* {{fallback}}"
+        ),
+        vec![SemanticDiagnosticCode::DuplicateVariant]
+    );
+    assert_eq!(
+        diagnostics(
+            ".input {$x :string}\n.match $x\n|a\\}b| {{first}}\n|a}b| {{second}}\n* {{fallback}}"
         ),
         vec![SemanticDiagnosticCode::DuplicateVariant]
     );

@@ -1316,13 +1316,12 @@ fn build_semantic_facts(
             let resolved_declaration = model
                 .semantic_declarations
                 .iter()
-                .filter(|declaration| {
+                .find(|declaration| {
                     Some(declaration.id) != enclosing_declaration
                         && declaration.name() == name
                         && declaration.name_span.end <= reference.semantic_ref.span.start
                 })
-                .map(SemanticDeclaration::id)
-                .next();
+                .map(SemanticDeclaration::id);
             let kind = reference_kind(model, reference, enclosing_declaration);
             SemanticReference {
                 id: ReferenceId::from_index(fact_index),
@@ -1354,12 +1353,11 @@ fn reference_kind(
     }) {
         return ReferenceKind::Selector;
     }
-    if let Some(markup) = model
+    if model
         .markups
         .iter()
-        .find(|markup| span_contains(markup.semantic_ref.span, reference.semantic_ref.span))
+        .any(|markup| span_contains(markup.semantic_ref.span, reference.semantic_ref.span))
     {
-        let _ = markup;
         return ReferenceKind::MarkupOption;
     }
     if model

@@ -278,24 +278,22 @@ fn validate_model_contract(model: &SemanticModel) -> Result<(), SemanticInvarian
                     .reference(*id)
                     .is_none_or(|reference| reference.kind() != ReferenceKind::Selector)
             })
-            || matcher
-                .variants()
-                .iter()
-                .enumerate()
-                .any(|(variant_index, variant)| {
-                    let invalid = variant.id().raw() != expected_variant_id
-                        || variant.matcher() != matcher.id()
-                        || variant.order() != variant_index as u32
-                        || !span_is_valid(variant.span(), source_len)
-                        || !span_is_valid(variant.key_span(), source_len)
-                        || !span_is_valid(variant.body_span(), source_len)
-                        || !span_contains(variant.span(), variant.key_span())
-                        || !span_contains(variant.span(), variant.body_span());
-                    expected_variant_id = expected_variant_id.saturating_add(1);
-                    invalid
-                })
         {
             return Err(SemanticInvariantError::invariant_violation());
+        }
+        for (variant_index, variant) in matcher.variants().iter().enumerate() {
+            let invalid = variant.id().raw() != expected_variant_id
+                || variant.matcher() != matcher.id()
+                || variant.order() != variant_index as u32
+                || !span_is_valid(variant.span(), source_len)
+                || !span_is_valid(variant.key_span(), source_len)
+                || !span_is_valid(variant.body_span(), source_len)
+                || !span_contains(variant.span(), variant.key_span())
+                || !span_contains(variant.span(), variant.body_span());
+            expected_variant_id = expected_variant_id.saturating_add(1);
+            if invalid {
+                return Err(SemanticInvariantError::invariant_violation());
+            }
         }
     }
     Ok(())
@@ -476,12 +474,11 @@ fn validate_matchers(
     occurrence: &mut u64,
 ) {
     for matcher in model.semantic_matchers() {
-        validate_matcher(model, source, matcher, diagnostics, occurrence);
+        validate_matcher(source, matcher, diagnostics, occurrence);
     }
 }
 
 fn validate_matcher(
-    _model: &SemanticModel,
     source: SourceId,
     matcher: &SemanticMatcher,
     diagnostics: &mut Vec<OrderedDiagnostic>,
