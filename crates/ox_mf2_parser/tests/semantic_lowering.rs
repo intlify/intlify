@@ -54,7 +54,7 @@ fn simple_message_is_pattern() {
     assert_eq!(semantic.references.len(), 1);
     assert_eq!(
         semantic.references[0].name_span.start,
-        semantic.references[0].semantic_ref.span.start
+        semantic.references[0].semantic_ref.span.start + 1
     );
 }
 

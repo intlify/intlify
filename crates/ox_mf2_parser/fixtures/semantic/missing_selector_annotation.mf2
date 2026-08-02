@@ -1,0 +1,4 @@
+.input {$count}
+.match $count
+one {{One}}
+* {{Other}}

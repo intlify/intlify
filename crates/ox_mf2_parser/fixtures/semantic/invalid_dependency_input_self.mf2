@@ -1,0 +1,2 @@
+.input {$count :number minimumFractionDigits=$count}
+{{{$count}}}

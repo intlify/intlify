@@ -1,0 +1,3 @@
+--semantic-diagnostics--
+duplicate-option-name Error @ 26..32
+duplicate-option-name Error @ 35..41

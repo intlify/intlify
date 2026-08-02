@@ -1,0 +1,4 @@
+.local $selector = {$later}
+.local $later = {|x|}
+.match $selector $other
+* * {{Fallback}}

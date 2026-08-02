@@ -123,17 +123,7 @@ impl SemanticWorkspace {
             // Reuse capacity rather than dropping the SemanticModel — vector
             // clears keep their backing allocation so repeated parse loops
             // stay allocation-flat.
-            model.declarations.clear();
-            model.references.clear();
-            model.patterns.clear();
-            model.expressions.clear();
-            model.markups.clear();
-            model.literals.clear();
-            model.functions.clear();
-            model.options.clear();
-            model.attributes.clear();
-            model.selectors.clear();
-            model.variants.clear();
+            model.clear_preserving_capacity();
         }
     }
 }

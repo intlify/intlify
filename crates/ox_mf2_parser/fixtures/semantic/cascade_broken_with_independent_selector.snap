@@ -1,0 +1,3 @@
+--semantic-diagnostics--
+invalid-declaration-dependency Error @ 36..41
+missing-selector-annotation Error @ 67..73

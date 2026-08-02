@@ -67,6 +67,52 @@ pub enum DiagnosticCode {
 }
 
 impl DiagnosticCode {
+    /// Complete parser diagnostic catalog in stable numeric order.
+    pub const fn all() -> &'static [Self] {
+        &[
+            Self::Unspecified,
+            Self::UnexpectedEndOfInput,
+            Self::UnclosedExpression,
+            Self::UnclosedQuotedLiteral,
+            Self::UnclosedQuotedPattern,
+            Self::InvalidDeclarationStart,
+            Self::InvalidMatcherSyntax,
+            Self::InvalidVariantBoundary,
+            Self::InvalidMarkupBoundary,
+            Self::MissingComplexBody,
+            Self::UnexpectedToken,
+            Self::SpanOverflow,
+            Self::InvalidEscape,
+            Self::AmbiguousMessageMode,
+            Self::MissingRequiredWhitespace,
+            Self::MissingIdentifierName,
+            Self::InvalidInputDeclaration,
+        ]
+    }
+
+    /// Stable kebab-case code used by structured tooling output.
+    pub const fn json_code(self) -> &'static str {
+        match self {
+            Self::Unspecified => "unspecified",
+            Self::UnexpectedEndOfInput => "unexpected-end-of-input",
+            Self::UnclosedExpression => "unclosed-expression",
+            Self::UnclosedQuotedLiteral => "unclosed-quoted-literal",
+            Self::UnclosedQuotedPattern => "unclosed-quoted-pattern",
+            Self::InvalidDeclarationStart => "invalid-declaration-start",
+            Self::InvalidMatcherSyntax => "invalid-matcher-syntax",
+            Self::InvalidVariantBoundary => "invalid-variant-boundary",
+            Self::InvalidMarkupBoundary => "invalid-markup-boundary",
+            Self::MissingComplexBody => "missing-complex-body",
+            Self::UnexpectedToken => "unexpected-token",
+            Self::SpanOverflow => "span-overflow",
+            Self::InvalidEscape => "invalid-escape",
+            Self::AmbiguousMessageMode => "ambiguous-message-mode",
+            Self::MissingRequiredWhitespace => "missing-required-whitespace",
+            Self::MissingIdentifierName => "missing-identifier-name",
+            Self::InvalidInputDeclaration => "invalid-input-declaration",
+        }
+    }
+
     /// Severity associated with this code. Single source of truth used by the
     /// catalog so the parser does not embed severity at every emit site.
     pub const fn severity(self) -> DiagnosticSeverity {
@@ -399,28 +445,21 @@ mod tests {
 
     #[test]
     fn catalog_has_one_message_per_code() {
-        use DiagnosticCode::*;
-        for code in [
-            Unspecified,
-            UnexpectedEndOfInput,
-            UnclosedExpression,
-            UnclosedQuotedLiteral,
-            UnclosedQuotedPattern,
-            InvalidDeclarationStart,
-            InvalidMatcherSyntax,
-            InvalidVariantBoundary,
-            InvalidMarkupBoundary,
-            MissingComplexBody,
-            UnexpectedToken,
-            SpanOverflow,
-            InvalidEscape,
-            AmbiguousMessageMode,
-            MissingRequiredWhitespace,
-            MissingIdentifierName,
-            InvalidInputDeclaration,
-        ] {
+        let codes = DiagnosticCode::all();
+        assert_eq!(
+            codes.len(),
+            DiagnosticCode::InvalidInputDeclaration as usize + 1
+        );
+        for (index, code) in codes.iter().copied().enumerate() {
             let msg = code.static_message();
             assert!(!msg.is_empty(), "missing message for {code:?}");
+            assert!(
+                !code.json_code().is_empty(),
+                "missing JSON code for {code:?}"
+            );
+            assert!(!codes[..index]
+                .iter()
+                .any(|earlier| earlier.json_code() == code.json_code()));
         }
     }
 

@@ -1,0 +1,4 @@
+.input {$value :string}
+.local $value = {|first|}
+.input {$value :number}
+{{{$value}}}
