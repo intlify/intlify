@@ -25,11 +25,12 @@ use intlify_contract::{
     ProducerId, ProducerIdentity, ProducerRevision, ReferenceArtifactIdentity,
     ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_linker::{
     link, CoverageBaseline, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkPolicy,
-    LinkRequest, PlacementPolicy, ScopeCompleteness, ScopeCompletenessTable, ScopeMappingTable,
+    LinkFindingKind, LinkRequest, LocaleFallback, PlacementPolicy, ScopeCompleteness,
+    ScopeCompletenessTable, ScopeMappingTable,
 };
-use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
 use intlify_producer_js::benchmark::{
     benchmark_produce_reference_artifacts_with_cache, BenchmarkJsStage,
 };
@@ -82,6 +83,7 @@ fn run() -> Result<(), String> {
         options.warmup_iterations,
     )?);
     results.extend(measure_typed_key_models(&selection, &options)?);
+    results.extend(measure_locale_fallback_expansion(&selection, &options)?);
 
     let output = CoreOutput { results };
     println!(
@@ -165,6 +167,7 @@ impl FixtureSelection {
             FixtureShape::BoundedSelector,
             FixtureShape::FindingDense,
             FixtureShape::TypedKeyModel,
+            FixtureShape::LocaleFallbackExpansion,
         ];
         for shape in expected {
             let profile = self
@@ -226,6 +229,7 @@ enum FixtureShape {
     BoundedSelector,
     FindingDense,
     TypedKeyModel,
+    LocaleFallbackExpansion,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1047,7 +1051,12 @@ fn measure_link_peak_memory(
     for profile in selection
         .profiles
         .iter()
-        .filter(|profile| profile.shape != FixtureShape::TypedKeyModel)
+        .filter(|profile| {
+            !matches!(
+                profile.shape,
+                FixtureShape::TypedKeyModel | FixtureShape::LocaleFallbackExpansion
+            )
+        })
     {
         for &scale in &profile.scales {
             let fixture = GeneratedLinkFixture::new(profile.shape, scale)?;
@@ -1096,7 +1105,7 @@ fn measure_typed_key_models(
             black_box(benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?);
         }
 
-        let mut aggregates = BTreeMap::<MessageBenchmarkStage, TypedKeyModelStageAggregate>::new();
+        let mut aggregates = BTreeMap::<MessageBenchmarkStage, LinkStageAggregate>::new();
         for _ in 0..options.iterations {
             let execution = benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?;
             let stages = execution
@@ -1170,8 +1179,132 @@ fn measure_typed_key_models(
     Ok(results)
 }
 
+fn measure_locale_fallback_expansion(
+    selection: &FixtureSelection,
+    options: &Options,
+) -> Result<Vec<Measurement>, String> {
+    let profile = selection
+        .profiles
+        .iter()
+        .find(|profile| profile.shape == FixtureShape::LocaleFallbackExpansion)
+        .ok_or("locale-fallback-expansion profile is missing")?;
+    let mut results = Vec::with_capacity(profile.scales.len().saturating_mul(3));
+
+    for &scale in &profile.scales {
+        let fixture = LocaleFallbackFixture::new(scale)?;
+        let prepared_outcome = benchmark_link(&fixture.request()?)
+            .map_err(|error| error.to_string())?
+            .into_outcome();
+        fixture.verify_outcome(&prepared_outcome)?;
+        let output_count = outcome_item_count(&prepared_outcome)?;
+
+        for _ in 0..options.warmup_iterations {
+            let execution = benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?;
+            fixture.verify_outcome(execution.outcome())?;
+            black_box(execution);
+        }
+
+        let mut aggregates = BTreeMap::<MessageBenchmarkStage, LinkStageAggregate>::new();
+        for _ in 0..options.iterations {
+            let execution = benchmark_link(&fixture.request()?).map_err(|error| error.to_string())?;
+            let stages = execution
+                .stages()
+                .iter()
+                .filter_map(|measurement| {
+                    fallback_message_stage(measurement.stage()).map(|stage| (stage, measurement))
+                })
+                .collect::<Vec<_>>();
+            if stages
+                .iter()
+                .map(|(stage, _)| *stage)
+                .ne([
+                    MessageBenchmarkStage::FallbackChainConstruction,
+                    MessageBenchmarkStage::LocaleAwareResolution,
+                    MessageBenchmarkStage::LocaleFindingMaterialization,
+                ])
+            {
+                return Err("fallback benchmark stages are incomplete or reordered".to_owned());
+            }
+            fixture.verify_outcome(execution.outcome())?;
+            if outcome_item_count(execution.outcome())? != output_count {
+                return Err("fallback benchmark output count changed across repetitions".to_owned());
+            }
+
+            for (stage, measurement) in stages {
+                let checksum = checksum_observation_sequence(
+                    stage.cost(),
+                    std::iter::once(("link-request", measurement.checksum())),
+                );
+                let aggregate = aggregates.entry(stage).or_default();
+                if aggregate
+                    .per_iteration_checksum
+                    .replace(checksum)
+                    .is_some_and(|expected| expected != checksum)
+                {
+                    return Err(format!(
+                        "{}/{} changed across repetitions",
+                        stage.phase(),
+                        stage.cost()
+                    ));
+                }
+                aggregate.elapsed = aggregate.elapsed.saturating_add(measurement.elapsed());
+                aggregate.repeated_checksum = aggregate.repeated_checksum.wrapping_add(checksum);
+            }
+            black_box(execution);
+        }
+
+        if aggregates.len() != 3 {
+            return Err("fallback benchmark did not retain all three costs".to_owned());
+        }
+        for (stage, aggregate) in aggregates {
+            results.push(duration_record(DurationRecord {
+                stage,
+                fixture: &profile.name,
+                fixture_revision: profile.revision,
+                variant: "locale_fallback_expansion",
+                scale,
+                operation: stage.boundary_id(),
+                input_count: fixture.input_count(),
+                output_count,
+                physical_group_count: None,
+                host_byte_count: None,
+                entry_count: None,
+                iterations: options.iterations,
+                elapsed: aggregate.elapsed,
+                checksum: aggregate.repeated_checksum,
+            }));
+        }
+    }
+    Ok(results)
+}
+
+const fn fallback_message_stage(stage: BenchmarkLinkStage) -> Option<MessageBenchmarkStage> {
+    match stage {
+        BenchmarkLinkStage::FallbackChainConstruction => {
+            Some(MessageBenchmarkStage::FallbackChainConstruction)
+        }
+        BenchmarkLinkStage::LocaleAwareResolution => {
+            Some(MessageBenchmarkStage::LocaleAwareResolution)
+        }
+        BenchmarkLinkStage::LocaleFindingMaterialization => {
+            Some(MessageBenchmarkStage::LocaleFindingMaterialization)
+        }
+        BenchmarkLinkStage::SemanticIndexConstruction
+        | BenchmarkLinkStage::CoverageBaselineSelection
+        | BenchmarkLinkStage::TypedKeyModelConstruction
+        | BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
+        | BenchmarkLinkStage::ReachabilityAndPlacement
+        | BenchmarkLinkStage::FindingAndPlanMaterialization => None,
+    }
+}
+
+fn outcome_item_count(outcome: &intlify_linker::LinkOutcome) -> Result<u64, String> {
+    u64::try_from(outcome.findings().len() + outcome.bundle_plans().map_or(0, <[_]>::len))
+        .map_err(|_| "link output count does not fit u64".to_owned())
+}
+
 #[derive(Debug, Default)]
-struct TypedKeyModelStageAggregate {
+struct LinkStageAggregate {
     elapsed: Duration,
     per_iteration_checksum: Option<u32>,
     repeated_checksum: u32,
@@ -1189,8 +1322,11 @@ const fn typed_key_model_message_stage(
         }
         BenchmarkLinkStage::SemanticIndexConstruction
         | BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
+        | BenchmarkLinkStage::FallbackChainConstruction
+        | BenchmarkLinkStage::LocaleAwareResolution
         | BenchmarkLinkStage::ReachabilityAndPlacement
-        | BenchmarkLinkStage::FindingAndPlanMaterialization => None,
+        | BenchmarkLinkStage::FindingAndPlanMaterialization
+        | BenchmarkLinkStage::LocaleFindingMaterialization => None,
     }
 }
 
@@ -1295,6 +1431,198 @@ impl TypedKeyModelFixture {
     }
 }
 
+struct LocaleFallbackFixture {
+    references: Vec<MessageReferenceArtifact>,
+    definitions: Vec<MessageDefinitionArtifact>,
+    policy: LinkPolicy,
+    mappings: ScopeMappingTable,
+    completeness: ScopeCompletenessTable,
+    graph: DeliveryUnitGraph,
+    limits: LinkLimits,
+}
+
+impl LocaleFallbackFixture {
+    const EXACT_KEY: &'static str = "/fallback/exact";
+    const FIRST_TARGET_KEY: &'static str = "/fallback/first-target";
+    const SECOND_TARGET_KEY: &'static str = "/fallback/second-target";
+    const ABSENT_KEY: &'static str = "/fallback/absent";
+    const ORPHAN_KEY: &'static str = "/fallback/orphan";
+
+    fn new(scale: usize) -> Result<Self, String> {
+        if scale == 0 {
+            return Err("locale-fallback fixture scale must be positive".to_owned());
+        }
+        let scope = app_scope();
+        let limits = LinkLimits::default();
+        let production_locales = (0..=scale)
+            .map(|index| {
+                Locale::try_new(format!("l{index:08}"))
+                    .map_err(|error| format!("generated locale is invalid: {error}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let baseline_locale = production_locales[0].clone();
+        let first_target_locale = production_locales[1].clone();
+
+        let fallbacks = production_locales
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(index, source)| {
+                let targets = if index % 2 == 0 {
+                    vec![first_target_locale.clone(), baseline_locale.clone()]
+                } else {
+                    vec![baseline_locale.clone()]
+                };
+                LocaleFallback::new(source.clone(), targets)
+            })
+            .collect();
+
+        let mut definitions = Vec::with_capacity(production_locales.len());
+        for (index, locale) in production_locales.iter().enumerate() {
+            let mut records = vec![definition_for_locale(
+                scope.clone(),
+                Self::EXACT_KEY,
+                locale.clone(),
+                format!("Exact {index}"),
+            )?];
+            if index == 0 {
+                records.push(definition_for_locale(
+                    scope.clone(),
+                    Self::FIRST_TARGET_KEY,
+                    locale.clone(),
+                    "Baseline first target".to_owned(),
+                )?);
+                records.push(definition_for_locale(
+                    scope.clone(),
+                    Self::SECOND_TARGET_KEY,
+                    locale.clone(),
+                    "Baseline second target".to_owned(),
+                )?);
+            } else if index == 1 {
+                records.push(definition_for_locale(
+                    scope.clone(),
+                    Self::FIRST_TARGET_KEY,
+                    locale.clone(),
+                    "First fallback target".to_owned(),
+                )?);
+                records.push(definition_for_locale(
+                    scope.clone(),
+                    Self::ORPHAN_KEY,
+                    locale.clone(),
+                    "Non-baseline orphan".to_owned(),
+                )?);
+            }
+            definitions.push(definition_artifact_at(
+                &format!("fallback-l{index:08}.json"),
+                records,
+                &limits,
+            )?);
+        }
+
+        let references = [
+            Self::EXACT_KEY,
+            Self::FIRST_TARGET_KEY,
+            Self::SECOND_TARGET_KEY,
+            Self::ABSENT_KEY,
+            Self::ORPHAN_KEY,
+        ]
+        .into_iter()
+        .map(|key| {
+            reference(
+                scope.clone(),
+                MessageSelector::Exact(catalog_key(key)?),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+        let references = vec![reference_artifact(references, &limits)?];
+        let policy = LinkPolicy::try_new(
+            production_locales,
+            fallbacks,
+            Vec::new(),
+            vec![CoverageBaseline::new(scope.clone(), baseline_locale)],
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &limits,
+        )
+        .map_err(|error| error.to_string())?;
+        let mappings = ScopeMappingTable::empty(std::slice::from_ref(&scope), &limits)
+            .map_err(|error| error.to_string())?;
+        let completeness = ScopeCompletenessTable::try_new(
+            std::slice::from_ref(&scope),
+            vec![ScopeCompleteness::try_new(
+                scope.clone(),
+                InputCompleteness::Closed,
+                InputCompleteness::Closed,
+            )
+            .map_err(|error| error.to_string())?],
+            &limits,
+        )
+        .map_err(|error| error.to_string())?;
+        let graph = DeliveryUnitGraph::single_main(&limits).map_err(|error| error.to_string())?;
+        Ok(Self {
+            references,
+            definitions,
+            policy,
+            mappings,
+            completeness,
+            graph,
+            limits,
+        })
+    }
+
+    fn request(&self) -> Result<LinkRequest<'_>, String> {
+        LinkRequest::try_new(
+            &self.references,
+            &self.definitions,
+            &self.policy,
+            &self.mappings,
+            &self.completeness,
+            &self.graph,
+            &self.limits,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    fn input_count(&self) -> u64 {
+        let count = self
+            .definitions
+            .iter()
+            .map(|artifact| artifact.definitions().len())
+            .sum::<usize>()
+            + self
+                .references
+                .iter()
+                .map(|artifact| artifact.references().len())
+                .sum::<usize>();
+        u64::try_from(count).expect("supported fallback fixture input count fits u64")
+    }
+
+    fn verify_outcome(&self, outcome: &intlify_linker::LinkOutcome) -> Result<(), String> {
+        for required in [
+            LinkFindingKind::UnresolvedMessage,
+            LinkFindingKind::MissingTranslation,
+            LinkFindingKind::OrphanedTranslation,
+        ] {
+            if !outcome
+                .findings()
+                .iter()
+                .any(|finding| finding.kind() == required)
+            {
+                return Err(format!(
+                    "locale-fallback fixture did not produce {required:?}"
+                ));
+            }
+        }
+        if outcome.bundle_plans().is_some() || !outcome.typed_key_models().is_empty() {
+            return Err(
+                "locale-fallback fixture did not retain its blocking coverage-gap outcome"
+                    .to_owned(),
+            );
+        }
+        Ok(())
+    }
+}
+
 struct GeneratedLinkFixture {
     references: Vec<MessageReferenceArtifact>,
     definitions: Vec<MessageDefinitionArtifact>,
@@ -1312,6 +1640,9 @@ impl GeneratedLinkFixture {
             FixtureShape::FindingDense => Vec::new(),
             FixtureShape::TypedKeyModel => {
                 return Err("typed-key model fixtures use their dedicated generator".to_owned());
+            }
+            FixtureShape::LocaleFallbackExpansion => {
+                return Err("locale-fallback fixtures use their dedicated generator".to_owned());
             }
             _ => (0..scale)
                 .map(|index| definition(scope.clone(), &definition_key(shape, index), index))
@@ -1347,6 +1678,9 @@ impl GeneratedLinkFixture {
                 .collect::<Result<Vec<_>, _>>()?,
             FixtureShape::TypedKeyModel => {
                 return Err("typed-key model fixtures use their dedicated generator".to_owned());
+            }
+            FixtureShape::LocaleFallbackExpansion => {
+                return Err("locale-fallback fixtures use their dedicated generator".to_owned());
             }
         };
         let limits = LinkLimits::default();
@@ -1421,6 +1755,7 @@ fn definition_key(shape: FixtureShape, index: usize) -> String {
     match shape {
         FixtureShape::BoundedSelector => format!("/group/{index:08}"),
         FixtureShape::TypedKeyModel => format!("/typed/{index:08}"),
+        FixtureShape::LocaleFallbackExpansion => format!("/fallback/{index:08}"),
         _ => format!("/key/{index:08}"),
     }
 }
@@ -1639,6 +1974,7 @@ const fn fixture_variant(shape: FixtureShape) -> &'static str {
         FixtureShape::BoundedSelector => "bounded_selector",
         FixtureShape::FindingDense => "finding_dense",
         FixtureShape::TypedKeyModel => "typed_key_model",
+        FixtureShape::LocaleFallbackExpansion => "locale_fallback_expansion",
     }
 }
 

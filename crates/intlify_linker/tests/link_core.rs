@@ -319,8 +319,11 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
             BenchmarkLinkStage::CoverageBaselineSelection,
             BenchmarkLinkStage::TypedKeyModelConstruction,
             BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
+            BenchmarkLinkStage::FallbackChainConstruction,
+            BenchmarkLinkStage::LocaleAwareResolution,
             BenchmarkLinkStage::ReachabilityAndPlacement,
             BenchmarkLinkStage::FindingAndPlanMaterialization,
+            BenchmarkLinkStage::LocaleFindingMaterialization,
         ]
     );
     assert!(measured.stages().iter().all(|stage| {
@@ -395,6 +398,185 @@ fn typed_key_benchmark_checksums_observe_each_stage_contract() {
     // Construction records the exact private payload and source relation.
     assert_ne!(baseline[1], payload_changed[1]);
     assert_ne!(baseline[1], location_changed[1]);
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn typed_key_construction_checksum_observes_complete_coverage_gap_state() {
+    let app = scope("app");
+    let policy = policy_with_baselines(
+        &["en", "ja"],
+        Vec::new(),
+        vec![CoverageBaseline::new(app.clone(), locale("en"))],
+        DynamicReferenceMode::Compat,
+    );
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let mapping = mappings(std::slice::from_ref(&app), Vec::new());
+
+    let checksum = |key_value: &str| {
+        let definitions = vec![definition_artifact(
+            "ja.json",
+            vec![definition(app.clone(), key_value, "ja", "Only Japanese", 0)],
+        )];
+        let request = LinkRequest::try_new(
+            &[],
+            &definitions,
+            &policy,
+            &mapping,
+            &completeness,
+            &graph,
+            &limits,
+        )
+        .unwrap();
+        let execution = benchmark_link(&request).unwrap();
+        assert!(execution.outcome().typed_key_models().is_empty());
+        execution
+            .stages()
+            .iter()
+            .find(|measurement| {
+                measurement.stage() == BenchmarkLinkStage::TypedKeyModelConstruction
+            })
+            .unwrap()
+            .checksum()
+    };
+
+    assert_ne!(checksum("/orphan-a"), checksum("/orphan-b"));
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn fallback_benchmark_checksums_observe_semantics_but_not_submitted_set_order() {
+    let app = scope("app");
+    let references = vec![reference_artifact(
+        "entry",
+        DeliveryUnitId::main(),
+        vec![reference(
+            app.clone(),
+            MessageSelector::Exact(key("/hello")),
+        )],
+    )];
+    let definitions = vec![
+        definition_artifact(
+            "en.json",
+            vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
+        ),
+        definition_artifact(
+            "ja.json",
+            vec![definition(app.clone(), "/hello", "ja", "Konnichiwa", 0)],
+        ),
+    ];
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let mapping = mappings(std::slice::from_ref(&app), Vec::new());
+
+    let checksums = |locales: &[&str], fallbacks: &[(&str, &[&str])]| {
+        let policy = policy_with_fallbacks(locales, fallbacks, DynamicReferenceMode::Compat);
+        let request = LinkRequest::try_new(
+            &references,
+            &definitions,
+            &policy,
+            &mapping,
+            &completeness,
+            &graph,
+            &limits,
+        )
+        .unwrap();
+        let execution = benchmark_link(&request).unwrap();
+        let checksum = |stage| {
+            execution
+                .stages()
+                .iter()
+                .find(|measurement| measurement.stage() == stage)
+                .unwrap()
+                .checksum()
+        };
+        [
+            checksum(BenchmarkLinkStage::FallbackChainConstruction),
+            checksum(BenchmarkLinkStage::LocaleAwareResolution),
+            checksum(BenchmarkLinkStage::LocaleFindingMaterialization),
+        ]
+    };
+
+    let en_before_ja = checksums(&["en", "fr", "ja"], &[("fr", &["en", "ja"])]);
+    let ja_before_en = checksums(&["en", "fr", "ja"], &[("fr", &["ja", "en"])]);
+    assert_ne!(en_before_ja[0], ja_before_en[0]);
+    assert_ne!(en_before_ja[1], ja_before_en[1]);
+    assert_ne!(en_before_ja[2], ja_before_en[2]);
+
+    let canonical = checksums(&["en", "fr", "ja"], &[("fr", &["en"]), ("ja", &["en"])]);
+    let reordered_input = checksums(&["ja", "en", "fr"], &[("ja", &["en"]), ("fr", &["en"])]);
+    assert_eq!(canonical, reordered_input);
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn locale_resolution_checksum_observes_selector_and_selected_source_identity() {
+    let app = scope("app");
+    let policy = policy_with_fallbacks(
+        &["en", "fr"],
+        &[("fr", &["en"])],
+        DynamicReferenceMode::Compat,
+    );
+    let completeness = closed_completeness(std::slice::from_ref(&app));
+    let graph = DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap();
+    let limits = LinkLimits::default();
+    let mapping = mappings(std::slice::from_ref(&app), Vec::new());
+    let checksum = |references: &[MessageReferenceArtifact],
+                    definitions: &[MessageDefinitionArtifact]| {
+        let request = LinkRequest::try_new(
+            references,
+            definitions,
+            &policy,
+            &mapping,
+            &completeness,
+            &graph,
+            &limits,
+        )
+        .unwrap();
+        benchmark_link(&request)
+            .unwrap()
+            .stages()
+            .iter()
+            .find(|measurement| measurement.stage() == BenchmarkLinkStage::LocaleAwareResolution)
+            .unwrap()
+            .checksum()
+    };
+
+    let exact = vec![reference_artifact(
+        "entry",
+        DeliveryUnitId::main(),
+        vec![reference(
+            app.clone(),
+            MessageSelector::Exact(key("/hello")),
+        )],
+    )];
+    let source_a = vec![definition_artifact(
+        "a.json",
+        vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
+    )];
+    let source_b = vec![definition_artifact(
+        "b.json",
+        vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
+    )];
+    assert_ne!(checksum(&exact, &source_a), checksum(&exact, &source_b));
+
+    let unmatched_prefix = |value| {
+        vec![reference_artifact(
+            "entry",
+            DeliveryUnitId::main(),
+            vec![reference(
+                app.clone(),
+                MessageSelector::Prefix(CatalogKeyPrefix::try_new(DOMAIN, value).unwrap()),
+            )],
+        )]
+    };
+    assert_ne!(
+        checksum(&unmatched_prefix("/missing-a"), &[]),
+        checksum(&unmatched_prefix("/missing-b"), &[])
+    );
 }
 
 #[test]

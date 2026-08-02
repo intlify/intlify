@@ -182,11 +182,37 @@ trait LinkObserver {
 
     fn finish_coverage_baseline_selection(&mut self, _analysis: &[CoverageAnalysis<'_>]) {}
 
-    fn finish_typed_key_model_construction(&mut self, _models: &TypedKeyModelBatch) {}
+    fn finish_typed_key_model_construction(
+        &mut self,
+        _analysis: &[CoverageAnalysis<'_>],
+        _models: &TypedKeyModelBatch,
+    ) {
+    }
 
-    fn finish_selector_resolution(&mut self, _resolution: &ResolutionAnalysis) {}
+    fn finish_fallback_chain_construction(
+        &mut self,
+        _production_locales: &[Locale],
+        _chains: &BTreeMap<Locale, Box<[Locale]>>,
+    ) {
+    }
+
+    fn finish_locale_aware_resolution(
+        &mut self,
+        _resolution: &ResolutionAnalysis,
+        _definitions: &DefinitionAnalysis,
+    ) {
+    }
+
+    fn finish_selector_resolution(
+        &mut self,
+        _resolution: &ResolutionAnalysis,
+        _definitions: &DefinitionAnalysis,
+    ) {
+    }
 
     fn finish_reachability(&mut self, _reachability: &Reachability) {}
+
+    fn finish_locale_finding_materialization(&mut self, _findings: &[LinkFinding]) {}
 
     fn finish_outcome(&mut self, _outcome: &LinkOutcome) {}
 }
@@ -201,8 +227,11 @@ enum LinkStage {
     CoverageBaselineSelection,
     TypedKeyModelConstruction,
     SelectorExpansionAndReferenceResolution,
+    FallbackChainConstruction,
+    LocaleAwareResolution,
     ReachabilityAndPlacement,
     FindingAndPlanMaterialization,
+    LocaleFindingMaterialization,
 }
 
 fn link_with_observer<O>(
@@ -224,14 +253,25 @@ where
     observer.begin(LinkStage::TypedKeyModelConstruction);
     let typed_key_models =
         construct_typed_key_models(&coverage_analysis, request.resolved_policy())?;
-    observer.finish_typed_key_model_construction(&typed_key_models);
+    observer.finish_typed_key_model_construction(&coverage_analysis, &typed_key_models);
 
     observer.begin(LinkStage::SelectorExpansionAndReferenceResolution);
+    observer.begin(LinkStage::FallbackChainConstruction);
     let chains = build_resolution_chains(request);
+    observer.finish_fallback_chain_construction(
+        request.resolved_policy().production_locales(),
+        &chains,
+    );
     let mut pattern_budget = PatternWorkBudget::new(request);
-    let resolution =
-        resolve_references(request, &index, &definitions, chains, &mut pattern_budget)?;
-    observer.finish_selector_resolution(&resolution);
+    let resolution = resolve_references(
+        request,
+        &index,
+        &definitions,
+        chains,
+        &mut pattern_budget,
+        observer,
+    )?;
+    observer.finish_selector_resolution(&resolution, &definitions);
 
     observer.begin(LinkStage::ReachabilityAndPlacement);
     let reachability = match request.resolved_policy().placement() {
@@ -248,6 +288,7 @@ where
         &coverage_analysis,
         &resolution,
         &reachability,
+        observer,
     )?;
 
     let bundle_plans = if findings.iter().any(LinkFinding::blocking) {
@@ -282,7 +323,7 @@ pub(crate) fn benchmark_link(
 
 #[cfg(feature = "benchmark")]
 struct BenchmarkLinkObserver {
-    active: Option<(LinkStage, Instant)>,
+    active: Vec<ActiveBenchmarkLinkStage>,
     stages: Vec<BenchmarkLinkStageMeasurement>,
     observed: Vec<bool>,
     observation_overhead: Duration,
@@ -290,33 +331,51 @@ struct BenchmarkLinkObserver {
 }
 
 #[cfg(feature = "benchmark")]
+struct ActiveBenchmarkLinkStage {
+    stage: LinkStage,
+    started: Instant,
+    excluded: Duration,
+    measurement_index: usize,
+}
+
+#[cfg(feature = "benchmark")]
+const EXPECTED_BENCHMARK_LINK_STAGES: [BenchmarkLinkStage; 9] = [
+    BenchmarkLinkStage::SemanticIndexConstruction,
+    BenchmarkLinkStage::CoverageBaselineSelection,
+    BenchmarkLinkStage::TypedKeyModelConstruction,
+    BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
+    BenchmarkLinkStage::FallbackChainConstruction,
+    BenchmarkLinkStage::LocaleAwareResolution,
+    BenchmarkLinkStage::ReachabilityAndPlacement,
+    BenchmarkLinkStage::FindingAndPlanMaterialization,
+    BenchmarkLinkStage::LocaleFindingMaterialization,
+];
+
+#[cfg(feature = "benchmark")]
 impl BenchmarkLinkObserver {
     fn new() -> Self {
         Self {
-            active: None,
-            stages: Vec::with_capacity(6),
-            observed: Vec::with_capacity(6),
+            active: Vec::with_capacity(2),
+            stages: Vec::with_capacity(EXPECTED_BENCHMARK_LINK_STAGES.len()),
+            observed: Vec::with_capacity(EXPECTED_BENCHMARK_LINK_STAGES.len()),
             observation_overhead: Duration::ZERO,
             invariant_failed: false,
         }
     }
 
     fn complete(&mut self, expected: LinkStage) -> Option<usize> {
-        let Some((active, started)) = self.active.take() else {
+        let Some(active) = self.active.pop() else {
             self.invariant_failed = true;
             return None;
         };
-        if active != expected {
+        if active.stage != expected {
             self.invariant_failed = true;
             return None;
         }
-        self.stages.push(BenchmarkLinkStageMeasurement::new(
-            benchmark_stage(expected),
-            started.elapsed(),
-            0,
-        ));
-        self.observed.push(false);
-        Some(self.stages.len() - 1)
+        let elapsed = active.started.elapsed().saturating_sub(active.excluded);
+        self.stages[active.measurement_index] =
+            BenchmarkLinkStageMeasurement::new(benchmark_stage(expected), elapsed, 0);
+        Some(active.measurement_index)
     }
 
     fn observe(&mut self, index: Option<usize>, checksum: u32) {
@@ -340,31 +399,26 @@ impl BenchmarkLinkObserver {
         let observation_started = Instant::now();
         let checksum = checksum();
         self.observe(index, checksum);
-        self.observation_overhead = self
-            .observation_overhead
-            .saturating_add(observation_started.elapsed());
+        let elapsed = observation_started.elapsed();
+        for active in &mut self.active {
+            active.excluded = active.excluded.saturating_add(elapsed);
+        }
+        self.observation_overhead = self.observation_overhead.saturating_add(elapsed);
     }
 
     fn finish(
         self,
     ) -> Result<(Vec<BenchmarkLinkStageMeasurement>, Duration), LinkOperationalError> {
         if self.invariant_failed
-            || self.active.is_some()
-            || self.stages.len() != 6
+            || !self.active.is_empty()
+            || self.stages.len() != EXPECTED_BENCHMARK_LINK_STAGES.len()
             || self.observed.len() != self.stages.len()
             || self.observed.iter().any(|observed| !observed)
             || self
                 .stages
                 .iter()
                 .map(BenchmarkLinkStageMeasurement::stage)
-                .ne([
-                    BenchmarkLinkStage::SemanticIndexConstruction,
-                    BenchmarkLinkStage::CoverageBaselineSelection,
-                    BenchmarkLinkStage::TypedKeyModelConstruction,
-                    BenchmarkLinkStage::SelectorExpansionAndReferenceResolution,
-                    BenchmarkLinkStage::ReachabilityAndPlacement,
-                    BenchmarkLinkStage::FindingAndPlanMaterialization,
-                ])
+                .ne(EXPECTED_BENCHMARK_LINK_STAGES)
         {
             return Err(LinkOperationalError::InternalInvariant);
         }
@@ -375,9 +429,23 @@ impl BenchmarkLinkObserver {
 #[cfg(feature = "benchmark")]
 impl LinkObserver for BenchmarkLinkObserver {
     fn begin(&mut self, stage: LinkStage) {
-        if self.active.replace((stage, Instant::now())).is_some() {
+        let parent = self.active.last().map(|active| active.stage);
+        if !allowed_link_stage_parent(parent, stage) {
             self.invariant_failed = true;
         }
+        let measurement_index = self.stages.len();
+        self.stages.push(BenchmarkLinkStageMeasurement::new(
+            benchmark_stage(stage),
+            Duration::ZERO,
+            0,
+        ));
+        self.observed.push(false);
+        self.active.push(ActiveBenchmarkLinkStage {
+            stage,
+            started: Instant::now(),
+            excluded: Duration::ZERO,
+            measurement_index,
+        });
     }
 
     fn finish_semantic_index(&mut self, index: &SemanticIndex, definitions: &DefinitionAnalysis) {
@@ -390,14 +458,46 @@ impl LinkObserver for BenchmarkLinkObserver {
         self.observe_with(measurement, || checksum_coverage_analysis(analysis));
     }
 
-    fn finish_typed_key_model_construction(&mut self, models: &TypedKeyModelBatch) {
+    fn finish_typed_key_model_construction(
+        &mut self,
+        analysis: &[CoverageAnalysis<'_>],
+        models: &TypedKeyModelBatch,
+    ) {
         let measurement = self.complete(LinkStage::TypedKeyModelConstruction);
-        self.observe_with(measurement, || checksum_typed_key_models(models));
+        self.observe_with(measurement, || checksum_typed_key_models(analysis, models));
     }
 
-    fn finish_selector_resolution(&mut self, resolution: &ResolutionAnalysis) {
+    fn finish_fallback_chain_construction(
+        &mut self,
+        production_locales: &[Locale],
+        chains: &BTreeMap<Locale, Box<[Locale]>>,
+    ) {
+        let measurement = self.complete(LinkStage::FallbackChainConstruction);
+        self.observe_with(measurement, || {
+            checksum_fallback_chains(production_locales, chains)
+        });
+    }
+
+    fn finish_locale_aware_resolution(
+        &mut self,
+        resolution: &ResolutionAnalysis,
+        definitions: &DefinitionAnalysis,
+    ) {
+        let measurement = self.complete(LinkStage::LocaleAwareResolution);
+        self.observe_with(measurement, || {
+            checksum_locale_aware_resolution(resolution, definitions)
+        });
+    }
+
+    fn finish_selector_resolution(
+        &mut self,
+        resolution: &ResolutionAnalysis,
+        definitions: &DefinitionAnalysis,
+    ) {
         let measurement = self.complete(LinkStage::SelectorExpansionAndReferenceResolution);
-        self.observe_with(measurement, || checksum_resolution_analysis(resolution));
+        self.observe_with(measurement, || {
+            checksum_resolution_analysis(resolution, definitions)
+        });
     }
 
     fn finish_reachability(&mut self, reachability: &Reachability) {
@@ -405,9 +505,30 @@ impl LinkObserver for BenchmarkLinkObserver {
         self.observe_with(measurement, || checksum_reachability(reachability));
     }
 
+    fn finish_locale_finding_materialization(&mut self, findings: &[LinkFinding]) {
+        let measurement = self.complete(LinkStage::LocaleFindingMaterialization);
+        self.observe_with(measurement, || checksum_locale_findings(findings));
+    }
+
     fn finish_outcome(&mut self, outcome: &LinkOutcome) {
         let measurement = self.complete(LinkStage::FindingAndPlanMaterialization);
         self.observe_with(measurement, || checksum_outcome(outcome));
+    }
+}
+
+#[cfg(feature = "benchmark")]
+const fn allowed_link_stage_parent(parent: Option<LinkStage>, stage: LinkStage) -> bool {
+    match (parent, stage) {
+        (None, _)
+        | (
+            Some(LinkStage::SelectorExpansionAndReferenceResolution),
+            LinkStage::FallbackChainConstruction | LinkStage::LocaleAwareResolution,
+        )
+        | (
+            Some(LinkStage::FindingAndPlanMaterialization),
+            LinkStage::LocaleFindingMaterialization,
+        ) => true,
+        (Some(_), _) => false,
     }
 }
 
@@ -420,10 +541,13 @@ const fn benchmark_stage(stage: LinkStage) -> BenchmarkLinkStage {
         LinkStage::SelectorExpansionAndReferenceResolution => {
             BenchmarkLinkStage::SelectorExpansionAndReferenceResolution
         }
+        LinkStage::FallbackChainConstruction => BenchmarkLinkStage::FallbackChainConstruction,
+        LinkStage::LocaleAwareResolution => BenchmarkLinkStage::LocaleAwareResolution,
         LinkStage::ReachabilityAndPlacement => BenchmarkLinkStage::ReachabilityAndPlacement,
         LinkStage::FindingAndPlanMaterialization => {
             BenchmarkLinkStage::FindingAndPlanMaterialization
         }
+        LinkStage::LocaleFindingMaterialization => BenchmarkLinkStage::LocaleFindingMaterialization,
     }
 }
 
@@ -503,31 +627,249 @@ fn checksum_coverage_analysis(analysis: &[CoverageAnalysis<'_>]) -> u32 {
 }
 
 #[cfg(feature = "benchmark")]
-fn checksum_typed_key_models(batch: &TypedKeyModelBatch) -> u32 {
+fn checksum_typed_key_models(analysis: &[CoverageAnalysis<'_>], batch: &TypedKeyModelBatch) -> u32 {
     let mut checksum = BenchmarkChecksum::new(b"intlify-link-typed-key-model-construction-v1");
-    checksum.write_u64(0x01, batch.models().len() as u64);
-    for (model, relation) in batch.models().iter().zip(batch.relations()) {
-        checksum.write_resolved_scope(0x02, model.resolved_scope());
-        checksum.write_u64(0x03, model.keys().len() as u64);
-        for key in model.keys() {
-            checksum.write_catalog_key(0x04, key);
+    checksum.write_u64(0x01, analysis.len() as u64);
+    for entry in analysis {
+        checksum.write_resolved_scope(0x02, &entry.scope);
+        match &entry.state {
+            CoverageAnalysisState::NotSelected => checksum.write_u64(0x03, 0),
+            CoverageAnalysisState::Partial { baseline_locale } => {
+                checksum.write_u64(0x03, 1);
+                checksum.write_str(0x04, baseline_locale.as_str());
+            }
+            CoverageAnalysisState::Model(selection) => {
+                checksum.write_u64(0x03, 2);
+                checksum.write_str(0x04, selection.baseline_locale.as_str());
+                checksum.write_u64(0x05, selection.baseline_definitions.len() as u64);
+                for (key, snapshot) in &selection.baseline_definitions {
+                    checksum.write_catalog_key(0x06, key);
+                    checksum.write_selected_definition_identity(0x07, snapshot);
+                }
+            }
+            CoverageAnalysisState::ModelUnavailable {
+                baseline_locale,
+                ambiguous_keys,
+                difference,
+            } => {
+                checksum.write_u64(0x03, 3);
+                checksum.write_str(0x04, baseline_locale.as_str());
+                checksum.write_u64(0x08, ambiguous_keys.len() as u64);
+                for key in ambiguous_keys {
+                    checksum.write_catalog_key(0x09, key);
+                }
+                checksum.write_u64(0x0a, difference.len() as u64);
+                for key in difference {
+                    checksum.write_catalog_key(0x0b, key);
+                }
+            }
         }
-        checksum.write_resolved_scope(0x05, relation.resolved_scope());
-        checksum.write_str(0x06, relation.baseline_locale().as_str());
-        checksum.write_u64(0x07, relation.snapshots().len() as u64);
+    }
+    checksum.write_u64(0x0c, batch.models().len() as u64);
+    for (model, relation) in batch.models().iter().zip(batch.relations()) {
+        checksum.write_resolved_scope(0x0d, model.resolved_scope());
+        checksum.write_u64(0x0e, model.keys().len() as u64);
+        for key in model.keys() {
+            checksum.write_catalog_key(0x0f, key);
+        }
+        checksum.write_resolved_scope(0x10, relation.resolved_scope());
+        checksum.write_str(0x11, relation.baseline_locale().as_str());
+        checksum.write_u64(0x12, relation.snapshots().len() as u64);
         for snapshot in relation.snapshots() {
-            checksum.write_resolved_scope(0x08, snapshot.resolved_scope());
-            checksum.write_catalog_key(0x09, snapshot.key());
-            checksum.write_str(0x0a, snapshot.locale().as_str());
-            checksum.write_str(0x0b, snapshot.message().as_str());
-            checksum.write_definition_location(0x0c, snapshot.location());
+            checksum.write_resolved_scope(0x13, snapshot.resolved_scope());
+            checksum.write_catalog_key(0x14, snapshot.key());
+            checksum.write_str(0x15, snapshot.locale().as_str());
+            checksum.write_str(0x16, snapshot.message().as_str());
+            checksum.write_definition_location(0x17, snapshot.location());
         }
     }
     checksum.finish()
 }
 
 #[cfg(feature = "benchmark")]
-fn checksum_resolution_analysis(resolution: &ResolutionAnalysis) -> u32 {
+fn checksum_fallback_chains(
+    production_locales: &[Locale],
+    chains: &BTreeMap<Locale, Box<[Locale]>>,
+) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-fallback-chain-construction-v1");
+    checksum.write_u64(0x01, production_locales.len() as u64);
+    for locale in production_locales {
+        checksum.write_str(0x02, locale.as_str());
+    }
+    checksum.write_u64(0x03, chains.len() as u64);
+    for (source, chain) in chains {
+        checksum.write_str(0x04, source.as_str());
+        checksum.write_u64(0x05, chain.len() as u64);
+        for locale in chain {
+            checksum.write_str(0x06, locale.as_str());
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_locale_aware_resolution(
+    resolution: &ResolutionAnalysis,
+    definitions: &DefinitionAnalysis,
+) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-locale-aware-resolution-v1");
+    checksum.write_u64(0x01, resolution.facts.len() as u64);
+    for (logical, by_locale) in &resolution.facts {
+        checksum.write_logical_identity(0x02, logical);
+        checksum.write_u64(0x03, by_locale.len() as u64);
+        for (requested_locale, fact) in by_locale {
+            let chain = resolution
+                .chains
+                .get(requested_locale)
+                .expect("resolution fact must retain its canonical chain");
+            let probed = &chain[..fact.probed_len];
+            checksum.write_str(0x04, requested_locale.as_str());
+            checksum.write_u64(0x05, probed.len() as u64);
+            for locale in probed {
+                checksum.write_str(0x06, locale.as_str());
+            }
+            match fact.selected_chain_index {
+                Some(index) => {
+                    let selected_locale = &chain[index];
+                    let snapshot =
+                        exact_definition(&definitions.unique_definitions, logical, selected_locale)
+                            .expect("selected locale-resolution fact must retain its definition");
+                    checksum.write_bool(0x07, true);
+                    checksum.write_str(0x08, selected_locale.as_str());
+                    checksum.write_definition_location(0x09, &snapshot.location);
+                }
+                None => checksum.write_bool(0x07, false),
+            }
+        }
+    }
+    let unmatched_selector_count = resolution
+        .references
+        .iter()
+        .filter(|reference| reference.unmatched_non_exact)
+        .count();
+    checksum.write_u64(0x0a, unmatched_selector_count as u64);
+    for reference in resolution
+        .references
+        .iter()
+        .filter(|reference| reference.unmatched_non_exact)
+    {
+        checksum.write_reference_identity(0x0b, &reference.reference.identity);
+        checksum.write_resolved_scope(0x0c, &reference.reference.scope);
+        checksum.write_str(0x0d, reference.reference.domain.as_str());
+        checksum.write_selector(0x0e, &reference.reference.selector);
+    }
+    if unmatched_selector_count != 0 {
+        // Every unmatched selector fails against the same request-wide chain table. Hash the two
+        // canonical sets once; their cross product is the complete selector-locale failure relation.
+        checksum.write_u64(0x0f, resolution.chains.len() as u64);
+        for (requested_locale, chain) in &resolution.chains {
+            checksum.write_str(0x10, requested_locale.as_str());
+            checksum.write_u64(0x11, chain.len() as u64);
+            for locale in chain {
+                checksum.write_str(0x12, locale.as_str());
+            }
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_locale_findings(findings: &[LinkFinding]) -> u32 {
+    let mut checksum = BenchmarkChecksum::new(b"intlify-link-locale-finding-materialization-v1");
+    checksum.write_u64(0x01, findings.len() as u64);
+    for finding in findings {
+        checksum.write_u64(0x02, u64::from(finding.kind().precedence()));
+        match finding.record() {
+            LinkFindingRecord::UnresolvedMessage(finding) => {
+                let evidence = finding.evidence();
+                checksum.write_reference_identity(0x03, finding.subject().reference());
+                checksum.write_delivery_unit(0x04, evidence.delivery_unit());
+                checksum.write_resolved_scope(0x05, evidence.resolved_scope());
+                checksum.write_str(0x06, evidence.domain().as_str());
+                checksum.write_selector(0x07, evidence.selector());
+                checksum.write_u64(0x08, evidence.failures().len() as u64);
+                for failure in evidence.failures() {
+                    match failure {
+                        ResolutionFailure::Selector(_) => checksum.write_u64(0x09, 0),
+                        ResolutionFailure::Message(failure) => {
+                            checksum.write_u64(0x09, 1);
+                            checksum.write_catalog_key(0x0a, failure.key());
+                        }
+                    }
+                    checksum.write_str(0x0b, failure.requested_locale().as_str());
+                    checksum.write_u64(0x0c, failure.probed_locales().len() as u64);
+                    for locale in failure.probed_locales() {
+                        checksum.write_str(0x0d, locale.as_str());
+                    }
+                }
+                match evidence.reason() {
+                    Some(reason) => {
+                        checksum.write_bool(0x1e, true);
+                        checksum.write_str(0x1f, reason.as_str());
+                    }
+                    None => checksum.write_bool(0x1e, false),
+                }
+                match evidence.origin() {
+                    Some(origin) => {
+                        checksum.write_bool(0x20, true);
+                        checksum.write_source_identity(0x21, origin.source());
+                        checksum.write_u64(0x22, u64::from(origin.span().start()));
+                        checksum.write_u64(0x23, u64::from(origin.span().end()));
+                    }
+                    None => checksum.write_bool(0x20, false),
+                }
+            }
+            LinkFindingRecord::MissingTranslation(finding) => {
+                let subject = finding.subject();
+                let evidence = finding.evidence();
+                checksum.write_reference_identity(0x0e, subject.reference());
+                checksum.write_str(0x0f, subject.requested_locale().as_str());
+                checksum.write_catalog_key(0x10, subject.key());
+                checksum.write_delivery_unit(0x11, evidence.delivery_unit());
+                checksum.write_resolved_scope(0x12, evidence.resolved_scope());
+                checksum.write_str(0x13, evidence.domain().as_str());
+                checksum.write_u64(0x14, evidence.probed_locales().len() as u64);
+                for locale in evidence.probed_locales() {
+                    checksum.write_str(0x15, locale.as_str());
+                }
+                checksum.write_str(0x16, evidence.selected_locale().as_str());
+                checksum.write_definition_location(0x17, evidence.definition());
+                match evidence.origin() {
+                    Some(origin) => {
+                        checksum.write_bool(0x24, true);
+                        checksum.write_source_identity(0x25, origin.source());
+                        checksum.write_u64(0x26, u64::from(origin.span().start()));
+                        checksum.write_u64(0x27, u64::from(origin.span().end()));
+                    }
+                    None => checksum.write_bool(0x24, false),
+                }
+            }
+            LinkFindingRecord::OrphanedTranslation(finding) => {
+                let subject = finding.subject();
+                let evidence = finding.evidence();
+                checksum.write_resolved_scope(0x18, subject.resolved_scope());
+                checksum.write_str(0x19, subject.domain().as_str());
+                checksum.write_catalog_key(0x1a, subject.key());
+                checksum.write_str(0x1b, subject.locale().as_str());
+                checksum.write_str(0x1c, evidence.baseline_locale().as_str());
+                checksum.write_definition_location(0x1d, evidence.definition());
+            }
+            LinkFindingRecord::AmbiguousMessageDefinition(_)
+            | LinkFindingRecord::UnusedMessage(_)
+            | LinkFindingRecord::UnboundedDynamicReference(_)
+            | LinkFindingRecord::DegradedAnalysis(_) => {
+                unreachable!("locale-finding interval retained a later or earlier finding kind")
+            }
+        }
+    }
+    checksum.finish()
+}
+
+#[cfg(feature = "benchmark")]
+fn checksum_resolution_analysis(
+    resolution: &ResolutionAnalysis,
+    definitions: &DefinitionAnalysis,
+) -> u32 {
     let mut checksum = BenchmarkChecksum::new(b"intlify-link-selector-resolution-v1");
     checksum.write_u64(0x01, resolution.references.len() as u64);
     for reference in &resolution.references {
@@ -558,16 +900,21 @@ fn checksum_resolution_analysis(resolution: &ResolutionAnalysis) -> u32 {
             }
             checksum.write_bool(0x0e, fact.selected_chain_index.is_some());
             if let Some(index) = fact.selected_chain_index {
-                checksum.write_str(0x0f, chain[index].as_str());
+                let selected_locale = &chain[index];
+                let snapshot =
+                    exact_definition(&definitions.unique_definitions, logical, selected_locale)
+                        .expect("selected locale-resolution fact must retain its definition");
+                checksum.write_str(0x0f, selected_locale.as_str());
+                checksum.write_definition_location(0x10, &snapshot.location);
             }
         }
     }
-    checksum.write_u64(0x10, resolution.chains.len() as u64);
+    checksum.write_u64(0x11, resolution.chains.len() as u64);
     for (source, chain) in &resolution.chains {
-        checksum.write_str(0x11, source.as_str());
-        checksum.write_u64(0x12, chain.len() as u64);
+        checksum.write_str(0x12, source.as_str());
+        checksum.write_u64(0x13, chain.len() as u64);
         for locale in chain {
-            checksum.write_str(0x13, locale.as_str());
+            checksum.write_str(0x14, locale.as_str());
         }
     }
     checksum.finish()
@@ -1038,13 +1385,17 @@ fn construct_typed_key_models(
     TypedKeyModelBatch::try_new(models, relations, resolved_policy)
 }
 
-fn resolve_references(
+fn resolve_references<O>(
     request: &LinkRequest<'_>,
     index: &SemanticIndex,
     definitions: &DefinitionAnalysis,
     chains: BTreeMap<Locale, Box<[Locale]>>,
     pattern_budget: &mut PatternWorkBudget,
-) -> Result<ResolutionAnalysis, LinkOperationalError> {
+    observer: &mut O,
+) -> Result<ResolutionAnalysis, LinkOperationalError>
+where
+    O: LinkObserver,
+{
     let mut resolutions = Vec::with_capacity(index.references.len());
 
     for reference in &index.references {
@@ -1094,6 +1445,7 @@ fn resolve_references(
             demands.insert(logical.clone());
         }
     }
+    observer.begin(LinkStage::LocaleAwareResolution);
     preflight_locale_resolution_facts(request, &demands, &resolutions)?;
 
     let mut facts = BTreeMap::new();
@@ -1123,12 +1475,14 @@ fn resolve_references(
         facts.insert(logical, by_locale);
     }
 
-    Ok(ResolutionAnalysis {
+    let analysis = ResolutionAnalysis {
         references: resolutions,
         root_selected,
         chains,
         facts,
-    })
+    };
+    observer.finish_locale_aware_resolution(&analysis, definitions);
+    Ok(analysis)
 }
 
 fn is_non_exact_bounded(selector: &MessageSelector) -> bool {
@@ -1309,13 +1663,17 @@ fn extend_unambiguous(
     );
 }
 
-fn materialize_findings(
+fn materialize_findings<O>(
     request: &LinkRequest<'_>,
     definitions: &DefinitionAnalysis,
     coverage_analysis: &[CoverageAnalysis<'_>],
     resolution: &ResolutionAnalysis,
     reachability: &Reachability,
-) -> Result<Vec<LinkFinding>, LinkOperationalError> {
+    observer: &mut O,
+) -> Result<Vec<LinkFinding>, LinkOperationalError>
+where
+    O: LinkObserver,
+{
     let finding_count = count_findings(
         request,
         definitions,
@@ -1343,6 +1701,9 @@ fn materialize_findings(
             )),
         )?;
     }
+
+    let locale_finding_start = findings.len();
+    observer.begin(LinkStage::LocaleFindingMaterialization);
 
     for reference in &resolution.references {
         if !reference_has_resolution_failure(reference, resolution) {
@@ -1451,6 +1812,8 @@ fn materialize_findings(
             }
         }
     }
+
+    observer.finish_locale_finding_materialization(&findings[locale_finding_start..]);
 
     for (logical, definitions_by_locale) in &definitions.unique_definitions {
         if !should_report_unused(request, definitions, reachability, logical)? {

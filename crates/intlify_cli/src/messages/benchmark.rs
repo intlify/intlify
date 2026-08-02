@@ -309,8 +309,11 @@ impl BenchmarkRecorder {
                     | MessageBenchmarkStage::CoverageBaselineSelection
                     | MessageBenchmarkStage::TypedKeyModelConstruction
                     | MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
+                    | MessageBenchmarkStage::FallbackChainConstruction
+                    | MessageBenchmarkStage::LocaleAwareResolution
                     | MessageBenchmarkStage::ReachabilityAndPlacement
                     | MessageBenchmarkStage::FindingAndPlanMaterialization
+                    | MessageBenchmarkStage::LocaleFindingMaterialization
             )
     }
 

@@ -16,7 +16,7 @@ import {
 } from './benchmark-profile.mjs'
 import { assertValidChecksumObservationRegistry } from './checksum-observations.mjs'
 
-export const MESSAGE_BENCH_RESULT_SCHEMA_VERSION = '1'
+export const MESSAGE_BENCH_RESULT_SCHEMA_VERSION = '2'
 
 const fixtureSelection = JSON.parse(
   readFileSync(new URL('./fixture-selection.json', import.meta.url), 'utf8')

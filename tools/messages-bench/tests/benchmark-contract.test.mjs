@@ -80,6 +80,82 @@ test('typed-key model costs activate the exact generated scales and sibling boun
   ).toHaveLength(2)
 })
 
+test('fallback-aware costs activate the exact generated scales and nested sibling boundaries', () => {
+  expect(MESSAGE_BENCH_RESULT_SCHEMA_VERSION).toBe('2')
+  expect(MESSAGE_BENCHMARK_PROFILE_REVISION).toBe(3)
+  expect(fixtures.revision).toBe(3)
+  expect(MESSAGE_BENCHMARK_PHASES.find(phase => phase.name === 'message_link_fallback')).toEqual({
+    name: 'message_link_fallback',
+    costs: [
+      'fallback_chain_construction',
+      'locale_aware_resolution',
+      'locale_finding_materialization'
+    ]
+  })
+  const fixture = fixtures.profiles.find(profile => profile.shape === 'locale_fallback_expansion')
+  expect(fixture).toEqual({
+    name: 'locale-fallback-expansion',
+    revision: 1,
+    shape: 'locale_fallback_expansion',
+    generator: { kind: 'rust', id: 'locale_fallback_expansion' },
+    variants: ['locale_fallback_expansion'],
+    scales: [16, 64, 256]
+  })
+  const required = MESSAGE_BENCHMARK_REQUIRED_CASES.filter(
+    record => record.phase === 'message_link_fallback'
+  )
+  expect(required).toHaveLength(9)
+  expect(new Set(required.map(record => record.scale))).toEqual(new Set(fixture.scales))
+  expect(new Set(required.map(record => record.cost))).toEqual(
+    new Set([
+      'fallback_chain_construction',
+      'locale_aware_resolution',
+      'locale_finding_materialization'
+    ])
+  )
+  for (const cost of [
+    'fallback_chain_construction',
+    'locale_aware_resolution',
+    'locale_finding_materialization'
+  ]) {
+    const descriptor = MESSAGE_BENCHMARK_BOUNDARIES.find(
+      entry => entry.descriptor.phase === 'message_link_fallback' && entry.descriptor.cost === cost
+    ).descriptor
+    expect(descriptor).toMatchObject({
+      boundaryId: cost,
+      metric: 'duration',
+      occurrencePolicy: 'one_per_workflow_iteration',
+      firstMarker: `before_${cost}`,
+      finalMarker: `complete_${cost}_output_retained`,
+      includedMarkers: [cost],
+      excludedMarkers: ['fixture_setup', 'warmup', 'checksum_observation', 'result_aggregation']
+    })
+  }
+  expect(
+    MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY.filter(
+      edge => edge.parentBoundaryId === 'link_selector_resolution'
+    ).map(edge => edge.childBoundaryId)
+  ).toEqual(['fallback_chain_construction', 'locale_aware_resolution'])
+  expect(MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY).toContainEqual({
+    parentBoundaryId: 'link_finding_plan_materialization',
+    childBoundaryId: 'locale_finding_materialization'
+  })
+  expect(
+    MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY.some(edge =>
+      [
+        'fallback_chain_construction',
+        'locale_aware_resolution',
+        'locale_finding_materialization'
+      ].includes(edge.parentBoundaryId)
+    )
+  ).toBe(false)
+  expect(
+    MESSAGE_DURATION_OBSERVATIONS.find(
+      observation => observation.cost === 'typed_key_model_construction'
+    ).semanticFields
+  ).toContain('canonicalCoverageAnalysisStates')
+})
+
 test('JavaScript occurrence checksum matches the shared Rust vectors', () => {
   expect(checksumVectors.revision).toBe(1)
   for (const vector of checksumVectors.vectors) {
@@ -162,6 +238,45 @@ describe('boundary recorder', () => {
     })
     nested.start('coverage_baseline_selection', 'link-request')
     expect(() => nested.start('typed_key_model_construction', 'link-request')).toThrow(
+      /undeclared nesting/
+    )
+  })
+
+  test('accepts fallback children only under their declared enclosing boundaries', () => {
+    const recorder = new BoundaryRecorder({
+      link_selector_resolution: ['link-request'],
+      fallback_chain_construction: ['link-request'],
+      locale_aware_resolution: ['link-request'],
+      link_finding_plan_materialization: ['link-request'],
+      locale_finding_materialization: ['link-request']
+    })
+    recorder.start('link_selector_resolution', 'link-request')
+    recorder.start('fallback_chain_construction', 'link-request')
+    recorder.stop('fallback_chain_construction', 'link-request')
+    recorder.start('locale_aware_resolution', 'link-request')
+    recorder.stop('locale_aware_resolution', 'link-request')
+    recorder.stop('link_selector_resolution', 'link-request')
+    recorder.start('link_finding_plan_materialization', 'link-request')
+    recorder.start('locale_finding_materialization', 'link-request')
+    recorder.stop('locale_finding_materialization', 'link-request')
+    recorder.stop('link_finding_plan_materialization', 'link-request')
+    expect(() => recorder.finish()).not.toThrow()
+
+    const nestedChildren = new BoundaryRecorder({
+      fallback_chain_construction: ['link-request'],
+      locale_aware_resolution: ['link-request']
+    })
+    nestedChildren.start('fallback_chain_construction', 'link-request')
+    expect(() => nestedChildren.start('locale_aware_resolution', 'link-request')).toThrow(
+      /undeclared nesting/
+    )
+
+    const wrongParent = new BoundaryRecorder({
+      link_selector_resolution: ['link-request'],
+      locale_finding_materialization: ['link-request']
+    })
+    wrongParent.start('link_selector_resolution', 'link-request')
+    expect(() => wrongParent.start('locale_finding_materialization', 'link-request')).toThrow(
       /undeclared nesting/
     )
   })

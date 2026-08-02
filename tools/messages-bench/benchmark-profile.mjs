@@ -5,7 +5,7 @@ import {
   resource_host_parse_and_entry_extraction
 } from './benchmark-phases.mjs'
 
-export const MESSAGE_BENCHMARK_PROFILE_REVISION = 2
+export const MESSAGE_BENCHMARK_PROFILE_REVISION = 3
 
 const selection = JSON.parse(
   readFileSync(new URL('./fixture-selection.json', import.meta.url), 'utf8')
@@ -19,6 +19,9 @@ const descriptorByPair = new Map(
 const project = selection.projectFixture
 const dense = selection.profiles.find(profile => profile.shape === 'exact_reference_dense')
 const typedKeyModel = selection.profiles.find(profile => profile.shape === 'typed_key_model')
+const localeFallbackExpansion = selection.profiles.find(
+  profile => profile.shape === 'locale_fallback_expansion'
+)
 
 const projectPairs = [
   ['message_project_input_io', 'inventory_metadata_io'],
@@ -85,7 +88,10 @@ export const MESSAGE_BENCHMARK_REQUIRED_CASES = Object.freeze([
     metric: 'duration'
   }),
   ...selection.profiles
-    .filter(profile => profile.shape !== 'typed_key_model')
+    .filter(
+      profile =>
+        profile.shape !== 'typed_key_model' && profile.shape !== 'locale_fallback_expansion'
+    )
     .flatMap(profile =>
       profile.scales.map(scale =>
         requiredCase({
@@ -107,6 +113,24 @@ export const MESSAGE_BENCHMARK_REQUIRED_CASES = Object.freeze([
         cost,
         fixture: typedKeyModel.name,
         variant: 'typed_key_model',
+        scale,
+        operation: descriptor.boundaryId,
+        metric: descriptor.metric
+      })
+    })
+  ),
+  ...localeFallbackExpansion.scales.flatMap(scale =>
+    [
+      'fallback_chain_construction',
+      'locale_aware_resolution',
+      'locale_finding_materialization'
+    ].map(cost => {
+      const descriptor = descriptorFor('message_link_fallback', cost)
+      return requiredCase({
+        phase: 'message_link_fallback',
+        cost,
+        fixture: localeFallbackExpansion.name,
+        variant: 'locale_fallback_expansion',
         scale,
         operation: descriptor.boundaryId,
         metric: descriptor.metric
