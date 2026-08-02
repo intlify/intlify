@@ -34,7 +34,8 @@
 //! ```
 //! use ox_mf2_parser::parse_message;
 //!
-//! let result = parse_message("Hello, {$name}!")?;
+//! let parsed = parse_message("Hello, {$name}!")?;
+//! let result = parsed.result();
 //! assert!(result.diagnostics.is_empty());
 //! assert!(result.cst.node_count() > 0);
 //! # Ok::<(), ox_mf2_parser::ParseError>(())
@@ -62,6 +63,7 @@ mod workspace;
 pub use api::{
     parse_batch, parse_message, parse_source, parse_source_session, BatchExecution, BatchParseItem,
     BatchParseOptions, BatchParseResult, ParseInput, ParseOptions, ParseResult, ParseSessionResult,
+    StandaloneParseResult,
 };
 pub use diagnostic::{
     Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef, DiagnosticSeverity,

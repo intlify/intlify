@@ -92,12 +92,10 @@ pub struct BatchSnapshotResult {
 /// text) from `sources.get(result.source)` and trusts the caller to
 /// have kept them in sync.
 ///
-/// **Do not pass a [`ParseResult`] from
-/// [`parse_message`](crate::parse_message) here**:
-/// `parse_message` does not register the source in any store and
-/// always returns `SourceId::new(0)`, so pairing it with an
-/// unrelated store silently encodes the wrong source metadata. Use
-/// [`parse_message_to_snapshot`] for the standalone case.
+/// A caller that already used [`parse_message`](crate::parse_message) passes
+/// `parsed.sources()` and `parsed.result()` from the same
+/// [`StandaloneParseResult`](crate::StandaloneParseResult). Do not rebuild a
+/// different store or mix accessors from different parses.
 ///
 /// `parse_result_to_snapshot` does not reparse the source.
 pub fn parse_result_to_snapshot(
@@ -135,11 +133,9 @@ pub struct SnapshotSourceMetadata<'a> {
     pub base_offset: Option<u32>,
 }
 
-/// Parse `source` standalone and encode the result into a Binary
-/// AST snapshot. Builds a private one-entry [`SourceStore`] so
-/// callers never have to construct one to pair with
-/// [`parse_message`](crate::parse_message)'s
-/// `SourceId::new(0)` return value.
+/// Parse `source` standalone and encode the result into a Binary AST snapshot.
+/// Builds a private one-entry [`SourceStore`] so callers that only need bytes
+/// do not have to retain a [`StandaloneParseResult`](crate::StandaloneParseResult).
 ///
 /// `metadata` lets callers attach path / locale / `message_id` /
 /// `base_offset` to the resulting `SourceRecord`. When `None`, the

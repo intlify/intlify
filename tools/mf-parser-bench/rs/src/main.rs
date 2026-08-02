@@ -254,8 +254,9 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
         "ox-mf2-parse" => {
             // Parser entry point equivalent to mf2-tools-parse: default
             // options and no semantic lowering.
-            let result = ox_mf2_parser::parse_message(black_box(source))
+            let parsed = ox_mf2_parser::parse_message(black_box(source))
                 .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
+            let result = parsed.result();
             Ok(TargetResult {
                 checksum: (size_of_val(black_box(&result.cst))
                     + result.cst.node_count() as usize
@@ -286,8 +287,10 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
             })
         }
         "ox-mf2-parse-session-no-trivia" => {
-            let mut options = ox_mf2_parser::ParseOptions::default();
-            options.collect_trivia = false;
+            let options = ox_mf2_parser::ParseOptions {
+                collect_trivia: false,
+                ..Default::default()
+            };
             let mut sources = ox_mf2_parser::SourceStore::new();
             let id = sources.add(ox_mf2_parser::SourceFileInput {
                 source: black_box(source),
@@ -305,20 +308,19 @@ fn run_target(target: &str, source: &str) -> Result<TargetResult, String> {
             })
         }
         "ox-mf2-parse-and-lower" => {
-            let mut options = ox_mf2_parser::ParseOptions::default();
-            options.parse_semantic = true;
             let mut sources = ox_mf2_parser::SourceStore::new();
             let id = sources.add(ox_mf2_parser::SourceFileInput {
                 source: black_box(source),
                 ..Default::default()
             });
-            let result = ox_mf2_parser::parse_source(&sources, id, options)
-                .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
-            let semantic_size = result
-                .semantic
-                .as_ref()
-                .map(|s| s.declarations.len() + s.expressions.len() + s.patterns.len())
-                .unwrap_or(0);
+            let result =
+                ox_mf2_parser::parse_source(&sources, id, ox_mf2_parser::ParseOptions::default())
+                    .map_err(|error| format!("ox-mf2 parse failed: {error}"))?;
+            let semantic = ox_mf2_parser::build_semantic_model(&sources, &result)
+                .map_err(|error| format!("ox-mf2 semantic lowering failed: {error}"))?;
+            let semantic_size = semantic.declarations().len()
+                + semantic.expressions().len()
+                + semantic.patterns().len();
             Ok(TargetResult {
                 checksum: (result.cst.node_count() + semantic_size) as u64,
                 diagnostics: result.diagnostics.len(),
@@ -379,8 +381,10 @@ fn run_ox_mf2_parse_session(
     iterations: usize,
     collect_trivia: bool,
 ) -> u64 {
-    let mut options = ox_mf2_parser::ParseOptions::default();
-    options.collect_trivia = collect_trivia;
+    let options = ox_mf2_parser::ParseOptions {
+        collect_trivia,
+        ..Default::default()
+    };
 
     let mut workspace = ox_mf2_parser::ParseWorkspace::new();
     workspace.reserve_for_source_len(max_source_len);

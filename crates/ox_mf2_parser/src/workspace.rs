@@ -3,11 +3,11 @@
 
 //! `ParseWorkspace`: reusable allocation scratch space.
 //!
-//! Public callers see a single [`ParseWorkspace`] that bundles a parser-side
-//! workspace (CST tables + diagnostic record buffer) and a semantic-side
-//! workspace. `clear()` / `reset()` keep capacity so repeated parsing,
-//! batch parsing, benchmark loops, and LSP sessions stay allocation-flat.
-//! Capacity is released only on [`Self::shrink_to_fit`] or [`Drop`].
+//! Public callers see one parser-only workspace for CST tables, diagnostics,
+//! and parser staging buffers. `clear()` / `reset()` keep capacity so repeated
+//! parsing, batch parsing, benchmark loops, and LSP sessions stay
+//! allocation-flat. Semantic models are built explicitly after parsing and do
+//! not share hidden scratch state with this workspace.
 
 use crate::diagnostic::{DiagnosticLabelRecord, DiagnosticRecord};
 use crate::tables::{CstCapacity, CstEdgeRecord, CstTables};
@@ -111,28 +111,10 @@ impl ParserWorkspace {
     }
 }
 
-/// Internal semantic-side workspace.
-#[derive(Debug, Default)]
-pub(crate) struct SemanticWorkspace {
-    pub model: Option<crate::semantic::SemanticModel>,
-}
-
-impl SemanticWorkspace {
-    pub fn clear(&mut self) {
-        if let Some(model) = self.model.as_mut() {
-            // Reuse capacity rather than dropping the SemanticModel — vector
-            // clears keep their backing allocation so repeated parse loops
-            // stay allocation-flat.
-            model.clear_preserving_capacity();
-        }
-    }
-}
-
 /// Reusable workspace for repeated parse, batch parse, benchmarks, and LSP.
 #[derive(Debug, Default)]
 pub struct ParseWorkspace {
     pub(crate) parser: ParserWorkspace,
-    pub(crate) semantic: SemanticWorkspace,
 }
 
 impl ParseWorkspace {
@@ -155,7 +137,6 @@ impl ParseWorkspace {
     /// Clear table contents but keep allocated capacity.
     pub fn clear(&mut self) {
         self.parser.clear();
-        self.semantic.clear();
     }
 
     /// Alias for [`Self::clear`]: kept distinct so future versions can

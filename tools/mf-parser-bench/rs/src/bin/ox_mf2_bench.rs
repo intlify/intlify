@@ -18,20 +18,20 @@
 //!
 //! Optional / downstream cost (always include alongside a baseline):
 //!
-//! - `--phase lower_semantic` — `parse_source_session` with
-//!   `parse_semantic = true`. Measures parser-core + `SemanticModel` lowering.
+//! - `--phase lower_semantic` — `parse_source` followed by explicit
+//!   `build_semantic_model`. Measures owned parser output + `SemanticModel`
+//!   construction through the supported public boundary.
 //! - `--phase owned_materialize` — parses once with workspace reuse and
 //!   then measures the batch-style cost of cloning `CstTables` and
 //!   materialising diagnostics into an owned `ParseResult`. One-shot
 //!   `parse_source` moves the final tables instead of cloning them.
 //!
-//! Convenience APIs (NOT parser-core baselines — they include fresh workspace
-//! setup and owned result construction; malformed inputs may also build a
-//! temporary source store for diagnostic locations):
+//! Convenience APIs (NOT parser-core baselines — they include a private source
+//! owner, fresh workspace setup, and owned result construction):
 //!
 //! - `--phase parse_message_owned` — convenience `parse_message` call,
-//!   freshly allocating a workspace and constructing an owned `ParseResult`
-//!   every iteration.
+//!   freshly allocating a source owner and workspace, then constructing a
+//!   `StandaloneParseResult` every iteration.
 //!
 //! View / diagnostic / batch phases:
 //!
@@ -55,7 +55,7 @@
 //! - `--reuse-workspace` / `--no-reuse-workspace`
 //! - `--reserve` / `--no-reserve` (calls `reserve_for_source_len` first)
 //! - `--collect-trivia` / `--no-collect-trivia`
-//! - `--parse-semantic`
+//! - `--build-semantic`
 //! - `--input <path>` / `--input-text <text>` / stdin
 //! - `--corpus <dir>` — for `parse_batch_sequential`.
 
@@ -77,8 +77,8 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use ox_mf2_parser::snapshot::{
-    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot, ChildView,
-    parse_result_to_snapshot, SnapshotOptions,
+    decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
+    parse_result_to_snapshot, ChildView, SnapshotOptions,
 };
 use ox_mf2_parser::{
     parse_batch, parse_message, parse_source, parse_source_session, BatchParseOptions, CstChild,
@@ -131,7 +131,7 @@ struct Args {
     reuse_workspace: bool,
     reserve: bool,
     collect_trivia: Option<bool>,
-    parse_semantic: bool,
+    build_semantic: bool,
     input_path: Option<PathBuf>,
     input_text: Option<String>,
     corpus_dir: Option<PathBuf>,
@@ -162,7 +162,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-reserve" => a.reserve = false,
             "--collect-trivia" => a.collect_trivia = Some(true),
             "--no-collect-trivia" => a.collect_trivia = Some(false),
-            "--parse-semantic" => a.parse_semantic = true,
+            "--build-semantic" => a.build_semantic = true,
             "--input" => a.input_path = Some(it.next().ok_or("missing --input value")?.into()),
             "--input-text" => a.input_text = Some(it.next().ok_or("missing --input-text value")?),
             "--corpus" => a.corpus_dir = Some(it.next().ok_or("missing --corpus value")?.into()),
@@ -214,13 +214,13 @@ fn print_help() {
     println!("  parse_cst                    parser-core, borrowed result, trivia enabled");
     println!();
     println!("Phases (optional / downstream cost — include alongside a baseline):");
-    println!("  lower_semantic               parser-core + SemanticModel lowering");
+    println!("  lower_semantic               owned parse + explicit SemanticModel construction");
     println!(
         "  owned_materialize            batch-style CstTables.clone + diagnostic materialise only"
     );
     println!();
     println!("Phases (convenience APIs — NOT parser-core, include extra setup):");
-    println!("  parse_message_owned          parse_message → owned ParseResult (fresh sources/workspace)");
+    println!("  parse_message_owned          parse_message → StandaloneParseResult (fresh owner/workspace)");
     println!();
     println!("Phases (view / diagnostic / batch):");
     println!("  cst_view_traversal           parse once, traverse CST N times");
@@ -259,7 +259,9 @@ fn print_help() {
     println!("  --no-reserve");
     println!("  --collect-trivia             override default trivia collection (default true)");
     println!("  --no-collect-trivia");
-    println!("  --parse-semantic             enable optional semantic lowering");
+    println!(
+        "  --build-semantic             allocations phase also builds SemanticModel explicitly"
+    );
     println!("  --input <path>               read input from file");
     println!("  --input-text <str>           inline input");
     println!("  --corpus <dir>               directory of .mf2 files for batch phase");
@@ -362,8 +364,8 @@ fn run_parse_message_owned(args: &Args) -> Result<PhaseSummary, String> {
     let iters = args.iterations.max(1);
     let mut count = 0usize;
     for _ in 0..iters {
-        let r = parse_message(&input).map_err(|error| format!("parse failed: {error}"))?;
-        count += r.cst.node_count();
+        let parsed = parse_message(&input).map_err(|error| format!("parse failed: {error}"))?;
+        count += parsed.result().cst.node_count();
     }
     Ok(PhaseSummary {
         iterations: iters,
@@ -371,17 +373,16 @@ fn run_parse_message_owned(args: &Args) -> Result<PhaseSummary, String> {
     })
 }
 
-fn options_for(args: &Args, default_trivia: bool, parse_semantic: bool) -> ParseOptions {
+fn options_for(args: &Args, default_trivia: bool) -> ParseOptions {
     let mut o = ParseOptions::default();
     o.collect_trivia = args.collect_trivia.unwrap_or(default_trivia);
-    o.parse_semantic = parse_semantic || args.parse_semantic;
     o
 }
 
 fn run_parse_cst(args: &Args, default_trivia: bool) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
-    let options = options_for(args, default_trivia, false);
+    let options = options_for(args, default_trivia);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
@@ -418,23 +419,19 @@ fn run_parse_cst(args: &Args, default_trivia: bool) -> Result<PhaseSummary, Stri
 fn run_lower_semantic(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
-    let options = options_for(args, true, true);
+    let options = options_for(args, true);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
         ..Default::default()
     });
-    let mut workspace = ParseWorkspace::new();
-    if args.reserve {
-        workspace.reserve_for_source_len(input.len());
-    }
     let mut units = 0usize;
     for _ in 0..iters {
-        let session = parse_source_session(&sources, id, &mut workspace, options)
+        let result = parse_source(&sources, id, options)
             .map_err(|error| format!("parse failed: {error}"))?;
-        if let Some(s) = session.semantic {
-            units += s.references().len() + s.expressions().len();
-        }
+        let semantic = ox_mf2_parser::build_semantic_model(&sources, &result)
+            .map_err(|error| format!("semantic lowering failed: {error}"))?;
+        units += semantic.references().len() + semantic.expressions().len();
     }
     Ok(PhaseSummary {
         iterations: iters,
@@ -452,7 +449,7 @@ fn run_lower_semantic(args: &Args) -> Result<PhaseSummary, String> {
 fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
-    let options = options_for(args, true, false);
+    let options = options_for(args, true);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
@@ -486,7 +483,7 @@ fn run_owned_materialize(args: &Args) -> Result<PhaseSummary, String> {
 fn run_cst_view_traversal(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let iters = args.iterations.max(1);
-    let options = options_for(args, true, false);
+    let options = options_for(args, true);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
@@ -590,12 +587,12 @@ fn run_source_mapping(args: &Args) -> Result<PhaseSummary, String> {
     })
 }
 
-/// Allocator-focused measurement. Parses the input N times with workspace
-/// reuse and reports both the aggregate alloc count / byte total and the
-/// per-iteration averages, so it is obvious whether the steady-state cost
-/// of one parse is zero allocations (P3-P8 ideal) or some small number.
+/// Allocator-focused measurement. Syntax-only mode parses the input N times
+/// with workspace reuse. `--build-semantic` instead measures the supported
+/// owned parse plus explicit semantic-construction boundary. Both modes report
+/// aggregate and per-iteration allocation counts and byte totals.
 ///
-/// Honours `--collect-trivia` / `--no-collect-trivia` / `--parse-semantic`
+/// Honours `--collect-trivia` / `--no-collect-trivia` / `--build-semantic`
 /// the same way the timing phases do: any combination is measurable so
 /// regression checks can target the exact parse path that changed (for
 /// example "did adding a semantic-lowering optimisation introduce a hidden
@@ -610,7 +607,7 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     let iters = args.iterations.max(1);
     // Same plumbing as the parser-core timing phases so the measured
     // allocations match the path under test, not a hard-coded default.
-    let options = options_for(args, true, false);
+    let options = options_for(args, true);
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source: &input,
@@ -620,17 +617,34 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     if args.reserve {
         workspace.reserve_for_source_len(input.len());
     }
-    // Warm the workspace so the first iteration's lazy growth is not
-    // attributed to the steady state.
-    let _ = parse_source_session(&sources, id, &mut workspace, options)
-        .map_err(|error| format!("parse failed: {error}"))?;
+    // Warm the selected public path so first-call lazy growth is not
+    // attributed to the measured loop.
+    if args.build_semantic {
+        let result = parse_source(&sources, id, options)
+            .map_err(|error| format!("parse failed: {error}"))?;
+        let _ = ox_mf2_parser::build_semantic_model(&sources, &result)
+            .map_err(|error| format!("semantic lowering failed: {error}"))?;
+    } else {
+        let _ = parse_source_session(&sources, id, &mut workspace, options)
+            .map_err(|error| format!("parse failed: {error}"))?;
+    }
 
     let region = Region::new(GLOBAL);
     let mut total_nodes = 0usize;
-    for _ in 0..iters {
-        let session = parse_source_session(&sources, id, &mut workspace, options)
-            .map_err(|error| format!("parse failed: {error}"))?;
-        total_nodes += session.cst.tables().node_count();
+    if args.build_semantic {
+        for _ in 0..iters {
+            let result = parse_source(&sources, id, options)
+                .map_err(|error| format!("parse failed: {error}"))?;
+            let semantic = ox_mf2_parser::build_semantic_model(&sources, &result)
+                .map_err(|error| format!("semantic lowering failed: {error}"))?;
+            total_nodes += result.cst.node_count() + semantic.semantic_references().len();
+        }
+    } else {
+        for _ in 0..iters {
+            let session = parse_source_session(&sources, id, &mut workspace, options)
+                .map_err(|error| format!("parse failed: {error}"))?;
+            total_nodes += session.cst.tables().node_count();
+        }
     }
     let stats = region.change();
     // Net = allocations - deallocations gives the steady-state retained
@@ -638,12 +652,12 @@ fn run_allocations(args: &Args) -> Result<PhaseSummary, String> {
     // allocated is the gross throughput through the allocator.
     let net_bytes = stats.bytes_allocated as i64 - stats.bytes_deallocated as i64;
     eprintln!(
-        "allocations: iters={iters} collect_trivia={ct} parse_semantic={ps} \
+        "allocations: iters={iters} collect_trivia={ct} build_semantic={semantic} \
          alloc_calls={alloc} dealloc_calls={dealloc} \
          bytes_allocated={bytes_alloc} bytes_deallocated={bytes_dealloc} \
          net_bytes={net} alloc_per_iter={apk:.2} bytes_per_iter={bpk:.2}",
         ct = options.collect_trivia,
-        ps = options.parse_semantic,
+        semantic = args.build_semantic,
         alloc = stats.allocations,
         dealloc = stats.deallocations,
         bytes_alloc = stats.bytes_allocated,
@@ -682,7 +696,7 @@ fn run_parse_batch_session(args: &Args) -> Result<PhaseSummary, String> {
         .ok_or("parse_batch_session requires --corpus <dir>")?;
     let corpus = read_corpus(dir)?;
     let iters = args.iterations.max(1);
-    let options = options_for(args, true, false);
+    let options = options_for(args, true);
     let mut sources = SourceStore::new();
     let mut ids = Vec::with_capacity(corpus.len());
     let mut max_source_len = 0usize;
@@ -763,7 +777,7 @@ fn parse_for_snapshot(args: &Args) -> Result<(SourceStore, ox_mf2_parser::ParseR
         source: &input,
         ..Default::default()
     });
-    let options = options_for(args, true, false);
+    let options = options_for(args, true);
     let result =
         parse_source(&sources, id, options).map_err(|error| format!("parse failed: {error}"))?;
     Ok((sources, result))
@@ -788,7 +802,7 @@ fn run_encode_snapshot(args: &Args) -> Result<PhaseSummary, String> {
 fn run_parse_cst_and_encode_snapshot(args: &Args) -> Result<PhaseSummary, String> {
     let input = read_input(args)?;
     let snap_opts = snapshot_options(args);
-    let parse_opts = options_for(args, true, false);
+    let parse_opts = options_for(args, true);
     let iters = args.iterations.max(1);
     let mut bytes_total = 0usize;
     for _ in 0..iters {
@@ -916,11 +930,10 @@ fn run_traverse_diagnostics(args: &Args) -> Result<PhaseSummary, String> {
 }
 
 fn batch_options_for(args: &Args) -> BatchParseOptions {
-    // Honour the same `--collect-trivia` / `--parse-semantic` flags
-    // the single-source bench phases use so comparisons across
-    // phases stay apples-to-apples.
+    // Honour the same trivia override as the single-source syntax phases so
+    // comparisons across phases stay apples-to-apples.
     BatchParseOptions {
-        parse: options_for(args, true, false),
+        parse: options_for(args, true),
         ..BatchParseOptions::default()
     }
 }
@@ -970,8 +983,8 @@ fn run_parse_batch_result_to_snapshot(args: &Args) -> Result<PhaseSummary, Strin
             ..Default::default()
         })
         .collect();
-    let batch = parse_batch(&inputs, batch_opts)
-        .map_err(|error| format!("batch parse failed: {error}"))?;
+    let batch =
+        parse_batch(&inputs, batch_opts).map_err(|error| format!("batch parse failed: {error}"))?;
     let iters = args.iterations.max(1);
     let mut bytes_total = 0usize;
     for _ in 0..iters {

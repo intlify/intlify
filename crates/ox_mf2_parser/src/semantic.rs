@@ -5,10 +5,8 @@
 //!
 //! [`build_semantic_model`] is the checked consumer boundary. It accepts only
 //! a parser-diagnostic-free result paired with its source owner, then derives
-//! raw CST-linked records and cooked read-only facts. The older optional
-//! lowering path used by [`crate::ParseOptions::parse_semantic`] shares the
-//! same construction code while parser consumers migrate to the explicit
-//! checked boundary.
+//! raw CST-linked records and cooked read-only facts. Parsing remains a syntax
+//! phase; the returned model is owned separately from [`crate::ParseResult`].
 //!
 //! The model owns facts only. Parser-owned data-model diagnostics are produced
 //! separately by [`crate::validate_semantics`], and locale or runtime fallback
@@ -509,22 +507,22 @@ pub struct VariantRecord {
     pub has_catch_all: bool,
 }
 
-/// Optional semantic lowering result.
+/// Parser-owned semantic facts built explicitly from a syntax result.
 #[derive(Debug, Default, Clone)]
 pub struct SemanticModel {
-    pub mode: MessageMode,
-    pub kind: SemanticMessageKind,
-    pub declarations: Vec<DeclarationRecord>,
-    pub references: Vec<ReferenceRecord>,
-    pub patterns: Vec<PatternRecord>,
-    pub expressions: Vec<ExpressionRecord>,
-    pub markups: Vec<MarkupRecord>,
-    pub literals: Vec<LiteralRecord>,
-    pub functions: Vec<FunctionRecord>,
-    pub options: Vec<OptionRecord>,
-    pub attributes: Vec<AttributeRecord>,
-    pub selectors: Vec<SelectorRecord>,
-    pub variants: Vec<VariantRecord>,
+    mode: MessageMode,
+    kind: SemanticMessageKind,
+    declarations: Vec<DeclarationRecord>,
+    references: Vec<ReferenceRecord>,
+    patterns: Vec<PatternRecord>,
+    expressions: Vec<ExpressionRecord>,
+    markups: Vec<MarkupRecord>,
+    literals: Vec<LiteralRecord>,
+    functions: Vec<FunctionRecord>,
+    options: Vec<OptionRecord>,
+    attributes: Vec<AttributeRecord>,
+    selectors: Vec<SelectorRecord>,
+    variants: Vec<VariantRecord>,
     source: SourceId,
     source_len: u32,
     semantic_declarations: Vec<SemanticDeclaration>,
@@ -536,6 +534,71 @@ pub struct SemanticModel {
 }
 
 impl SemanticModel {
+    #[must_use]
+    pub const fn mode(&self) -> MessageMode {
+        self.mode
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> SemanticMessageKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn declarations(&self) -> &[DeclarationRecord] {
+        &self.declarations
+    }
+
+    #[must_use]
+    pub fn references(&self) -> &[ReferenceRecord] {
+        &self.references
+    }
+
+    #[must_use]
+    pub fn patterns(&self) -> &[PatternRecord] {
+        &self.patterns
+    }
+
+    #[must_use]
+    pub fn expressions(&self) -> &[ExpressionRecord] {
+        &self.expressions
+    }
+
+    #[must_use]
+    pub fn markups(&self) -> &[MarkupRecord] {
+        &self.markups
+    }
+
+    #[must_use]
+    pub fn literals(&self) -> &[LiteralRecord] {
+        &self.literals
+    }
+
+    #[must_use]
+    pub fn functions(&self) -> &[FunctionRecord] {
+        &self.functions
+    }
+
+    #[must_use]
+    pub fn options(&self) -> &[OptionRecord] {
+        &self.options
+    }
+
+    #[must_use]
+    pub fn attributes(&self) -> &[AttributeRecord] {
+        &self.attributes
+    }
+
+    #[must_use]
+    pub fn selectors(&self) -> &[SelectorRecord] {
+        &self.selectors
+    }
+
+    #[must_use]
+    pub fn variants(&self) -> &[VariantRecord] {
+        &self.variants
+    }
+
     /// Return the source identity assigned by the paired source store.
     #[must_use]
     pub const fn source(&self) -> SourceId {
@@ -785,10 +848,8 @@ fn source_attachment_is_consistent(sources: &SourceStore, result: &crate::ParseR
     result.cst.root_id().is_some() && nodes_are_valid && tokens_are_valid && trivia_are_valid
 }
 
-/// Lower a [`CstView`] into a fresh [`SemanticModel`]. Convenience wrapper
-/// around [`lower_into`] that allocates a new model — prefer the latter
-/// when you already own a model whose capacity can be reused (LSP, batch
-/// loops, the borrowed-session workspace).
+/// Lower a [`CstView`] into a fresh [`SemanticModel`]. Internal convenience
+/// wrapper around [`lower_into`] used by checked construction.
 #[allow(dead_code)]
 pub fn lower(sources: &SourceStore, source_id: SourceId, tables: &CstTables) -> SemanticModel {
     let mut model = SemanticModel::default();
@@ -796,10 +857,8 @@ pub fn lower(sources: &SourceStore, source_id: SourceId, tables: &CstTables) -> 
     model
 }
 
-/// Lower a [`CstTables`] into a caller-owned [`SemanticModel`]. The model
-/// is cleared first so all `Vec` capacities are reused. Used by
-/// [`crate::ParseWorkspace`] so repeated semantic lowering does not
-/// re-allocate the record tables.
+/// Lower a [`CstTables`] into a parser-owned [`SemanticModel`]. The model is
+/// cleared first so internal callers may reuse its vector capacities.
 ///
 /// Walks the CST through `CstTables::node_at` / `CstTables::edges_for`
 /// directly instead of the public `CstView` layer; spans / kinds come

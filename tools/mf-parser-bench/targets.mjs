@@ -79,7 +79,7 @@ export const RUST_TARGETS = [
     name: 'ox-mf2-parse-and-lower',
     runtime: 'rust',
     format: 'mf2',
-    description: 'ox_mf2_parser::parse_source(parse_semantic=true) — CST + SemanticModel'
+    description: 'ox_mf2_parser::parse_source + build_semantic_model — CST + SemanticModel'
   }
 ]
 

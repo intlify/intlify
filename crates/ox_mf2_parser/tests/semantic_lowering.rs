@@ -6,127 +6,122 @@
 //! Covers the semantic-lowering contract described in
 //! `design/002-ox-mf2-phase-1-rust-parser-design.md`:
 
-#![allow(clippy::field_reassign_with_default, clippy::doc_markdown)]
+#![allow(clippy::doc_markdown)]
 //!
-//! - `parse_semantic = false` does not grow semantic tables.
-//! - Parser diagnostics suppress SemanticModel construction.
+//! - SemanticModel construction is explicit and separate from ParseResult.
+//! - Parser diagnostics reject SemanticModel construction.
 //! - Every semantic record links back to a NodeId + Span.
 //! - Simple message → `SemanticMessageKind::Pattern`.
 //! - Complex quoted pattern → `SemanticMessageKind::Pattern`.
 //! - Matcher body → `SemanticMessageKind::Select`.
 
 use ox_mf2_parser::{
-    parse_source, MessageMode, ParseOptions, SemanticMessageKind, SourceFileInput, SourceStore,
+    build_semantic_model, parse_source, MessageMode, ParseOptions, ParseResult,
+    SemanticInvariantErrorKind, SemanticMessageKind, SemanticModel, SourceFileInput, SourceStore,
 };
 
-fn parse(source: &str, parse_semantic: bool) -> ox_mf2_parser::ParseResult {
+fn parse(source: &str) -> (SourceStore, ParseResult) {
     let mut sources = SourceStore::new();
     let id = sources.add(SourceFileInput {
         source,
         ..Default::default()
     });
-    let mut options = ParseOptions::default();
-    options.parse_semantic = parse_semantic;
-    parse_source(&sources, id, options).expect("parse succeeds")
+    let result = parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
+    (sources, result)
+}
+
+fn build(source: &str) -> SemanticModel {
+    let (sources, result) = parse(source);
+    build_semantic_model(&sources, &result).expect("semantic construction succeeds")
 }
 
 #[test]
-fn parse_semantic_false_omits_model() {
-    let result = parse("Hello", false);
-    assert!(result.semantic.is_none());
-}
-
-#[test]
-fn parser_diagnostics_suppress_semantic_model() {
-    let result = parse("Hello, {$name", true);
+fn parser_diagnostics_reject_semantic_model_construction() {
+    let (sources, result) = parse("Hello, {$name");
     assert!(!result.diagnostics.is_empty());
-    assert!(result.semantic.is_none());
+    assert_eq!(
+        build_semantic_model(&sources, &result)
+            .expect_err("recovery CST must not produce semantic facts")
+            .kind(),
+        SemanticInvariantErrorKind::ApiMisuse
+    );
 }
 
 #[test]
 fn simple_message_is_pattern() {
-    let result = parse("Hello, {$name}!", true);
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.mode, MessageMode::Simple);
-    assert_eq!(semantic.kind, SemanticMessageKind::Pattern);
-    assert!(!semantic.patterns.is_empty());
-    assert!(!semantic.expressions.is_empty());
-    assert_eq!(semantic.references.len(), 1);
+    let semantic = build("Hello, {$name}!");
+    assert_eq!(semantic.mode(), MessageMode::Simple);
+    assert_eq!(semantic.kind(), SemanticMessageKind::Pattern);
+    assert!(!semantic.patterns().is_empty());
+    assert!(!semantic.expressions().is_empty());
+    assert_eq!(semantic.references().len(), 1);
     assert_eq!(
-        semantic.references[0].name_span.start,
-        semantic.references[0].semantic_ref.span.start + 1
+        semantic.references()[0].name_span.start,
+        semantic.references()[0].semantic_ref.span.start + 1
     );
 }
 
 #[test]
 fn complex_quoted_pattern_is_pattern() {
-    let result = parse("{{Hello, {$name}!}}", true);
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.mode, MessageMode::Complex);
-    assert_eq!(semantic.kind, SemanticMessageKind::Pattern);
-    assert!(semantic.patterns.iter().any(|p| p.is_quoted));
+    let semantic = build("{{Hello, {$name}!}}");
+    assert_eq!(semantic.mode(), MessageMode::Complex);
+    assert_eq!(semantic.kind(), SemanticMessageKind::Pattern);
+    assert!(semantic.patterns().iter().any(|p| p.is_quoted));
 }
 
 #[test]
 fn matcher_body_is_select() {
-    let result = parse(".match $x\n* {{fallback}}", true);
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.mode, MessageMode::Complex);
-    assert_eq!(semantic.kind, SemanticMessageKind::Select);
-    assert_eq!(semantic.selectors.len(), 1);
-    assert!(semantic.variants.iter().any(|v| v.has_catch_all));
+    let semantic = build(".match $x\n* {{fallback}}");
+    assert_eq!(semantic.mode(), MessageMode::Complex);
+    assert_eq!(semantic.kind(), SemanticMessageKind::Select);
+    assert_eq!(semantic.selectors().len(), 1);
+    assert!(semantic.variants().iter().any(|v| v.has_catch_all));
 }
 
 #[test]
 fn declarations_collect_with_variable_back_reference() {
-    let result = parse(".local $x = {$y}\n{{Hi}}", true);
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.declarations.len(), 1);
-    let decl = &semantic.declarations[0];
+    let semantic = build(".local $x = {$y}\n{{Hi}}");
+    assert_eq!(semantic.declarations().len(), 1);
+    let decl = &semantic.declarations()[0];
     assert!(decl.variable.is_some(), "declared variable link expected");
     // The `$y` reference inside the RHS expression is collected.
-    assert!(!semantic.references.is_empty());
+    assert!(!semantic.references().is_empty());
 }
 
 #[test]
 fn markup_options_and_attributes_are_lowered() {
-    let result = parse("{{Click {#a opt=|x| @id=|me|/} now}}", true);
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.markups.len(), 1, "expected one markup");
+    let semantic = build("{{Click {#a opt=|x| @id=|me|/} now}}");
+    assert_eq!(semantic.markups().len(), 1, "expected one markup");
     assert!(
-        !semantic.options.is_empty(),
+        !semantic.options().is_empty(),
         "expected markup options to be lowered"
     );
     assert!(
-        !semantic.attributes.is_empty(),
+        !semantic.attributes().is_empty(),
         "expected markup attributes to be lowered"
     );
 }
 
 #[test]
 fn input_declaration_body_is_lowered() {
-    let result = parse(
-        ".input {$count :number minimumFractionDigits=2}\n{{Hi {$count}}}",
-        true,
-    );
-    let semantic = result.semantic.unwrap();
-    assert_eq!(semantic.declarations.len(), 1);
+    let semantic = build(".input {$count :number minimumFractionDigits=2}\n{{Hi {$count}}}");
+    assert_eq!(semantic.declarations().len(), 1);
     // The variable annotated on .input should still appear in declarations.
-    assert!(semantic.declarations[0].variable.is_some());
+    assert!(semantic.declarations()[0].variable.is_some());
     // The function annotation should be recorded.
     assert!(
-        !semantic.functions.is_empty(),
+        !semantic.functions().is_empty(),
         "expected .input body's function to be recorded"
     );
     // The option `minimumFractionDigits` should be lowered.
     assert!(
-        !semantic.options.is_empty(),
+        !semantic.options().is_empty(),
         "expected .input body's option to be recorded"
     );
     // The placeholder `$count` reference inside the body should be recorded
     // exactly once (not the declared input variable itself).
     let refs_to_count = semantic
-        .references
+        .references()
         .iter()
         .filter(|r| !r.semantic_ref.span.is_empty())
         .count();
@@ -138,18 +133,17 @@ fn input_declaration_body_is_lowered() {
 
 #[test]
 fn every_record_links_back_to_node_id() {
-    let result = parse(".local $x = {$y}\n.match $x\n* {{fallback}}", true);
-    let semantic = result.semantic.unwrap();
-    for r in &semantic.declarations {
+    let semantic = build(".local $x = {$y}\n.match $x\n* {{fallback}}");
+    for r in semantic.declarations() {
         assert_ne!(r.semantic_ref.node.raw(), u32::MAX);
     }
-    for r in &semantic.selectors {
+    for r in semantic.selectors() {
         assert_ne!(r.semantic_ref.node.raw(), u32::MAX);
     }
-    for r in &semantic.variants {
+    for r in semantic.variants() {
         assert_ne!(r.semantic_ref.node.raw(), u32::MAX);
     }
-    for r in &semantic.patterns {
+    for r in semantic.patterns() {
         assert_ne!(r.semantic_ref.node.raw(), u32::MAX);
     }
 }

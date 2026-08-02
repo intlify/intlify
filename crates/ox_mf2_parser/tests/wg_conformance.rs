@@ -81,11 +81,8 @@ fn wg_message_format_tests_match_parser_syntax_boundary() {
                 path: file.to_str(),
                 ..Default::default()
             });
-            let options = ParseOptions {
-                parse_semantic: false,
-                ..Default::default()
-            };
-            let result = parse_source(&sources, id, options).expect("parse succeeds");
+            let result =
+                parse_source(&sources, id, ParseOptions::default()).expect("parse succeeds");
             let wants_syntax_error = expects_syntax_error(test, defaults);
             let has_parser_error = !result.diagnostics.is_empty();
 
