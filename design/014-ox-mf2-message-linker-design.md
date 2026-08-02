@@ -3922,7 +3922,15 @@ pub enum TypedOutputInvariant {
 
 `ModelRelationMismatch` covers any cross-crate handoff state that is not the exact model/relation/key one-to-one order. `SignatureKeyMismatch` covers a derived message slice that is not one-to-one with the model keys. `DuplicateArgument` and `NonCanonicalArgumentOrder` cover the final exact cooked-name set.
 
-The family is checked in declaration order for each canonical model and key after parser and semantic validation of that definition. The smallest canonical affected model/key selects the result. Any such failure is `ExportPreparationError::InternalInvariant`, discards all earlier ordinary diagnostics and derived signatures, and returns no batch. It never becomes `ExportError`, a linker finding, a partially typed model, or an omitted accessor artifact.
+Typed-output checks begin only after the complete identity-deduplicated validation set has finished with zero parser or semantic diagnostics and no semantic API or diagnostic-mapping failure. They never stop the earlier `DefinitionLocation`-ordered validation scan.
+
+The typed-output phase has one total failure order:
+
+1. Preflight the complete model-to-baseline relation in canonical model and key merge order. Any missing, extra, repeated, or out-of-order relation item selects `ModelRelationMismatch` before signature derivation.
+2. Traverse the admitted models in canonical resolved-scope order and each model's keys in canonical domain-qualified key order.
+3. At one key, check `SignatureKeyMismatch`, `DuplicateArgument`, and `NonCanonicalArgumentOrder` in their `TypedOutputInvariant` declaration order. The first failure at that key wins.
+
+Thus relation mismatch precedes every derived-signature invariant; otherwise the smallest canonical model/key wins, followed by declaration order at that exact key. Baseline `DefinitionLocation` does not participate in typed-output failure selection because its complete validation phase has already succeeded. Any typed-output failure is `ExportPreparationError::InternalInvariant`, discards all derived signatures, and returns no batch. It never becomes `ExportError`, a linker finding, a partially typed model, or an omitted accessor artifact.
 
 #### Typed-output benchmark contract
 
@@ -4937,7 +4945,7 @@ Promotion is per rule and is a deliberate preset/default change; merely configur
   - M1 exposes no CLI leaf, writes no file, and has no standalone `--check` mode. Its model is inspectable through the checked Rust/in-process boundary fixed by the M1 implementation contract.
   - Beginning with M3, shared export preparation may combine that model with parser-backed validated MF2 argument signatures before each platform exporter renders its native form through the existing export transaction. The initial built-in ESM exporter renders one explicit scope-bound TypeScript accessor module for each admitted model.
   - `intlify messages emit` registers those modules together with the other artifacts in the selected ESM transaction, and `intlify messages emit --check` verifies their freshness through the same manifest and byte-comparison contract.
-  - The initial TypeScript module contains a domain-qualified key-tuple union and one conditional required-argument shape per key. Preparation retains exact `.input` annotation identifiers as language-neutral evidence, while the initial value type remains `unknown` because MF2 runtime operand types are implementation-defined.
+  - The initial TypeScript module contains a domain-qualified key-tuple union, one conditional required-argument shape per key, and one non-exported discriminated call-tuple branch that keeps each key correlated with that exact argument shape. Preparation retains exact `.input` annotation identifiers as language-neutral evidence, while the initial value type remains `unknown` because MF2 runtime operand types are implementation-defined.
   - It does not use global or ambient `.d.ts` augmentation:
 
 ```ts
@@ -5669,12 +5677,12 @@ pub enum TypedOutputInvariant {
 Preparation selects failures deterministically:
 
 1. It preflights the complete outcome contract before parsing. If several outcome contradictions are detectable, `OutcomeContractInvariant` declaration order wins, followed by the smallest affected canonical plan, message, or definition identity for that variant.
-2. After a clean preflight, it visits the identity-deduplicated export validation set in stable `DefinitionLocation` order. The first record with a semantic API failure or preparation-owned invariant determines the result; later records do not run merely to collect another operational error.
+2. After a clean preflight, it visits the identity-deduplicated export validation set in stable `DefinitionLocation` order. The first record with a semantic API failure, diagnostic-mapping invariant, or diagnostic-count overflow determines the result; later records do not run merely to collect another operational error.
 3. For each ordinary diagnostic, it checks label count, primary span, label spans in parser-owned label order, and label-source equality in that order. These checks run even after the retention budget is full.
 4. Only after that diagnostic's mapping contract succeeds does preparation checked-add one to `total_diagnostics`. A mapping invariant on that diagnostic therefore precedes `DiagnosticCountOverflow`.
-5. For a diagnostic-free baseline record, typed-output derivation follows semantic validation. It checks the model relation, signature-key correspondence, duplicate argument names, and canonical argument order in the `TypedOutputInvariant` declaration order. The smallest canonical model/key selects an equal-family failure.
+5. Preparation enters no typed-output check unless the complete validation scan finishes with zero ordinary diagnostics and no operational failure. It then preflights the complete model relation; `ModelRelationMismatch` wins at the first canonical merge mismatch. Only after a clean relation preflight does it traverse canonical models and keys, selecting the smallest model/key and then the first of `SignatureKeyMismatch`, `DuplicateArgument`, and `NonCanonicalArgumentOrder` in declaration order at that key.
 
-An operational failure discards every ordinary diagnostic accumulated from earlier records and returns no batch. Input order, hash-map order, optional within-call computation reuse, worker completion, and retention-limit fullness cannot change the selected failure.
+An operational failure discards every ordinary diagnostic accumulated from earlier records and returns no batch. Input order, baseline `DefinitionLocation` order relative to model/key order, hash-map order, optional within-call computation reuse, worker completion, and retention-limit fullness cannot change the selected failure.
 
 Structured adapters project `definition().source()` and `definition().entry()` and expose fields in this order: `source`, `entry`, `category`, `code`, `severity`, `message`, `span`, and `labels`; labels contain `span` then `message`. The wire shape does not add a nested `definition` object merely because the Rust representation reuses `DefinitionLocation`.
 
@@ -6729,13 +6737,17 @@ export type MessageArguments<K extends MessageKey> = K extends readonly ["json-p
       }>
     : never;
 
+type MessageCall =
+  | [key: readonly ["json-pointer", "/checkout/title"], args: MessageArguments<readonly ["json-pointer", "/checkout/title"]>]
+  | [key: readonly ["json-pointer", "/checkout/total"], args: MessageArguments<readonly ["json-pointer", "/checkout/total"]>];
+
 export interface MessageRuntime<Result> {
-  format<K extends MessageKey>(scope: typeof scope, key: K, args: MessageArguments<K>): Result;
+  format(messageScope: typeof scope, ...call: MessageCall): Result;
 }
 
 export function createMessageAccessor<Result>(runtime: MessageRuntime<Result>) {
-  return function t<K extends MessageKey>(key: K, args: MessageArguments<K>): Result {
-    return runtime.format(scope, key, args);
+  return function t(...call: MessageCall): Result {
+    return runtime.format(scope, ...call);
   };
 }
 ```
@@ -6748,11 +6760,15 @@ This tuple is the generated API's key identity. It avoids collision between equa
 
 `MessageArguments<K>` has exactly one conditional branch per key in the same order. A message with no external arguments maps to `Readonly<Record<string, never>>`. A message with arguments maps to one `Readonly` object whose required quoted properties follow canonical argument-name order and whose values are `unknown`. The module emits no optional property, index signature on a non-empty argument object, annotation-derived host type, or locale-specific argument difference.
 
-An empty admitted model emits `export type MessageKey = never;` and `export type MessageArguments<K extends MessageKey> = never;`. It still emits the two constants, `MessageRuntime`, and `createMessageAccessor`, producing a valid scope-bound module whose `t` function cannot be called with a key.
+The non-exported `MessageCall` alias has exactly one labeled two-element tuple branch per canonical key. Its `key` element is that exact readonly domain-qualified key tuple, and its `args` element is `MessageArguments` instantiated with that same exact key. Branches follow canonical model-key order.
+
+Both callable boundaries use `...call: MessageCall`; neither independently infers a generic key from separate `key` and `args` parameters. A value widened to `MessageKey` must therefore be narrowed again or carried together with its correlated arguments before invocation. It cannot pair with an empty or different branch's argument object merely because `MessageArguments<MessageKey>` would be a union.
+
+An empty admitted model emits `export type MessageKey = never;`, `export type MessageArguments<K extends MessageKey> = never;`, and non-exported `type MessageCall = [key: never, args: never];`. It still emits the two constants, `MessageRuntime`, and `createMessageAccessor`, producing a valid scope-bound module whose `t` function has no callable argument pair.
 
 `MessageRuntime<Result>` is the complete runtime binding. The application supplies one immutable adapter object explicitly to `createMessageAccessor`; the generated module imports no runtime package, loader map, locale module, global singleton, environment binding, or project-specific module specifier. The generic `Result` is owned by that adapter rather than inferred by the exporter.
 
-`createMessageAccessor` performs one delegation only. It forwards the exact scope tuple, key tuple, and argument object to `runtime.format` and returns its result. It performs no locale selection, message lookup, fallback, loading, formatting, caching, validation, coercion, cloning, or error recovery.
+`MessageRuntime.format` names its first parameter `messageScope` so its `typeof scope` annotation refers to the module constant without a self-shadowing type query. It receives that scope followed by the same discriminated `MessageCall` rest tuple. `createMessageAccessor` performs one delegation only: it forwards the exact scope tuple and spreads the correlated key/argument pair to `runtime.format`, then returns its result. It performs no locale selection, message lookup, fallback, loading, formatting, caching, validation, coercion, cloning, or error recovery.
 
 Consumers explicitly import the generated module and retain the returned `t` function in their own scope. M3 emits no ambient/global declaration, module augmentation, default runtime instance, per-key exported function, `useMessageSet` replacement, or generated declaration for an existing `i18n.t` symbol.
 
@@ -6788,12 +6804,15 @@ The writer emits sections in this exact order:
 1. `formatVersion` and `scope` on adjacent lines;
 2. one blank line and `MessageKey`;
 3. one blank line and `MessageArguments`;
-4. one blank line and `MessageRuntime`;
-5. one blank line and `createMessageAccessor`.
+4. one blank line and non-exported `MessageCall`;
+5. one blank line and `MessageRuntime`;
+6. one blank line and `createMessageAccessor`.
 
 Every declaration statement, type-union final branch, conditional-type final branch, interface method, return-function expression, and `return` statement ends in `;`. Function and interface closing braces do not. There are no comments, trailing commas, tabs, CRs, extra blank lines, banners, timestamps, source paths, source maps, or formatter-dependent wrapping.
 
-Indentation is exactly two ASCII spaces per block or continuation level. Non-empty key unions and conditional branches each occupy one canonical key per branch. Non-empty argument objects contain one quoted property per line in canonical argument order. Empty-model aliases use the exact one-line forms above rather than an empty union or conditional chain.
+Generated declaration and parameter identifiers use the exact spellings shown above, including `MessageCall`, `messageScope`, `call`, `runtime`, and `t`. Catalog domains, keys, and argument names appear only as escaped string or property literals, so input data never renames or collides with those helpers.
+
+Indentation is exactly two ASCII spaces per block or continuation level. Non-empty key unions, conditional branches, and `MessageCall` unions each occupy one canonical key per branch. Every non-empty call branch is one labeled `[key: exact-key-tuple, args: MessageArguments<exact-key-tuple>]` physical line; byte length never triggers another wrapping rule. Non-empty argument objects contain one quoted property per line in canonical argument order. Empty-model aliases use the exact one-line forms above rather than an empty union or conditional chain.
 
 Every namespace, scope, domain, key, and argument-name string uses the same double-quoted scalar escaping fixed for the locale/loader writer below. The writer emits neither the optional `input_annotation` nor an inferred type comment; that language-neutral evidence remains available to other exporters through `ValidatedExportBatch::typed_output()`.
 
@@ -8488,12 +8507,13 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Locale-module ABI fixtures emit exactly named `formatVersion`, `deliveryUnit`, `locale`, and `messages` exports with no default; use exact five-position tuples containing explicit project scope namespace/name, domain, canonical key, definition locale, and MF2 source; preserve the fixed canonical record order; and reject duplicate resolved identities, source/debug evidence, object-key catalogs, mutation helpers, or a second payload API.
   - Loader-module ABI fixtures emit one `["loader.mjs"]` `dev.intlify/loader-map` `0.1` artifact with no default; order static eager imports and aliases canonically; emit exact `formatVersion`, canonical `locales`, priority-preserving `fallbacks`, and one `loadLocale` switch case per locale; and return a promise for every branch.
   - Loader behavior fixtures resolve eager modules through `Promise.resolve`, lazy modules through direct dynamic import, and unsupported inputs through a rejected `RangeError("unsupported locale")`; perform no coercion, normalization, input interpolation, or fallback traversal; and require one matching eager/lazy relationship per locale with no reverse edge.
-  - TypeScript-accessor ABI fixtures emit exactly one scope-bound module per admitted model with exact runtime exports `formatVersion`, `scope`, and `createMessageAccessor`, exact type exports `MessageKey`, `MessageArguments`, and `MessageRuntime`, and no default, ambient declaration, module augmentation, per-key function, runtime import, loader import, or `useMessageSet` replacement.
+  - TypeScript-accessor ABI fixtures emit exactly one scope-bound module per admitted model with exact runtime exports `formatVersion`, `scope`, and `createMessageAccessor`, exact type exports `MessageKey`, `MessageArguments`, and `MessageRuntime`, and one non-exported `MessageCall` correlation alias. They admit no default, exported call helper, ambient declaration, module augmentation, per-key function, runtime import, loader import, or `useMessageSet` replacement.
     - Key fixtures preserve every exact domain-qualified canonical key as one readonly `[domain, key]` tuple, including equal key strings in different domains and the JSON Pointer root; retain canonical model order; and reject dot-path conversion, configured producer syntax reuse, scope merging, plan-key widening, or fallback-derived additions.
     - Argument fixtures include explicit inputs and implicit external references, exclude local bound names while retaining their external dependencies, merge repeated names, preserve only the exact optional direct `.input` annotation identifier, and order exact cooked names by UTF-8 bytes. They require every property, use `unknown` for values, use `Readonly<Record<string, never>>` for no arguments, and reject optionality, first/last annotation selection, function-name host-type inference, or locale-specific signatures.
-    - Runtime-binding fixtures inject one `MessageRuntime<Result>` object, return one typed `t` delegation, and forward exact scope, key tuple, and arguments without lookup, fallback, loading, formatting, caching, coercion, or recovery. Empty-model fixtures emit the exact `never` aliases and a non-callable typed function surface without dropping the artifact.
+    - Runtime-binding fixtures inject one `MessageRuntime<Result>` object, require exact non-shadowing parameter name `messageScope: typeof scope`, use the same discriminated `MessageCall` rest tuple on `format` and returned `t`, and forward exact scope plus the correlated key/arguments without lookup, fallback, loading, formatting, caching, coercion, or recovery.
+    - TypeScript compile fixtures accept every exact key with its own argument shape and reject omitted arguments, another key's arguments, and a widened `MessageKey` paired with an argument object before control-flow narrowing. Empty-model fixtures emit the exact `never` aliases plus `MessageCall = [key: never, args: never]` and a function surface with no callable pair, without dropping the artifact.
   - Accessor-path fixtures hash the exact accessor domain, `0.1`, namespace length/value, and scope-name length/value with BLAKE3-256; emit only `["accessors", "scope-" + lowercase_hex + ".ts"]`; cover scope byte boundaries and distinct Unicode/case spellings; and reject exposed, normalized, escaped, truncated, numbered, or collision-suffixed scope paths.
-  - Canonical TypeScript-writer fixtures emit exact UTF-8 without BOM, LF-only lines, one final LF, fixed section and branch order, two-space indentation, semicolons, blank lines, quoted properties, and shared double-quoted scalar escaping. They reject Oxfmt or declaration-emitter influence, comments, banners, timestamps, source maps, trailing commas, host newlines, inferred annotation comments, and nondeterministic wrapping.
+  - Canonical TypeScript-writer fixtures emit exact UTF-8 without BOM, LF-only lines, one final LF, fixed section and branch order including `MessageCall`, one physical line per correlated call branch, two-space indentation, semicolons, blank lines, quoted properties, and shared double-quoted scalar escaping. They reject Oxfmt or declaration-emitter influence, comments, banners, timestamps, source maps, trailing commas, host newlines, inferred annotation comments, and byte-length-dependent wrapping.
   - Accessor metadata fixtures require exact `dev.intlify/typescript-accessor` `0.1`, exact `text/typescript`, and no relationships; classify the artifact under shared locale/unit and its own kind bucket; preflight support together with both resource kinds; and reject `.ts` inference, omission after an admitted model, post-set append, or a fabricated external application-import relationship.
   - Canonical ESM-writer fixtures emit exact ECMAScript 2020 UTF-8 bytes with no BOM, LF-only lines, one final LF, fixed semicolons, two-space indentation, blank-line and no-trailing-comma templates, and double-quoted scalar escaping including control, `U+2028`, and `U+2029` boundaries. They preserve all other scalars and reject formatter, comment, banner, timestamp, source-map, environment, and host-newline influence.
   - ESM metadata fixtures require `text/javascript` without parameters on the locale and loader `0.1` kinds, `text/typescript` on the accessor kind, no relationships on locale or accessor modules, and one payload-consistent eager/lazy loader relationship per locale; reject extension/MIME inference, MIME rewriting, extra metadata, payload/envelope version mismatch, and every relationship/payload classification mismatch as `ArtifactAssemblyState`.
@@ -8849,7 +8869,8 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Preparation-invariant fixtures admit exactly `DiagnosticCountOverflow`, `DiagnosticMapping`, `OutcomeContract`, and `TypedOutput`, with the exact four mapping variants, five outcome-contract variants, and four typed-output variants.
     - Complete outcome preflight precedes parsing; outcome variant declaration order and canonical affected identity select one contradiction.
     - A clean outcome is scanned in stable `DefinitionLocation` order over the delivery-plus-baseline union; within one diagnostic, label count precedes primary span, parser-ordered label spans, label-source equality, and then checked total increment.
-    - Input, hash-map, optional within-call reuse, worker, and retention-state permutations select the same error and discard every earlier ordinary diagnostic.
+    - Typed-output checks begin only after that complete scan is diagnostic-free and operationally clean. Complete canonical relation preflight selects `ModelRelationMismatch` first; otherwise canonical model/key order followed by declaration order at one key selects `SignatureKeyMismatch`, `DuplicateArgument`, or `NonCanonicalArgumentOrder`.
+    - Mixed fixtures deliberately reverse baseline `DefinitionLocation` order relative to canonical model/key order and prove that typed-output selection still uses only the typed phase's total order. Input, hash-map, optional within-call reuse, worker, and retention-state permutations select the same error and discard every earlier ordinary diagnostic.
     - They reject parser semantic API failures as preparation-owned invariants and reject generic assertion, panic, custom, source-I/O, cache, and exporter variants.
     - Structured-error fixtures map the fourteen exact Rust leaf values bijectively to fourteen fixed `details.invariant` tokens under `message_export_preparation_invariant_failed`.
     - They require `reason` followed by `invariant` and reject category/violation splitting, unknown or alternate tokens, source or entry identity, plan/message indexes, paths, spans, payload excerpts, nested errors, and secondary invariant vectors.
