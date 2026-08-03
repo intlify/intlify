@@ -30,6 +30,20 @@ fn artifact(name: &str, relationships: Vec<ExportArtifactRelationship>) -> Expor
     )
 }
 
+fn lightweight_artifact(
+    name: impl Into<Box<str>>,
+    kind: &ExportArtifactKind,
+    relationships: Vec<ExportArtifactRelationship>,
+) -> ExportArtifact {
+    ExportArtifact::new(
+        ExportArtifactPath::try_new([name]).unwrap(),
+        kind.clone(),
+        ExportArtifactFormatVersion::DRAFT_V0_1,
+        ExportArtifactPayload::try_new(Box::<[u8]>::default()).unwrap(),
+        ExportArtifactMetadata::try_new(None, relationships).unwrap(),
+    )
+}
+
 fn invalid(error: &ExportError) -> InvalidOutputViolation {
     let ExportErrorEvidence::InvalidOutput(evidence) = error.evidence() else {
         panic!("expected invalid-output evidence, got {error:?}");
@@ -400,17 +414,16 @@ fn relationship_count_charges_submitted_occurrences_before_semantics() {
 #[test]
 fn artifact_record_count_accepts_the_exact_ceiling_and_rejects_first_over() {
     let ceiling = OutputLimitCounter::ArtifactRecordsPerSet.ceiling() as usize;
+    let kind = ExportArtifactKind::try_new("com.example/count-fixture").unwrap();
     let exact: Vec<_> = (0..ceiling)
-        .map(|index| artifact(&format!("artifact-{index:05}"), Vec::new()))
+        .map(|index| lightweight_artifact(format!("artifact-{index:05}"), &kind, Vec::new()))
         .collect();
     assert_eq!(
         ExportArtifactSet::try_new(exact).unwrap().artifacts().len(),
         ceiling
     );
 
-    let over: Vec<_> = (0..=ceiling)
-        .map(|index| artifact(&format!("artifact-{index:05}"), Vec::new()))
-        .collect();
+    let over = vec![lightweight_artifact("over", &kind, Vec::new()); ceiling + 1];
     let error = ExportArtifactSet::try_new(over).unwrap_err();
     assert_eq!(
         limit(&error),
@@ -423,6 +436,7 @@ fn artifact_record_count_accepts_the_exact_ceiling_and_rejects_first_over() {
 
 #[test]
 fn set_relationship_count_accepts_the_exact_ceiling_and_rejects_first_over() {
+    let kind = ExportArtifactKind::try_new("com.example/relationship-fixture").unwrap();
     let targets: Vec<_> = (0..4_096)
         .map(|index| ExportArtifactPath::try_new([format!("target-{index:04}")]).unwrap())
         .collect();
@@ -437,9 +451,11 @@ fn set_relationship_count_accepts_the_exact_ceiling_and_rejects_first_over() {
     };
 
     let mut exact: Vec<_> = (0..4_096)
-        .map(|index| artifact(&format!("target-{index:04}"), Vec::new()))
+        .map(|index| lightweight_artifact(format!("target-{index:04}"), &kind, Vec::new()))
         .collect();
-    exact.extend((0..16).map(|index| artifact(&format!("source-{index:02}"), fanout())));
+    exact.extend(
+        (0..16).map(|index| lightweight_artifact(format!("source-{index:02}"), &kind, fanout())),
+    );
     assert_eq!(
         ExportArtifactSet::try_new(exact)
             .unwrap()
@@ -450,15 +466,17 @@ fn set_relationship_count_accepts_the_exact_ceiling_and_rejects_first_over() {
         65_536
     );
 
-    let mut over: Vec<_> = (0..16)
-        .map(|index| artifact(&format!("source-{index:02}"), fanout()))
-        .collect();
-    over.push(artifact(
+    let repeated_relationship = ExportArtifactRelationship::new(
+        ExportArtifactRelationshipKind::EagerLoad,
+        targets[0].clone(),
+    );
+    let full_source =
+        lightweight_artifact("source", &kind, vec![repeated_relationship.clone(); 4_096]);
+    let mut over = vec![full_source; 16];
+    over.push(lightweight_artifact(
         "source-extra",
-        vec![ExportArtifactRelationship::new(
-            ExportArtifactRelationshipKind::EagerLoad,
-            targets[0].clone(),
-        )],
+        &kind,
+        vec![repeated_relationship],
     ));
     let error = ExportArtifactSet::try_new(over).unwrap_err();
     assert_eq!(

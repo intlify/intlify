@@ -38,7 +38,13 @@ pub(crate) struct BoundedExportWriter<'a> {
 
 impl BoundedExportWriter<'_> {
     pub(crate) fn try_extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), ExportError> {
-        checked_output_lengths(self.bytes.len(), bytes.len(), self.budget.committed)?;
+        checked_output_lengths(
+            PendingOutputLengths {
+                current_artifact: self.bytes.len(),
+                appended: bytes.len(),
+            },
+            self.budget.committed,
+        )?;
         self.bytes.reserve(bytes.len());
         self.bytes.extend_from_slice(bytes);
         Ok(())
@@ -49,7 +55,13 @@ impl BoundedExportWriter<'_> {
     }
 
     pub(crate) fn finish(self) -> Result<ExportArtifactPayload, ExportError> {
-        let (_, total) = checked_output_lengths(0, self.bytes.len(), self.budget.committed)?;
+        let (_, total) = checked_output_lengths(
+            PendingOutputLengths {
+                current_artifact: 0,
+                appended: self.bytes.len(),
+            },
+            self.budget.committed,
+        )?;
         self.budget.committed = total;
         Ok(ExportArtifactPayload::from_checked(
             self.bytes.into_boxed_slice(),
@@ -57,9 +69,14 @@ impl BoundedExportWriter<'_> {
     }
 }
 
-fn checked_output_lengths(
+#[derive(Debug, Clone, Copy)]
+struct PendingOutputLengths {
     current_artifact: usize,
     appended: usize,
+}
+
+fn checked_output_lengths(
+    pending: PendingOutputLengths,
     committed_set: u64,
 ) -> Result<(usize, u64), ExportError> {
     let mut limits = OutputLimitAccumulator::new();
@@ -67,26 +84,26 @@ fn checked_output_lengths(
     limits.add_usize(
         OutputLimitCounter::PayloadBytesPerArtifact,
         &mut artifact_total,
-        current_artifact,
+        pending.current_artifact,
     );
     limits.add_usize(
         OutputLimitCounter::PayloadBytesPerArtifact,
         &mut artifact_total,
-        appended,
+        pending.appended,
     );
 
     let mut set_total = committed_set;
     limits.add_usize(
         OutputLimitCounter::PayloadBytesPerSet,
         &mut set_total,
-        current_artifact,
+        pending.current_artifact,
     );
     limits.add_usize(
         OutputLimitCounter::PayloadBytesPerSet,
         &mut set_total,
-        appended,
+        pending.appended,
     );
-    let next_artifact = current_artifact.checked_add(appended);
+    let next_artifact = pending.current_artifact.checked_add(pending.appended);
     if next_artifact.is_none() {
         limits.observe_overflow(OutputLimitCounter::PayloadBytesPerArtifact);
     }
@@ -105,7 +122,7 @@ fn checked_output_lengths(
 
 #[cfg(test)]
 mod tests {
-    use super::{checked_output_lengths, ExportPayloadBudget};
+    use super::{checked_output_lengths, ExportPayloadBudget, PendingOutputLengths};
     use crate::{ExportErrorEvidence, OutputLimitCounter, OutputLimitObservation};
 
     fn limit(error: &crate::ExportError) -> (OutputLimitCounter, OutputLimitObservation) {
@@ -120,7 +137,13 @@ mod tests {
         let per_artifact = OutputLimitCounter::PayloadBytesPerArtifact.ceiling() as usize;
         let per_set = OutputLimitCounter::PayloadBytesPerSet.ceiling();
         assert_eq!(
-            checked_output_lengths(per_artifact - 1, 1, per_set - per_artifact as u64),
+            checked_output_lengths(
+                PendingOutputLengths {
+                    current_artifact: per_artifact - 1,
+                    appended: 1,
+                },
+                per_set - per_artifact as u64,
+            ),
             Ok((per_artifact, per_set))
         );
     }
@@ -129,8 +152,10 @@ mod tests {
     fn per_artifact_payload_limit_precedes_the_set_limit() {
         let per_artifact = OutputLimitCounter::PayloadBytesPerArtifact.ceiling() as usize;
         let error = checked_output_lengths(
-            per_artifact,
-            1,
+            PendingOutputLengths {
+                current_artifact: per_artifact,
+                appended: 1,
+            },
             OutputLimitCounter::PayloadBytesPerSet.ceiling(),
         )
         .unwrap_err();

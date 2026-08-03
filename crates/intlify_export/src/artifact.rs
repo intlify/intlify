@@ -13,7 +13,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use intlify_contract::ProducerId;
 
 use crate::export_error::{invalid_output, OutputLimitAccumulator};
-use crate::{ExportError, InvalidOutputViolation, OutputLimitCounter};
+use crate::{
+    ExportError, InternalInvariantEvidence, InternalInvariantViolation, InvalidOutputViolation,
+    OutputLimitCounter,
+};
 
 /// Complete checked result of one platform-exporter invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,13 +137,6 @@ impl ExportArtifactPath {
         let mut input = segments.into_iter();
         let mut limits = OutputLimitAccumulator::new();
         let (lower, upper) = input.size_hint();
-        if upper == Some(lower) {
-            limits.observe_usize(OutputLimitCounter::ArtifactPathSegmentsPerPath, lower);
-            if let Some(error) = limits.clone().finish() {
-                return Err(error);
-            }
-        }
-
         let mut segments = Vec::with_capacity(upper.unwrap_or(lower).min(64));
         let mut path_bytes = 0;
         for segment in &mut input {
@@ -420,9 +416,21 @@ fn valid_path_segment(segment: &str) -> bool {
     !segment.is_empty()
         && segment != "."
         && segment != ".."
-        && !segment
-            .chars()
-            .any(|character| matches!(character, '/' | '\\' | '\0') || character.is_control())
+        && !segment.chars().any(|character| {
+            matches!(character, '/' | '\\' | '\0')
+                || character.is_control()
+                || is_bidirectional_control(character)
+        })
+}
+
+fn is_bidirectional_control(character: char) -> bool {
+    matches!(
+        character,
+        '\u{061C}'
+            | '\u{200E}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2066}'..='\u{2069}'
+    )
 }
 
 fn valid_kind_shape(value: &str) -> bool {
@@ -651,7 +659,17 @@ fn validate_kind_and_media(artifacts: &[ExportArtifact]) -> Result<(), ExportErr
     Ok(())
 }
 
+/// Validate a resolved relationship graph whose records are in canonical order.
+///
+/// Duplicate detection relies on every artifact's relationships already being
+/// sorted by `(kind, target)`.
 fn validate_relationships(artifacts: &[ExportArtifact]) -> Result<(), ExportError> {
+    debug_assert!(artifacts.iter().all(|artifact| artifact
+        .metadata
+        .relationships
+        .windows(2)
+        .all(|pair| (pair[0].kind, &pair[0].target) <= (pair[1].kind, &pair[1].target))));
+
     let paths: BTreeMap<&ExportArtifactPath, usize> = artifacts
         .iter()
         .enumerate()
@@ -737,7 +755,7 @@ fn validate_lazy_relationships(
         targets.dedup();
     }
 
-    let mut queries = BTreeMap::<usize, BTreeSet<usize>>::new();
+    let mut queries_by_target = BTreeMap::<usize, BTreeSet<usize>>::new();
     for (source, source_edges) in edges.iter().enumerate() {
         for (kind, target) in source_edges {
             if *kind != ExportArtifactRelationshipKind::LazyLoad {
@@ -745,36 +763,79 @@ fn validate_lazy_relationships(
             }
             let source_component = components[source];
             let target_component = components[*target];
-            if source_component == target_component {
-                return Err(invalid_output(
-                    InvalidOutputViolation::LazyTargetInEagerClosure,
-                ));
-            }
-            queries
-                .entry(source_component)
+            queries_by_target
+                .entry(target_component)
                 .or_default()
-                .insert(target_component);
+                .insert(source_component);
         }
     }
 
-    let mut visited = vec![false; component_count];
-    for (source, targets) in queries {
-        visited.fill(false);
-        let mut stack = component_edges[source].clone();
-        while let Some(component) = stack.pop() {
-            if visited[component] {
-                continue;
+    if queries_by_target.is_empty() {
+        return Ok(());
+    }
+
+    let topological_order = component_topological_order(&component_edges)?;
+    let lazy_targets: Vec<_> = queries_by_target.keys().copied().collect();
+    let mut reachable_targets = vec![0_u64; component_count];
+
+    // Propagate 64 lazy targets at a time through the condensation DAG. This
+    // shares graph traversal among all lazy sources without retaining an
+    // unbounded all-pairs transitive closure.
+    for target_block in lazy_targets.chunks(u64::BITS as usize) {
+        reachable_targets.fill(0);
+        for (bit, target) in target_block.iter().copied().enumerate() {
+            reachable_targets[target] = 1_u64 << bit;
+        }
+        for source in topological_order.iter().copied().rev() {
+            for target in &component_edges[source] {
+                reachable_targets[source] |= reachable_targets[*target];
             }
-            visited[component] = true;
-            if targets.contains(&component) {
+        }
+        for (bit, target) in target_block.iter().copied().enumerate() {
+            let target_bit = 1_u64 << bit;
+            if queries_by_target[&target]
+                .iter()
+                .any(|source| reachable_targets[*source] & target_bit != 0)
+            {
                 return Err(invalid_output(
                     InvalidOutputViolation::LazyTargetInEagerClosure,
                 ));
             }
-            stack.extend(component_edges[component].iter().copied());
         }
     }
     Ok(())
+}
+
+fn component_topological_order(adjacency: &[Vec<usize>]) -> Result<Vec<usize>, ExportError> {
+    let mut indegrees = vec![0_usize; adjacency.len()];
+    for targets in adjacency {
+        for target in targets {
+            indegrees[*target] += 1;
+        }
+    }
+
+    let mut ready: BTreeSet<_> = indegrees
+        .iter()
+        .enumerate()
+        .filter_map(|(node, indegree)| (*indegree == 0).then_some(node))
+        .collect();
+    let mut order = Vec::with_capacity(adjacency.len());
+    while let Some(node) = ready.pop_first() {
+        order.push(node);
+        for target in &adjacency[node] {
+            indegrees[*target] -= 1;
+            if indegrees[*target] == 0 {
+                ready.insert(*target);
+            }
+        }
+    }
+
+    if order.len() != adjacency.len() {
+        return Err(ExportError::internal_invariant(
+            InternalInvariantEvidence::new(InternalInvariantViolation::SharedConstructorState),
+        ));
+    }
+    Ok(order)
 }
 
 fn eager_components(adjacency: &[Vec<usize>]) -> (Vec<usize>, usize) {
@@ -843,10 +904,15 @@ mod tests {
     #[test]
     fn scalar_grammars_reject_ambiguous_or_host_specific_spellings() {
         assert!(valid_path_segment("messages.en.mjs"));
+        assert!(valid_path_segment("メッセージ.mjs"));
         assert!(!valid_path_segment(".."));
         assert!(!valid_path_segment("a/b"));
         assert!(!valid_path_segment("a\\b"));
         assert!(!valid_path_segment("a\u{0007}b"));
+        assert!(!valid_path_segment("a\u{061c}b"));
+        assert!(!valid_path_segment("a\u{200e}b"));
+        assert!(!valid_path_segment("a\u{202e}b"));
+        assert!(!valid_path_segment("a\u{2066}b"));
 
         assert!(valid_kind_shape("com.example/custom-bundle"));
         assert!(!valid_kind_shape("example/custom-bundle"));
@@ -855,6 +921,34 @@ mod tests {
         assert!(valid_media_component("vnd.example+json"));
         assert!(!valid_media_component("Vnd.Example"));
         assert!(!valid_media_component("*"));
+    }
+
+    #[test]
+    fn path_validation_counts_yielded_segments_instead_of_trusting_size_hint() {
+        struct MisleadingSizeHint {
+            yielded: bool,
+        }
+
+        impl Iterator for MisleadingSizeHint {
+            type Item = &'static str;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.yielded {
+                    None
+                } else {
+                    self.yielded = true;
+                    Some("one")
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (65, Some(65))
+            }
+        }
+
+        let path = ExportArtifactPath::try_new(MisleadingSizeHint { yielded: false }).unwrap();
+        assert_eq!(path.segments().len(), 1);
+        assert_eq!(path.segments()[0].as_str(), "one");
     }
 
     #[test]
@@ -899,6 +993,25 @@ mod tests {
                 "graph encoding {original_encoding} selected the wrong eager-closure result"
             );
         }
+    }
+
+    #[test]
+    fn lazy_reachability_shares_dag_propagation_across_target_blocks() {
+        let mut valid = vec![Vec::new(); 132];
+        valid[0].extend((1..=130).map(|target| (ExportArtifactRelationshipKind::LazyLoad, target)));
+        assert!(validate_lazy_relationships(&valid).is_ok());
+
+        let mut invalid = valid;
+        invalid[0].push((ExportArtifactRelationshipKind::EagerLoad, 131));
+        invalid[131].push((ExportArtifactRelationshipKind::EagerLoad, 130));
+        let error = validate_lazy_relationships(&invalid).unwrap_err();
+        let ExportErrorEvidence::InvalidOutput(evidence) = error.evidence() else {
+            panic!("expected invalid output evidence");
+        };
+        assert_eq!(
+            evidence.violation(),
+            crate::InvalidOutputViolation::LazyTargetInEagerClosure
+        );
     }
 
     fn eager_reaches(

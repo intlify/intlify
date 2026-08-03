@@ -553,9 +553,6 @@ impl OutputLimitAccumulator {
             return;
         }
         let slot = &mut self.observations[counter.index()];
-        if matches!(*slot, Some(OutputLimitObservation::ArithmeticOverflow)) {
-            return;
-        }
         let replace = match slot {
             Some(OutputLimitObservation::Exact(previous)) => value > *previous,
             None => true,
@@ -632,6 +629,13 @@ mod tests {
                 1_073_741_824,
             ]
         );
+    }
+
+    #[test]
+    fn counter_precedence_order_matches_observation_slot_indexes() {
+        for (slot, counter) in OutputLimitCounter::ALL.into_iter().enumerate() {
+            assert_eq!(counter.index(), slot);
+        }
     }
 
     #[test]

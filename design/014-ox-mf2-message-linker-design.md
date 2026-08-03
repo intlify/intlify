@@ -5756,9 +5756,9 @@ pub struct ExportArtifactPath {
     segments: Vec<ExportArtifactPathSegment>,
 }
 
-pub struct ExportArtifactPathSegment(String);
+pub struct ExportArtifactPathSegment(Box<str>);
 
-pub struct ExportArtifactKind(String);
+pub struct ExportArtifactKind(Box<str>);
 
 pub struct ExportArtifactFormatVersion {
     major: u16,
@@ -5772,7 +5772,7 @@ pub struct ExportArtifactMetadata {
     relationships: Vec<ExportArtifactRelationship>,
 }
 
-pub struct ExportMediaType(String);
+pub struct ExportMediaType(Box<str>);
 
 pub struct ExportArtifactRelationship {
     kind: ExportArtifactRelationshipKind,
@@ -6365,7 +6365,7 @@ Checked construction rejects an unbounded payload and any set that is not valid 
 
 `ExportArtifactPath` is a non-empty ordered `Vec<ExportArtifactPathSegment>`, not a host `Path` / `PathBuf`, absolute pathname, filesystem capability, or command to write a file. A segment is an owned non-empty sequence of Unicode scalar values encoded as UTF-8.
 
-It rejects the exact navigation segments `.` and `..`, `/`, `\`, `U+0000`, and every Unicode General Category `Control` (`Cc`) scalar.
+It rejects the exact navigation segments `.` and `..`, `/`, `\`, `U+0000`, every Unicode General Category `Control` (`Cc`) scalar, and every Unicode `Bidi_Control` scalar.
 
 Dots inside any other segment, including an extension such as `en.json`, remain ordinary data.
 
@@ -8562,7 +8562,7 @@ Elapsed time, allocator memory, RSS, artifact payload bytes, derived byte differ
   - Configured-exporter fixtures construct one immutable typed ESM instance per selected target from the exact link policy's production locales/fallback and that target's canonical eager set; preserve the object-safe batch-only `PlatformExporter` trait; and reject global/environment/config rereads, untyped option bags, target/output/filesystem authority, shared mutable cross-target state, and mismatched policy/batch state. A detected built-in mismatch remains `CapabilityPreflightContract`.
   - Output-root shape fixtures require exactly one string-valued `out` per M3 configured target and reject omission, `null`, every other JSON type, defaults, and inference. They prove that the resolved value belongs to CLI registration rather than exporter I/O and that non-filesystem integrations supply their destination outside this CLI target shape.
   - Output-root namespace fixtures accept only non-empty slash-separated project-root-relative paths; resolve them against the same 006 `projectRoot` independently of current directory and config-file location; and reject leading or trailing separators, repeated separators, empty or navigation segments, absolute, drive-prefixed, UNC, and backslash-containing forms without host-dependent rewriting.
-  - Output-root limit fixtures reuse the portable artifact-path segment validator; accept exact 1- and 255-byte segment, 64-segment, and 4,096-total-byte boundaries; and reject the first value above each ceiling, NUL, and every `Cc` scalar. They preserve exact Unicode bytes and reject trimming, case folding, normalization, percent decoding, or host-dependent canonicalization.
+  - Output-root limit fixtures reuse the portable artifact-path segment validator; accept exact 1- and 255-byte segment, 64-segment, and 4,096-total-byte boundaries; and reject the first value above each ceiling, NUL, every `Cc` scalar, and every `Bidi_Control` scalar. They preserve exact remaining Unicode bytes and reject trimming, case folding, normalization, percent decoding, or host-dependent canonicalization.
   - Output-root filesystem fixtures reject every existing directory symlink, Windows reparse point, and symlinked destination leaf below the trusted project root without following it; create missing real directories only in write mode; create nothing in check mode; and fail the complete target when the platform cannot preserve verified-root-relative no-follow registration. They prove exporters receive no host path or filesystem capability.
   - Output-ownership fixtures reserve exact root path `[".intlify-output-manifest.json"]` for integration metadata and reject an exporter collision before mutation; adopt only an absent or empty real root; reject a non-empty unmanifested root, invalid or unsupported manifest, and every unrecorded file, directory, symlink, reparse point, or special entry without deleting it; and admit only the manifest, its recorded regular files, and their exact real ancestor directories.
     - They prove that a valid manifest records the selected exporter and every canonical artifact path, kind, format version, complete common metadata, payload byte length, and payload fingerprint without entering `ExportArtifactSet` limits; permits repair of a missing or changed owned file; removes a prior recorded path absent from the new set only on successful commit; and never treats a digest as payload or cleanup authority for an unrecorded entry.
