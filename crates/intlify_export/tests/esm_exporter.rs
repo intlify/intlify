@@ -11,7 +11,7 @@ use intlify_contract::{
     ReferenceArtifactSegment, SourceDocumentIdentity,
 };
 use intlify_export::{
-    prepare_export, EsmExporter, EsmExporterOptions, ExportArtifact,
+    prepare_export, EsmExporter, EsmExporterOptions, ExportArtifact, ExportArtifactFormatVersion,
     ExportArtifactRelationshipKind, ExportErrorEvidence, ExportValidationLimits,
     InternalInvariantViolation, PlatformExporter, UnsupportedBatchFeature,
 };
@@ -337,24 +337,44 @@ fn fallback_materialization_emits_canonical_locale_loader_and_accessor_artifacts
 
     assert_eq!(
         source(locale_en),
-        "export const formatVersion = [0, 1];\nexport const deliveryUnit = [\"main\"];\nexport const locale = \"en\";\n\nexport const messages = [\n  [[\"project\", \"app\"], \"json-pointer\", \"/hello\", \"en\", \"Hello\"]\n  [[\"project\", \"app\"], \"json-pointer\", \"/total\", \"en\", \".input {$count :number}\\n{{Total: {$count}}}\"]\n];\n"
+        include_str!("../fixtures/esm/locale-multiple.mjs")
     );
     assert_eq!(
         source(locale_fr),
-        "export const formatVersion = [0, 1];\nexport const deliveryUnit = [\"main\"];\nexport const locale = \"fr\";\n\nexport const messages = [\n  [[\"project\", \"app\"], \"json-pointer\", \"/hello\", \"en\", \"Hello\"]\n  [[\"project\", \"app\"], \"json-pointer\", \"/total\", \"en\", \".input {$count :number}\\n{{Total: {$count}}}\"]\n];\n"
+        "export const formatVersion = [0, 1];\nexport const deliveryUnit = [\"main\"];\nexport const locale = \"fr\";\n\nexport const messages = [\n  [[\"project\", \"app\"], \"json-pointer\", \"/hello\", \"en\", \"Hello\"],\n  [[\"project\", \"app\"], \"json-pointer\", \"/total\", \"en\", \".input {$count :number}\\n{{Total: {$count}}}\"]\n];\n"
     );
 
     let en_specifier = format!("./{}", logical_path(locale_en));
     let fr_specifier = format!("./{}", logical_path(locale_fr));
+    let normalized_loader = source(loader)
+        .replace(&en_specifier, "./locales/locale-en.mjs")
+        .replace(&fr_specifier, "./locales/locale-fr.mjs");
     assert_eq!(
-        source(loader),
-        format!(
-            "import * as eager0 from \"{en_specifier}\";\n\nexport const formatVersion = [0, 1];\nexport const locales = [\"en\", \"fr\"];\nexport const fallbacks = [\n  [\"fr\", [\"en\"]]\n];\n\nexport function loadLocale(locale) {{\n  switch (locale) {{\n    case \"en\":\n      return Promise.resolve(eager0);\n    case \"fr\":\n      return import(\"{fr_specifier}\");\n    default:\n      return Promise.reject(new RangeError(\"unsupported locale\"));\n  }}\n}}\n"
-        )
+        normalized_loader,
+        include_str!("../fixtures/esm/loader-multiple.mjs")
     );
     assert_eq!(
         source(accessor),
         include_str!("../fixtures/esm/accessor-app.ts")
+    );
+
+    for artifact in [locale_en, locale_fr, loader] {
+        assert_eq!(
+            artifact.format_version(),
+            ExportArtifactFormatVersion::DRAFT_V0_1
+        );
+        assert_eq!(
+            artifact.metadata().media_type().unwrap().as_str(),
+            "text/javascript"
+        );
+    }
+    assert_eq!(
+        accessor.format_version(),
+        ExportArtifactFormatVersion::DRAFT_V0_1
+    );
+    assert_eq!(
+        accessor.metadata().media_type().unwrap().as_str(),
+        "text/typescript"
     );
 
     assert_eq!(loader.logical_path().segments()[0].as_str(), "loader.mjs");
@@ -420,11 +440,11 @@ fn empty_message_plan_and_empty_eager_set_still_emit_all_lazy_locale_output() {
 fn loader_preserves_fallback_priority_and_assigns_eager_aliases_canonically() {
     let app = scope("app");
     let policy = policy(
-        &["fr", "en", "de"],
-        vec![LocaleFallback::new(
-            locale("fr"),
-            vec![locale("de"), locale("en")],
-        )],
+        &["fr", "en", "de", "ja"],
+        vec![
+            LocaleFallback::new(locale("fr"), vec![locale("de"), locale("en")]),
+            LocaleFallback::new(locale("ja"), vec![locale("en")]),
+        ],
         Vec::new(),
     );
     let outcome = linked_outcome(
@@ -457,7 +477,9 @@ fn loader_preserves_fallback_priority_and_assigns_eager_aliases_canonically() {
         logical_path(locale_de),
         logical_path(locale_fr)
     )));
-    assert!(loader_source.contains("export const fallbacks = [\n  [\"fr\", [\"de\", \"en\"]]\n];"));
+    assert!(loader_source.contains(
+        "export const fallbacks = [\n  [\"fr\", [\"de\", \"en\"]],\n  [\"ja\", [\"en\"]]\n];"
+    ));
     assert!(loader_source.contains("case \"de\":\n      return Promise.resolve(eager0);"));
     assert!(loader_source.contains("case \"fr\":\n      return Promise.resolve(eager1);"));
 }

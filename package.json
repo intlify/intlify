@@ -9,6 +9,7 @@
     "check:rust:fmt": "cargo fmt --all -- --check",
     "check:rust:clippy": "cargo clippy --all-targets --color always",
     "check:rust:compile": "cargo check --all-targets --color always",
+    "test:export-esm-syntax": "node --check crates/intlify_export/fixtures/esm/locale-multiple.mjs && node --check crates/intlify_export/fixtures/esm/loader-multiple.mjs",
     "test:export-accessor-types": "vp exec -w -- tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --ignoreConfig crates/intlify_export/fixtures/esm/accessor-app.compile.ts",
     "bench": "vp run mf-parser-bench#bench",
     "bench:smoke": "vp run mf-parser-bench#bench:smoke",
@@ -44,7 +45,7 @@
     "dev": "vp run playground#dev",
     "dev:playground": "vp run playground#dev",
     "check": "vp run check:rust && vp check && vp run playground#vize:check",
-    "test": "cargo test -p ox_mf2_parser --all-targets --color always && cargo test -p intlify_cli --all-targets --color always && cargo test -p intlify_format --all-targets --color always && cargo test -p intlify_resource --all-targets --color always && cargo test -p intlify_contract --all-targets --color always && cargo test -p intlify_linker --all-targets --color always && cargo test -p intlify_export --all-targets --color always && cargo test -p intlify_producer_js --all-targets --color always && vp run test:export-accessor-types && vp test",
+    "test": "cargo test -p ox_mf2_parser --all-targets --color always && cargo test -p intlify_cli --all-targets --color always && cargo test -p intlify_format --all-targets --color always && cargo test -p intlify_resource --all-targets --color always && cargo test -p intlify_contract --all-targets --color always && cargo test -p intlify_linker --all-targets --color always && cargo test -p intlify_export --all-targets --color always && cargo test -p intlify_producer_js --all-targets --color always && vp run test:export-esm-syntax && vp run test:export-accessor-types && vp test",
     "prepare": "vp config"
   },
   "devDependencies": {

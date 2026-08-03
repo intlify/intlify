@@ -39,7 +39,7 @@ pub(super) fn render_locale_module(
     }
 
     writer.try_write_str("export const messages = [\n")?;
-    for message in plan.messages() {
+    for (index, message) in plan.messages().iter().enumerate() {
         let scope = message.resolved_scope().as_catalog_scope();
         writer.try_write_str("  [[")?;
         write_js_string(&mut writer, scope.namespace().as_str())?;
@@ -53,7 +53,11 @@ pub(super) fn render_locale_module(
         write_js_string(&mut writer, message.definition_locale().as_str())?;
         writer.try_write_str(", ")?;
         write_js_string(&mut writer, message.message().as_str())?;
-        writer.try_write_str("]\n")?;
+        writer.try_write_str(if index + 1 == plan.messages().len() {
+            "]\n"
+        } else {
+            "],\n"
+        })?;
     }
     writer.try_write_str("];\n")?;
     writer.finish()
@@ -241,12 +245,16 @@ fn write_fallbacks(
     }
 
     writer.try_write_str("export const fallbacks = [\n")?;
-    for fallback in options.fallbacks() {
+    for (index, fallback) in options.fallbacks().iter().enumerate() {
         writer.try_write_str("  [")?;
         write_js_string(writer, fallback.source().as_str())?;
         writer.try_write_str(", [")?;
         write_string_values(writer, fallback.targets().iter().map(Locale::as_str))?;
-        writer.try_write_str("]]\n")?;
+        writer.try_write_str(if index + 1 == options.fallbacks().len() {
+            "]]\n"
+        } else {
+            "]],\n"
+        })?;
     }
     writer.try_write_str("];\n")
 }
