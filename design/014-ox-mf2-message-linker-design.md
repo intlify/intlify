@@ -3803,6 +3803,7 @@ impl LinkOutcome {
 
 impl<'a> ExportPreparationView<'a> {
     pub fn plans(&self) -> &'a [MessageBundlePlan];
+    pub fn typed_key_baseline_relation_is_complete(&self) -> bool;
     pub fn typed_key_baselines(
         &self,
     ) -> impl ExactSizeIterator<Item = TypedKeyBaselineView<'a>> + 'a;
@@ -3826,6 +3827,8 @@ impl<'a> BaselineDefinitionView<'a> {
 ```
 
 The concrete iterator types and private fields are implementation details. They borrow one `LinkOutcome`, allocate no copied relation, and yield models, keys, and definitions in the exact canonical one-to-one order already checked during outcome construction.
+
+`typed_key_baseline_relation_is_complete()` compares the original top-level model and relation slice lengths before `typed_key_baselines()` pairs them. It exposes neither count nor either raw slice. `prepare_export` observes the predicate only during the typed-output relation preflight, after the complete ordinary message-validation scan, so a missing or extra relation item selects `ModelRelationMismatch` without changing validation failure precedence.
 
 `export_preparation_view()` returns `None` exactly when `bundle_plans()` is `None`. Otherwise it returns one view, including when the plan slice, model slice, or both are empty. `prepare_export` is the sole workspace consumer of this handoff.
 

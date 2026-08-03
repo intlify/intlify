@@ -212,6 +212,9 @@ fn map_diagnostic(
     kind: MappedMessageDiagnosticKind,
     labels: &[DiagnosticLabel],
 ) -> Result<MappedMessageDiagnostic, DiagnosticMappingInvariant> {
+    // Preserve the documented invariant precedence: the complete label count
+    // is checked before the primary span. `map_labels` repeats the bound so it
+    // remains a self-contained mapping boundary.
     if labels.len() > MAX_LABELS {
         return Err(DiagnosticMappingInvariant::LabelCountExceeded);
     }

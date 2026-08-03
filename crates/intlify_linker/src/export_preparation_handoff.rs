@@ -39,6 +39,15 @@ impl<'a> ExportPreparationView<'a> {
         self.plans
     }
 
+    /// Return whether every typed-key model has exactly one baseline relation.
+    ///
+    /// This purpose-bound integrity predicate compares the original slices
+    /// before the iterator below can truncate them through `zip`.
+    #[must_use]
+    pub const fn typed_key_baseline_relation_is_complete(&self) -> bool {
+        self.models.len() == self.relations.len()
+    }
+
     /// Iterate canonical typed-key models with their exact baseline relation.
     pub fn typed_key_baselines(
         &self,

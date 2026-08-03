@@ -304,6 +304,9 @@ fn build_typed_output<'a>(
 }
 
 fn preflight_model_relation(view: ExportPreparationView<'_>) -> Result<(), TypedOutputInvariant> {
+    if !view.typed_key_baseline_relation_is_complete() {
+        return Err(TypedOutputInvariant::ModelRelationMismatch);
+    }
     let mut previous_scope = None;
     for baseline in view.typed_key_baselines() {
         let scope = baseline.model().resolved_scope();
