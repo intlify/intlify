@@ -131,8 +131,37 @@ impl ExportArtifactPath {
         I: IntoIterator<Item = S>,
         S: Into<Box<str>>,
     {
-        let segments: Vec<Box<str>> = segments.into_iter().map(Into::into).collect();
-        validate_path_limits(&segments)?;
+        let mut input = segments.into_iter();
+        let mut limits = OutputLimitAccumulator::new();
+        let (lower, upper) = input.size_hint();
+        if upper == Some(lower) {
+            limits.observe_usize(OutputLimitCounter::ArtifactPathSegmentsPerPath, lower);
+            if let Some(error) = limits.clone().finish() {
+                return Err(error);
+            }
+        }
+
+        let mut segments = Vec::with_capacity(upper.unwrap_or(lower).min(64));
+        let mut path_bytes = 0;
+        for segment in &mut input {
+            if segments.len() == 64 {
+                limits.observe_exact(OutputLimitCounter::ArtifactPathSegmentsPerPath, 65);
+                return Err(limits
+                    .finish()
+                    .expect("the sixty-fifth segment must exceed the fixed path ceiling"));
+            }
+            let segment = segment.into();
+            limits.observe_usize(OutputLimitCounter::ArtifactPathSegmentBytes, segment.len());
+            limits.add_usize(
+                OutputLimitCounter::ArtifactPathBytesPerPath,
+                &mut path_bytes,
+                segment.len(),
+            );
+            segments.push(segment);
+        }
+        if let Some(error) = limits.finish() {
+            return Err(error);
+        }
         if !valid_path_segments(segments.iter().map(Box::as_ref)) {
             return Err(invalid_output(InvalidOutputViolation::ArtifactPath));
         }
@@ -380,24 +409,6 @@ impl ExportArtifactRelationshipKind {
     }
 }
 
-fn validate_path_limits(segments: &[Box<str>]) -> Result<(), ExportError> {
-    let mut limits = OutputLimitAccumulator::new();
-    limits.observe_usize(
-        OutputLimitCounter::ArtifactPathSegmentsPerPath,
-        segments.len(),
-    );
-    let mut path_bytes = 0;
-    for segment in segments {
-        limits.observe_usize(OutputLimitCounter::ArtifactPathSegmentBytes, segment.len());
-        limits.add_usize(
-            OutputLimitCounter::ArtifactPathBytesPerPath,
-            &mut path_bytes,
-            segment.len(),
-        );
-    }
-    limits.finish().map_or(Ok(()), Err)
-}
-
 fn valid_path_segments<'a>(mut segments: impl Iterator<Item = &'a str>) -> bool {
     let Some(first) = segments.next() else {
         return false;
@@ -488,12 +499,14 @@ fn valid_media_component(component: &str) -> bool {
 fn validate_output_limits(artifacts: &[ExportArtifact]) -> Result<(), ExportError> {
     let mut limits = OutputLimitAccumulator::new();
     limits.observe_usize(OutputLimitCounter::ArtifactRecordsPerSet, artifacts.len());
+    if let Some(error) = limits.finish() {
+        return Err(error);
+    }
 
+    // Logical paths, kinds, and media types precede relationship counters and
+    // can be measured without visiting any relationship record.
+    let mut limits = OutputLimitAccumulator::new();
     let mut artifact_path_bytes = 0;
-    let mut relationship_records = 0;
-    let mut relationship_target_bytes = 0;
-    let mut payload_bytes = 0;
-
     for artifact in artifacts {
         measure_path(
             &artifact.logical_path,
@@ -513,6 +526,17 @@ fn validate_output_limits(artifacts: &[ExportArtifact]) -> Result<(), ExportErro
                 limits.observe_usize(OutputLimitCounter::MediaTypeBytes, media_type.0.len());
             }
         }
+    }
+    if let Some(error) = limits.finish() {
+        return Err(error);
+    }
+
+    // Every relationship target is already an independently checked path.
+    // Preflight the submitted vector lengths before walking their records so
+    // an oversized set cannot force unbounded target traversal or graph work.
+    let mut limits = OutputLimitAccumulator::new();
+    let mut relationship_records = 0;
+    for artifact in artifacts {
         limits.observe_usize(
             OutputLimitCounter::RelationshipRecordsPerArtifact,
             artifact.metadata.relationships.len(),
@@ -522,6 +546,15 @@ fn validate_output_limits(artifacts: &[ExportArtifact]) -> Result<(), ExportErro
             &mut relationship_records,
             artifact.metadata.relationships.len(),
         );
+    }
+    if let Some(error) = limits.finish() {
+        return Err(error);
+    }
+
+    let mut limits = OutputLimitAccumulator::new();
+    let mut relationship_target_bytes = 0;
+    let mut payload_bytes = 0;
+    for artifact in artifacts {
         for relationship in &artifact.metadata.relationships {
             measure_path(&relationship.target, &mut limits, None);
             for segment in &relationship.target.segments {
@@ -801,8 +834,9 @@ fn eager_components(adjacency: &[Vec<usize>]) -> (Vec<usize>, usize) {
 mod tests {
     use super::{
         eager_components, valid_kind_shape, valid_media_component, valid_path_segment,
-        ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
-        ExportArtifactPath, ExportArtifactPathSegment, ExportArtifactPayload, ExportArtifactSet,
+        validate_lazy_relationships, ExportArtifact, ExportArtifactFormatVersion,
+        ExportArtifactKind, ExportArtifactMetadata, ExportArtifactPath, ExportArtifactPathSegment,
+        ExportArtifactPayload, ExportArtifactRelationshipKind, ExportArtifactSet,
     };
     use crate::{ExportErrorEvidence, OutputLimitCounter, OutputLimitObservation};
 
@@ -831,6 +865,67 @@ mod tests {
         assert_eq!(components[0], components[1]);
         assert_eq!(components[1], components[2]);
         assert_ne!(components[2], components[3]);
+    }
+
+    #[test]
+    fn eager_closure_matches_every_three_artifact_graph() {
+        const SLOTS: [(usize, usize); 6] = [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)];
+
+        for mut encoding in 0..3_usize.pow(SLOTS.len() as u32) {
+            let original_encoding = encoding;
+            let mut edges = vec![Vec::new(); 3];
+            for (source, target) in SLOTS {
+                let kind = match encoding % 3 {
+                    0 => None,
+                    1 => Some(ExportArtifactRelationshipKind::EagerLoad),
+                    2 => Some(ExportArtifactRelationshipKind::LazyLoad),
+                    _ => unreachable!(),
+                };
+                encoding /= 3;
+                if let Some(kind) = kind {
+                    edges[source].push((kind, target));
+                }
+            }
+
+            let expected_rejection = edges.iter().enumerate().any(|(source, outgoing)| {
+                outgoing.iter().any(|(kind, target)| {
+                    *kind == ExportArtifactRelationshipKind::LazyLoad
+                        && eager_reaches(&edges, source, *target)
+                })
+            });
+            assert_eq!(
+                validate_lazy_relationships(&edges).is_err(),
+                expected_rejection,
+                "graph encoding {original_encoding} selected the wrong eager-closure result"
+            );
+        }
+    }
+
+    fn eager_reaches(
+        edges: &[Vec<(ExportArtifactRelationshipKind, usize)>],
+        source: usize,
+        target: usize,
+    ) -> bool {
+        let mut visited = vec![false; edges.len()];
+        let mut stack: Vec<_> = edges[source]
+            .iter()
+            .filter_map(|(kind, target)| {
+                (*kind == ExportArtifactRelationshipKind::EagerLoad).then_some(*target)
+            })
+            .collect();
+        while let Some(node) = stack.pop() {
+            if node == target {
+                return true;
+            }
+            if visited[node] {
+                continue;
+            }
+            visited[node] = true;
+            stack.extend(edges[node].iter().filter_map(|(kind, target)| {
+                (*kind == ExportArtifactRelationshipKind::EagerLoad).then_some(*target)
+            }));
+        }
+        false
     }
 
     #[test]

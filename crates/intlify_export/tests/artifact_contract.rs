@@ -171,6 +171,21 @@ fn path_limits_accept_exact_boundaries_and_select_fixed_counter_precedence() {
             OutputLimitObservation::Exact(4_097),
         )
     );
+
+    let consumed = std::cell::Cell::new(0_u8);
+    let streaming = std::iter::from_fn(|| {
+        consumed.set(consumed.get() + 1);
+        Some("a")
+    });
+    let error = ExportArtifactPath::try_new(streaming).unwrap_err();
+    assert_eq!(consumed.get(), 65);
+    assert_eq!(
+        limit(&error),
+        (
+            OutputLimitCounter::ArtifactPathSegmentsPerPath,
+            OutputLimitObservation::Exact(65),
+        )
+    );
 }
 
 #[test]
