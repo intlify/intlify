@@ -5785,6 +5785,95 @@ pub enum ExportArtifactRelationshipKind {
 }
 ```
 
+The direct Rust construction path is staged but ends at one mandatory set proof:
+
+```rust
+impl ExportArtifactPath {
+    pub fn try_new<I, S>(segments: I) -> Result<Self, ExportError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<Box<str>>;
+
+    pub fn segments(&self) -> &[ExportArtifactPathSegment];
+}
+
+impl ExportArtifactPathSegment {
+    pub fn as_str(&self) -> &str;
+}
+
+impl ExportArtifactKind {
+    pub fn try_new(value: impl Into<Box<str>>) -> Result<Self, ExportError>;
+    pub fn as_str(&self) -> &str;
+}
+
+impl ExportArtifactFormatVersion {
+    pub const DRAFT_V0_1: Self;
+    pub fn new(major: u16, minor: u16) -> Self;
+    pub fn major(self) -> u16;
+    pub fn minor(self) -> u16;
+}
+
+impl ExportMediaType {
+    pub fn try_new(value: impl Into<Box<str>>) -> Result<Self, ExportError>;
+    pub fn as_str(&self) -> &str;
+}
+
+impl ExportArtifactPayload {
+    pub fn try_new(bytes: impl Into<Box<[u8]>>) -> Result<Self, ExportError>;
+    pub fn as_bytes(&self) -> &[u8];
+}
+
+impl ExportArtifactMetadata {
+    pub fn try_new(
+        media_type: Option<ExportMediaType>,
+        relationships: Vec<ExportArtifactRelationship>,
+    ) -> Result<Self, ExportError>;
+
+    pub fn empty() -> Self;
+    pub fn media_type(&self) -> Option<&ExportMediaType>;
+    pub fn relationships(&self) -> &[ExportArtifactRelationship];
+}
+
+impl ExportArtifactRelationship {
+    pub fn new(
+        kind: ExportArtifactRelationshipKind,
+        target: ExportArtifactPath,
+    ) -> Self;
+
+    pub fn kind(&self) -> ExportArtifactRelationshipKind;
+    pub fn target(&self) -> &ExportArtifactPath;
+}
+
+impl ExportArtifactRelationshipKind {
+    pub fn tag(self) -> u8;
+}
+
+impl ExportArtifact {
+    pub fn new(
+        logical_path: ExportArtifactPath,
+        kind: ExportArtifactKind,
+        format_version: ExportArtifactFormatVersion,
+        payload: ExportArtifactPayload,
+        metadata: ExportArtifactMetadata,
+    ) -> Self;
+
+    pub fn logical_path(&self) -> &ExportArtifactPath;
+    pub fn kind(&self) -> &ExportArtifactKind;
+    pub fn format_version(&self) -> ExportArtifactFormatVersion;
+    pub fn payload(&self) -> &ExportArtifactPayload;
+    pub fn metadata(&self) -> &ExportArtifactMetadata;
+}
+
+impl ExportArtifactSet {
+    pub fn try_new(artifacts: Vec<ExportArtifact>) -> Result<Self, ExportError>;
+    pub fn artifacts(&self) -> &[ExportArtifact];
+}
+```
+
+The path, kind, media-type, payload, and metadata constructors return only fully checked immutable scalar values. `ExportArtifact::new` can therefore assemble but cannot independently certify one candidate record. `ExportArtifactSet::try_new` is always required: it remeasures every final scalar and all 13 common counters, canonicalizes the artifact and relationship collections, and performs set-wide uniqueness, target-resolution, classification, self-edge, and eager-closure validation.
+
+Direct Rust construction cannot hold two independently malformed scalar values because the first scalar constructor has already returned an error. A structured adapter may observe several malformed raw fields at once; it must collect bounded raw validation observations and apply the same counter and `InvalidOutputViolation` precedence before constructing scalar values. It must not expose decoder field order as error precedence. Built-in and third-party Rust exporters both finish through `ExportArtifactSet::try_new`; no scalar constructor, `ExportArtifact::new`, or bounded writer is a substitute for the final set proof.
+
 ##### Export error types
 
 ```rust
