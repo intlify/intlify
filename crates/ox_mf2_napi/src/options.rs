@@ -30,7 +30,6 @@ impl JsParseMessageOptions {
     pub(crate) fn parse_options(&self) -> ParseOptions {
         ParseOptions {
             recovery: true,
-            parse_semantic: false,
             collect_trivia: self.collect_trivia.unwrap_or(true),
         }
     }
@@ -55,7 +54,6 @@ impl JsParseBatchOptions {
             preserve_order: true,
             parse: ParseOptions {
                 recovery: true,
-                parse_semantic: false,
                 collect_trivia: self.collect_trivia.unwrap_or(true),
             },
         }

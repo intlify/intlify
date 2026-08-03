@@ -24,17 +24,18 @@ use crate::{
 pub fn format_message(source: &str, options: FormatOptions) -> FormatResult {
     #[cfg(test)]
     test_observer::record_source_parse();
-    let parse = parse_message(source).map_err(|error| {
+    let parsed = parse_message(source).map_err(|error| {
         FormatFailure::from_error(
             OperationalError::internal(format!("MF2 parser failed: {error}"))
                 .with_detail("parser_code", error.code().name()),
         )
     })?;
+    let parse = parsed.result();
     if !parse.diagnostics.is_empty() {
-        return Err(FormatFailure::from_diagnostics(parse.diagnostics));
+        return Err(FormatFailure::from_diagnostics(parse.diagnostics.clone()));
     }
 
-    let code = format_parse_result(source, &parse, options).map_err(FormatFailure::from_error)?;
+    let code = format_parse_result(source, parse, options).map_err(FormatFailure::from_error)?;
     Ok(FormatSuccess {
         changed: code != source,
         code,

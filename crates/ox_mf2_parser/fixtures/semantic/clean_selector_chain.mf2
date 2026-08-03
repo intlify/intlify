@@ -1,0 +1,5 @@
+.input {$count :number}
+.local $selector = {$count}
+.match $selector
+one {{One}}
+* {{Other}}

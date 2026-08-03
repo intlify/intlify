@@ -55,7 +55,8 @@ fn valid_input_does_not_emit_diagnostics() {
         ".input {$x}\n{{Hi {$x}}}",
         ".match $x\n* {{fallback}}",
     ] {
-        let result = parse_message(case).expect("parse succeeds");
+        let parsed = parse_message(case).expect("parse succeeds");
+        let result = parsed.result();
         assert!(
             result.diagnostics.is_empty(),
             "case `{case}` produced diagnostics: {:?}",
@@ -109,7 +110,8 @@ fn trivia_runs_collapse_contiguous_whitespace() {
     // same-kind run becomes a single record — three spaces ⇒ one record.
     // Source fidelity is preserved because each record's span still
     // covers the whole run.
-    let result = parse_message(".local   $x = {$y}\n{{Hi}}").expect("parse succeeds");
+    let parsed = parse_message(".local   $x = {$y}\n{{Hi}}").expect("parse succeeds");
+    let result = parsed.result();
     // Whitespace runs that the parser commits as trivia (each becomes
     // exactly one record):
     //   ".local" ␣␣␣ "$x" ␣ "=" ␣ "{$y}" \n "{{Hi}}"
@@ -126,9 +128,9 @@ fn trivia_runs_collapse_contiguous_whitespace() {
 
 #[test]
 fn cst_view_traversal_visits_every_node_and_token() {
-    let result = parse_message("Hello, {$name}!").expect("parse succeeds");
-    let sources = SourceStore::new();
-    let view = CstView::new(&sources, result.source, &result.cst);
+    let parsed = parse_message("Hello, {$name}!").expect("parse succeeds");
+    let result = parsed.result();
+    let view = CstView::new(parsed.sources(), result.source, &result.cst);
     let mut visited_nodes = 0usize;
     let mut visited_tokens = 0usize;
     if let Some(root) = view.root() {

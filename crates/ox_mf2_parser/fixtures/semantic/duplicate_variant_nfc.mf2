@@ -1,0 +1,5 @@
+.input {$value :string}
+.match $value
+é {{First}}
+|é| {{Second}}
+* {{Fallback}}

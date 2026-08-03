@@ -1,0 +1,3 @@
+--semantic-diagnostics--
+duplicate-declaration Error @ 32..37
+duplicate-declaration Error @ 59..64

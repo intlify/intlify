@@ -2,7 +2,7 @@
 
 High performance MessageFormat 2 parser core for the intlify ox-mf2 packages.
 
-This crate parses Unicode MessageFormat 2 messages into a recovering, lossless concrete syntax tree (CST). It also exposes diagnostics, optional semantic lowering, and a Binary AST snapshot format used by the N-API and WASM bindings.
+This crate parses Unicode MessageFormat 2 messages into a recovering, lossless concrete syntax tree (CST). It also exposes diagnostics, explicit source-backed semantic construction and validation, and a Binary AST snapshot format used by the N-API and WASM bindings.
 
 ## Installation
 
@@ -16,13 +16,14 @@ ox_mf2_parser = "0.1"
 ```rust
 use ox_mf2_parser::parse_message;
 
-let result = parse_message("Hello, {$name}!").expect("valid message should parse");
+let parsed = parse_message("Hello, {$name}!").expect("valid message should parse");
+let result = parsed.result();
 
 assert!(result.diagnostics.is_empty());
 assert!(result.cst.node_count() > 0);
 ```
 
-`parse_message` is the one-shot convenience API. It owns the returned `ParseResult`, including CST tables and diagnostics.
+`parse_message` is the one-shot convenience API. Its `StandaloneParseResult` keeps the syntax result paired with the private source owner needed by source-backed consumers.
 
 ## Diagnostics
 
@@ -31,7 +32,8 @@ Malformed input is parsed with recovery enabled by default. Diagnostics carry st
 ```rust
 use ox_mf2_parser::{parse_message, DiagnosticSeverity};
 
-let result = parse_message("Hello, {$name").expect("malformed message should recover");
+let parsed = parse_message("Hello, {$name").expect("malformed message should recover");
+let result = parsed.result();
 
 assert!(!result.diagnostics.is_empty());
 assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -39,10 +41,13 @@ assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
 
 ## Semantic Model
 
-The parser can optionally lower CST data into a semantic model.
+Semantic construction is an explicit phase after a diagnostic-free parse.
 
 ```rust
-use ox_mf2_parser::{parse_source, ParseOptions, SourceFileInput, SourceStore};
+use ox_mf2_parser::{
+    build_semantic_model, parse_source, validate_semantics, ParseOptions,
+    SourceFileInput, SourceStore,
+};
 
 let mut sources = SourceStore::new();
 let source = sources.add(SourceFileInput {
@@ -53,17 +58,15 @@ let source = sources.add(SourceFileInput {
     base_offset: None,
 });
 
-let result = parse_source(
-    &sources,
-    source,
-    ParseOptions {
-        parse_semantic: true,
-        ..ParseOptions::default()
-    },
-)
-.expect("source should parse");
+let result = parse_source(&sources, source, ParseOptions::default())
+    .expect("source should parse");
+assert!(result.diagnostics.is_empty());
 
-assert!(result.semantic.is_some());
+let model = build_semantic_model(&sources, &result)
+    .expect("semantic model should build");
+let diagnostics = validate_semantics(&model)
+    .expect("semantic model invariants should hold");
+assert!(diagnostics.is_empty());
 ```
 
 Use `parse_source_session` with `ParseWorkspace` when repeated parsing should reuse allocations.

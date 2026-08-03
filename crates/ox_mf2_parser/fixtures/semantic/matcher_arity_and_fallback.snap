@@ -1,0 +1,3 @@
+--semantic-diagnostics--
+missing-fallback-variant Error @ 24..30
+variant-key-arity-mismatch Error @ 38..45

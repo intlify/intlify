@@ -64,7 +64,8 @@ ox_mf2_parser = "=${version}"
     `use ox_mf2_parser::parse_message;
 
 fn main() {
-    let result = parse_message("Hello, {$name}!").expect("valid message should parse");
+    let parsed = parse_message("Hello, {$name}!").expect("valid message should parse");
+    let result = parsed.result();
     assert!(result.diagnostics.is_empty());
     assert!(result.cst.node_count() > 0);
 }

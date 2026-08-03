@@ -7,10 +7,10 @@
 //! behavior is covered by the dedicated parser grammar tests.
 
 use ox_mf2_parser::{
-    ox_mf2_error_code_name, parse_batch, parse_message, parse_source, parse_source_session,
-    BatchParseOptions, DecodeError, DecodeErrorCode, OxMf2ErrorCode, ParseCapacity, ParseError,
-    ParseInput, ParseOptions, ParseWorkspace, SnapshotWriteError, SourceFileInput, SourceId,
-    SourceStore, SourceTextUnavailable,
+    build_semantic_model, ox_mf2_error_code_name, parse_batch, parse_message, parse_source,
+    parse_source_session, BatchParseOptions, DecodeError, DecodeErrorCode, OxMf2ErrorCode,
+    ParseCapacity, ParseError, ParseInput, ParseOptions, ParseWorkspace, SnapshotWriteError,
+    SourceFileInput, SourceId, SourceStore, SourceTextUnavailable,
 };
 
 #[test]
@@ -30,15 +30,21 @@ fn error_code_exports_are_available_from_crate_root() {
 }
 
 #[test]
-fn parse_message_returns_owned_result() {
-    let result = parse_message("Hello").expect("parse succeeds");
+fn parse_message_returns_paired_source_owner_and_result() {
+    let parsed = parse_message("Hello").expect("parse succeeds");
+    let result = parsed.result();
     assert!(
         result.diagnostics.is_empty(),
         "unexpected diagnostics: {:?}",
         result.diagnostics
     );
+    assert_eq!(
+        parsed.sources().get(result.source).map(|file| &*file.text),
+        Some("Hello")
+    );
     // Root, SimpleMessage, Pattern, Text — see design/002 §"Message Mode".
     assert!(result.cst.node_count() >= 4);
+    assert!(build_semantic_model(parsed.sources(), parsed.result()).is_ok());
 }
 
 #[test]

@@ -14,10 +14,12 @@
 //! encode that does not require building a [`crate::SourceStore`].
 //! Use [`parse_source_to_snapshot`] / [`parse_result_to_snapshot`] /
 //! [`parse_session_to_snapshot`] when the caller already owns a
-//! `SourceStore` (e.g. a batch parse pipeline). Mixing
-//! [`crate::parse_message`]'s `ParseResult` with an unrelated
-//! `SourceStore` is **not safe** — see
-//! [`parse_result_to_snapshot`]'s documentation for the contract.
+//! `SourceStore` (e.g. a batch parse pipeline). A caller that already used
+//! [`crate::parse_message`] should pass `parsed.sources()` and
+//! `parsed.result()` from the same [`crate::StandaloneParseResult`] to
+//! [`parse_result_to_snapshot`]. Those separate references do not encode owner
+//! identity, so mixing values from different parses can silently attach the
+//! wrong source text or metadata when their local ids and bounds coincide.
 //!
 //! ```
 //! use ox_mf2_parser::{snapshot::{

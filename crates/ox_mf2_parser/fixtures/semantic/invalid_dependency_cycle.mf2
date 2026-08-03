@@ -1,0 +1,4 @@
+.local $a = {$b}
+.local $b = {$c}
+.local $c = {$a}
+{{{$a}}}

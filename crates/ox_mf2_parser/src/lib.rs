@@ -34,7 +34,8 @@
 //! ```
 //! use ox_mf2_parser::parse_message;
 //!
-//! let result = parse_message("Hello, {$name}!")?;
+//! let parsed = parse_message("Hello, {$name}!")?;
+//! let result = parsed.result();
 //! assert!(result.diagnostics.is_empty());
 //! assert!(result.cst.node_count() > 0);
 //! # Ok::<(), ox_mf2_parser::ParseError>(())
@@ -50,6 +51,7 @@ mod error;
 mod parser;
 mod scanner;
 mod semantic;
+mod semantic_validation;
 pub mod snapshot;
 mod source;
 mod span;
@@ -61,6 +63,7 @@ mod workspace;
 pub use api::{
     parse_batch, parse_message, parse_source, parse_source_session, BatchExecution, BatchParseItem,
     BatchParseOptions, BatchParseResult, ParseInput, ParseOptions, ParseResult, ParseSessionResult,
+    StandaloneParseResult,
 };
 pub use diagnostic::{
     Diagnostic, DiagnosticCode, DiagnosticIter, DiagnosticLabel, DiagnosticRef, DiagnosticSeverity,
@@ -75,7 +78,16 @@ pub use error::{
     OX_MF2_PARSE_ERROR_MIN, OX_MF2_SNAPSHOT_WRITE_ERROR_MAX, OX_MF2_SNAPSHOT_WRITE_ERROR_MIN,
     OX_MF2_SOURCE_TEXT_ERROR_MAX, OX_MF2_SOURCE_TEXT_ERROR_MIN,
 };
-pub use semantic::{MessageMode, SemanticMessageKind, SemanticModel, SemanticView};
+pub use semantic::{
+    build_semantic_model, AttributeOwnerKind, DeclarationId, DeclarationKind, MatcherId,
+    MessageMode, OptionOwnerKind, ReferenceId, ReferenceKind, SemanticAttribute,
+    SemanticDeclaration, SemanticMatcher, SemanticMessageKind, SemanticModel, SemanticOption,
+    SemanticReference, SemanticVariant, SemanticVariantKey, SemanticView, VariantId,
+};
+pub use semantic_validation::{
+    validate_semantics, SemanticDiagnostic, SemanticDiagnosticCode, SemanticInvariantError,
+    SemanticInvariantErrorKind,
+};
 pub use snapshot::{
     decode_snapshot, decode_snapshot_owned, parse_batch_result_to_snapshot,
     parse_batch_to_snapshot, parse_message_to_snapshot, parse_result_to_snapshot,

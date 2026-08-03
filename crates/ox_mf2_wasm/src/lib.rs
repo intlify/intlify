@@ -78,7 +78,6 @@ pub fn parse_batch_to_snapshot_js(items: JsValue, options: JsValue) -> Result<Ve
             preserve_order: true,
             parse: ParseOptions {
                 recovery: true,
-                parse_semantic: false,
                 collect_trivia: options.collect_trivia,
             },
         },
@@ -101,7 +100,6 @@ pub fn decode_snapshot_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
 fn parse_options(options: &WasmParseOptions) -> ParseOptions {
     ParseOptions {
         recovery: true,
-        parse_semantic: false,
         collect_trivia: options.collect_trivia,
     }
 }

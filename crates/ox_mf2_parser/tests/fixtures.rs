@@ -142,9 +142,7 @@ fn fixture_corpus_matches_snapshots() {
             path: fixture.to_str(),
             ..Default::default()
         });
-        let mut options = ParseOptions::default();
-        options.parse_semantic = false;
-        let result = parse_source(&sources, id, options).expect("fixture parses");
+        let result = parse_source(&sources, id, ParseOptions::default()).expect("fixture parses");
         let view = CstView::new(&sources, id, &result.cst);
         let actual = render_snapshot(&view, &result.diagnostics);
 

@@ -1,0 +1,6 @@
+.input {$count :number}
+.local $selector = {$later}
+.local $later = {|x|}
+.match $selector $count
+one {{Bad}}
+* * {{Fallback}}

@@ -13,9 +13,31 @@ use ox_mf2_parser::snapshot::{
     SourceTextUnavailable, SNAPSHOT_MAGIC,
 };
 use ox_mf2_parser::{
-    parse_batch_to_snapshot, parse_result_to_snapshot, parse_source, parse_source_to_snapshot,
-    BatchParseOptions, ParseInput, ParseOptions, SourceFileInput, SourceStore, Span,
+    parse_batch_to_snapshot, parse_message, parse_result_to_snapshot, parse_source,
+    parse_source_to_snapshot, BatchParseOptions, ParseInput, ParseOptions, SourceFileInput,
+    SourceStore, Span,
 };
+
+#[test]
+fn standalone_result_keeps_the_snapshot_source_owner_attached() {
+    let parsed = parse_message("Hello, {$name}!").expect("standalone parse succeeds");
+    let snapshot = parse_result_to_snapshot(
+        parsed.sources(),
+        parsed.result(),
+        SnapshotOptions {
+            include_source_text: true,
+            ..SnapshotOptions::default()
+        },
+    )
+    .expect("paired standalone result encodes");
+    let view = decode_snapshot(&snapshot.bytes).expect("snapshot decodes");
+    let root = view.root(snapshot.root).expect("snapshot root exists");
+    assert_eq!(
+        view.source(root.source_id())
+            .and_then(|source| source.text()),
+        Some("Hello, {$name}!")
+    );
+}
 
 #[test]
 fn simple_message_round_trips_through_snapshot() {

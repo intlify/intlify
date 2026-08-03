@@ -3,18 +3,18 @@
 
 //! Public parser API.
 //!
-//! `parse_message` and `parse_source` are owned-result entry points. They
-//! materialise a [`ParseResult`] that the caller owns. `parse_source_session`
-//! reuses a borrowed [`crate::ParseWorkspace`] and returns a
-//! [`ParseSessionResult`] tied to the workspace lifetime.
+//! `parse_source` materialises a [`ParseResult`] against a caller-owned source
+//! store. `parse_message` keeps its private source owner and syntax result
+//! paired in [`StandaloneParseResult`]. `parse_source_session` reuses a
+//! borrowed [`crate::ParseWorkspace`] and returns a [`ParseSessionResult`]
+//! tied to the workspace lifetime.
 //!
 //! Every entry point uses the same parser pipeline; they differ only in result
 //! ownership, workspace reuse, and single-source versus batch orchestration.
 
 use crate::diagnostic::{Diagnostic, DiagnosticView};
 use crate::error::{BatchParseError, ParseError, ParseResource};
-use crate::parser::{run_parse, run_parse_text};
-use crate::semantic::{lower_into as lower_semantic_into, SemanticModel, SemanticView};
+use crate::parser::run_parse;
 use crate::source::{SourceFileInput, SourceStore};
 use crate::span::SourceId;
 use crate::tables::CstTables;
@@ -27,9 +27,6 @@ pub struct ParseOptions {
     /// Recover when input is malformed instead of bailing out at the first
     /// syntax error. Defaults to `true`.
     pub recovery: bool,
-    /// Build the optional [`SemanticModel`] after a diagnostic-free parse.
-    /// Defaults to `false`. Parser diagnostics always suppress construction.
-    pub parse_semantic: bool,
     /// Preserve `ws` / `bidi` trivia. Defaults to `true`.
     pub collect_trivia: bool,
 }
@@ -38,7 +35,6 @@ impl Default for ParseOptions {
     fn default() -> Self {
         Self {
             recovery: true,
-            parse_semantic: false,
             collect_trivia: true,
         }
     }
@@ -49,7 +45,6 @@ impl Default for ParseOptions {
 pub struct ParseResult {
     pub source: SourceId,
     pub cst: CstTables,
-    pub semantic: Option<SemanticModel>,
     pub diagnostics: Vec<Diagnostic>,
     /// Whether whitespace / bidi trivia was collected during parsing.
     /// Snapshot writers use this as a capability proof; an empty trivia
@@ -62,10 +57,32 @@ pub struct ParseResult {
 pub struct ParseSessionResult<'a> {
     pub source: SourceId,
     pub cst: CstView<'a>,
-    pub semantic: Option<SemanticView<'a>>,
     pub diagnostics: DiagnosticView<'a>,
     /// Whether whitespace / bidi trivia was collected during parsing.
     pub trivia_collected: bool,
+}
+
+/// Self-contained result for the one-shot [`parse_message`] convenience API.
+///
+/// The fields stay private so the syntax result cannot be detached from the
+/// [`SourceStore`] that assigned its source ids. Source-backed consumers must
+/// receive both immutable accessors from the same wrapper.
+#[derive(Debug, Clone)]
+pub struct StandaloneParseResult {
+    sources: SourceStore,
+    result: ParseResult,
+}
+
+impl StandaloneParseResult {
+    #[must_use]
+    pub const fn sources(&self) -> &SourceStore {
+        &self.sources
+    }
+
+    #[must_use]
+    pub const fn result(&self) -> &ParseResult {
+        &self.result
+    }
 }
 
 /// Single-source batch input.
@@ -155,20 +172,21 @@ pub fn parse_source(
     ))
 }
 
-/// One-shot convenience parser. Parses `source` directly and returns an owned
-/// [`ParseResult`]. The success path does not allocate a temporary
-/// [`SourceStore`]; malformed inputs build one only when diagnostics need
-/// line/column materialisation.
-pub fn parse_message(source: &str) -> Result<ParseResult, ParseError> {
+/// One-shot convenience parser that retains the source owner with the syntax
+/// result.
+pub fn parse_message(source: &str) -> Result<StandaloneParseResult, ParseError> {
     if u32::try_from(source.len()).is_err() {
         return Err(ParseError::SourceTooLarge);
     }
-    let source_id = SourceId::new(0);
-    let mut workspace = ParseWorkspace::new();
-    workspace.reserve_for_source_len(source.len());
-    run_parse_text(source, source_id, &mut workspace, ParseOptions::default());
-    ensure_parse_complete(&workspace)?;
-    Ok(materialise_one_shot_message(source, source_id, workspace))
+    let mut sources = SourceStore::with_capacity(1);
+    let source_id = sources
+        .try_add(SourceFileInput {
+            source,
+            ..Default::default()
+        })
+        .map_err(|_| ParseError::SourceTooLarge)?;
+    let result = parse_source(&sources, source_id, ParseOptions::default())?;
+    Ok(StandaloneParseResult { sources, result })
 }
 
 /// Reuse `workspace` to parse `source_id`. Returns a [`ParseSessionResult`]
@@ -185,33 +203,15 @@ pub fn parse_source_session<'a>(
     workspace.clear();
     run_parse(sources, source_id, workspace, options);
 
-    if options.parse_semantic && workspace.parser.diagnostics.is_empty() {
-        // Reuse the workspace-held SemanticModel's capacity instead of
-        // allocating a fresh model every session.
-        let model = workspace
-            .semantic
-            .model
-            .get_or_insert_with(SemanticModel::default);
-        lower_semantic_into(sources, source_id, &workspace.parser.tables, model);
-    } else {
-        workspace.semantic.model = None;
-    }
-
     let cst = CstView::new(sources, source_id, &workspace.parser.tables);
     let diagnostics = DiagnosticView {
         sources,
         records: &workspace.parser.diagnostics,
     };
-    let semantic = workspace
-        .semantic
-        .model
-        .as_ref()
-        .map(|m| SemanticView::new(m, &workspace.parser.tables));
     ensure_parse_complete(workspace)?;
     Ok(ParseSessionResult {
         source: source_id,
         cst,
-        semantic,
         diagnostics,
         trivia_collected: options.collect_trivia,
     })
@@ -306,13 +306,6 @@ fn materialise(
     options: ParseOptions,
 ) -> ParseResult {
     let cst = workspace.parser.tables.clone();
-    let semantic = if options.parse_semantic && workspace.parser.diagnostics.is_empty() {
-        let mut model = SemanticModel::default();
-        lower_semantic_into(sources, source_id, &cst, &mut model);
-        Some(model)
-    } else {
-        None
-    };
     let diagnostics = DiagnosticView {
         sources,
         records: &workspace.parser.diagnostics,
@@ -322,7 +315,6 @@ fn materialise(
     ParseResult {
         source: source_id,
         cst,
-        semantic,
         diagnostics,
         trivia_collected: options.collect_trivia,
     }
@@ -335,13 +327,6 @@ fn materialise_owned_workspace(
     options: ParseOptions,
 ) -> ParseResult {
     let cst = core::mem::take(&mut workspace.parser.tables);
-    let semantic = if options.parse_semantic && workspace.parser.diagnostics.is_empty() {
-        let mut model = SemanticModel::default();
-        lower_semantic_into(sources, source_id, &cst, &mut model);
-        Some(model)
-    } else {
-        None
-    };
     let diagnostics = DiagnosticView {
         sources,
         records: &workspace.parser.diagnostics,
@@ -351,39 +336,7 @@ fn materialise_owned_workspace(
     ParseResult {
         source: source_id,
         cst,
-        semantic,
         diagnostics,
         trivia_collected: options.collect_trivia,
-    }
-}
-
-fn materialise_one_shot_message(
-    source: &str,
-    source_id: SourceId,
-    mut workspace: ParseWorkspace,
-) -> ParseResult {
-    let cst = core::mem::take(&mut workspace.parser.tables);
-    let diagnostics = if workspace.parser.diagnostics.is_empty() {
-        Vec::new()
-    } else {
-        let mut sources = SourceStore::with_capacity(1);
-        let actual_source_id = sources.add(SourceFileInput {
-            source,
-            ..Default::default()
-        });
-        debug_assert_eq!(actual_source_id, source_id);
-        DiagnosticView {
-            sources: &sources,
-            records: &workspace.parser.diagnostics,
-        }
-        .iter()
-        .collect()
-    };
-    ParseResult {
-        source: source_id,
-        cst,
-        semantic: None,
-        diagnostics,
-        trivia_collected: true,
     }
 }

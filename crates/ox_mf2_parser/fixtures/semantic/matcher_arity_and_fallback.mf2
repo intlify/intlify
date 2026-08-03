@@ -1,0 +1,4 @@
+.input {$count :number}
+.match $count
+one two {{Bad}}
+other {{Other}}
