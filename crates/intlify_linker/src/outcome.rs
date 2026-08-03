@@ -77,4 +77,45 @@ impl LinkOutcome {
     pub const fn generation_blocked(&self) -> bool {
         self.bundle_plans.is_none()
     }
+
+    /// Lend the checked plan and typed-key baseline relation to export preparation.
+    #[cfg(feature = "export-preparation")]
+    #[doc(hidden)]
+    #[must_use]
+    pub fn export_preparation_view(
+        &self,
+    ) -> Option<crate::export_preparation_handoff::ExportPreparationView<'_>> {
+        let plans = self.bundle_plans.as_deref()?;
+        Some(
+            crate::export_preparation_handoff::ExportPreparationView::new(
+                plans,
+                &self.typed_key_models,
+                &self.typed_key_model_snapshots,
+            ),
+        )
+    }
+}
+
+#[cfg(all(test, feature = "export-preparation"))]
+mod export_preparation_tests {
+    use super::LinkOutcome;
+
+    fn outcome_with_plans(bundle_plans: Option<Box<[crate::MessageBundlePlan]>>) -> LinkOutcome {
+        LinkOutcome {
+            findings: Box::new([]),
+            bundle_plans,
+            typed_key_models: Box::new([]),
+            typed_key_model_snapshots: Box::new([]),
+        }
+    }
+
+    #[test]
+    fn export_view_preserves_blocked_and_empty_plan_states() {
+        assert!(outcome_with_plans(None).export_preparation_view().is_none());
+
+        let outcome = outcome_with_plans(Some(Box::new([])));
+        let view = outcome.export_preparation_view().unwrap();
+        assert!(view.plans().is_empty());
+        assert_eq!(view.typed_key_baselines().len(), 0);
+    }
 }

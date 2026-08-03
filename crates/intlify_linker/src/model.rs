@@ -80,12 +80,12 @@ impl BaselineDefinitionSnapshot {
         &self.locale
     }
 
-    #[cfg(feature = "benchmark")]
+    #[cfg(any(feature = "benchmark", feature = "export-preparation"))]
     pub(crate) const fn message(&self) -> &MessagePayload {
         &self.message
     }
 
-    #[cfg(feature = "benchmark")]
+    #[cfg(any(feature = "benchmark", feature = "export-preparation"))]
     pub(crate) const fn location(&self) -> &DefinitionLocation {
         &self.location
     }
