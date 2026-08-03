@@ -3803,6 +3803,7 @@ impl LinkOutcome {
 
 impl<'a> ExportPreparationView<'a> {
     pub fn plans(&self) -> &'a [MessageBundlePlan];
+    pub fn typed_key_baseline_relation_is_complete(&self) -> bool;
     pub fn typed_key_baselines(
         &self,
     ) -> impl ExactSizeIterator<Item = TypedKeyBaselineView<'a>> + 'a;
@@ -3826,6 +3827,8 @@ impl<'a> BaselineDefinitionView<'a> {
 ```
 
 The concrete iterator types and private fields are implementation details. They borrow one `LinkOutcome`, allocate no copied relation, and yield models, keys, and definitions in the exact canonical one-to-one order already checked during outcome construction.
+
+`typed_key_baseline_relation_is_complete()` compares the original top-level model and relation slice lengths before `typed_key_baselines()` pairs them. It exposes neither count nor either raw slice. `prepare_export` observes the predicate only during the typed-output relation preflight, after the complete ordinary message-validation scan, so a missing or extra relation item selects `ModelRelationMismatch` without changing validation failure precedence.
 
 `export_preparation_view()` returns `None` exactly when `bundle_plans()` is `None`. Otherwise it returns one view, including when the plan slice, model slice, or both are empty. `prepare_export` is the sole workspace consumer of this handoff.
 
@@ -5631,12 +5634,15 @@ An inverted or out-of-payload span, foreign label source, or thirty-third label 
 
 An error from `build_semantic_model` or `validate_semantics` is likewise an operational preparation failure, not an ordinary message diagnostic. Export preparation preserves the 012-owned distinction. Passing a parse result that still has parser diagnostics or a detectably mismatched `SourceStore` / `ParseResult` pair uses `semantic_api_misuse` with no additional required details field. A valid pair that fails model construction uses `semantic_invariant_failed` with required stage `semantic_model_construction`; semantic validation failure uses the same reason with required stage `semantic_validation`. Every case discards any partially accumulated diagnostic failure and invokes no exporter. A conforming preparation path checks parser diagnostics and passes the original owner/result pair, so misuse is an implementation bug, but it is never relabeled or converted into a panic.
 
+A fatal `ParseError` from the one-shot parser is also impossible for an admitted at-most-1-MiB `MessagePayload` and its newly created paired source owner under the parser's `u32` resource ceilings. If the parser nevertheless cannot return a trustworthy result, preparation returns `InternalInvariant(ParserFailure)`, discards every accumulated ordinary diagnostic, and invokes no exporter. It does not panic, convert the failure into an ordinary parser diagnostic, retain a parser error as a new public preparation variant, or continue with another definition.
+
 These invariant failures may stop the gate; complete-set validation applies to ordinary parser and semantic diagnostics, not trusted parser/integration contract violations.
 
 Preparation-owned invariant failures use this closed hierarchy:
 
 ```rust
 pub enum ExportPreparationInvariant {
+    ParserFailure,
     DiagnosticCountOverflow,
     DiagnosticMapping(DiagnosticMappingInvariant),
     OutcomeContract(OutcomeContractInvariant),
@@ -5723,8 +5729,8 @@ pub struct ValidatedExportBatch<'a> {
     outcome: &'a LinkOutcome,
 }
 
-impl ValidatedExportBatch<'_> {
-    pub fn plans(&self) -> &[MessageBundlePlan];
+impl<'a> ValidatedExportBatch<'a> {
+    pub fn plans(&self) -> &'a [MessageBundlePlan];
 }
 ```
 
@@ -5964,7 +5970,7 @@ The built-in orchestration constructs the linker request and ESM options from on
 
 `prepare_export` returns `Ok(None)` for `bundle_plans: None` without running the message-validation gate. It returns `Ok(Some(batch))` for a parser-and-semantically clean `Some`. An empty plan slice may still yield typed output from admitted M1 models; the batch is empty only when both its plan slice and typed-output slice are empty.
 
-Ordinary parser or semantic diagnostics return `ExportPreparationError::MessageValidation(ExportMessageValidationFailure)`. A `build_semantic_model` error returns `SemanticModelConstruction`; a `validate_semantics` error returns `SemanticValidation`; and checked-count overflow, diagnostic-mapping contradiction, or invalid outcome/batch state returns `InternalInvariant`. Every error returns no batch.
+Ordinary parser or semantic diagnostics return `ExportPreparationError::MessageValidation(ExportMessageValidationFailure)`. A fatal parser API error returns `InternalInvariant(ParserFailure)`; a `build_semantic_model` error returns `SemanticModelConstruction`; a `validate_semantics` error returns `SemanticValidation`; and checked-count overflow, diagnostic-mapping contradiction, or invalid outcome/batch state returns `InternalInvariant`. Every error returns no batch.
 
 The two semantic variants retain the exact parser-owned `SemanticInvariantError`. The integration combines their call-site stage with its 012-owned `kind()` classification: `ApiMisuse` remains `semantic_api_misuse`, while `InvariantViolation` remains `semantic_invariant_failed` at `semantic_model_construction` or `semantic_validation`. It does not copy those conditions into `ExportPreparationInvariant` or relabel them with an 014-owned reason.
 
@@ -5977,6 +5983,8 @@ Successful private construction by `prepare_export` is the complete validation p
 It borrows the exact `LinkOutcome`. `plans()` returns the outcome's complete canonical read-only `MessageBundlePlan` slice; selected message-validated `ResolvedMessage` values are reached only through each plan's `messages()` accessor.
 
 `typed_output()` is the only additional read-only top-level accessor. Each canonical item pairs one admitted key-only M1 model with its M3-derived validated argument signatures under the exact types, lifetime, bounds, and ordering fixed above. There is no second model-only or signature-only accessor. Neither a built-in nor third-party exporter may reconstruct models from plans, inspect private outcome state, or derive another argument-signature path.
+
+`plans()` returns the outcome-owned slice with the batch's `'a` lifetime, so the immutable plans may remain borrowed while that exact `LinkOutcome` remains alive. `typed_output()` remains tied to the `&self` borrow because the batch owns its boxed typed-output records and signatures. This lifetime distinction adds no mutable or independently constructible proof surface.
 
 The batch exposes no finding access, outcome accessor, flattened or unique-definition view, definition-artifact collection, parser workspace, parse result, semantic model, mutable cache handle, target option, or exporter-specific data. Slice `len`, `is_empty`, and iteration provide the ordinary collection operations without duplicate batch methods.
 
@@ -7938,6 +7946,7 @@ The artifact, producer, linker, and output-registration variants are reason-only
 
 | Rust invariant                                | `details.invariant`                        |
 | --------------------------------------------- | ------------------------------------------ |
+| `ParserFailure`                               | `parser_failure`                           |
 | `DiagnosticCountOverflow`                     | `diagnostic_count_overflow`                |
 | `DiagnosticMapping(LabelCountExceeded)`       | `diagnostic_label_count_exceeded`          |
 | `DiagnosticMapping(InvalidPrimarySpan)`       | `diagnostic_primary_span_invalid`          |

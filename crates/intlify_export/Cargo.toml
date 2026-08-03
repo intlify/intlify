@@ -1,5 +1,5 @@
 [package]
-name = "intlify_linker"
+name = "intlify_export"
 version = "0.14.0-alpha.11"
 edition.workspace = true
 rust-version.workspace = true
@@ -7,13 +7,10 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
-[features]
-default = []
-benchmark = []
-export-preparation = []
-
 [lints]
 workspace = true
 
 [dependencies]
 intlify_contract = { path = "../intlify_contract" }
+intlify_linker = { path = "../intlify_linker", features = ["export-preparation"] }
+ox_mf2_parser = { path = "../ox_mf2_parser" }

@@ -11,6 +11,9 @@
 //! exporting, or process-global scheduling.
 
 mod error;
+#[cfg(feature = "export-preparation")]
+#[doc(hidden)]
+pub mod export_preparation_handoff;
 mod finding;
 mod graph;
 mod link;
