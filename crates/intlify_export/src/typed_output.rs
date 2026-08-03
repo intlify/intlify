@@ -29,7 +29,7 @@ impl<'a> ValidatedExportBatch<'a> {
     }
 
     #[must_use]
-    pub const fn plans(&self) -> &[MessageBundlePlan] {
+    pub const fn plans(&self) -> &'a [MessageBundlePlan] {
         self.plans
     }
 

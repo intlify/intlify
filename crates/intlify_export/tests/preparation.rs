@@ -199,6 +199,28 @@ fn delivery_without_a_coverage_baseline_has_no_typed_output() {
 }
 
 #[test]
+fn plan_slice_uses_the_outcome_lifetime_not_the_batch_borrow() {
+    let outcome = linked_outcome(
+        vec![definition_artifact(
+            "en.json",
+            vec![definition("/hello", "Hello", 0)],
+        )],
+        &["/hello"],
+        false,
+        true,
+    );
+    let plans = {
+        let batch = prepare_export(&outcome, ExportValidationLimits::default())
+            .unwrap()
+            .unwrap();
+        batch.plans()
+    };
+
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].messages()[0].key().as_str(), "/hello");
+}
+
+#[test]
 fn valid_baseline_derives_canonical_required_arguments() {
     let message = ".input {$count :number}\n.input {$plain}\n.input {$unused :string}\n.local $label = {$external}\n{{{$count} {$label} {$external} {$名前}}}";
     let outcome = linked_outcome(
