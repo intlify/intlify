@@ -10,7 +10,10 @@ use intlify_contract::{
     ReferenceArtifactIdentity, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
 use intlify_export::{
-    prepare_export, ExportPreparationError, ExportValidationLimits, MappedMessageDiagnosticKind,
+    prepare_export, ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind,
+    ExportArtifactMetadata, ExportArtifactPath, ExportArtifactPayload, ExportArtifactSet,
+    ExportPreparationError, ExportValidationLimits, MappedMessageDiagnosticKind, PlatformExporter,
+    ValidatedExportBatch,
 };
 use intlify_linker::{
     link, CoverageBaseline, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness,
@@ -161,6 +164,27 @@ fn linked_outcome(
     link(&request).unwrap()
 }
 
+struct ThirdPartyExporter {
+    calls: std::cell::Cell<u8>,
+}
+
+impl PlatformExporter for ThirdPartyExporter {
+    fn export(
+        &self,
+        _batch: &ValidatedExportBatch<'_>,
+    ) -> Result<ExportArtifactSet, intlify_export::ExportError> {
+        let call = self.calls.get() + 1;
+        self.calls.set(call);
+        ExportArtifactSet::try_new(vec![ExportArtifact::new(
+            ExportArtifactPath::try_new(["custom.bundle"])?,
+            ExportArtifactKind::try_new("com.example/custom-bundle")?,
+            ExportArtifactFormatVersion::DRAFT_V0_1,
+            ExportArtifactPayload::try_new(vec![call])?,
+            ExportArtifactMetadata::empty(),
+        )])
+    }
+}
+
 #[test]
 fn blocked_outcomes_skip_export_validation() {
     let outcome = linked_outcome(Vec::new(), &["/missing"], false, true);
@@ -178,6 +202,25 @@ fn successful_empty_outcome_produces_an_empty_checked_batch() {
         .unwrap();
     assert!(batch.plans().is_empty());
     assert!(batch.typed_output().is_empty());
+}
+
+#[test]
+fn non_sync_third_party_exporter_uses_the_object_safe_common_contract() {
+    let outcome = linked_outcome(Vec::new(), &[], false, false);
+    let batch = prepare_export(&outcome, ExportValidationLimits::default())
+        .unwrap()
+        .unwrap();
+    let exporter: Box<dyn PlatformExporter> = Box::new(ThirdPartyExporter {
+        calls: std::cell::Cell::new(0),
+    });
+
+    let set = exporter.export(&batch).unwrap();
+    assert_eq!(set.artifacts().len(), 1);
+    assert_eq!(set.artifacts()[0].payload().as_bytes(), &[1]);
+    assert_eq!(
+        set.artifacts()[0].kind().as_str(),
+        "com.example/custom-bundle"
+    );
 }
 
 #[test]
