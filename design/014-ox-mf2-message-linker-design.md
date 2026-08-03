@@ -6031,19 +6031,48 @@ The M3 built-in registry in `intlify_cli` maps exact ID `"esm"` to a private typ
 
 ```rust
 pub struct EsmExporterOptions {
-    production_locales: ProductionLocales,
-    fallback: FallbackSources,
+    production_locales: Box<[Locale]>,
+    fallbacks: Box<[LocaleFallback]>,
     eager_locales: EagerLocales,
 }
 
-pub struct EagerLocales(Vec<Locale>);
+pub struct EagerLocales(Box<[Locale]>);
+
+pub enum EsmExporterOptionsError {
+    InvalidPolicySnapshot,
+    DuplicateEagerLocale(Locale),
+    EagerLocaleNotProduction(Locale),
+}
 
 pub struct EsmExporter {
     options: EsmExporterOptions,
 }
+
+impl EsmExporterOptions {
+    pub fn try_new(
+        policy: &LinkPolicy,
+        eager_locales: Vec<Locale>,
+    ) -> Result<Self, EsmExporterOptionsError>;
+    pub fn production_locales(&self) -> &[Locale];
+    pub fn fallbacks(&self) -> &[LocaleFallback];
+    pub fn eager_locales(&self) -> &EagerLocales;
+}
+
+impl EagerLocales {
+    pub fn locales(&self) -> &[Locale];
+}
+
+impl EsmExporter {
+    pub fn new(options: EsmExporterOptions) -> Self;
+    pub fn options(&self) -> &EsmExporterOptions;
+}
 ```
 
-The concrete fields are private checked values with read-only accessors. The factory receives the production-locale set and fallback table from the exact immutable `LinkPolicy` used to create the current `LinkRequest`, plus the selected target's resolved eager-locale set. It revalidates every eager and fallback locale against that production set before exposing the exporter.
+The concrete fields are private checked values with read-only accessors. The factory receives the production-locale set and fallback table from the exact immutable `LinkPolicy` used to create the current `LinkRequest`, plus the selected target's resolved eager-locale set. `try_new` copies only those three canonical policy components. It revalidates every eager and fallback locale against that production set before exposing the exporter.
+
+`InvalidPolicySnapshot` is reachable only if the supposedly checked `LinkPolicy` contradicts its canonical production/fallback contract. Eager locales are sorted by exact locale bytes before validation; an equal duplicate selects `DuplicateEagerLocale`, and otherwise the first canonical non-member selects `EagerLocaleNotProduction`. No variant repairs, deduplicates, filters, or expands the submitted set. A valid permutation therefore yields the same immutable `EagerLocales` value.
+
+`EsmExporterOptionsError` belongs to checked exporter construction before a target transaction invokes `PlatformExporter`. It is not an `ExportError`, linker finding, message-validation diagnostic, or filesystem error. The CLI-owned target validator normally rejects the corresponding raw configuration earlier; seeing this error after that validation is an integration contract failure rather than a second user-facing option parser.
 
 The built-in constructor and factory are not a generic map-valued plugin API. An in-process third-party exporter registers its own typed factory and validation boundary before yielding `Box<dyn PlatformExporter>`; the trait's `Send` supertrait makes that instance movable into one integration-owned worker. No common `Any`, JSON object, string map, environment lookup, downcast, or exporter-specific union is added to the object-safe trait.
 
