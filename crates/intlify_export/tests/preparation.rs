@@ -332,7 +332,22 @@ fn parser_and_semantic_diagnostics_keep_their_owned_categories() {
 
 #[test]
 fn validation_deduplicates_roles_by_location_but_not_equal_payload_text() {
-    let single = linked_outcome(
+    let delivery_only = linked_outcome(
+        vec![definition_artifact(
+            "single.json",
+            vec![definition("/one", "Hello {$name", 0)],
+        )],
+        &["/one"],
+        false,
+        true,
+    );
+    let ExportPreparationError::MessageValidation(delivery_only_failure) =
+        prepare_export(&delivery_only, ExportValidationLimits::default()).unwrap_err()
+    else {
+        panic!("expected one invalid delivery definition");
+    };
+
+    let delivery_and_baseline = linked_outcome(
         vec![definition_artifact(
             "single.json",
             vec![definition("/one", "Hello {$name", 0)],
@@ -341,11 +356,12 @@ fn validation_deduplicates_roles_by_location_but_not_equal_payload_text() {
         true,
         true,
     );
-    let ExportPreparationError::MessageValidation(single_failure) =
-        prepare_export(&single, ExportValidationLimits::default()).unwrap_err()
+    let ExportPreparationError::MessageValidation(overlap_failure) =
+        prepare_export(&delivery_and_baseline, ExportValidationLimits::default()).unwrap_err()
     else {
-        panic!("expected one invalid definition");
+        panic!("expected one overlapping invalid definition");
     };
+    assert_eq!(overlap_failure, delivery_only_failure);
 
     let duplicate_text = linked_outcome(
         vec![definition_artifact(
@@ -366,7 +382,7 @@ fn validation_deduplicates_roles_by_location_but_not_equal_payload_text() {
     };
     assert_eq!(
         double_failure.total_diagnostics(),
-        single_failure.total_diagnostics() * 2
+        overlap_failure.total_diagnostics() * 2
     );
 }
 
