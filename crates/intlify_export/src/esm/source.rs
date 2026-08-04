@@ -6,6 +6,9 @@
 //! These writers own the observable UTF-8, whitespace, declaration ordering,
 //! and scalar escaping of format `0.1`. They consume only checked semantic
 //! values and never invoke a formatter, serializer, runtime, or filesystem.
+//! Generated payloads are module-file content, not HTML-safe script fragments:
+//! the scalar writer deliberately leaves `<`, `&`, `/`, and `'` unescaped, so
+//! callers must not embed the output directly in an HTML `<script>` element.
 
 use intlify_contract::DeliveryUnitSegment;
 use intlify_contract::{CatalogKey, Locale};
@@ -70,6 +73,9 @@ pub(super) fn render_loader_module(
 ) -> Result<ExportArtifactPayload, ExportError> {
     let mut writer = budget.writer();
     let mut eager_count = 0usize;
+    // Batch preflight fixes assets in canonical locale order. Eager aliases
+    // come from binary search over the same sorted locale order, so each eager
+    // asset must expose the next contiguous alias or generation fails closed.
     for asset in assets {
         let Some(alias) = asset.eager_alias else {
             continue;

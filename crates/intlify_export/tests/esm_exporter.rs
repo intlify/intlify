@@ -263,7 +263,9 @@ fn artifact<'a>(
                     .unwrap()
                     .contains(payload_fragment)
         })
-        .unwrap()
+        .unwrap_or_else(|| {
+            panic!("no artifact of kind {kind} contains the fragment {payload_fragment:?}")
+        })
 }
 
 fn source(artifact: &ExportArtifact) -> &str {
@@ -346,6 +348,8 @@ fn fallback_materialization_emits_canonical_locale_loader_and_accessor_artifacts
 
     let en_specifier = format!("./{}", logical_path(locale_en));
     let fr_specifier = format!("./{}", logical_path(locale_fr));
+    // The golden keeps readable placeholders because opaque hashed specifier
+    // framing is asserted independently by esm::path tests.
     let normalized_loader = source(loader)
         .replace(&en_specifier, "./locales/locale-en.mjs")
         .replace(&fr_specifier, "./locales/locale-fr.mjs");

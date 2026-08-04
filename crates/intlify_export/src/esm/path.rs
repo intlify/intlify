@@ -7,6 +7,8 @@
 //! format version before standard unkeyed BLAKE3-256 hashing. The resulting
 //! portable paths expose no reversible locale or scope spelling.
 
+use std::mem::size_of;
+
 use intlify_contract::Locale;
 use intlify_linker::ResolvedCatalogScopeId;
 
@@ -15,15 +17,28 @@ use crate::{ExportArtifactPath, ExportError};
 const FORMAT_MAJOR: u16 = 0;
 const FORMAT_MINOR: u16 = 1;
 
+// Capacity accounting mirrors the exact frame layout: one NUL terminator after
+// the domain, two big-endian u16 version fields, and a length prefix before
+// every variable-width identity component.
+const FRAME_DOMAIN_TERMINATOR: u8 = 0;
+const FRAME_DOMAIN_TERMINATOR_BYTES: usize = size_of::<u8>();
+const FORMAT_VERSION_BYTES: usize = size_of::<u16>() + size_of::<u16>();
+const U16_LENGTH_PREFIX_BYTES: usize = size_of::<u16>();
+const U32_LENGTH_PREFIX_BYTES: usize = size_of::<u32>();
+
 pub(super) fn locale_path(locale: &Locale) -> Result<ExportArtifactPath, ExportError> {
     let locale_bytes = locale.as_str().as_bytes();
     let locale_len =
         u32::try_from(locale_bytes.len()).map_err(|_| super::artifact_assembly_error())?;
     let mut framed = Vec::with_capacity(
-        b"dev.intlify/esm-locale-path".len() + 1 + 2 + 2 + 4 + locale_bytes.len(),
+        b"dev.intlify/esm-locale-path".len()
+            + FRAME_DOMAIN_TERMINATOR_BYTES
+            + FORMAT_VERSION_BYTES
+            + U32_LENGTH_PREFIX_BYTES
+            + locale_bytes.len(),
     );
     framed.extend_from_slice(b"dev.intlify/esm-locale-path");
-    framed.push(0);
+    framed.push(FRAME_DOMAIN_TERMINATOR);
     framed.extend_from_slice(&FORMAT_MAJOR.to_be_bytes());
     framed.extend_from_slice(&FORMAT_MINOR.to_be_bytes());
     framed.extend_from_slice(&locale_len.to_be_bytes());
@@ -36,24 +51,30 @@ pub(super) fn accessor_path(
     scope: &ResolvedCatalogScopeId,
 ) -> Result<ExportArtifactPath, ExportError> {
     let scope = scope.as_catalog_scope();
-    let namespace = scope.namespace().as_str().as_bytes();
-    let scope_name = scope.name().as_str().as_bytes();
+    accessor_path_from_parts(scope.namespace().as_str(), scope.name().as_str())
+}
+
+fn accessor_path_from_parts(
+    namespace: &str,
+    scope_name: &str,
+) -> Result<ExportArtifactPath, ExportError> {
+    let namespace = namespace.as_bytes();
+    let scope_name = scope_name.as_bytes();
     let namespace_len =
         u16::try_from(namespace.len()).map_err(|_| super::artifact_assembly_error())?;
     let scope_name_len =
         u16::try_from(scope_name.len()).map_err(|_| super::artifact_assembly_error())?;
     let mut framed = Vec::with_capacity(
         b"dev.intlify/typescript-accessor-path".len()
-            + 1
-            + 2
-            + 2
-            + 2
+            + FRAME_DOMAIN_TERMINATOR_BYTES
+            + FORMAT_VERSION_BYTES
+            + U16_LENGTH_PREFIX_BYTES
             + namespace.len()
-            + 2
+            + U16_LENGTH_PREFIX_BYTES
             + scope_name.len(),
     );
     framed.extend_from_slice(b"dev.intlify/typescript-accessor-path");
-    framed.push(0);
+    framed.push(FRAME_DOMAIN_TERMINATOR);
     framed.extend_from_slice(&FORMAT_MAJOR.to_be_bytes());
     framed.extend_from_slice(&FORMAT_MINOR.to_be_bytes());
     framed.extend_from_slice(&namespace_len.to_be_bytes());
@@ -96,7 +117,7 @@ mod tests {
         ScopeCompletenessTable, ScopeMappingTable,
     };
 
-    use super::{accessor_path, locale_path};
+    use super::{accessor_path, accessor_path_from_parts, locale_path};
 
     #[test]
     fn locale_path_uses_the_exact_opaque_framing() {
@@ -166,6 +187,12 @@ mod tests {
             })
             .collect::<BTreeSet<_>>();
         assert_eq!(paths.len(), scope_names.len());
+
+        // Both pairs concatenate to "project-abc". The u16 length prefix on
+        // each component keeps the namespace/name split part of the hash input.
+        let namespace_ends_earlier = accessor_path_from_parts("project-a", "bc").unwrap();
+        let namespace_ends_later = accessor_path_from_parts("project-ab", "c").unwrap();
+        assert_ne!(namespace_ends_earlier, namespace_ends_later);
     }
 
     fn resolved_scope(name: &str) -> ResolvedCatalogScopeId {

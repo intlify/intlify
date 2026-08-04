@@ -11,7 +11,7 @@
 mod path;
 mod source;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
@@ -372,11 +372,11 @@ fn build_locale_assets<'a>(
     options: &EsmExporterOptions,
     plans: &'a [MessageBundlePlan],
 ) -> Result<Vec<LocaleAsset<'a>>, ExportError> {
-    let mut paths = BTreeMap::new();
+    let mut paths = BTreeSet::new();
     let mut assets = Vec::with_capacity(plans.len());
     for plan in plans {
         let path = path::locale_path(plan.locale())?;
-        if paths.insert(path.clone(), plan.locale()).is_some() {
+        if !paths.insert(path.clone()) {
             return Err(duplicate_artifact_path_error());
         }
         let eager_alias = options.eager_locales.0.binary_search(plan.locale()).ok();
