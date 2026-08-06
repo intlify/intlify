@@ -552,6 +552,7 @@ dependencies = [
 name = "intlify_export"
 version = "0.14.0-alpha.11"
 dependencies = [
+ "blake3",
  "intlify_contract",
  "intlify_linker",
  "ox_mf2_parser",

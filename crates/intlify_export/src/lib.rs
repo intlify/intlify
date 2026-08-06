@@ -12,6 +12,7 @@
 mod artifact;
 mod diagnostic;
 mod error;
+mod esm;
 mod export_error;
 mod exporter;
 mod limits;
@@ -33,6 +34,7 @@ pub use error::{
     DiagnosticMappingInvariant, ExportPreparationError, ExportPreparationInvariant,
     OutcomeContractInvariant, TypedOutputInvariant,
 };
+pub use esm::{EagerLocales, EsmExporter, EsmExporterOptions, EsmExporterOptionsError};
 pub use export_error::{
     ExportError, ExportErrorEvidence, ExportErrorKind, GenerationFailedEvidence,
     GenerationLocation, GenerationStage, InternalInvariantEvidence, InternalInvariantViolation,
@@ -50,7 +52,8 @@ pub use typed_output::{
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
+        EsmExporter, EsmExporterOptions, EsmExporterOptionsError, ExportArtifact,
+        ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
         ExportArtifactPath, ExportArtifactPathSegment, ExportArtifactPayload,
         ExportArtifactRelationship, ExportArtifactSet, ExportError, ExportMessageValidationFailure,
         ExportPreparationError, ExportValidationLimits, MappedMessageDiagnostic,
@@ -81,6 +84,9 @@ mod tests {
         assert_send_sync::<ExportArtifactMetadata>();
         assert_send_sync::<ExportArtifactRelationship>();
         assert_send_sync::<ExportError>();
+        assert_send_sync::<EsmExporterOptions>();
+        assert_send_sync::<EsmExporterOptionsError>();
+        assert_send::<EsmExporter>();
         assert_send::<Box<dyn PlatformExporter>>();
     }
 }
