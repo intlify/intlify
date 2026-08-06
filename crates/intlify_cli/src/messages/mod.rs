@@ -13,6 +13,10 @@
 pub mod benchmark;
 mod completeness;
 mod config;
+#[allow(dead_code)] // Activated with the public delivery config and emit command.
+mod delivery;
+#[allow(dead_code)] // Activated with one exporter factory per selected target.
+mod exporter_registry;
 #[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
 mod observation;
@@ -29,3 +33,44 @@ pub use config::{
     MessagesConfigError, MessagesConfigReason, MessagesConfigViolation, ResolvedJsProducerConfig,
     ResolvedMessageProducers, ResolvedMessagesConfig,
 };
+
+#[cfg(test)]
+mod tests {
+    use intlify_contract::{LinkLimits, Locale};
+    use intlify_linker::{DynamicReferenceMode, LinkPolicy, PlacementPolicy};
+
+    use super::delivery::{DeliveryTargetInput, ResolvedDeliveryTargets};
+    use super::exporter_registry::BuiltInExporterRegistry;
+
+    #[test]
+    fn selected_targets_construct_exactly_one_fresh_exporter_each() {
+        let policy = LinkPolicy::try_new(
+            vec![Locale::try_new("en").unwrap()],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            DynamicReferenceMode::Compat,
+            PlacementPolicy::Duplicate,
+            &LinkLimits::default(),
+        )
+        .unwrap();
+        let eager = Vec::new();
+        let resolved = ResolvedDeliveryTargets::try_new(
+            &[
+                DeliveryTargetInput::new("web", "esm", "dist/web", &eager, None),
+                DeliveryTargetInput::new("native", "esm", "dist/native", &eager, None),
+            ],
+            &policy,
+        )
+        .unwrap();
+        let selected = resolved.select(None).unwrap();
+        let registry = BuiltInExporterRegistry::new();
+
+        let exporters = selected
+            .targets()
+            .iter()
+            .map(|target| registry.create(target, &policy).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(exporters.len(), selected.targets().len());
+    }
+}
