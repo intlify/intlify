@@ -530,6 +530,7 @@ dependencies = [
  "file-id",
  "glob",
  "intlify_contract",
+ "intlify_export",
  "intlify_format",
  "intlify_linker",
  "intlify_producer_js",

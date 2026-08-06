@@ -23,6 +23,7 @@ blake3 = "=1.8.5"
 file-id = "0.2"
 glob = "0.3"
 intlify_contract = { path = "../intlify_contract" }
+intlify_export = { path = "../intlify_export" }
 intlify_format = { path = "../intlify_format" }
 intlify_linker = { path = "../intlify_linker" }
 intlify_producer_js = { path = "../intlify_producer_js" }
