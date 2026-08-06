@@ -20,14 +20,14 @@ catalog:
   vue: ^3.5.39
   '@vitejs/plugin-vue': ^6.0.7
   monaco-editor: ^0.55.1
-  vize: ^0.291.0
+  vize: ^0.302.0
   void: ^0.10.0
   vite-plus: 0.2.6
   '@kazupon/vp-config': ^0.5.1
   wasm-pack: 0.15.0
   bumpp: ^12.0.0
   gh-changelogen: ^0.2.8
-  pkg-pr-new: 0.0.80
+  pkg-pr-new: 0.0.82
 overrides:
   vite: 'catalog:'
 peerDependencyRules:
