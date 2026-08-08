@@ -25,6 +25,8 @@ pub(crate) mod orchestration;
 mod physical;
 #[allow(dead_code)] // Consumed when project-link orchestration is wired.
 pub(crate) mod reference;
+#[allow(dead_code)] // Activated by filesystem delivery and check orchestration.
+mod registration;
 
 pub use config::{
     validate_messages_config, MessageCatalogKeyDomain, MessageDynamicReferenceMode,
