@@ -2535,10 +2535,15 @@ fn remove_rollback_control(
 }
 
 fn sync_directory(directory: &Dir) -> io::Result<()> {
+    // `cap_std::fs::Dir` may hold an `O_PATH` descriptor on Linux. Cloning
+    // that descriptor preserves `O_PATH`, which cannot be passed to `fsync`.
+    // Reopen the directory itself through the existing capability so the
+    // resulting handle has read access and is suitable for durable flushes.
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
     directory
-        .try_clone()?
-        .into_std_file()
-        .sync_all()
+        .open_with(Path::new("."), &options)
+        .and_then(|syncable_directory| syncable_directory.sync_all())
         .map_err(|error| {
             if matches!(
                 error.kind(),
@@ -2771,9 +2776,9 @@ mod tests {
     use tempfile::{Builder, TempDir};
 
     use super::{
-        write_output_with_transaction_id_source, write_output_with_transaction_id_source_and_hooks,
-        FaultPoint, OutputRootControlId, TransactionHooks, TransactionId, WriteRegistrationOutcome,
-        WriteRegistrationStatus,
+        sync_directory, write_output_with_transaction_id_source,
+        write_output_with_transaction_id_source_and_hooks, FaultPoint, OutputRootControlId,
+        TransactionHooks, TransactionId, WriteRegistrationOutcome, WriteRegistrationStatus,
     };
     use crate::messages::delivery::{
         DeliveryTargetInput, ResolvedDeliveryTarget, ResolvedDeliveryTargets,
@@ -2808,6 +2813,16 @@ mod tests {
         fn output_parent(&self) -> PathBuf {
             self.path().join("generated")
         }
+    }
+
+    #[test]
+    fn directory_flush_uses_a_syncable_capability_relative_handle() {
+        let project = TempProject::new();
+        let directory =
+            cap_std::fs::Dir::open_ambient_dir(project.path(), cap_std::ambient_authority())
+                .unwrap();
+
+        sync_directory(&directory).unwrap();
     }
 
     fn policy() -> LinkPolicy {
