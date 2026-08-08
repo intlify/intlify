@@ -3,16 +3,18 @@
 
 //! Private output-destination preparation and ownership inspection.
 //!
-//! This module will combine a checked exporter artifact set with deterministic
-//! host mapping, a strict ownership manifest, and non-mutating output checks.
-//! Durable mutation, locking, recovery, and public command reporting remain
-//! separate later integration responsibilities.
+//! This module combines a checked exporter artifact set with deterministic
+//! host mapping, a strict ownership manifest, non-mutating output checks, and
+//! target-local durable registration. Public command reporting remains a
+//! separate integration responsibility.
 
+mod control;
 mod destination;
 mod difference;
 mod error;
 mod inspection;
 mod manifest;
+mod transaction;
 
 use std::path::Path;
 
@@ -74,13 +76,15 @@ impl<'a> PreparedOutput<'a> {
         &self,
         project_root: &Path,
     ) -> Result<CheckComparison, OutputRegistrationError> {
-        inspection::inspect_output(
-            project_root,
-            self.output_root,
-            self.exporter,
-            self.artifacts,
-            &self.manifest,
-        )
+        transaction::check_output(self, project_root)
+    }
+
+    /// Durably install the complete expected output or prove it is unchanged.
+    pub(crate) fn write(
+        &self,
+        project_root: &Path,
+    ) -> Result<transaction::WriteRegistrationOutcome, OutputRegistrationError> {
+        transaction::write_output(self, project_root)
     }
 
     const fn manifest(&self) -> &CheckedOutputManifest {

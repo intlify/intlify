@@ -184,6 +184,11 @@ impl ObservedArtifactFile {
             expected_payload_equal,
         }
     }
+
+    /// Whether one safely read file exactly matched the selected payload proof.
+    pub(super) const fn is_present_and_equal(self) -> bool {
+        self.present && matches!(self.expected_payload_equal, Some(true))
+    }
 }
 
 struct DifferenceAccumulator {

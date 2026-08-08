@@ -29,54 +29,125 @@ use super::error::{
     RegistrationOperation, RegistrationSubject, UnsupportedCapabilityEvidence,
 };
 use super::manifest::{
-    CheckedOutputManifest, ManifestCodecErrorKind, OutputManifest, OUTPUT_MANIFEST_BASENAME,
-    OUTPUT_MANIFEST_WIRE_LIMIT,
+    Blake3Fingerprint, CheckedOutputManifest, ManifestArtifact, ManifestCodecError,
+    ManifestCodecErrorKind, OutputManifest, OUTPUT_MANIFEST_BASENAME, OUTPUT_MANIFEST_WIRE_LIMIT,
 };
 
-/// Inspect one selected output root and return its complete deterministic check.
+fn map_manifest_decode_error(error: ManifestCodecError) -> OutputRegistrationError {
+    match error.kind() {
+        ManifestCodecErrorKind::Invalid => OutputRegistrationError::registration(
+            RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestInvalid, None),
+        ),
+        ManifestCodecErrorKind::Unsupported => {
+            OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
+                OwnershipFailureReason::ManifestUnsupported,
+                None,
+            ))
+        }
+        ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
+            RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestLimit, None),
+        ),
+        ManifestCodecErrorKind::InternalInvariant => OutputRegistrationError::internal_invariant(),
+    }
+}
+
+/// Complete safe observation used by check and write registration paths.
+pub(super) struct OutputInspection {
+    state: PriorOutputState,
+    comparison: CheckComparison,
+}
+
+impl OutputInspection {
+    pub(super) const fn state(&self) -> PriorOutputState {
+        self.state
+    }
+
+    pub(super) const fn comparison(&self) -> &CheckComparison {
+        &self.comparison
+    }
+
+    pub(super) fn into_comparison(self) -> CheckComparison {
+        self.comparison
+    }
+}
+
+/// Prior output-root shape required by the transaction journal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PriorOutputState {
+    Absent,
+    Empty,
+    Managed {
+        manifest_fingerprint: Blake3Fingerprint,
+    },
+}
+
+/// Inspect one selected output root and return its deterministic checked state.
 pub(super) fn inspect_output(
     project_root: &Path,
     output_root: &DeliveryOutputRoot,
     exporter: BuiltInExporterId,
     expected_artifacts: &ExportArtifactSet,
     expected_manifest: &CheckedOutputManifest,
-) -> Result<CheckComparison, OutputRegistrationError> {
-    let first_root = match open_output_root(project_root, output_root)? {
+) -> Result<OutputInspection, OutputRegistrationError> {
+    inspect_output_at(
+        &OutputRootLocation::Project {
+            project_root,
+            output_root,
+        },
+        output_root,
+        exporter,
+        expected_artifacts,
+        expected_manifest,
+    )
+}
+
+/// Inspect an output root relative to the already verified lock parent.
+pub(super) fn inspect_named_output(
+    parent: &Dir,
+    basename: &str,
+    output_root: &DeliveryOutputRoot,
+    exporter: BuiltInExporterId,
+    expected_artifacts: &ExportArtifactSet,
+    expected_manifest: &CheckedOutputManifest,
+) -> Result<OutputInspection, OutputRegistrationError> {
+    inspect_output_at(
+        &OutputRootLocation::Named { parent, basename },
+        output_root,
+        exporter,
+        expected_artifacts,
+        expected_manifest,
+    )
+}
+
+fn inspect_output_at(
+    location: &OutputRootLocation<'_>,
+    output_root: &DeliveryOutputRoot,
+    exporter: BuiltInExporterId,
+    expected_artifacts: &ExportArtifactSet,
+    expected_manifest: &CheckedOutputManifest,
+) -> Result<OutputInspection, OutputRegistrationError> {
+    let first_root = match location.open()? {
         OpenedOutputRoot::Missing => {
-            return verify_missing_root(project_root, output_root)
-                .map(|()| CheckComparison::output_missing());
+            location.verify_missing()?;
+            return Ok(OutputInspection {
+                state: PriorOutputState::Absent,
+                comparison: CheckComparison::output_missing(),
+            });
         }
         OpenedOutputRoot::Present(root) => root,
     };
 
     if directory_is_empty(&first_root.dir)? {
-        verify_empty_root(project_root, output_root, &first_root.stamp)?;
-        return Ok(CheckComparison::output_missing());
+        location.verify_empty(&first_root.stamp)?;
+        return Ok(OutputInspection {
+            state: PriorOutputState::Empty,
+            comparison: CheckComparison::output_missing(),
+        });
     }
 
     let manifest_file = read_manifest_file(&first_root.dir)?;
-    let prior_manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter).map_err(
-        |error| match error.kind() {
-            ManifestCodecErrorKind::Invalid => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestInvalid,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Unsupported => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestUnsupported,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
-                RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestLimit, None),
-            ),
-            ManifestCodecErrorKind::InternalInvariant => {
-                OutputRegistrationError::internal_invariant()
-            }
-        },
-    )?;
+    let prior_manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter)
+        .map_err(map_manifest_decode_error)?;
     let manifest_is_canonical = manifest_file.bytes.as_ref() == prior_manifest.canonical_bytes();
 
     preflight_manifest_capabilities(exporter, prior_manifest.manifest())?;
@@ -90,12 +161,13 @@ pub(super) fn inspect_output(
     let first_tree = scan_owned_tree(
         &first_root.dir,
         &layout,
-        expected_artifacts,
+        Some(expected_artifacts),
+        prior_manifest.manifest(),
         &manifest_file.stamp,
-        ScanMode::ComparePayloads,
+        ScanMode::CompareExpectedPayloads,
     )?;
 
-    let second_root = match open_output_root(project_root, output_root) {
+    let second_root = match location.open() {
         Ok(OpenedOutputRoot::Present(root)) => root,
         Ok(OpenedOutputRoot::Missing) => return Err(snapshot_changed_output_root()),
         Err(error) => {
@@ -111,7 +183,8 @@ pub(super) fn inspect_output(
     let second_tree = scan_owned_tree(
         &second_root.dir,
         &layout,
-        expected_artifacts,
+        Some(expected_artifacts),
+        prior_manifest.manifest(),
         &manifest_file.stamp,
         ScanMode::MetadataOnly,
     )
@@ -138,9 +211,119 @@ pub(super) fn inspect_output(
         return Err(snapshot_changed_output_root());
     }
 
+    let prior_fingerprint = prior_manifest.canonical_fingerprint();
     let observation =
         ManagedOutputObservation::new(prior_manifest, manifest_is_canonical, first_tree.files);
-    CheckComparison::compare_managed(expected_manifest, &observation)
+    Ok(OutputInspection {
+        state: PriorOutputState::Managed {
+            manifest_fingerprint: prior_fingerprint,
+        },
+        comparison: CheckComparison::compare_managed(expected_manifest, &observation)?,
+    })
+}
+
+/// Safe participant state used by the journal recovery state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RecoveryRootObservation {
+    Missing,
+    Empty,
+    Managed {
+        manifest_fingerprint: Blake3Fingerprint,
+    },
+}
+
+/// Inspect one sibling root and prove every manifest-owned payload fingerprint.
+///
+/// The caller maps any invalid or externally modified participant combination
+/// to one recovery-stage failure. Random control basenames never enter the
+/// retained evidence produced by this helper.
+pub(super) fn inspect_recovery_root(
+    parent: &Dir,
+    basename: &str,
+    output_root: &DeliveryOutputRoot,
+    exporter: BuiltInExporterId,
+) -> Result<RecoveryRootObservation, OutputRegistrationError> {
+    let first_root = match open_named_root(parent, basename)? {
+        OpenedOutputRoot::Missing => {
+            verify_missing_named_root(parent, basename)?;
+            return Ok(RecoveryRootObservation::Missing);
+        }
+        OpenedOutputRoot::Present(root) => root,
+    };
+    if directory_is_empty(&first_root.dir)? {
+        verify_empty_named_root(parent, basename, &first_root.stamp)?;
+        return Ok(RecoveryRootObservation::Empty);
+    }
+
+    let manifest_file = read_manifest_file(&first_root.dir)?;
+    let manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter)
+        .map_err(map_manifest_decode_error)?;
+    preflight_manifest_capabilities(exporter, manifest.manifest())?;
+    let _destinations = DestinationMap::try_from_manifest(output_root, manifest.manifest())?;
+    let layout = OwnershipLayout::try_new(manifest.manifest())?;
+    let first_tree = scan_owned_tree(
+        &first_root.dir,
+        &layout,
+        None,
+        manifest.manifest(),
+        &manifest_file.stamp,
+        ScanMode::VerifyManifestPayloads,
+    )?;
+    if first_tree.files.len() != manifest.manifest().artifacts().len()
+        || first_tree
+            .files
+            .values()
+            .any(|file| !file.is_present_and_equal())
+    {
+        return Err(snapshot_changed_output_root());
+    }
+
+    let second_root = match open_named_root(parent, basename) {
+        Ok(OpenedOutputRoot::Present(root)) => root,
+        Ok(OpenedOutputRoot::Missing) => return Err(snapshot_changed_output_root()),
+        Err(error) => {
+            return Err(preserve_unreadable_or_changed(
+                error,
+                snapshot_changed_output_root,
+            ));
+        }
+    };
+    if second_root.stamp != first_root.stamp {
+        return Err(snapshot_changed_output_root());
+    }
+    let second_tree = scan_owned_tree(
+        &second_root.dir,
+        &layout,
+        None,
+        manifest.manifest(),
+        &manifest_file.stamp,
+        ScanMode::MetadataOnly,
+    )
+    .map_err(|error| preserve_unreadable_or_changed(error, snapshot_changed_output_root))?;
+    if first_tree.entries != second_tree.entries {
+        return Err(snapshot_changed_output_root());
+    }
+    let final_manifest = read_manifest_file(&second_root.dir)
+        .map_err(|error| preserve_unreadable_or_changed(error, snapshot_changed_manifest))?;
+    if final_manifest.bytes != manifest_file.bytes || final_manifest.stamp != manifest_file.stamp {
+        return Err(snapshot_changed_manifest());
+    }
+    let final_root_stamp = snapshot_stamp(&second_root.dir.dir_metadata().map_err(|error| {
+        snapshot_unreadable(
+            RegistrationSubject::OutputRoot,
+            None,
+            None,
+            RegistrationOperation::Inspect,
+            &error,
+        )
+    })?)?;
+    if final_root_stamp != first_root.stamp {
+        return Err(snapshot_changed_output_root());
+    }
+
+    Ok(RecoveryRootObservation::Managed {
+        manifest_fingerprint: manifest.canonical_fingerprint(),
+    })
 }
 
 enum OpenedOutputRoot {
@@ -151,6 +334,49 @@ enum OpenedOutputRoot {
 struct VerifiedOutputRoot {
     dir: Dir,
     stamp: SnapshotStamp,
+}
+
+enum OutputRootLocation<'a> {
+    Project {
+        project_root: &'a Path,
+        output_root: &'a DeliveryOutputRoot,
+    },
+    Named {
+        parent: &'a Dir,
+        basename: &'a str,
+    },
+}
+
+impl OutputRootLocation<'_> {
+    fn open(&self) -> Result<OpenedOutputRoot, OutputRegistrationError> {
+        match self {
+            Self::Project {
+                project_root,
+                output_root,
+            } => open_output_root(project_root, output_root),
+            Self::Named { parent, basename } => open_named_root(parent, basename),
+        }
+    }
+
+    fn verify_missing(&self) -> Result<(), OutputRegistrationError> {
+        match self {
+            Self::Project {
+                project_root,
+                output_root,
+            } => verify_missing_root(project_root, output_root),
+            Self::Named { parent, basename } => verify_missing_named_root(parent, basename),
+        }
+    }
+
+    fn verify_empty(&self, stamp: &SnapshotStamp) -> Result<(), OutputRegistrationError> {
+        match self {
+            Self::Project {
+                project_root,
+                output_root,
+            } => verify_empty_root(project_root, output_root, stamp),
+            Self::Named { parent, basename } => verify_empty_named_root(parent, basename, stamp),
+        }
+    }
 }
 
 fn open_output_root(
@@ -242,6 +468,92 @@ fn open_output_root(
         dir: current,
         stamp,
     }))
+}
+
+fn open_named_root(
+    parent: &Dir,
+    basename: &str,
+) -> Result<OpenedOutputRoot, OutputRegistrationError> {
+    let metadata = match parent.symlink_metadata(basename) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(OpenedOutputRoot::Missing);
+        }
+        Err(error) => {
+            return Err(snapshot_unreadable(
+                RegistrationSubject::OutputRoot,
+                None,
+                None,
+                RegistrationOperation::Inspect,
+                &error,
+            ));
+        }
+    };
+    if metadata.is_symlink() {
+        return Err(OutputRegistrationError::registration(
+            RegistrationFailureEvidence::unsafe_entry(RegistrationSubject::OutputRoot, None, None),
+        ));
+    }
+    if !metadata.is_dir() {
+        return Err(OutputRegistrationError::registration(
+            RegistrationFailureEvidence::root_not_directory(None),
+        ));
+    }
+    let dir = parent.open_dir_nofollow(basename).map_err(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            snapshot_changed_output_root()
+        } else {
+            snapshot_unreadable(
+                RegistrationSubject::OutputRoot,
+                None,
+                None,
+                RegistrationOperation::Open,
+                &error,
+            )
+        }
+    })?;
+    let stamp = snapshot_stamp(&dir.dir_metadata().map_err(|error| {
+        snapshot_unreadable(
+            RegistrationSubject::OutputRoot,
+            None,
+            None,
+            RegistrationOperation::Inspect,
+            &error,
+        )
+    })?)?;
+    Ok(OpenedOutputRoot::Present(VerifiedOutputRoot { dir, stamp }))
+}
+
+fn verify_missing_named_root(parent: &Dir, basename: &str) -> Result<(), OutputRegistrationError> {
+    match open_named_root(parent, basename) {
+        Ok(OpenedOutputRoot::Missing) => Ok(()),
+        Ok(OpenedOutputRoot::Present(_)) => Err(snapshot_changed_output_root()),
+        Err(error) => Err(preserve_unreadable_or_changed(
+            error,
+            snapshot_changed_output_root,
+        )),
+    }
+}
+
+fn verify_empty_named_root(
+    parent: &Dir,
+    basename: &str,
+    first_stamp: &SnapshotStamp,
+) -> Result<(), OutputRegistrationError> {
+    let second = match open_named_root(parent, basename) {
+        Ok(OpenedOutputRoot::Present(root)) => root,
+        Ok(OpenedOutputRoot::Missing) => return Err(snapshot_changed_output_root()),
+        Err(error) => {
+            return Err(preserve_unreadable_or_changed(
+                error,
+                snapshot_changed_output_root,
+            ));
+        }
+    };
+    if &second.stamp != first_stamp || !directory_is_empty(&second.dir)? {
+        return Err(snapshot_changed_output_root());
+    }
+    Ok(())
 }
 
 fn verify_missing_root(
@@ -523,7 +835,8 @@ impl OwnedEntry {
 
 #[derive(Debug, Clone, Copy)]
 enum ScanMode {
-    ComparePayloads,
+    CompareExpectedPayloads,
+    VerifyManifestPayloads,
     MetadataOnly,
 }
 
@@ -542,7 +855,8 @@ struct TreeSnapshot {
 fn scan_owned_tree(
     root: &Dir,
     layout: &OwnershipLayout,
-    expected_artifacts: &ExportArtifactSet,
+    expected_artifacts: Option<&ExportArtifactSet>,
+    manifest: &OutputManifest,
     manifest_stamp: &SnapshotStamp,
     mode: ScanMode,
 ) -> Result<TreeSnapshot, OutputRegistrationError> {
@@ -558,6 +872,7 @@ fn scan_owned_tree(
         &NativePathKey::root(),
         layout,
         expected_artifacts,
+        manifest,
         manifest_stamp,
         mode,
         &mut snapshot,
@@ -581,7 +896,8 @@ fn scan_directory(
     actual_prefix: &[Box<str>],
     native_prefix: &NativePathKey,
     layout: &OwnershipLayout,
-    expected_artifacts: &ExportArtifactSet,
+    expected_artifacts: Option<&ExportArtifactSet>,
+    manifest: &OutputManifest,
     manifest_stamp: &SnapshotStamp,
     mode: ScanMode,
     snapshot: &mut TreeSnapshot,
@@ -681,7 +997,7 @@ fn scan_directory(
                     );
                     continue;
                 }
-                match open_regular_file(dir, name, None) {
+                match open_regular_file(dir, name, None, None) {
                     Ok((stamp, _)) => {
                         if &stamp != manifest_stamp {
                             failures.record_representable(
@@ -726,6 +1042,7 @@ fn scan_directory(
                             &native_path,
                             layout,
                             expected_artifacts,
+                            manifest,
                             manifest_stamp,
                             mode,
                             snapshot,
@@ -752,12 +1069,18 @@ fn scan_directory(
                     );
                     continue;
                 }
-                let expected_payload = if matches!(mode, ScanMode::ComparePayloads) {
-                    expected_payload(expected_artifacts, logical_path)
+                let expected_payload = if matches!(mode, ScanMode::CompareExpectedPayloads) {
+                    expected_artifacts
+                        .and_then(|artifacts| expected_payload(artifacts, logical_path))
                 } else {
                     None
                 };
-                match open_regular_file(dir, name, expected_payload) {
+                let manifest_artifact = if matches!(mode, ScanMode::VerifyManifestPayloads) {
+                    manifest.artifact(logical_path)
+                } else {
+                    None
+                };
+                match open_regular_file(dir, name, expected_payload, manifest_artifact) {
                     Ok((stamp, payload_equal)) => {
                         snapshot.entries.insert(
                             logical_path.clone(),
@@ -878,6 +1201,7 @@ fn open_regular_file(
     parent: &Dir,
     name: &str,
     expected_payload: Option<&[u8]>,
+    manifest_artifact: Option<&ManifestArtifact>,
 ) -> Result<(SnapshotStamp, Option<bool>), EntryReadError> {
     let mut options = OpenOptions::new();
     options.read(true).follow(FollowSymlinks::No);
@@ -891,10 +1215,22 @@ fn open_regular_file(
         return Err(EntryReadError::Changed);
     }
     let before = snapshot_stamp(&before_metadata).map_err(EntryReadError::Registration)?;
-    let payload_equal = expected_payload
-        .map(|expected| compare_payload_bytes(&mut file, before.len, expected))
-        .transpose()
-        .map_err(|error| EntryReadError::io(RegistrationOperation::Read, error))?;
+    let payload_equal = match (expected_payload, manifest_artifact) {
+        (Some(expected), None) => Some(compare_payload_bytes(&mut file, before.len, expected)),
+        (None, Some(manifest_artifact)) => Some(compare_manifest_payload(
+            &mut file,
+            before.len,
+            manifest_artifact,
+        )),
+        (None, None) => None,
+        (Some(_), Some(_)) => {
+            return Err(EntryReadError::Registration(
+                OutputRegistrationError::internal_invariant(),
+            ))
+        }
+    }
+    .transpose()
+    .map_err(|error| EntryReadError::io(RegistrationOperation::Read, error))?;
     let after_metadata = file
         .metadata()
         .map_err(|error| EntryReadError::io(RegistrationOperation::Inspect, error))?;
@@ -903,6 +1239,35 @@ fn open_regular_file(
         return Err(EntryReadError::Changed);
     }
     Ok((after, payload_equal))
+}
+
+fn compare_manifest_payload(
+    file: &mut cap_std::fs::File,
+    actual_len: u64,
+    manifest_artifact: &ManifestArtifact,
+) -> io::Result<bool> {
+    if actual_len != manifest_artifact.payload_bytes() {
+        return Ok(false);
+    }
+    let mut hasher = blake3::Hasher::new();
+    let mut observed = 0_u64;
+    let mut buffer = vec![0_u8; 64 * 1024].into_boxed_slice();
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(observed == actual_len
+                && hasher.finalize().as_bytes()
+                    == &manifest_artifact.payload_fingerprint().as_bytes());
+        }
+        observed = match observed.checked_add(u64::try_from(read).unwrap_or(u64::MAX)) {
+            Some(value) => value,
+            None => return Ok(false),
+        };
+        if observed > actual_len {
+            return Ok(false);
+        }
+        hasher.update(&buffer[..read]);
+    }
 }
 
 fn compare_payload_bytes(

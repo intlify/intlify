@@ -15,6 +15,8 @@ use intlify_export::{
     ExportArtifactRelationshipKind,
 };
 
+use super::super::delivery::DeliveryOutputRoot;
+
 const EVIDENCE_PATH_SEGMENTS_LIMIT: usize = 128;
 const EVIDENCE_PATH_BYTES_LIMIT: usize = 8_192;
 
@@ -22,6 +24,7 @@ const EVIDENCE_PATH_BYTES_LIMIT: usize = 8_192;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::messages) struct OutputRegistrationError {
     evidence: OutputRegistrationErrorEvidence,
+    output_state: OutputState,
 }
 
 impl OutputRegistrationError {
@@ -29,6 +32,7 @@ impl OutputRegistrationError {
     pub(super) const fn unsupported_capability(evidence: UnsupportedCapabilityEvidence) -> Self {
         Self {
             evidence: OutputRegistrationErrorEvidence::UnsupportedCapability(evidence),
+            output_state: OutputState::Unchanged,
         }
     }
 
@@ -36,6 +40,7 @@ impl OutputRegistrationError {
     pub(super) const fn destination_mapping(evidence: DestinationMappingEvidence) -> Self {
         Self {
             evidence: OutputRegistrationErrorEvidence::DestinationMapping(evidence),
+            output_state: OutputState::Unchanged,
         }
     }
 
@@ -43,6 +48,7 @@ impl OutputRegistrationError {
     pub(super) const fn destination_collision(evidence: DestinationCollisionEvidence) -> Self {
         Self {
             evidence: OutputRegistrationErrorEvidence::DestinationCollision(evidence),
+            output_state: OutputState::Unchanged,
         }
     }
 
@@ -50,6 +56,7 @@ impl OutputRegistrationError {
     pub(super) const fn registration(evidence: RegistrationFailureEvidence) -> Self {
         Self {
             evidence: OutputRegistrationErrorEvidence::Registration(evidence),
+            output_state: OutputState::Unchanged,
         }
     }
 
@@ -57,7 +64,14 @@ impl OutputRegistrationError {
     pub(super) const fn internal_invariant() -> Self {
         Self {
             evidence: OutputRegistrationErrorEvidence::InternalInvariant,
+            output_state: OutputState::Unchanged,
         }
+    }
+
+    /// Attach the strongest output-root state proved after transaction work.
+    pub(super) const fn with_output_state(mut self, output_state: OutputState) -> Self {
+        self.output_state = output_state;
+        self
     }
 
     /// Return the public-boundary classification derived from the evidence.
@@ -84,6 +98,11 @@ impl OutputRegistrationError {
     /// Return the sole retained checked evidence value.
     pub(super) const fn evidence(&self) -> &OutputRegistrationErrorEvidence {
         &self.evidence
+    }
+
+    /// Return the output-root state proved when this failure was selected.
+    pub(super) const fn output_state(&self) -> OutputState {
+        self.output_state
     }
 }
 
@@ -131,6 +150,15 @@ pub(super) enum OutputRegistrationErrorEvidence {
     InternalInvariant,
 }
 
+/// Output-root side effect proved at result construction time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::messages) enum OutputState {
+    Unchanged,
+    Updated,
+    Restored,
+    Indeterminate,
+}
+
 /// Closed capability evidence admitted before filesystem ownership inspection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum UnsupportedCapabilityEvidence {
@@ -155,6 +183,12 @@ pub(super) enum UnsupportedCapabilityEvidence {
         artifact_path: Option<ExportArtifactPath>,
     },
     FilesystemNoFollow,
+    ProcessLocking,
+    SameFilesystemStaging,
+    DurableFlush,
+    SafeRename,
+    SecureRandom,
+    DeterministicRecovery,
 }
 
 /// Why one portable artifact path cannot be represented by the host.
@@ -223,6 +257,10 @@ pub(super) enum DestinationCollisionEvidence {
     },
     ReservedManifest {
         first_artifact_path: ExportArtifactPath,
+    },
+    OutputRootControlId {
+        first_output_root: DeliveryOutputRoot,
+        second_output_root: DeliveryOutputRoot,
     },
 }
 
@@ -296,11 +334,62 @@ pub(super) enum CheckFailureReason {
     SnapshotChanged,
 }
 
+/// Lock-stage failures selected before recovery or ownership admission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LockFailureReason {
+    ControlConflict,
+    ControlInvalid,
+    AcquireFailed,
+    ConcurrentStateChanged,
+}
+
+/// Staging-stage failures while constructing the complete new root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum StagingFailureReason {
+    ControlConflict,
+    CreateFailed,
+    WriteFailed,
+    FlushFailed,
+}
+
+/// Commit-stage failures after the complete staging root is durable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CommitFailureReason {
+    JournalConflict,
+    JournalWriteFailed,
+    OldRootMoveFailed,
+    NewRootInstallFailed,
+    CleanupFailed,
+    FlushFailed,
+}
+
+/// Rollback-stage failures while re-establishing the prior root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RollbackFailureReason {
+    OldRootRestore,
+    Cleanup,
+    Flush,
+}
+
+/// Recovery-stage failures from a prior interrupted transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RecoveryFailureReason {
+    JournalInvalid,
+    StateAmbiguous,
+    OldRootRestoreFailed,
+    CleanupFailed,
+    FlushFailed,
+}
+
 /// Stable subject selected by a registration failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RegistrationSubject {
     OutputRoot,
     Manifest,
+    Lock,
+    Journal,
+    Staging,
+    Backup,
     Artifact,
 }
 
@@ -308,6 +397,10 @@ pub(super) enum RegistrationSubject {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RegistrationControl {
     Manifest,
+    Lock,
+    Journal,
+    Staging,
+    Backup,
 }
 
 /// Closed filesystem operation retained only when an OS operation failed.
@@ -316,6 +409,13 @@ pub(super) enum RegistrationOperation {
     Inspect,
     Open,
     Read,
+    Create,
+    Write,
+    Flush,
+    Lock,
+    Replace,
+    Rename,
+    Remove,
 }
 
 /// Portable classification of an underlying operating-system error.
@@ -381,6 +481,38 @@ pub(super) enum RegistrationFailureEvidence {
         subject: RegistrationSubject,
         artifact_path: Option<ExportArtifactPath>,
         relative_path: Option<EvidencePath>,
+        io: Option<RegistrationIoEvidence>,
+    },
+    Lock {
+        reason: LockFailureReason,
+        subject: RegistrationSubject,
+        control: RegistrationControl,
+        io: Option<RegistrationIoEvidence>,
+    },
+    Staging {
+        reason: StagingFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        artifact_path: Option<ExportArtifactPath>,
+        relative_path: Option<EvidencePath>,
+        io: Option<RegistrationIoEvidence>,
+    },
+    Commit {
+        reason: CommitFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        io: Option<RegistrationIoEvidence>,
+    },
+    Rollback {
+        reason: RollbackFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        io: Option<RegistrationIoEvidence>,
+    },
+    Recovery {
+        reason: RecoveryFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
         io: Option<RegistrationIoEvidence>,
     },
 }
@@ -474,6 +606,78 @@ impl RegistrationFailureEvidence {
             artifact_path,
             relative_path,
             io: None,
+        }
+    }
+
+    pub(super) const fn lock(
+        reason: LockFailureReason,
+        io: Option<RegistrationIoEvidence>,
+    ) -> Self {
+        Self::Lock {
+            reason,
+            subject: RegistrationSubject::Lock,
+            control: RegistrationControl::Lock,
+            io,
+        }
+    }
+
+    pub(super) const fn staging(
+        reason: StagingFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        artifact_path: Option<ExportArtifactPath>,
+        relative_path: Option<EvidencePath>,
+        io: Option<RegistrationIoEvidence>,
+    ) -> Self {
+        Self::Staging {
+            reason,
+            subject,
+            control,
+            artifact_path,
+            relative_path,
+            io,
+        }
+    }
+
+    pub(super) const fn commit(
+        reason: CommitFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        io: Option<RegistrationIoEvidence>,
+    ) -> Self {
+        Self::Commit {
+            reason,
+            subject,
+            control,
+            io,
+        }
+    }
+
+    pub(super) const fn rollback(
+        reason: RollbackFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        io: Option<RegistrationIoEvidence>,
+    ) -> Self {
+        Self::Rollback {
+            reason,
+            subject,
+            control,
+            io,
+        }
+    }
+
+    pub(super) const fn recovery(
+        reason: RecoveryFailureReason,
+        subject: RegistrationSubject,
+        control: Option<RegistrationControl>,
+        io: Option<RegistrationIoEvidence>,
+    ) -> Self {
+        Self::Recovery {
+            reason,
+            subject,
+            control,
+            io,
         }
     }
 }
