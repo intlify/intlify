@@ -4,6 +4,8 @@ The `@intlify/cli` package provides the public `intlify` command for Intlify Mes
 
 `intlify fmt` formats direct `.mf2` messages and opted-in JSON resource catalogs with the native formatter. It supports write mode, `--check`, `--list-different`, `--stdin-filepath`, `--mode standard|preserve`, `--ignore-path`, and `--reporter json`.
 
+`intlify messages emit` links configured JSON catalogs with JavaScript or TypeScript message references, exports the selected messages as ESM artifacts, and durably registers those artifacts under configured project-relative output roots.
+
 `lint`, `check`, and `init` remain reserved command names. Invoking those commands in this release returns a `command_not_ready` operational error.
 
 ## Install
@@ -75,6 +77,103 @@ intlify fmt .
 
 `resources.catalogs` is optional. An explicit empty array disables catalog processing, while omitted configuration leaves direct-file JSON opt-in available. Catalog membership uses project-relative `include` and optional `exclude` patterns; an optional `format` field can explicitly select the canonical `json` adapter.
 
+## Message Delivery
+
+Message delivery is a project-wide operation. Its inputs come from `resources.catalogs` and `messages`; `messages emit` does not accept positional files, directories, globs, or stdin.
+
+The following project links one `t()` call to the matching English and Japanese catalog entries:
+
+```text
+.
+├── intlify.config.json
+├── locales
+│   ├── en.json
+│   └── ja.json
+└── src
+    └── app.ts
+```
+
+`locales/en.json`:
+
+```json
+{ "title": "Title" }
+```
+
+`locales/ja.json`:
+
+```json
+{ "title": "タイトル" }
+```
+
+`src/app.ts`:
+
+```ts
+t('title')
+```
+
+Configure the catalog scope, production locales, reference recognizer, and delivery target in `intlify.config.json`:
+
+```json
+{
+  "$schema": "./node_modules/@intlify/cli/schema/config.schema.json",
+  "resources": {
+    "catalogs": [
+      {
+        "scope": "app",
+        "include": ["locales/*.json"],
+        "locale": {
+          "from": "path",
+          "pattern": "locales/{locale}.json"
+        }
+      }
+    ]
+  },
+  "messages": {
+    "locales": ["en", "ja"],
+    "coverageBaseline": { "app": "en" },
+    "producers": {
+      "js": {
+        "include": ["src/**/*.ts"],
+        "recognizers": {
+          "t": {
+            "kind": "lookup",
+            "scope": "app",
+            "domain": "json-pointer",
+            "keySyntax": "dot-path"
+          }
+        }
+      }
+    },
+    "delivery": {
+      "targets": [
+        {
+          "name": "web",
+          "exporter": "esm",
+          "out": "generated/messages",
+          "eagerLocales": ["en"]
+        }
+      ]
+    }
+  }
+}
+```
+
+Write the complete managed output for every configured target:
+
+```sh
+intlify messages emit
+```
+
+The ESM exporter writes locale modules, `loader.mjs`, a typed accessor for the baseline scope, and `.intlify-output-manifest.json` under `generated/messages`. Artifact filenames are deterministic but intentionally opaque.
+
+Compare the expected artifacts without changing the output:
+
+```sh
+intlify messages emit --check
+```
+
+A matching check exits with `0`. Missing, changed, stale, or non-canonical managed output is reported as a difference and exits with `1`; operational failures exit with `2`. Use `--target web` to execute one configured target while retaining the same complete project analysis, and use `--reporter=json` for the stable structured result.
+
 ## Formatter Limitations
 
 The resource + catalog formatter acceptance gate covers the JSON adapter and `intlify fmt`; catalog linting remains deferred until the Phase 3C linter exists.
@@ -106,7 +205,7 @@ vp run bench:resource:validate
 
 ## Message Linker Benchmarks
 
-The internal M0 project-link path has a separate release-profile benchmark under `tools/messages-bench`:
+The core project-link path has a separate release-profile benchmark under `tools/messages-bench`:
 
 ```sh
 vp run bench:messages
@@ -116,4 +215,4 @@ vp run bench:messages:validate
 
 It measures project input I/O, JavaScript/TypeScript reference production and cache hit/miss paths, artifact codecs, resource-to-definition projection, semantic-link stages, allocator-observed link peak memory, and the complete in-process workflow. Tier 1 extraction in the E2E case retains its separate resource-owned measurement.
 
-The non-default Rust benchmark features are enabled only by the non-published runner. They do not add a user-facing message command or enable linker-backed lint, exporter, or artifact-size behavior. CI checks buildability, required-case coverage, result structure, boundary/companion integrity, and within-run determinism; timing and memory magnitudes remain observational.
+The non-default Rust benchmark features are enabled only by the non-published runner. They do not add user-facing options or alter ordinary linker, exporter, or artifact-size behavior. CI checks buildability, required-case coverage, result structure, boundary/companion integrity, and within-run determinism; timing and memory magnitudes remain observational.

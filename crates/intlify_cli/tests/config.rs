@@ -377,6 +377,16 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
     ],
     "coverageBaseline": { "app": "en" },
     "fallback": { "ja": ["en"] },
+    "delivery": {
+      "targets": [
+        {
+          "name": "web",
+          "exporter": "esm",
+          "out": "generated/web",
+          "eagerLocales": ["ja", "en"]
+        }
+      ]
+    },
     "producers": {
       "js": {
         "include": ["src/**/*.ts"],
@@ -406,6 +416,9 @@ fn parses_messages_config_and_retains_checked_policy_and_producers() {
         Some("en")
     );
     assert_eq!(normalized.fallback()["ja"], ["en"]);
+    let delivery = normalized.delivery().expect("delivery present");
+    assert_eq!(delivery.targets()[0].name(), "web");
+    assert_eq!(delivery.targets()[0].eager_locales(), ["en", "ja"]);
 
     let resolved = loaded
         .resolved_messages
@@ -465,6 +478,11 @@ fn maps_messages_validation_evidence_into_the_existing_config_envelope() {
             "/messages/fallback",
             "invalid_message_fallback",
         ),
+        (
+            r#"{"messages":{"locales":["en"],"delivery":null}}"#,
+            "/messages/delivery",
+            "invalid_message_delivery",
+        ),
     ];
 
     for (fixture, pointer, reason) in cases {
@@ -489,6 +507,37 @@ fn maps_messages_validation_evidence_into_the_existing_config_envelope() {
     assert_eq!(details["pointer"], "/messages/locales/2");
     assert_eq!(details["firstPointer"], "/messages/locales/0");
     assert!(details.get("value").is_none());
+    let _ = fs::remove_dir_all(root);
+
+    let root = temp_root("messages-delivery-conflict");
+    write(
+        &root.join("intlify.config.json"),
+        r#"{
+  "messages": {
+    "locales": ["en"],
+    "delivery": {
+      "targets": [
+        { "name": "web", "exporter": "esm", "out": "dist" },
+        { "name": "worker", "exporter": "esm", "out": "dist/worker" }
+      ]
+    }
+  }
+}"#,
+    );
+    let error = load_project_config(&root, None).expect_err("overlapping outputs should fail");
+    let details = error.details.expect("delivery conflict details");
+    assert_eq!(details["reason"], "delivery_output_conflict");
+    assert_eq!(details["pointer"], "/messages/delivery/targets");
+    assert_eq!(details["firstTarget"], "web");
+    assert_eq!(details["secondTarget"], "worker");
+    assert_eq!(
+        details["firstOutPointer"],
+        "/messages/delivery/targets/0/out"
+    );
+    assert_eq!(
+        details["secondOutPointer"],
+        "/messages/delivery/targets/1/out"
+    );
     let _ = fs::remove_dir_all(root);
 }
 

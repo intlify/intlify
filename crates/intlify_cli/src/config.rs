@@ -792,6 +792,18 @@ fn messages_section_validation_error(
     if let Some(observed) = violation.observed() {
         details.insert("observed".to_owned(), json!(observed));
     }
+    if let Some(first_target) = violation.first_target() {
+        details.insert("firstTarget".to_owned(), json!(first_target));
+    }
+    if let Some(second_target) = violation.second_target() {
+        details.insert("secondTarget".to_owned(), json!(second_target));
+    }
+    if let Some(first_out_pointer) = violation.first_out_pointer() {
+        details.insert("firstOutPointer".to_owned(), json!(first_out_pointer));
+    }
+    if let Some(second_out_pointer) = violation.second_out_pointer() {
+        details.insert("secondOutPointer".to_owned(), json!(second_out_pointer));
+    }
 
     ConfigError::new(
         "config_validation_failed",

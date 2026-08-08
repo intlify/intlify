@@ -33,8 +33,84 @@ fn no_args_prints_top_level_help() {
 
     assert_eq!(result.exit_code, 0);
     assert!(result.stdout.starts_with("Usage: intlify [options]"));
-    assert!(!result.stdout.contains("Commands:"));
+    assert!(result.stdout.contains("Commands:"));
+    assert!(result.stdout.contains("messages"));
     assert!(result.stderr.is_empty());
+}
+
+#[test]
+fn messages_namespace_and_emit_help_are_human_readable() {
+    let namespace = run(&["messages"]);
+    let emit = run(&["messages", "emit", "--help", "unexpected"]);
+
+    assert_eq!(namespace.exit_code, 0);
+    assert!(namespace
+        .stdout
+        .starts_with("Usage: intlify messages <command>"));
+    assert!(namespace.stdout.contains("emit"));
+    assert_eq!(emit.exit_code, 0);
+    assert!(emit.stdout.starts_with("Usage: intlify messages emit"));
+    assert!(emit.stdout.contains("--target <name>"));
+    assert!(emit.stdout.contains("--check"));
+}
+
+#[test]
+fn unknown_messages_leaf_uses_joined_identity() {
+    let result = run(&["messages", "inspect", "--reporter=json"]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["command"], "intlify");
+    assert_eq!(json["errors"][0]["details"]["command"], "messages.inspect");
+}
+
+#[test]
+fn messages_emit_rejects_every_operand_before_config_loading() {
+    for operand in ["file.json", "directory", "*.json", "-"] {
+        let result = run(&[
+            "messages",
+            "emit",
+            operand,
+            "--config",
+            "missing.json",
+            "--reporter=json",
+        ]);
+        let json = json_stdout(&result);
+
+        assert_eq!(result.exit_code, 2);
+        assert_eq!(json["command"], "messages.emit");
+        assert_eq!(json["errors"][0]["code"], "invalid_cli_argument");
+        assert_eq!(json["errors"][0]["details"]["argument"], operand);
+    }
+
+    let post_marker = run(&["messages", "emit", "--", "file.json", "--reporter=json"]);
+    let json = json_stdout(&post_marker);
+    assert_eq!(json["errors"][0]["code"], "invalid_cli_argument");
+    assert_eq!(json["errors"][0]["details"]["argument"], "file.json");
+}
+
+#[test]
+fn messages_emit_rejects_an_invalid_target_name_before_config_loading() {
+    let result = run(&[
+        "messages",
+        "emit",
+        "--target",
+        "Web",
+        "--config",
+        "missing.json",
+        "--reporter=json",
+    ]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert_eq!(json["command"], "messages.emit");
+    assert_eq!(json["errors"][0]["code"], "invalid_cli_argument");
+    assert_eq!(
+        json["errors"][0]["details"]["reason"],
+        "invalid_target_name"
+    );
+    assert_eq!(json["errors"][0]["details"]["option"], "--target");
+    assert_eq!(json["errors"][0]["details"]["value"], "Web");
 }
 
 #[test]

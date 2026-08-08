@@ -133,6 +133,43 @@
         }
       ]
     },
+    "MessageDeliveryTargetConfig": {
+      "additionalProperties": false,
+      "description": "One normalized checked delivery target.",
+      "properties": {
+        "eagerLocales": {
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1024,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "exporter": {
+          "enum": ["esm"],
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,254}$",
+          "type": "string"
+        },
+        "out": {
+          "maxLength": 4159,
+          "minLength": 1,
+          "type": "string"
+        },
+        "placement": {
+          "enum": ["duplicate"],
+          "type": "string"
+        }
+      },
+      "required": ["name", "exporter", "out"],
+      "type": "object"
+    },
     "MessageDynamicReferenceMode": {
       "description": "Normalized exact dynamic-reference mode.",
       "oneOf": [
@@ -347,6 +384,22 @@
             "minLength": 1,
             "type": "string"
           },
+          "type": "object"
+        },
+        "delivery": {
+          "additionalProperties": false,
+          "description": "Normalized delivery configuration admitted for executable message output.",
+          "properties": {
+            "targets": {
+              "items": {
+                "$ref": "#/definitions/MessageDeliveryTargetConfig"
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["targets"],
           "type": "object"
         },
         "dynamicReferences": {

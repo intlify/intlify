@@ -14,8 +14,10 @@ use intlify_export::{
     ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactPath,
     ExportArtifactRelationshipKind,
 };
+use serde_json::{json, Map, Value};
 
 use super::super::delivery::DeliveryOutputRoot;
+use crate::error::OperationalError;
 
 const EVIDENCE_PATH_SEGMENTS_LIMIT: usize = 128;
 const EVIDENCE_PATH_BYTES_LIMIT: usize = 8_192;
@@ -101,8 +103,554 @@ impl OutputRegistrationError {
     }
 
     /// Return the output-root state proved when this failure was selected.
-    pub(super) const fn output_state(&self) -> OutputState {
+    pub(in crate::messages) const fn output_state(&self) -> OutputState {
         self.output_state
+    }
+}
+
+/// Convert one checked registration failure into the stable target-local CLI shape.
+pub(in crate::messages) fn reporter_error(
+    error: &OutputRegistrationError,
+    output_root: &str,
+) -> OperationalError {
+    if matches!(
+        error.evidence(),
+        OutputRegistrationErrorEvidence::InternalInvariant
+    ) {
+        return OperationalError {
+            kind: "internal",
+            code: "internal_error",
+            message: error.to_string(),
+            path: Some(output_root.to_owned()),
+            details: Some(json!({
+                "reason": "message_output_registration_invariant_failed"
+            })),
+        };
+    }
+
+    OperationalError {
+        kind: "output",
+        code: "message_output_registration_failed",
+        message: error.to_string(),
+        path: Some(output_root.to_owned()),
+        details: Some(json!({
+            "kind": registration_kind_token(error.kind()),
+            "evidence": registration_evidence_value(error.evidence()),
+        })),
+    }
+}
+
+/// Return the closed reporter token for one proved output-root state.
+pub(in crate::messages) const fn output_state_token(state: OutputState) -> &'static str {
+    match state {
+        OutputState::Unchanged => "unchanged",
+        OutputState::Updated => "updated",
+        OutputState::Restored => "restored",
+        OutputState::Indeterminate => "indeterminate",
+    }
+}
+
+const fn registration_kind_token(kind: OutputRegistrationErrorKind) -> &'static str {
+    match kind {
+        OutputRegistrationErrorKind::UnsupportedCapability => "unsupported_capability",
+        OutputRegistrationErrorKind::DestinationMappingFailed => "destination_mapping_failed",
+        OutputRegistrationErrorKind::DestinationCollision => "destination_collision",
+        OutputRegistrationErrorKind::RegistrationFailed => "registration_failed",
+        OutputRegistrationErrorKind::InternalInvariant => "internal_invariant",
+    }
+}
+
+fn registration_evidence_value(evidence: &OutputRegistrationErrorEvidence) -> Value {
+    match evidence {
+        OutputRegistrationErrorEvidence::UnsupportedCapability(evidence) => {
+            unsupported_capability_value(evidence)
+        }
+        OutputRegistrationErrorEvidence::DestinationMapping(evidence) => {
+            let mut object = ordered_object([
+                (
+                    "reason",
+                    Value::String(mapping_reason_token(evidence.reason()).to_owned()),
+                ),
+                (
+                    "artifactPath",
+                    artifact_path_value(evidence.artifact_path()),
+                ),
+            ]);
+            insert_optional_u16(&mut object, "segmentIndex", evidence.segment_index());
+            insert_optional_path(
+                &mut object,
+                "mappedDestination",
+                evidence.mapped_destination(),
+            );
+            Value::Object(object)
+        }
+        OutputRegistrationErrorEvidence::DestinationCollision(evidence) => {
+            destination_collision_value(evidence)
+        }
+        OutputRegistrationErrorEvidence::Registration(evidence) => {
+            registration_failure_value(evidence)
+        }
+        OutputRegistrationErrorEvidence::InternalInvariant => Value::Object(Map::new()),
+    }
+}
+
+fn unsupported_capability_value(evidence: &UnsupportedCapabilityEvidence) -> Value {
+    let mut object = Map::new();
+    match evidence {
+        UnsupportedCapabilityEvidence::ArtifactKind {
+            artifact_path,
+            artifact_kind,
+        } => {
+            insert_string(&mut object, "capability", "artifact_kind");
+            object.insert(
+                "artifactPath".to_owned(),
+                artifact_path_value(artifact_path),
+            );
+            insert_string(&mut object, "artifactKind", artifact_kind.as_str());
+        }
+        UnsupportedCapabilityEvidence::ArtifactFormatVersion {
+            artifact_path,
+            artifact_kind,
+            format_version,
+        } => {
+            insert_string(&mut object, "capability", "artifact_format_version");
+            object.insert(
+                "artifactPath".to_owned(),
+                artifact_path_value(artifact_path),
+            );
+            insert_string(&mut object, "artifactKind", artifact_kind.as_str());
+            object.insert(
+                "formatVersion".to_owned(),
+                json!({ "major": format_version.major(), "minor": format_version.minor() }),
+            );
+        }
+        UnsupportedCapabilityEvidence::MediaType {
+            artifact_path,
+            artifact_kind,
+        } => {
+            insert_string(&mut object, "capability", "media_type");
+            object.insert(
+                "artifactPath".to_owned(),
+                artifact_path_value(artifact_path),
+            );
+            insert_string(&mut object, "artifactKind", artifact_kind.as_str());
+        }
+        UnsupportedCapabilityEvidence::RelationshipKind {
+            artifact_path,
+            relationship_kind,
+        } => {
+            insert_string(&mut object, "capability", "relationship_kind");
+            object.insert(
+                "artifactPath".to_owned(),
+                artifact_path_value(artifact_path),
+            );
+            insert_string(
+                &mut object,
+                "relationshipKind",
+                relationship_kind_token(*relationship_kind),
+            );
+        }
+        UnsupportedCapabilityEvidence::RelationshipGraph { artifact_path } => {
+            insert_string(&mut object, "capability", "relationship_graph");
+            if let Some(path) = artifact_path {
+                object.insert("artifactPath".to_owned(), artifact_path_value(path));
+            }
+        }
+        UnsupportedCapabilityEvidence::FilesystemNoFollow => {
+            insert_string(&mut object, "capability", "filesystem_no_follow");
+        }
+        UnsupportedCapabilityEvidence::ProcessLocking => {
+            insert_string(&mut object, "capability", "process_locking");
+        }
+        UnsupportedCapabilityEvidence::SameFilesystemStaging => {
+            insert_string(&mut object, "capability", "same_filesystem_staging");
+        }
+        UnsupportedCapabilityEvidence::DurableFlush => {
+            insert_string(&mut object, "capability", "durable_flush");
+        }
+        UnsupportedCapabilityEvidence::SafeRename => {
+            insert_string(&mut object, "capability", "safe_rename");
+        }
+        UnsupportedCapabilityEvidence::SecureRandom => {
+            insert_string(&mut object, "capability", "secure_random");
+        }
+        UnsupportedCapabilityEvidence::DeterministicRecovery => {
+            insert_string(&mut object, "capability", "deterministic_recovery");
+        }
+    }
+    Value::Object(object)
+}
+
+fn destination_collision_value(evidence: &DestinationCollisionEvidence) -> Value {
+    let mut object = Map::new();
+    match evidence {
+        DestinationCollisionEvidence::MappedPath {
+            first_artifact_path,
+            second_artifact_path,
+            mapped_destination,
+        }
+        | DestinationCollisionEvidence::HostEquivalentPath {
+            first_artifact_path,
+            second_artifact_path,
+            mapped_destination,
+        } => {
+            let reason = if matches!(evidence, DestinationCollisionEvidence::MappedPath { .. }) {
+                "mapped_path_collision"
+            } else {
+                "host_equivalence_collision"
+            };
+            insert_string(&mut object, "reason", reason);
+            object.insert(
+                "firstArtifactPath".to_owned(),
+                artifact_path_value(first_artifact_path),
+            );
+            object.insert(
+                "secondArtifactPath".to_owned(),
+                artifact_path_value(second_artifact_path),
+            );
+            insert_optional_path(
+                &mut object,
+                "mappedDestination",
+                mapped_destination.as_ref(),
+            );
+        }
+        DestinationCollisionEvidence::ReservedManifest {
+            first_artifact_path,
+        } => {
+            insert_string(&mut object, "reason", "reserved_control_path");
+            object.insert(
+                "firstArtifactPath".to_owned(),
+                artifact_path_value(first_artifact_path),
+            );
+            insert_string(&mut object, "controlPath", "manifest");
+        }
+        DestinationCollisionEvidence::OutputRootControlId {
+            first_output_root,
+            second_output_root,
+        } => {
+            insert_string(&mut object, "reason", "output_root_control_id_collision");
+            object.insert(
+                "firstOutputRoot".to_owned(),
+                output_root_value(first_output_root),
+            );
+            object.insert(
+                "secondOutputRoot".to_owned(),
+                output_root_value(second_output_root),
+            );
+            insert_string(&mut object, "controlPath", "lock");
+        }
+    }
+    Value::Object(object)
+}
+
+fn registration_failure_value(evidence: &RegistrationFailureEvidence) -> Value {
+    let (stage, reason, subject, control, artifact_path, relative_path, io) = match evidence {
+        RegistrationFailureEvidence::Ownership {
+            reason,
+            subject,
+            control,
+            artifact_path,
+            relative_path,
+            io,
+        } => (
+            "ownership",
+            ownership_reason_token(*reason),
+            *subject,
+            *control,
+            artifact_path.as_ref(),
+            relative_path.as_ref(),
+            *io,
+        ),
+        RegistrationFailureEvidence::Check {
+            reason,
+            subject,
+            artifact_path,
+            relative_path,
+            io,
+        } => (
+            "check",
+            check_reason_token(*reason),
+            *subject,
+            None,
+            artifact_path.as_ref(),
+            relative_path.as_ref(),
+            *io,
+        ),
+        RegistrationFailureEvidence::Lock {
+            reason,
+            subject,
+            control,
+            io,
+        } => (
+            "lock",
+            lock_reason_token(*reason),
+            *subject,
+            Some(*control),
+            None,
+            None,
+            *io,
+        ),
+        RegistrationFailureEvidence::Staging {
+            reason,
+            subject,
+            control,
+            artifact_path,
+            relative_path,
+            io,
+        } => (
+            "staging",
+            staging_reason_token(*reason),
+            *subject,
+            *control,
+            artifact_path.as_ref(),
+            relative_path.as_ref(),
+            *io,
+        ),
+        RegistrationFailureEvidence::Commit {
+            reason,
+            subject,
+            control,
+            io,
+        } => (
+            "commit",
+            commit_reason_token(*reason),
+            *subject,
+            *control,
+            None,
+            None,
+            *io,
+        ),
+        RegistrationFailureEvidence::Rollback {
+            reason,
+            subject,
+            control,
+            io,
+        } => (
+            "rollback",
+            rollback_reason_token(*reason),
+            *subject,
+            *control,
+            None,
+            None,
+            *io,
+        ),
+        RegistrationFailureEvidence::Recovery {
+            reason,
+            subject,
+            control,
+            io,
+        } => (
+            "recovery",
+            recovery_reason_token(*reason),
+            *subject,
+            *control,
+            None,
+            None,
+            *io,
+        ),
+    };
+
+    let mut object = ordered_object([
+        ("stage", Value::String(stage.to_owned())),
+        ("reason", Value::String(reason.to_owned())),
+        ("subject", Value::String(subject_token(subject).to_owned())),
+    ]);
+    if let Some(control) = control {
+        insert_string(&mut object, "control", control_token(control));
+    }
+    if let Some(path) = artifact_path {
+        object.insert("artifactPath".to_owned(), artifact_path_value(path));
+    }
+    insert_optional_path(&mut object, "relativePath", relative_path);
+    if let Some(io) = io {
+        insert_string(&mut object, "operation", operation_token(io.operation()));
+        insert_string(&mut object, "ioKind", io_kind_token(io.kind()));
+        if let Some(raw) = io.raw_os_error() {
+            object.insert("rawOsError".to_owned(), Value::from(raw));
+        }
+    }
+    Value::Object(object)
+}
+
+fn ordered_object<const N: usize>(fields: [(&str, Value); N]) -> Map<String, Value> {
+    fields
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value))
+        .collect()
+}
+
+fn insert_string(object: &mut Map<String, Value>, field: &str, value: &str) {
+    object.insert(field.to_owned(), Value::String(value.to_owned()));
+}
+
+fn insert_optional_u16(object: &mut Map<String, Value>, field: &str, value: Option<u16>) {
+    if let Some(value) = value {
+        object.insert(field.to_owned(), Value::from(value));
+    }
+}
+
+fn insert_optional_path(
+    object: &mut Map<String, Value>,
+    field: &str,
+    value: Option<&EvidencePath>,
+) {
+    if let Some(value) = value {
+        object.insert(field.to_owned(), evidence_path_value(value));
+    }
+}
+
+fn artifact_path_value(path: &ExportArtifactPath) -> Value {
+    Value::Array(
+        path.segments()
+            .iter()
+            .map(|segment| Value::String(segment.as_str().to_owned()))
+            .collect(),
+    )
+}
+
+fn evidence_path_value(path: &EvidencePath) -> Value {
+    Value::Array(
+        path.segments()
+            .map(|segment| Value::String(segment.to_owned()))
+            .collect(),
+    )
+}
+
+fn output_root_value(path: &DeliveryOutputRoot) -> Value {
+    Value::Array(
+        path.segments()
+            .map(|segment| Value::String(segment.to_owned()))
+            .collect(),
+    )
+}
+
+const fn relationship_kind_token(kind: ExportArtifactRelationshipKind) -> &'static str {
+    match kind {
+        ExportArtifactRelationshipKind::EagerLoad => "eager_load",
+        ExportArtifactRelationshipKind::LazyLoad => "lazy_load",
+    }
+}
+
+const fn mapping_reason_token(reason: DestinationMappingReason) -> &'static str {
+    match reason {
+        DestinationMappingReason::NameUnrepresentable => "host_name_unrepresentable",
+        DestinationMappingReason::NameReserved => "host_name_reserved",
+        DestinationMappingReason::PathLimit => "host_path_limit",
+        DestinationMappingReason::DestinationUnsupported => "host_destination_unsupported",
+    }
+}
+
+const fn ownership_reason_token(reason: OwnershipFailureReason) -> &'static str {
+    match reason {
+        OwnershipFailureReason::RootNotDirectory => "root_not_directory",
+        OwnershipFailureReason::ManifestMissing => "manifest_missing",
+        OwnershipFailureReason::ManifestInvalid => "manifest_invalid",
+        OwnershipFailureReason::ManifestUnsupported => "manifest_unsupported",
+        OwnershipFailureReason::ManifestLimit => "manifest_limit",
+        OwnershipFailureReason::UnownedEntry => "unowned_entry",
+        OwnershipFailureReason::UnsafeEntry => "unsafe_entry",
+        OwnershipFailureReason::EntryUnrepresentable => "entry_unrepresentable",
+    }
+}
+
+const fn check_reason_token(reason: CheckFailureReason) -> &'static str {
+    match reason {
+        CheckFailureReason::SnapshotUnreadable => "snapshot_unreadable",
+        CheckFailureReason::SnapshotChanged => "snapshot_changed",
+    }
+}
+
+const fn lock_reason_token(reason: LockFailureReason) -> &'static str {
+    match reason {
+        LockFailureReason::ControlConflict => "control_conflict",
+        LockFailureReason::ControlInvalid => "control_invalid",
+        LockFailureReason::AcquireFailed => "acquire_failed",
+        LockFailureReason::ConcurrentStateChanged => "concurrent_state_changed",
+    }
+}
+
+const fn staging_reason_token(reason: StagingFailureReason) -> &'static str {
+    match reason {
+        StagingFailureReason::ControlConflict => "control_conflict",
+        StagingFailureReason::CreateFailed => "create_failed",
+        StagingFailureReason::WriteFailed => "write_failed",
+        StagingFailureReason::FlushFailed => "flush_failed",
+    }
+}
+
+const fn commit_reason_token(reason: CommitFailureReason) -> &'static str {
+    match reason {
+        CommitFailureReason::JournalConflict => "journal_conflict",
+        CommitFailureReason::JournalWriteFailed => "journal_write_failed",
+        CommitFailureReason::OldRootMoveFailed => "old_root_move_failed",
+        CommitFailureReason::NewRootInstallFailed => "new_root_install_failed",
+        CommitFailureReason::CleanupFailed => "cleanup_failed",
+        CommitFailureReason::FlushFailed => "flush_failed",
+    }
+}
+
+const fn rollback_reason_token(reason: RollbackFailureReason) -> &'static str {
+    match reason {
+        RollbackFailureReason::OldRootRestore => "old_root_restore_failed",
+        RollbackFailureReason::Cleanup => "cleanup_failed",
+        RollbackFailureReason::Flush => "flush_failed",
+    }
+}
+
+const fn recovery_reason_token(reason: RecoveryFailureReason) -> &'static str {
+    match reason {
+        RecoveryFailureReason::JournalInvalid => "journal_invalid",
+        RecoveryFailureReason::StateAmbiguous => "state_ambiguous",
+        RecoveryFailureReason::OldRootRestoreFailed => "old_root_restore_failed",
+        RecoveryFailureReason::CleanupFailed => "cleanup_failed",
+        RecoveryFailureReason::FlushFailed => "flush_failed",
+    }
+}
+
+const fn subject_token(subject: RegistrationSubject) -> &'static str {
+    match subject {
+        RegistrationSubject::OutputRoot => "output_root",
+        RegistrationSubject::Manifest => "manifest",
+        RegistrationSubject::Lock => "lock",
+        RegistrationSubject::Journal => "journal",
+        RegistrationSubject::Staging => "staging",
+        RegistrationSubject::Backup => "backup",
+        RegistrationSubject::Artifact => "artifact",
+    }
+}
+
+const fn control_token(control: RegistrationControl) -> &'static str {
+    match control {
+        RegistrationControl::Manifest => "manifest",
+        RegistrationControl::Lock => "lock",
+        RegistrationControl::Journal => "journal",
+        RegistrationControl::Staging => "staging",
+        RegistrationControl::Backup => "backup",
+    }
+}
+
+const fn operation_token(operation: RegistrationOperation) -> &'static str {
+    match operation {
+        RegistrationOperation::Inspect => "inspect",
+        RegistrationOperation::Open => "open",
+        RegistrationOperation::Read => "read",
+        RegistrationOperation::Create => "create",
+        RegistrationOperation::Write => "write",
+        RegistrationOperation::Flush => "flush",
+        RegistrationOperation::Lock => "lock",
+        RegistrationOperation::Replace => "replace",
+        RegistrationOperation::Rename => "rename",
+        RegistrationOperation::Remove => "remove",
+    }
+}
+
+const fn io_kind_token(kind: RegistrationIoKind) -> &'static str {
+    match kind {
+        RegistrationIoKind::NotFound => "not_found",
+        RegistrationIoKind::PermissionDenied => "permission_denied",
+        RegistrationIoKind::NotFile => "not_file",
+        RegistrationIoKind::NotDirectory => "not_directory",
+        RegistrationIoKind::Unknown => "unknown",
     }
 }
 
@@ -194,6 +742,7 @@ pub(super) enum UnsupportedCapabilityEvidence {
 /// Why one portable artifact path cannot be represented by the host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DestinationMappingReason {
+    #[allow(dead_code)] // Reserved for hosts that cannot represent a Unicode segment.
     NameUnrepresentable,
     NameReserved,
     PathLimit,

@@ -43,7 +43,7 @@ impl CliRunResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Envelope<TSummary, TResult> {
+struct Envelope<TSummary, TAnalysis, TResult> {
     // Field order follows this struct definition; fixture tests rely on it for
     // stable single-line JSON output consumed by tools and agents.
     schema_version: &'static str,
@@ -51,6 +51,8 @@ struct Envelope<TSummary, TResult> {
     version: &'static str,
     project_root: String,
     summary: TSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    analysis: Option<TAnalysis>,
     results: Vec<TResult>,
     errors: Vec<OperationalError>,
 }
@@ -151,6 +153,34 @@ where
         version: VERSION,
         project_root: slash_normalize_path(project_root),
         summary,
+        analysis: Option::<serde_json::Value>::None,
+        results,
+        errors,
+    };
+
+    serde_json::to_string(&envelope).expect("serializing CLI output envelope should not fail")
+}
+
+pub(crate) fn serialize_json_envelope_with_analysis<TSummary, TAnalysis, TResult>(
+    command: &str,
+    project_root: &Path,
+    summary: TSummary,
+    analysis: TAnalysis,
+    results: Vec<TResult>,
+    errors: Vec<OperationalError>,
+) -> String
+where
+    TSummary: Serialize,
+    TAnalysis: Serialize,
+    TResult: Serialize,
+{
+    let envelope = Envelope {
+        schema_version: OUTPUT_SCHEMA_VERSION,
+        command: command.to_owned(),
+        version: VERSION,
+        project_root: slash_normalize_path(project_root),
+        summary,
+        analysis: Some(analysis),
         results,
         errors,
     };

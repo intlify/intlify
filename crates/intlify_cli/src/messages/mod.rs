@@ -8,31 +8,34 @@
 //! It performs no filesystem discovery, source parsing, artifact loading, or
 //! linking.
 
+mod artifact_error;
 #[cfg(feature = "benchmark")]
 #[doc(hidden)]
 pub mod benchmark;
 mod completeness;
 mod config;
-#[allow(dead_code)] // Activated with the public delivery config and emit command.
 mod delivery;
-#[allow(dead_code)] // Activated with one exporter factory per selected target.
+pub(crate) mod emit;
 mod exporter_registry;
-#[allow(dead_code)] // Consumed when the project-link command orchestration is wired.
 mod inventory;
+mod link_error;
 mod observation;
-#[allow(dead_code)] // Kept internal until a user-facing message command consumes it.
 pub(crate) mod orchestration;
 mod physical;
-#[allow(dead_code)] // Consumed when project-link orchestration is wired.
 pub(crate) mod reference;
-#[allow(dead_code)] // Activated by filesystem delivery and check orchestration.
 mod registration;
 
+/// Check an explicit delivery target operand before configuration I/O.
+pub(crate) fn is_valid_delivery_target_name(value: &str) -> bool {
+    delivery::DeliveryTargetName::try_new(value).is_ok()
+}
+
 pub use config::{
-    validate_messages_config, MessageCatalogKeyDomain, MessageDynamicReferenceMode,
-    MessageJsCallKind, MessageJsKeySyntax, MessageJsProducerConfig, MessageJsRecognizerConfig,
-    MessageProducersConfig, MessageRootConfig, MessageSelectorConfig, MessagesConfig,
-    MessagesConfigError, MessagesConfigReason, MessagesConfigViolation, ResolvedJsProducerConfig,
+    validate_messages_config, MessageCatalogKeyDomain, MessageDeliveryConfig,
+    MessageDeliveryTargetConfig, MessageDynamicReferenceMode, MessageJsCallKind,
+    MessageJsKeySyntax, MessageJsProducerConfig, MessageJsRecognizerConfig, MessageProducersConfig,
+    MessageRootConfig, MessageSelectorConfig, MessagesConfig, MessagesConfigError,
+    MessagesConfigReason, MessagesConfigViolation, ResolvedJsProducerConfig,
     ResolvedMessageProducers, ResolvedMessagesConfig,
 };
 

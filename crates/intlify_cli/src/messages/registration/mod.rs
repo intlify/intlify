@@ -22,8 +22,10 @@ use intlify_export::ExportArtifactSet;
 
 use self::destination::{preflight_capabilities, DestinationMap};
 use self::difference::CheckComparison;
+pub(in crate::messages) use self::error::{output_state_token, reporter_error};
 use self::error::{OutputRegistrationError, OwnershipFailureReason, RegistrationFailureEvidence};
 use self::manifest::{CheckedOutputManifest, ManifestCodecErrorKind};
+pub(in crate::messages) use self::transaction::WriteRegistrationStatus;
 use super::delivery::{BuiltInExporterId, DeliveryOutputRoot, ResolvedDeliveryTarget};
 
 /// Fully preflighted expected output for one immutable selected target.
