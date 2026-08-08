@@ -94,6 +94,10 @@ trait TransactionHooks {
     fn before(&self, _point: FaultPoint) -> io::Result<()> {
         Ok(())
     }
+
+    fn sync_directory(&self, directory: &Dir) -> io::Result<()> {
+        sync_directory(directory)
+    }
 }
 
 struct NoTransactionHooks;
@@ -2534,6 +2538,15 @@ fn remove_rollback_control(
     }
 }
 
+#[cfg(windows)]
+fn sync_directory(_directory: &Dir) -> io::Result<()> {
+    // Windows exposes durable regular-file flushes but no documented primitive
+    // that durably publishes directory-entry changes. Treating a successful
+    // file flush as a directory flush would weaken the transaction contract.
+    Err(io::Error::from(io::ErrorKind::Unsupported))
+}
+
+#[cfg(not(windows))]
 fn sync_directory(directory: &Dir) -> io::Result<()> {
     // `cap_std::fs::Dir` may hold an `O_PATH` descriptor on Linux. Cloning
     // that descriptor preserves `O_PATH`, which cannot be passed to `fsync`.
@@ -2548,8 +2561,7 @@ fn sync_directory(directory: &Dir) -> io::Result<()> {
             if matches!(
                 error.kind(),
                 io::ErrorKind::Unsupported | io::ErrorKind::InvalidInput
-            ) || cfg!(windows) && error.kind() == io::ErrorKind::PermissionDenied
-            {
+            ) {
                 io::Error::from(io::ErrorKind::Unsupported)
             } else {
                 error
@@ -2563,7 +2575,7 @@ fn sync_directory_at(
     point: FaultPoint,
 ) -> io::Result<()> {
     hooks.before(point)?;
-    sync_directory(directory)
+    hooks.sync_directory(directory)
 }
 
 fn sync_file_at(
@@ -2775,10 +2787,12 @@ mod tests {
     use intlify_linker::{DynamicReferenceMode, LinkPolicy, PlacementPolicy};
     use tempfile::{Builder, TempDir};
 
+    #[cfg(windows)]
+    use super::write_output_with_transaction_id_source;
     use super::{
-        sync_directory, write_output_with_transaction_id_source,
-        write_output_with_transaction_id_source_and_hooks, FaultPoint, OutputRootControlId,
-        TransactionHooks, TransactionId, WriteRegistrationOutcome, WriteRegistrationStatus,
+        sync_directory, write_output_with_transaction_id_source_and_hooks, FaultPoint,
+        NoTransactionHooks, OutputRootControlId, TransactionHooks, TransactionId,
+        WriteRegistrationOutcome, WriteRegistrationStatus,
     };
     use crate::messages::delivery::{
         DeliveryTargetInput, ResolvedDeliveryTarget, ResolvedDeliveryTargets,
@@ -2815,6 +2829,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn directory_flush_uses_a_syncable_capability_relative_handle() {
         let project = TempProject::new();
@@ -2823,6 +2838,43 @@ mod tests {
                 .unwrap();
 
         sync_directory(&directory).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn directory_flush_reports_the_missing_windows_durability_capability() {
+        let project = TempProject::new();
+        let directory =
+            cap_std::fs::Dir::open_ambient_dir(project.path(), cap_std::ambient_authority())
+                .unwrap();
+
+        assert_eq!(
+            sync_directory(&directory).unwrap_err().kind(),
+            std::io::ErrorKind::Unsupported
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn output_transaction_preserves_the_windows_durable_flush_failure() {
+        let project = TempProject::new();
+        let set = artifact_set(&[(&["loader.mjs"], b"created")]);
+        let target = target();
+        let prepared = PreparedOutput::try_new(&target, &set).unwrap();
+
+        let error = write_output_with_transaction_id_source(&prepared, project.path(), || {
+            Ok(transaction_id(0x10))
+        })
+        .unwrap_err();
+
+        assert!(matches!(
+            error.evidence(),
+            OutputRegistrationErrorEvidence::UnsupportedCapability(
+                UnsupportedCapabilityEvidence::DurableFlush
+            )
+        ));
+        assert_eq!(error.output_state(), OutputState::Unchanged);
+        assert!(!project.output().exists());
     }
 
     fn policy() -> LinkPolicy {
@@ -2895,9 +2947,50 @@ mod tests {
         project: &TempProject,
         byte: u8,
     ) -> Result<super::WriteRegistrationOutcome, OutputRegistrationError> {
-        write_output_with_transaction_id_source(prepared, project.path(), || {
-            Ok(transaction_id(byte))
-        })
+        write_with_transaction_id_source(prepared, project, || Ok(transaction_id(byte)))
+    }
+
+    fn write_with_transaction_id_source(
+        prepared: &PreparedOutput<'_>,
+        project: &TempProject,
+        transaction_id_source: impl FnOnce() -> Result<TransactionId, OutputRegistrationError>,
+    ) -> Result<WriteRegistrationOutcome, OutputRegistrationError> {
+        let hooks = PlatformTestHooks {
+            inner: &NoTransactionHooks,
+        };
+        write_output_with_transaction_id_source_and_hooks(
+            prepared,
+            project.path(),
+            transaction_id_source,
+            &hooks,
+        )
+    }
+
+    /// Keeps the transaction state-machine fixtures portable without claiming
+    /// that Windows provides the missing production durability primitive.
+    /// The real platform result is fixed by the Windows-only tests above; these
+    /// fixtures model a successful directory flush so every later commit,
+    /// rollback, recovery, and fault boundary remains exercised.
+    struct PlatformTestHooks<'a> {
+        inner: &'a dyn TransactionHooks,
+    }
+
+    impl TransactionHooks for PlatformTestHooks<'_> {
+        fn before(&self, point: FaultPoint) -> std::io::Result<()> {
+            self.inner.before(point)
+        }
+
+        fn sync_directory(&self, directory: &cap_std::fs::Dir) -> std::io::Result<()> {
+            #[cfg(windows)]
+            {
+                let _ = directory;
+                Ok(())
+            }
+            #[cfg(not(windows))]
+            {
+                self.inner.sync_directory(directory)
+            }
+        }
     }
 
     struct RecordingHooks {
@@ -3009,11 +3102,12 @@ mod tests {
         byte: u8,
         hooks: &dyn TransactionHooks,
     ) -> Result<WriteRegistrationOutcome, OutputRegistrationError> {
+        let hooks = PlatformTestHooks { inner: hooks };
         write_output_with_transaction_id_source_and_hooks(
             prepared,
             project.path(),
             || Ok(transaction_id(byte)),
-            hooks,
+            &hooks,
         )
     }
 
@@ -3099,7 +3193,7 @@ mod tests {
         write_with_id(&prepared, &project, 0x22);
         let before = sibling_names(&project);
 
-        let outcome = write_output_with_transaction_id_source(&prepared, project.path(), || {
+        let outcome = write_with_transaction_id_source(&prepared, &project, || {
             panic!("an unchanged write must not request a transaction ID")
         })
         .unwrap();
@@ -3119,7 +3213,7 @@ mod tests {
         let prepared = PreparedOutput::try_new(&target, &new).unwrap();
         let displaced_parent = project.path().join("generated-displaced");
 
-        let error = write_output_with_transaction_id_source(&prepared, project.path(), || {
+        let error = write_with_transaction_id_source(&prepared, &project, || {
             fs::rename(project.output_parent(), &displaced_parent).unwrap();
             fs::create_dir(project.output_parent()).unwrap();
             fs::write(project.output_parent().join("caller-owned"), b"keep").unwrap();
@@ -3194,7 +3288,7 @@ mod tests {
         let set = artifact_set(&[(&["loader.mjs"], b"created")]);
         let target = target();
         let prepared = PreparedOutput::try_new(&target, &set).unwrap();
-        let error = write_output_with_transaction_id_source(&prepared, project.path(), || {
+        let error = write_with_transaction_id_source(&prepared, &project, || {
             Err(OutputRegistrationError::unsupported_capability(
                 UnsupportedCapabilityEvidence::SecureRandom,
             ))
@@ -3387,11 +3481,12 @@ mod tests {
         project: &TempProject,
         hooks: &dyn TransactionHooks,
     ) -> Result<WriteRegistrationOutcome, OutputRegistrationError> {
+        let hooks = PlatformTestHooks { inner: hooks };
         write_output_with_transaction_id_source_and_hooks(
             prepared,
             project.path(),
             || panic!("a completed recovery must short-circuit before a new transaction"),
-            hooks,
+            &hooks,
         )
     }
 
