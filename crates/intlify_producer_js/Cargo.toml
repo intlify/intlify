@@ -20,7 +20,7 @@ intlify_contract = { path = "../intlify_contract" }
 # Keep the exact pins aligned because Oxc crates share internal API contracts.
 oxc_allocator = "=0.141.0"
 oxc_ast = "=0.141.0"
-oxc_ast_visit = "=0.141.0"
+oxc_ast_visit = "=0.142.0"
 oxc_parser = { version = "=0.141.0", default-features = false }
 oxc_span = "=0.141.0"
 
