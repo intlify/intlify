@@ -30,6 +30,12 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
+use super::delivery::{
+    BuiltInExporterId, CheckedEagerLocales, DeliveryOutputRoot, DeliveryOutputRootError,
+    DeliveryOutputRootLimit, DeliveryPlacement, DeliveryTargetInput, DeliveryTargetName,
+    DeliveryTargetNameError, DeliveryTargetsError, EagerLocalesError, ResolvedDeliveryTargets,
+};
+
 const CONFIG_EVIDENCE_BYTES: usize = 255;
 const LOCALE_BYTES_LIMIT: usize = 255;
 const SCOPE_BYTES_LIMIT: usize = 255;
@@ -76,6 +82,10 @@ pub enum MessagesConfigReason {
     InvalidMessageCoverageBaseline,
     /// Locale fallback mapping is malformed or contradicts production locale policy.
     InvalidMessageFallback,
+    /// Delivery target shape, identity, exporter, output, or options are malformed.
+    InvalidMessageDelivery,
+    /// Two checked delivery targets own equal or nested portable output roots.
+    DeliveryOutputConflict,
 }
 
 impl MessagesConfigReason {
@@ -91,6 +101,8 @@ impl MessagesConfigReason {
             Self::InvalidMessageProducers => "invalid_message_producers",
             Self::InvalidMessageCoverageBaseline => "invalid_message_coverage_baseline",
             Self::InvalidMessageFallback => "invalid_message_fallback",
+            Self::InvalidMessageDelivery => "invalid_message_delivery",
+            Self::DeliveryOutputConflict => "delivery_output_conflict",
         }
     }
 }
@@ -105,6 +117,10 @@ pub struct MessagesConfigViolation {
     first_pointer: Option<Arc<str>>,
     limit: Option<u64>,
     observed: Option<u64>,
+    first_target: Option<Arc<str>>,
+    second_target: Option<Arc<str>>,
+    first_out_pointer: Option<Arc<str>>,
+    second_out_pointer: Option<Arc<str>>,
 }
 
 impl MessagesConfigViolation {
@@ -150,6 +166,30 @@ impl MessagesConfigViolation {
         self.observed
     }
 
+    /// Return the canonical first target for an output-root conflict.
+    #[must_use]
+    pub fn first_target(&self) -> Option<&str> {
+        self.first_target.as_deref()
+    }
+
+    /// Return the canonical second target for an output-root conflict.
+    #[must_use]
+    pub fn second_target(&self) -> Option<&str> {
+        self.second_target.as_deref()
+    }
+
+    /// Return the submitted first target's exact `/out` pointer.
+    #[must_use]
+    pub fn first_out_pointer(&self) -> Option<&str> {
+        self.first_out_pointer.as_deref()
+    }
+
+    /// Return the submitted second target's exact `/out` pointer.
+    #[must_use]
+    pub fn second_out_pointer(&self) -> Option<&str> {
+        self.second_out_pointer.as_deref()
+    }
+
     fn invalid(
         reason: MessagesConfigReason,
         pointer: impl Into<Arc<str>>,
@@ -164,6 +204,10 @@ impl MessagesConfigViolation {
             first_pointer: None,
             limit: None,
             observed: None,
+            first_target: None,
+            second_target: None,
+            first_out_pointer: None,
+            second_out_pointer: None,
         }
     }
 
@@ -198,6 +242,35 @@ impl MessagesConfigViolation {
             first_pointer: None,
             limit: Some(limit),
             observed: Some(observed),
+            first_target: None,
+            second_target: None,
+            first_out_pointer: None,
+            second_out_pointer: None,
+        }
+    }
+
+    fn output_conflict(
+        first_target: &str,
+        second_target: &str,
+        first_target_index: usize,
+        second_target_index: usize,
+    ) -> Self {
+        Self {
+            reason: MessagesConfigReason::DeliveryOutputConflict,
+            pointer: Arc::from("/messages/delivery/targets"),
+            field: None,
+            value: None,
+            first_pointer: None,
+            limit: None,
+            observed: None,
+            first_target: Some(Arc::from(first_target)),
+            second_target: Some(Arc::from(second_target)),
+            first_out_pointer: Some(Arc::from(format!(
+                "/messages/delivery/targets/{first_target_index}/out"
+            ))),
+            second_out_pointer: Some(Arc::from(format!(
+                "/messages/delivery/targets/{second_target_index}/out"
+            ))),
         }
     }
 }
@@ -416,6 +489,80 @@ pub struct MessageProducersConfig {
     artifacts: Vec<String>,
 }
 
+/// Normalized delivery configuration admitted for executable message output.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MessageDeliveryConfig {
+    #[schemars(length(min = 1, max = 64))]
+    targets: Vec<MessageDeliveryTargetConfig>,
+}
+
+impl MessageDeliveryConfig {
+    /// Return targets in canonical checked-name order.
+    #[must_use]
+    pub fn targets(&self) -> &[MessageDeliveryTargetConfig] {
+        &self.targets
+    }
+}
+
+/// One normalized checked delivery target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MessageDeliveryTargetConfig {
+    #[schemars(schema_with = "delivery_target_name_schema")]
+    name: String,
+    #[schemars(schema_with = "delivery_exporter_schema")]
+    exporter: String,
+    #[schemars(schema_with = "delivery_output_root_schema")]
+    out: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(default, schema_with = "eager_locales_schema")]
+    eager_locales: Vec<String>,
+    #[serde(
+        default = "duplicate_placement",
+        skip_serializing_if = "is_duplicate_placement"
+    )]
+    #[schemars(
+        default = "duplicate_placement",
+        schema_with = "delivery_placement_schema"
+    )]
+    placement: String,
+}
+
+impl MessageDeliveryTargetConfig {
+    /// Return the exact checked target identity.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the exact built-in exporter identifier.
+    #[must_use]
+    pub fn exporter(&self) -> &str {
+        &self.exporter
+    }
+
+    /// Return the checked project-root-relative output root.
+    #[must_use]
+    pub fn out(&self) -> &str {
+        &self.out
+    }
+
+    /// Return eager locales in canonical locale order.
+    #[must_use]
+    pub fn eager_locales(&self) -> &[String] {
+        &self.eager_locales
+    }
+
+    /// Return the normalized target-wide placement token.
+    #[must_use]
+    pub fn placement(&self) -> &str {
+        &self.placement
+    }
+}
+
 /// Validated normalized `messages` section.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -436,6 +583,9 @@ pub struct MessagesConfig {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(default, schema_with = "fallback_schema")]
     fallback: BTreeMap<String, Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(default, schema_with = "delivery_schema")]
+    delivery: Option<MessageDeliveryConfig>,
 }
 
 impl MessagesConfig {
@@ -473,6 +623,12 @@ impl MessagesConfig {
     #[must_use]
     pub const fn fallback(&self) -> &BTreeMap<String, Vec<String>> {
         &self.fallback
+    }
+
+    /// Return normalized delivery targets when output delivery is configured.
+    #[must_use]
+    pub const fn delivery(&self) -> Option<&MessageDeliveryConfig> {
+        self.delivery.as_ref()
     }
 }
 
@@ -551,6 +707,62 @@ fn fallback_schema(_: &mut SchemaGenerator) -> Schema {
                 "maxLength": 255
             }
         }
+    })
+}
+
+fn delivery_target_name_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,254}$"
+    })
+}
+
+fn delivery_schema(generator: &mut SchemaGenerator) -> Schema {
+    MessageDeliveryConfig::json_schema(generator)
+}
+
+fn delivery_exporter_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "enum": ["esm"]
+    })
+}
+
+fn delivery_output_root_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4159
+    })
+}
+
+fn eager_locales_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "array",
+        "maxItems": 1024,
+        "uniqueItems": true,
+        "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+        }
+    })
+}
+
+fn duplicate_placement() -> String {
+    "duplicate".to_owned()
+}
+
+fn is_duplicate_placement(value: &String) -> bool {
+    value == "duplicate"
+}
+
+fn delivery_placement_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "enum": ["duplicate"]
     })
 }
 
@@ -634,6 +846,7 @@ pub struct ResolvedMessagesConfig {
     policy: LinkPolicy,
     producers: ResolvedMessageProducers,
     domain_declarations: Arc<[ResolvedMessageDomainDeclaration]>,
+    delivery: Option<ResolvedDeliveryTargets>,
 }
 
 impl ResolvedMessagesConfig {
@@ -653,6 +866,12 @@ impl ResolvedMessagesConfig {
     #[must_use]
     pub(crate) fn domain_declarations(&self) -> &[ResolvedMessageDomainDeclaration] {
         &self.domain_declarations
+    }
+
+    /// Return canonical checked delivery targets when configured.
+    #[must_use]
+    pub(crate) const fn delivery(&self) -> Option<&ResolvedDeliveryTargets> {
+        self.delivery.as_ref()
     }
 
     /// Return whether an exact resource-resolved locale is in the production set.
@@ -696,6 +915,7 @@ pub fn validate_messages_config(
             "producers",
             "coverageBaseline",
             "fallback",
+            "delivery",
         ],
     ) {
         return Err(MessagesConfigViolation::unknown(
@@ -744,6 +964,8 @@ pub fn validate_messages_config(
         return Err(MessagesConfigError::CatalogLocaleNotProduction(violation));
     }
 
+    let (delivery, resolved_delivery) = validate_delivery(section.get("delivery"), &policy)?;
+
     roots.sort_by(root_config_order);
     Ok(Some((
         MessagesConfig {
@@ -753,13 +975,505 @@ pub fn validate_messages_config(
             producers,
             coverage_baseline,
             fallback,
+            delivery,
         },
         ResolvedMessagesConfig {
             policy,
             producers: resolved_producers,
             domain_declarations: Arc::from(domain_declarations),
+            delivery: resolved_delivery,
         },
     )))
+}
+
+fn validate_delivery(
+    value: Option<&Value>,
+    policy: &LinkPolicy,
+) -> Result<
+    (
+        Option<MessageDeliveryConfig>,
+        Option<ResolvedDeliveryTargets>,
+    ),
+    MessagesConfigViolation,
+> {
+    let Some(value) = value else {
+        return Ok((None, None));
+    };
+    let pointer = "/messages/delivery";
+    let object = value.as_object().ok_or_else(|| {
+        MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageDelivery,
+            pointer,
+            Some(value),
+            CONFIG_EVIDENCE_BYTES,
+        )
+    })?;
+    if let Some((field, rejected)) = first_unknown_field(object, &["targets"]) {
+        return Err(MessagesConfigViolation::unknown(
+            pointer_property(pointer, field),
+            field,
+            rejected,
+        ));
+    }
+
+    let targets_pointer = pointer_property(pointer, "targets");
+    let targets_value = object.get("targets").ok_or_else(|| {
+        MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageDelivery,
+            targets_pointer.clone(),
+            None,
+            CONFIG_EVIDENCE_BYTES,
+        )
+    })?;
+    let targets = targets_value.as_array().ok_or_else(|| {
+        MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageDelivery,
+            targets_pointer.clone(),
+            Some(targets_value),
+            CONFIG_EVIDENCE_BYTES,
+        )
+    })?;
+    if targets.is_empty() {
+        return Err(MessagesConfigViolation::invalid(
+            MessagesConfigReason::InvalidMessageDelivery,
+            targets_pointer,
+            Some(targets_value),
+            CONFIG_EVIDENCE_BYTES,
+        ));
+    }
+    if targets.len() > 64 {
+        return Err(MessagesConfigViolation::with_limit(
+            MessagesConfigReason::InvalidMessageDelivery,
+            targets_pointer,
+            64,
+            usize_to_u64(targets.len()),
+        ));
+    }
+
+    let mut target_objects = Vec::with_capacity(targets.len());
+    for (target_index, target) in targets.iter().enumerate() {
+        let target_pointer = pointer_index(&targets_pointer, target_index);
+        let target_object = target.as_object().ok_or_else(|| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageDelivery,
+                target_pointer.clone(),
+                Some(target),
+                CONFIG_EVIDENCE_BYTES,
+            )
+        })?;
+        if let Some((field, rejected)) = first_unknown_field(
+            target_object,
+            &["name", "exporter", "out", "eagerLocales", "placement"],
+        ) {
+            return Err(MessagesConfigViolation::unknown(
+                pointer_property(&target_pointer, field),
+                field,
+                rejected,
+            ));
+        }
+        target_objects.push(target_object);
+    }
+
+    let names = decode_required_delivery_strings(&target_objects, &targets_pointer, "name")?;
+    validate_delivery_names(&names, &targets_pointer)?;
+
+    let exporters =
+        decode_required_delivery_strings(&target_objects, &targets_pointer, "exporter")?;
+    for (target_index, exporter) in exporters.iter().enumerate() {
+        if BuiltInExporterId::try_new(exporter).is_err() {
+            return Err(delivery_string_violation(
+                pointer_property(&pointer_index(&targets_pointer, target_index), "exporter"),
+                exporter,
+            ));
+        }
+    }
+
+    let outputs = decode_required_delivery_strings(&target_objects, &targets_pointer, "out")?;
+    for (target_index, output) in outputs.iter().enumerate() {
+        if let Err(error) = DeliveryOutputRoot::try_new(output) {
+            return Err(delivery_output_violation(
+                &targets_pointer,
+                target_index,
+                output,
+                error,
+            ));
+        }
+    }
+
+    let mut eager_locales = Vec::with_capacity(target_objects.len());
+    for (target_index, target) in target_objects.iter().enumerate() {
+        let eager_pointer = pointer_property(
+            &pointer_index(&targets_pointer, target_index),
+            "eagerLocales",
+        );
+        let Some(value) = target.get("eagerLocales") else {
+            eager_locales.push(Vec::new());
+            continue;
+        };
+        let locales = value.as_array().ok_or_else(|| {
+            MessagesConfigViolation::invalid(
+                MessagesConfigReason::InvalidMessageDelivery,
+                eager_pointer.clone(),
+                Some(value),
+                CONFIG_EVIDENCE_BYTES,
+            )
+        })?;
+        if locales.len() > 1_024 {
+            return Err(MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageDelivery,
+                eager_pointer,
+                1_024,
+                usize_to_u64(locales.len()),
+            ));
+        }
+        let mut spellings = Vec::with_capacity(locales.len());
+        for (locale_index, locale) in locales.iter().enumerate() {
+            let locale_pointer = pointer_index(&eager_pointer, locale_index);
+            let spelling = locale.as_str().ok_or_else(|| {
+                MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageDelivery,
+                    locale_pointer,
+                    Some(locale),
+                    LOCALE_BYTES_LIMIT,
+                )
+            })?;
+            spellings.push(spelling.to_owned());
+        }
+        eager_locales.push(spellings);
+    }
+    for (target_index, locales) in eager_locales.iter().enumerate() {
+        if let Err(error) = CheckedEagerLocales::try_new(locales, policy) {
+            return Err(delivery_eager_locales_violation(
+                &targets_pointer,
+                target_index,
+                locales,
+                &error,
+            ));
+        }
+    }
+
+    let mut placements = Vec::with_capacity(target_objects.len());
+    for (target_index, target) in target_objects.iter().enumerate() {
+        let placement_pointer =
+            pointer_property(&pointer_index(&targets_pointer, target_index), "placement");
+        let placement = target
+            .get("placement")
+            .map(|value| {
+                value.as_str().map(str::to_owned).ok_or_else(|| {
+                    MessagesConfigViolation::invalid(
+                        MessagesConfigReason::InvalidMessageDelivery,
+                        placement_pointer,
+                        Some(value),
+                        CONFIG_EVIDENCE_BYTES,
+                    )
+                })
+            })
+            .transpose()?;
+        placements.push(placement);
+    }
+    for (target_index, placement) in placements.iter().enumerate() {
+        if DeliveryPlacement::try_new(placement.as_deref()).is_err() {
+            return Err(delivery_string_violation(
+                pointer_property(&pointer_index(&targets_pointer, target_index), "placement"),
+                placement
+                    .as_deref()
+                    .expect("unsupported placement must be present"),
+            ));
+        }
+    }
+
+    let inputs = names
+        .iter()
+        .zip(&exporters)
+        .zip(&outputs)
+        .zip(&eager_locales)
+        .zip(&placements)
+        .map(|((((name, exporter), out), eager_locales), placement)| {
+            DeliveryTargetInput::new(name, exporter, out, eager_locales, placement.as_deref())
+        })
+        .collect::<Vec<_>>();
+    let resolved = ResolvedDeliveryTargets::try_new(&inputs, policy)
+        .map_err(|error| delivery_targets_violation(error, &targets_pointer, &inputs))?;
+    let normalized = MessageDeliveryConfig {
+        targets: resolved
+            .targets()
+            .iter()
+            .map(|target| MessageDeliveryTargetConfig {
+                name: target.name().as_str().to_owned(),
+                exporter: target.exporter().as_str().to_owned(),
+                out: target.out().as_str().to_owned(),
+                eager_locales: target
+                    .eager_locales()
+                    .locales()
+                    .iter()
+                    .map(|locale| locale.as_str().to_owned())
+                    .collect(),
+                placement: target.placement().as_str().to_owned(),
+            })
+            .collect(),
+    };
+    Ok((Some(normalized), Some(resolved)))
+}
+
+fn decode_required_delivery_strings(
+    targets: &[&Map<String, Value>],
+    targets_pointer: &str,
+    field: &str,
+) -> Result<Vec<String>, MessagesConfigViolation> {
+    targets
+        .iter()
+        .enumerate()
+        .map(|(target_index, target)| {
+            let pointer = pointer_property(&pointer_index(targets_pointer, target_index), field);
+            let value = target.get(field).ok_or_else(|| {
+                MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageDelivery,
+                    pointer.clone(),
+                    None,
+                    CONFIG_EVIDENCE_BYTES,
+                )
+            })?;
+            value.as_str().map(str::to_owned).ok_or_else(|| {
+                MessagesConfigViolation::invalid(
+                    MessagesConfigReason::InvalidMessageDelivery,
+                    pointer,
+                    Some(value),
+                    CONFIG_EVIDENCE_BYTES,
+                )
+            })
+        })
+        .collect()
+}
+
+fn validate_delivery_names(
+    names: &[String],
+    targets_pointer: &str,
+) -> Result<(), MessagesConfigViolation> {
+    let mut checked = Vec::with_capacity(names.len());
+    for (target_index, name) in names.iter().enumerate() {
+        let pointer = pointer_property(&pointer_index(targets_pointer, target_index), "name");
+        let name = DeliveryTargetName::try_new(name).map_err(|error| match error {
+            DeliveryTargetNameError::InvalidGrammar => delivery_string_violation(pointer, name),
+            DeliveryTargetNameError::ByteLimitExceeded { limit, observed } => {
+                MessagesConfigViolation::with_limit(
+                    MessagesConfigReason::InvalidMessageDelivery,
+                    pointer,
+                    limit,
+                    observed,
+                )
+            }
+        })?;
+        checked.push(name);
+    }
+
+    let mut first_occurrences = BTreeMap::new();
+    for (target_index, name) in checked.into_iter().enumerate() {
+        if let Some(first_target_index) = first_occurrences.insert(name, target_index) {
+            return Err(MessagesConfigViolation::duplicate(
+                MessagesConfigReason::InvalidMessageDelivery,
+                pointer_property(&pointer_index(targets_pointer, target_index), "name"),
+                pointer_property(&pointer_index(targets_pointer, first_target_index), "name"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn delivery_output_violation(
+    targets_pointer: &str,
+    target_index: usize,
+    output: &str,
+    error: DeliveryOutputRootError,
+) -> MessagesConfigViolation {
+    let pointer = pointer_property(&pointer_index(targets_pointer, target_index), "out");
+    match error {
+        DeliveryOutputRootError::InvalidGrammar => delivery_string_violation(pointer, output),
+        DeliveryOutputRootError::LimitExceeded {
+            counter:
+                DeliveryOutputRootLimit::Segments
+                | DeliveryOutputRootLimit::SegmentBytes
+                | DeliveryOutputRootLimit::DecodedBytes,
+            limit,
+            observed,
+        } => MessagesConfigViolation::with_limit(
+            MessagesConfigReason::InvalidMessageDelivery,
+            pointer,
+            limit,
+            observed,
+        ),
+    }
+}
+
+fn delivery_eager_locales_violation(
+    targets_pointer: &str,
+    target_index: usize,
+    locales: &[String],
+    error: &EagerLocalesError,
+) -> MessagesConfigViolation {
+    let pointer = pointer_property(
+        &pointer_index(targets_pointer, target_index),
+        "eagerLocales",
+    );
+    match error {
+        EagerLocalesError::CountLimitExceeded { limit, observed } => {
+            MessagesConfigViolation::with_limit(
+                MessagesConfigReason::InvalidMessageDelivery,
+                pointer,
+                *limit,
+                *observed,
+            )
+        }
+        EagerLocalesError::LocaleByteLimitExceeded {
+            occurrence,
+            limit,
+            observed,
+        } => MessagesConfigViolation::with_limit(
+            MessagesConfigReason::InvalidMessageDelivery,
+            pointer_index(&pointer, *occurrence),
+            *limit,
+            *observed,
+        ),
+        EagerLocalesError::InvalidLocale { occurrence }
+        | EagerLocalesError::LocaleNotProduction { occurrence, .. } => {
+            delivery_string_violation(pointer_index(&pointer, *occurrence), &locales[*occurrence])
+        }
+        EagerLocalesError::DuplicateLocale {
+            occurrence,
+            first_occurrence,
+            ..
+        } => MessagesConfigViolation::duplicate(
+            MessagesConfigReason::InvalidMessageDelivery,
+            pointer_index(&pointer, *occurrence),
+            pointer_index(&pointer, *first_occurrence),
+        ),
+    }
+}
+
+fn delivery_targets_violation(
+    error: DeliveryTargetsError,
+    targets_pointer: &str,
+    inputs: &[DeliveryTargetInput<'_>],
+) -> MessagesConfigViolation {
+    let reason = MessagesConfigReason::InvalidMessageDelivery;
+    match error {
+        DeliveryTargetsError::TargetCount {
+            minimum: _,
+            maximum,
+            observed,
+        } => MessagesConfigViolation::with_limit(reason, targets_pointer, maximum, observed),
+        DeliveryTargetsError::InvalidTargetName {
+            target_index,
+            error,
+        } => {
+            let pointer = pointer_property(&pointer_index(targets_pointer, target_index), "name");
+            match error {
+                DeliveryTargetNameError::InvalidGrammar => {
+                    delivery_string_violation(pointer, inputs[target_index].name())
+                }
+                DeliveryTargetNameError::ByteLimitExceeded { limit, observed } => {
+                    MessagesConfigViolation::with_limit(reason, pointer, limit, observed)
+                }
+            }
+        }
+        DeliveryTargetsError::DuplicateTargetName {
+            first_target_index,
+            second_target_index,
+            ..
+        } => MessagesConfigViolation::duplicate(
+            reason,
+            pointer_property(&pointer_index(targets_pointer, second_target_index), "name"),
+            pointer_property(&pointer_index(targets_pointer, first_target_index), "name"),
+        ),
+        DeliveryTargetsError::UnsupportedExporter { target_index } => delivery_string_violation(
+            pointer_property(&pointer_index(targets_pointer, target_index), "exporter"),
+            inputs[target_index].exporter(),
+        ),
+        DeliveryTargetsError::InvalidOutputRoot {
+            target_index,
+            error,
+        } => {
+            let pointer = pointer_property(&pointer_index(targets_pointer, target_index), "out");
+            match error {
+                DeliveryOutputRootError::InvalidGrammar => {
+                    delivery_string_violation(pointer, inputs[target_index].out())
+                }
+                DeliveryOutputRootError::LimitExceeded {
+                    counter:
+                        DeliveryOutputRootLimit::Segments
+                        | DeliveryOutputRootLimit::SegmentBytes
+                        | DeliveryOutputRootLimit::DecodedBytes,
+                    limit,
+                    observed,
+                } => MessagesConfigViolation::with_limit(reason, pointer, limit, observed),
+            }
+        }
+        DeliveryTargetsError::InvalidEagerLocales {
+            target_index,
+            error,
+        } => {
+            let pointer = pointer_property(
+                &pointer_index(targets_pointer, target_index),
+                "eagerLocales",
+            );
+            match error {
+                EagerLocalesError::CountLimitExceeded { limit, observed } => {
+                    MessagesConfigViolation::with_limit(reason, pointer, limit, observed)
+                }
+                EagerLocalesError::LocaleByteLimitExceeded {
+                    occurrence,
+                    limit,
+                    observed,
+                } => MessagesConfigViolation::with_limit(
+                    reason,
+                    pointer_index(&pointer, occurrence),
+                    limit,
+                    observed,
+                ),
+                EagerLocalesError::InvalidLocale { occurrence }
+                | EagerLocalesError::LocaleNotProduction { occurrence, .. } => {
+                    delivery_string_violation(
+                        pointer_index(&pointer, occurrence),
+                        &inputs[target_index].eager_locales()[occurrence],
+                    )
+                }
+                EagerLocalesError::DuplicateLocale {
+                    occurrence,
+                    first_occurrence,
+                    ..
+                } => MessagesConfigViolation::duplicate(
+                    reason,
+                    pointer_index(&pointer, occurrence),
+                    pointer_index(&pointer, first_occurrence),
+                ),
+            }
+        }
+        DeliveryTargetsError::UnsupportedPlacement { target_index } => delivery_string_violation(
+            pointer_property(&pointer_index(targets_pointer, target_index), "placement"),
+            inputs[target_index]
+                .placement()
+                .expect("unsupported placement must be present"),
+        ),
+        DeliveryTargetsError::OutputRootConflict {
+            first_name,
+            second_name,
+            first_target_index,
+            second_target_index,
+        } => MessagesConfigViolation::output_conflict(
+            first_name.as_str(),
+            second_name.as_str(),
+            first_target_index,
+            second_target_index,
+        ),
+    }
+}
+
+fn delivery_string_violation(pointer: String, value: &str) -> MessagesConfigViolation {
+    MessagesConfigViolation::invalid(
+        MessagesConfigReason::InvalidMessageDelivery,
+        pointer,
+        Some(&Value::String(value.to_owned())),
+        CONFIG_EVIDENCE_BYTES,
+    )
 }
 
 fn validate_locales(
@@ -2103,6 +2817,10 @@ fn pointer_index(base: &str, index: usize) -> String {
     format!("{base}/{index}")
 }
 
+fn usize_to_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
 fn has_windows_drive_prefix(source: &str) -> bool {
     let bytes = source.as_bytes();
     bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
@@ -2282,7 +3000,125 @@ mod tests {
     }
 
     #[test]
-    fn rejects_shape_and_future_fields_before_locales() {
+    fn delivery_is_canonical_and_conflicts_retain_submitted_out_pointers() {
+        let resources = app_resources();
+        let (normalized, resolved) = validate_messages_config(
+            Some(&json!({
+                "locales": ["ja", "en"],
+                "delivery": {
+                    "targets": [
+                        {
+                            "name": "web",
+                            "exporter": "esm",
+                            "out": "generated/web",
+                            "eagerLocales": ["ja", "en"]
+                        },
+                        {
+                            "name": "native",
+                            "exporter": "esm",
+                            "out": "generated/native",
+                            "placement": "duplicate"
+                        }
+                    ]
+                }
+            })),
+            &resources,
+        )
+        .unwrap()
+        .unwrap();
+
+        let targets = normalized.delivery().unwrap().targets();
+        assert_eq!(targets[0].name(), "native");
+        assert_eq!(targets[1].name(), "web");
+        assert_eq!(targets[1].eager_locales(), ["en", "ja"]);
+        assert_eq!(targets[0].placement(), "duplicate");
+        assert_eq!(resolved.delivery().unwrap().targets().len(), 2);
+
+        let conflict = section_error(
+            &json!({
+                "locales": ["en"],
+                "delivery": {
+                    "targets": [
+                        { "name": "z", "exporter": "esm", "out": "dist" },
+                        { "name": "a", "exporter": "esm", "out": "dist/web" }
+                    ]
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(
+            conflict.reason(),
+            MessagesConfigReason::DeliveryOutputConflict
+        );
+        assert_eq!(conflict.pointer(), "/messages/delivery/targets");
+        assert_eq!(conflict.first_target(), Some("a"));
+        assert_eq!(conflict.second_target(), Some("z"));
+        assert_eq!(
+            conflict.first_out_pointer(),
+            Some("/messages/delivery/targets/1/out")
+        );
+        assert_eq!(
+            conflict.second_out_pointer(),
+            Some("/messages/delivery/targets/0/out")
+        );
+        assert!(conflict.value().is_none());
+    }
+
+    #[test]
+    fn delivery_validation_uses_field_family_precedence_and_narrow_evidence() {
+        let resources = app_resources();
+        let error = section_error(
+            &json!({
+                "locales": ["en"],
+                "delivery": {
+                    "targets": [
+                        { "name": "ok", "exporter": null, "out": "dist/ok" },
+                        { "name": "Bad", "exporter": "unknown", "out": "../bad" }
+                    ]
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(error.reason(), MessagesConfigReason::InvalidMessageDelivery);
+        assert_eq!(error.pointer(), "/messages/delivery/targets/1/name");
+        assert_eq!(error.value(), Some(&Value::String("Bad".to_owned())));
+
+        let exporter = section_error(
+            &json!({
+                "locales": ["en"],
+                "delivery": {
+                    "targets": [
+                        { "name": "ok", "exporter": null, "out": "dist/ok" },
+                        { "name": "also-ok", "exporter": "unknown", "out": "../bad" }
+                    ]
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(exporter.pointer(), "/messages/delivery/targets/0/exporter");
+        assert!(exporter.value().is_none());
+
+        let duplicate = section_error(
+            &json!({
+                "locales": ["en"],
+                "delivery": {
+                    "targets": [
+                        { "name": "web", "exporter": "esm", "out": "dist/a" },
+                        { "name": "web", "exporter": "esm", "out": "dist/b" }
+                    ]
+                }
+            }),
+            &resources,
+        );
+        assert_eq!(duplicate.pointer(), "/messages/delivery/targets/1/name");
+        assert_eq!(
+            duplicate.first_pointer(),
+            Some("/messages/delivery/targets/0/name")
+        );
+    }
+
+    #[test]
+    fn rejects_shape_and_unknown_fields_before_locales() {
         let resource = app_resources();
         let shape = section_error(&Value::Null, &resource);
         assert_eq!(
@@ -2292,20 +3128,25 @@ mod tests {
         assert_eq!(shape.pointer(), "/messages");
         assert!(shape.value().is_none());
 
-        let unknown = section_error(&json!({ "locales": null, "delivery": null }), &resource);
+        let unknown = section_error(&json!({ "locales": null, "exporter": null }), &resource);
         assert_eq!(unknown.reason(), MessagesConfigReason::UnknownField);
-        assert_eq!(unknown.pointer(), "/messages/delivery");
-        assert_eq!(unknown.field(), Some("delivery"));
+        assert_eq!(unknown.pointer(), "/messages/exporter");
+        assert_eq!(unknown.field(), Some("exporter"));
 
-        for (field, placeholder) in [("delivery", Value::Null), ("exporter", json!({}))] {
-            let error = section_error(
-                &json!({ "locales": ["en"], (field): placeholder }),
-                &resource,
-            );
-            assert_eq!(error.reason(), MessagesConfigReason::UnknownField);
-            assert_eq!(error.pointer(), format!("/messages/{field}"));
-            assert_eq!(error.field(), Some(field));
-        }
+        let error = section_error(&json!({ "locales": ["en"], "exporter": {} }), &resource);
+        assert_eq!(error.reason(), MessagesConfigReason::UnknownField);
+        assert_eq!(error.pointer(), "/messages/exporter");
+        assert_eq!(error.field(), Some("exporter"));
+
+        let delivery = section_error(
+            &json!({ "locales": ["en"], "fallback": null, "delivery": null }),
+            &resource,
+        );
+        assert_eq!(
+            delivery.reason(),
+            MessagesConfigReason::InvalidMessageFallback
+        );
+        assert_eq!(delivery.pointer(), "/messages/fallback");
     }
 
     #[test]

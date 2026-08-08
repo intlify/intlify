@@ -66,11 +66,13 @@ impl ProjectLinkExecution {
     }
 
     /// Return definition artifacts admitted by this invocation.
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn definition_artifacts(&self) -> &[intlify_contract::MessageDefinitionArtifact] {
         self.definitions.artifacts()
     }
 
     /// Return reference artifacts admitted by this invocation.
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn reference_artifacts(&self) -> &[intlify_contract::MessageReferenceArtifact] {
         self.references.artifacts()
     }

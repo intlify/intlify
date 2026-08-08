@@ -35,10 +35,9 @@ use intlify_producer_js::{
 };
 
 use super::config::{ResolvedJsProducerConfig, ResolvedMessageProducers};
-use super::observation::{
-    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
-    NoopMessageBenchmarkObserver,
-};
+#[cfg(test)]
+use super::observation::NoopMessageBenchmarkObserver;
+use super::observation::{observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage};
 use super::physical::{
     acquire_physical_snapshot, compare_optional_paths, discover_project_files,
     group_physical_files, portable_path, PhysicalFileGroup, ProjectFileTarget,
@@ -177,11 +176,6 @@ impl ReferenceInventory {
     pub(crate) fn failures(&self) -> &[ReferenceSourceFailure] {
         &self.failures
     }
-
-    /// Consume the inventory into its owned artifact and failure collections.
-    pub(crate) fn into_parts(self) -> (Vec<MessageReferenceArtifact>, Vec<ReferenceSourceFailure>) {
-        (self.artifacts, self.failures)
-    }
 }
 
 /// Reference participant selected by host inventory.
@@ -308,6 +302,7 @@ struct PendingReferenceFailure {
 }
 
 /// Produce the complete built-in and configured external reference inventory.
+#[cfg(test)]
 pub(crate) fn produce_reference_inventory(
     project_root: &Path,
     target_scopes: &[CatalogScopeId],

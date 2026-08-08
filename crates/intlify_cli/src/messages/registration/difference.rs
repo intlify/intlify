@@ -11,9 +11,10 @@
 use std::collections::BTreeMap;
 
 use intlify_export::ExportArtifactPath;
+use serde_json::{json, Value};
 
 use super::error::OutputRegistrationError;
-use super::manifest::{CheckedOutputManifest, OutputManifest};
+use super::manifest::CheckedOutputManifest;
 
 /// One manifest record plus 5,121 expected paths and 5,121 prior-only paths.
 pub(super) const CHECK_DIFFERENCE_LIMIT: usize = 10_243;
@@ -101,13 +102,54 @@ impl CheckComparison {
         })
     }
 
+    #[cfg(test)]
     pub(super) const fn differences(&self) -> &[CheckDifference] {
         &self.differences
     }
 
-    pub(super) fn is_matched(&self) -> bool {
+    pub(in crate::messages) fn is_matched(&self) -> bool {
         self.differences.is_empty()
     }
+
+    /// Project the closed comparison records into their stable reporter shape.
+    pub(in crate::messages) fn reporter_differences(&self) -> Vec<Value> {
+        self.differences.iter().map(difference_value).collect()
+    }
+}
+
+fn difference_value(difference: &CheckDifference) -> Value {
+    match difference {
+        CheckDifference::OutputMissing => json!({ "kind": "output_missing" }),
+        CheckDifference::ManifestNoncanonical => json!({ "kind": "manifest_noncanonical" }),
+        CheckDifference::ArtifactMissing { path } => json!({
+            "kind": "artifact_missing",
+            "path": artifact_path_value(path),
+        }),
+        CheckDifference::ArtifactChanged { path, components } => json!({
+            "kind": "artifact_changed",
+            "path": artifact_path_value(path),
+            "components": components.iter().map(|component| match component {
+                ArtifactChangedComponent::Kind => "kind",
+                ArtifactChangedComponent::FormatVersion => "format_version",
+                ArtifactChangedComponent::MediaType => "media_type",
+                ArtifactChangedComponent::Relationships => "relationships",
+                ArtifactChangedComponent::Payload => "payload",
+            }).collect::<Vec<_>>(),
+        }),
+        CheckDifference::ArtifactStale { path } => json!({
+            "kind": "artifact_stale",
+            "path": artifact_path_value(path),
+        }),
+    }
+}
+
+fn artifact_path_value(path: &ExportArtifactPath) -> Value {
+    Value::Array(
+        path.segments()
+            .iter()
+            .map(|segment| Value::String(segment.as_str().to_owned()))
+            .collect(),
+    )
 }
 
 /// One closed check difference record.
@@ -156,10 +198,6 @@ impl ManagedOutputObservation {
             manifest_is_canonical,
             files,
         }
-    }
-
-    pub(super) const fn manifest(&self) -> &OutputManifest {
-        self.manifest.manifest()
     }
 }
 

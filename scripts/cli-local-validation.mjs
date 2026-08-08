@@ -32,6 +32,44 @@ const formatterSmokeInput = '.input   {$count   :number}\n{{Value {$count   :num
 const formatterSmokeOutput = '.input {$count :number}\n{{Value {$count :number}}}\n'
 const catalogSmokeInput = '{"count":".input   {$count   :number}\\n{{Value {$count   :number}}}"}'
 const catalogSmokeOutput = '{"count":".input {$count :number}\\n{{Value {$count :number}}}"}'
+const messageDeliveryConfig = {
+  resources: {
+    catalogs: [
+      {
+        scope: 'app',
+        include: ['locales/*.json'],
+        locale: { from: 'path', pattern: 'locales/{locale}.json' }
+      }
+    ]
+  },
+  messages: {
+    locales: ['en', 'ja'],
+    coverageBaseline: { app: 'en' },
+    producers: {
+      js: {
+        include: ['src/**/*.ts'],
+        recognizers: {
+          t: {
+            kind: 'lookup',
+            scope: 'app',
+            domain: 'json-pointer',
+            keySyntax: 'dot-path'
+          }
+        }
+      }
+    },
+    delivery: {
+      targets: [
+        {
+          name: 'web',
+          exporter: 'esm',
+          out: 'generated/messages',
+          eagerLocales: ['en']
+        }
+      ]
+    }
+  }
+}
 
 const command = process.argv[2]
 
@@ -109,14 +147,83 @@ async function checkCliPackages() {
   try {
     const nativeTarball = await packageManagerPack(nativePackageRoot, packDirectory)
     const cliTarball = await packageManagerPack(cliPackageRoot, packDirectory)
-    await installPackedCli({ installDirectory, nativeTarball, cliTarball })
+    const installedBinPath = await installPackedCli({
+      installDirectory,
+      nativeTarball,
+      cliTarball
+    })
     await assertInstalledPackagePermissions({ installDirectory, target })
+    await assertInstalledMessageDelivery({ installDirectory, installedBinPath })
     console.log(`Created ${nativeTarball}`)
     console.log(`Created ${cliTarball}`)
   } finally {
     await rm(packDirectory, { recursive: true, force: true })
     await rm(installDirectory, { recursive: true, force: true })
   }
+}
+
+async function assertInstalledMessageDelivery({ installDirectory, installedBinPath }) {
+  const projectRoot = join(installDirectory, 'message-delivery-smoke')
+  const outputRoot = join(projectRoot, 'generated', 'messages')
+  const loaderPath = join(outputRoot, 'loader.mjs')
+  await mkdir(join(projectRoot, '.git'), { recursive: true })
+  await mkdir(join(projectRoot, 'locales'), { recursive: true })
+  await mkdir(join(projectRoot, 'src'), { recursive: true })
+  await writeFile(
+    join(projectRoot, 'intlify.config.json'),
+    `${JSON.stringify(messageDeliveryConfig, null, 2)}\n`
+  )
+  await writeFile(join(projectRoot, 'locales', 'en.json'), '{"title":"Title"}\n')
+  await writeFile(join(projectRoot, 'locales', 'ja.json'), '{"title":"タイトル"}\n')
+  await writeFile(join(projectRoot, 'src', 'app.ts'), "t('title')\n")
+
+  const written = await run(installedBinPath, ['messages', 'emit', '--reporter=json'], {
+    cwd: projectRoot,
+    capture: true
+  })
+  const writtenEnvelope = JSON.parse(written.stdout)
+  assertEqual(written.stderr, '', 'installed message write stderr')
+  assertEqual(writtenEnvelope.command, 'messages.emit', 'installed message write command')
+  assertEqual(writtenEnvelope.summary?.status, 'success', 'installed message write status')
+  assertEqual(writtenEnvelope.summary?.operation, 'write', 'installed message write operation')
+  assertEqual(writtenEnvelope.results?.[0]?.target, 'web', 'installed message write target')
+  assertEqual(writtenEnvelope.results?.[0]?.status, 'written', 'installed message write result')
+
+  const matched = await run(installedBinPath, ['messages', 'emit', '--check', '--reporter=json'], {
+    cwd: projectRoot,
+    capture: true
+  })
+  const matchedEnvelope = JSON.parse(matched.stdout)
+  assertEqual(matched.stderr, '', 'installed message matched stderr')
+  assertEqual(matchedEnvelope.summary?.status, 'success', 'installed message matched status')
+  assertEqual(matchedEnvelope.summary?.operation, 'check', 'installed message matched operation')
+  assertEqual(matchedEnvelope.results?.[0]?.status, 'matched', 'installed message matched result')
+
+  const changedLoader = 'export const changedByPackedSmoke = true\n'
+  await writeFile(loaderPath, changedLoader)
+  const different = await run(
+    installedBinPath,
+    ['messages', 'emit', '--check', '--reporter=json'],
+    { cwd: projectRoot, capture: true, allowExitCodes: [1] }
+  )
+  const differentEnvelope = JSON.parse(different.stdout)
+  assertEqual(different.stderr, '', 'installed message different stderr')
+  assertEqual(differentEnvelope.summary?.status, 'failure', 'installed message different status')
+  assertEqual(
+    differentEnvelope.results?.[0]?.status,
+    'different',
+    'installed message different result'
+  )
+  assertEqual(
+    differentEnvelope.results?.[0]?.differences?.[0]?.kind,
+    'artifact_changed',
+    'installed message difference kind'
+  )
+  assertEqual(
+    await readFile(loaderPath, 'utf8'),
+    changedLoader,
+    'installed message check must not mutate output'
+  )
 }
 
 async function smokeCli() {

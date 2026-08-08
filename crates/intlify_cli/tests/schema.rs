@@ -91,7 +91,43 @@ fn generated_config_schema_matches_design_contract() {
     assert_eq!(coverage_baseline["propertyNames"]["maxLength"], 255);
     assert_eq!(coverage_baseline["additionalProperties"]["minLength"], 1);
     assert_eq!(coverage_baseline["additionalProperties"]["maxLength"], 255);
-    assert!(messages["properties"].get("delivery").is_none());
+    let delivery = &messages["properties"]["delivery"];
+    assert_eq!(delivery["required"], serde_json::json!(["targets"]));
+    assert_eq!(delivery["properties"]["targets"]["minItems"], 1);
+    assert_eq!(delivery["properties"]["targets"]["maxItems"], 64);
+    assert_eq!(
+        delivery["properties"]["targets"]["items"]["$ref"],
+        "#/definitions/MessageDeliveryTargetConfig"
+    );
+    let delivery_target = &json["definitions"]["MessageDeliveryTargetConfig"];
+    assert_eq!(
+        delivery_target["required"],
+        serde_json::json!(["name", "exporter", "out"])
+    );
+    assert_eq!(delivery_target["properties"]["name"]["minLength"], 1);
+    assert_eq!(delivery_target["properties"]["name"]["maxLength"], 255);
+    assert_eq!(
+        delivery_target["properties"]["name"]["pattern"],
+        "^[a-z0-9][a-z0-9._-]{0,254}$"
+    );
+    assert_eq!(
+        delivery_target["properties"]["exporter"]["enum"],
+        serde_json::json!(["esm"])
+    );
+    assert_eq!(delivery_target["properties"]["out"]["minLength"], 1);
+    assert_eq!(delivery_target["properties"]["out"]["maxLength"], 4_159);
+    assert_eq!(
+        delivery_target["properties"]["eagerLocales"]["maxItems"],
+        1_024
+    );
+    assert_eq!(
+        delivery_target["properties"]["eagerLocales"]["uniqueItems"],
+        true
+    );
+    assert_eq!(
+        delivery_target["properties"]["placement"]["enum"],
+        serde_json::json!(["duplicate"])
+    );
 
     let producers = &json["definitions"]["MessageProducersConfig"];
     let js = &producers["properties"]["js"];

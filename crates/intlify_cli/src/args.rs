@@ -15,20 +15,30 @@ use crate::output::Reporter;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ParsedCommand {
     Reserved(&'static str),
+    Messages(MessagesCommand),
     Unknown(String),
 }
 
-impl ParsedCommand {
-    pub(crate) const fn reserved_name(&self) -> Option<&'static str> {
-        match self {
-            Self::Reserved(command) => Some(command),
-            Self::Unknown(_) => None,
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum MessagesCommand {
+    Namespace,
+    Emit(MessagesEmitArgs),
+    Prune,
+}
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MessagesEmitArgs {
+    pub(crate) target: Option<String>,
+    pub(crate) check: bool,
+}
+
+impl ParsedCommand {
     pub(crate) fn resolved_name(&self) -> Option<&str> {
         match self {
             Self::Reserved(command) => Some(command),
+            Self::Messages(MessagesCommand::Namespace) => Some("messages"),
+            Self::Messages(MessagesCommand::Emit(_)) => Some("messages.emit"),
+            Self::Messages(MessagesCommand::Prune) => Some("messages.prune"),
             Self::Unknown(_) => None,
         }
     }
@@ -59,6 +69,10 @@ pub(crate) fn parse_args(args: &[String]) -> ParsedArgs {
     };
 
     let mut seen_options = HashSet::<&'static str>::new();
+    let mut target = None;
+    let mut check = false;
+    let mut emit_options = Vec::<String>::new();
+    let mut positionals = Vec::<String>::new();
     let mut index = 0;
 
     while index < args.len() {
@@ -111,19 +125,92 @@ pub(crate) fn parse_args(args: &[String]) -> ParsedArgs {
             continue;
         }
 
-        if arg.starts_with('-') {
+        if arg == "--target" {
+            emit_options.push(arg.clone());
+            index = parse_target_option(&mut parsed, &mut seen_options, &mut target, args, index);
+            continue;
+        }
+
+        if let Some(value) = arg.strip_prefix("--target=") {
+            emit_options.push("--target".to_owned());
+            record_target_value(&mut parsed, &mut seen_options, &mut target, value);
+            index += 1;
+            continue;
+        }
+
+        if arg == "--check" {
+            emit_options.push(arg.clone());
+            record_flag(&mut parsed, &mut seen_options, "--check");
+            check = true;
+            index += 1;
+            continue;
+        }
+
+        if arg == "--" {
+            if positionals.first().is_some_and(|value| value == "messages")
+                && positionals.get(1).is_some_and(|value| value == "emit")
+            {
+                positionals.extend(args[(index + 1)..].iter().cloned());
+                break;
+            }
             record_first_error(&mut parsed, CliError::unknown_option(arg));
             index += 1;
             continue;
         }
 
-        if parsed.command.is_none() && parsed.error.is_none() {
-            parsed.command = Some(parse_command(arg));
+        if arg.starts_with('-') && arg != "-" {
+            record_first_error(&mut parsed, CliError::unknown_option(arg));
+            index += 1;
+            continue;
         }
+
+        positionals.push(arg.clone());
         index += 1;
     }
 
+    parsed.command = parse_command_path(&positionals, target, check, &mut parsed);
+    if !matches!(
+        parsed.command,
+        Some(ParsedCommand::Messages(MessagesCommand::Emit(_)))
+    ) {
+        if let Some(option) = emit_options.first() {
+            record_first_error(&mut parsed, CliError::unknown_option(option));
+        }
+    }
+
     parsed
+}
+
+fn parse_target_option(
+    parsed: &mut ParsedArgs,
+    seen_options: &mut HashSet<&'static str>,
+    target: &mut Option<String>,
+    args: &[String],
+    index: usize,
+) -> usize {
+    match args.get(index + 1) {
+        Some(value) if !value.starts_with('-') => {
+            record_target_value(parsed, seen_options, target, value);
+            index + 2
+        }
+        _ => {
+            record_first_error(parsed, CliError::missing_option_value("--target"));
+            index + 1
+        }
+    }
+}
+
+fn record_target_value(
+    parsed: &mut ParsedArgs,
+    seen_options: &mut HashSet<&'static str>,
+    target: &mut Option<String>,
+    value: &str,
+) {
+    if !seen_options.insert("--target") {
+        record_first_error(parsed, CliError::duplicate_option("--target"));
+        return;
+    }
+    *target = Some(value.to_owned());
 }
 
 fn parse_value_option(
@@ -213,13 +300,55 @@ fn parse_reporter_value(value: &str) -> Option<CliError> {
     }
 }
 
-fn parse_command(command: &str) -> ParsedCommand {
-    match command {
-        "fmt" => ParsedCommand::Reserved("fmt"),
-        "lint" => ParsedCommand::Reserved("lint"),
-        "check" => ParsedCommand::Reserved("check"),
-        "init" => ParsedCommand::Reserved("init"),
-        command => ParsedCommand::Unknown(command.to_owned()),
+fn parse_command_path(
+    positionals: &[String],
+    target: Option<String>,
+    check: bool,
+    parsed: &mut ParsedArgs,
+) -> Option<ParsedCommand> {
+    let command = positionals.first()?;
+    match command.as_str() {
+        "fmt" => Some(ParsedCommand::Reserved("fmt")),
+        "lint" => Some(ParsedCommand::Reserved("lint")),
+        "check" => Some(ParsedCommand::Reserved("check")),
+        "init" => Some(ParsedCommand::Reserved("init")),
+        "messages" => match positionals.get(1).map(String::as_str) {
+            None => Some(ParsedCommand::Messages(MessagesCommand::Namespace)),
+            Some("emit") => {
+                if let Some(target) = target.as_deref() {
+                    if !crate::messages::is_valid_delivery_target_name(target) {
+                        record_first_error(
+                            parsed,
+                            CliError::invalid_argument(
+                                format!("The messages emit target name is invalid: {target}"),
+                                serde_json::json!({
+                                    "reason": "invalid_target_name",
+                                    "option": "--target",
+                                    "value": target,
+                                }),
+                            ),
+                        );
+                    }
+                }
+                if let Some(argument) = positionals.get(2) {
+                    record_first_error(
+                        parsed,
+                        CliError::invalid_argument(
+                            format!(
+                                "The messages emit command does not accept operands: {argument}"
+                            ),
+                            serde_json::json!({ "argument": argument }),
+                        ),
+                    );
+                }
+                Some(ParsedCommand::Messages(MessagesCommand::Emit(
+                    MessagesEmitArgs { target, check },
+                )))
+            }
+            Some("prune") => Some(ParsedCommand::Messages(MessagesCommand::Prune)),
+            Some(leaf) => Some(ParsedCommand::Unknown(format!("messages.{leaf}"))),
+        },
+        command => Some(ParsedCommand::Unknown(command.to_owned())),
     }
 }
 
@@ -291,5 +420,91 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn parses_nested_emit_options_in_any_position() {
+        let parsed = parse(&[
+            "--target",
+            "web",
+            "messages",
+            "--check",
+            "emit",
+            "--reporter=json",
+        ]);
+
+        assert_eq!(
+            parsed.command,
+            Some(ParsedCommand::Messages(MessagesCommand::Emit(
+                MessagesEmitArgs {
+                    target: Some("web".to_owned()),
+                    check: true,
+                }
+            )))
+        );
+        assert_eq!(parsed.reporter, Reporter::Json);
+        assert!(parsed.error.is_none());
+    }
+
+    #[test]
+    fn rejects_emit_operands_before_project_processing() {
+        let parsed = parse(&["messages", "emit", "locales"]);
+
+        assert!(matches!(
+            parsed.error,
+            Some(CliError {
+                code: "invalid_cli_argument",
+                ..
+            })
+        ));
+        assert_eq!(
+            parsed.command.unwrap().resolved_name(),
+            Some("messages.emit")
+        );
+    }
+
+    #[test]
+    fn accepts_an_empty_end_of_options_marker_for_emit() {
+        let parsed = parse(&["messages", "emit", "--"]);
+
+        assert_eq!(
+            parsed.command,
+            Some(ParsedCommand::Messages(MessagesCommand::Emit(
+                MessagesEmitArgs {
+                    target: None,
+                    check: false,
+                }
+            )))
+        );
+        assert!(parsed.error.is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_emit_target_before_project_processing() {
+        for target in ["", "Web", ".web", "web/esm", &"a".repeat(256)] {
+            let parsed = parse(&["messages", "emit", &format!("--target={target}")]);
+
+            assert!(matches!(
+                parsed.error,
+                Some(CliError {
+                    code: "invalid_cli_argument",
+                    ..
+                })
+            ));
+            assert_eq!(
+                parsed.command.unwrap().resolved_name(),
+                Some("messages.emit")
+            );
+        }
+    }
+
+    #[test]
+    fn joins_unknown_message_leaf_for_command_evidence() {
+        let parsed = parse(&["messages", "inspect"]);
+
+        assert_eq!(
+            parsed.command,
+            Some(ParsedCommand::Unknown("messages.inspect".to_owned()))
+        );
     }
 }
