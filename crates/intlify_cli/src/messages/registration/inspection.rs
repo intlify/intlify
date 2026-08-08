@@ -29,9 +29,27 @@ use super::error::{
     RegistrationOperation, RegistrationSubject, UnsupportedCapabilityEvidence,
 };
 use super::manifest::{
-    Blake3Fingerprint, CheckedOutputManifest, ManifestArtifact, ManifestCodecErrorKind,
-    OutputManifest, OUTPUT_MANIFEST_BASENAME, OUTPUT_MANIFEST_WIRE_LIMIT,
+    Blake3Fingerprint, CheckedOutputManifest, ManifestArtifact, ManifestCodecError,
+    ManifestCodecErrorKind, OutputManifest, OUTPUT_MANIFEST_BASENAME, OUTPUT_MANIFEST_WIRE_LIMIT,
 };
+
+fn map_manifest_decode_error(error: ManifestCodecError) -> OutputRegistrationError {
+    match error.kind() {
+        ManifestCodecErrorKind::Invalid => OutputRegistrationError::registration(
+            RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestInvalid, None),
+        ),
+        ManifestCodecErrorKind::Unsupported => {
+            OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
+                OwnershipFailureReason::ManifestUnsupported,
+                None,
+            ))
+        }
+        ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
+            RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestLimit, None),
+        ),
+        ManifestCodecErrorKind::InternalInvariant => OutputRegistrationError::internal_invariant(),
+    }
+}
 
 /// Complete safe observation used by check and write registration paths.
 pub(super) struct OutputInspection {
@@ -128,28 +146,8 @@ fn inspect_output_at(
     }
 
     let manifest_file = read_manifest_file(&first_root.dir)?;
-    let prior_manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter).map_err(
-        |error| match error.kind() {
-            ManifestCodecErrorKind::Invalid => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestInvalid,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Unsupported => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestUnsupported,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
-                RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestLimit, None),
-            ),
-            ManifestCodecErrorKind::InternalInvariant => {
-                OutputRegistrationError::internal_invariant()
-            }
-        },
-    )?;
+    let prior_manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter)
+        .map_err(map_manifest_decode_error)?;
     let manifest_is_canonical = manifest_file.bytes.as_ref() == prior_manifest.canonical_bytes();
 
     preflight_manifest_capabilities(exporter, prior_manifest.manifest())?;
@@ -258,28 +256,8 @@ pub(super) fn inspect_recovery_root(
     }
 
     let manifest_file = read_manifest_file(&first_root.dir)?;
-    let manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter).map_err(
-        |error| match error.kind() {
-            ManifestCodecErrorKind::Invalid => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestInvalid,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Unsupported => {
-                OutputRegistrationError::registration(RegistrationFailureEvidence::manifest(
-                    OwnershipFailureReason::ManifestUnsupported,
-                    None,
-                ))
-            }
-            ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
-                RegistrationFailureEvidence::manifest(OwnershipFailureReason::ManifestLimit, None),
-            ),
-            ManifestCodecErrorKind::InternalInvariant => {
-                OutputRegistrationError::internal_invariant()
-            }
-        },
-    )?;
+    let manifest = CheckedOutputManifest::decode(&manifest_file.bytes, exporter)
+        .map_err(map_manifest_decode_error)?;
     preflight_manifest_capabilities(exporter, manifest.manifest())?;
     let _destinations = DestinationMap::try_from_manifest(output_root, manifest.manifest())?;
     let layout = OwnershipLayout::try_new(manifest.manifest())?;

@@ -2265,9 +2265,12 @@ fn rollback_after_commit(
     hooks: &dyn TransactionHooks,
 ) -> OutputRegistrationError {
     if !failure.progress.old_moved() {
+        // Only sibling staging or control entries can have changed before this
+        // point. The configured output root is still provably unchanged even
+        // when cleanup of those sibling entries fails.
         return match cleanup_before_old_move(parent, journal, failure.progress, hooks) {
             Ok(()) => failure.error.with_output_state(OutputState::Unchanged),
-            Err(error) => error,
+            Err(error) => error.with_output_state(OutputState::Unchanged),
         };
     }
     if failure.progress.backup_removed() {
@@ -2276,7 +2279,8 @@ fn rollback_after_commit(
 
     match restore_prior_root(parent, journal, failure.progress, hooks) {
         Ok(state) => failure.error.with_output_state(state),
-        Err(error) => error,
+        Err(error) if error.output_state() == OutputState::Restored => error,
+        Err(error) => error.with_output_state(OutputState::Indeterminate),
     }
 }
 
@@ -2289,8 +2293,9 @@ fn cleanup_before_old_move(
     let mut removed =
         remove_rollback_staging(parent, journal.staging(), OutputState::Unchanged, hooks)?;
 
-    let control_id = OutputRootControlId::derive(journal.output_root())
-        .map_err(|_| OutputRegistrationError::internal_invariant())?;
+    let control_id = OutputRootControlId::derive(journal.output_root()).map_err(|_| {
+        OutputRegistrationError::internal_invariant().with_output_state(OutputState::Unchanged)
+    })?;
     if progress.owns_journal_temporary() {
         removed |= remove_rollback_control(
             parent,
@@ -2425,8 +2430,9 @@ fn restore_prior_root(
     }
 
     remove_rollback_staging(parent, journal.staging(), OutputState::Restored, hooks)?;
-    let control_id = OutputRootControlId::derive(journal.output_root())
-        .map_err(|_| OutputRegistrationError::internal_invariant())?;
+    let control_id = OutputRootControlId::derive(journal.output_root()).map_err(|_| {
+        OutputRegistrationError::internal_invariant().with_output_state(OutputState::Restored)
+    })?;
     if progress.owns_journal_temporary() {
         remove_rollback_control(
             parent,
@@ -3419,6 +3425,64 @@ mod tests {
             ));
             assert!(prepared.check(project.path()).unwrap().is_matched());
         }
+    }
+
+    #[test]
+    fn rollback_failures_report_the_strongest_proven_output_state() {
+        let old = artifact_set(&[(&["loader.mjs"], b"old")]);
+        let new = artifact_set(&[(&["loader.mjs"], b"new")]);
+        let target = target();
+
+        let unchanged_project = TempProject::new();
+        install_old_output(&unchanged_project, &target, &old);
+        let prepared = PreparedOutput::try_new(&target, &new).unwrap();
+        let unchanged_error = write_with_hooks(
+            &prepared,
+            &unchanged_project,
+            0x93,
+            &PointFailureHooks::new([FaultPoint::OldRootRename, FaultPoint::RollbackCleanup]),
+        )
+        .unwrap_err();
+        assert_eq!(unchanged_error.output_state(), OutputState::Unchanged);
+        assert!(PreparedOutput::try_new(&target, &old)
+            .unwrap()
+            .check(unchanged_project.path())
+            .is_ok_and(|comparison| comparison.is_matched()));
+
+        let restored_project = TempProject::new();
+        install_old_output(&restored_project, &target, &old);
+        let restored_error = write_with_hooks(
+            &prepared,
+            &restored_project,
+            0x94,
+            &PointFailureHooks::new([
+                FaultPoint::NewRootDirectoryFlush,
+                FaultPoint::RollbackCleanup,
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(restored_error.output_state(), OutputState::Restored);
+        assert!(PreparedOutput::try_new(&target, &old)
+            .unwrap()
+            .check(restored_project.path())
+            .is_ok_and(|comparison| comparison.is_matched()));
+
+        let indeterminate_project = TempProject::new();
+        install_old_output(&indeterminate_project, &target, &old);
+        let indeterminate_error = write_with_hooks(
+            &prepared,
+            &indeterminate_project,
+            0x95,
+            &PointFailureHooks::new([
+                FaultPoint::NewRootDirectoryFlush,
+                FaultPoint::RollbackRename,
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(
+            indeterminate_error.output_state(),
+            OutputState::Indeterminate
+        );
     }
 
     #[derive(Debug, Clone, Copy)]
