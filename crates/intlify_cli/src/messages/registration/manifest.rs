@@ -26,8 +26,8 @@ pub(super) const OUTPUT_MANIFEST_WIRE_LIMIT: usize = 16_777_216;
 
 const MANIFEST_SCHEMA_MAJOR: u16 = 0;
 const MANIFEST_SCHEMA_MINOR: u16 = 1;
-const BLAKE3_ALGORITHM: &str = "blake3-256";
-const LOWER_HEX: &[u8; 16] = b"0123456789abcdef";
+pub(super) const BLAKE3_ALGORITHM: &str = "blake3-256";
+pub(super) const LOWER_HEX: &[u8; 16] = b"0123456789abcdef";
 pub(super) const ESM_MODULE_KIND: &str = "dev.intlify/esm-module";
 pub(super) const ESM_LOADER_KIND: &str = "dev.intlify/loader-map";
 pub(super) const ESM_ACCESSOR_KIND: &str = "dev.intlify/typescript-accessor";
@@ -194,7 +194,7 @@ impl Blake3Fingerprint {
         Self(*blake3::hash(bytes).as_bytes())
     }
 
-    fn from_lower_hex(value: &str) -> Option<Self> {
+    pub(super) fn from_lower_hex(value: &str) -> Option<Self> {
         if value.len() != 64 {
             return None;
         }
@@ -496,7 +496,7 @@ fn map_export_error(error: &ExportError) -> ManifestCodecError {
     }
 }
 
-fn exact_object<'a>(
+pub(super) fn exact_object<'a>(
     value: &'a Value,
     names: &[&str],
 ) -> Result<Vec<&'a Value>, ManifestCodecError> {
@@ -510,12 +510,12 @@ fn exact_object<'a>(
         .collect()
 }
 
-fn plain_u16(value: &Value) -> Result<u16, ManifestCodecError> {
+pub(super) fn plain_u16(value: &Value) -> Result<u16, ManifestCodecError> {
     let value = plain_u64(value)?;
     u16::try_from(value).map_err(|_| ManifestCodecError::invalid())
 }
 
-fn plain_u64(value: &Value) -> Result<u64, ManifestCodecError> {
+pub(super) fn plain_u64(value: &Value) -> Result<u64, ManifestCodecError> {
     let number = value.as_number().ok_or_else(ManifestCodecError::invalid)?;
     let spelling = number.to_string();
     if spelling.is_empty()
@@ -533,7 +533,7 @@ fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-fn parse_unique_json(source: &str) -> Result<Value, ManifestCodecError> {
+pub(super) fn parse_unique_json(source: &str) -> Result<Value, ManifestCodecError> {
     let mut deserializer = serde_json::Deserializer::from_str(source);
     UniqueJsonValueSeed
         .deserialize(&mut deserializer)
@@ -652,46 +652,58 @@ fn encode_manifest(manifest: &OutputManifest) -> Result<Box<[u8]>, ManifestCodec
     Ok(writer.finish())
 }
 
-struct CanonicalJsonWriter {
+pub(super) struct CanonicalJsonWriter {
     bytes: Vec<u8>,
+    limit: usize,
 }
 
 impl CanonicalJsonWriter {
     fn new() -> Self {
-        Self { bytes: Vec::new() }
+        Self::with_limit(OUTPUT_MANIFEST_WIRE_LIMIT)
     }
 
-    fn finish(self) -> Box<[u8]> {
+    pub(super) fn with_limit(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    pub(super) fn finish(self) -> Box<[u8]> {
         self.bytes.into_boxed_slice()
     }
 
-    fn bytes(&mut self, bytes: &[u8]) -> Result<(), ManifestCodecError> {
+    pub(super) fn bytes(&mut self, bytes: &[u8]) -> Result<(), ManifestCodecError> {
         let next = self
             .bytes
             .len()
             .checked_add(bytes.len())
             .ok_or_else(ManifestCodecError::limit)?;
-        if next > OUTPUT_MANIFEST_WIRE_LIMIT {
+        if next > self.limit {
             return Err(ManifestCodecError::limit());
         }
         self.bytes.extend_from_slice(bytes);
         Ok(())
     }
 
-    fn indent(&mut self, level: usize) -> Result<(), ManifestCodecError> {
+    pub(super) fn indent(&mut self, level: usize) -> Result<(), ManifestCodecError> {
         for _ in 0..level {
             self.bytes(b"  ")?;
         }
         Ok(())
     }
 
-    fn member_name(&mut self, level: usize, name: &str) -> Result<(), ManifestCodecError> {
+    pub(super) fn member_name(
+        &mut self,
+        level: usize,
+        name: &str,
+    ) -> Result<(), ManifestCodecError> {
         self.indent(level)?;
         self.string(name)?;
         self.bytes(b": ")
     }
 
-    fn member_u64(
+    pub(super) fn member_u64(
         &mut self,
         level: usize,
         name: &str,
@@ -703,7 +715,7 @@ impl CanonicalJsonWriter {
         self.bytes(if comma { b",\n" } else { b"\n" })
     }
 
-    fn string(&mut self, value: &str) -> Result<(), ManifestCodecError> {
+    pub(super) fn string(&mut self, value: &str) -> Result<(), ManifestCodecError> {
         self.bytes(b"\"")?;
         for character in value.chars() {
             match character {
