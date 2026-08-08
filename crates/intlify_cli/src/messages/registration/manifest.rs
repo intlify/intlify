@@ -8,7 +8,6 @@
 //! reconstructs common artifact types, enforces the independent wire ceiling,
 //! and keeps payload and manifest fingerprints in separate typed values.
 
-use std::cell::Cell;
 use std::fmt;
 
 use intlify_export::{
@@ -29,9 +28,9 @@ const MANIFEST_SCHEMA_MAJOR: u16 = 0;
 const MANIFEST_SCHEMA_MINOR: u16 = 1;
 const BLAKE3_ALGORITHM: &str = "blake3-256";
 const LOWER_HEX: &[u8; 16] = b"0123456789abcdef";
-const ESM_MODULE_KIND: &str = "dev.intlify/esm-module";
-const ESM_LOADER_KIND: &str = "dev.intlify/loader-map";
-const ESM_ACCESSOR_KIND: &str = "dev.intlify/typescript-accessor";
+pub(super) const ESM_MODULE_KIND: &str = "dev.intlify/esm-module";
+pub(super) const ESM_LOADER_KIND: &str = "dev.intlify/loader-map";
+pub(super) const ESM_ACCESSOR_KIND: &str = "dev.intlify/typescript-accessor";
 const ESM_MODULE_LIMIT: usize = 1_024;
 const ESM_LOADER_LIMIT: usize = 1;
 const ESM_ACCESSOR_LIMIT: usize = 4_096;
@@ -535,42 +534,33 @@ fn usize_to_u64(value: usize) -> u64 {
 }
 
 fn parse_unique_json(source: &str) -> Result<Value, ManifestCodecError> {
-    let duplicate_found = Cell::new(false);
     let mut deserializer = serde_json::Deserializer::from_str(source);
-    UniqueJsonValueSeed {
-        duplicate_found: &duplicate_found,
-    }
-    .deserialize(&mut deserializer)
-    .and_then(|value| {
-        deserializer.end()?;
-        Ok(value)
-    })
-    .map_err(|_| ManifestCodecError::invalid())
+    UniqueJsonValueSeed
+        .deserialize(&mut deserializer)
+        .and_then(|value| {
+            deserializer.end()?;
+            Ok(value)
+        })
+        .map_err(|_| ManifestCodecError::invalid())
 }
 
 #[derive(Clone, Copy)]
-struct UniqueJsonValueSeed<'a> {
-    duplicate_found: &'a Cell<bool>,
-}
+struct UniqueJsonValueSeed;
 
-struct UniqueJsonValueVisitor<'a> {
-    duplicate_found: &'a Cell<bool>,
-}
+struct UniqueJsonValueVisitor;
 
-impl<'de> DeserializeSeed<'de> for UniqueJsonValueSeed<'_> {
+impl<'de> DeserializeSeed<'de> for UniqueJsonValueSeed {
     type Value = Value;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_any(UniqueJsonValueVisitor {
-            duplicate_found: self.duplicate_found,
-        })
+        deserializer.deserialize_any(UniqueJsonValueVisitor)
     }
 }
 
-impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
+impl<'de> Visitor<'de> for UniqueJsonValueVisitor {
     type Value = Value;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -622,9 +612,7 @@ impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
         A: SeqAccess<'de>,
     {
         let mut values = Vec::new();
-        while let Some(value) = sequence.next_element_seed(UniqueJsonValueSeed {
-            duplicate_found: self.duplicate_found,
-        })? {
+        while let Some(value) = sequence.next_element_seed(UniqueJsonValueSeed)? {
             values.push(value);
         }
         Ok(Value::Array(values))
@@ -637,12 +625,9 @@ impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
         let mut values = serde_json::Map::new();
         while let Some(key) = object.next_key::<String>()? {
             if values.contains_key(&key) {
-                self.duplicate_found.set(true);
                 return Err(de::Error::custom("duplicate object member"));
             }
-            let value = object.next_value_seed(UniqueJsonValueSeed {
-                duplicate_found: self.duplicate_found,
-            })?;
+            let value = object.next_value_seed(UniqueJsonValueSeed)?;
             values.insert(key, value);
         }
         Ok(Value::Object(values))

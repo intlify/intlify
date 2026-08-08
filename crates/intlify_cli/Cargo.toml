@@ -20,6 +20,7 @@ workspace = true
 
 [dependencies]
 blake3 = "=1.8.5"
+# Filesystem-capability crates are exact-pinned so their no-follow semantics cannot drift.
 cap-fs-ext = "=4.0.2"
 cap-std = "=4.0.2"
 file-id = "0.2"
@@ -33,8 +34,11 @@ intlify_resource = { path = "../intlify_resource" }
 ox_mf2_parser = { path = "../ox_mf2_parser" }
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
 unicode-normalization = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
 
 [build-dependencies]
 blake3 = "=1.8.5"

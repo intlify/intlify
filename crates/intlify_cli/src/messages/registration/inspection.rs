@@ -1038,21 +1038,20 @@ fn snapshot_stamp(metadata: &Metadata) -> Result<SnapshotStamp, OutputRegistrati
 }
 
 #[cfg(windows)]
+#[allow(clippy::unnecessary_wraps)]
 fn snapshot_stamp(metadata: &Metadata) -> Result<SnapshotStamp, OutputRegistrationError> {
-    use cap_std::fs::MetadataExt;
+    use cap_fs_ext::MetadataExt as StableMetadataExt;
+    use cap_std::fs::MetadataExt as WindowsMetadataExt;
 
-    let Some(volume) = metadata.volume_serial_number() else {
-        return Err(filesystem_no_follow_unsupported());
-    };
-    let Some(index) = metadata.file_index() else {
-        return Err(filesystem_no_follow_unsupported());
-    };
+    // Every metadata value in this inspection path comes from an opened handle.
+    // cap-fs-ext exposes that stable identity without relying on nightly-only
+    // std::os::windows by-handle metadata methods.
     Ok(SnapshotStamp {
-        identity_a: u64::from(volume),
-        identity_b: index,
+        identity_a: StableMetadataExt::dev(metadata),
+        identity_b: StableMetadataExt::ino(metadata),
         len: metadata.len(),
-        change_a: i64::try_from(metadata.last_write_time()).unwrap_or(i64::MAX),
-        change_b: i64::try_from(metadata.creation_time()).unwrap_or(i64::MAX),
+        change_a: i64::try_from(WindowsMetadataExt::last_write_time(metadata)).unwrap_or(i64::MAX),
+        change_b: i64::try_from(WindowsMetadataExt::creation_time(metadata)).unwrap_or(i64::MAX),
     })
 }
 

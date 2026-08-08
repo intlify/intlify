@@ -15,6 +15,7 @@ use intlify_export::ExportArtifactPath;
 use super::error::OutputRegistrationError;
 use super::manifest::{CheckedOutputManifest, OutputManifest};
 
+/// One manifest record plus 5,121 expected paths and 5,121 prior-only paths.
 pub(super) const CHECK_DIFFERENCE_LIMIT: usize = 10_243;
 
 /// Complete check result for one selected target.
@@ -407,6 +408,31 @@ mod tests {
                 .unwrap()
                 .differences(),
             [CheckDifference::ArtifactMissing { path }]
+        );
+    }
+
+    #[test]
+    fn unknown_payload_equality_is_a_payload_difference() {
+        let expected = manifest(vec![artifact(
+            "a",
+            "dev.intlify/esm-module",
+            "text/javascript",
+            b"payload",
+        )]);
+        let path = ExportArtifactPath::try_new(["a"]).unwrap();
+        let observed = ManagedOutputObservation::new(
+            expected.clone(),
+            true,
+            BTreeMap::from([(path.clone(), ObservedArtifactFile::present(None))]),
+        );
+        assert_eq!(
+            CheckComparison::compare_managed(&expected, &observed)
+                .unwrap()
+                .differences(),
+            [CheckDifference::ArtifactChanged {
+                path,
+                components: Box::new([ArtifactChangedComponent::Payload]),
+            }]
         );
     }
 

@@ -8,6 +8,8 @@
 //! spelling during host conversion, and rejects control-name or host-equivalent
 //! collisions. It never truncates, escapes, suffixes, or writes a path.
 
+use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Bound::{Excluded, Included, Unbounded};
 use std::path::{Path, PathBuf};
 
 use intlify_export::{
@@ -21,11 +23,11 @@ use super::error::{
     DestinationCollisionEvidence, DestinationMappingEvidence, DestinationMappingReason,
     EvidencePath, OutputRegistrationError, UnsupportedCapabilityEvidence,
 };
-use super::manifest::{ManifestArtifact, OutputManifest, OUTPUT_MANIFEST_BASENAME};
+use super::manifest::{
+    ManifestArtifact, OutputManifest, ESM_ACCESSOR_KIND, ESM_LOADER_KIND, ESM_MODULE_KIND,
+    OUTPUT_MANIFEST_BASENAME,
+};
 
-const ESM_MODULE_KIND: &str = "dev.intlify/esm-module";
-const LOADER_MAP_KIND: &str = "dev.intlify/loader-map";
-const TYPESCRIPT_ACCESSOR_KIND: &str = "dev.intlify/typescript-accessor";
 const JAVASCRIPT_MEDIA_TYPE: &str = "text/javascript";
 const TYPESCRIPT_MEDIA_TYPE: &str = "text/typescript";
 
@@ -77,14 +79,13 @@ impl DestinationMap {
         paths: impl Iterator<Item = &'a ExportArtifactPath>,
     ) -> Result<Self, OutputRegistrationError> {
         let mut mapped = Vec::new();
+        let mut relative_paths = BTreeSet::new();
+        let mut equivalence_keys = BTreeSet::new();
         for path in paths {
             let candidate = map_artifact(namespace, output_root, path)?;
-            if mapped.iter().any(|prior: &MappedArtifactDestination| {
-                path_is_proper_prefix(&prior.relative_path, &candidate.relative_path)
-                    || path_is_proper_prefix(&candidate.relative_path, &prior.relative_path)
-                    || key_is_proper_prefix(&prior.equivalence_key, &candidate.equivalence_key)
-                    || key_is_proper_prefix(&candidate.equivalence_key, &prior.equivalence_key)
-            }) {
+            if path_prefix_conflict(&relative_paths, &candidate.relative_path)
+                || key_prefix_conflict(&equivalence_keys, &candidate.equivalence_key)
+            {
                 return Err(OutputRegistrationError::destination_mapping(
                     DestinationMappingEvidence::new(
                         DestinationMappingReason::DestinationUnsupported,
@@ -94,6 +95,8 @@ impl DestinationMap {
                     ),
                 ));
             }
+            relative_paths.insert(candidate.relative_path.clone());
+            equivalence_keys.insert(candidate.equivalence_key.clone());
             mapped.push(candidate);
         }
 
@@ -113,31 +116,27 @@ impl DestinationMap {
             ));
         }
 
-        for first_index in 0..mapped.len() {
-            for second_index in (first_index + 1)..mapped.len() {
-                let first = &mapped[first_index];
-                let second = &mapped[second_index];
-                if first.relative_path == second.relative_path {
-                    return Err(OutputRegistrationError::destination_collision(
-                        DestinationCollisionEvidence::MappedPath {
-                            first_artifact_path: first.logical_path.clone(),
-                            second_artifact_path: second.logical_path.clone(),
-                            mapped_destination: first.evidence_path.clone(),
-                        },
-                    ));
+        if let Some((first_index, second_index, kind)) = first_destination_collision(&mapped) {
+            let first = &mapped[first_index];
+            let second = &mapped[second_index];
+            let evidence = match kind {
+                DestinationCollisionKind::MappedPath => DestinationCollisionEvidence::MappedPath {
+                    first_artifact_path: first.logical_path.clone(),
+                    second_artifact_path: second.logical_path.clone(),
+                    mapped_destination: first.evidence_path.clone(),
+                },
+                DestinationCollisionKind::HostEquivalentPath => {
+                    DestinationCollisionEvidence::HostEquivalentPath {
+                        first_artifact_path: first.logical_path.clone(),
+                        second_artifact_path: second.logical_path.clone(),
+                        mapped_destination: first.evidence_path.clone(),
+                    }
                 }
-                if first.equivalence_key == second.equivalence_key {
-                    return Err(OutputRegistrationError::destination_collision(
-                        DestinationCollisionEvidence::HostEquivalentPath {
-                            first_artifact_path: first.logical_path.clone(),
-                            second_artifact_path: second.logical_path.clone(),
-                            mapped_destination: first.evidence_path.clone(),
-                        },
-                    ));
-                }
-            }
+            };
+            return Err(OutputRegistrationError::destination_collision(evidence));
         }
 
+        mapped.sort_by(|left, right| left.logical_path.cmp(&right.logical_path));
         Ok(Self {
             artifacts: mapped.into_boxed_slice(),
         })
@@ -147,6 +146,7 @@ impl DestinationMap {
         &self.artifacts
     }
 
+    /// Look up a logical path in the canonical order established by construction.
     pub(super) fn artifact(&self, path: &ExportArtifactPath) -> Option<&MappedArtifactDestination> {
         self.artifacts
             .binary_search_by(|artifact| artifact.logical_path.cmp(path))
@@ -204,55 +204,52 @@ trait CapabilityArtifact {
 
 impl CapabilityArtifact for ExportArtifact {
     fn path(&self) -> &ExportArtifactPath {
-        self.logical_path()
+        ExportArtifact::logical_path(self)
     }
 
     fn kind(&self) -> &ExportArtifactKind {
-        self.kind()
+        ExportArtifact::kind(self)
     }
 
     fn format_version(&self) -> ExportArtifactFormatVersion {
-        self.format_version()
+        ExportArtifact::format_version(self)
     }
 
     fn media_type(&self) -> Option<&ExportMediaType> {
-        self.metadata().media_type()
+        ExportArtifact::metadata(self).media_type()
     }
 
     fn relationships(&self) -> &[ExportArtifactRelationship] {
-        self.metadata().relationships()
+        ExportArtifact::metadata(self).relationships()
     }
 }
 
 impl CapabilityArtifact for ManifestArtifact {
     fn path(&self) -> &ExportArtifactPath {
-        self.path()
+        ManifestArtifact::path(self)
     }
 
     fn kind(&self) -> &ExportArtifactKind {
-        self.kind()
+        ManifestArtifact::kind(self)
     }
 
     fn format_version(&self) -> ExportArtifactFormatVersion {
-        self.format_version()
+        ManifestArtifact::format_version(self)
     }
 
     fn media_type(&self) -> Option<&ExportMediaType> {
-        self.media_type()
+        ManifestArtifact::media_type(self)
     }
 
     fn relationships(&self) -> &[ExportArtifactRelationship] {
-        self.relationships()
+        ManifestArtifact::relationships(self)
     }
 }
 
 fn preflight_esm<T: CapabilityArtifact>(artifacts: &[T]) -> Result<(), OutputRegistrationError> {
     for artifact in artifacts {
         let kind = artifact.kind().as_str();
-        if !matches!(
-            kind,
-            ESM_MODULE_KIND | LOADER_MAP_KIND | TYPESCRIPT_ACCESSOR_KIND
-        ) {
+        if !matches!(kind, ESM_MODULE_KIND | ESM_LOADER_KIND | ESM_ACCESSOR_KIND) {
             return Err(OutputRegistrationError::unsupported_capability(
                 UnsupportedCapabilityEvidence::ArtifactKind {
                     artifact_path: artifact.path().clone(),
@@ -269,7 +266,7 @@ fn preflight_esm<T: CapabilityArtifact>(artifacts: &[T]) -> Result<(), OutputReg
                 },
             ));
         }
-        let expected_media_type = if kind == TYPESCRIPT_ACCESSOR_KIND {
+        let expected_media_type = if kind == ESM_ACCESSOR_KIND {
             TYPESCRIPT_MEDIA_TYPE
         } else {
             JAVASCRIPT_MEDIA_TYPE
@@ -299,7 +296,7 @@ fn preflight_esm<T: CapabilityArtifact>(artifacts: &[T]) -> Result<(), OutputReg
                 .binary_search_by(|candidate| candidate.path().cmp(relationship.target()))
                 .ok()
                 .map(|index| artifacts[index].kind().as_str());
-            if artifact.kind().as_str() != LOADER_MAP_KIND || target_kind != Some(ESM_MODULE_KIND) {
+            if artifact.kind().as_str() != ESM_LOADER_KIND || target_kind != Some(ESM_MODULE_KIND) {
                 return Err(OutputRegistrationError::unsupported_capability(
                     UnsupportedCapabilityEvidence::RelationshipGraph {
                         artifact_path: Some(artifact.path().clone()),
@@ -459,10 +456,40 @@ fn host_equivalent_segment(namespace: HostNamespace, segment: &str) -> String {
     }
 }
 
+fn path_prefix_conflict(paths: &BTreeSet<PathBuf>, candidate: &PathBuf) -> bool {
+    paths
+        .range::<PathBuf, _>((Unbounded, Excluded(candidate)))
+        .next_back()
+        .is_some_and(|prior| path_is_proper_prefix(prior, candidate))
+        || paths
+            .range::<PathBuf, _>((Included(candidate), Unbounded))
+            .next()
+            .is_some_and(|next| path_is_proper_prefix(candidate, next))
+}
+
+fn key_prefix_conflict(
+    keys: &BTreeSet<HostEquivalenceKey>,
+    candidate: &HostEquivalenceKey,
+) -> bool {
+    keys.range::<HostEquivalenceKey, _>((Unbounded, Excluded(candidate)))
+        .next_back()
+        .is_some_and(|prior| key_is_proper_prefix(prior, candidate))
+        || keys
+            .range::<HostEquivalenceKey, _>((Included(candidate), Unbounded))
+            .next()
+            .is_some_and(|next| key_is_proper_prefix(candidate, next))
+}
+
 fn path_is_proper_prefix(first: &Path, second: &Path) -> bool {
-    let first = first.components().collect::<Vec<_>>();
-    let second = second.components().collect::<Vec<_>>();
-    first.len() < second.len() && first.iter().zip(&second).all(|(left, right)| left == right)
+    let mut first = first.components();
+    let mut second = second.components();
+    loop {
+        match (first.next(), second.next()) {
+            (Some(left), Some(right)) if left == right => {}
+            (None, Some(_)) => return true,
+            _ => return false,
+        }
+    }
 }
 
 fn key_is_proper_prefix(first: &HostEquivalenceKey, second: &HostEquivalenceKey) -> bool {
@@ -472,6 +499,61 @@ fn key_is_proper_prefix(first: &HostEquivalenceKey, second: &HostEquivalenceKey)
             .iter()
             .zip(second.0.iter())
             .all(|(left, right)| left == right)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum DestinationCollisionKind {
+    MappedPath,
+    HostEquivalentPath,
+}
+
+fn first_destination_collision(
+    artifacts: &[MappedArtifactDestination],
+) -> Option<(usize, usize, DestinationCollisionKind)> {
+    let mut relative_paths = BTreeMap::<&Path, usize>::new();
+    let mut equivalence_keys = BTreeMap::<&HostEquivalenceKey, usize>::new();
+    let mut selected = None;
+
+    for (second_index, artifact) in artifacts.iter().enumerate() {
+        let relative_path = artifact.relative_path.as_path();
+        if let Some(&first_index) = relative_paths.get(relative_path) {
+            retain_earlier_collision(
+                &mut selected,
+                (
+                    first_index,
+                    second_index,
+                    DestinationCollisionKind::MappedPath,
+                ),
+            );
+        } else {
+            relative_paths.insert(relative_path, second_index);
+        }
+
+        if let Some(&first_index) = equivalence_keys.get(&artifact.equivalence_key) {
+            retain_earlier_collision(
+                &mut selected,
+                (
+                    first_index,
+                    second_index,
+                    DestinationCollisionKind::HostEquivalentPath,
+                ),
+            );
+        } else {
+            equivalence_keys.insert(&artifact.equivalence_key, second_index);
+        }
+    }
+
+    selected
+}
+
+fn retain_earlier_collision(
+    selected: &mut Option<(usize, usize, DestinationCollisionKind)>,
+    candidate: (usize, usize, DestinationCollisionKind),
+) {
+    match selected {
+        Some(current) if *current <= candidate => {}
+        _ => *selected = Some(candidate),
+    }
 }
 
 #[cfg(test)]
@@ -634,6 +716,50 @@ mod tests {
                 if evidence.reason() == DestinationMappingReason::DestinationUnsupported
                     && evidence.artifact_path() == &child
         ));
+    }
+
+    #[test]
+    fn collision_selection_preserves_first_then_second_input_order() {
+        let root = DeliveryOutputRoot::try_new("out").unwrap();
+        let first = ExportArtifactPath::try_new(["A.mjs"]).unwrap();
+        let later_first = ExportArtifactPath::try_new(["B.mjs"]).unwrap();
+        let later_second = ExportArtifactPath::try_new(["b.MJS"]).unwrap();
+        let second = ExportArtifactPath::try_new(["a.MJS"]).unwrap();
+        let error = DestinationMap::try_from_paths_with_namespace(
+            HostNamespace::Windows,
+            &root,
+            [&first, &later_first, &later_second, &second].into_iter(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.evidence(),
+            OutputRegistrationErrorEvidence::DestinationCollision(
+                DestinationCollisionEvidence::HostEquivalentPath {
+                    first_artifact_path,
+                    second_artifact_path,
+                    ..
+                }
+            ) if first_artifact_path == &first && second_artifact_path == &second
+        ));
+    }
+
+    #[test]
+    fn successful_mapping_canonicalizes_storage_for_binary_lookup() {
+        let root = DeliveryOutputRoot::try_new("out").unwrap();
+        let first = ExportArtifactPath::try_new(["a.mjs"]).unwrap();
+        let second = ExportArtifactPath::try_new(["b.mjs"]).unwrap();
+        let mapping = DestinationMap::try_from_paths_with_namespace(
+            HostNamespace::PosixExact,
+            &root,
+            [&second, &first].into_iter(),
+        )
+        .unwrap();
+        assert_eq!(
+            mapping.artifacts()[0].logical_path(),
+            &first,
+            "successful mappings must be stored in logical-path order"
+        );
+        assert_eq!(mapping.artifact(&first).unwrap().logical_path(), &first);
     }
 
     #[test]

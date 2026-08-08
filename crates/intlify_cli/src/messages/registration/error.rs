@@ -569,6 +569,30 @@ mod tests {
                 error.kind(),
                 OutputRegistrationErrorKind::DestinationCollision
             );
+            match error.evidence() {
+                OutputRegistrationErrorEvidence::DestinationCollision(
+                    DestinationCollisionEvidence::MappedPath {
+                        first_artifact_path,
+                        second_artifact_path,
+                        mapped_destination,
+                    }
+                    | DestinationCollisionEvidence::HostEquivalentPath {
+                        first_artifact_path,
+                        second_artifact_path,
+                        mapped_destination,
+                    },
+                ) => {
+                    assert_eq!(first_artifact_path, &first);
+                    assert_eq!(second_artifact_path, &second);
+                    assert_eq!(mapped_destination, &mapped);
+                }
+                OutputRegistrationErrorEvidence::DestinationCollision(
+                    DestinationCollisionEvidence::ReservedManifest {
+                        first_artifact_path,
+                    },
+                ) => assert_eq!(first_artifact_path, &first),
+                other => panic!("unexpected evidence: {other:?}"),
+            }
         }
     }
 }

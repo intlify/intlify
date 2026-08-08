@@ -31,6 +31,7 @@ pub(crate) struct PreparedOutput<'a> {
     output_root: &'a DeliveryOutputRoot,
     artifacts: &'a ExportArtifactSet,
     manifest: CheckedOutputManifest,
+    // The durable writer consumes this exact preflighted mapping next.
     destinations: DestinationMap,
 }
 
@@ -86,6 +87,7 @@ impl<'a> PreparedOutput<'a> {
         &self.manifest
     }
 
+    /// Return the exact mapping retained for the durable write transaction.
     const fn destinations(&self) -> &DestinationMap {
         &self.destinations
     }
@@ -95,7 +97,6 @@ impl<'a> PreparedOutput<'a> {
 mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicU64, Ordering};
 
     use intlify_contract::{LinkLimits, Locale};
     use intlify_export::{
@@ -103,6 +104,7 @@ mod tests {
         ExportArtifactPath, ExportArtifactPayload, ExportArtifactSet, ExportMediaType,
     };
     use intlify_linker::{DynamicReferenceMode, LinkPolicy, PlacementPolicy};
+    use tempfile::{Builder, TempDir};
 
     use super::difference::{ArtifactChangedComponent, CheckDifference};
     use super::error::{
@@ -115,34 +117,24 @@ mod tests {
         BuiltInExporterId, DeliveryTargetInput, ResolvedDeliveryTarget, ResolvedDeliveryTargets,
     };
 
-    static NEXT_TEMP_ROOT: AtomicU64 = AtomicU64::new(0);
-
-    struct TempProject(PathBuf);
+    struct TempProject(TempDir);
 
     impl TempProject {
         fn new() -> Self {
-            let id = NEXT_TEMP_ROOT.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "intlify-output-inspection-{}-{id}",
-                std::process::id()
-            ));
-            let _ = fs::remove_dir_all(&path);
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
+            Self(
+                Builder::new()
+                    .prefix("intlify-output-inspection-")
+                    .tempdir()
+                    .unwrap(),
+            )
         }
 
         fn path(&self) -> &Path {
-            &self.0
+            self.0.path()
         }
 
         fn output(&self) -> PathBuf {
-            self.0.join("generated/messages")
-        }
-    }
-
-    impl Drop for TempProject {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            self.path().join("generated/messages")
         }
     }
 
@@ -300,6 +292,8 @@ mod tests {
     fn host_equivalent_ancestor_directories_can_hold_injective_artifact_paths() {
         let project = TempProject::new();
         let set = module_set(&[(&["A", "x.mjs"], b"x"), (&["a", "y.mjs"], b"y")]);
+        // Case-insensitive hosts intentionally share one physical ancestor;
+        // the distinct final names keep the destination mapping injective.
         write_managed(&project, &set, true);
         let target = target();
         assert!(PreparedOutput::try_new(&target, &set)
