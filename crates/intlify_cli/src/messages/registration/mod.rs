@@ -221,9 +221,11 @@ mod tests {
         let bytes = if canonical {
             prepared.manifest().canonical_bytes().to_vec()
         } else {
-            let value: serde_json::Value =
-                serde_json::from_slice(prepared.manifest().canonical_bytes()).unwrap();
-            serde_json::to_vec(&value).unwrap()
+            // JSON permits trailing whitespace, so this preserves the decoded
+            // manifest while guaranteeing a byte-distinct noncanonical wire form.
+            let mut bytes = prepared.manifest().canonical_bytes().to_vec();
+            bytes.push(b' ');
+            bytes
         };
         fs::write(project.output().join(OUTPUT_MANIFEST_BASENAME), bytes).unwrap();
     }
