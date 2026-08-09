@@ -9,7 +9,9 @@
 //! values.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(not(windows))]
+use std::path::PathBuf;
 
 use serde_json::{json, Value};
 
@@ -17,6 +19,7 @@ mod common;
 
 use common::{json_stdout, run_in, temp_project_root, write};
 
+#[cfg(not(windows))]
 const MANIFEST_NAME: &str = ".intlify-output-manifest.json";
 
 fn write_project(root: &Path, targets: &Value) {
@@ -86,6 +89,7 @@ fn run_emit_text(root: &Path, options: &[&str]) -> intlify_cli::CliRunResult {
     run_in(&arguments, root)
 }
 
+#[cfg(not(windows))]
 fn artifact_path_from_manifest(output_root: &Path) -> PathBuf {
     let manifest: Value = serde_json::from_slice(
         &fs::read(output_root.join(MANIFEST_NAME)).expect("manifest should be readable"),
@@ -100,6 +104,7 @@ fn artifact_path_from_manifest(output_root: &Path) -> PathBuf {
         })
 }
 
+#[cfg(not(windows))]
 #[test]
 fn write_then_check_reports_durable_state_and_complete_differences() {
     let root = temp_project_root("messages-emit-write-check");
@@ -158,6 +163,41 @@ fn write_then_check_reports_durable_state_and_complete_differences() {
         different_json["results"][0]["differences"][0]["components"],
         json!(["payload"])
     );
+}
+
+#[cfg(windows)]
+#[test]
+fn write_reports_missing_durable_flush_without_publishing_output() {
+    let root = temp_project_root("messages-emit-windows-durable-flush");
+    write_project(&root, &json!([target("web", "generated/messages")]));
+
+    let result = run_emit(&root, &[]);
+    let json = json_stdout(&result);
+
+    assert_eq!(result.exit_code, 2);
+    assert!(result.stderr.is_empty());
+    assert_eq!(json["command"], "messages.emit");
+    assert_eq!(json["summary"]["status"], "error");
+    assert_eq!(json["summary"]["operation"], "write");
+    assert_eq!(json["summary"]["selectedTargets"], 1);
+    assert_eq!(json["summary"]["errorTargets"], 1);
+    assert_eq!(json["summary"]["errorCount"], 1);
+    assert_eq!(json["results"][0]["target"], "web");
+    assert_eq!(json["results"][0]["status"], "error");
+    assert_eq!(json["results"][0]["outputState"], "unchanged");
+    assert_eq!(
+        json["results"][0]["errors"][0]["code"],
+        "message_output_registration_failed"
+    );
+    assert_eq!(
+        json["results"][0]["errors"][0]["details"]["kind"],
+        "unsupported_capability"
+    );
+    assert_eq!(
+        json["results"][0]["errors"][0]["details"]["evidence"]["capability"],
+        "durable_flush"
+    );
+    assert!(!root.join("generated/messages").exists());
 }
 
 #[test]
@@ -286,19 +326,25 @@ fn one_target_failure_does_not_suppress_later_disjoint_targets() {
     );
     write(&root.join("generated/alpha/unowned.txt"), "unowned\n");
 
-    let result = run_emit(&root, &[]);
+    let result = run_emit(&root, &["--check"]);
     let json = json_stdout(&result);
 
     assert_eq!(result.exit_code, 2);
     assert_eq!(json["summary"]["status"], "error");
     assert_eq!(json["summary"]["selectedTargets"], 2);
     assert_eq!(json["summary"]["errorTargets"], 1);
+    assert_eq!(json["summary"]["errorCount"], 1);
     assert_eq!(json["results"][0]["target"], "alpha");
     assert_eq!(json["results"][0]["status"], "error");
     assert_eq!(json["results"][1]["target"], "omega");
-    assert_eq!(json["results"][1]["status"], "written");
+    assert_eq!(json["results"][1]["status"], "different");
+    assert_eq!(json["results"][1]["outputState"], "unchanged");
+    assert_eq!(
+        json["results"][1]["differences"],
+        json!([{ "kind": "output_missing" }])
+    );
     assert!(root.join("generated/alpha/unowned.txt").is_file());
-    assert!(root.join("generated/omega").join(MANIFEST_NAME).is_file());
+    assert!(!root.join("generated/omega").exists());
 }
 
 #[test]
@@ -312,15 +358,23 @@ fn explicit_target_selection_preserves_project_wide_analysis() {
         ]),
     );
 
-    let result = run_emit(&root, &["--target", "server"]);
+    let result = run_emit(&root, &["--target", "server", "--check"]);
     let json = json_stdout(&result);
 
-    assert_eq!(result.exit_code, 0);
+    assert_eq!(result.exit_code, 1);
+    assert_eq!(json["summary"]["status"], "failure");
+    assert_eq!(json["summary"]["operation"], "check");
     assert_eq!(json["summary"]["selectedTargets"], 1);
     assert_eq!(json["results"].as_array().unwrap().len(), 1);
     assert_eq!(json["results"][0]["target"], "server");
+    assert_eq!(json["results"][0]["status"], "different");
+    assert_eq!(json["results"][0]["outputState"], "unchanged");
+    assert_eq!(
+        json["results"][0]["differences"],
+        json!([{ "kind": "output_missing" }])
+    );
     assert!(!root.join("generated/browser").exists());
-    assert!(root.join("generated/server").join(MANIFEST_NAME).is_file());
+    assert!(!root.join("generated/server").exists());
 }
 
 #[test]
@@ -328,19 +382,23 @@ fn text_reporter_renders_the_same_target_state_as_the_typed_json_result() {
     let root = temp_project_root("messages-emit-text-reporter");
     write_project(&root, &json!([target("web", "generated/messages")]));
 
-    let text = run_emit_text(&root, &[]);
-    assert_eq!(text.exit_code, 0);
+    let text = run_emit_text(&root, &["--check"]);
+    assert_eq!(text.exit_code, 1);
     assert_eq!(
         text.stdout,
-        "messages emit: success\nweb: written (updated)\n"
+        "messages emit: failure\nweb: different (unchanged)\n  difference: output_missing\n"
     );
     assert!(text.stderr.is_empty());
 
     let json = json_stdout(&run_emit(&root, &["--check"]));
-    assert_eq!(json["summary"]["status"], "success");
+    assert_eq!(json["summary"]["status"], "failure");
     assert_eq!(json["results"][0]["target"], "web");
-    assert_eq!(json["results"][0]["status"], "matched");
+    assert_eq!(json["results"][0]["status"], "different");
     assert_eq!(json["results"][0]["outputState"], "unchanged");
+    assert_eq!(
+        json["results"][0]["differences"],
+        json!([{ "kind": "output_missing" }])
+    );
 }
 
 #[test]

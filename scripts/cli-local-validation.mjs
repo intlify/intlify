@@ -177,6 +177,93 @@ async function assertInstalledMessageDelivery({ installDirectory, installedBinPa
   await writeFile(join(projectRoot, 'locales', 'ja.json'), '{"title":"タイトル"}\n')
   await writeFile(join(projectRoot, 'src', 'app.ts'), "t('title')\n")
 
+  if (process.platform === 'win32') {
+    const failedWrite = await run(installedBinPath, ['messages', 'emit', '--reporter=json'], {
+      cwd: projectRoot,
+      capture: true,
+      allowExitCodes: [2]
+    })
+    const failedWriteEnvelope = JSON.parse(failedWrite.stdout)
+    assertEqual(failedWrite.stderr, '', 'installed message Windows write stderr')
+    assertEqual(failedWriteEnvelope.command, 'messages.emit', 'installed message Windows command')
+    assertEqual(
+      failedWriteEnvelope.summary?.status,
+      'error',
+      'installed message Windows write status'
+    )
+    assertEqual(
+      failedWriteEnvelope.summary?.operation,
+      'write',
+      'installed message Windows write operation'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.target,
+      'web',
+      'installed message Windows write target'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.status,
+      'error',
+      'installed message Windows write result'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.outputState,
+      'unchanged',
+      'installed message Windows output state'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.errors?.[0]?.code,
+      'message_output_registration_failed',
+      'installed message Windows error code'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.errors?.[0]?.details?.kind,
+      'unsupported_capability',
+      'installed message Windows error kind'
+    )
+    assertEqual(
+      failedWriteEnvelope.results?.[0]?.errors?.[0]?.details?.evidence?.capability,
+      'durable_flush',
+      'installed message Windows error capability'
+    )
+    assertEqual(existsSync(outputRoot), false, 'installed message Windows output publication')
+
+    const missing = await run(
+      installedBinPath,
+      ['messages', 'emit', '--check', '--reporter=json'],
+      { cwd: projectRoot, capture: true, allowExitCodes: [1] }
+    )
+    const missingEnvelope = JSON.parse(missing.stdout)
+    assertEqual(missing.stderr, '', 'installed message Windows check stderr')
+    assertEqual(
+      missingEnvelope.summary?.status,
+      'failure',
+      'installed message Windows check status'
+    )
+    assertEqual(
+      missingEnvelope.summary?.operation,
+      'check',
+      'installed message Windows check operation'
+    )
+    assertEqual(
+      missingEnvelope.results?.[0]?.status,
+      'different',
+      'installed message Windows check result'
+    )
+    assertEqual(
+      missingEnvelope.results?.[0]?.outputState,
+      'unchanged',
+      'installed message Windows check output state'
+    )
+    assertEqual(
+      missingEnvelope.results?.[0]?.differences?.[0]?.kind,
+      'output_missing',
+      'installed message Windows check difference'
+    )
+    assertEqual(existsSync(outputRoot), false, 'installed message Windows check mutation')
+    return
+  }
+
   const written = await run(installedBinPath, ['messages', 'emit', '--reporter=json'], {
     cwd: projectRoot,
     capture: true
