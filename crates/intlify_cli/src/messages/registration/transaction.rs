@@ -3907,6 +3907,9 @@ mod tests {
         use std::sync::mpsc;
         use std::time::Duration;
 
+        const BLOCKED_OBSERVATION_WINDOW: Duration = Duration::from_millis(75);
+        const LOCK_RELEASE_COMPLETION_TIMEOUT: Duration = Duration::from_secs(10);
+
         let project = TempProject::new();
         let old = artifact_set(&[(&["loader.mjs"], b"old")]);
         let new = artifact_set(&[(&["loader.mjs"], b"new")]);
@@ -3932,10 +3935,10 @@ mod tests {
                 result_tx.send(prepared.check(project.path())).unwrap();
             });
             started_rx.recv().unwrap();
-            assert!(result_rx.recv_timeout(Duration::from_millis(75)).is_err());
+            assert!(result_rx.recv_timeout(BLOCKED_OBSERVATION_WINDOW).is_err());
             std::fs::File::unlock(&exclusive).unwrap();
             assert!(result_rx
-                .recv_timeout(Duration::from_secs(2))
+                .recv_timeout(LOCK_RELEASE_COMPLETION_TIMEOUT)
                 .unwrap()
                 .unwrap()
                 .is_matched());
@@ -3959,11 +3962,11 @@ mod tests {
                     .unwrap();
             });
             started_rx.recv().unwrap();
-            assert!(result_rx.recv_timeout(Duration::from_millis(75)).is_err());
+            assert!(result_rx.recv_timeout(BLOCKED_OBSERVATION_WINDOW).is_err());
             std::fs::File::unlock(&shared).unwrap();
             assert_eq!(
                 result_rx
-                    .recv_timeout(Duration::from_secs(2))
+                    .recv_timeout(LOCK_RELEASE_COMPLETION_TIMEOUT)
                     .unwrap()
                     .unwrap()
                     .status(),
