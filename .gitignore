@@ -52,6 +52,7 @@ tools/mf-parser-bench/rs/target
 tools/format-bench/results
 tools/resource-bench/results
 tools/messages-bench/results
+examples/message-linker-cli/generated
 packages/ox-mf2-napi/*.node
 packages/ox-mf2-napi/native-binding.js
 packages/ox-mf2-napi/native-binding.d.ts

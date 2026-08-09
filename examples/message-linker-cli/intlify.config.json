@@ -1,0 +1,44 @@
+{
+  "$schema": "../../packages/cli/schema/config.schema.json",
+  "resources": {
+    "catalogs": [
+      {
+        "scope": "app",
+        "include": ["examples/message-linker-cli/locales/*.json"],
+        "locale": {
+          "from": "path",
+          "pattern": "examples/message-linker-cli/locales/{locale}.json"
+        }
+      }
+    ]
+  },
+  "messages": {
+    "locales": ["en", "ja"],
+    "coverageBaseline": {
+      "app": "en"
+    },
+    "producers": {
+      "js": {
+        "include": ["examples/message-linker-cli/src/**/*.ts"],
+        "recognizers": {
+          "t": {
+            "kind": "lookup",
+            "scope": "app",
+            "domain": "json-pointer",
+            "keySyntax": "dot-path"
+          }
+        }
+      }
+    },
+    "delivery": {
+      "targets": [
+        {
+          "name": "web",
+          "exporter": "esm",
+          "out": "examples/message-linker-cli/generated/messages",
+          "eagerLocales": ["en"]
+        }
+      ]
+    }
+  }
+}

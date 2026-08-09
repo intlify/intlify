@@ -81,6 +81,8 @@ intlify fmt .
 
 Message delivery is a project-wide operation. Its inputs come from `resources.catalogs` and `messages`; `messages emit` does not accept positional files, directories, globs, or stdin.
 
+A runnable repository example is available at [examples/message-linker-cli](../../examples/message-linker-cli/README.md).
+
 The following project links one `t()` call to the matching English and Japanese catalog entries:
 
 ```text
