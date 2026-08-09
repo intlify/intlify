@@ -34,6 +34,14 @@ const fixtures = JSON.parse(
 const checksumVectors = JSON.parse(
   readFileSync(new URL('../checksum-vectors.json', import.meta.url), 'utf8')
 )
+const packageManifest = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+)
+
+test('smoke benchmark exercises repeated checksum validation', () => {
+  expect(packageManifest.scripts['bench:smoke']).toContain('--iterations 2')
+  expect(packageManifest.scripts['bench:smoke']).toContain('--warmup-iterations 1')
+})
 
 test('active project-link boundaries cover every phase/cost and import the 013 descriptor by identity', () => {
   expect(() => assertValidBoundaryRegistry()).not.toThrow()

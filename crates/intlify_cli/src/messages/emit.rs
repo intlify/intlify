@@ -12,6 +12,9 @@ mod report;
 
 use std::path::Path;
 
+#[cfg(feature = "benchmark")]
+use std::time::Instant;
+
 use intlify_contract::{ArtifactContractError, LinkLimits};
 use intlify_export::{
     prepare_export, ExportArtifactSet, ExportPreparationError, ExportValidationLimits,
@@ -28,8 +31,7 @@ use self::report::{
 use super::delivery::{DeliveryTargetSelectionError, ResolvedDeliveryTarget};
 use super::exporter_registry::BuiltInExporterRegistry;
 use super::observation::{
-    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
-    NoopMessageBenchmarkObserver,
+    MessageBenchmarkObserver, MessageBenchmarkStage, NoopMessageBenchmarkObserver,
 };
 use super::orchestration::{
     link_project, link_project_with_observer, ProjectLinkError, ProjectLinkExecution,
@@ -254,6 +256,10 @@ fn execute_target(
     let (artifact_count, payload_bytes) = artifact_metrics(&artifacts);
     result.artifact_count = Some(artifact_count);
     result.payload_bytes = Some(payload_bytes);
+    #[cfg(feature = "benchmark")]
+    if observer.enabled() {
+        observer.observe_emit_artifacts(target.name().as_str(), &artifacts);
+    }
 
     let prepared_result = if observer.enabled() {
         PreparedOutput::try_new_with_observer(target, &artifacts, observer)
@@ -493,34 +499,52 @@ fn render_results_with_observer(
             ),
         })
     };
+    let report = EmitReport {
+        summary,
+        analysis,
+        results,
+        errors: Vec::new(),
+        exit_code,
+    };
     let observe_json = observer.enabled() && reporter == Reporter::Json;
+    #[cfg(feature = "benchmark")]
+    let json_observation = if observe_json {
+        let started = Instant::now();
+        let observation =
+            report::benchmark_analysis_checksum(&report.analysis).and_then(|analysis| {
+                report::benchmark_observation_checksum(&report).map(|result| (analysis, result))
+            });
+        observer.exclude_observation_overhead(started.elapsed());
+        if let Ok((analysis, _)) = observation {
+            observer.observe_emit_analysis(analysis);
+        }
+        Some(observation)
+    } else {
+        None
+    };
     if observe_json {
         observer.begin(
             MessageBenchmarkStage::MessagesEmitJson,
             "messages-emit-json",
         );
     }
-    let rendered = report::render(
-        EmitReport {
-            summary,
-            analysis,
-            results,
-            errors: Vec::new(),
-            exit_code,
-        },
-        reporter,
-        project_root,
-    );
+    let rendered = report::render(report, reporter, project_root);
     if observe_json {
         observer.finish(
             MessageBenchmarkStage::MessagesEmitJson,
             "messages-emit-json",
         );
-        observer.observe(
-            MessageBenchmarkStage::MessagesEmitJson,
-            "messages-emit-json",
-            observation_checksum(b"json_reporter", [rendered.stdout.as_bytes()]),
-        );
+        #[cfg(feature = "benchmark")]
+        match json_observation.expect("enabled JSON observation was prepared") {
+            Ok((_, checksum)) => observer.observe(
+                MessageBenchmarkStage::MessagesEmitJson,
+                "messages-emit-json",
+                checksum,
+            ),
+            Err(()) => observer.invalidate(),
+        }
+        #[cfg(not(feature = "benchmark"))]
+        observer.invalidate();
     }
     rendered
 }

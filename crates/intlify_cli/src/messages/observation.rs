@@ -10,6 +10,9 @@
 #[cfg(feature = "benchmark")]
 use std::time::Duration;
 
+#[cfg(feature = "benchmark")]
+use intlify_export::ExportArtifactSet;
+
 /// One exact project-link workflow measurement boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(not(feature = "benchmark"), allow(dead_code))]
@@ -262,6 +265,12 @@ pub(crate) trait MessageBenchmarkObserver {
         _checksum: u32,
     ) {
     }
+
+    #[cfg(feature = "benchmark")]
+    fn observe_emit_artifacts(&mut self, _target: &str, _artifacts: &ExportArtifactSet) {}
+
+    #[cfg(feature = "benchmark")]
+    fn observe_emit_analysis(&mut self, _checksum: u32) {}
 }
 
 /// Zero-overhead semantic observer selected by ordinary product execution.

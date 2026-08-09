@@ -2133,9 +2133,11 @@ fn measure_messages_emit(
                         || aggregate.per_iteration_checksum != summary.checksum
                     {
                         return Err(format!(
-                            "{}/{} changed across emit repetitions",
+                            "{}/{} changed across emit repetitions for {variant} at scale {scale}: expected checksum {}, observed {}",
                             stage.phase(),
-                            stage.cost()
+                            stage.cost(),
+                            aggregate.per_iteration_checksum,
+                            summary.checksum,
                         ));
                     }
                     aggregate.elapsed = aggregate.elapsed.saturating_add(summary.elapsed);

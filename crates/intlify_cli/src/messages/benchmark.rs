@@ -363,15 +363,7 @@ pub fn benchmark_messages_emit(
         &mut recorder,
     );
     recorder.finish(e2e_stage, "messages-emit");
-    let result_fields = [
-        result.exit_code.to_be_bytes().to_vec(),
-        result.stdout.as_bytes().to_vec(),
-        result.stderr.as_bytes().to_vec(),
-    ];
-    let checksum = observation_checksum(
-        e2e_stage.cost().as_bytes(),
-        result_fields.iter().map(Vec::as_slice),
-    );
+    let checksum = recorder.emit_e2e_checksum(e2e_stage, result.exit_code)?;
     recorder.observe(e2e_stage, "messages-emit", checksum);
     Ok(BenchmarkMessagesEmitExecution {
         result,
@@ -392,11 +384,106 @@ struct BenchmarkRecorder {
     active: Vec<ActiveMeasurement>,
     completed: Vec<BenchmarkMessageMeasurement>,
     observation_started: Vec<Option<Instant>>,
+    emit_artifacts: Vec<EmitArtifactObservation>,
+    emit_analysis_checksum: Option<u32>,
     invariant_failed: bool,
     invariant_detail: Option<String>,
 }
 
+#[derive(Debug)]
+struct EmitArtifactObservation {
+    target: Box<str>,
+    checksum: u32,
+}
+
 impl BenchmarkRecorder {
+    fn emit_e2e_checksum(
+        &self,
+        stage: MessageBenchmarkStage,
+        exit_code: i32,
+    ) -> Result<u32, BenchmarkProjectLinkError> {
+        let analysis = self
+            .emit_analysis_checksum
+            .ok_or_else(|| BenchmarkProjectLinkError {
+                message: "message benchmark command analysis observation is missing".to_owned(),
+            })?;
+        if self.emit_artifacts.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark export artifact observation is missing".to_owned(),
+            });
+        }
+        let link = self
+            .completed
+            .iter()
+            .filter(|measurement| {
+                measurement.stage == MessageBenchmarkStage::FindingAndPlanMaterialization
+                    && measurement.observation_complete
+            })
+            .collect::<Vec<_>>();
+        if link.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark link outcome observation is missing".to_owned(),
+            });
+        }
+        let registration = self
+            .completed
+            .iter()
+            .filter(|measurement| {
+                matches!(
+                    measurement.stage,
+                    MessageBenchmarkStage::OutputCapabilityPreflight
+                        | MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection
+                        | MessageBenchmarkStage::OutputStaging
+                        | MessageBenchmarkStage::OutputCommit
+                        | MessageBenchmarkStage::OutputCheckComparison
+                ) && measurement.observation_complete
+            })
+            .collect::<Vec<_>>();
+        if registration.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark registration observation is missing".to_owned(),
+            });
+        }
+        let typed_outcome = self.completed_checksum(
+            MessageBenchmarkStage::MessagesEmitJson,
+            "messages-emit-json",
+        )?;
+        let mut fields = vec![
+            b"canonical-command-analysis".to_vec(),
+            analysis.to_be_bytes().to_vec(),
+            b"canonical-link-outcome".to_vec(),
+            count_bytes(link.len()),
+        ];
+        for measurement in link {
+            fields.push(measurement.identity.as_bytes().to_vec());
+            fields.push(measurement.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(b"canonical-export-artifacts".to_vec());
+        fields.push(count_bytes(self.emit_artifacts.len()));
+        for observation in &self.emit_artifacts {
+            fields.push(observation.target.as_bytes().to_vec());
+            fields.push(observation.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(if stage == MessageBenchmarkStage::MessagesEmitCheckE2e {
+            b"check-classification".to_vec()
+        } else {
+            b"registration-classification".to_vec()
+        });
+        fields.push(count_bytes(registration.len()));
+        for measurement in registration {
+            fields.push(measurement.stage.boundary_id().as_bytes().to_vec());
+            fields.push(measurement.identity.as_bytes().to_vec());
+            fields.push(measurement.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(b"typed-command-outcome".to_vec());
+        fields.push(typed_outcome.to_be_bytes().to_vec());
+        fields.push(exit_code.to_be_bytes().to_vec());
+        Ok(observation_checksum(
+            stage.boundary_id().as_bytes(),
+            fields.iter().map(Vec::as_slice),
+        ))
+    }
+
     fn completed_checksum(
         &self,
         stage: MessageBenchmarkStage,
@@ -672,6 +759,68 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
         self.push_completed(stage, identity, elapsed, Some(checksum), None);
         self.exclude_observation_time(observation_started.elapsed());
     }
+
+    fn observe_emit_artifacts(&mut self, target: &str, artifacts: &ExportArtifactSet) {
+        let observation_started = Instant::now();
+        if self
+            .emit_artifacts
+            .iter()
+            .any(|observation| observation.target.as_ref() == target)
+        {
+            self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| format!("duplicate emit artifact observation for {target}"));
+        } else {
+            self.emit_artifacts.push(EmitArtifactObservation {
+                target: target.into(),
+                checksum: emit_artifact_checksum(target, artifacts),
+            });
+        }
+        self.exclude_observation_time(observation_started.elapsed());
+    }
+
+    fn observe_emit_analysis(&mut self, checksum: u32) {
+        let observation_started = Instant::now();
+        if self.emit_analysis_checksum.replace(checksum).is_some() {
+            self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| "duplicate emit command analysis observation".to_owned());
+        }
+        self.exclude_observation_time(observation_started.elapsed());
+    }
+}
+
+fn emit_artifact_checksum(target: &str, artifacts: &ExportArtifactSet) -> u32 {
+    let mut fields = vec![
+        b"target".to_vec(),
+        target.as_bytes().to_vec(),
+        b"artifacts".to_vec(),
+        count_bytes(artifacts.artifacts().len()),
+    ];
+    for artifact in artifacts.artifacts() {
+        fields.push(b"artifact".to_vec());
+        fields.push(count_bytes(artifact.logical_path().segments().len()));
+        for segment in artifact.logical_path().segments() {
+            fields.push(segment.as_str().as_bytes().to_vec());
+        }
+        fields.push(artifact.kind().as_str().as_bytes().to_vec());
+        fields.push(artifact.format_version().major().to_be_bytes().to_vec());
+        fields.push(artifact.format_version().minor().to_be_bytes().to_vec());
+        fields.push(count_bytes(artifact.payload().len()));
+        fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
+        fields.push(count_bytes(artifact.metadata().relationships().len()));
+        for relationship in artifact.metadata().relationships() {
+            fields.push(vec![relationship.kind().tag()]);
+            fields.push(count_bytes(relationship.target().segments().len()));
+            for segment in relationship.target().segments() {
+                fields.push(segment.as_str().as_bytes().to_vec());
+            }
+        }
+    }
+    observation_checksum(
+        b"messages_emit_export_artifacts",
+        fields.iter().map(Vec::as_slice),
+    )
 }
 
 fn count_bytes(count: usize) -> Vec<u8> {
