@@ -11,7 +11,7 @@ use intlify_contract::{
     ProducerRevision, ReferenceArtifactIdentity, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
 #[cfg(feature = "benchmark")]
-use intlify_linker::benchmark::{benchmark_link, BenchmarkLinkStage};
+use intlify_linker::benchmark::{benchmark_link, benchmark_link_comparison, BenchmarkLinkStage};
 use intlify_linker::{
     link, ConfiguredRoot, CoverageBaseline, DegradedAnalysisFinding, DeliveryUnitEdge,
     DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness, LinkFinding, LinkFindingKind,
@@ -279,7 +279,10 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
     )];
     let definitions = vec![definition_artifact(
         "en.json",
-        vec![definition(app.clone(), "/hello", "en", "Hello", 0)],
+        vec![
+            definition(app.clone(), "/hello", "en", "Hello", 0),
+            definition(app.clone(), "/unused", "en", "Unused", 0),
+        ],
     )];
     let policy = policy_with_baselines(
         &["en"],
@@ -305,9 +308,31 @@ fn benchmark_path_reuses_the_ordinary_link_result_and_closed_stage_order() {
     let ordinary = link(&request).unwrap();
     let measured = benchmark_link(&request).unwrap();
     let repeated = benchmark_link(&request).unwrap();
+    let comparison = benchmark_link_comparison(&request).unwrap();
 
     assert_eq!(measured.outcome(), &ordinary);
     assert_eq!(repeated.outcome(), &ordinary);
+    assert_eq!(comparison.linked(), &ordinary);
+    assert!(!comparison.full_retention().generation_blocked());
+    assert_eq!(
+        comparison.full_retention().bundle_plans().unwrap().len(),
+        ordinary.bundle_plans().unwrap().len()
+    );
+    let linked_message_count = ordinary
+        .bundle_plans()
+        .unwrap()
+        .iter()
+        .map(|plan| plan.messages().len())
+        .sum::<usize>();
+    let full_retention_message_count = comparison
+        .full_retention()
+        .bundle_plans()
+        .unwrap()
+        .iter()
+        .map(|plan| plan.messages().len())
+        .sum::<usize>();
+    assert_eq!(linked_message_count, 1);
+    assert_eq!(full_retention_message_count, 2);
     assert_eq!(
         measured
             .stages()

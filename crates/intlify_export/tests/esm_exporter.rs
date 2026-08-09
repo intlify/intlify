@@ -10,11 +10,18 @@ use intlify_contract::{
     ProducerId, ProducerIdentity, ProducerRevision, ReferenceArtifactIdentity,
     ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+#[cfg(feature = "benchmark")]
+use intlify_export::benchmark::{
+    benchmark_export_esm, benchmark_prepare_export, BenchmarkArtifactAssociation,
+    BenchmarkDeliveryUnitBucket, BenchmarkExportStage, BenchmarkLocaleBucket,
+};
 use intlify_export::{
     prepare_export, EsmExporter, EsmExporterOptions, ExportArtifact, ExportArtifactFormatVersion,
     ExportArtifactRelationshipKind, ExportErrorEvidence, ExportValidationLimits,
     InternalInvariantViolation, PlatformExporter, UnsupportedBatchFeature,
 };
+#[cfg(feature = "benchmark")]
+use intlify_export::{ExportArtifactPath, ExportArtifactSet, PayloadFingerprint};
 use intlify_linker::{
     link, CoverageBaseline, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness,
     LinkOutcome, LinkPolicy, LinkRequest, LocaleFallback, PlacementPolicy, ScopeCompleteness,
@@ -313,6 +320,34 @@ fn fallback_materialization_emits_canonical_locale_loader_and_accessor_artifacts
         &policy,
         &DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
     );
+
+    #[cfg(feature = "benchmark")]
+    {
+        let preparation =
+            benchmark_prepare_export(&outcome, ExportValidationLimits::default()).unwrap();
+        assert_eq!(preparation.measurements().len(), 5);
+        let exporter =
+            EsmExporter::new(EsmExporterOptions::try_new(&policy, vec![locale("en")]).unwrap());
+        let execution = benchmark_export_esm(&exporter, preparation.batch().unwrap()).unwrap();
+        assert_eq!(execution.measurements().len(), 4);
+        assert_eq!(
+            execution.observation().associations().len(),
+            execution.observation().artifacts().artifacts().len()
+        );
+        assert_eq!(execution.observation().entry_roots().len(), 2);
+        assert!(matches!(
+            execution.observation().associations()[0].locale(),
+            BenchmarkLocaleBucket::Shared | BenchmarkLocaleBucket::Locale(_)
+        ));
+        assert!(execution
+            .observation()
+            .associations()
+            .iter()
+            .any(|association| matches!(
+                association.delivery_unit(),
+                BenchmarkDeliveryUnitBucket::Shared
+            )));
+    }
 
     let set = export(&outcome, &policy, &["en"]);
     assert_eq!(set.artifacts().len(), 4);
@@ -770,4 +805,145 @@ fn maximum_builtin_cardinality_emits_all_locale_and_scope_artifacts() {
         .find(|artifact| artifact.kind().as_str() == "dev.intlify/loader-map")
         .unwrap();
     assert_eq!(loader.metadata().relationships().len(), 1_024);
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn benchmark_observations_ignore_input_enumeration_and_track_semantic_output() {
+    let (baseline_outcome, baseline_policy) = benchmark_outcome("First message", false);
+    let baseline = benchmark_snapshot(&baseline_outcome, &baseline_policy);
+
+    let (reordered_outcome, reordered_policy) = benchmark_outcome("First message", true);
+    let reordered = benchmark_snapshot(&reordered_outcome, &reordered_policy);
+    assert_eq!(baseline, reordered);
+
+    let (changed_outcome, changed_policy) = benchmark_outcome("Changed message", false);
+    let changed = benchmark_snapshot(&changed_outcome, &changed_policy);
+    assert_eq!(
+        baseline
+            .preparation
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>(),
+        changed
+            .preparation
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        baseline
+            .export
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>(),
+        changed
+            .export
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        baseline
+            .preparation
+            .iter()
+            .zip(&changed.preparation)
+            .any(|(left, right)| left.1 != right.1),
+        "a semantic message change must affect a preparation checksum"
+    );
+    assert!(
+        baseline
+            .export
+            .iter()
+            .zip(&changed.export)
+            .any(|(left, right)| left.1 != right.1),
+        "a semantic message change must affect an exporter checksum"
+    );
+    assert_ne!(
+        artifact_fingerprints(&baseline.artifacts),
+        artifact_fingerprints(&changed.artifacts)
+    );
+}
+
+#[cfg(feature = "benchmark")]
+#[derive(Debug, PartialEq, Eq)]
+struct BenchmarkSnapshot {
+    preparation: Vec<(BenchmarkExportStage, u32)>,
+    export: Vec<(BenchmarkExportStage, u32)>,
+    artifacts: ExportArtifactSet,
+    associations: Vec<BenchmarkArtifactAssociation>,
+    entry_roots: Vec<ExportArtifactPath>,
+}
+
+#[cfg(feature = "benchmark")]
+fn benchmark_snapshot(outcome: &LinkOutcome, policy: &LinkPolicy) -> BenchmarkSnapshot {
+    let preparation = benchmark_prepare_export(outcome, ExportValidationLimits::default()).unwrap();
+    let preparation_measurements = preparation
+        .measurements()
+        .iter()
+        .map(|measurement| (measurement.stage(), measurement.checksum()))
+        .collect();
+    let exporter =
+        EsmExporter::new(EsmExporterOptions::try_new(policy, vec![locale("en")]).unwrap());
+    let execution = benchmark_export_esm(&exporter, preparation.batch().unwrap()).unwrap();
+    let export_measurements = execution
+        .measurements()
+        .iter()
+        .map(|measurement| (measurement.stage(), measurement.checksum()))
+        .collect();
+    let observation = execution.into_observation();
+
+    BenchmarkSnapshot {
+        preparation: preparation_measurements,
+        export: export_measurements,
+        artifacts: observation.artifacts().clone(),
+        associations: observation.associations().to_vec(),
+        entry_roots: observation.entry_roots().to_vec(),
+    }
+}
+
+#[cfg(feature = "benchmark")]
+fn benchmark_outcome(message: &str, reverse_artifacts: bool) -> (LinkOutcome, LinkPolicy) {
+    let app = scope("app");
+    let policy = policy(&["en"], Vec::new(), vec![(app.clone(), "en")]);
+    let mut definitions = vec![
+        definition_artifact(
+            "a.json",
+            vec![definition(app.clone(), "/first", "en", message, 0)],
+        ),
+        definition_artifact(
+            "b.json",
+            vec![definition(
+                app.clone(),
+                "/second",
+                "en",
+                "Second message",
+                0,
+            )],
+        ),
+    ];
+    if reverse_artifacts {
+        definitions.reverse();
+    }
+    let outcome = linked_outcome(
+        std::slice::from_ref(&app),
+        definitions,
+        vec![reference_artifact(
+            "app",
+            DeliveryUnitId::main(),
+            vec![(app.clone(), "/first"), (app.clone(), "/second")],
+        )],
+        &policy,
+        &DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
+    );
+    (outcome, policy)
+}
+
+#[cfg(feature = "benchmark")]
+fn artifact_fingerprints(artifacts: &ExportArtifactSet) -> Vec<PayloadFingerprint> {
+    artifacts
+        .artifacts()
+        .iter()
+        .map(|artifact| artifact.payload().fingerprint())
+        .collect()
 }

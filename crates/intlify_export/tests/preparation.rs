@@ -9,6 +9,8 @@ use intlify_contract::{
     PortablePathSegment, PortableRelativePath, ProducerId, ProducerIdentity, ProducerRevision,
     ReferenceArtifactIdentity, ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+#[cfg(feature = "benchmark")]
+use intlify_export::benchmark::benchmark_prepare_export;
 use intlify_export::{
     prepare_export, ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind,
     ExportArtifactMetadata, ExportArtifactPath, ExportArtifactPayload, ExportArtifactSet,
@@ -192,6 +194,16 @@ fn blocked_outcomes_skip_export_validation() {
     assert!(prepare_export(&outcome, ExportValidationLimits::default())
         .unwrap()
         .is_none());
+}
+
+#[cfg(feature = "benchmark")]
+#[test]
+fn blocked_outcomes_produce_an_empty_benchmark_execution() {
+    let outcome = linked_outcome(Vec::new(), &["/missing"], false, true);
+    let execution = benchmark_prepare_export(&outcome, ExportValidationLimits::default()).unwrap();
+
+    assert!(execution.batch().is_none());
+    assert!(execution.measurements().is_empty());
 }
 
 #[test]

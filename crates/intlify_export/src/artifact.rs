@@ -276,6 +276,39 @@ impl ExportArtifactPayload {
     pub const fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    /// Return the exact payload byte length used by output-size accounting.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Return whether the exact checked payload is empty.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Compute the product payload fingerprint used by manifests and observations.
+    #[must_use]
+    pub fn fingerprint(&self) -> PayloadFingerprint {
+        PayloadFingerprint(*blake3::hash(&self.0).as_bytes())
+    }
+}
+
+/// Exact BLAKE3-256 fingerprint of one checked artifact payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct PayloadFingerprint([u8; 32]);
+
+impl PayloadFingerprint {
+    /// Stable structured-output algorithm token.
+    pub const ALGORITHM: &'static str = "blake3-256";
+
+    /// Return the exact raw digest bytes.
+    #[must_use]
+    pub const fn as_bytes(self) -> [u8; 32] {
+        self.0
+    }
 }
 
 /// Closed common metadata shared by build integrations.

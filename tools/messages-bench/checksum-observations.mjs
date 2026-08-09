@@ -111,7 +111,59 @@ const semanticFieldsByBoundaryId = Object.freeze({
     'completeProbedSequence',
     'selectedDefinitionIdentityOrClosedFailure'
   ]),
-  locale_finding_materialization: Object.freeze(['canonicalTypedLocaleAwareCandidateRecords'])
+  locale_finding_materialization: Object.freeze(['canonicalTypedLocaleAwareCandidateRecords']),
+  selected_message_parse: Object.freeze(['canonicalSelectedDefinitionIdentity', 'parserOutcome']),
+  message_semantic_validation: Object.freeze([
+    'canonicalSelectedDefinitionIdentity',
+    'semanticOutcome'
+  ]),
+  portable_diagnostic_mapping: Object.freeze(['canonicalPortableDiagnostics']),
+  argument_signature_derivation: Object.freeze(['canonicalArgumentSignatures']),
+  validated_export_batch_construction: Object.freeze(['canonicalValidatedExportBatch']),
+  locale_asset_rendering: Object.freeze(['canonicalLocaleArtifactObservations']),
+  loader_map_rendering: Object.freeze(['canonicalLoaderArtifactObservation']),
+  typed_key_accessor_rendering: Object.freeze(['canonicalAccessorArtifactObservations']),
+  export_artifact_set_construction: Object.freeze(['canonicalExportArtifactSetObservation']),
+  capability_preflight: Object.freeze([
+    'canonicalLogicalPaths',
+    'capabilityStates',
+    'productPayloadFingerprints'
+  ]),
+  path_mapping_and_ownership_inspection: Object.freeze([
+    'canonicalLogicalPaths',
+    'normalizedOutputRelativeDestinations',
+    'ownershipStates'
+  ]),
+  staging: Object.freeze([
+    'canonicalLogicalPaths',
+    'normalizedOutputRelativeDestinations',
+    'productPayloadFingerprints'
+  ]),
+  commit: Object.freeze([
+    'canonicalLogicalPaths',
+    'normalizedOutputRelativeDestinations',
+    'registrationState'
+  ]),
+  check_comparison: Object.freeze([
+    'canonicalLogicalPaths',
+    'normalizedOutputRelativeDestinations',
+    'comparisonState'
+  ]),
+  messages_emit_e2e: Object.freeze([
+    'canonicalCommandAnalysis',
+    'canonicalLinkOutcome',
+    'canonicalExportArtifacts',
+    'registrationClassification',
+    'typedCommandOutcome'
+  ]),
+  messages_emit_check_e2e: Object.freeze([
+    'canonicalCommandAnalysis',
+    'canonicalLinkOutcome',
+    'canonicalExportArtifacts',
+    'checkClassification',
+    'typedCommandOutcome'
+  ]),
+  messages_emit_json: Object.freeze(['typedCommandResultFields'])
 })
 
 export const MESSAGE_DURATION_OBSERVATIONS = Object.freeze(

@@ -115,6 +115,33 @@ pub struct BenchmarkLinkExecution {
     observation_overhead: Duration,
 }
 
+/// Opaque same-request outcomes used by the export artifact comparison.
+#[derive(Debug)]
+pub struct BenchmarkLinkComparison {
+    linked: LinkOutcome,
+    full_retention: LinkOutcome,
+}
+
+impl BenchmarkLinkComparison {
+    /// Return the exact ordinary link result.
+    #[must_use]
+    pub const fn linked(&self) -> &LinkOutcome {
+        &self.linked
+    }
+
+    /// Return the checked comparison result that retains every eligible definition.
+    #[must_use]
+    pub const fn full_retention(&self) -> &LinkOutcome {
+        &self.full_retention
+    }
+
+    /// Consume the pair without exposing mutable or caller-authored plans.
+    #[must_use]
+    pub fn into_outcomes(self) -> (LinkOutcome, LinkOutcome) {
+        (self.linked, self.full_retention)
+    }
+}
+
 impl BenchmarkLinkExecution {
     pub(crate) fn new(
         outcome: LinkOutcome,
@@ -162,4 +189,19 @@ pub fn benchmark_link(
     request: &LinkRequest<'_>,
 ) -> Result<BenchmarkLinkExecution, LinkOperationalError> {
     crate::link::benchmark_link(request)
+}
+
+/// Produce the ordinary result and its same-request full-retention comparison.
+///
+/// The operation accepts only an already admitted ordinary request. A blocked
+/// ordinary result or failure to build either complete outcome returns no pair.
+#[doc(hidden)]
+pub fn benchmark_link_comparison(
+    request: &LinkRequest<'_>,
+) -> Result<BenchmarkLinkComparison, LinkOperationalError> {
+    let (linked, full_retention) = crate::link::benchmark_link_with_full_retention(request)?;
+    Ok(BenchmarkLinkComparison {
+        linked,
+        full_retention,
+    })
 }

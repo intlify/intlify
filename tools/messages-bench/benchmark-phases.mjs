@@ -41,7 +41,31 @@ export const MESSAGE_BENCHMARK_PHASES = Object.freeze([
     'fallback_chain_construction',
     'locale_aware_resolution',
     'locale_finding_materialization'
-  ])
+  ]),
+  phase('message_export_prepare', [
+    'selected_message_parse',
+    'message_semantic_validation',
+    'portable_diagnostic_mapping',
+    'argument_signature_derivation',
+    'validated_export_batch_construction'
+  ]),
+  phase('message_export_esm', [
+    'locale_asset_rendering',
+    'loader_map_rendering',
+    'typed_key_accessor_rendering',
+    'export_artifact_set_construction'
+  ]),
+  phase('message_export_artifact_size', ['payload_size_comparison']),
+  phase('message_output_register', [
+    'capability_preflight',
+    'path_mapping_and_ownership_inspection',
+    'staging',
+    'commit',
+    'check_comparison'
+  ]),
+  phase('messages_emit_e2e', ['complete_workflow']),
+  phase('messages_emit_check_e2e', ['complete_workflow']),
+  phase('messages_emit_json', ['json_reporter'])
 ])
 
 function phase(name, costs) {
@@ -251,8 +275,48 @@ const messagesOwnedDescriptors = [
     'locale_finding_materialization',
     'duration',
     PER_WORKFLOW
-  )
+  ),
+  ...[
+    'selected_message_parse',
+    'message_semantic_validation',
+    'portable_diagnostic_mapping',
+    'argument_signature_derivation',
+    'validated_export_batch_construction'
+  ].map(cost => boundary('message_export_prepare', cost, cost, 'duration', PER_WORKFLOW)),
+  ...[
+    'locale_asset_rendering',
+    'loader_map_rendering',
+    'typed_key_accessor_rendering',
+    'export_artifact_set_construction'
+  ].map(cost => boundary('message_export_esm', cost, cost, 'duration', PER_WORKFLOW)),
+  ...[
+    'capability_preflight',
+    'path_mapping_and_ownership_inspection',
+    'staging',
+    'commit',
+    'check_comparison'
+  ].map(cost => boundary('message_output_register', cost, cost, 'duration', PER_WORKFLOW)),
+  boundary('messages_emit_e2e', 'complete_workflow', 'messages_emit_e2e', 'duration', PER_WORKFLOW),
+  boundary(
+    'messages_emit_check_e2e',
+    'complete_workflow',
+    'messages_emit_check_e2e',
+    'duration',
+    PER_WORKFLOW
+  ),
+  boundary('messages_emit_json', 'json_reporter', 'messages_emit_json', 'duration', PER_WORKFLOW)
 ]
+
+export const MESSAGE_BENCHMARK_NON_INTERVALS = Object.freeze([
+  Object.freeze({
+    owner: '014',
+    descriptor: Object.freeze({
+      phase: 'message_export_artifact_size',
+      cost: 'payload_size_comparison',
+      metric: 'artifact_payload_size'
+    })
+  })
+])
 
 export const MESSAGE_BENCHMARK_BOUNDARIES = Object.freeze([
   ...messagesOwnedDescriptors.map(descriptor => Object.freeze({ owner: '014', descriptor })),
@@ -285,6 +349,44 @@ export const MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY = Object.freeze([
     'locale_finding_materialization'
   ].map(childBoundaryId =>
     Object.freeze({ parentBoundaryId: 'project_link_e2e', childBoundaryId })
+  ),
+  ...['messages_emit_e2e', 'messages_emit_check_e2e'].flatMap(parentBoundaryId =>
+    [
+      'project_inventory_metadata_io',
+      'project_definition_snapshot_read',
+      'project_reference_snapshot_read',
+      'project_external_artifact_read',
+      'definition_pre_extraction_admission',
+      'resource_host_parse_and_entry_extraction',
+      'definition_projection',
+      'js_cache_miss_production',
+      'reference_artifact_decode',
+      'link_request_validation_scope_mapping',
+      'link_semantic_index_construction',
+      'coverage_baseline_selection',
+      'typed_key_model_construction',
+      'link_selector_resolution',
+      'fallback_chain_construction',
+      'locale_aware_resolution',
+      'link_reachability_placement',
+      'link_finding_plan_materialization',
+      'locale_finding_materialization',
+      'selected_message_parse',
+      'message_semantic_validation',
+      'portable_diagnostic_mapping',
+      'argument_signature_derivation',
+      'validated_export_batch_construction',
+      'locale_asset_rendering',
+      'loader_map_rendering',
+      'typed_key_accessor_rendering',
+      'export_artifact_set_construction',
+      'capability_preflight',
+      'path_mapping_and_ownership_inspection',
+      'staging',
+      'commit',
+      'check_comparison',
+      'messages_emit_json'
+    ].map(childBoundaryId => Object.freeze({ parentBoundaryId, childBoundaryId }))
   ),
   ...[
     'js_source_parse',
@@ -327,10 +429,12 @@ function boundary(phaseName, cost, boundaryId, metric, occurrencePolicy) {
  *
  * @param registry - Boundary descriptors under validation.
  * @param topology - Explicitly allowed parent/child interval relations.
+ * @param nonIntervals - Active measurements that report values without elapsed intervals.
  */
 export function assertValidBoundaryRegistry(
   registry = MESSAGE_BENCHMARK_BOUNDARIES,
-  topology = MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY
+  topology = MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY,
+  nonIntervals = MESSAGE_BENCHMARK_NON_INTERVALS
 ) {
   const activePairs = new Set(
     MESSAGE_BENCHMARK_PHASES.flatMap(active => active.costs.map(cost => `${active.name}\0${cost}`))
@@ -374,8 +478,23 @@ export function assertValidBoundaryRegistry(
     pairs.add(pair)
     ids.add(descriptor.boundaryId)
   }
+  for (const [index, entry] of nonIntervals.entries()) {
+    const pointer = `/nonIntervals/${index}`
+    if (!entry || entry.owner !== '014' || !entry.descriptor) {
+      throw new Error(`${pointer} must declare the local owner and descriptor`)
+    }
+    const descriptor = entry.descriptor
+    const pair = `${descriptor.phase}\0${descriptor.cost}`
+    if (!activePairs.has(pair) || pairs.has(pair)) {
+      throw new Error(`${pointer} must identify one unique active phase/cost`)
+    }
+    if (descriptor.metric !== 'artifact_payload_size' || Object.hasOwn(descriptor, 'boundaryId')) {
+      throw new Error(`${pointer} must be a boundary-free artifact payload-size metric`)
+    }
+    pairs.add(pair)
+  }
   if (pairs.size !== activePairs.size) {
-    throw new Error('/boundaries must cover every active phase/cost exactly once')
+    throw new Error('/metric registries must cover every active phase/cost exactly once')
   }
 
   const edges = new Set()

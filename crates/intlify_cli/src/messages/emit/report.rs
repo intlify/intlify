@@ -185,6 +185,287 @@ pub(super) struct EmitReport {
     pub(super) exit_code: i32,
 }
 
+#[cfg(feature = "benchmark")]
+pub(super) fn benchmark_analysis_checksum(analysis: &EmitAnalysis) -> Result<u32, ()> {
+    let mut fields = Vec::new();
+    push_analysis(&mut fields, analysis)?;
+    Ok(super::super::observation::observation_checksum(
+        b"messages_emit_command_analysis",
+        fields.iter().map(Vec::as_slice),
+    ))
+}
+
+#[cfg(feature = "benchmark")]
+pub(super) fn benchmark_observation_checksum(report: &EmitReport) -> Result<u32, ()> {
+    let mut fields = Vec::new();
+    push_text(&mut fields, "schemaVersion", "0");
+    push_text(&mut fields, "command", COMMAND);
+    push_text(&mut fields, "version", env!("CARGO_PKG_VERSION"));
+    push_summary(&mut fields, &report.summary);
+    push_analysis(&mut fields, &report.analysis)?;
+    push_count(&mut fields, "results", report.results.len())?;
+    for result in &report.results {
+        fields.push(b"result".to_vec());
+        push_text(&mut fields, "target", &result.target);
+        push_text(&mut fields, "exporter", result.exporter);
+        push_text(&mut fields, "out", &result.out);
+        push_text(&mut fields, "status", result.status);
+        push_text(&mut fields, "outputState", result.output_state);
+        push_optional_u64(&mut fields, "artifactCount", result.artifact_count);
+        push_optional_u64(&mut fields, "payloadBytes", result.payload_bytes);
+        push_optional_values(&mut fields, "differences", result.differences.as_deref())?;
+        push_values(&mut fields, "diagnostics", &result.diagnostics)?;
+        push_errors(&mut fields, "errors", &result.errors)?;
+    }
+    push_errors(&mut fields, "errors", &report.errors)?;
+    push_i32(&mut fields, "exitCode", report.exit_code);
+    Ok(super::super::observation::observation_checksum(
+        b"messages_emit_typed_result",
+        fields.iter().map(Vec::as_slice),
+    ))
+}
+
+#[cfg(feature = "benchmark")]
+fn push_summary(fields: &mut Vec<Vec<u8>>, summary: &EmitSummary) {
+    fields.push(b"summary".to_vec());
+    match summary {
+        EmitSummary::Write(summary) => {
+            fields.push(b"write".to_vec());
+            push_text(fields, "status", summary.status);
+            push_text(fields, "operation", summary.operation);
+            push_u64(fields, "selectedTargets", summary.selected_targets);
+            push_u64(fields, "preparedTargets", summary.prepared_targets);
+            push_u64(fields, "preparedArtifacts", summary.prepared_artifacts);
+            push_u64(
+                fields,
+                "preparedPayloadBytes",
+                summary.prepared_payload_bytes,
+            );
+            push_u64(fields, "blockedTargets", summary.blocked_targets);
+            push_u64(fields, "diagnosticCount", summary.diagnostic_count);
+            push_u64(fields, "findingCount", summary.finding_count);
+            push_u64(
+                fields,
+                "blockingFindingCount",
+                summary.blocking_finding_count,
+            );
+            push_u64(fields, "errorTargets", summary.error_targets);
+            push_u64(fields, "errorCount", summary.error_count);
+            push_u64(fields, "writtenTargets", summary.written_targets);
+            push_u64(fields, "unchangedTargets", summary.unchanged_targets);
+        }
+        EmitSummary::Check(summary) => {
+            fields.push(b"check".to_vec());
+            push_text(fields, "status", summary.status);
+            push_text(fields, "operation", summary.operation);
+            push_u64(fields, "selectedTargets", summary.selected_targets);
+            push_u64(fields, "preparedTargets", summary.prepared_targets);
+            push_u64(fields, "preparedArtifacts", summary.prepared_artifacts);
+            push_u64(
+                fields,
+                "preparedPayloadBytes",
+                summary.prepared_payload_bytes,
+            );
+            push_u64(fields, "blockedTargets", summary.blocked_targets);
+            push_u64(fields, "diagnosticCount", summary.diagnostic_count);
+            push_u64(fields, "findingCount", summary.finding_count);
+            push_u64(
+                fields,
+                "blockingFindingCount",
+                summary.blocking_finding_count,
+            );
+            push_u64(fields, "errorTargets", summary.error_targets);
+            push_u64(fields, "errorCount", summary.error_count);
+            push_u64(fields, "matchedTargets", summary.matched_targets);
+            push_u64(fields, "differentTargets", summary.different_targets);
+            push_u64(fields, "differenceCount", summary.difference_count);
+        }
+        EmitSummary::Reduced(summary) => {
+            fields.push(b"reduced".to_vec());
+            push_text(fields, "status", summary.status);
+            push_text(fields, "operation", summary.operation);
+            push_u64(fields, "selectedTargets", summary.selected_targets);
+            push_u64(fields, "preparedTargets", summary.prepared_targets);
+            push_u64(fields, "preparedArtifacts", summary.prepared_artifacts);
+            push_u64(
+                fields,
+                "preparedPayloadBytes",
+                summary.prepared_payload_bytes,
+            );
+            push_u64(fields, "diagnosticCount", summary.diagnostic_count);
+            push_u64(fields, "findingCount", summary.finding_count);
+            push_u64(
+                fields,
+                "blockingFindingCount",
+                summary.blocking_finding_count,
+            );
+            push_u64(fields, "errorCount", summary.error_count);
+        }
+    }
+}
+
+#[cfg(feature = "benchmark")]
+fn push_analysis(fields: &mut Vec<Vec<u8>>, analysis: &EmitAnalysis) -> Result<(), ()> {
+    fields.push(b"analysis".to_vec());
+    push_bool(fields, "generationBlocked", analysis.generation_blocked);
+    push_values(fields, "findings", &analysis.findings)?;
+    fields.push(b"messageValidation".to_vec());
+    if let Some(validation) = analysis.message_validation.as_ref() {
+        fields.push(b"present".to_vec());
+        push_values(fields, "diagnostics", &validation.diagnostics)?;
+        push_u64(fields, "totalDiagnostics", validation.total_diagnostics);
+        push_bool(fields, "truncated", validation.truncated);
+    } else {
+        fields.push(b"absent".to_vec());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_errors(
+    fields: &mut Vec<Vec<u8>>,
+    name: &str,
+    errors: &[OperationalError],
+) -> Result<(), ()> {
+    push_count(fields, name, errors.len())?;
+    for error in errors {
+        fields.push(b"error".to_vec());
+        push_text(fields, "kind", error.kind);
+        push_text(fields, "code", error.code);
+        fields.push(b"path".to_vec());
+        match error.path.as_deref() {
+            Some(path) if !Path::new(path).is_absolute() => {
+                fields.push(b"relative".to_vec());
+                fields.push(path.as_bytes().to_vec());
+            }
+            Some(_) => fields.push(b"absolute-redacted".to_vec()),
+            None => fields.push(b"absent".to_vec()),
+        }
+        fields.push(b"details".to_vec());
+        if let Some(details) = error.details.as_ref() {
+            fields.push(b"present".to_vec());
+            push_value(fields, details)?;
+        } else {
+            fields.push(b"absent".to_vec());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_optional_values(
+    fields: &mut Vec<Vec<u8>>,
+    name: &str,
+    values: Option<&[Value]>,
+) -> Result<(), ()> {
+    fields.push(name.as_bytes().to_vec());
+    if let Some(values) = values {
+        fields.push(b"present".to_vec());
+        push_count(fields, "items", values.len())?;
+        for value in values {
+            push_value(fields, value)?;
+        }
+    } else {
+        fields.push(b"absent".to_vec());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_values(fields: &mut Vec<Vec<u8>>, name: &str, values: &[Value]) -> Result<(), ()> {
+    push_count(fields, name, values.len())?;
+    for value in values {
+        push_value(fields, value)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_value(fields: &mut Vec<Vec<u8>>, value: &Value) -> Result<(), ()> {
+    match value {
+        Value::Null => fields.push(b"null".to_vec()),
+        Value::Bool(value) => {
+            fields.push(b"bool".to_vec());
+            fields.push(vec![u8::from(*value)]);
+        }
+        Value::Number(value) => {
+            if let Some(value) = value.as_u64() {
+                fields.push(b"u64".to_vec());
+                fields.push(value.to_be_bytes().to_vec());
+            } else if let Some(value) = value.as_i64() {
+                fields.push(b"i64".to_vec());
+                fields.push(value.to_be_bytes().to_vec());
+            } else if let Some(value) = value.as_f64().filter(|value| value.is_finite()) {
+                fields.push(b"f64".to_vec());
+                fields.push(value.to_bits().to_be_bytes().to_vec());
+            } else {
+                return Err(());
+            }
+        }
+        Value::String(value) => {
+            fields.push(b"string".to_vec());
+            fields.push(value.as_bytes().to_vec());
+        }
+        Value::Array(values) => {
+            push_count(fields, "array", values.len())?;
+            for value in values {
+                push_value(fields, value)?;
+            }
+        }
+        Value::Object(object) => {
+            let members = object.iter().filter(|(name, _)| name.as_str() != "message");
+            push_count(fields, "object", members.clone().count())?;
+            for (name, value) in members {
+                fields.push(name.as_bytes().to_vec());
+                push_value(fields, value)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_optional_u64(fields: &mut Vec<Vec<u8>>, name: &str, value: Option<u64>) {
+    fields.push(name.as_bytes().to_vec());
+    if let Some(value) = value {
+        fields.push(b"present".to_vec());
+        fields.push(value.to_be_bytes().to_vec());
+    } else {
+        fields.push(b"absent".to_vec());
+    }
+}
+
+#[cfg(feature = "benchmark")]
+fn push_count(fields: &mut Vec<Vec<u8>>, name: &str, value: usize) -> Result<(), ()> {
+    fields.push(name.as_bytes().to_vec());
+    fields.push(u64::try_from(value).map_err(|_| ())?.to_be_bytes().to_vec());
+    Ok(())
+}
+
+#[cfg(feature = "benchmark")]
+fn push_text(fields: &mut Vec<Vec<u8>>, name: &str, value: &str) {
+    fields.push(name.as_bytes().to_vec());
+    fields.push(value.as_bytes().to_vec());
+}
+
+#[cfg(feature = "benchmark")]
+fn push_u64(fields: &mut Vec<Vec<u8>>, name: &str, value: u64) {
+    fields.push(name.as_bytes().to_vec());
+    fields.push(value.to_be_bytes().to_vec());
+}
+
+#[cfg(feature = "benchmark")]
+fn push_i32(fields: &mut Vec<Vec<u8>>, name: &str, value: i32) {
+    fields.push(name.as_bytes().to_vec());
+    fields.push(value.to_be_bytes().to_vec());
+}
+
+#[cfg(feature = "benchmark")]
+fn push_bool(fields: &mut Vec<Vec<u8>>, name: &str, value: bool) {
+    fields.push(name.as_bytes().to_vec());
+    fields.push(vec![u8::from(value)]);
+}
+
 #[derive(Debug, Serialize)]
 struct EarlyErrorSummary {
     status: &'static str,
@@ -975,5 +1256,132 @@ const fn severity_token(severity: DiagnosticSeverity) -> &'static str {
         DiagnosticSeverity::Warning => "warning",
         DiagnosticSeverity::Information => "information",
         DiagnosticSeverity::Hint => "hint",
+    }
+}
+
+#[cfg(all(test, feature = "benchmark"))]
+mod benchmark_tests {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn observation_checksum_ignores_render_only_project_root() {
+        let first_report = report("web");
+        let second_report = report("web");
+        let first_checksum = benchmark_observation_checksum(&first_report).unwrap();
+        let second_checksum = benchmark_observation_checksum(&second_report).unwrap();
+        let first_root = tempdir().unwrap();
+        let second_root = tempdir().unwrap();
+
+        let first_rendered = render(first_report, Reporter::Json, first_root.path());
+        let second_rendered = render(second_report, Reporter::Json, second_root.path());
+
+        assert_ne!(first_rendered.stdout, second_rendered.stdout);
+        assert_eq!(first_checksum, second_checksum);
+    }
+
+    #[test]
+    fn observation_checksum_changes_with_typed_result_fields() {
+        let first_checksum = benchmark_observation_checksum(&report("web")).unwrap();
+        let second_checksum = benchmark_observation_checksum(&report("server")).unwrap();
+
+        assert_ne!(first_checksum, second_checksum);
+    }
+
+    #[test]
+    fn observation_checksum_ignores_human_error_messages() {
+        let mut first_report = report("web");
+        first_report.errors.push(error("first human explanation"));
+        let mut second_report = report("web");
+        second_report
+            .errors
+            .push(error("rewritten human explanation"));
+
+        assert_eq!(
+            benchmark_observation_checksum(&first_report).unwrap(),
+            benchmark_observation_checksum(&second_report).unwrap()
+        );
+    }
+
+    #[test]
+    fn observation_checksum_redacts_absolute_error_paths() {
+        let first_root = tempdir().unwrap();
+        let second_root = tempdir().unwrap();
+        let mut first_report = report("web");
+        let mut first_error = error("failure");
+        first_error.path = Some(
+            first_root
+                .path()
+                .join("catalog.json")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        first_report.errors.push(first_error);
+        let mut second_report = report("web");
+        let mut second_error = error("failure");
+        second_error.path = Some(
+            second_root
+                .path()
+                .join("catalog.json")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        second_report.errors.push(second_error);
+
+        assert_eq!(
+            benchmark_observation_checksum(&first_report).unwrap(),
+            benchmark_observation_checksum(&second_report).unwrap()
+        );
+    }
+
+    fn report(target: &str) -> EmitReport {
+        EmitReport {
+            summary: EmitSummary::Write(WriteSummary {
+                status: "success",
+                operation: "write",
+                selected_targets: 1,
+                prepared_targets: 1,
+                prepared_artifacts: 1,
+                prepared_payload_bytes: 4,
+                blocked_targets: 0,
+                diagnostic_count: 0,
+                finding_count: 0,
+                blocking_finding_count: 0,
+                error_targets: 0,
+                error_count: 0,
+                written_targets: 1,
+                unchanged_targets: 0,
+            }),
+            analysis: EmitAnalysis {
+                generation_blocked: false,
+                findings: Vec::new(),
+                message_validation: None,
+            },
+            results: vec![EmitTargetResult {
+                target: target.to_owned(),
+                exporter: "esm",
+                out: "generated/messages".to_owned(),
+                status: "written",
+                output_state: "updated",
+                artifact_count: Some(1),
+                payload_bytes: Some(4),
+                differences: None,
+                diagnostics: Vec::new(),
+                errors: Vec::new(),
+            }],
+            errors: Vec::new(),
+            exit_code: 0,
+        }
+    }
+
+    fn error(message: &str) -> OperationalError {
+        OperationalError {
+            kind: "generation_failed",
+            code: "message_export_generation_failed",
+            message: message.to_owned(),
+            path: Some("catalog.json".to_owned()),
+            details: Some(json!({ "stage": "artifact-construction" })),
+        }
     }
 }

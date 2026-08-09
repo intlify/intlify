@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vite-plus/test'
 import {
   BoundaryRecorder,
   MESSAGE_BENCHMARK_BOUNDARIES,
+  MESSAGE_BENCHMARK_NON_INTERVALS,
   MESSAGE_BENCHMARK_OVERLAP_TOPOLOGY,
   MESSAGE_BENCHMARK_PHASES,
   assertValidBoundaryRegistry,
@@ -33,11 +34,19 @@ const fixtures = JSON.parse(
 const checksumVectors = JSON.parse(
   readFileSync(new URL('../checksum-vectors.json', import.meta.url), 'utf8')
 )
+const packageManifest = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+)
+
+test('smoke benchmark exercises repeated checksum validation', () => {
+  expect(packageManifest.scripts['bench:smoke']).toContain('--iterations 2')
+  expect(packageManifest.scripts['bench:smoke']).toContain('--warmup-iterations 1')
+})
 
 test('active project-link boundaries cover every phase/cost and import the 013 descriptor by identity', () => {
   expect(() => assertValidBoundaryRegistry()).not.toThrow()
   expect(resource_host_parse_and_entry_extraction).toBe(ownedResourceDescriptor)
-  expect(MESSAGE_BENCHMARK_BOUNDARIES).toHaveLength(
+  expect(MESSAGE_BENCHMARK_BOUNDARIES.length + MESSAGE_BENCHMARK_NON_INTERVALS.length).toBe(
     MESSAGE_BENCHMARK_PHASES.reduce((count, phase) => count + phase.costs.length, 0)
   )
   expect(
@@ -81,9 +90,9 @@ test('typed-key model costs activate the exact generated scales and sibling boun
 })
 
 test('fallback-aware costs activate the exact generated scales and nested sibling boundaries', () => {
-  expect(MESSAGE_BENCH_RESULT_SCHEMA_VERSION).toBe('2')
-  expect(MESSAGE_BENCHMARK_PROFILE_REVISION).toBe(3)
-  expect(fixtures.revision).toBe(3)
+  expect(MESSAGE_BENCH_RESULT_SCHEMA_VERSION).toBe('3')
+  expect(MESSAGE_BENCHMARK_PROFILE_REVISION).toBe(4)
+  expect(fixtures.revision).toBe(4)
   expect(MESSAGE_BENCHMARK_PHASES.find(phase => phase.name === 'message_link_fallback')).toEqual({
     name: 'message_link_fallback',
     costs: [
@@ -420,6 +429,94 @@ test('result schema rejects unknown top-level and metric-record fields', () => {
   expect(() => assertValidMessageBenchmarkResult(unknownOperation)).toThrow(/operation mismatch/)
 })
 
+test('artifact payload size is active without an interval boundary', () => {
+  expect(MESSAGE_BENCHMARK_NON_INTERVALS).toEqual([
+    {
+      owner: '014',
+      descriptor: {
+        phase: 'message_export_artifact_size',
+        cost: 'payload_size_comparison',
+        metric: 'artifact_payload_size'
+      }
+    }
+  ])
+  expect(
+    MESSAGE_BENCHMARK_BOUNDARIES.some(
+      entry => entry.descriptor.phase === 'message_export_artifact_size'
+    )
+  ).toBe(false)
+})
+
+test('export, registration, and emit fixtures retain three increasing scales and closed variants', () => {
+  const byShape = new Map(fixtures.profiles.map(profile => [profile.shape, profile]))
+  expect(byShape.get('message_export_esm')).toMatchObject({
+    revision: 1,
+    scales: [4, 16, 64],
+    variants: [
+      'all_definitions_baseline',
+      'linked_output',
+      'all_definitions_baseline_vs_linked_output'
+    ],
+    benchmarkContractRevision: 1,
+    groupingMode: 'exporter_associations'
+  })
+  for (const shape of ['message_output_registration', 'messages_emit']) {
+    expect(byShape.get(shape)).toMatchObject({
+      revision: 1,
+      scales: [4, 16, 64],
+      variants: ['write_absent', 'write_unchanged', 'check_matched', 'check_different']
+    })
+  }
+})
+
+test('artifact comparison reconciles exporter observations, fingerprints, roots, and buckets', () => {
+  const malformedFingerprint = validResult()
+  artifactComparison(malformedFingerprint).baselineArtifacts[0].payloadFingerprint.digest = 'ABC'
+  expect(() => assertValidMessageBenchmarkResult(malformedFingerprint)).toThrow(/BLAKE3-256/)
+
+  const mismatchedExporter = validResult()
+  artifactComparison(mismatchedExporter).baselineArtifacts[0].payloadBytes += 1
+  expect(() => assertValidMessageBenchmarkResult(mismatchedExporter)).toThrow(
+    /baselineArtifacts mismatch/
+  )
+
+  const unresolvedRelationship = validResult()
+  exportArtifactRecord(
+    unresolvedRelationship,
+    'all_definitions_baseline'
+  ).artifacts[1].relationships[0].target = ['missing.mjs']
+  expect(() => assertValidMessageBenchmarkResult(unresolvedRelationship)).toThrow(/unresolved/)
+
+  const wrongBucket = validResult()
+  artifactComparison(wrongBucket).buckets[0].linkedBytes += 1
+  expect(() => assertValidMessageBenchmarkResult(wrongBucket)).toThrow(/buckets mismatch/)
+
+  const boundaryOnSize = validResult()
+  artifactComparison(boundaryOnSize).boundaryId = 'payload_size_comparison'
+  expect(() => assertValidMessageBenchmarkResult(boundaryOnSize)).toThrow(/boundaryId is forbidden/)
+})
+
+test('each emit E2E case has one distinct imported extraction companion', () => {
+  const emitMappings = MESSAGE_BENCHMARK_E2E_EXTRACTION_COMPANIONS.filter(
+    mapping => mapping.e2e.fixture === 'messages-emit'
+  )
+  expect(emitMappings).toHaveLength(12)
+  expect(new Set(emitMappings.map(mapping => JSON.stringify(mapping.extraction))).size).toBe(12)
+})
+
+function artifactComparison(result) {
+  return result.results.find(record => record.metric === 'artifact_payload_size')
+}
+
+function exportArtifactRecord(result, variant) {
+  return result.results.find(
+    record =>
+      record.phase === 'message_export_esm' &&
+      record.cost === 'export_artifact_set_construction' &&
+      record.variant === variant
+  )
+}
+
 function validResult() {
   const fixtureByName = new Map([
     ...fixtures.profiles.map(profile => [profile.name, profile]),
@@ -437,26 +534,45 @@ function validResult() {
     fixtures,
     results: MESSAGE_BENCHMARK_REQUIRED_CASES.map(required => {
       const fixture = fixtureByName.get(required.fixture)
-      const descriptor = MESSAGE_BENCHMARK_BOUNDARIES.find(
+      const descriptor = [...MESSAGE_BENCHMARK_BOUNDARIES, ...MESSAGE_BENCHMARK_NON_INTERVALS].find(
         entry =>
           entry.descriptor.phase === required.phase && entry.descriptor.cost === required.cost
       ).descriptor
       const record = {
         status: 'measured',
         ...required,
-        boundaryId: descriptor.boundaryId,
         fixtureRevision: fixture.revision,
         inputCount: 0,
         outputCount: 0
       }
+      if (descriptor.boundaryId) {
+        record.boundaryId = descriptor.boundaryId
+      }
       if (required.metric === 'duration') {
         Object.assign(record, { iterations: 1, elapsedMs: 0, checksum: 0 })
-      } else {
+      } else if (required.metric === 'peak_live_memory') {
         Object.assign(record, {
           peakLiveBytes: 0,
           retainedLiveBytes: 0,
           allocationCount: 0
         })
+      } else {
+        const baselineObservation = fixtureArtifactObservation(fixture)
+        const linkedObservation = fixtureArtifactObservation(fixture)
+        Object.assign(record, {
+          baselineArtifacts: baselineObservation.artifacts,
+          linkedArtifacts: linkedObservation.artifacts,
+          baselineAssociations: baselineObservation.associations,
+          linkedAssociations: linkedObservation.associations,
+          entryRoots: fixture.entryRoots,
+          buckets: baselineObservation.buckets
+        })
+      }
+      if (
+        required.phase === 'message_export_esm' &&
+        required.cost === 'export_artifact_set_construction'
+      ) {
+        record.artifacts = fixtureArtifactObservation(fixture).artifacts
       }
       if (required.phase === 'resource_extract') {
         Object.assign(record, {
@@ -468,4 +584,58 @@ function validResult() {
       return record
     })
   }
+}
+
+function fixtureArtifactObservation(fixture) {
+  const accessorPath = fixture.entryRoots[1]
+  const enPath = ['locales', 'en.mjs']
+  const jaPath = ['locales', 'ja.mjs']
+  const loaderPath = fixture.entryRoots[0]
+  const fingerprint = { algorithm: 'blake3-256', digest: '0'.repeat(64) }
+  const artifact = (path, kind, relationships = []) => ({
+    path,
+    kind,
+    formatVersion: { major: 0, minor: 1 },
+    payloadBytes: 1,
+    payloadFingerprint: fingerprint,
+    relationships
+  })
+  const artifacts = [
+    artifact(accessorPath, 'dev.intlify/typescript-accessor'),
+    artifact(loaderPath, 'dev.intlify/loader-map', [
+      { kind: 'eager-load', target: enPath },
+      { kind: 'lazy-load', target: jaPath }
+    ]),
+    artifact(enPath, 'dev.intlify/esm-module'),
+    artifact(jaPath, 'dev.intlify/esm-module')
+  ]
+  const shared = { kind: 'shared' }
+  const main = { kind: 'unit', segments: ['main'] }
+  const associations = [
+    { path: accessorPath, locale: shared, deliveryUnit: shared },
+    { path: loaderPath, locale: shared, deliveryUnit: main },
+    { path: enPath, locale: { kind: 'locale', value: 'en' }, deliveryUnit: main },
+    { path: jaPath, locale: { kind: 'locale', value: 'ja' }, deliveryUnit: main }
+  ]
+  const bucket = (axis, identity, bytes) => ({
+    axis,
+    identity,
+    baselineBytes: bytes,
+    linkedBytes: bytes,
+    difference: { direction: 'equal', bytes: 0 },
+    ratio: { state: 'defined', numerator: bytes, denominator: bytes }
+  })
+  const buckets = [
+    bucket('complete-set', { kind: 'all' }, 4),
+    bucket('initial-eager-load', { kind: 'entry-root-closure' }, 3),
+    bucket('locale', { kind: 'locale', value: 'en' }, 1),
+    bucket('locale', { kind: 'locale', value: 'ja' }, 1),
+    bucket('locale', shared, 2),
+    bucket('delivery-unit', main, 3),
+    bucket('delivery-unit', shared, 1),
+    bucket('kind', { kind: 'artifact-kind', value: 'dev.intlify/esm-module' }, 2),
+    bucket('kind', { kind: 'artifact-kind', value: 'dev.intlify/loader-map' }, 1),
+    bucket('kind', { kind: 'artifact-kind', value: 'dev.intlify/typescript-accessor' }, 1)
+  ]
+  return { artifacts, associations, buckets }
 }

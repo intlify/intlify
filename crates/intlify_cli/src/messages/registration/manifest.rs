@@ -66,7 +66,7 @@ impl CheckedOutputManifest {
                     .to_vec()
                     .into_boxed_slice(),
                 payload_bytes,
-                payload_fingerprint: Blake3Fingerprint::of(artifact.payload().as_bytes()),
+                payload_fingerprint: Blake3Fingerprint(artifact.payload().fingerprint().as_bytes()),
             });
         }
         Self::finish(OutputManifest {

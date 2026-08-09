@@ -16,13 +16,19 @@ use intlify_contract::{
     encode_definition_artifact, encode_reference_artifact, LinkLimits, MessageDefinitionArtifact,
     MessageReferenceArtifact,
 };
-use intlify_linker::LinkOutcome;
+use intlify_export::ExportArtifactSet;
+use intlify_linker::{LinkOutcome, LinkPolicy};
 use intlify_resource::{HostFormatRegistry, ResolvedResources};
 
 use super::config::ResolvedMessagesConfig;
+use super::delivery::{DeliveryTargetInput, ResolvedDeliveryTargets};
+use super::emit;
 use super::observation::{observation_checksum, MessageBenchmarkObserver};
 use super::orchestration::link_project_with_observer;
 use super::reference::MessageLinkCache;
+use super::registration::{PreparedOutput, WriteRegistrationStatus};
+use crate::args::MessagesEmitArgs;
+use crate::output::{CliRunResult, Reporter};
 
 pub use super::observation::MessageBenchmarkStage;
 
@@ -226,6 +232,145 @@ pub fn benchmark_project_link(
     })
 }
 
+/// One checked registration path selected by a stateful benchmark fixture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BenchmarkRegistrationMode {
+    Write,
+    Check,
+}
+
+/// Completed registration observations and the product state token.
+#[derive(Debug)]
+pub struct BenchmarkRegistrationExecution {
+    measurements: Box<[BenchmarkMessageMeasurement]>,
+    status: &'static str,
+}
+
+impl BenchmarkRegistrationExecution {
+    #[must_use]
+    pub const fn measurements(&self) -> &[BenchmarkMessageMeasurement] {
+        &self.measurements
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+}
+
+/// Completed command result plus E2E and JSON reporter observations.
+#[derive(Debug)]
+pub struct BenchmarkMessagesEmitExecution {
+    result: CliRunResult,
+    measurements: Box<[BenchmarkMessageMeasurement]>,
+}
+
+impl BenchmarkMessagesEmitExecution {
+    #[must_use]
+    pub const fn result(&self) -> &CliRunResult {
+        &self.result
+    }
+
+    #[must_use]
+    pub const fn measurements(&self) -> &[BenchmarkMessageMeasurement] {
+        &self.measurements
+    }
+}
+
+/// Run the ordinary output-registration path with benchmark-only observation.
+#[doc(hidden)]
+pub fn benchmark_output_registration(
+    project_root: &Path,
+    output_root: &str,
+    policy: &LinkPolicy,
+    artifacts: &ExportArtifactSet,
+    mode: BenchmarkRegistrationMode,
+) -> Result<BenchmarkRegistrationExecution, BenchmarkProjectLinkError> {
+    let eager_locales = policy
+        .production_locales()
+        .first()
+        .map(|locale| vec![locale.as_str().to_owned()])
+        .unwrap_or_default();
+    let input = [DeliveryTargetInput::new(
+        "benchmark",
+        "esm",
+        output_root,
+        &eager_locales,
+        None,
+    )];
+    let targets = ResolvedDeliveryTargets::try_new(&input, policy).map_err(|error| {
+        BenchmarkProjectLinkError {
+            message: format!("registration fixture target is invalid: {error:?}"),
+        }
+    })?;
+    let target = &targets.targets()[0];
+    let mut recorder = BenchmarkRecorder::default();
+    let prepared = PreparedOutput::try_new_with_observer(target, artifacts, &mut recorder)
+        .map_err(|error| BenchmarkProjectLinkError {
+            message: error.to_string(),
+        })?;
+    let status = match mode {
+        BenchmarkRegistrationMode::Write => match prepared
+            .write_with_observer(project_root, target.name().as_str(), &mut recorder)
+            .map_err(|error| BenchmarkProjectLinkError {
+                message: error.to_string(),
+            })?
+            .status()
+        {
+            WriteRegistrationStatus::Unchanged => "unchanged",
+            WriteRegistrationStatus::Written => "written",
+        },
+        BenchmarkRegistrationMode::Check => {
+            let comparison = prepared
+                .check_with_observer(project_root, target.name().as_str(), &mut recorder)
+                .map_err(|error| BenchmarkProjectLinkError {
+                    message: error.to_string(),
+                })?;
+            if comparison.is_matched() {
+                "matched"
+            } else {
+                "different"
+            }
+        }
+    };
+    Ok(BenchmarkRegistrationExecution {
+        measurements: recorder.finish_recording()?.into_boxed_slice(),
+        status,
+    })
+}
+
+/// Run the ordinary JSON-reporting message-delivery command in process.
+#[doc(hidden)]
+pub fn benchmark_messages_emit(
+    project_root: &Path,
+    check: bool,
+) -> Result<BenchmarkMessagesEmitExecution, BenchmarkProjectLinkError> {
+    let mut recorder = BenchmarkRecorder::default();
+    let e2e_stage = if check {
+        MessageBenchmarkStage::MessagesEmitCheckE2e
+    } else {
+        MessageBenchmarkStage::MessagesEmitE2e
+    };
+    recorder.begin(e2e_stage, "messages-emit");
+    let result = emit::run_with_observer(
+        &MessagesEmitArgs {
+            target: None,
+            check,
+        },
+        Reporter::Json,
+        Some("intlify.config.json"),
+        project_root,
+        &mut recorder,
+    );
+    recorder.finish(e2e_stage, "messages-emit");
+    let checksum = recorder.emit_e2e_checksum(e2e_stage, result.exit_code)?;
+    recorder.observe(e2e_stage, "messages-emit", checksum);
+    Ok(BenchmarkMessagesEmitExecution {
+        result,
+        measurements: recorder.finish_recording()?.into_boxed_slice(),
+    })
+}
+
 #[derive(Debug)]
 struct ActiveMeasurement {
     stage: MessageBenchmarkStage,
@@ -239,10 +384,106 @@ struct BenchmarkRecorder {
     active: Vec<ActiveMeasurement>,
     completed: Vec<BenchmarkMessageMeasurement>,
     observation_started: Vec<Option<Instant>>,
+    emit_artifacts: Vec<EmitArtifactObservation>,
+    emit_analysis_checksum: Option<u32>,
     invariant_failed: bool,
+    invariant_detail: Option<String>,
+}
+
+#[derive(Debug)]
+struct EmitArtifactObservation {
+    target: Box<str>,
+    checksum: u32,
 }
 
 impl BenchmarkRecorder {
+    fn emit_e2e_checksum(
+        &self,
+        stage: MessageBenchmarkStage,
+        exit_code: i32,
+    ) -> Result<u32, BenchmarkProjectLinkError> {
+        let analysis = self
+            .emit_analysis_checksum
+            .ok_or_else(|| BenchmarkProjectLinkError {
+                message: "message benchmark command analysis observation is missing".to_owned(),
+            })?;
+        if self.emit_artifacts.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark export artifact observation is missing".to_owned(),
+            });
+        }
+        let link = self
+            .completed
+            .iter()
+            .filter(|measurement| {
+                measurement.stage == MessageBenchmarkStage::FindingAndPlanMaterialization
+                    && measurement.observation_complete
+            })
+            .collect::<Vec<_>>();
+        if link.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark link outcome observation is missing".to_owned(),
+            });
+        }
+        let registration = self
+            .completed
+            .iter()
+            .filter(|measurement| {
+                matches!(
+                    measurement.stage,
+                    MessageBenchmarkStage::OutputCapabilityPreflight
+                        | MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection
+                        | MessageBenchmarkStage::OutputStaging
+                        | MessageBenchmarkStage::OutputCommit
+                        | MessageBenchmarkStage::OutputCheckComparison
+                ) && measurement.observation_complete
+            })
+            .collect::<Vec<_>>();
+        if registration.is_empty() {
+            return Err(BenchmarkProjectLinkError {
+                message: "message benchmark registration observation is missing".to_owned(),
+            });
+        }
+        let typed_outcome = self.completed_checksum(
+            MessageBenchmarkStage::MessagesEmitJson,
+            "messages-emit-json",
+        )?;
+        let mut fields = vec![
+            b"canonical-command-analysis".to_vec(),
+            analysis.to_be_bytes().to_vec(),
+            b"canonical-link-outcome".to_vec(),
+            count_bytes(link.len()),
+        ];
+        for measurement in link {
+            fields.push(measurement.identity.as_bytes().to_vec());
+            fields.push(measurement.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(b"canonical-export-artifacts".to_vec());
+        fields.push(count_bytes(self.emit_artifacts.len()));
+        for observation in &self.emit_artifacts {
+            fields.push(observation.target.as_bytes().to_vec());
+            fields.push(observation.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(if stage == MessageBenchmarkStage::MessagesEmitCheckE2e {
+            b"check-classification".to_vec()
+        } else {
+            b"registration-classification".to_vec()
+        });
+        fields.push(count_bytes(registration.len()));
+        for measurement in registration {
+            fields.push(measurement.stage.boundary_id().as_bytes().to_vec());
+            fields.push(measurement.identity.as_bytes().to_vec());
+            fields.push(measurement.checksum.to_be_bytes().to_vec());
+        }
+        fields.push(b"typed-command-outcome".to_vec());
+        fields.push(typed_outcome.to_be_bytes().to_vec());
+        fields.push(exit_code.to_be_bytes().to_vec());
+        Ok(observation_checksum(
+            stage.boundary_id().as_bytes(),
+            fields.iter().map(Vec::as_slice),
+        ))
+    }
+
     fn completed_checksum(
         &self,
         stage: MessageBenchmarkStage,
@@ -285,36 +526,68 @@ impl BenchmarkRecorder {
             })
         {
             return Err(BenchmarkProjectLinkError {
-                message: "message benchmark boundary invariant failed".to_owned(),
+                message: format!(
+                    "message benchmark boundary invariant failed: {}",
+                    self.invariant_detail
+                        .as_deref()
+                        .unwrap_or("the completed interval set is inconsistent")
+                ),
             });
         }
         Ok(self.completed)
     }
 
     fn parent_allows(parent: MessageBenchmarkStage, child: MessageBenchmarkStage) -> bool {
-        parent == MessageBenchmarkStage::ProjectLinkE2e
-            && matches!(
-                child,
-                MessageBenchmarkStage::InventoryMetadataIo
-                    | MessageBenchmarkStage::DefinitionSnapshotRead
-                    | MessageBenchmarkStage::ReferenceSnapshotRead
-                    | MessageBenchmarkStage::ExternalArtifactRead
-                    | MessageBenchmarkStage::PreExtractionAdmission
-                    | MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
-                    | MessageBenchmarkStage::DefinitionProjection
-                    | MessageBenchmarkStage::CacheMissProduction
-                    | MessageBenchmarkStage::ReferenceArtifactDecode
-                    | MessageBenchmarkStage::RequestValidationAndScopeMapping
-                    | MessageBenchmarkStage::SemanticIndexConstruction
-                    | MessageBenchmarkStage::CoverageBaselineSelection
-                    | MessageBenchmarkStage::TypedKeyModelConstruction
-                    | MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
-                    | MessageBenchmarkStage::FallbackChainConstruction
-                    | MessageBenchmarkStage::LocaleAwareResolution
-                    | MessageBenchmarkStage::ReachabilityAndPlacement
-                    | MessageBenchmarkStage::FindingAndPlanMaterialization
-                    | MessageBenchmarkStage::LocaleFindingMaterialization
-            )
+        (matches!(
+            parent,
+            MessageBenchmarkStage::ProjectLinkE2e
+                | MessageBenchmarkStage::MessagesEmitE2e
+                | MessageBenchmarkStage::MessagesEmitCheckE2e
+        ) && matches!(
+            child,
+            MessageBenchmarkStage::InventoryMetadataIo
+                | MessageBenchmarkStage::DefinitionSnapshotRead
+                | MessageBenchmarkStage::ReferenceSnapshotRead
+                | MessageBenchmarkStage::ExternalArtifactRead
+                | MessageBenchmarkStage::PreExtractionAdmission
+                | MessageBenchmarkStage::ResourceHostParseAndEntryExtraction
+                | MessageBenchmarkStage::DefinitionProjection
+                | MessageBenchmarkStage::CacheMissProduction
+                | MessageBenchmarkStage::ReferenceArtifactDecode
+                | MessageBenchmarkStage::RequestValidationAndScopeMapping
+                | MessageBenchmarkStage::SemanticIndexConstruction
+                | MessageBenchmarkStage::CoverageBaselineSelection
+                | MessageBenchmarkStage::TypedKeyModelConstruction
+                | MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
+                | MessageBenchmarkStage::FallbackChainConstruction
+                | MessageBenchmarkStage::LocaleAwareResolution
+                | MessageBenchmarkStage::ReachabilityAndPlacement
+                | MessageBenchmarkStage::FindingAndPlanMaterialization
+                | MessageBenchmarkStage::LocaleFindingMaterialization
+                | MessageBenchmarkStage::SelectedMessageParse
+                | MessageBenchmarkStage::MessageSemanticValidation
+                | MessageBenchmarkStage::PortableDiagnosticMapping
+                | MessageBenchmarkStage::ArgumentSignatureDerivation
+                | MessageBenchmarkStage::ValidatedExportBatchConstruction
+                | MessageBenchmarkStage::LocaleAssetRendering
+                | MessageBenchmarkStage::LoaderMapRendering
+                | MessageBenchmarkStage::TypedKeyAccessorRendering
+                | MessageBenchmarkStage::ExportArtifactSetConstruction
+                | MessageBenchmarkStage::OutputCapabilityPreflight
+                | MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection
+                | MessageBenchmarkStage::OutputStaging
+                | MessageBenchmarkStage::OutputCommit
+                | MessageBenchmarkStage::OutputCheckComparison
+                | MessageBenchmarkStage::MessagesEmitJson
+        )) || (parent == MessageBenchmarkStage::CacheMissProduction && is_js_cache_child(child))
+            || (parent == MessageBenchmarkStage::SelectorExpansionAndReferenceResolution
+                && matches!(
+                    child,
+                    MessageBenchmarkStage::FallbackChainConstruction
+                        | MessageBenchmarkStage::LocaleAwareResolution
+                ))
+            || (parent == MessageBenchmarkStage::FindingAndPlanMaterialization
+                && child == MessageBenchmarkStage::LocaleFindingMaterialization)
     }
 
     fn push_completed(
@@ -329,6 +602,8 @@ impl BenchmarkRecorder {
             measurement.stage == stage && measurement.identity.as_ref() == identity
         }) {
             self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| format!("duplicate completion for {stage:?}/{identity}"));
             return;
         }
         self.completed.push(BenchmarkMessageMeasurement {
@@ -360,14 +635,19 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
             .any(|active| active.stage == stage && active.identity.as_ref() == identity)
         {
             self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| format!("duplicate start for {stage:?}/{identity}"));
             return;
         }
-        if self
+        if let Some(parent) = self
             .active
             .last()
-            .is_some_and(|parent| !Self::parent_allows(parent.stage, stage))
+            .filter(|parent| !Self::parent_allows(parent.stage, stage))
         {
             self.invariant_failed = true;
+            self.invariant_detail.get_or_insert_with(|| {
+                format!("undeclared nesting from {:?} to {stage:?}", parent.stage)
+            });
         }
         self.active.push(ActiveMeasurement {
             stage,
@@ -380,10 +660,18 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
     fn finish(&mut self, stage: MessageBenchmarkStage, identity: &str) {
         let Some(active) = self.active.pop() else {
             self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| format!("unmatched finish for {stage:?}/{identity}"));
             return;
         };
         if active.stage != stage || active.identity.as_ref() != identity {
             self.invariant_failed = true;
+            self.invariant_detail.get_or_insert_with(|| {
+                format!(
+                    "crossing finish for {stage:?}/{identity} while {:?}/{} is active",
+                    active.stage, active.identity
+                )
+            });
             return;
         }
         let finished = Instant::now();
@@ -405,6 +693,9 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
 
     fn invalidate(&mut self) {
         self.invariant_failed = true;
+        self.invariant_detail.get_or_insert_with(|| {
+            "an observation codec rejected a completed product value".to_owned()
+        });
     }
 
     fn observe(&mut self, stage: MessageBenchmarkStage, identity: &str, checksum: u32) {
@@ -414,6 +705,9 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
                 && !measurement.observation_complete
         }) else {
             self.invariant_failed = true;
+            self.invariant_detail.get_or_insert_with(|| {
+                format!("observation has no completed interval for {stage:?}/{identity}")
+            });
             return;
         };
         let Some(observation_started) = self
@@ -422,6 +716,9 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
             .and_then(Option::take)
         else {
             self.invariant_failed = true;
+            self.invariant_detail.get_or_insert_with(|| {
+                format!("observation timer is missing for {stage:?}/{identity}")
+            });
             return;
         };
         self.completed[index].checksum = checksum;
@@ -441,17 +738,96 @@ impl MessageBenchmarkObserver for BenchmarkRecorder {
         checksum: u32,
     ) {
         let observation_started = Instant::now();
-        if self.active.last().is_some_and(|parent| {
+        if let Some(parent) = self.active.last().filter(|parent| {
             let permitted = Self::parent_allows(parent.stage, stage)
-                || (parent.stage == MessageBenchmarkStage::ProjectLinkE2e
-                    && is_js_cache_child(stage));
+                || (matches!(
+                    parent.stage,
+                    MessageBenchmarkStage::ProjectLinkE2e
+                        | MessageBenchmarkStage::MessagesEmitE2e
+                        | MessageBenchmarkStage::MessagesEmitCheckE2e
+                ) && is_js_cache_child(stage));
             !permitted
         }) {
             self.invariant_failed = true;
+            self.invariant_detail.get_or_insert_with(|| {
+                format!(
+                    "undeclared recorded nesting from {:?} into {stage:?}/{identity}",
+                    parent.stage
+                )
+            });
         }
         self.push_completed(stage, identity, elapsed, Some(checksum), None);
         self.exclude_observation_time(observation_started.elapsed());
     }
+
+    fn observe_emit_artifacts(&mut self, target: &str, artifacts: &ExportArtifactSet) {
+        let observation_started = Instant::now();
+        if self
+            .emit_artifacts
+            .iter()
+            .any(|observation| observation.target.as_ref() == target)
+        {
+            self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| format!("duplicate emit artifact observation for {target}"));
+        } else {
+            self.emit_artifacts.push(EmitArtifactObservation {
+                target: target.into(),
+                checksum: emit_artifact_checksum(target, artifacts),
+            });
+        }
+        self.exclude_observation_time(observation_started.elapsed());
+    }
+
+    fn observe_emit_analysis(&mut self, checksum: u32) {
+        let observation_started = Instant::now();
+        if self.emit_analysis_checksum.replace(checksum).is_some() {
+            self.invariant_failed = true;
+            self.invariant_detail
+                .get_or_insert_with(|| "duplicate emit command analysis observation".to_owned());
+        }
+        self.exclude_observation_time(observation_started.elapsed());
+    }
+}
+
+fn emit_artifact_checksum(target: &str, artifacts: &ExportArtifactSet) -> u32 {
+    let mut fields = vec![
+        b"target".to_vec(),
+        target.as_bytes().to_vec(),
+        b"artifacts".to_vec(),
+        count_bytes(artifacts.artifacts().len()),
+    ];
+    for artifact in artifacts.artifacts() {
+        fields.push(b"artifact".to_vec());
+        fields.push(count_bytes(artifact.logical_path().segments().len()));
+        for segment in artifact.logical_path().segments() {
+            fields.push(segment.as_str().as_bytes().to_vec());
+        }
+        fields.push(artifact.kind().as_str().as_bytes().to_vec());
+        fields.push(artifact.format_version().major().to_be_bytes().to_vec());
+        fields.push(artifact.format_version().minor().to_be_bytes().to_vec());
+        match artifact.metadata().media_type() {
+            Some(media_type) => {
+                fields.push(b"media-type-present".to_vec());
+                fields.push(media_type.as_str().as_bytes().to_vec());
+            }
+            None => fields.push(b"media-type-absent".to_vec()),
+        }
+        fields.push(count_bytes(artifact.payload().len()));
+        fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
+        fields.push(count_bytes(artifact.metadata().relationships().len()));
+        for relationship in artifact.metadata().relationships() {
+            fields.push(vec![relationship.kind().tag()]);
+            fields.push(count_bytes(relationship.target().segments().len()));
+            for segment in relationship.target().segments() {
+                fields.push(segment.as_str().as_bytes().to_vec());
+            }
+        }
+    }
+    observation_checksum(
+        b"messages_emit_export_artifacts",
+        fields.iter().map(Vec::as_slice),
+    )
 }
 
 fn count_bytes(count: usize) -> Vec<u8> {
@@ -473,7 +849,27 @@ const fn is_js_cache_child(stage: MessageBenchmarkStage) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use intlify_export::{
+        ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
+        ExportArtifactPath, ExportArtifactPayload, ExportMediaType,
+    };
+
     use super::*;
+
+    fn artifact_set(media_type: Option<&str>) -> ExportArtifactSet {
+        ExportArtifactSet::try_new(vec![ExportArtifact::new(
+            ExportArtifactPath::try_new(["messages.mjs"]).unwrap(),
+            ExportArtifactKind::try_new("dev.intlify/test-artifact").unwrap(),
+            ExportArtifactFormatVersion::DRAFT_V0_1,
+            ExportArtifactPayload::try_new(b"payload".to_vec()).unwrap(),
+            ExportArtifactMetadata::try_new(
+                media_type.map(|value| ExportMediaType::try_new(value).unwrap()),
+                Vec::new(),
+            )
+            .unwrap(),
+        )])
+        .unwrap()
+    }
 
     #[test]
     fn recorder_accepts_zero_as_a_completed_checksum() {
@@ -485,6 +881,22 @@ mod tests {
         let completed = recorder.finish_recording().unwrap();
         assert_eq!(completed.len(), 1);
         assert_eq!(completed[0].checksum(), 0);
+    }
+
+    #[test]
+    fn emit_artifact_checksum_includes_media_type_presence_and_value() {
+        let absent = artifact_set(None);
+        let javascript = artifact_set(Some("text/javascript"));
+        let typescript = artifact_set(Some("text/typescript"));
+
+        assert_ne!(
+            emit_artifact_checksum("web", &absent),
+            emit_artifact_checksum("web", &javascript)
+        );
+        assert_ne!(
+            emit_artifact_checksum("web", &javascript),
+            emit_artifact_checksum("web", &typescript)
+        );
     }
 
     #[test]

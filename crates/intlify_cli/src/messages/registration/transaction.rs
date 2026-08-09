@@ -33,6 +33,10 @@ use super::inspection::{self, PriorOutputState, RecoveryRootObservation};
 use super::manifest::OUTPUT_MANIFEST_BASENAME;
 use super::PreparedOutput;
 use crate::messages::delivery::DeliveryOutputRoot;
+use crate::messages::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
 
 /// Write result consumed by the later command-level result adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,6 +190,31 @@ pub(super) fn write_output(
     )
 }
 
+pub(super) fn write_output_with_observer<O>(
+    prepared: &PreparedOutput<'_>,
+    project_root: &Path,
+    identity: &str,
+    observer: &mut O,
+) -> Result<WriteRegistrationOutcome, OutputRegistrationError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
+    write_output_with_transaction_id_source_and_hooks_and_observer(
+        prepared,
+        project_root,
+        || {
+            TransactionId::generate().map_err(|_| {
+                OutputRegistrationError::unsupported_capability(
+                    UnsupportedCapabilityEvidence::SecureRandom,
+                )
+            })
+        },
+        &NoTransactionHooks,
+        identity,
+        observer,
+    )
+}
+
 #[cfg(all(test, windows))]
 fn write_output_with_transaction_id_source(
     prepared: &PreparedOutput<'_>,
@@ -206,6 +235,27 @@ fn write_output_with_transaction_id_source_and_hooks(
     transaction_id_source: impl FnOnce() -> Result<TransactionId, OutputRegistrationError>,
     hooks: &dyn TransactionHooks,
 ) -> Result<WriteRegistrationOutcome, OutputRegistrationError> {
+    write_output_with_transaction_id_source_and_hooks_and_observer(
+        prepared,
+        project_root,
+        transaction_id_source,
+        hooks,
+        "output",
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+fn write_output_with_transaction_id_source_and_hooks_and_observer<O>(
+    prepared: &PreparedOutput<'_>,
+    project_root: &Path,
+    transaction_id_source: impl FnOnce() -> Result<TransactionId, OutputRegistrationError>,
+    hooks: &dyn TransactionHooks,
+    identity: &str,
+    observer: &mut O,
+) -> Result<WriteRegistrationOutcome, OutputRegistrationError>
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
     let control_id = OutputRootControlId::derive(prepared.output_root)
         .map_err(|_| OutputRegistrationError::internal_invariant())?;
     let parent = open_output_parent(project_root, prepared.output_root, ParentMode::Write, hooks)?
@@ -252,7 +302,9 @@ fn write_output_with_transaction_id_source_and_hooks(
 
     preflight_transaction_names(&parent, control_id, &journal)
         .map_err(|error| error.with_output_state(recovery_effect.output_state()))?;
+    observer.begin(MessageBenchmarkStage::OutputStaging, identity);
     if let Err(failure) = construct_staging(prepared, &parent, &journal, hooks) {
+        observer.abandon(MessageBenchmarkStage::OutputStaging, identity);
         let output_state = recovery_effect.output_state();
         if !failure.owns_staging {
             return Err(failure.error.with_output_state(output_state));
@@ -262,17 +314,35 @@ fn write_output_with_transaction_id_source_and_hooks(
             Err(cleanup_error) => Err(cleanup_error.with_output_state(output_state)),
         };
     }
+    finish_registration_stage(
+        observer,
+        MessageBenchmarkStage::OutputStaging,
+        identity,
+        prepared,
+        b"staged",
+    );
 
+    observer.begin(MessageBenchmarkStage::OutputCommit, identity);
     match commit_staging(&parent, &journal, hooks) {
         Ok(()) => {
-            verify_output_parent(project_root, prepared.output_root, &parent)
-                .map_err(|error| error.with_output_state(OutputState::Indeterminate))?;
+            if let Err(error) = verify_output_parent(project_root, prepared.output_root, &parent) {
+                observer.abandon(MessageBenchmarkStage::OutputCommit, identity);
+                return Err(error.with_output_state(OutputState::Indeterminate));
+            }
+            finish_registration_stage(
+                observer,
+                MessageBenchmarkStage::OutputCommit,
+                identity,
+                prepared,
+                b"committed",
+            );
             Ok(WriteRegistrationOutcome {
                 status: WriteRegistrationStatus::Written,
                 output_state: OutputState::Updated,
             })
         }
         Err(failure) => {
+            observer.abandon(MessageBenchmarkStage::OutputCommit, identity);
             let error = rollback_after_commit(&parent, &journal, failure, hooks);
             match verify_output_parent(project_root, prepared.output_root, &parent) {
                 Ok(()) => Err(error),
@@ -282,6 +352,38 @@ fn write_output_with_transaction_id_source_and_hooks(
             }
         }
     }
+}
+
+fn finish_registration_stage(
+    observer: &mut (impl MessageBenchmarkObserver + ?Sized),
+    stage: MessageBenchmarkStage,
+    identity: &str,
+    prepared: &PreparedOutput<'_>,
+    state: &[u8],
+) {
+    observer.finish(stage, identity);
+    if !observer.enabled() {
+        return;
+    }
+    let mut fields = vec![state.to_vec()];
+    for artifact in prepared.artifacts.artifacts() {
+        fields.push(
+            artifact
+                .logical_path()
+                .segments()
+                .iter()
+                .map(intlify_export::ExportArtifactPathSegment::as_str)
+                .collect::<Vec<_>>()
+                .join("/")
+                .into_bytes(),
+        );
+        fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
+    }
+    observer.observe(
+        stage,
+        identity,
+        observation_checksum(stage.cost().as_bytes(), fields.iter().map(Vec::as_slice)),
+    );
 }
 
 fn journal_old_root(state: PriorOutputState) -> JournalOldRoot {
@@ -3805,6 +3907,9 @@ mod tests {
         use std::sync::mpsc;
         use std::time::Duration;
 
+        const BLOCKED_OBSERVATION_WINDOW: Duration = Duration::from_millis(75);
+        const LOCK_RELEASE_COMPLETION_TIMEOUT: Duration = Duration::from_secs(10);
+
         let project = TempProject::new();
         let old = artifact_set(&[(&["loader.mjs"], b"old")]);
         let new = artifact_set(&[(&["loader.mjs"], b"new")]);
@@ -3830,10 +3935,10 @@ mod tests {
                 result_tx.send(prepared.check(project.path())).unwrap();
             });
             started_rx.recv().unwrap();
-            assert!(result_rx.recv_timeout(Duration::from_millis(75)).is_err());
+            assert!(result_rx.recv_timeout(BLOCKED_OBSERVATION_WINDOW).is_err());
             std::fs::File::unlock(&exclusive).unwrap();
             assert!(result_rx
-                .recv_timeout(Duration::from_secs(2))
+                .recv_timeout(LOCK_RELEASE_COMPLETION_TIMEOUT)
                 .unwrap()
                 .unwrap()
                 .is_matched());
@@ -3857,11 +3962,11 @@ mod tests {
                     .unwrap();
             });
             started_rx.recv().unwrap();
-            assert!(result_rx.recv_timeout(Duration::from_millis(75)).is_err());
+            assert!(result_rx.recv_timeout(BLOCKED_OBSERVATION_WINDOW).is_err());
             std::fs::File::unlock(&shared).unwrap();
             assert_eq!(
                 result_rx
-                    .recv_timeout(Duration::from_secs(2))
+                    .recv_timeout(LOCK_RELEASE_COMPLETION_TIMEOUT)
                     .unwrap()
                     .unwrap()
                     .status(),
