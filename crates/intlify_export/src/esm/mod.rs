@@ -18,6 +18,10 @@ use std::fmt;
 use intlify_contract::{DeliveryUnitId, Locale};
 use intlify_linker::{LinkPolicy, LocaleFallback, MessageBundlePlan};
 
+use crate::observation::{
+    observation_checksum, ExportBenchmarkObserver, ExportBenchmarkStage,
+    NoopExportBenchmarkObserver,
+};
 use crate::writer::ExportPayloadBudget;
 use crate::{
     ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
@@ -165,64 +169,158 @@ impl EsmExporter {
 
 impl PlatformExporter for EsmExporter {
     fn export(&self, batch: &ValidatedExportBatch<'_>) -> Result<ExportArtifactSet, ExportError> {
-        preflight_batch_contract(batch)?;
-        preflight_builtin_batch(&self.options, batch)?;
-
-        let locale_assets = build_locale_assets(&self.options, batch.plans())?;
-        let accessor_assets = build_accessor_assets(batch.typed_output())?;
-        let loader_path = path::loader_path()?;
-        let mut payload_budget = ExportPayloadBudget::new();
-
-        let esm_kind = checked_kind(ESM_MODULE_KIND)?;
-        let loader_kind = checked_kind(LOADER_MAP_KIND)?;
-        let accessor_kind = checked_kind(TYPESCRIPT_ACCESSOR_KIND)?;
-        let javascript_media = checked_media_type(JAVASCRIPT_MEDIA_TYPE)?;
-        let typescript_media = checked_media_type(TYPESCRIPT_MEDIA_TYPE)?;
-
-        let expected_count = locale_assets
-            .len()
-            .checked_add(1)
-            .and_then(|count| count.checked_add(accessor_assets.len()))
-            .ok_or_else(artifact_assembly_error)?;
-        let mut artifacts = Vec::with_capacity(expected_count);
-
-        for asset in &locale_assets {
-            artifacts.push(ExportArtifact::new(
-                asset.path.clone(),
-                esm_kind.clone(),
-                FORMAT_VERSION,
-                source::render_locale_module(&mut payload_budget, asset.plan)?,
-                ExportArtifactMetadata::try_new(Some(javascript_media.clone()), Vec::new())?,
-            ));
-        }
-
-        let loader_relationships = locale_assets
-            .iter()
-            .map(|asset| {
-                ExportArtifactRelationship::new(asset.relationship_kind(), asset.path.clone())
-            })
-            .collect();
-        artifacts.push(ExportArtifact::new(
-            loader_path.clone(),
-            loader_kind,
-            FORMAT_VERSION,
-            source::render_loader_module(&mut payload_budget, &self.options, &locale_assets)?,
-            ExportArtifactMetadata::try_new(Some(javascript_media), loader_relationships)?,
-        ));
-
-        for asset in &accessor_assets {
-            artifacts.push(ExportArtifact::new(
-                asset.path.clone(),
-                accessor_kind.clone(),
-                FORMAT_VERSION,
-                source::render_accessor_module(&mut payload_budget, asset.typed_output)?,
-                ExportArtifactMetadata::try_new(Some(typescript_media.clone()), Vec::new())?,
-            ));
-        }
-
-        validate_artifact_assembly(&artifacts, &locale_assets, &loader_path, &accessor_assets)?;
-        ExportArtifactSet::try_new(artifacts)
+        export_with_observer(self, batch, &mut NoopExportBenchmarkObserver)
     }
+}
+
+pub(crate) fn export_with_observer<O>(
+    exporter: &EsmExporter,
+    batch: &ValidatedExportBatch<'_>,
+    observer: &mut O,
+) -> Result<ExportArtifactSet, ExportError>
+where
+    O: ExportBenchmarkObserver,
+{
+    preflight_batch_contract(batch)?;
+    preflight_builtin_batch(&exporter.options, batch)?;
+
+    let loader_path = path::loader_path()?;
+    let mut payload_budget = ExportPayloadBudget::new();
+    let esm_kind = checked_kind(ESM_MODULE_KIND)?;
+    let loader_kind = checked_kind(LOADER_MAP_KIND)?;
+    let accessor_kind = checked_kind(TYPESCRIPT_ACCESSOR_KIND)?;
+    let javascript_media = checked_media_type(JAVASCRIPT_MEDIA_TYPE)?;
+    let typescript_media = checked_media_type(TYPESCRIPT_MEDIA_TYPE)?;
+
+    observer.begin(ExportBenchmarkStage::LocaleAssetRendering);
+    let locale_assets = build_locale_assets(&exporter.options, batch.plans())?;
+    let mut artifacts = Vec::with_capacity(locale_assets.len().saturating_add(1));
+    for asset in &locale_assets {
+        let artifact = ExportArtifact::new(
+            asset.path.clone(),
+            esm_kind.clone(),
+            FORMAT_VERSION,
+            source::render_locale_module(&mut payload_budget, asset.plan)?,
+            ExportArtifactMetadata::try_new(Some(javascript_media.clone()), Vec::new())?,
+        );
+        #[cfg(feature = "benchmark")]
+        observer.associate(
+            crate::benchmark::BenchmarkArtifactAssociation::new(
+                asset.path.clone(),
+                crate::benchmark::BenchmarkLocaleBucket::Locale(asset.plan.locale().clone()),
+                crate::benchmark::BenchmarkDeliveryUnitBucket::Unit(
+                    asset.plan.delivery_unit().clone(),
+                ),
+            ),
+            false,
+        );
+        artifacts.push(artifact);
+    }
+    observer.finish(
+        ExportBenchmarkStage::LocaleAssetRendering,
+        checksum_artifacts(b"locale_asset_rendering", &artifacts),
+    );
+
+    observer.begin(ExportBenchmarkStage::LoaderMapRendering);
+    let loader_relationships = locale_assets
+        .iter()
+        .map(|asset| ExportArtifactRelationship::new(asset.relationship_kind(), asset.path.clone()))
+        .collect();
+    let loader = ExportArtifact::new(
+        loader_path.clone(),
+        loader_kind,
+        FORMAT_VERSION,
+        source::render_loader_module(&mut payload_budget, &exporter.options, &locale_assets)?,
+        ExportArtifactMetadata::try_new(Some(javascript_media), loader_relationships)?,
+    );
+    #[cfg(feature = "benchmark")]
+    observer.associate(
+        crate::benchmark::BenchmarkArtifactAssociation::new(
+            loader_path.clone(),
+            crate::benchmark::BenchmarkLocaleBucket::Shared,
+            crate::benchmark::BenchmarkDeliveryUnitBucket::Unit(DeliveryUnitId::main()),
+        ),
+        true,
+    );
+    observer.finish(
+        ExportBenchmarkStage::LoaderMapRendering,
+        checksum_artifacts(b"loader_map_rendering", std::slice::from_ref(&loader)),
+    );
+    artifacts.push(loader);
+
+    observer.begin(ExportBenchmarkStage::TypedKeyAccessorRendering);
+    let accessor_assets = build_accessor_assets(batch.typed_output())?;
+    let accessor_start = artifacts.len();
+    for asset in &accessor_assets {
+        let artifact = ExportArtifact::new(
+            asset.path.clone(),
+            accessor_kind.clone(),
+            FORMAT_VERSION,
+            source::render_accessor_module(&mut payload_budget, asset.typed_output)?,
+            ExportArtifactMetadata::try_new(Some(typescript_media.clone()), Vec::new())?,
+        );
+        #[cfg(feature = "benchmark")]
+        observer.associate(
+            crate::benchmark::BenchmarkArtifactAssociation::new(
+                asset.path.clone(),
+                crate::benchmark::BenchmarkLocaleBucket::Shared,
+                crate::benchmark::BenchmarkDeliveryUnitBucket::Shared,
+            ),
+            true,
+        );
+        artifacts.push(artifact);
+    }
+    observer.finish(
+        ExportBenchmarkStage::TypedKeyAccessorRendering,
+        checksum_artifacts(
+            b"typed_key_accessor_rendering",
+            &artifacts[accessor_start..],
+        ),
+    );
+
+    let expected_count = locale_assets
+        .len()
+        .checked_add(1)
+        .and_then(|count| count.checked_add(accessor_assets.len()))
+        .ok_or_else(artifact_assembly_error)?;
+    if artifacts.len() != expected_count {
+        return Err(artifact_assembly_error());
+    }
+
+    observer.begin(ExportBenchmarkStage::ExportArtifactSetConstruction);
+    validate_artifact_assembly(&artifacts, &locale_assets, &loader_path, &accessor_assets)?;
+    let artifacts = ExportArtifactSet::try_new(artifacts)?;
+    observer.finish(
+        ExportBenchmarkStage::ExportArtifactSetConstruction,
+        checksum_artifacts(b"export_artifact_set_construction", artifacts.artifacts()),
+    );
+    Ok(artifacts)
+}
+
+fn checksum_artifacts(domain: &[u8], artifacts: &[ExportArtifact]) -> u32 {
+    let mut fields = Vec::new();
+    for artifact in artifacts {
+        for segment in artifact.logical_path().segments() {
+            fields.push(segment.as_str().as_bytes().to_vec());
+        }
+        fields.push(artifact.kind().as_str().as_bytes().to_vec());
+        fields.push(artifact.format_version().major().to_be_bytes().to_vec());
+        fields.push(artifact.format_version().minor().to_be_bytes().to_vec());
+        fields.push(
+            u64::try_from(artifact.payload().len())
+                .expect("checked payload length fits u64")
+                .to_be_bytes()
+                .to_vec(),
+        );
+        fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
+        for relationship in artifact.metadata().relationships() {
+            fields.push([relationship.kind().tag()].to_vec());
+            for segment in relationship.target().segments() {
+                fields.push(segment.as_str().as_bytes().to_vec());
+            }
+        }
+    }
+    observation_checksum(domain, fields.iter().map(Vec::as_slice))
 }
 
 #[derive(Debug)]

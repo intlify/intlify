@@ -174,6 +174,13 @@ pub fn link(request: &LinkRequest<'_>) -> Result<LinkOutcome, LinkOperationalErr
     link_with_observer(request, &mut NoopLinkObserver)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlanSelection {
+    Reachable,
+    #[cfg(feature = "benchmark")]
+    FullRetention,
+}
+
 trait LinkObserver {
     fn begin(&mut self, _stage: LinkStage) {}
 
@@ -241,6 +248,17 @@ fn link_with_observer<O>(
 where
     O: LinkObserver,
 {
+    link_with_observer_and_plan_selection(request, observer, PlanSelection::Reachable)
+}
+
+fn link_with_observer_and_plan_selection<O>(
+    request: &LinkRequest<'_>,
+    observer: &mut O,
+    plan_selection: PlanSelection,
+) -> Result<LinkOutcome, LinkOperationalError>
+where
+    O: LinkObserver,
+{
     observer.begin(LinkStage::SemanticIndexConstruction);
     let index = build_semantic_index(request)?;
     let definitions = analyze_definitions(&index);
@@ -294,12 +312,18 @@ where
     let bundle_plans = if findings.iter().any(LinkFinding::blocking) {
         None
     } else {
-        Some(materialize_plans(
-            request,
-            &definitions.unique_definitions,
-            &resolution,
-            &reachability.by_delivery_unit,
-        )?)
+        Some(match plan_selection {
+            PlanSelection::Reachable => materialize_plans(
+                request,
+                &definitions.unique_definitions,
+                &resolution,
+                &reachability.by_delivery_unit,
+            )?,
+            #[cfg(feature = "benchmark")]
+            PlanSelection::FullRetention => {
+                materialize_full_retention_plans(request, &definitions.unique_definitions)?
+            }
+        })
     };
 
     let outcome = LinkOutcome::try_new(findings, bundle_plans, typed_key_models)?;
@@ -319,6 +343,26 @@ pub(crate) fn benchmark_link(
         stages,
         observation_overhead,
     ))
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn benchmark_link_with_full_retention(
+    request: &LinkRequest<'_>,
+) -> Result<(LinkOutcome, LinkOutcome), LinkOperationalError> {
+    let linked = link(request)?;
+    if linked.generation_blocked() {
+        return Err(LinkOperationalError::InternalInvariant);
+    }
+
+    let baseline = link_with_observer_and_plan_selection(
+        request,
+        &mut NoopLinkObserver,
+        PlanSelection::FullRetention,
+    )?;
+    if baseline.generation_blocked() {
+        return Err(LinkOperationalError::InternalInvariant);
+    }
+    Ok((linked, baseline))
 }
 
 #[cfg(feature = "benchmark")]
@@ -2205,6 +2249,100 @@ fn materialize_plans(
         }
     }
     Ok(plans)
+}
+
+#[cfg(feature = "benchmark")]
+fn materialize_full_retention_plans(
+    request: &LinkRequest<'_>,
+    definitions: &UniqueDefinitions,
+) -> Result<Vec<MessageBundlePlan>, LinkOperationalError> {
+    let node_count = u64::try_from(request.delivery_graph().nodes().len())
+        .map_err(|_| LinkOperationalError::InternalInvariant)?;
+    let locale_count = u64::try_from(request.resolved_policy().production_locales().len())
+        .map_err(|_| LinkOperationalError::InternalInvariant)?;
+    let plan_count = node_count
+        .checked_mul(locale_count)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    preflight_first_over(LinkLimitCounter::BundlePlansTotal, plan_count, request)?;
+
+    let retained_per_unit = request
+        .resolved_policy()
+        .production_locales()
+        .iter()
+        .try_fold(0_u64, |total, locale| {
+            definitions.values().try_fold(total, |total, by_locale| {
+                if by_locale.contains_key(locale) {
+                    total
+                        .checked_add(1)
+                        .ok_or(LinkOperationalError::InternalInvariant)
+                } else {
+                    Ok(total)
+                }
+            })
+        })?;
+    let resolved_count = retained_per_unit
+        .checked_mul(node_count)
+        .ok_or(LinkOperationalError::InternalInvariant)?;
+    preflight_first_over(
+        LinkLimitCounter::ResolvedMessagesTotal,
+        resolved_count,
+        request,
+    )?;
+    account_full_retention_plan_bytes(request, definitions)?;
+
+    let capacity =
+        usize::try_from(plan_count).map_err(|_| LinkOperationalError::InternalInvariant)?;
+    let mut plans = Vec::with_capacity(capacity);
+    for unit in request.delivery_graph().nodes() {
+        for locale in request.resolved_policy().production_locales() {
+            let mut messages = Vec::new();
+            for by_locale in definitions.values() {
+                let Some(snapshot) = by_locale.get(locale) else {
+                    continue;
+                };
+                messages.push(ResolvedMessage::new(
+                    snapshot.logical.scope.clone(),
+                    snapshot.logical.domain,
+                    snapshot.logical.key.clone(),
+                    snapshot.locale.clone(),
+                    snapshot.message.clone(),
+                    snapshot.location.clone(),
+                ));
+            }
+            plans.push(MessageBundlePlan::new(
+                unit.clone(),
+                locale.clone(),
+                messages,
+            ));
+        }
+    }
+    Ok(plans)
+}
+
+#[cfg(feature = "benchmark")]
+fn account_full_retention_plan_bytes(
+    request: &LinkRequest<'_>,
+    definitions: &UniqueDefinitions,
+) -> Result<(), LinkOperationalError> {
+    let mut budget = SemanticByteBudget::new(LinkLimitCounter::BundlePlanBytesTotal, request);
+    for unit in request.delivery_graph().nodes() {
+        for locale in request.resolved_policy().production_locales() {
+            add_delivery_unit_bytes(&mut budget, unit)?;
+            budget.add(locale.as_str().len())?;
+            for by_locale in definitions.values() {
+                let Some(snapshot) = by_locale.get(locale) else {
+                    continue;
+                };
+                add_scope_bytes(&mut budget, &snapshot.logical.scope)?;
+                budget.add(snapshot.logical.key.as_str().len())?;
+                budget.add(snapshot.locale.as_str().len())?;
+                budget.add(snapshot.message.as_str().len())?;
+                add_source_bytes(&mut budget, snapshot.location.source())?;
+                budget.add(snapshot.location.entry().structural_path().as_str().len())?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn account_plan_bytes(

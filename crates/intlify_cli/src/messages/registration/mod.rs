@@ -27,6 +27,10 @@ use self::error::{OutputRegistrationError, OwnershipFailureReason, RegistrationF
 use self::manifest::{CheckedOutputManifest, ManifestCodecErrorKind};
 pub(in crate::messages) use self::transaction::WriteRegistrationStatus;
 use super::delivery::{BuiltInExporterId, DeliveryOutputRoot, ResolvedDeliveryTarget};
+use super::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
 
 /// Fully preflighted expected output for one immutable selected target.
 #[derive(Debug)]
@@ -45,9 +49,21 @@ impl<'a> PreparedOutput<'a> {
         target: &'a ResolvedDeliveryTarget,
         artifacts: &'a ExportArtifactSet,
     ) -> Result<Self, OutputRegistrationError> {
+        Self::try_new_with_observer(target, artifacts, &mut NoopMessageBenchmarkObserver)
+    }
+
+    pub(crate) fn try_new_with_observer<O>(
+        target: &'a ResolvedDeliveryTarget,
+        artifacts: &'a ExportArtifactSet,
+        observer: &mut O,
+    ) -> Result<Self, OutputRegistrationError>
+    where
+        O: MessageBenchmarkObserver + ?Sized,
+    {
+        let identity = target.name().as_str();
+        observer.begin(MessageBenchmarkStage::OutputCapabilityPreflight, identity);
         let exporter = target.exporter();
-        preflight_capabilities(exporter, artifacts)?;
-        let manifest =
+        let manifest = match preflight_capabilities(exporter, artifacts).and_then(|()| {
             CheckedOutputManifest::from_artifact_set(exporter, artifacts).map_err(|error| {
                 match error.kind() {
                     ManifestCodecErrorKind::Limit => OutputRegistrationError::registration(
@@ -62,8 +78,43 @@ impl<'a> PreparedOutput<'a> {
                         OutputRegistrationError::internal_invariant()
                     }
                 }
-            })?;
-        let destinations = DestinationMap::try_new(target.out(), artifacts)?;
+            })
+        }) {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                observer.abandon(MessageBenchmarkStage::OutputCapabilityPreflight, identity);
+                return Err(error);
+            }
+        };
+        finish_stage(
+            observer,
+            MessageBenchmarkStage::OutputCapabilityPreflight,
+            identity,
+            artifacts,
+            b"capability_preflight",
+        );
+
+        observer.begin(
+            MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection,
+            identity,
+        );
+        let destinations = match DestinationMap::try_new(target.out(), artifacts) {
+            Ok(destinations) => destinations,
+            Err(error) => {
+                observer.abandon(
+                    MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection,
+                    identity,
+                );
+                return Err(error);
+            }
+        };
+        finish_stage(
+            observer,
+            MessageBenchmarkStage::OutputPathMappingAndOwnershipInspection,
+            identity,
+            artifacts,
+            b"path_mapping_and_ownership_inspection",
+        );
         Ok(Self {
             exporter,
             output_root: target.out(),
@@ -81,12 +132,55 @@ impl<'a> PreparedOutput<'a> {
         transaction::check_output(self, project_root)
     }
 
+    pub(crate) fn check_with_observer<O>(
+        &self,
+        project_root: &Path,
+        identity: &str,
+        observer: &mut O,
+    ) -> Result<CheckComparison, OutputRegistrationError>
+    where
+        O: MessageBenchmarkObserver + ?Sized,
+    {
+        observer.begin(MessageBenchmarkStage::OutputCheckComparison, identity);
+        let comparison = match transaction::check_output(self, project_root) {
+            Ok(comparison) => comparison,
+            Err(error) => {
+                observer.abandon(MessageBenchmarkStage::OutputCheckComparison, identity);
+                return Err(error);
+            }
+        };
+        finish_stage(
+            observer,
+            MessageBenchmarkStage::OutputCheckComparison,
+            identity,
+            self.artifacts,
+            if comparison.is_matched() {
+                b"check_matched"
+            } else {
+                b"check_different"
+            },
+        );
+        Ok(comparison)
+    }
+
     /// Durably install the complete expected output or prove it is unchanged.
     pub(crate) fn write(
         &self,
         project_root: &Path,
     ) -> Result<transaction::WriteRegistrationOutcome, OutputRegistrationError> {
         transaction::write_output(self, project_root)
+    }
+
+    pub(crate) fn write_with_observer<O>(
+        &self,
+        project_root: &Path,
+        identity: &str,
+        observer: &mut O,
+    ) -> Result<transaction::WriteRegistrationOutcome, OutputRegistrationError>
+    where
+        O: MessageBenchmarkObserver + ?Sized,
+    {
+        transaction::write_output_with_observer(self, project_root, identity, observer)
     }
 
     const fn manifest(&self) -> &CheckedOutputManifest {
@@ -97,6 +191,35 @@ impl<'a> PreparedOutput<'a> {
     const fn destinations(&self) -> &DestinationMap {
         &self.destinations
     }
+}
+
+fn finish_stage(
+    observer: &mut (impl MessageBenchmarkObserver + ?Sized),
+    stage: MessageBenchmarkStage,
+    identity: &str,
+    artifacts: &ExportArtifactSet,
+    state: &[u8],
+) {
+    observer.finish(stage, identity);
+    let mut fields = vec![state.to_vec()];
+    for artifact in artifacts.artifacts() {
+        fields.push(
+            artifact
+                .logical_path()
+                .segments()
+                .iter()
+                .map(intlify_export::ExportArtifactPathSegment::as_str)
+                .collect::<Vec<_>>()
+                .join("/")
+                .into_bytes(),
+        );
+        fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
+    }
+    observer.observe(
+        stage,
+        identity,
+        observation_checksum(stage.cost().as_bytes(), fields.iter().map(Vec::as_slice)),
+    );
 }
 
 #[cfg(test)]

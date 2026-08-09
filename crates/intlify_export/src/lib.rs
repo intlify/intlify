@@ -16,15 +16,21 @@ mod esm;
 mod export_error;
 mod exporter;
 mod limits;
+mod observation;
 mod preparation;
 mod typed_output;
 #[allow(dead_code)]
 mod writer;
 
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub mod benchmark;
+
 pub use artifact::{
     ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
     ExportArtifactPath, ExportArtifactPathSegment, ExportArtifactPayload,
     ExportArtifactRelationship, ExportArtifactRelationshipKind, ExportArtifactSet, ExportMediaType,
+    PayloadFingerprint,
 };
 pub use diagnostic::{
     ExportMessageValidationFailure, MappedMessageDiagnostic, MappedMessageDiagnosticKind,
@@ -57,7 +63,7 @@ mod tests {
         ExportArtifactPath, ExportArtifactPathSegment, ExportArtifactPayload,
         ExportArtifactRelationship, ExportArtifactSet, ExportError, ExportMessageValidationFailure,
         ExportPreparationError, ExportValidationLimits, MappedMessageDiagnostic,
-        MessageArgumentSignature, PlatformExporter, ValidatedExportBatch,
+        MessageArgumentSignature, PayloadFingerprint, PlatformExporter, ValidatedExportBatch,
         ValidatedMessageSignature, ValidatedTypedOutput,
     };
 
@@ -81,6 +87,7 @@ mod tests {
         assert_send_sync::<ExportArtifactKind>();
         assert_send_sync::<ExportArtifactFormatVersion>();
         assert_send_sync::<ExportArtifactPayload>();
+        assert_send_sync::<PayloadFingerprint>();
         assert_send_sync::<ExportArtifactMetadata>();
         assert_send_sync::<ExportArtifactRelationship>();
         assert_send_sync::<ExportError>();

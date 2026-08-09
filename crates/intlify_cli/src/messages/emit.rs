@@ -27,8 +27,14 @@ use self::report::{
 };
 use super::delivery::{DeliveryTargetSelectionError, ResolvedDeliveryTarget};
 use super::exporter_registry::BuiltInExporterRegistry;
-use super::orchestration::{link_project, ProjectLinkError, ProjectLinkExecution};
-use super::reference::{ReferenceInventoryError, ReferenceSourceFailure};
+use super::observation::{
+    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
+    NoopMessageBenchmarkObserver,
+};
+use super::orchestration::{
+    link_project, link_project_with_observer, ProjectLinkError, ProjectLinkExecution,
+};
+use super::reference::{MessageLinkCache, ReferenceInventoryError, ReferenceSourceFailure};
 use super::registration::{
     output_state_token, reporter_error as registration_error, PreparedOutput,
     WriteRegistrationStatus,
@@ -46,6 +52,25 @@ pub(crate) fn run(
     config_path: Option<&str>,
     cwd: &Path,
 ) -> CliRunResult {
+    run_with_observer(
+        arguments,
+        reporter,
+        config_path,
+        cwd,
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+pub(super) fn run_with_observer<O>(
+    arguments: &MessagesEmitArgs,
+    reporter: Reporter,
+    config_path: Option<&str>,
+    cwd: &Path,
+    observer: &mut O,
+) -> CliRunResult
+where
+    O: MessageBenchmarkObserver + ?Sized,
+{
     let project_root = config::discover_project_root(cwd);
     let loaded = match config::load_project_config(cwd, config_path) {
         Ok(loaded) => loaded,
@@ -87,15 +112,30 @@ pub(crate) fn run(
     };
 
     let selected_targets = selected.targets();
-    let execution = match link_project(
-        &loaded.project_root,
-        loaded.config_path.as_deref(),
-        &loaded.resolved_resources,
-        messages,
-        &HostFormatRegistry::new(),
-        &LinkLimits::default(),
-        None,
-    ) {
+    let benchmark_cache = observer.enabled().then(MessageLinkCache::default);
+    let execution_result = if observer.enabled() {
+        link_project_with_observer(
+            &loaded.project_root,
+            loaded.config_path.as_deref(),
+            &loaded.resolved_resources,
+            messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+            benchmark_cache.as_ref(),
+            observer,
+        )
+    } else {
+        link_project(
+            &loaded.project_root,
+            loaded.config_path.as_deref(),
+            &loaded.resolved_resources,
+            messages,
+            &HostFormatRegistry::new(),
+            &LinkLimits::default(),
+            benchmark_cache.as_ref(),
+        )
+    };
+    let execution = match execution_result {
         Ok(execution) => execution,
         Err(error) => {
             return report::render_early_error(
@@ -114,6 +154,7 @@ pub(crate) fn run(
         arguments.check,
         reporter,
         &loaded.project_root,
+        observer,
     )
 }
 
@@ -124,6 +165,7 @@ fn execute_from_linked_project(
     check: bool,
     reporter: Reporter,
     project_root: &Path,
+    observer: &mut (impl MessageBenchmarkObserver + ?Sized),
 ) -> CliRunResult {
     let mut analysis = EmitAnalysis::from_findings(
         execution.outcome().findings(),
@@ -167,20 +209,19 @@ fn execute_from_linked_project(
     };
 
     let registry = BuiltInExporterRegistry::new();
-    let results = selected_targets
-        .iter()
-        .map(|target| {
-            execute_target(
-                target,
-                messages.policy(),
-                &prepared,
-                &registry,
-                check,
-                project_root,
-            )
-        })
-        .collect::<Vec<_>>();
-    render_results(results, check, analysis, reporter, project_root)
+    let mut results = Vec::with_capacity(selected_targets.len());
+    for target in selected_targets {
+        results.push(execute_target(
+            target,
+            messages.policy(),
+            &prepared,
+            &registry,
+            check,
+            project_root,
+            observer,
+        ));
+    }
+    render_results_with_observer(results, check, analysis, reporter, project_root, observer)
 }
 
 fn execute_target(
@@ -190,6 +231,7 @@ fn execute_target(
     registry: &BuiltInExporterRegistry,
     check: bool,
     project_root: &Path,
+    observer: &mut (impl MessageBenchmarkObserver + ?Sized),
 ) -> EmitTargetResult {
     let mut result = target_result_shell(target, check);
     let Ok(exporter) = registry.create(target, policy) else {
@@ -213,7 +255,12 @@ fn execute_target(
     result.artifact_count = Some(artifact_count);
     result.payload_bytes = Some(payload_bytes);
 
-    let prepared = match PreparedOutput::try_new(target, &artifacts) {
+    let prepared_result = if observer.enabled() {
+        PreparedOutput::try_new_with_observer(target, &artifacts, observer)
+    } else {
+        PreparedOutput::try_new(target, &artifacts)
+    };
+    let prepared = match prepared_result {
         Ok(prepared) => prepared,
         Err(error) => {
             result.status = "error";
@@ -226,7 +273,12 @@ fn execute_target(
     };
 
     if check {
-        match prepared.check(project_root) {
+        let comparison = if observer.enabled() {
+            prepared.check_with_observer(project_root, target.name().as_str(), observer)
+        } else {
+            prepared.check(project_root)
+        };
+        match comparison {
             Ok(comparison) => {
                 result.status = if comparison.is_matched() {
                     "matched"
@@ -244,7 +296,12 @@ fn execute_target(
             }
         }
     } else {
-        match prepared.write(project_root) {
+        let write = if observer.enabled() {
+            prepared.write_with_observer(project_root, target.name().as_str(), observer)
+        } else {
+            prepared.write(project_root)
+        };
+        match write {
             Ok(outcome) => {
                 result.status = match outcome.status() {
                     WriteRegistrationStatus::Unchanged => "unchanged",
@@ -313,6 +370,24 @@ fn render_results(
     analysis: EmitAnalysis,
     reporter: Reporter,
     project_root: &Path,
+) -> CliRunResult {
+    render_results_with_observer(
+        results,
+        check,
+        analysis,
+        reporter,
+        project_root,
+        &mut NoopMessageBenchmarkObserver,
+    )
+}
+
+fn render_results_with_observer(
+    results: Vec<EmitTargetResult>,
+    check: bool,
+    analysis: EmitAnalysis,
+    reporter: Reporter,
+    project_root: &Path,
+    observer: &mut (impl MessageBenchmarkObserver + ?Sized),
 ) -> CliRunResult {
     let selected_targets = count(results.len());
     let prepared_targets = count(
@@ -418,7 +493,14 @@ fn render_results(
             ),
         })
     };
-    report::render(
+    let observe_json = observer.enabled() && reporter == Reporter::Json;
+    if observe_json {
+        observer.begin(
+            MessageBenchmarkStage::MessagesEmitJson,
+            "messages-emit-json",
+        );
+    }
+    let rendered = report::render(
         EmitReport {
             summary,
             analysis,
@@ -428,7 +510,19 @@ fn render_results(
         },
         reporter,
         project_root,
-    )
+    );
+    if observe_json {
+        observer.finish(
+            MessageBenchmarkStage::MessagesEmitJson,
+            "messages-emit-json",
+        );
+        observer.observe(
+            MessageBenchmarkStage::MessagesEmitJson,
+            "messages-emit-json",
+            observation_checksum(b"json_reporter", [rendered.stdout.as_bytes()]),
+        );
+    }
+    rendered
 }
 
 fn render_reduced_error(

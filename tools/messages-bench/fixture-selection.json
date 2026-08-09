@@ -1,5 +1,5 @@
 {
-  "revision": 3,
+  "revision": 4,
   "profiles": [
     {
       "name": "exact-reference-dense",
@@ -66,6 +66,65 @@
       },
       "variants": ["locale_fallback_expansion"],
       "scales": [16, 64, 256]
+    },
+    {
+      "name": "message-export-esm",
+      "revision": 1,
+      "shape": "message_export_esm",
+      "generator": {
+        "kind": "rust",
+        "id": "message_export_esm"
+      },
+      "variants": [
+        "all_definitions_baseline",
+        "linked_output",
+        "all_definitions_baseline_vs_linked_output"
+      ],
+      "scales": [4, 16, 64],
+      "benchmarkContractRevision": 1,
+      "exporter": {
+        "id": "esm",
+        "benchmarkRevision": 1,
+        "options": {
+          "productionLocales": ["ja", "en"],
+          "eagerLocales": ["en"]
+        },
+        "acceptedKinds": [
+          { "kind": "dev.intlify/esm-module", "formatVersion": { "major": 0, "minor": 1 } },
+          { "kind": "dev.intlify/loader-map", "formatVersion": { "major": 0, "minor": 1 } },
+          {
+            "kind": "dev.intlify/typescript-accessor",
+            "formatVersion": { "major": 0, "minor": 1 }
+          }
+        ]
+      },
+      "entryRoots": [
+        ["loader.mjs"],
+        ["accessors", "scope-73907d636a7fe439dc88556cf27161097f869fdafbe02bd38ffb2ced211f2578.ts"]
+      ],
+      "groupingMode": "exporter_associations"
+    },
+    {
+      "name": "message-output-registration",
+      "revision": 1,
+      "shape": "message_output_registration",
+      "generator": {
+        "kind": "rust",
+        "id": "message_output_registration"
+      },
+      "variants": ["write_absent", "write_unchanged", "check_matched", "check_different"],
+      "scales": [4, 16, 64]
+    },
+    {
+      "name": "messages-emit",
+      "revision": 1,
+      "shape": "messages_emit",
+      "generator": {
+        "kind": "rust",
+        "id": "messages_emit"
+      },
+      "variants": ["write_absent", "write_unchanged", "check_matched", "check_different"],
+      "scales": [4, 16, 64]
     }
   ],
   "projectFixture": {

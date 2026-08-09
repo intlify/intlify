@@ -43,6 +43,23 @@ pub enum MessageBenchmarkStage {
     LocaleFindingMaterialization,
     LinkCorePeakLiveMemory,
     ProjectLinkE2e,
+    SelectedMessageParse,
+    MessageSemanticValidation,
+    PortableDiagnosticMapping,
+    ArgumentSignatureDerivation,
+    ValidatedExportBatchConstruction,
+    LocaleAssetRendering,
+    LoaderMapRendering,
+    TypedKeyAccessorRendering,
+    ExportArtifactSetConstruction,
+    OutputCapabilityPreflight,
+    OutputPathMappingAndOwnershipInspection,
+    OutputStaging,
+    OutputCommit,
+    OutputCheckComparison,
+    MessagesEmitE2e,
+    MessagesEmitCheckE2e,
+    MessagesEmitJson,
 }
 
 impl MessageBenchmarkStage {
@@ -83,6 +100,23 @@ impl MessageBenchmarkStage {
             | Self::LocaleFindingMaterialization => "message_link_fallback",
             Self::LinkCorePeakLiveMemory => "message_link_peak_memory",
             Self::ProjectLinkE2e => "message_project_link_e2e",
+            Self::SelectedMessageParse
+            | Self::MessageSemanticValidation
+            | Self::PortableDiagnosticMapping
+            | Self::ArgumentSignatureDerivation
+            | Self::ValidatedExportBatchConstruction => "message_export_prepare",
+            Self::LocaleAssetRendering
+            | Self::LoaderMapRendering
+            | Self::TypedKeyAccessorRendering
+            | Self::ExportArtifactSetConstruction => "message_export_esm",
+            Self::OutputCapabilityPreflight
+            | Self::OutputPathMappingAndOwnershipInspection
+            | Self::OutputStaging
+            | Self::OutputCommit
+            | Self::OutputCheckComparison => "message_output_register",
+            Self::MessagesEmitE2e => "messages_emit_e2e",
+            Self::MessagesEmitCheckE2e => "messages_emit_check_e2e",
+            Self::MessagesEmitJson => "messages_emit_json",
         }
     }
 
@@ -120,7 +154,26 @@ impl MessageBenchmarkStage {
             Self::FindingAndPlanMaterialization => "finding_and_plan_materialization",
             Self::LocaleFindingMaterialization => "locale_finding_materialization",
             Self::LinkCorePeakLiveMemory => "link_core_peak_live_memory",
-            Self::ProjectLinkE2e => "complete_workflow",
+            Self::ProjectLinkE2e | Self::MessagesEmitE2e | Self::MessagesEmitCheckE2e => {
+                "complete_workflow"
+            }
+            Self::SelectedMessageParse => "selected_message_parse",
+            Self::MessageSemanticValidation => "message_semantic_validation",
+            Self::PortableDiagnosticMapping => "portable_diagnostic_mapping",
+            Self::ArgumentSignatureDerivation => "argument_signature_derivation",
+            Self::ValidatedExportBatchConstruction => "validated_export_batch_construction",
+            Self::LocaleAssetRendering => "locale_asset_rendering",
+            Self::LoaderMapRendering => "loader_map_rendering",
+            Self::TypedKeyAccessorRendering => "typed_key_accessor_rendering",
+            Self::ExportArtifactSetConstruction => "export_artifact_set_construction",
+            Self::OutputCapabilityPreflight => "capability_preflight",
+            Self::OutputPathMappingAndOwnershipInspection => {
+                "path_mapping_and_ownership_inspection"
+            }
+            Self::OutputStaging => "staging",
+            Self::OutputCommit => "commit",
+            Self::OutputCheckComparison => "check_comparison",
+            Self::MessagesEmitJson => "json_reporter",
         }
     }
 
@@ -158,6 +211,25 @@ impl MessageBenchmarkStage {
             Self::LocaleFindingMaterialization => "locale_finding_materialization",
             Self::LinkCorePeakLiveMemory => "link_core_peak_live_memory",
             Self::ProjectLinkE2e => "project_link_e2e",
+            Self::SelectedMessageParse => "selected_message_parse",
+            Self::MessageSemanticValidation => "message_semantic_validation",
+            Self::PortableDiagnosticMapping => "portable_diagnostic_mapping",
+            Self::ArgumentSignatureDerivation => "argument_signature_derivation",
+            Self::ValidatedExportBatchConstruction => "validated_export_batch_construction",
+            Self::LocaleAssetRendering => "locale_asset_rendering",
+            Self::LoaderMapRendering => "loader_map_rendering",
+            Self::TypedKeyAccessorRendering => "typed_key_accessor_rendering",
+            Self::ExportArtifactSetConstruction => "export_artifact_set_construction",
+            Self::OutputCapabilityPreflight => "capability_preflight",
+            Self::OutputPathMappingAndOwnershipInspection => {
+                "path_mapping_and_ownership_inspection"
+            }
+            Self::OutputStaging => "staging",
+            Self::OutputCommit => "commit",
+            Self::OutputCheckComparison => "check_comparison",
+            Self::MessagesEmitE2e => "messages_emit_e2e",
+            Self::MessagesEmitCheckE2e => "messages_emit_check_e2e",
+            Self::MessagesEmitJson => "messages_emit_json",
         }
     }
 }

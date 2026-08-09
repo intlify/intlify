@@ -14,6 +14,7 @@ path = "src/main.rs"
 allocation-counter = "0.8.1"
 intlify_cli = { path = "../../../crates/intlify_cli", features = ["benchmark"] }
 intlify_contract = { path = "../../../crates/intlify_contract" }
+intlify_export = { path = "../../../crates/intlify_export", features = ["benchmark"] }
 intlify_linker = { path = "../../../crates/intlify_linker", features = ["benchmark"] }
 intlify_producer_js = { path = "../../../crates/intlify_producer_js", features = ["benchmark"] }
 intlify_resource = { path = "../../../crates/intlify_resource" }

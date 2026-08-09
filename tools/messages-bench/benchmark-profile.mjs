@@ -2,16 +2,17 @@ import { readFileSync } from 'node:fs'
 
 import {
   MESSAGE_BENCHMARK_BOUNDARIES,
+  MESSAGE_BENCHMARK_NON_INTERVALS,
   resource_host_parse_and_entry_extraction
 } from './benchmark-phases.mjs'
 
-export const MESSAGE_BENCHMARK_PROFILE_REVISION = 3
+export const MESSAGE_BENCHMARK_PROFILE_REVISION = 4
 
 const selection = JSON.parse(
   readFileSync(new URL('./fixture-selection.json', import.meta.url), 'utf8')
 )
 const descriptorByPair = new Map(
-  MESSAGE_BENCHMARK_BOUNDARIES.map(entry => [
+  [...MESSAGE_BENCHMARK_BOUNDARIES, ...MESSAGE_BENCHMARK_NON_INTERVALS].map(entry => [
     `${entry.descriptor.phase}\0${entry.descriptor.cost}`,
     entry.descriptor
   ])
@@ -22,6 +23,11 @@ const typedKeyModel = selection.profiles.find(profile => profile.shape === 'type
 const localeFallbackExpansion = selection.profiles.find(
   profile => profile.shape === 'locale_fallback_expansion'
 )
+const messageExportEsm = selection.profiles.find(profile => profile.shape === 'message_export_esm')
+const messageOutputRegistration = selection.profiles.find(
+  profile => profile.shape === 'message_output_registration'
+)
+const messagesEmit = selection.profiles.find(profile => profile.shape === 'messages_emit')
 
 const projectPairs = [
   ['message_project_input_io', 'inventory_metadata_io'],
@@ -90,7 +96,13 @@ export const MESSAGE_BENCHMARK_REQUIRED_CASES = Object.freeze([
   ...selection.profiles
     .filter(
       profile =>
-        profile.shape !== 'typed_key_model' && profile.shape !== 'locale_fallback_expansion'
+        ![
+          'typed_key_model',
+          'locale_fallback_expansion',
+          'message_export_esm',
+          'message_output_registration',
+          'messages_emit'
+        ].includes(profile.shape)
     )
     .flatMap(profile =>
       profile.scales.map(scale =>
@@ -136,8 +148,102 @@ export const MESSAGE_BENCHMARK_REQUIRED_CASES = Object.freeze([
         metric: descriptor.metric
       })
     })
+  ),
+  ...messageExportEsm.scales.flatMap(scale =>
+    ['all_definitions_baseline', 'linked_output'].flatMap(variant => [
+      ...[
+        'selected_message_parse',
+        'message_semantic_validation',
+        'portable_diagnostic_mapping',
+        'argument_signature_derivation',
+        'validated_export_batch_construction'
+      ].map(cost =>
+        requiredBoundaryCase('message_export_prepare', cost, messageExportEsm, variant, scale)
+      ),
+      ...[
+        'locale_asset_rendering',
+        'loader_map_rendering',
+        'typed_key_accessor_rendering',
+        'export_artifact_set_construction'
+      ].map(cost =>
+        requiredBoundaryCase('message_export_esm', cost, messageExportEsm, variant, scale)
+      )
+    ])
+  ),
+  ...messageExportEsm.scales.map(scale =>
+    requiredCase({
+      phase: 'message_export_artifact_size',
+      cost: 'payload_size_comparison',
+      fixture: messageExportEsm.name,
+      variant: 'all_definitions_baseline_vs_linked_output',
+      scale,
+      operation: 'payload_size_comparison',
+      metric: 'artifact_payload_size'
+    })
+  ),
+  ...messageOutputRegistration.scales.flatMap(scale => [
+    ...messageOutputRegistration.variants.flatMap(variant =>
+      ['capability_preflight', 'path_mapping_and_ownership_inspection'].map(cost =>
+        requiredBoundaryCase(
+          'message_output_register',
+          cost,
+          messageOutputRegistration,
+          variant,
+          scale
+        )
+      )
+    ),
+    ...['staging', 'commit'].map(cost =>
+      requiredBoundaryCase(
+        'message_output_register',
+        cost,
+        messageOutputRegistration,
+        'write_absent',
+        scale
+      )
+    ),
+    ...['check_matched', 'check_different'].map(variant =>
+      requiredBoundaryCase(
+        'message_output_register',
+        'check_comparison',
+        messageOutputRegistration,
+        variant,
+        scale
+      )
+    )
+  ]),
+  ...messagesEmit.scales.flatMap(scale =>
+    messagesEmit.variants.flatMap(variant => {
+      const phase = variant.startsWith('check_') ? 'messages_emit_check_e2e' : 'messages_emit_e2e'
+      return [
+        requiredBoundaryCase(phase, 'complete_workflow', messagesEmit, variant, scale),
+        requiredBoundaryCase('messages_emit_json', 'json_reporter', messagesEmit, variant, scale),
+        requiredCase({
+          phase: resource_host_parse_and_entry_extraction.phase,
+          cost: resource_host_parse_and_entry_extraction.cost,
+          fixture: messagesEmit.name,
+          variant,
+          scale,
+          operation: resource_host_parse_and_entry_extraction.boundaryId,
+          metric: resource_host_parse_and_entry_extraction.metric
+        })
+      ]
+    })
   )
 ])
+
+function requiredBoundaryCase(phase, cost, fixture, variant, scale) {
+  const descriptor = descriptorFor(phase, cost)
+  return requiredCase({
+    phase,
+    cost,
+    fixture: fixture.name,
+    variant,
+    scale,
+    operation: descriptor.boundaryId,
+    metric: descriptor.metric
+  })
+}
 
 function descriptorFor(phase, cost) {
   const descriptor = descriptorByPair.get(`${phase}\0${cost}`)
@@ -175,7 +281,24 @@ export const MESSAGE_BENCHMARK_E2E_EXTRACTION_COMPANIONS = Object.freeze([
       operation: resource_host_parse_and_entry_extraction.boundaryId,
       metric: resource_host_parse_and_entry_extraction.metric
     })
-  })
+  }),
+  ...messagesEmit.scales.flatMap(scale =>
+    messagesEmit.variants.map(variant => {
+      const phase = variant.startsWith('check_') ? 'messages_emit_check_e2e' : 'messages_emit_e2e'
+      return Object.freeze({
+        e2e: requiredBoundaryCase(phase, 'complete_workflow', messagesEmit, variant, scale),
+        extraction: requiredCase({
+          phase: resource_host_parse_and_entry_extraction.phase,
+          cost: resource_host_parse_and_entry_extraction.cost,
+          fixture: messagesEmit.name,
+          variant,
+          scale,
+          operation: resource_host_parse_and_entry_extraction.boundaryId,
+          metric: resource_host_parse_and_entry_extraction.metric
+        })
+      })
+    })
+  )
 ])
 
 /**

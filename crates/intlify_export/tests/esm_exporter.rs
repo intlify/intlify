@@ -10,6 +10,11 @@ use intlify_contract::{
     ProducerId, ProducerIdentity, ProducerRevision, ReferenceArtifactIdentity,
     ReferenceArtifactSegment, SourceDocumentIdentity,
 };
+#[cfg(feature = "benchmark")]
+use intlify_export::benchmark::{
+    benchmark_export_esm, benchmark_prepare_export, BenchmarkDeliveryUnitBucket,
+    BenchmarkLocaleBucket,
+};
 use intlify_export::{
     prepare_export, EsmExporter, EsmExporterOptions, ExportArtifact, ExportArtifactFormatVersion,
     ExportArtifactRelationshipKind, ExportErrorEvidence, ExportValidationLimits,
@@ -313,6 +318,34 @@ fn fallback_materialization_emits_canonical_locale_loader_and_accessor_artifacts
         &policy,
         &DeliveryUnitGraph::single_main(&LinkLimits::default()).unwrap(),
     );
+
+    #[cfg(feature = "benchmark")]
+    {
+        let preparation =
+            benchmark_prepare_export(&outcome, ExportValidationLimits::default()).unwrap();
+        assert_eq!(preparation.measurements().len(), 5);
+        let exporter =
+            EsmExporter::new(EsmExporterOptions::try_new(&policy, vec![locale("en")]).unwrap());
+        let execution = benchmark_export_esm(&exporter, preparation.batch().unwrap()).unwrap();
+        assert_eq!(execution.measurements().len(), 4);
+        assert_eq!(
+            execution.observation().associations().len(),
+            execution.observation().artifacts().artifacts().len()
+        );
+        assert_eq!(execution.observation().entry_roots().len(), 2);
+        assert!(matches!(
+            execution.observation().associations()[0].locale(),
+            BenchmarkLocaleBucket::Shared | BenchmarkLocaleBucket::Locale(_)
+        ));
+        assert!(execution
+            .observation()
+            .associations()
+            .iter()
+            .any(|association| matches!(
+                association.delivery_unit(),
+                BenchmarkDeliveryUnitBucket::Shared
+            )));
+    }
 
     let set = export(&outcome, &policy, &["en"]);
     assert_eq!(set.artifacts().len(), 4);
