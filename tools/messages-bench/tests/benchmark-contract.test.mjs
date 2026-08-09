@@ -557,14 +557,15 @@ function validResult() {
           allocationCount: 0
         })
       } else {
-        const observation = fixtureArtifactObservation(fixture)
+        const baselineObservation = fixtureArtifactObservation(fixture)
+        const linkedObservation = fixtureArtifactObservation(fixture)
         Object.assign(record, {
-          baselineArtifacts: observation.artifacts,
-          linkedArtifacts: observation.artifacts,
-          baselineAssociations: observation.associations,
-          linkedAssociations: observation.associations,
+          baselineArtifacts: baselineObservation.artifacts,
+          linkedArtifacts: linkedObservation.artifacts,
+          baselineAssociations: baselineObservation.associations,
+          linkedAssociations: linkedObservation.associations,
           entryRoots: fixture.entryRoots,
-          buckets: observation.buckets
+          buckets: baselineObservation.buckets
         })
       }
       if (

@@ -265,7 +265,7 @@ pub fn benchmark_prepare_export(
 ) -> Result<BenchmarkPreparationExecution<'_>, ExportPreparationError> {
     let mut recorder = BenchmarkExportRecorder::default();
     let batch = crate::preparation::prepare_export_with_observer(outcome, limits, &mut recorder)?;
-    let measurements = recorder.finish_preparation()?;
+    let measurements = recorder.finish_preparation(batch.is_some())?;
     Ok(BenchmarkPreparationExecution {
         batch,
         measurements: measurements.into_boxed_slice(),
@@ -308,7 +308,10 @@ type FinishedEsmObservation = (
 );
 
 impl BenchmarkExportRecorder {
-    fn finish_preparation(self) -> Result<Vec<BenchmarkExportMeasurement>, ExportPreparationError> {
+    fn finish_preparation(
+        self,
+        has_batch: bool,
+    ) -> Result<Vec<BenchmarkExportMeasurement>, ExportPreparationError> {
         let expected = [
             BenchmarkExportStage::SelectedMessageParse,
             BenchmarkExportStage::MessageSemanticValidation,
@@ -316,9 +319,14 @@ impl BenchmarkExportRecorder {
             BenchmarkExportStage::ArgumentSignatureDerivation,
             BenchmarkExportStage::ValidatedExportBatchConstruction,
         ];
+        let stage_order_is_valid = if has_batch {
+            self.measurements.iter().map(|item| item.stage).eq(expected)
+        } else {
+            self.measurements.is_empty()
+        };
         if self.invariant_failed
             || self.active.is_some()
-            || self.measurements.iter().map(|item| item.stage).ne(expected)
+            || !stage_order_is_valid
             || !self.associations.is_empty()
             || !self.entry_roots.is_empty()
         {
@@ -349,6 +357,10 @@ impl BenchmarkExportRecorder {
 }
 
 impl ExportBenchmarkObserver for BenchmarkExportRecorder {
+    fn enabled(&self) -> bool {
+        true
+    }
+
     fn begin(&mut self, stage: ExportBenchmarkStage) {
         if self.active.is_some() {
             self.invariant_failed = true;

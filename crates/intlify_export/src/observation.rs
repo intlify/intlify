@@ -22,6 +22,10 @@ pub(crate) enum ExportBenchmarkStage {
 }
 
 pub(crate) trait ExportBenchmarkObserver {
+    fn enabled(&self) -> bool {
+        false
+    }
+
     fn begin(&mut self, _stage: ExportBenchmarkStage) {}
 
     fn finish(&mut self, _stage: ExportBenchmarkStage, _checksum: u32) {}
@@ -38,6 +42,15 @@ pub(crate) trait ExportBenchmarkObserver {
 pub(crate) struct NoopExportBenchmarkObserver;
 
 impl ExportBenchmarkObserver for NoopExportBenchmarkObserver {}
+
+pub(crate) fn finish_observation(
+    observer: &mut impl ExportBenchmarkObserver,
+    stage: ExportBenchmarkStage,
+    checksum: impl FnOnce() -> u32,
+) {
+    let checksum = if observer.enabled() { checksum() } else { 0 };
+    observer.finish(stage, checksum);
+}
 
 pub(crate) fn observation_checksum<'a>(
     domain: &[u8],
@@ -75,5 +88,19 @@ fn update(checksum: &mut u32, bytes: &[u8]) {
     for byte in bytes {
         *checksum ^= u32::from(*byte);
         *checksum = checksum.wrapping_mul(16_777_619);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disabled_observer_does_not_evaluate_the_checksum() {
+        finish_observation(
+            &mut NoopExportBenchmarkObserver,
+            ExportBenchmarkStage::LocaleAssetRendering,
+            || panic!("disabled observation must remain lazy"),
+        );
     }
 }

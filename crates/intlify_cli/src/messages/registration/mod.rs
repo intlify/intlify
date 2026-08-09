@@ -201,6 +201,9 @@ fn finish_stage(
     state: &[u8],
 ) {
     observer.finish(stage, identity);
+    if !observer.enabled() {
+        return;
+    }
     let mut fields = vec![state.to_vec()];
     for artifact in artifacts.artifacts() {
         fields.push(

@@ -1304,6 +1304,37 @@ mod benchmark_tests {
         );
     }
 
+    #[test]
+    fn observation_checksum_redacts_absolute_error_paths() {
+        let first_root = tempdir().unwrap();
+        let second_root = tempdir().unwrap();
+        let mut first_report = report("web");
+        let mut first_error = error("failure");
+        first_error.path = Some(
+            first_root
+                .path()
+                .join("catalog.json")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        first_report.errors.push(first_error);
+        let mut second_report = report("web");
+        let mut second_error = error("failure");
+        second_error.path = Some(
+            second_root
+                .path()
+                .join("catalog.json")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        second_report.errors.push(second_error);
+
+        assert_eq!(
+            benchmark_observation_checksum(&first_report).unwrap(),
+            benchmark_observation_checksum(&second_report).unwrap()
+        );
+    }
+
     fn report(target: &str) -> EmitReport {
         EmitReport {
             summary: EmitSummary::Write(WriteSummary {

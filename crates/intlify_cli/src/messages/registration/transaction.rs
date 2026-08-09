@@ -325,6 +325,10 @@ where
     observer.begin(MessageBenchmarkStage::OutputCommit, identity);
     match commit_staging(&parent, &journal, hooks) {
         Ok(()) => {
+            if let Err(error) = verify_output_parent(project_root, prepared.output_root, &parent) {
+                observer.abandon(MessageBenchmarkStage::OutputCommit, identity);
+                return Err(error.with_output_state(OutputState::Indeterminate));
+            }
             finish_registration_stage(
                 observer,
                 MessageBenchmarkStage::OutputCommit,
@@ -332,8 +336,6 @@ where
                 prepared,
                 b"committed",
             );
-            verify_output_parent(project_root, prepared.output_root, &parent)
-                .map_err(|error| error.with_output_state(OutputState::Indeterminate))?;
             Ok(WriteRegistrationOutcome {
                 status: WriteRegistrationStatus::Written,
                 output_state: OutputState::Updated,
@@ -360,6 +362,9 @@ fn finish_registration_stage(
     state: &[u8],
 ) {
     observer.finish(stage, identity);
+    if !observer.enabled() {
+        return;
+    }
     let mut fields = vec![state.to_vec()];
     for artifact in prepared.artifacts.artifacts() {
         fields.push(

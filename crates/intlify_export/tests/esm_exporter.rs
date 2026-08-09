@@ -17,10 +17,11 @@ use intlify_export::benchmark::{
 };
 use intlify_export::{
     prepare_export, EsmExporter, EsmExporterOptions, ExportArtifact, ExportArtifactFormatVersion,
-    ExportArtifactPath, ExportArtifactRelationshipKind, ExportArtifactSet, ExportErrorEvidence,
-    ExportValidationLimits, InternalInvariantViolation, PayloadFingerprint, PlatformExporter,
-    UnsupportedBatchFeature,
+    ExportArtifactRelationshipKind, ExportErrorEvidence, ExportValidationLimits,
+    InternalInvariantViolation, PlatformExporter, UnsupportedBatchFeature,
 };
+#[cfg(feature = "benchmark")]
+use intlify_export::{ExportArtifactPath, ExportArtifactSet, PayloadFingerprint};
 use intlify_linker::{
     link, CoverageBaseline, DeliveryUnitGraph, DynamicReferenceMode, InputCompleteness,
     LinkOutcome, LinkPolicy, LinkRequest, LocaleFallback, PlacementPolicy, ScopeCompleteness,
@@ -818,6 +819,30 @@ fn benchmark_observations_ignore_input_enumeration_and_track_semantic_output() {
 
     let (changed_outcome, changed_policy) = benchmark_outcome("Changed message", false);
     let changed = benchmark_snapshot(&changed_outcome, &changed_policy);
+    assert_eq!(
+        baseline
+            .preparation
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>(),
+        changed
+            .preparation
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        baseline
+            .export
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>(),
+        changed
+            .export
+            .iter()
+            .map(|(stage, _)| *stage)
+            .collect::<Vec<_>>()
+    );
     assert!(
         baseline
             .preparation

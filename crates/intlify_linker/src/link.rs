@@ -2333,12 +2333,7 @@ fn account_full_retention_plan_bytes(
                 let Some(snapshot) = by_locale.get(locale) else {
                     continue;
                 };
-                add_scope_bytes(&mut budget, &snapshot.logical.scope)?;
-                budget.add(snapshot.logical.key.as_str().len())?;
-                budget.add(snapshot.locale.as_str().len())?;
-                budget.add(snapshot.message.as_str().len())?;
-                add_source_bytes(&mut budget, snapshot.location.source())?;
-                budget.add(snapshot.location.entry().structural_path().as_str().len())?;
+                add_definition_snapshot_bytes(&mut budget, snapshot)?;
             }
         }
     }
@@ -2368,16 +2363,23 @@ fn account_plan_bytes(
                 else {
                     continue;
                 };
-                add_scope_bytes(&mut budget, &snapshot.logical.scope)?;
-                budget.add(snapshot.logical.key.as_str().len())?;
-                budget.add(snapshot.locale.as_str().len())?;
-                budget.add(snapshot.message.as_str().len())?;
-                add_source_bytes(&mut budget, snapshot.location.source())?;
-                budget.add(snapshot.location.entry().structural_path().as_str().len())?;
+                add_definition_snapshot_bytes(&mut budget, snapshot)?;
             }
         }
     }
     Ok(())
+}
+
+fn add_definition_snapshot_bytes(
+    budget: &mut SemanticByteBudget,
+    snapshot: &DefinitionSnapshot,
+) -> Result<(), LinkOperationalError> {
+    add_scope_bytes(budget, &snapshot.logical.scope)?;
+    budget.add(snapshot.logical.key.as_str().len())?;
+    budget.add(snapshot.locale.as_str().len())?;
+    budget.add(snapshot.message.as_str().len())?;
+    add_source_bytes(budget, snapshot.location.source())?;
+    budget.add(snapshot.location.entry().structural_path().as_str().len())
 }
 
 fn resolution_fact<'a>(

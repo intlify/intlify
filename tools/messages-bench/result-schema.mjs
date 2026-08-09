@@ -28,6 +28,22 @@ const descriptorByPair = new Map(
     entry.descriptor
   ])
 )
+const ESM_ASSOCIATION_CONTRACT = Object.freeze({
+  'dev.intlify/esm-module': {
+    localeKind: 'locale',
+    deliveryUnitKind: 'unit',
+    deliveryUnitSegments: ['main']
+  },
+  'dev.intlify/loader-map': {
+    localeKind: 'shared',
+    deliveryUnitKind: 'unit',
+    deliveryUnitSegments: ['main']
+  },
+  'dev.intlify/typescript-accessor': {
+    localeKind: 'shared',
+    deliveryUnitKind: 'shared'
+  }
+})
 
 /**
  * Validate one aggregate messages benchmark result.
@@ -299,14 +315,20 @@ function assertArtifactSizeComparisons(byCase, fixtures) {
       runtime: comparison.runtime,
       executionModel: comparison.executionModel
     }
+    const exporterDescriptor = descriptorByPair.get(
+      'message_export_esm\0export_artifact_set_construction'
+    )
+    if (!exporterDescriptor) {
+      throw new Error('/descriptors omits the ESM artifact-set construction record')
+    }
     const exporterRecord = variant => {
       const key = benchmarkCaseKey({
         phase: 'message_export_esm',
         cost: 'export_artifact_set_construction',
         ...sharedIdentity,
         variant,
-        operation: 'export_artifact_set_construction',
-        metric: 'duration'
+        operation: exporterDescriptor.boundaryId,
+        metric: exporterDescriptor.metric
       })
       const records = byCase.get(key) ?? []
       if (records.length !== 1) {
@@ -505,17 +527,16 @@ function assertAssociationSemantics(associations, artifacts, fixture, pointer) {
       throw new Error(`${pointer}/${index}/locale is not a production locale`)
     }
     const artifactKind = artifacts[index].kind
+    const expected = ESM_ASSOCIATION_CONTRACT[artifactKind]
+    if (!expected) {
+      throw new Error(`${pointer}/${index} has no built-in ESM association contract`)
+    }
     if (
-      (artifactKind === 'dev.intlify/esm-module' &&
-        (association.locale.kind !== 'locale' ||
-          association.deliveryUnit.kind !== 'unit' ||
-          JSON.stringify(association.deliveryUnit.segments) !== JSON.stringify(['main']))) ||
-      (artifactKind === 'dev.intlify/loader-map' &&
-        (association.locale.kind !== 'shared' ||
-          association.deliveryUnit.kind !== 'unit' ||
-          JSON.stringify(association.deliveryUnit.segments) !== JSON.stringify(['main']))) ||
-      (artifactKind === 'dev.intlify/typescript-accessor' &&
-        (association.locale.kind !== 'shared' || association.deliveryUnit.kind !== 'shared'))
+      association.locale.kind !== expected.localeKind ||
+      association.deliveryUnit.kind !== expected.deliveryUnitKind ||
+      (expected.deliveryUnitSegments &&
+        JSON.stringify(association.deliveryUnit.segments) !==
+          JSON.stringify(expected.deliveryUnitSegments))
     ) {
       throw new Error(`${pointer}/${index} violates the built-in ESM association contract`)
     }
@@ -562,9 +583,7 @@ function deriveArtifactSizeBuckets(
       )
     )
   }
-  const kindKeys = unionSorted(baseline.kinds, linked.kinds, (left, right) =>
-    left.localeCompare(right)
-  )
+  const kindKeys = unionSorted(baseline.kinds, linked.kinds, compareByteOrder)
   for (const key of kindKeys) {
     buckets.push(
       sizeBucket(
@@ -657,7 +676,7 @@ function bucketKeyCompare(left, right) {
   if (rightValue.kind === 'shared') {
     return -1
   }
-  return JSON.stringify(leftValue).localeCompare(JSON.stringify(rightValue))
+  return compareByteOrder(JSON.stringify(leftValue), JSON.stringify(rightValue))
 }
 
 function compareRelationship(left, right) {
@@ -668,12 +687,16 @@ function compareRelationship(left, right) {
 function comparePath(left, right) {
   const length = Math.min(left.length, right.length)
   for (let index = 0; index < length; index += 1) {
-    const compared = left[index].localeCompare(right[index])
+    const compared = compareByteOrder(left[index], right[index])
     if (compared !== 0) {
       return compared
     }
   }
   return left.length - right.length
+}
+
+function compareByteOrder(left, right) {
+  return Buffer.compare(Buffer.from(left), Buffer.from(right))
 }
 
 function artifactPathKey(path) {

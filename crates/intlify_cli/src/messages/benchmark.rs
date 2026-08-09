@@ -806,6 +806,13 @@ fn emit_artifact_checksum(target: &str, artifacts: &ExportArtifactSet) -> u32 {
         fields.push(artifact.kind().as_str().as_bytes().to_vec());
         fields.push(artifact.format_version().major().to_be_bytes().to_vec());
         fields.push(artifact.format_version().minor().to_be_bytes().to_vec());
+        match artifact.metadata().media_type() {
+            Some(media_type) => {
+                fields.push(b"media-type-present".to_vec());
+                fields.push(media_type.as_str().as_bytes().to_vec());
+            }
+            None => fields.push(b"media-type-absent".to_vec()),
+        }
         fields.push(count_bytes(artifact.payload().len()));
         fields.push(artifact.payload().fingerprint().as_bytes().to_vec());
         fields.push(count_bytes(artifact.metadata().relationships().len()));
@@ -842,7 +849,27 @@ const fn is_js_cache_child(stage: MessageBenchmarkStage) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use intlify_export::{
+        ExportArtifact, ExportArtifactFormatVersion, ExportArtifactKind, ExportArtifactMetadata,
+        ExportArtifactPath, ExportArtifactPayload, ExportMediaType,
+    };
+
     use super::*;
+
+    fn artifact_set(media_type: Option<&str>) -> ExportArtifactSet {
+        ExportArtifactSet::try_new(vec![ExportArtifact::new(
+            ExportArtifactPath::try_new(["messages.mjs"]).unwrap(),
+            ExportArtifactKind::try_new("dev.intlify/test-artifact").unwrap(),
+            ExportArtifactFormatVersion::DRAFT_V0_1,
+            ExportArtifactPayload::try_new(b"payload".to_vec()).unwrap(),
+            ExportArtifactMetadata::try_new(
+                media_type.map(|value| ExportMediaType::try_new(value).unwrap()),
+                Vec::new(),
+            )
+            .unwrap(),
+        )])
+        .unwrap()
+    }
 
     #[test]
     fn recorder_accepts_zero_as_a_completed_checksum() {
@@ -854,6 +881,22 @@ mod tests {
         let completed = recorder.finish_recording().unwrap();
         assert_eq!(completed.len(), 1);
         assert_eq!(completed[0].checksum(), 0);
+    }
+
+    #[test]
+    fn emit_artifact_checksum_includes_media_type_presence_and_value() {
+        let absent = artifact_set(None);
+        let javascript = artifact_set(Some("text/javascript"));
+        let typescript = artifact_set(Some("text/typescript"));
+
+        assert_ne!(
+            emit_artifact_checksum("web", &absent),
+            emit_artifact_checksum("web", &javascript)
+        );
+        assert_ne!(
+            emit_artifact_checksum("web", &javascript),
+            emit_artifact_checksum("web", &typescript)
+        );
     }
 
     #[test]

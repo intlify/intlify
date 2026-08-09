@@ -19,7 +19,7 @@ use intlify_contract::{DeliveryUnitId, Locale};
 use intlify_linker::{LinkPolicy, LocaleFallback, MessageBundlePlan};
 
 use crate::observation::{
-    observation_checksum, ExportBenchmarkObserver, ExportBenchmarkStage,
+    finish_observation, observation_checksum, ExportBenchmarkObserver, ExportBenchmarkStage,
     NoopExportBenchmarkObserver,
 };
 use crate::writer::ExportPayloadBudget;
@@ -216,10 +216,9 @@ where
         );
         artifacts.push(artifact);
     }
-    observer.finish(
-        ExportBenchmarkStage::LocaleAssetRendering,
-        checksum_artifacts(b"locale_asset_rendering", &artifacts),
-    );
+    finish_observation(observer, ExportBenchmarkStage::LocaleAssetRendering, || {
+        checksum_artifacts(b"locale_asset_rendering", &artifacts)
+    });
 
     observer.begin(ExportBenchmarkStage::LoaderMapRendering);
     let loader_relationships = locale_assets
@@ -242,10 +241,9 @@ where
         ),
         true,
     );
-    observer.finish(
-        ExportBenchmarkStage::LoaderMapRendering,
-        checksum_artifacts(b"loader_map_rendering", std::slice::from_ref(&loader)),
-    );
+    finish_observation(observer, ExportBenchmarkStage::LoaderMapRendering, || {
+        checksum_artifacts(b"loader_map_rendering", std::slice::from_ref(&loader))
+    });
     artifacts.push(loader);
 
     observer.begin(ExportBenchmarkStage::TypedKeyAccessorRendering);
@@ -270,12 +268,15 @@ where
         );
         artifacts.push(artifact);
     }
-    observer.finish(
+    finish_observation(
+        observer,
         ExportBenchmarkStage::TypedKeyAccessorRendering,
-        checksum_artifacts(
-            b"typed_key_accessor_rendering",
-            &artifacts[accessor_start..],
-        ),
+        || {
+            checksum_artifacts(
+                b"typed_key_accessor_rendering",
+                &artifacts[accessor_start..],
+            )
+        },
     );
 
     let expected_count = locale_assets
@@ -290,9 +291,10 @@ where
     observer.begin(ExportBenchmarkStage::ExportArtifactSetConstruction);
     validate_artifact_assembly(&artifacts, &locale_assets, &loader_path, &accessor_assets)?;
     let artifacts = ExportArtifactSet::try_new(artifacts)?;
-    observer.finish(
+    finish_observation(
+        observer,
         ExportBenchmarkStage::ExportArtifactSetConstruction,
-        checksum_artifacts(b"export_artifact_set_construction", artifacts.artifacts()),
+        || checksum_artifacts(b"export_artifact_set_construction", artifacts.artifacts()),
     );
     Ok(artifacts)
 }

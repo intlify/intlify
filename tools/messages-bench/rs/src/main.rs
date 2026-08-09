@@ -1755,6 +1755,12 @@ struct ArtifactTotals {
     kinds: BTreeMap<String, u64>,
 }
 
+#[derive(Clone, Copy)]
+enum PendingArtifactOrigin {
+    EntryRoot,
+    EagerRelationship,
+}
+
 fn artifact_totals(observation: &ExportObservationRecord) -> Result<ArtifactTotals, String> {
     let by_path = observation
         .artifacts
@@ -1763,10 +1769,22 @@ fn artifact_totals(observation: &ExportObservationRecord) -> Result<ArtifactTota
         .map(|(index, artifact)| (artifact.path.clone(), index))
         .collect::<BTreeMap<_, _>>();
     let mut eager_paths = std::collections::BTreeSet::new();
-    let mut pending = observation.entry_roots.clone();
-    while let Some(path) = pending.pop() {
+    let mut pending = observation
+        .entry_roots
+        .iter()
+        .cloned()
+        .map(|path| (path, PendingArtifactOrigin::EntryRoot))
+        .collect::<Vec<_>>();
+    while let Some((path, origin)) = pending.pop() {
         let Some(&index) = by_path.get(&path) else {
-            return Err("artifact-size entry root does not resolve".to_owned());
+            let subject = match origin {
+                PendingArtifactOrigin::EntryRoot => "entry root",
+                PendingArtifactOrigin::EagerRelationship => "eager-load relationship target",
+            };
+            return Err(format!(
+                "artifact-size {subject} does not resolve: {}",
+                path.join("/")
+            ));
         };
         if !eager_paths.insert(path) {
             continue;
@@ -1776,7 +1794,12 @@ fn artifact_totals(observation: &ExportObservationRecord) -> Result<ArtifactTota
                 .relationships
                 .iter()
                 .filter(|relationship| relationship.kind == "eager-load")
-                .map(|relationship| relationship.target.clone()),
+                .map(|relationship| {
+                    (
+                        relationship.target.clone(),
+                        PendingArtifactOrigin::EagerRelationship,
+                    )
+                }),
         );
     }
     let mut totals = ArtifactTotals {
@@ -1939,7 +1962,7 @@ fn measure_output_registration(
                         .wrapping_add(measurement.checksum());
                 }
             }
-            assert_registration_stages(variant, aggregates.keys().copied())?;
+            assert_registration_stage_set(variant, aggregates.keys().copied())?;
             for (stage, aggregate) in aggregates {
                 results.push(duration_record(DurationRecord {
                     stage,
@@ -2058,7 +2081,7 @@ fn mutate_first_registered_artifact(
     fs::write(path, bytes).map_err(|error| error.to_string())
 }
 
-fn assert_registration_stages(
+fn assert_registration_stage_set(
     variant: &str,
     stages: impl Iterator<Item = MessageBenchmarkStage>,
 ) -> Result<(), String> {
@@ -2220,10 +2243,12 @@ fn execute_emit_case(scale: usize, variant: &str) -> Result<EmitCaseIteration, S
     assert_emit_result(execution.result(), expected_status, expected_exit)?;
     Ok(EmitCaseIteration {
         execution,
-        physical_group_count: 2,
+        physical_group_count: project.catalog_count,
         host_byte_count: project.host_byte_count,
-        entry_count: u64::try_from(scale.saturating_mul(2))
-            .map_err(|_| "emit entry count does not fit u64")?,
+        entry_count: u64::try_from(scale)
+            .map_err(|_| "emit entry count does not fit u64")?
+            .checked_mul(project.catalog_count)
+            .ok_or("emit entry count overflowed u64")?,
     })
 }
 
@@ -2258,6 +2283,7 @@ fn assert_emit_result(
 struct EmitBenchmarkProject {
     root: TempDir,
     host_byte_count: u64,
+    catalog_count: u64,
 }
 
 impl EmitBenchmarkProject {
@@ -2325,13 +2351,27 @@ impl EmitBenchmarkProject {
             "intlify.config.json",
             &serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?,
         )?;
-        write_file(root.path(), "locales/en.json", &en_bytes)?;
-        write_file(root.path(), "locales/ja.json", &ja_bytes)?;
+        let catalogs = [
+            ("locales/en.json", en_bytes.as_slice()),
+            ("locales/ja.json", ja_bytes.as_slice()),
+        ];
+        let catalog_count = u64::try_from(catalogs.len())
+            .map_err(|_| "emit catalog count does not fit u64")?;
+        let host_byte_count = catalogs.iter().try_fold(0_u64, |total, (_, bytes)| {
+            let bytes = u64::try_from(bytes.len())
+                .map_err(|_| "emit host byte count does not fit u64")?;
+            total
+                .checked_add(bytes)
+                .ok_or("emit host byte count overflowed u64")
+        })?;
+        for (path, bytes) in catalogs {
+            write_file(root.path(), path, bytes)?;
+        }
         write_file(root.path(), "src/app.ts", source.as_bytes())?;
         Ok(Self {
             root,
-            host_byte_count: u64::try_from(en_bytes.len().saturating_add(ja_bytes.len()))
-                .map_err(|_| "emit host byte count does not fit u64")?,
+            host_byte_count,
+            catalog_count,
         })
     }
 
