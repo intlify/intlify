@@ -722,7 +722,8 @@ async function run(commandName, args, options = {}) {
     let killTimer
     const child = spawn(commandName, args, {
       cwd,
-      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit'
+      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      shell: process.platform === 'win32' && /\.(?:bat|cmd)$/i.test(commandName)
     })
     let stdout = ''
     let stderr = ''
