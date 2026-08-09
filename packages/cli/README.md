@@ -166,6 +166,8 @@ intlify messages emit
 
 The ESM exporter writes locale modules, `loader.mjs`, a typed accessor for the baseline scope, and `.intlify-output-manifest.json` under `generated/messages`. Artifact filenames are deterministic but intentionally opaque.
 
+On Windows, write mode currently exits with `2` and publishes no output because the required durable directory-flush capability is unavailable. Read-only `--check` mode remains supported.
+
 Compare the expected artifacts without changing the output:
 
 ```sh

@@ -720,10 +720,14 @@ async function run(commandName, args, options = {}) {
   return new Promise((resolve, reject) => {
     let settled = false
     let killTimer
-    const child = spawn(commandName, args, {
+    const useWindowsShell = process.platform === 'win32' && /\.(?:bat|cmd)$/i.test(commandName)
+    // cmd.exe splits an unquoted executable path at spaces before it invokes a
+    // package-manager shim such as node_modules/.bin/intlify.cmd.
+    const executable = useWindowsShell ? `"${commandName}"` : commandName
+    const child = spawn(executable, args, {
       cwd,
       stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-      shell: process.platform === 'win32' && /\.(?:bat|cmd)$/i.test(commandName)
+      shell: useWindowsShell
     })
     let stdout = ''
     let stderr = ''
