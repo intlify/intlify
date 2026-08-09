@@ -142,6 +142,7 @@ impl DestinationMap {
         })
     }
 
+    #[cfg(test)]
     pub(super) const fn artifacts(&self) -> &[MappedArtifactDestination] {
         &self.artifacts
     }
@@ -165,6 +166,7 @@ pub(super) struct MappedArtifactDestination {
 }
 
 impl MappedArtifactDestination {
+    #[cfg(test)]
     pub(super) const fn logical_path(&self) -> &ExportArtifactPath {
         &self.logical_path
     }

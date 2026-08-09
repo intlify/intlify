@@ -24,7 +24,7 @@ use std::env;
 use std::io;
 use std::path::Path;
 
-use args::{parse_args, ParsedCommand};
+use args::{parse_args, MessagesCommand, ParsedCommand};
 use command::{reserved_command, top_level_help};
 use error::CliError;
 use output::{render_error, render_reserved_command};
@@ -69,13 +69,20 @@ fn run_with_slice(raw_args: &[String], cwd: &Path, stdin: &[u8]) -> CliRunResult
         return if fmt::is_fmt_invocation(raw_args) {
             CliRunResult::success(command::fmt_help())
         } else {
-            match parsed
-                .command
-                .as_ref()
-                .and_then(ParsedCommand::reserved_name)
-            {
-                Some(command) => CliRunResult::success(command::reserved_help(command)),
-                None => CliRunResult::success(top_level_help()),
+            match parsed.command.as_ref() {
+                Some(ParsedCommand::Reserved(command)) => {
+                    CliRunResult::success(command::reserved_help(command))
+                }
+                Some(ParsedCommand::Messages(MessagesCommand::Namespace)) => {
+                    CliRunResult::success(command::messages_help())
+                }
+                Some(ParsedCommand::Messages(MessagesCommand::Emit(_))) => {
+                    CliRunResult::success(command::messages_emit_help())
+                }
+                Some(ParsedCommand::Messages(MessagesCommand::Prune)) => {
+                    CliRunResult::success(command::reserved_help("messages prune"))
+                }
+                Some(ParsedCommand::Unknown(_)) | None => CliRunResult::success(top_level_help()),
             }
         };
     }
@@ -114,11 +121,25 @@ fn run_with_slice(raw_args: &[String], cwd: &Path, stdin: &[u8]) -> CliRunResult
     }
 
     match parsed.command {
-        // Formatter/linter engines land in later phases; these command names are
-        // reserved now so integrations can depend on the public CLI surface.
+        // Commands without concrete engines retain placeholders so integrations
+        // can depend on their public names without receiving a silent no-op.
         Some(ParsedCommand::Reserved(command)) => {
             render_reserved_command(reserved_command(command), parsed.reporter, &project_root)
         }
+        Some(ParsedCommand::Messages(MessagesCommand::Namespace)) => {
+            CliRunResult::success(command::messages_help())
+        }
+        Some(ParsedCommand::Messages(MessagesCommand::Emit(arguments))) => messages::emit::run(
+            &arguments,
+            parsed.reporter,
+            parsed.config_path.as_deref(),
+            cwd,
+        ),
+        Some(ParsedCommand::Messages(MessagesCommand::Prune)) => render_reserved_command(
+            command::reserved_messages_prune(),
+            parsed.reporter,
+            &project_root,
+        ),
         Some(ParsedCommand::Unknown(command)) => render_error(
             CliError::unknown_command(&command),
             parsed.reporter,

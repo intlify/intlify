@@ -53,6 +53,26 @@ impl<'a> DeliveryTargetInput<'a> {
             placement,
         }
     }
+
+    pub(crate) const fn name(self) -> &'a str {
+        self.name
+    }
+
+    pub(crate) const fn exporter(self) -> &'a str {
+        self.exporter
+    }
+
+    pub(crate) const fn out(self) -> &'a str {
+        self.out
+    }
+
+    pub(crate) const fn eager_locales(self) -> &'a [String] {
+        self.eager_locales
+    }
+
+    pub(crate) const fn placement(self) -> Option<&'a str> {
+        self.placement
+    }
 }
 
 /// Exact checked machine-facing target identity.

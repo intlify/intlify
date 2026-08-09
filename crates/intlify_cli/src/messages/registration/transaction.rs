@@ -186,6 +186,7 @@ pub(super) fn write_output(
     )
 }
 
+#[cfg(all(test, windows))]
 fn write_output_with_transaction_id_source(
     prepared: &PreparedOutput<'_>,
     project_root: &Path,

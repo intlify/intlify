@@ -33,10 +33,9 @@ use intlify_resource::{
 use serde_json::{json, Value};
 
 use super::config::ResolvedMessagesConfig;
-use super::observation::{
-    observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage,
-    NoopMessageBenchmarkObserver,
-};
+#[cfg(test)]
+use super::observation::NoopMessageBenchmarkObserver;
+use super::observation::{observation_checksum, MessageBenchmarkObserver, MessageBenchmarkStage};
 use super::physical::{
     acquire_physical_snapshot, compare_optional_paths, compare_portable_path_str,
     discover_project_files, group_physical_files, portable_path, PhysicalFileGroup,
@@ -206,6 +205,7 @@ enum ProjectionError {
 /// Configuration contradictions return `Err` and expose no partial inventory.
 /// Filesystem, extraction, and projection failures remain in the successful
 /// inventory result so callers can derive definition-side completeness.
+#[cfg(test)]
 pub(crate) fn produce_definition_inventory(
     project_root: &Path,
     config_path: Option<&Path>,
@@ -1403,23 +1403,16 @@ fn projection_error(path: &str, error: ProjectionError) -> OperationalError {
 
 fn artifact_production_error(path: &str, error: &ArtifactContractError) -> OperationalError {
     match error {
-        ArtifactContractError::Limit(evidence) => {
-            let observed = match evidence.observation() {
-                LinkLimitObservation::Exact(value) => json!(value),
-                LinkLimitObservation::ArithmeticOverflow => json!("arithmetic_overflow"),
-            };
+        ArtifactContractError::Limit(_) => {
+            let (kind, evidence) = super::artifact_error::contract_error_parts(error);
             OperationalError {
                 kind: "input",
                 code: "message_artifact_failed",
                 message: format!("Message definition artifact production failed: {path}"),
                 path: Some(path.to_owned()),
                 details: Some(json!({
-                    "kind": "limit",
-                    "evidence": {
-                        "counter": evidence.counter().as_str(),
-                        "limit": evidence.effective_limit(),
-                        "observed": observed
-                    }
+                    "kind": kind,
+                    "evidence": evidence,
                 })),
             }
         }

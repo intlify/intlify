@@ -23,10 +23,12 @@ use super::destination::{
     host_equivalence_key, preflight_manifest_capabilities, DestinationMap, HostEquivalenceKey,
 };
 use super::difference::{CheckComparison, ManagedOutputObservation, ObservedArtifactFile};
+#[cfg(not(any(unix, windows)))]
+use super::error::UnsupportedCapabilityEvidence;
 use super::error::{
     CheckFailureReason, EvidencePath, OutputRegistrationError, OutputRegistrationErrorEvidence,
     OwnershipFailureReason, RegistrationFailureEvidence, RegistrationIoEvidence,
-    RegistrationOperation, RegistrationSubject, UnsupportedCapabilityEvidence,
+    RegistrationOperation, RegistrationSubject,
 };
 use super::manifest::{
     Blake3Fingerprint, CheckedOutputManifest, ManifestArtifact, ManifestCodecError,
@@ -1425,6 +1427,7 @@ fn snapshot_stamp(_metadata: &Metadata) -> Result<SnapshotStamp, OutputRegistrat
     Err(filesystem_no_follow_unsupported())
 }
 
+#[cfg(not(any(unix, windows)))]
 fn filesystem_no_follow_unsupported() -> OutputRegistrationError {
     OutputRegistrationError::unsupported_capability(
         UnsupportedCapabilityEvidence::FilesystemNoFollow,

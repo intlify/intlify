@@ -37,6 +37,7 @@ impl BuiltInExporterRegistry {
     }
 
     /// Return the complete registry identities in canonical token order.
+    #[cfg(test)]
     pub(crate) const fn ids(&self) -> &'static [BuiltInExporterId] {
         self.ids
     }
