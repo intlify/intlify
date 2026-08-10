@@ -604,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "intlify_cli"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "blake3",
  "cap-fs-ext",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "intlify_format"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "ox_mf2_parser",
  "serde",
@@ -656,7 +656,7 @@ dependencies = [
 
 [[package]]
 name = "intlify_format_napi"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "intlify_format",
  "napi",
@@ -667,7 +667,7 @@ dependencies = [
 
 [[package]]
 name = "intlify_format_wasm"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "intlify_format",
  "ox_mf2_parser",
@@ -1041,7 +1041,7 @@ checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
 name = "ox_mf2_napi"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "napi",
  "napi-build",
@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "ox_mf2_parser"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "memchr",
  "serde_json",
@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "ox_mf2_wasm"
-version = "0.14.0-alpha.11"
+version = "0.14.0-alpha.12"
 dependencies = [
  "ox_mf2_parser",
  "serde",
