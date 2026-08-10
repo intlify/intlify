@@ -78,6 +78,17 @@ jobs:
       - name: Verify release version
         run: node scripts/check-release-version.mjs
 
+      - name: Verify tagged changelog
+        run: node scripts/check-release-changelog.mjs
+
+      - name: Verify release commit ancestry
+        run: |
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "release tag must point to a commit reachable from origin/main" >&2
+            exit 1
+          fi
+
       - name: Build packages
         run: vpr build
 
@@ -832,24 +843,16 @@ jobs:
               needs.published-crate-smoke.result == 'success')))
       )
 
+    # The only write capability is GitHub Release creation; tagged source and main stay immutable.
     permissions:
       contents: write
     steps:
-      - name: Checkout main # zizmor: ignore[artipacked]
+      - name: Checkout tagged release
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Setup Vite Plus
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
-        with:
-          node-version: 24
-          cache: true
-          run-install: false
-
-      - name: Install dependencies
-        run: vp install --frozen-lockfile
+          ref: ${{ env.TAG }}
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Create GitHub Release
         env:
@@ -858,17 +861,9 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists, skipping creation"
           else
-            gh release create "$TAG" --generate-notes
+            release_args=("$TAG" --verify-tag --generate-notes)
+            if [[ "${TAG#v}" == *-* ]]; then
+              release_args+=(--prerelease --latest=false)
+            fi
+            gh release create "${release_args[@]}"
           fi
-
-      - name: Sync changelog from GitHub releases
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: vp exec gh-changelogen --repo=intlify/intlify --tag="$TAG"
-
-      - name: Commit changelog
-        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
-        with:
-          branch: main
-          file_pattern: CHANGELOG.md
-          commit_message: 'chore: generate changelog'

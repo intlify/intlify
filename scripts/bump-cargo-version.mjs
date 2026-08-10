@@ -1,22 +1,43 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
-const version = JSON.parse(
-  await readFile(new URL('../package.json', import.meta.url), 'utf8')
-).version
 
-for (const relativePath of releaseCargoTomlFiles) {
-  await replacePackageVersion(relativePath, version)
+/**
+ * Propagate the selected release version into the publish-related Cargo files.
+ *
+ * The function is intentionally independent from package.json so bumpp can pass
+ * its selected version before it creates the release commit and tag.
+ *
+ * @param nextVersion - Version selected by bumpp.
+ * @param options - Optional workspace root used by tests.
+ */
+export async function bumpCargoVersion(nextVersion, options = {}) {
+  const workspaceRoot = options.rootDir ?? rootDir
+  for (const relativePath of releaseCargoTomlFiles) {
+    await replacePackageVersion(workspaceRoot, relativePath, nextVersion)
+  }
+
+  await replaceHtmlRootUrl(
+    workspaceRoot,
+    'crates/ox_mf2_parser/src/lib.rs',
+    'ox_mf2_parser',
+    nextVersion
+  )
+  await replaceCargoLockVersions(workspaceRoot, 'Cargo.lock', releaseCargoLockPackages, nextVersion)
 }
 
-await replaceHtmlRootUrl('crates/ox_mf2_parser/src/lib.rs', 'ox_mf2_parser', version)
-await replaceCargoLockVersions('Cargo.lock', releaseCargoLockPackages, version)
+if (isDirectRun()) {
+  const version = JSON.parse(
+    await readFile(new URL('../package.json', import.meta.url), 'utf8')
+  ).version
+  await bumpCargoVersion(version)
+}
 
-async function replacePackageVersion(relativePath, nextVersion) {
-  const file = new URL(relativePath, `file://${rootDir}/`)
+async function replacePackageVersion(workspaceRoot, relativePath, nextVersion) {
+  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
   const source = await readFile(file, 'utf8')
   let matched = false
   const updated = source.replace(
@@ -32,8 +53,8 @@ async function replacePackageVersion(relativePath, nextVersion) {
   await writeFile(file, updated)
 }
 
-async function replaceCargoLockVersions(relativePath, packageNames, nextVersion) {
-  const file = new URL(relativePath, `file://${rootDir}/`)
+async function replaceCargoLockVersions(workspaceRoot, relativePath, packageNames, nextVersion) {
+  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
   const source = await readFile(file, 'utf8')
   const seen = new Set()
   const blocks = source.split('\n[[package]]\n')
@@ -54,8 +75,8 @@ async function replaceCargoLockVersions(relativePath, packageNames, nextVersion)
   await writeFile(file, updated)
 }
 
-async function replaceHtmlRootUrl(relativePath, crateName, nextVersion) {
-  const file = new URL(relativePath, `file://${rootDir}/`)
+async function replaceHtmlRootUrl(workspaceRoot, relativePath, crateName, nextVersion) {
+  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
   const source = await readFile(file, 'utf8')
   const expected = `https://docs.rs/${crateName}/${nextVersion}`
   let matched = false
@@ -70,4 +91,8 @@ async function replaceHtmlRootUrl(relativePath, crateName, nextVersion) {
     throw new Error(`failed to update html_root_url in ${relativePath}`)
   }
   await writeFile(file, updated)
+}
+
+function isDirectRun() {
+  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
 }
