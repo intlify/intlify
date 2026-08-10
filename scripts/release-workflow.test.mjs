@@ -5,10 +5,7 @@ import { beforeAll, expect, test } from 'vite-plus/test'
 let workflow
 
 beforeAll(async () => {
-  workflow = await readFile(
-    new URL('../../../.github/workflows/release.yml', import.meta.url),
-    'utf8'
-  )
+  workflow = await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8')
 })
 
 test('validates the tagged changelog before publishing', () => {

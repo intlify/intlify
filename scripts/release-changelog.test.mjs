@@ -1,6 +1,6 @@
 import { expect, test } from 'vite-plus/test'
 
-import { validateReleaseChangelog } from '../../../scripts/check-release-changelog.mjs'
+import { validateReleaseChangelog } from './check-release-changelog.mjs'
 
 const releaseUrl = tag => `https://github.com/intlify/intlify/releases/tag/${tag}`
 

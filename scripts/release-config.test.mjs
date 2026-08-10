@@ -4,12 +4,9 @@ import { dirname, join } from 'node:path'
 
 import { expect, test } from 'vite-plus/test'
 
-import config, { prepareRelease } from '../../../bump.config.ts'
-import { bumpCargoVersion } from '../../../scripts/bump-cargo-version.mjs'
-import {
-  releaseCargoLockPackages,
-  releaseCargoTomlFiles
-} from '../../../scripts/lib/release-crates.mjs'
+import config, { prepareRelease } from '../bump.config.ts'
+import { bumpCargoVersion } from './bump-cargo-version.mjs'
+import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
 
 test('bumpp config owns the release commit, tag, push, and execute hook', () => {
   expect(config).toMatchObject({
