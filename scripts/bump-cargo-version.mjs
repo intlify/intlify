@@ -1,6 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+import { isDirectRun } from './lib/is-direct-run.mjs'
 import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url))
@@ -29,7 +31,7 @@ export async function bumpCargoVersion(nextVersion, options = {}) {
   await replaceCargoLockVersions(workspaceRoot, 'Cargo.lock', releaseCargoLockPackages, nextVersion)
 }
 
-if (isDirectRun()) {
+if (isDirectRun(import.meta.url)) {
   const version = JSON.parse(
     await readFile(new URL('../package.json', import.meta.url), 'utf8')
   ).version
@@ -37,7 +39,7 @@ if (isDirectRun()) {
 }
 
 async function replacePackageVersion(workspaceRoot, relativePath, nextVersion) {
-  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
+  const file = pathToFileURL(join(workspaceRoot, relativePath))
   const source = await readFile(file, 'utf8')
   let matched = false
   const updated = source.replace(
@@ -54,7 +56,7 @@ async function replacePackageVersion(workspaceRoot, relativePath, nextVersion) {
 }
 
 async function replaceCargoLockVersions(workspaceRoot, relativePath, packageNames, nextVersion) {
-  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
+  const file = pathToFileURL(join(workspaceRoot, relativePath))
   const source = await readFile(file, 'utf8')
   const seen = new Set()
   const blocks = source.split('\n[[package]]\n')
@@ -76,7 +78,7 @@ async function replaceCargoLockVersions(workspaceRoot, relativePath, packageName
 }
 
 async function replaceHtmlRootUrl(workspaceRoot, relativePath, crateName, nextVersion) {
-  const file = new URL(`${relativePath}`, pathToFileURL(`${workspaceRoot}/`))
+  const file = pathToFileURL(join(workspaceRoot, relativePath))
   const source = await readFile(file, 'utf8')
   const expected = `https://docs.rs/${crateName}/${nextVersion}`
   let matched = false
@@ -91,8 +93,4 @@ async function replaceHtmlRootUrl(workspaceRoot, relativePath, crateName, nextVe
     throw new Error(`failed to update html_root_url in ${relativePath}`)
   }
   await writeFile(file, updated)
-}
-
-function isDirectRun() {
-  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
 }

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 
 import { expect, test } from 'vite-plus/test'
 
-import config, { prepareRelease } from '../bump.config.ts'
+import config, { executeRelease, prepareRelease } from '../bump.config.ts'
 import { bumpCargoVersion } from './bump-cargo-version.mjs'
 import { releaseCargoLockPackages, releaseCargoTomlFiles } from './lib/release-crates.mjs'
 
@@ -16,6 +16,15 @@ test('bumpp config owns the release commit, tag, push, and execute hook', () => 
     tag: true
   })
   expect(config.execute).toBeTypeOf('function')
+})
+
+test('execute hook forwards the version selected by bumpp', async () => {
+  const selectedVersions = []
+  await executeRelease({ state: { newVersion: '9.9.9' } }, async version => {
+    selectedVersions.push(version)
+  })
+
+  expect(selectedVersions).toEqual(['9.9.9'])
 })
 
 test('Cargo version propagation accepts the version selected by bumpp', async () => {
@@ -53,6 +62,13 @@ test('release preparation awaits Cargo and changelog failures before bumpp commi
     },
     updateChangelog: async options => {
       calls.push(['changelog', options])
+    },
+    readChangelog: async path => {
+      calls.push(['read', path])
+      return 'generated changelog'
+    },
+    validateChangelog: (source, tag) => {
+      calls.push(['validate', source, tag])
     }
   }
 
@@ -68,7 +84,9 @@ test('release preparation awaits Cargo and changelog failures before bumpp commi
         targetCommitish: 'HEAD',
         output: 'CHANGELOG.md'
       }
-    ]
+    ],
+    ['read', 'CHANGELOG.md'],
+    ['validate', 'generated changelog', 'v1.2.3']
   ])
 
   const changelog = async () => {
@@ -77,7 +95,9 @@ test('release preparation awaits Cargo and changelog failures before bumpp commi
   await expect(
     prepareRelease('1.2.3', {
       bumpCargoVersion: dependencies.bumpCargoVersion,
-      updateChangelog: changelog
+      updateChangelog: changelog,
+      readChangelog: dependencies.readChangelog,
+      validateChangelog: dependencies.validateChangelog
     })
   ).rejects.toThrow('generated notes failed')
 

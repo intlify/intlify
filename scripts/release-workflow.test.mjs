@@ -14,7 +14,7 @@ test('validates the tagged changelog before publishing', () => {
 })
 
 test('creates the GitHub Release from the existing tag without mutating main', () => {
-  const releaseJob = workflow.slice(workflow.indexOf('  release-notes:'))
+  const releaseJob = getReleaseJob(workflow)
 
   expect(releaseJob).toContain('The only write capability is GitHub Release creation')
   expect(releaseJob).toContain('ref: ${{ env.TAG }}')
@@ -30,9 +30,15 @@ test('creates the GitHub Release from the existing tag without mutating main', (
 })
 
 test('keeps the release-notes dispatch as a publish-free retry path', () => {
-  const releaseJob = workflow.slice(workflow.indexOf('  release-notes:'))
+  const releaseJob = getReleaseJob(workflow)
 
   expect(releaseJob).toContain("inputs.job == 'release-notes'")
   expect(releaseJob).toContain('gh release view "$TAG"')
   expect(releaseJob).toContain('Release $TAG already exists, skipping creation')
 })
+
+function getReleaseJob(source) {
+  const jobIndex = source.indexOf('  release-notes:')
+  expect(jobIndex).toBeGreaterThan(-1)
+  return source.slice(jobIndex)
+}

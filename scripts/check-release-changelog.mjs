@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
+
+import { isDirectRun } from './lib/is-direct-run.mjs'
 
 const defaultRootDir = fileURLToPath(new URL('..', import.meta.url))
 
@@ -53,7 +55,7 @@ export function validateReleaseChangelog(source, tag) {
   }
 }
 
-if (isDirectRun()) {
+if (isDirectRun(import.meta.url)) {
   const rootDir = process.env.INTLIFY_RELEASE_ROOT
     ? resolve(process.env.INTLIFY_RELEASE_ROOT)
     : defaultRootDir
@@ -124,8 +126,4 @@ function escapeRegExp(value) {
 
 function firstNonEmpty(...values) {
   return values.find(value => value != null && value !== '')
-}
-
-function isDirectRun() {
-  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
 }
