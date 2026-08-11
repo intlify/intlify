@@ -46,3 +46,11 @@
 	path = refers/icu4x
 	url = https://github.com/unicode-org/icu4x.git
 	shallow = true
+[submodule "refers/i18n-discuss"]
+	path = refers/i18n-discuss
+	url = https://github.com/w3c/i18n-discuss.git
+	shallow = true
+[submodule "refers/proposal-dom-localization"]
+	path = refers/proposal-dom-localization
+	url = https://github.com/whatwg/proposal-dom-localization.git
+	shallow = true
