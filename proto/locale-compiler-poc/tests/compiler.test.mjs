@@ -1,6 +1,20 @@
-import { describe, expect, test } from 'vite-plus/test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+import { afterEach, describe, expect, test } from 'vite-plus/test'
 
 import { transformJavaScript } from '../src/frontend.mjs'
+import { runLocalizationProvider } from '../src/provider.mjs'
+
+const temporaryDirectories = []
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true }))
+  )
+})
 
 const transform = (sourceText, options = {}) =>
   transformJavaScript({
@@ -207,3 +221,315 @@ describe('Intent Frontend', () => {
     )
   })
 })
+
+describe('Localization Provider contract', () => {
+  const intents = [
+    {
+      id: 'm_b',
+      sourceLocale: 'en',
+      sourceText: 'Second',
+      surface: 'dom-text-content'
+    },
+    {
+      id: 'm_a',
+      sourceLocale: 'en',
+      sourceText: 'First',
+      surface: 'dom-text-content'
+    }
+  ]
+
+  test('loads named exports and canonicalizes requests and candidates', async () => {
+    const fixture = await createProvider(`
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+export let received
+export let returned
+export async function localize(requests) {
+  received = requests.map(request => ({ ...request }))
+  returned = requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: request.sourceText + ' ja',
+    ignored: true
+  })).reverse()
+  return returned
+}
+`)
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+    const providerModule = await import(pathToFileURL(fixture.providerPath).href)
+
+    expect(result).toEqual({
+      ok: true,
+      provider: { kind: 'fixture', revision: 'fixture-v1' },
+      requests: [
+        {
+          intentId: 'm_a',
+          sourceLocale: 'en',
+          targetLocale: 'ja',
+          sourceText: 'First',
+          surface: 'dom-text-content'
+        },
+        {
+          intentId: 'm_b',
+          sourceLocale: 'en',
+          targetLocale: 'ja',
+          sourceText: 'Second',
+          surface: 'dom-text-content'
+        }
+      ],
+      candidates: [
+        { intentId: 'm_a', locale: 'ja', message: 'First ja' },
+        { intentId: 'm_b', locale: 'ja', message: 'Second ja' }
+      ]
+    })
+    expect(providerModule.received.map(request => request.intentId)).toEqual(['m_a', 'm_b'])
+    expect(providerModule.returned.map(candidate => candidate.intentId)).toEqual(['m_b', 'm_a'])
+    expect(providerModule.returned[0].ignored).toBe(true)
+  })
+
+  test('does not call localize for an empty request batch', async () => {
+    const fixture = await createProvider(`
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+export let callCount = 0
+export async function localize() {
+  callCount += 1
+  return []
+}
+`)
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents: []
+    })
+    const providerModule = await import(pathToFileURL(fixture.providerPath).href)
+
+    expect(result).toEqual({
+      ok: true,
+      provider: { kind: 'fixture', revision: 'fixture-v1' },
+      requests: [],
+      candidates: []
+    })
+    expect(providerModule.callCount).toBe(0)
+  })
+
+  test('isolates Compiler expectations from Provider request mutation', async () => {
+    const fixture = await createProvider(`
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+export async function localize(requests) {
+  const candidates = requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: request.sourceText
+  }))
+  requests.reverse()
+  requests[0].intentId = 'mutated'
+  return candidates
+}
+`)
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.requests.map(request => request.intentId)).toEqual(['m_a', 'm_b'])
+  })
+
+  test.each([
+    ['missing kind', "export const revision = 'v1'; export function localize() {}"],
+    [
+      'empty kind',
+      "export const kind = ' '; export const revision = 'v1'; export function localize() {}"
+    ],
+    ['missing revision', "export const kind = 'fixture'; export function localize() {}"],
+    [
+      'empty revision',
+      "export const kind = 'fixture'; export const revision = ''; export function localize() {}"
+    ],
+    ['missing localize', "export const kind = 'fixture'; export const revision = 'v1'"]
+  ])('rejects a Provider with %s', async (_name, source) => {
+    const fixture = await createProvider(source)
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result).toEqual(providerDiagnostic('LC003', 'invalid_localization_provider'))
+  })
+
+  test('rejects a Provider module that cannot be loaded', async () => {
+    const fixture = await createProvider('export const =')
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result).toEqual(
+      providerDiagnostic(
+        'LC003',
+        'invalid_localization_provider',
+        'The provider module could not be loaded.'
+      )
+    )
+  })
+
+  test.each([
+    ['throws', "throw new Error('failed')"],
+    ['rejects', "return Promise.reject(new Error('failed'))"]
+  ])('reports LC007 when localize %s', async (_name, body) => {
+    const fixture = await createProvider(
+      validProvider(`export async function localize() { ${body} }`)
+    )
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result).toEqual(
+      providerDiagnostic(
+        'LC007',
+        'localization_provider_failed',
+        'The provider failed while localizing messages.'
+      )
+    )
+  })
+
+  test.each([
+    ['a non-array', 'return {}'],
+    ['a missing candidate', 'return []'],
+    [
+      'a duplicate candidate',
+      'return [candidate(requests[0]), candidate(requests[0]), candidate(requests[1])]'
+    ],
+    [
+      'an unsolicited candidate',
+      "return [...requests.map(candidate), { intentId: 'unknown', locale: 'ja', message: 'Unknown' }]"
+    ],
+    [
+      'a mismatched locale',
+      "return requests.map(request => ({ ...candidate(request), locale: 'fr' }))"
+    ],
+    [
+      'an invalid field type',
+      'return requests.map(request => ({ ...candidate(request), intentId: 1 }))'
+    ],
+    [
+      'an empty message',
+      "return requests.map(request => ({ ...candidate(request), message: '   ' }))"
+    ]
+  ])('rejects %s with LC004', async (_name, body) => {
+    const fixture = await createProvider(
+      validProvider(`
+const candidate = request => ({
+  intentId: request.intentId,
+  locale: request.targetLocale,
+  message: request.sourceText
+})
+export async function localize(requests) { ${body} }
+`)
+    )
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result).toEqual(providerDiagnostic('LC004', 'invalid_localization_result'))
+  })
+
+  test('preserves valid message bytes including whitespace, Unicode, and newlines', async () => {
+    const message = '  日本語\nsecond line  '
+    const fixture = await createProvider(
+      validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: ${JSON.stringify(message)},
+    ignored: 'metadata'
+  }))
+}
+`)
+    )
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.candidates.every(candidate => candidate.message === message)).toBe(true)
+    expect(result.candidates.every(candidate => !Object.hasOwn(candidate, 'ignored'))).toBe(true)
+  })
+
+  test('accepts a target message equal to its source text', async () => {
+    const fixture = await createProvider(
+      validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: request.sourceText
+  }))
+}
+`)
+    )
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.candidates.map(candidate => candidate.message)).toEqual(['First', 'Second'])
+  })
+})
+
+async function createProvider(source) {
+  const cwd = await mkdtemp(join(tmpdir(), 'locale-compiler-provider-'))
+  temporaryDirectories.push(cwd)
+  const providerPath = join(cwd, 'provider.mjs')
+  await writeFile(providerPath, source, 'utf8')
+  return { cwd, providerPath }
+}
+
+function validProvider(body) {
+  return `
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+${body}
+`
+}
+
+function providerDiagnostic(code, name, message) {
+  const messages = {
+    LC003: 'The provider must export kind, revision, and localize.',
+    LC004:
+      'The provider result must contain exactly one non-empty message for every requested intent and locale.'
+  }
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        severity: 'error',
+        code,
+        name,
+        message: message ?? messages[code],
+        path: 'provider.mjs'
+      }
+    ]
+  }
+}
