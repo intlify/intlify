@@ -923,6 +923,49 @@ describe('CLI', () => {
   })
 })
 
+describe('end-to-end generated application', () => {
+  test.each([
+    ['the default locale', '', 'Welcome', 'Pay now'],
+    ['English', '?locale=en', 'Welcome', 'Pay now'],
+    ['Japanese', '?locale=ja', 'ようこそ', '支払う']
+  ])('renders %s through bootstrap and the runtime', async (_name, query, heading, button) => {
+    const rendered = await runCompiledDemo({ query })
+
+    expect(rendered.get('h1').textContent).toBe(heading)
+    expect(rendered.get('#pay').textContent).toBe(button)
+  })
+
+  test('rejects an unsupported locale through bootstrap', async () => {
+    await expect(runCompiledDemo({ query: '?locale=fr' })).rejects.toThrow('unsupported locale: fr')
+  })
+
+  test('assigns an HTML-shaped Provider message as plain textContent', async () => {
+    const rendered = await runCompiledDemo({
+      source: "const heading = document.querySelector('h1')\nheading.textContent = 'Welcome'",
+      providerSource: validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: '<strong>Hello</strong>'
+  }))
+}
+`),
+      query: '?locale=ja'
+    })
+
+    expect(rendered.get('h1')).toEqual({ textContent: '<strong>Hello</strong>' })
+  })
+
+  test('executes an Intent-free generated application without importing the runtime', async () => {
+    const rendered = await runCompiledDemo({ source: 'globalThis.__pocExecuted = true' })
+
+    expect(globalThis.__pocExecuted).toBe(true)
+    expect(rendered.get('h1').textContent).toBe('')
+    delete globalThis.__pocExecuted
+  })
+})
+
 async function createProvider(source) {
   const cwd = await createTemporaryDirectory('locale-compiler-provider-')
   const providerPath = join(cwd, 'provider.mjs')
@@ -1023,4 +1066,65 @@ function providerDiagnostic(code, name, message) {
       }
     ]
   }
+}
+
+async function runCompiledDemo(options = {}) {
+  const fixture = await createCompileFixture({
+    source:
+      options.source ??
+      [
+        "const heading = document.querySelector('h1')",
+        "heading.textContent = 'Welcome'",
+        "const button = document.querySelector('#pay')",
+        "button.textContent = 'Pay now'"
+      ].join('\n'),
+    providerSource: options.providerSource ?? demoProviderSource()
+  })
+  const result = await compile(fixture)
+  expect(result.ok).toBe(true)
+
+  const bootstrapSource = await readFile(join(import.meta.dirname, '../demo/bootstrap.mjs'), 'utf8')
+  const bootstrapPath = join(fixture.cwd, 'bootstrap.mjs')
+  await writeFile(bootstrapPath, bootstrapSource, 'utf8')
+
+  const elements = new Map([
+    ['h1', { textContent: '' }],
+    ['#pay', { textContent: '' }]
+  ])
+  const previousGlobals = new Map(
+    ['location', 'document', '__INTLIFY_LOCALE__'].map(name => [
+      name,
+      { existed: Object.hasOwn(globalThis, name), value: globalThis[name] }
+    ])
+  )
+
+  try {
+    globalThis.location = { href: `https://example.test/index.html${options.query ?? ''}` }
+    globalThis.document = {
+      querySelector: selector => elements.get(selector) ?? null
+    }
+    await import(pathToFileURL(bootstrapPath).href)
+    return elements
+  } finally {
+    for (const [name, previous] of previousGlobals) {
+      restoreGlobal(name, previous.existed, previous.value)
+    }
+  }
+}
+
+function demoProviderSource() {
+  return validProvider(`
+const messages = new Map([
+  ['Welcome', 'ようこそ'],
+  ['Pay now', '支払う']
+])
+export async function localize(requests) {
+  return requests.flatMap(request => {
+    const message = messages.get(request.sourceText)
+    return message === undefined
+      ? []
+      : [{ intentId: request.intentId, locale: request.targetLocale, message }]
+  })
+}
+`)
 }
