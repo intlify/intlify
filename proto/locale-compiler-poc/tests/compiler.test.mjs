@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, test } from 'vite-plus/test'
 
+import { emitArtifacts } from '../src/emitter.mjs'
 import { transformJavaScript } from '../src/frontend.mjs'
 import { runLocalizationProvider } from '../src/provider.mjs'
 
@@ -498,12 +499,190 @@ export async function localize(requests) {
   })
 })
 
+describe('Artifact emitter', () => {
+  const intents = [
+    {
+      id: 'm_b',
+      sourceLocale: 'en',
+      sourceText: 'Quote " and slash \\ and\nnewline',
+      surface: 'dom-text-content'
+    },
+    {
+      id: 'm_a',
+      sourceLocale: 'en',
+      sourceText: 'Welcome',
+      surface: 'dom-text-content'
+    }
+  ]
+  const candidates = [
+    { intentId: 'm_b', locale: 'ja', message: '  日本語\nsecond line  ' },
+    { intentId: 'm_a', locale: 'ja', message: '<strong>Hello</strong>' }
+  ]
+  const provider = { kind: 'fixture', revision: 'fixture-v1' }
+
+  test('emits five artifacts in canonical order', () => {
+    const artifacts = emitArtifacts({
+      transformedSource: 'const unchanged = true',
+      intents,
+      candidates,
+      provider
+    })
+
+    expect([...artifacts.keys()]).toEqual([
+      'app.js',
+      'intlify-runtime.mjs',
+      'locale-en.mjs',
+      'locale-ja.mjs',
+      'localization-report.json'
+    ])
+    expect(artifacts.get('app.js')).toBe('const unchanged = true')
+  })
+
+  test('sorts messages by Intent ID and safely serializes their exact values', async () => {
+    const artifacts = emitArtifacts({
+      transformedSource: '',
+      intents,
+      candidates,
+      provider
+    })
+    const directory = await createTemporaryDirectory('locale-compiler-emitter-')
+    await writeFile(join(directory, 'locale-en.mjs'), artifacts.get('locale-en.mjs'), 'utf8')
+    await writeFile(join(directory, 'locale-ja.mjs'), artifacts.get('locale-ja.mjs'), 'utf8')
+
+    const en = await import(pathToFileURL(join(directory, 'locale-en.mjs')).href)
+    const ja = await import(pathToFileURL(join(directory, 'locale-ja.mjs')).href)
+
+    expect(Object.keys(en.messages)).toEqual(['m_a', 'm_b'])
+    expect(en.messages).toEqual({
+      m_a: 'Welcome',
+      m_b: 'Quote " and slash \\ and\nnewline'
+    })
+    expect(Object.keys(ja.messages)).toEqual(['m_a', 'm_b'])
+    expect(ja.messages).toEqual({
+      m_a: '<strong>Hello</strong>',
+      m_b: '  日本語\nsecond line  '
+    })
+  })
+
+  test('emits a runtime with default, target, and error behavior', async () => {
+    const artifacts = emitArtifacts({ transformedSource: '', intents, candidates, provider })
+    const directory = await createTemporaryDirectory('locale-compiler-runtime-')
+    for (const filename of ['intlify-runtime.mjs', 'locale-en.mjs', 'locale-ja.mjs']) {
+      await writeFile(join(directory, filename), artifacts.get(filename), 'utf8')
+    }
+
+    const runtime = await import(pathToFileURL(join(directory, 'intlify-runtime.mjs')).href)
+    const hadLocale = Object.hasOwn(globalThis, '__INTLIFY_LOCALE__')
+    const previousLocale = globalThis.__INTLIFY_LOCALE__
+
+    try {
+      delete globalThis.__INTLIFY_LOCALE__
+      expect(runtime.message('m_a')).toBe('Welcome')
+
+      globalThis.__INTLIFY_LOCALE__ = 'ja'
+      expect(runtime.message('m_a')).toBe('<strong>Hello</strong>')
+
+      globalThis.__INTLIFY_LOCALE__ = 'fr'
+      expect(() => runtime.message('m_a')).toThrow('unsupported locale: fr')
+
+      globalThis.__INTLIFY_LOCALE__ = 'en'
+      expect(() => runtime.message('missing')).toThrow('missing localized message: en/missing')
+    } finally {
+      restoreGlobal('__INTLIFY_LOCALE__', hadLocale, previousLocale)
+    }
+  })
+
+  test('emits the exact versioned report schema without nondeterministic metadata', () => {
+    const artifacts = emitArtifacts({ transformedSource: '', intents, candidates, provider })
+    const reportText = artifacts.get('localization-report.json')
+
+    expect(reportText).toBe(
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          sourceLocale: 'en',
+          targetLocales: ['ja'],
+          validationLevel: 'poc-contract-only',
+          intentCount: 2,
+          messageCountByLocale: { en: 2, ja: 2 },
+          provider: { kind: 'fixture', revision: 'fixture-v1' }
+        },
+        null,
+        2
+      )}\n`
+    )
+    expect(reportText).not.toContain('timestamp')
+    expect(reportText).not.toContain('diagnostic')
+    expect(reportText).not.toContain(process.cwd())
+  })
+
+  test('uses LF and one trailing LF for fully generated artifacts', () => {
+    const artifacts = emitArtifacts({ transformedSource: '', intents, candidates, provider })
+
+    for (const filename of [
+      'intlify-runtime.mjs',
+      'locale-en.mjs',
+      'locale-ja.mjs',
+      'localization-report.json'
+    ]) {
+      const text = artifacts.get(filename)
+      expect(text).not.toContain('\r')
+      expect(text.endsWith('\n')).toBe(true)
+      expect(text.endsWith('\n\n')).toBe(false)
+    }
+  })
+
+  test('emits deterministic bytes regardless of candidate input order', () => {
+    const first = emitArtifacts({ transformedSource: '', intents, candidates, provider })
+    const second = emitArtifacts({
+      transformedSource: '',
+      intents,
+      candidates: [...candidates].reverse(),
+      provider
+    })
+
+    expect([...first]).toEqual([...second])
+  })
+
+  test('emits all five no-op artifacts when there are no Intents', () => {
+    const source = 'const untouched = true'
+    const artifacts = emitArtifacts({
+      transformedSource: source,
+      intents: [],
+      candidates: [],
+      provider
+    })
+
+    expect([...artifacts.keys()]).toHaveLength(5)
+    expect(artifacts.get('app.js')).toBe(source)
+    expect(artifacts.get('locale-en.mjs')).toContain('export const messages = {}')
+    expect(artifacts.get('locale-ja.mjs')).toContain('export const messages = {}')
+    expect(JSON.parse(artifacts.get('localization-report.json'))).toMatchObject({
+      intentCount: 0,
+      messageCountByLocale: { en: 0, ja: 0 }
+    })
+  })
+})
+
 async function createProvider(source) {
-  const cwd = await mkdtemp(join(tmpdir(), 'locale-compiler-provider-'))
-  temporaryDirectories.push(cwd)
+  const cwd = await createTemporaryDirectory('locale-compiler-provider-')
   const providerPath = join(cwd, 'provider.mjs')
   await writeFile(providerPath, source, 'utf8')
   return { cwd, providerPath }
+}
+
+async function createTemporaryDirectory(prefix) {
+  const directory = await mkdtemp(join(tmpdir(), prefix))
+  temporaryDirectories.push(directory)
+  return directory
+}
+
+function restoreGlobal(name, existed, value) {
+  if (existed) {
+    globalThis[name] = value
+  } else {
+    delete globalThis[name]
+  }
 }
 
 function validProvider(body) {
