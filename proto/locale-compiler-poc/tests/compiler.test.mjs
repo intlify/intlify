@@ -1,10 +1,11 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, test } from 'vite-plus/test'
 
+import { compile } from '../src/compiler.mjs'
 import { emitArtifacts } from '../src/emitter.mjs'
 import { transformJavaScript } from '../src/frontend.mjs'
 import { runLocalizationProvider } from '../src/provider.mjs'
@@ -664,6 +665,181 @@ describe('Artifact emitter', () => {
   })
 })
 
+describe('Compiler orchestration', () => {
+  test('writes the same five artifacts returned by a successful compile', async () => {
+    const fixture = await createCompileFixture()
+    const result = await compile(fixture)
+
+    expect(result.ok).toBe(true)
+    expect([...result.artifacts.keys()]).toEqual([
+      'app.js',
+      'intlify-runtime.mjs',
+      'locale-en.mjs',
+      'locale-ja.mjs',
+      'localization-report.json'
+    ])
+
+    for (const [filename, text] of result.artifacts) {
+      expect(await readFile(join(fixture.outDir, filename), 'utf8')).toBe(text)
+    }
+  })
+
+  test('returns LC001 as a successful no-op compile warning', async () => {
+    const fixture = await createCompileFixture({ source: 'heading.textContent = user.name' })
+    const result = await compile(fixture)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ code: 'LC001', severity: 'warning' })
+    ])
+    expect(result.artifacts.get('app.js')).toBe('heading.textContent = user.name')
+    expect(JSON.parse(result.artifacts.get('localization-report.json'))).toMatchObject({
+      intentCount: 0,
+      messageCountByLocale: { en: 0, ja: 0 }
+    })
+  })
+
+  test('stops before loading the Provider after a Frontend error', async () => {
+    const fixture = await createCompileFixture({
+      source: "import value from './value.js'",
+      providerSource: 'export const ='
+    })
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC002' })]
+    })
+    await expectPathMissing(fixture.outDir)
+  })
+
+  test.each([
+    ['a non-js extension', { extension: '.txt' }],
+    ['a missing entry', { writeEntry: false }],
+    ['a UTF-8 BOM', { sourceBytes: Buffer.from([0xef, 0xbb, 0xbf, 0x61]) }],
+    ['invalid UTF-8', { sourceBytes: Buffer.from([0xff]) }]
+  ])('reports LC005 for %s', async (_name, options) => {
+    const fixture = await createCompileFixture(options)
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC005', name: 'invalid_source' })]
+    })
+    await expectPathMissing(fixture.outDir)
+  })
+
+  test('retains warnings when Provider validation fails and leaves output untouched', async () => {
+    const fixture = await createCompileFixture({
+      source: [
+        "heading.textContent = 'Welcome'",
+        'description.textContent = user.description'
+      ].join('\n'),
+      providerSource: validProvider('export async function localize() { return [] }')
+    })
+    await mkdir(fixture.outDir)
+    await writeFile(join(fixture.outDir, 'app.js'), 'existing output', 'utf8')
+
+    const result = await compile(fixture)
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.map(diagnostic => diagnostic.code)).toEqual(['LC001', 'LC004'])
+    expect(await readFile(join(fixture.outDir, 'app.js'), 'utf8')).toBe('existing output')
+    await expectPathMissing(join(fixture.outDir, 'locale-en.mjs'))
+  })
+
+  test('rejects output that contains the entry or Provider', async () => {
+    const fixture = await createCompileFixture()
+
+    const entryResult = await compile({ ...fixture, outDir: fixture.cwd })
+    expect(entryResult).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC009', path: '.' })]
+    })
+
+    const nestedOutput = join(fixture.cwd, 'nested-output')
+    await mkdir(nestedOutput)
+    const nestedProvider = join(nestedOutput, 'provider.mjs')
+    await writeFile(nestedProvider, defaultProviderSource(), 'utf8')
+    const providerResult = await compile({
+      ...fixture,
+      outDir: nestedOutput,
+      providerPath: nestedProvider
+    })
+    expect(providerResult).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC009', path: 'nested-output' })]
+    })
+  })
+
+  test('rejects an output directory symbolic link', async () => {
+    const fixture = await createCompileFixture()
+    const realOutput = join(fixture.cwd, 'real-output')
+    await mkdir(realOutput)
+    await symlink(realOutput, fixture.outDir, 'dir')
+
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC009', path: 'dist' })]
+    })
+  })
+
+  test('rejects a generated artifact symbolic link', async () => {
+    const fixture = await createCompileFixture()
+    await mkdir(fixture.outDir)
+    const target = join(fixture.cwd, 'outside-app.js')
+    await writeFile(target, 'outside', 'utf8')
+    await symlink(target, join(fixture.outDir, 'app.js'))
+
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC009', path: 'dist/app.js' })]
+    })
+    expect(await readFile(target, 'utf8')).toBe('outside')
+  })
+
+  test('preserves unknown files and overwrites only known artifact files', async () => {
+    const fixture = await createCompileFixture()
+    await mkdir(fixture.outDir)
+    await writeFile(join(fixture.outDir, 'unknown.txt'), 'keep me', 'utf8')
+    await writeFile(join(fixture.outDir, 'app.js'), 'replace me', 'utf8')
+
+    const result = await compile(fixture)
+
+    expect(result.ok).toBe(true)
+    expect(await readFile(join(fixture.outDir, 'unknown.txt'), 'utf8')).toBe('keep me')
+    expect(await readFile(join(fixture.outDir, 'app.js'), 'utf8')).toBe(
+      result.artifacts.get('app.js')
+    )
+  })
+
+  test('reports LC008 when the output cannot be created as a directory', async () => {
+    const fixture = await createCompileFixture()
+    await writeFile(fixture.outDir, 'not a directory', 'utf8')
+
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC008', path: 'dist' })]
+    })
+  })
+
+  test('reproduces byte-identical output over an existing build', async () => {
+    const fixture = await createCompileFixture()
+    const first = await compile(fixture)
+    const second = await compile(fixture)
+
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(true)
+    expect([...second.artifacts]).toEqual([...first.artifacts])
+  })
+})
+
 async function createProvider(source) {
   const cwd = await createTemporaryDirectory('locale-compiler-provider-')
   const providerPath = join(cwd, 'provider.mjs')
@@ -675,6 +851,41 @@ async function createTemporaryDirectory(prefix) {
   const directory = await mkdtemp(join(tmpdir(), prefix))
   temporaryDirectories.push(directory)
   return directory
+}
+
+async function createCompileFixture(options = {}) {
+  const cwd = await createTemporaryDirectory('locale-compiler-compile-')
+  const extension = options.extension ?? '.js'
+  const entryPath = join(cwd, `app${extension}`)
+  const outDir = join(cwd, 'dist')
+  const providerPath = join(cwd, 'provider.mjs')
+
+  if (options.writeEntry !== false) {
+    await writeFile(
+      entryPath,
+      options.sourceBytes ??
+        Buffer.from(options.source ?? "heading.textContent = 'Welcome'", 'utf8')
+    )
+  }
+  await writeFile(providerPath, options.providerSource ?? defaultProviderSource(), 'utf8')
+
+  return { cwd, entryPath, outDir, providerPath }
+}
+
+function defaultProviderSource() {
+  return validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: request.sourceText + ' ja'
+  }))
+}
+`)
+}
+
+async function expectPathMissing(path) {
+  await expect(readFile(path)).rejects.toMatchObject({ code: 'ENOENT' })
 }
 
 function restoreGlobal(name, existed, value) {
