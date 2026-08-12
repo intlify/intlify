@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, test } from 'vite-plus/test'
 
+import { main } from '../src/cli.mjs'
 import { compile } from '../src/compiler.mjs'
 import { emitArtifacts } from '../src/emitter.mjs'
 import { transformJavaScript } from '../src/frontend.mjs'
@@ -840,6 +841,88 @@ describe('Compiler orchestration', () => {
   })
 })
 
+describe('CLI', () => {
+  test('resolves the three required paths from the injected working directory', async () => {
+    const fixture = await createCompileFixture()
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(
+      ['--entry', 'app.js', '--out', 'dist', '--provider', 'provider.mjs'],
+      output.io
+    )
+
+    expect(exitCode).toBe(0)
+    expect(output.stdout()).toBe('')
+    expect(output.stderr()).toBe('')
+    expect(await readFile(join(fixture.outDir, 'app.js'), 'utf8')).toContain('intlify-runtime.mjs')
+  })
+
+  test.each([
+    ['a missing option', ['--entry', 'app.js', '--out', 'dist']],
+    [
+      'an unknown option',
+      ['--entry', 'app.js', '--out', 'dist', '--provider', 'provider.mjs', '--unknown', 'value']
+    ],
+    [
+      'a positional argument',
+      ['--entry', 'app.js', '--out', 'dist', '--provider', 'provider.mjs', 'positional']
+    ]
+  ])('returns exit code 2 for %s', async (_name, argv) => {
+    const fixture = await createCompileFixture()
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(argv, output.io)
+
+    expect(exitCode).toBe(2)
+    expect(output.stdout()).toBe('')
+    expect(output.stderr()).toContain('Usage: node src/cli.mjs')
+    expect(output.stderr()).not.toContain('LC00')
+    await expectPathMissing(fixture.outDir)
+  })
+
+  test('prints a source warning and still returns exit code 0', async () => {
+    const fixture = await createCompileFixture({ source: 'heading.textContent = user.name' })
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(cliArguments(), output.io)
+
+    expect(exitCode).toBe(0)
+    expect(output.stderr()).toMatch(
+      /^warning LC001 unsupported_dynamic_ui_text\napp\.js:1:\d+\nDynamic textContent was left unchanged\.\n$/
+    )
+  })
+
+  test('prints a blocking source diagnostic and returns exit code 1', async () => {
+    const fixture = await createCompileFixture({ source: "import value from './value.js'" })
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(cliArguments(), output.io)
+
+    expect(exitCode).toBe(1)
+    expect(output.stderr()).toBe(
+      'error LC002 unsupported_module_import\n' +
+        'app.js:1:1\n' +
+        'The PoC entry must be a self-contained browser module.\n'
+    )
+  })
+
+  test('prints a non-source diagnostic with a path but no line or column', async () => {
+    const fixture = await createCompileFixture({
+      providerSource: "export const kind = 'fixture'"
+    })
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(cliArguments(), output.io)
+
+    expect(exitCode).toBe(1)
+    expect(output.stderr()).toBe(
+      'error LC003 invalid_localization_provider\n' +
+        'provider.mjs\n' +
+        'The provider must export kind, revision, and localize.\n'
+    )
+  })
+})
+
 async function createProvider(source) {
   const cwd = await createTemporaryDirectory('locale-compiler-provider-')
   const providerPath = join(cwd, 'provider.mjs')
@@ -894,6 +977,24 @@ function restoreGlobal(name, existed, value) {
   } else {
     delete globalThis[name]
   }
+}
+
+function createIo(cwd) {
+  let stdout = ''
+  let stderr = ''
+  return {
+    io: {
+      cwd,
+      stdout: { write: text => (stdout += text) },
+      stderr: { write: text => (stderr += text) }
+    },
+    stdout: () => stdout,
+    stderr: () => stderr
+  }
+}
+
+function cliArguments() {
+  return ['--entry', 'app.js', '--out', 'dist', '--provider', 'provider.mjs']
 }
 
 function validProvider(body) {
