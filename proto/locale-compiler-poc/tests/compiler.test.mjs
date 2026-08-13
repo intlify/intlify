@@ -42,7 +42,8 @@ describe('Intent Frontend', () => {
       surface: 'dom-text-content',
       origin: { path: 'demo/src/app.js' }
     })
-    expect(result.intents[0].id).toMatch(/^m_[0-9a-f]{32}$/)
+    expect(result.intents[0].id).toMatch(/^m_[\w-]{16}$/)
+    expect(result.intents[0].parameters).toEqual([])
     expect(result.transformedSource).toContain(
       `heading.textContent = __intlify_message(${JSON.stringify(result.intents[0].id)})`
     )
@@ -223,6 +224,356 @@ describe('Intent Frontend', () => {
       /^import \{ message as __intlify_message \} from "\.\/intlify-runtime\.mjs"\n\n/
     )
   })
+
+  test('rewrites an explicit parameterized Intent alongside automatic extraction', () => {
+    const newline = '\r\n'
+    const source = [
+      '// marker comment',
+      "import { intent } from '@intlify/locale'",
+      '',
+      'const name = getName()',
+      'heading.textContent = intent(',
+      "  'Hello, {$name}!',",
+      '  /* evaluated once */ { name }',
+      ')',
+      "button.textContent = 'Pay now'"
+    ].join(newline)
+    const result = transform(source)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.intents).toHaveLength(2)
+    expect(result.intents[0]).toMatchObject({
+      sourceText: 'Hello, {$name}!',
+      surface: 'explicit-intent',
+      parameters: [{ name: 'name', type: 'string-or-number' }]
+    })
+    expect(result.intents[1]).toMatchObject({
+      sourceText: 'Pay now',
+      surface: 'dom-text-content',
+      parameters: []
+    })
+    expect(result.intents.every(intent => /^m_[\w-]{16}$/.test(intent.id))).toBe(true)
+    expect(result.transformedSource).toContain(
+      `import { message as __intlify_message } from "./intlify-runtime.mjs"${newline}`
+    )
+    expect(result.transformedSource).toContain(
+      `heading.textContent = __intlify_message(${newline}` +
+        `  ${JSON.stringify(result.intents[0].id)},${newline}` +
+        `  /* evaluated once */ { name }${newline}` +
+        ')'
+    )
+    expect(result.transformedSource).toContain(
+      `button.textContent = __intlify_message(${JSON.stringify(result.intents[1].id)})`
+    )
+  })
+
+  test('removes an unused marker import without adding the runtime', () => {
+    const source = [
+      '// before',
+      "import { intent } from '@intlify/locale'",
+      'const untouched = true'
+    ].join('\n')
+    const result = transform(source)
+
+    expect(result).toMatchObject({
+      ok: true,
+      diagnostics: [],
+      intents: [],
+      runtimeAlias: undefined,
+      transformedSource: '// before\n\nconst untouched = true'
+    })
+  })
+
+  test('preserves a marker semicolon that separates a same-line statement', () => {
+    const result = transform(
+      "import { intent } from '@intlify/locale';const value = intent('Welcome')"
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.transformedSource).toBe(
+      `import { message as __intlify_message } from "./intlify-runtime.mjs";` +
+        `const value = __intlify_message(${JSON.stringify(result.intents[0].id)})`
+    )
+  })
+
+  test.each([
+    ['single-quoted string', "intent('Welcome')"],
+    ['double-quoted string', 'intent("Welcome")'],
+    ['no-substitution template', 'intent(`Welcome`)']
+  ])('accepts an explicit source as a %s', (_name, declaration) => {
+    const result = transform(
+      ["import { intent } from '@intlify/locale'", `const value = ${declaration}`].join('\n')
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.intents[0]).toMatchObject({
+      sourceText: 'Welcome',
+      surface: 'explicit-intent',
+      parameters: []
+    })
+  })
+
+  test('accepts cooked explicit messages and normalizes parameters by placeholder order', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "const value = intent(' {$first}\\n{$last} {$first} ', { last, first })"
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.intents[0]).toMatchObject({
+      sourceText: ' {$first}\n{$last} {$first} ',
+      parameters: [
+        { name: 'first', type: 'string-or-number' },
+        { name: 'last', type: 'string-or-number' }
+      ]
+    })
+  })
+
+  test.each([
+    ['no arguments', 'intent()'],
+    ['too many arguments', "intent('Welcome', {}, 'extra')"],
+    ['a dynamic source', 'intent(message)'],
+    ['a substitution template', 'intent(`Hello, ${name}!`, { name })'],
+    ['an empty source', "intent('')"],
+    ['a whitespace-only source', "intent('   ')"],
+    ['a malformed placeholder', "intent('Hello, {$name!', { name })"],
+    ['whitespace inside a placeholder', "intent('Hello, {$ name}!', { name })"],
+    ['whitespace before the dollar', "intent('Hello, { $name}!', { name })"],
+    ['an invalid placeholder identifier', "intent('Hello, {$user-name}!', { user_name })"],
+    ['a forbidden placeholder identifier', "intent('Hello, {$__proto__}!', { value })"],
+    ['missing parameters', "intent('Hello, {$name}!')"],
+    ['unneeded parameters', "intent('Welcome', {})"],
+    ['a non-literal parameters object', "intent('Hello, {$name}!', parameters)"],
+    ['a quoted property', "intent('Hello, {$name}!', { 'name': name })"],
+    ['a computed property', "intent('Hello, {$name}!', { ['name']: name })"],
+    ['a spread property', "intent('Hello, {$name}!', { ...parameters })"],
+    ['a method property', "intent('Hello, {$name}!', { name() {} })"],
+    ['an accessor property', "intent('Hello, {$name}!', { get name() { return 'Ada' } })"],
+    ['a duplicate property', "intent('Hello, {$name}!', { name, name: fallback })"],
+    ['a forbidden property', "intent('Hello, {$name}!', { __proto__: name })"],
+    ['a missing property', "intent('{$first} {$last}', { first })"],
+    ['an extra property', "intent('Hello, {$name}!', { name, unused })"],
+    ['a nested call', "intent('Outer: {$inner}', { inner: intent('Inner') })"]
+  ])('reports one LC010 for %s', (_name, declaration) => {
+    const result = transform(
+      ["import { intent } from '@intlify/locale'", `const value = ${declaration}`].join('\n')
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.filter(diagnostic => diagnostic.code === 'LC010')).toHaveLength(1)
+    expect(result.diagnostics.at(-1)).toMatchObject({
+      severity: 'error',
+      code: 'LC010',
+      name: 'invalid_intent_declaration'
+    })
+  })
+
+  test('allows ordinary braces and repeated placeholders', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "const first = intent('Use { and } carefully')",
+        "const second = intent('{$name}, {$name}!', { name })"
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.intents.map(intent => intent.parameters)).toEqual([
+      [],
+      [{ name: 'name', type: 'string-or-number' }]
+    ])
+  })
+
+  test('accepts adjacent placeholders and normal property assignments', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "const value = intent('{$first}{$last}', { last: user.last, first: user.first })"
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.intents[0].parameters).toEqual([
+      { name: 'first', type: 'string-or-number' },
+      { name: 'last', type: 'string-or-number' }
+    ])
+    expect(result.transformedSource).toContain('{ last: user.last, first: user.first }')
+  })
+
+  test.each([
+    ["import { intent as localize } from '@intlify/locale'"],
+    ["import locale from '@intlify/locale'"],
+    ["import * as locale from '@intlify/locale'"],
+    ["import { intent, other } from '@intlify/locale'"],
+    ["import { intent } from '@intlify/locale' with { type: 'json' }"],
+    [
+      ["import { intent } from '@intlify/locale'", "import { intent } from '@intlify/locale'"].join(
+        '\n'
+      )
+    ]
+  ])('rejects a non-exact marker import: %s', source => {
+    const result = transform(source)
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ code: 'LC010', name: 'invalid_intent_declaration' })
+    ])
+  })
+
+  test('collects all unsupported non-marker imports in source order', () => {
+    const result = transform("import './first.js'\nimport value from './second.js'")
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.map(diagnostic => [diagnostic.code, diagnostic.line])).toEqual([
+      ['LC002', 1],
+      ['LC002', 2]
+    ])
+  })
+
+  test('rejects dynamic imports and re-exports as unsupported module graph edges', () => {
+    const result = transform(
+      ["const first = import('./first.js')", "export * from './second.js'"].join('\n')
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.map(diagnostic => [diagnostic.code, diagnostic.line])).toEqual([
+      ['LC002', 1],
+      ['LC002', 2]
+    ])
+  })
+
+  test('does not recognize an unimported application intent function', () => {
+    const source = [
+      'function intent(value) { return value }',
+      "const message = intent('Welcome')"
+    ].join('\n')
+    const result = transform(source)
+
+    expect(result).toMatchObject({
+      ok: true,
+      diagnostics: [],
+      intents: [],
+      transformedSource: source
+    })
+  })
+
+  test.each([
+    ['an assigned reference', 'const localize = intent'],
+    ['property-call indirection', "intent.call(null, 'Welcome')"],
+    ['construction', "const value = new intent('Welcome')"],
+    ['a parenthesized callee', "const value = (intent)('Welcome')"],
+    ['an optional call', "const value = intent?.('Welcome')"],
+    ['a tagged template', 'const value = intent`Welcome`'],
+    ['an exported reference', 'export { intent }']
+  ])('rejects %s of the marker binding', (_name, usage) => {
+    const result = transform(["import { intent } from '@intlify/locale'", usage].join('\n'))
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual([expect.objectContaining({ code: 'LC010' })])
+  })
+
+  test('rejects marker binding shadowing without misclassifying a valid outer call', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        'function render(intent) { return intent }',
+        "const title = intent('Welcome')"
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: 'LC010',
+        line: 2,
+        message: expect.stringContaining('shadowed')
+      })
+    ])
+  })
+
+  test('extracts explicit Intents from unreachable source', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        'if (false) {',
+        "  console.log(intent('Never shown'))",
+        '}'
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.intents[0].sourceText).toBe('Never shown')
+  })
+
+  test('warns only when an explicit Intent is part of a larger textContent expression', () => {
+    const direct = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "heading.textContent = intent('Hello, {$name}!', { name })"
+      ].join('\n')
+    )
+    const compound = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "heading.textContent = prefix + intent('Hello')"
+      ].join('\n')
+    )
+
+    expect(direct.ok).toBe(true)
+    expect(direct.diagnostics).toEqual([])
+    expect(compound.ok).toBe(true)
+    expect(compound.diagnostics).toEqual([expect.objectContaining({ code: 'LC001' })])
+    expect(compound.transformedSource).toContain('__intlify_message(')
+  })
+
+  test('collects LC001 and independent LC010 diagnostics in source order', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        'heading.textContent = dynamicValue',
+        'const first = intent(message)',
+        "const second = intent('Hello, {$user-name}!', { user_name })"
+      ].join('\n')
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.map(diagnostic => [diagnostic.code, diagnostic.line])).toEqual([
+      ['LC001', 2],
+      ['LC010', 3],
+      ['LC010', 4]
+    ])
+  })
+
+  test('assigns occurrence-aware IDs to repeated explicit call sites', () => {
+    const source = [
+      "import { intent } from '@intlify/locale'",
+      "const first = intent('Open')",
+      "const second = intent('Open')"
+    ].join('\n')
+    const first = transform(source)
+    const second = transform(source)
+
+    expect(first.ok).toBe(true)
+    expect(first.intents.map(intent => intent.id)).toEqual(second.intents.map(intent => intent.id))
+    expect(new Set(first.intents.map(intent => intent.id)).size).toBe(2)
+  })
+
+  test('detects ID collisions across explicit and automatic Intents', () => {
+    const result = transform(
+      [
+        "import { intent } from '@intlify/locale'",
+        "const title = intent('Welcome')",
+        "heading.textContent = 'Welcome'"
+      ].join('\n'),
+      { hashPayload: () => 'A'.repeat(16) }
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics.at(-1)).toMatchObject({ code: 'LC006', line: 3 })
+  })
 })
 
 describe('Localization Provider contract', () => {
@@ -238,6 +589,18 @@ describe('Localization Provider contract', () => {
       sourceLocale: 'en',
       sourceText: 'First',
       surface: 'dom-text-content'
+    }
+  ]
+  const parameterizedIntents = [
+    {
+      id: 'm_parameterized',
+      sourceLocale: 'en',
+      sourceText: 'Hello, {$first} {$last}!',
+      surface: 'explicit-intent',
+      parameters: [
+        { name: 'first', type: 'string-or-number' },
+        { name: 'last', type: 'string-or-number' }
+      ]
     }
   ]
 
@@ -275,14 +638,16 @@ export async function localize(requests) {
           sourceLocale: 'en',
           targetLocale: 'ja',
           sourceText: 'First',
-          surface: 'dom-text-content'
+          surface: 'dom-text-content',
+          parameters: []
         },
         {
           intentId: 'm_b',
           sourceLocale: 'en',
           targetLocale: 'ja',
           sourceText: 'Second',
-          surface: 'dom-text-content'
+          surface: 'dom-text-content',
+          parameters: []
         }
       ],
       candidates: [
@@ -346,6 +711,125 @@ export async function localize(requests) {
 
     expect(result.ok).toBe(true)
     expect(result.requests.map(request => request.intentId)).toEqual(['m_a', 'm_b'])
+  })
+
+  test('deep-copies parameter contracts before calling the Provider', async () => {
+    const fixture = await createProvider(`
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+export let received
+export async function localize(requests) {
+  received = requests
+  requests[0].parameters[0].name = 'mutated'
+  requests[0].parameters.push({ name: 'extra', type: 'string-or-number' })
+  return [{
+    intentId: requests[0].intentId,
+    locale: requests[0].targetLocale,
+    message: '{$last}、{$first}！'
+  }]
+}
+`)
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents: parameterizedIntents
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.requests[0].parameters).toEqual([
+      { name: 'first', type: 'string-or-number' },
+      { name: 'last', type: 'string-or-number' }
+    ])
+  })
+
+  test('passes parameter contracts in source-message order', async () => {
+    const fixture = await createProvider(`
+export const kind = 'fixture'
+export const revision = 'fixture-v1'
+export let received
+export async function localize(requests) {
+  received = requests
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: '{$last}、{$first}、{$first}！'
+  }))
+}
+`)
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents: parameterizedIntents
+    })
+    const providerModule = await import(pathToFileURL(fixture.providerPath).href)
+
+    expect(result.ok).toBe(true)
+    expect(providerModule.received[0]).toMatchObject({
+      surface: 'explicit-intent',
+      parameters: [
+        { name: 'first', type: 'string-or-number' },
+        { name: 'last', type: 'string-or-number' }
+      ]
+    })
+    expect(result.candidates[0].message).toBe('{$last}、{$first}、{$first}！')
+  })
+
+  test.each([
+    ['a missing placeholder', 'こんにちは！'],
+    ['an extra placeholder', '{$first} {$last} {$extra}'],
+    ['a malformed placeholder', '{$first} {$last']
+  ])('rejects a localized message with %s', async (_name, message) => {
+    const fixture = await createProvider(
+      validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: ${JSON.stringify(message)}
+  }))
+}
+`)
+    )
+
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents: parameterizedIntents
+    })
+
+    expect(result).toEqual(providerDiagnostic('LC004', 'invalid_localization_result'))
+  })
+
+  test('does not parse placeholder-shaped text for an automatically extracted Intent', async () => {
+    const fixture = await createProvider(
+      validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: '{$broken'
+  }))
+}
+`)
+    )
+    const result = await runLocalizationProvider({
+      providerPath: fixture.providerPath,
+      cwd: fixture.cwd,
+      intents: [
+        {
+          id: 'm_plain',
+          sourceLocale: 'en',
+          sourceText: 'Example: {$name}',
+          surface: 'dom-text-content',
+          parameters: []
+        }
+      ]
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.candidates[0].message).toBe('{$broken')
   })
 
   test.each([
@@ -594,6 +1078,125 @@ describe('Artifact emitter', () => {
     }
   })
 
+  test('interpolates validated strings and finite numbers in locale-specific order', async () => {
+    const parameterizedIntents = [
+      {
+        id: 'm_greeting',
+        sourceLocale: 'en',
+        sourceText: '{$first} {$last}: {$count} / {$first}',
+        surface: 'explicit-intent',
+        parameters: [
+          { name: 'first', type: 'string-or-number' },
+          { name: 'last', type: 'string-or-number' },
+          { name: 'count', type: 'string-or-number' }
+        ]
+      },
+      {
+        id: 'm_value',
+        sourceLocale: 'en',
+        sourceText: 'Value: {$value}',
+        surface: 'explicit-intent',
+        parameters: [{ name: 'value', type: 'string-or-number' }]
+      },
+      {
+        id: 'm_plain',
+        sourceLocale: 'en',
+        sourceText: 'Example: {$name}',
+        surface: 'dom-text-content',
+        parameters: []
+      }
+    ]
+    const parameterizedCandidates = [
+      {
+        intentId: 'm_greeting',
+        locale: 'ja',
+        message: '{$last}、{$first}: {$count} / {$first}'
+      },
+      { intentId: 'm_value', locale: 'ja', message: '値: {$value}' },
+      { intentId: 'm_plain', locale: 'ja', message: '例: {$name}' }
+    ]
+    const artifacts = emitArtifacts({
+      transformedSource: '',
+      intents: parameterizedIntents,
+      candidates: parameterizedCandidates,
+      provider
+    })
+    const directory = await createTemporaryDirectory('locale-compiler-parameter-runtime-')
+    for (const filename of ['intlify-runtime.mjs', 'locale-en.mjs', 'locale-ja.mjs']) {
+      await writeFile(join(directory, filename), artifacts.get(filename), 'utf8')
+    }
+
+    const runtime = await import(pathToFileURL(join(directory, 'intlify-runtime.mjs')).href)
+    const hadLocale = Object.hasOwn(globalThis, '__INTLIFY_LOCALE__')
+    const previousLocale = globalThis.__INTLIFY_LOCALE__
+
+    try {
+      delete globalThis.__INTLIFY_LOCALE__
+      expect(runtime.message('m_greeting', { last: 'Lovelace', first: 'Ada', count: 2 })).toBe(
+        'Ada Lovelace: 2 / Ada'
+      )
+
+      globalThis.__INTLIFY_LOCALE__ = 'ja'
+      expect(runtime.message('m_greeting', { count: 2, first: 'Ada', last: 'Lovelace' })).toBe(
+        'Lovelace、Ada: 2 / Ada'
+      )
+      expect(runtime.message('m_value', { value: '{$other}' })).toBe('値: {$other}')
+      expect(runtime.message('m_plain')).toBe('例: {$name}')
+    } finally {
+      restoreGlobal('__INTLIFY_LOCALE__', hadLocale, previousLocale)
+    }
+  })
+
+  test('rejects missing, unexpected, and unsafe runtime parameter values without leaking them', async () => {
+    const runtimeIntents = [
+      {
+        id: 'm_parameters',
+        sourceLocale: 'en',
+        sourceText: '{$first} {$last}',
+        surface: 'explicit-intent',
+        parameters: [
+          { name: 'first', type: 'string-or-number' },
+          { name: 'last', type: 'string-or-number' }
+        ]
+      }
+    ]
+    const runtimeCandidates = [
+      { intentId: 'm_parameters', locale: 'ja', message: '{$last} {$first}' }
+    ]
+    const artifacts = emitArtifacts({
+      transformedSource: '',
+      intents: runtimeIntents,
+      candidates: runtimeCandidates,
+      provider
+    })
+    const directory = await createTemporaryDirectory('locale-compiler-invalid-parameters-')
+    for (const filename of ['intlify-runtime.mjs', 'locale-en.mjs', 'locale-ja.mjs']) {
+      await writeFile(join(directory, filename), artifacts.get(filename), 'utf8')
+    }
+    const runtime = await import(pathToFileURL(join(directory, 'intlify-runtime.mjs')).href)
+
+    expect(() => runtime.message('m_parameters', { last: 'Lovelace' })).toThrow(
+      'missing message parameter: m_parameters/first'
+    )
+    expect(() =>
+      runtime.message('m_parameters', { first: 'Ada', last: 'Lovelace', unused: 'secret' })
+    ).toThrow('unexpected message parameter: m_parameters/unused')
+
+    for (const invalid of [null, undefined, true, {}, 1n, Number.NaN, Infinity, -Infinity]) {
+      let error
+      try {
+        runtime.message('m_parameters', { first: invalid, last: 'private-value' })
+      } catch (caught) {
+        error = caught
+      }
+      expect(error).toBeInstanceOf(TypeError)
+      expect(error.message).toBe(
+        'invalid message parameter: m_parameters/first must be a string or finite number'
+      )
+      expect(error.message).not.toContain('private-value')
+    }
+  })
+
   test('emits the exact versioned report schema without nondeterministic metadata', () => {
     const artifacts = emitArtifacts({ transformedSource: '', intents, candidates, provider })
     const reportText = artifacts.get('localization-report.json')
@@ -710,6 +1313,48 @@ describe('Compiler orchestration', () => {
     expect(result).toEqual({
       ok: false,
       diagnostics: [expect.objectContaining({ code: 'LC002' })]
+    })
+    await expectPathMissing(fixture.outDir)
+  })
+
+  test('stops before loading the Provider after an invalid explicit Intent', async () => {
+    const fixture = await createCompileFixture({
+      source: [
+        "import { intent } from '@intlify/locale'",
+        'const message = intent(dynamicSource)'
+      ].join('\n'),
+      providerSource: 'export const ='
+    })
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC010', line: 2 })]
+    })
+    await expectPathMissing(fixture.outDir)
+  })
+
+  test('rejects a localized parameter mismatch before writing artifacts', async () => {
+    const fixture = await createCompileFixture({
+      source: [
+        "import { intent } from '@intlify/locale'",
+        "const message = intent('Hello, {$name}!', { name: 'Ada' })"
+      ].join('\n'),
+      providerSource: validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: 'こんにちは！'
+  }))
+}
+`)
+    })
+    const result = await compile(fixture)
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'LC004' })]
     })
     await expectPathMissing(fixture.outDir)
   })
@@ -906,6 +1551,23 @@ describe('CLI', () => {
     )
   })
 
+  test('prints LC010 for an invalid explicit Intent and returns exit code 1', async () => {
+    const fixture = await createCompileFixture({
+      source: [
+        "import { intent } from '@intlify/locale'",
+        "const message = intent('Hello, {$name}!')"
+      ].join('\n')
+    })
+    const output = createIo(fixture.cwd)
+
+    const exitCode = await main(cliArguments(), output.io)
+
+    expect(exitCode).toBe(1)
+    expect(output.stderr()).toMatch(
+      /^error LC010 invalid_intent_declaration\napp\.js:2:\d+\nThe intent parameters must exactly match the message placeholders\.\n$/
+    )
+  })
+
   test('prints a non-source diagnostic with a path but no line or column', async () => {
     const fixture = await createCompileFixture({
       providerSource: "export const kind = 'fixture'"
@@ -925,9 +1587,9 @@ describe('CLI', () => {
 
 describe('end-to-end generated application', () => {
   test.each([
-    ['the default locale', '', 'Welcome', 'Pay now'],
-    ['English', '?locale=en', 'Welcome', 'Pay now'],
-    ['Japanese', '?locale=ja', 'ようこそ', '支払う']
+    ['the default locale', '', 'Hello, Ada!', 'Pay now'],
+    ['English', '?locale=en', 'Hello, Ada!', 'Pay now'],
+    ['Japanese', '?locale=ja', 'Adaさん、こんにちは！', '支払う']
   ])('renders %s through bootstrap and the runtime', async (_name, query, heading, button) => {
     const rendered = await runCompiledDemo({ query })
 
@@ -955,6 +1617,50 @@ export async function localize(requests) {
     })
 
     expect(rendered.get('h1')).toEqual({ textContent: '<strong>Hello</strong>' })
+  })
+
+  test('rejects an unsafe explicit runtime parameter value', async () => {
+    await expect(
+      runCompiledDemo({
+        source: [
+          "import { intent } from '@intlify/locale'",
+          "const heading = document.querySelector('h1')",
+          "heading.textContent = intent('Hello, {$name}!', { name: null })"
+        ].join('\n'),
+        query: '?locale=ja'
+      })
+    ).rejects.toThrow(/invalid message parameter: m_[\w-]{16}\/name/)
+  })
+
+  test('evaluates each explicit parameter expression once for repeated placeholders', async () => {
+    try {
+      const rendered = await runCompiledDemo({
+        source: [
+          "import { intent } from '@intlify/locale'",
+          'globalThis.__intentParameterEvaluations = 0',
+          'function getName() {',
+          '  globalThis.__intentParameterEvaluations += 1',
+          "  return 'Ada'",
+          '}',
+          "const heading = document.querySelector('h1')",
+          "heading.textContent = intent('{$name}, {$name}!', { name: getName() })"
+        ].join('\n'),
+        providerSource: validProvider(`
+export async function localize(requests) {
+  return requests.map(request => ({
+    intentId: request.intentId,
+    locale: request.targetLocale,
+    message: request.sourceText
+  }))
+}
+`)
+      })
+
+      expect(rendered.get('h1').textContent).toBe('Ada, Ada!')
+      expect(globalThis.__intentParameterEvaluations).toBe(1)
+    } finally {
+      delete globalThis.__intentParameterEvaluations
+    }
   })
 
   test('executes an Intent-free generated application without importing the runtime', async () => {
@@ -1073,8 +1779,10 @@ async function runCompiledDemo(options = {}) {
     source:
       options.source ??
       [
+        "import { intent } from '@intlify/locale'",
         "const heading = document.querySelector('h1')",
-        "heading.textContent = 'Welcome'",
+        "const name = 'Ada'",
+        "heading.textContent = intent('Hello, {$name}!', { name })",
         "const button = document.querySelector('#pay')",
         "button.textContent = 'Pay now'"
       ].join('\n'),
@@ -1115,7 +1823,7 @@ async function runCompiledDemo(options = {}) {
 function demoProviderSource() {
   return validProvider(`
 const messages = new Map([
-  ['Welcome', 'ようこそ'],
+  ['Hello, {$name}!', '{$name}さん、こんにちは！'],
   ['Pay now', '支払う']
 ])
 export async function localize(requests) {

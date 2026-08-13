@@ -6,6 +6,8 @@
 import { relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { parsePlaceholders } from './placeholder.mjs'
+
 const TARGET_LOCALE = 'ja'
 
 /**
@@ -48,7 +50,7 @@ export async function runLocalizationProvider({ providerPath, cwd, intents }) {
     return { ok: true, provider, requests, candidates: [] }
   }
 
-  const providerRequests = requests.map(request => ({ ...request }))
+  const providerRequests = requests.map(copyRequest)
   let result
 
   try {
@@ -92,7 +94,8 @@ function createLocalizationRequests(intents) {
       sourceLocale: intent.sourceLocale,
       targetLocale: TARGET_LOCALE,
       sourceText: intent.sourceText,
-      surface: intent.surface
+      surface: intent.surface,
+      parameters: (intent.parameters ?? []).map(parameter => ({ ...parameter }))
     }))
     .sort(compareRequests)
 }
@@ -102,8 +105,8 @@ function validateLocalizationResult(requests, result, diagnosticPath) {
     return invalidLocalizationResult(diagnosticPath)
   }
 
-  const expectedKeys = new Set(
-    requests.map(request => requestKey(request.targetLocale, request.intentId))
+  const requestByKey = new Map(
+    requests.map(request => [requestKey(request.targetLocale, request.intentId), request])
   )
   const seenKeys = new Set()
   const candidates = []
@@ -121,7 +124,15 @@ function validateLocalizationResult(requests, result, diagnosticPath) {
     }
 
     const key = requestKey(candidate.locale, candidate.intentId)
-    if (!expectedKeys.has(key) || seenKeys.has(key)) {
+    const request = requestByKey.get(key)
+    if (request === undefined || seenKeys.has(key)) {
+      return invalidLocalizationResult(diagnosticPath)
+    }
+
+    if (
+      request.surface === 'explicit-intent' &&
+      !hasMatchingPlaceholders(request, candidate.message)
+    ) {
       return invalidLocalizationResult(diagnosticPath)
     }
 
@@ -133,12 +144,32 @@ function validateLocalizationResult(requests, result, diagnosticPath) {
     })
   }
 
-  if (seenKeys.size !== expectedKeys.size) {
+  if (seenKeys.size !== requestByKey.size) {
     return invalidLocalizationResult(diagnosticPath)
   }
 
   candidates.sort(compareCandidates)
   return { ok: true, candidates }
+}
+
+function copyRequest(request) {
+  return {
+    ...request,
+    parameters: request.parameters.map(parameter => ({ ...parameter }))
+  }
+}
+
+function hasMatchingPlaceholders(request, message) {
+  const placeholders = parsePlaceholders(message)
+  if (!placeholders.ok) {
+    return false
+  }
+
+  const expected = new Set(request.parameters.map(parameter => parameter.name))
+  return (
+    placeholders.names.length === expected.size &&
+    placeholders.names.every(name => expected.has(name))
+  )
 }
 
 function invalidLocalizationResult(path) {

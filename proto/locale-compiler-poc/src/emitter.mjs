@@ -11,7 +11,9 @@ import { messages as ja } from './locale-ja.mjs'
 
 const capsules = { en, ja }
 
-export function message(intentId) {
+const PLACEHOLDER_PATTERN = /\\{\\$([A-Za-z_][A-Za-z0-9_]*)\\}/g
+
+export function message(intentId, parameters) {
   const locale = globalThis.__INTLIFY_LOCALE__ ?? 'en'
 
   if (!Object.hasOwn(capsules, locale)) {
@@ -24,7 +26,56 @@ export function message(intentId) {
     throw new RangeError(\`missing localized message: \${locale}/\${intentId}\`)
   }
 
-  return value
+  if (arguments.length < 2) {
+    return value
+  }
+
+  const source = capsules.en[intentId]
+  const parameterNames = placeholderNames(source)
+  const parameterObject =
+    parameters !== null && typeof parameters === 'object' ? parameters : Object.create(null)
+
+  for (const name of parameterNames) {
+    if (!Object.hasOwn(parameterObject, name)) {
+      throw new TypeError(\`missing message parameter: \${intentId}/\${name}\`)
+    }
+  }
+
+  const expected = new Set(parameterNames)
+  for (const name of Object.keys(parameterObject)) {
+    if (!expected.has(name)) {
+      throw new TypeError(\`unexpected message parameter: \${intentId}/\${name}\`)
+    }
+  }
+
+  for (const name of parameterNames) {
+    const parameter = parameterObject[name]
+    if (
+      typeof parameter !== 'string' &&
+      (typeof parameter !== 'number' || !Number.isFinite(parameter))
+    ) {
+      throw new TypeError(
+        \`invalid message parameter: \${intentId}/\${name} must be a string or finite number\`
+      )
+    }
+  }
+
+  return value.replace(PLACEHOLDER_PATTERN, (_placeholder, name) => String(parameterObject[name]))
+}
+
+function placeholderNames(message) {
+  const names = []
+  const seen = new Set()
+
+  for (const match of message.matchAll(PLACEHOLDER_PATTERN)) {
+    const name = match[1]
+    if (!seen.has(name)) {
+      seen.add(name)
+      names.push(name)
+    }
+  }
+
+  return names
 }
 `
 

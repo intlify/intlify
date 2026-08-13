@@ -2,7 +2,7 @@ export const kind = 'fixture'
 export const revision = 'fixture-v1'
 
 const jaBySourceText = new Map([
-  ['Welcome', 'ようこそ'],
+  ['Hello, {$name}!', '{$name}さん、こんにちは！'],
   ['Pay now', '支払う']
 ])
 
