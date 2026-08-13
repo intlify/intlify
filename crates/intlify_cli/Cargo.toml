@@ -23,7 +23,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-blake3 = "=1.8.5"
+blake3 = "=1.8.6"
 # Filesystem-capability crates are exact-pinned so their no-follow semantics cannot drift.
 cap-fs-ext = "=4.0.2"
 cap-std = "=4.0.2"
@@ -46,4 +46,4 @@ unicode-normalization = "0.1"
 tempfile = "3"
 
 [build-dependencies]
-blake3 = "=1.8.5"
+blake3 = "=1.8.6"
