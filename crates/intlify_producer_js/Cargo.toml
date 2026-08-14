@@ -15,7 +15,7 @@ benchmark = []
 workspace = true
 
 [dependencies]
-blake3 = "=1.8.5"
+blake3 = "=1.8.6"
 intlify_contract = { path = "../intlify_contract" }
 # Keep the exact pins aligned because Oxc crates share internal API contracts.
 oxc_allocator = "=0.141.0"
@@ -25,4 +25,4 @@ oxc_parser = { version = "=0.141.0", default-features = false }
 oxc_span = "=0.141.0"
 
 [build-dependencies]
-blake3 = "=1.8.5"
+blake3 = "=1.8.6"
