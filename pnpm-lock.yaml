@@ -25,8 +25,8 @@ catalogs:
       specifier: ^0.55.1
       version: 0.55.1
     pkg-pr-new:
-      specifier: 0.0.87
-      version: 0.0.87
+      specifier: 0.0.88
+      version: 0.0.88
     typescript:
       specifier: ^6.0.0
       version: 6.0.3
@@ -64,7 +64,7 @@ importers:
         version: 2.0.2
       pkg-pr-new:
         specifier: 'catalog:'
-        version: 0.0.87
+        version: 0.0.88
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -3197,6 +3197,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -3705,8 +3706,8 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  pkg-pr-new@0.0.87:
-    resolution: {integrity: sha512-nm+30Py1csXWfyMH1ueQyTR11IZGHS5oW8Qok/MxMwjPx9g1jX3wMRrJf8TgEvNo0a0M4i14T0zQsEPWdZfAhg==}
+  pkg-pr-new@0.0.88:
+    resolution: {integrity: sha512-Xc6PMJ2gher0WZP+rtjefFk26hIb7V1PTLL30bmy1Z2vsRmSvqiss7Ag1XUdyplTGYzIlFNJp4L3vMNmK44N6g==}
     hasBin: true
 
   pngjs@7.0.0:
@@ -6877,7 +6878,7 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  pkg-pr-new@0.0.87: {}
+  pkg-pr-new@0.0.88: {}
 
   pngjs@7.0.0: {}
 
