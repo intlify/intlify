@@ -22,7 +22,7 @@ oxc_allocator = "=0.141.0"
 oxc_ast = "=0.141.0"
 oxc_ast_visit = "=0.141.0"
 oxc_parser = { version = "=0.141.0", default-features = false }
-oxc_span = "=0.141.0"
+oxc_span = "=0.144.0"
 
 [build-dependencies]
 blake3 = "=1.8.6"
