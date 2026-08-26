@@ -202,6 +202,15 @@ importers:
         specifier: 'catalog:'
         version: 0.15.0
 
+  proto/locale-compiler-poc:
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@25.9.3)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
+
   tools/format-bench:
     dependencies:
       '@intlify/format-napi':

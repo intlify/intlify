@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - proto/*
   - tools/*
 
 allowBuilds:
