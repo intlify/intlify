@@ -2,7 +2,7 @@
 
 ## Status
 
-This document defines the high-level product architecture for Intlify as a compiler-based localization toolchain with an offline, artifact-driven runtime.
+This document defines the high-level product architecture for Intlify as a compiler-based localization toolchain with offline, artifact-driven production execution.
 
 It is one abstraction level above the component designs in this repository. In particular, [015](./015-ox-mf2-runtime-design.md) defines the runtime-side responsibility split, while this document explains how authoring, MF2 language services, localization synchronization, linking, target generation, editor and agent tooling, and runtime delivery form one Intlify system.
 
@@ -60,7 +60,7 @@ application-owned source messages
   -> validated localized artifacts
   -> reachability, requested-locale, message-locale-fallback, and delivery linking
   -> generated application bindings and requested-locale artifacts
-  -> deterministic locale-scoped runtime formatting
+  -> deterministic locale-scoped target execution
 ```
 
 The resulting system keeps translation generation and remote services out of production rendering while removing hand-maintained keys and catalogs from the normal source-first application workflow. Target execution remains driven by admitted artifacts even when the physical engine is implemented through a platform-native service.
@@ -124,7 +124,7 @@ This changes where responsibilities live:
 | Message identity | Developer-maintained string key | Generated, versioned identity and checked handle |
 | Translation supply | Manually edit locale files | Provider, TMS, MT, AI, rule, or human adapter |
 | Validation | Partial build checks or runtime errors | Shared MF2, parameter, policy, coverage, and target checks |
-| Selection | Runtime key and locale-fallback search | Link-time reachability, message locale fallback, and delivery planning |
+| Selection | Runtime key and locale-fallback search | Store-pinned candidate selection plus link-time reachability, message locale fallback, and delivery planning |
 | Delivery | Catalog-oriented bundles | Target- and delivery-unit-specific artifacts |
 | Target execution | Lookup, message locale fallback, parse, and format | Admit generated artifacts and evaluate an already selected message through a conforming engine |
 
@@ -148,9 +148,9 @@ This is not `t()` renamed to `intent()`.
 - Validate syntax, parameters, policy, provenance, approval, coverage, message locale fallback, reachability, and target capability before publication.
 - Publish Translation Store and deployable release views atomically so builds and target execution never observe mixed revisions.
 - Make invalidation content-addressed, incremental, and explainable instead of rerunning all localization work after every edit.
-- Generate only the messages and locales required by the final application and its delivery units.
+- Generate only the messages, locale data, functions, and execution components required by the final application, its delivery units, and admitted target capabilities.
 - Define one localized message per Message Intent revision and requested locale; target-specific wording is represented as a distinct Intent rather than an implicit target variant.
-- Compose application and library Message Intents before final requirement planning and linking.
+- Compose application and library Message Intents and references before the final application performs requirement planning and linking.
 - Keep migration and compatibility decisions separate so that existing resource-oriented specifications do not constrain the source-first core.
 - Provide structured compiler and semantic queries that can be reused by the CLI, editors, LSP adapters, build tools, and AI coding agents.
 - Keep browser locale state application-scoped and server locale state request-scoped.
@@ -201,13 +201,17 @@ The `ox-mf2` parser and semantic foundations are shared across compiler, formatt
 
 A normal application build pins one stored, validated snapshot. It never silently calls a remote service. Production localization execution receives only outputs named by one immutable `ReleaseSnapshot`.
 
+The Requirement Plan expresses direct requested-locale localization demand and the applicable coverage mode; message locale fallback does not erase that demand. A requested locale equal to an Intent's source locale is satisfied by its compiler-derived source artifact and creates no Provider work. Coverage policy decides whether a missing direct definition blocks a release or remains visible localization debt while an approved fallback is allowed.
+
 ### Providers propose; Intlify validates and policy approves
 
 A Provider returns localization candidates. It does not gain authority to publish production artifacts merely because it is an AI model, TMS, MT engine, or human adapter.
 
-MF2 and parameter validation determine whether a candidate can become a stored `LocalizedMessageArtifact`. Policy validation and approval are separate evidence bound to the exact localized-message digest. Only an artifact with all evidence required by the pinned project policy is selectable by a build. Synchronization may preflight configured targets, while the Target Exporter owns final target-capability admission.
+MF2 and parameter validation determine whether a candidate can become a stored `LocalizedMessageArtifact`. Policy validation and approval are separate evidence bound to the exact localized-message digest. Only an artifact with all evidence required by the pinned project policy is eligible for selection. Synchronization may preflight configured targets, while the Target Exporter owns final target-capability admission.
 
 Validation produces evidence; policy defines which evidence is required; an authorized approval makes the artifact selectable. Linguistic, cultural, legal, and product judgment remains an explicit human or organizational responsibility when policy requires it.
+
+Eligibility does not choose among multiple selectable candidates. Localization governance owns an immutable Selection Decision that binds one Intent revision and candidate definition locale to one exact artifact digest. Automatic policy or an authorized reviewer may create that decision, but a Provider and the application build may not. The build verifies the decision from its pinned Store snapshot and materializes it into the final bundle plan.
 
 ### Language-neutral core, producer-specific authoring
 
@@ -219,6 +223,8 @@ The same checked localization graph can generate Browser ESM, SSR modules, Local
 
 Target-native export is allowed only when it can preserve the required MF2 semantics or report an explicit capability failure. Every target implements the same logical Localization Execution Layer, but it may use the Intlify MF2 Runtime Core, a conforming language implementation, native bindings, or a capability-checked platform resource engine as its physical implementation.
 
+The logical layer specifies observable guarantees, not mandatory runtime machinery. A runtime-backed path may admit ABIs, load artifacts, resolve Message Handles, cache prepared messages, and evaluate MF2 dynamically. A target-native or ahead-of-time path may discharge compatibility admission, handle-to-resource resolution, and capability checks during export or packaging, then use generated code and platform resources without shipping an Intlify Runtime component.
+
 ### Internal identity is generated, not eliminated
 
 Stable identity is still required for translation history, provenance, caching, review, linking, and runtime lookup. Intlify generates and versions that identity instead of requiring application developers to invent and maintain message keys.
@@ -229,7 +235,7 @@ A production `MessageIntentId` is opaque and independent of source text, file pa
 
 Candidate acquisition, validation, approval, build generation, and deployment do not mutate one live catalog in place. Intlify stages immutable content and makes it visible by publishing a complete Translation Store or Release snapshot. A failed synchronization or export leaves the previously visible snapshot unchanged.
 
-Store publication, build selection, and release admission are distinct states. A Store snapshot may contain validated but unapproved artifacts; a build selects only artifacts whose validation and approval evidence satisfy the pinned policy; target admission and Release Assembly then bind selected content to compatible deployable outputs.
+Store publication, eligibility, selection, and release admission are distinct states. A Store snapshot may contain validated but unapproved artifacts. Applicable evidence makes an artifact selectable, and at most one active Selection Decision per Intent revision and candidate definition locale makes an exact selectable artifact selected in that snapshot. A later override, supersession, approval, or revocation publishes a new immutable snapshot without rewriting artifact history. The build verifies the pinned decision; target admission and Release Assembly then bind selected content to compatible deployable outputs.
 
 ### Versioned specifications admit compatibility explicitly
 
@@ -241,11 +247,13 @@ Editors and AI coding agents need more than source strings or TypeScript declara
 
 LSP is one editor adapter over those services, not the core semantic protocol.
 
-### Small, artifact-driven runtime
+### Bounded, artifact-driven execution
 
-Message locale fallback, reachability, coverage, approval, and target generation finish before target execution. The logical Localization Execution Layer loads admitted artifacts, resolves generated handles, and synchronously formats selected messages after readiness.
+Message locale fallback, reachability, coverage, approval, selection, and target generation finish before target execution. The logical Localization Execution Layer preserves the admitted Release, selected definition, declared locale-service behavior, scoped locale state, safe output model, and failure semantics whether those guarantees are discharged statically, by a runtime, or by a conforming target-native engine.
 
 No Provider, TMS, hidden message fallback, or process-global mutable locale is required. Exact locale-service output is reproducible under a pinned Locale Service Profile; a platform-managed profile permits only its explicitly declared locale-dependent variation.
+
+Emitted localization data and execution components remain proportional to reachable messages, requested locales, delivery units, and required capabilities. Unused messages, locale data, functions, and runtime components are not shipped. Target-specific component designs define measurable artifact-size, initialization, loading, formatting, and memory budgets.
 
 ## Terminology
 
@@ -258,28 +266,29 @@ No Provider, TMS, hidden message fallback, or process-global mutable locale is r
 | **Message Intent** | A statically discoverable communication requirement: source MF2, parameters, selectors, meaning or usage evidence, constraints, identity, and revision. |
 | **Message Reference** | Evidence that application or library code may use a message in a scope and delivery unit. |
 | **Localization Project Profile** | Language-neutral, resolved project configuration consumed by shared compiler stages. It references locale negotiation, message locale fallback, coverage, Provider-routing, approval, glossary, target, delivery, and resource-limit policies by explicit revision. |
-| **Localization Requirement Plan** | Deterministic finite set of reachable Intent revision × requested-locale work required by synchronization. |
+| **Localization Requirement Plan** | Deterministic finite set of direct requested-locale localization demands derived by the final application from reachable Intent revisions, plus the applicable direct-required or fallback-allowed coverage mode. It does not select the final definition locale; a request equal to the Intent's source locale creates no Provider work. |
 | **Localization Provider** | Adapter that returns requested-locale candidates from AI, MT, TMS, rules, or human-authored sources. |
 | **Localization Sync** | Explicit workflow that resolves missing or stale localization requirements through Providers or TMS systems and publishes checked artifacts. |
 | **Source-Locale Message Artifact** | Compiler-derived source-locale message for an exact Intent revision. It is regenerated from application or library source rather than synchronized through a Provider. |
 | **Localized Message Artifact** | Immutable localized MF2 bound to one exact Message Intent revision and definition locale, plus its parameter specification, provenance, content digest, and required capabilities. One Intent revision and requested locale selects at most one such message. |
-| **Approval Record** | Immutable decision that approves or rejects an exact localized-message digest under explicit policy and, where applicable, target revisions. |
+| **Approval Record** | Immutable decision that approves or rejects an exact Source-Locale or Localized Message Artifact digest under explicit policy and, where applicable, target revisions. |
+| **Selection Decision** | Immutable governance decision in one Store snapshot that binds an Intent revision and candidate definition locale to one exact selectable Localized Message Artifact digest. At most one decision is active for a pair in a snapshot. |
 | **Translation Store** | Logical storage and query system for localized artifacts and decision evidence. It may be local, remote, TMS-backed, or hybrid. |
-| **Translation Store Snapshot** | Atomically published immutable view of validated localized messages and their applicable evidence. It may contain artifacts that are stored but not yet selectable under the current policy. |
-| **Stored / Selectable / Release-admitted** | Successive eligibility states: visible as a validated Store artifact; eligible under pinned policy and approval evidence; then bound to a capability-admitted target output in one Release snapshot. |
+| **Translation Store Snapshot** | Atomically published immutable view of validated localized messages, applicable evidence, and Selection Decisions. Evidence in the snapshot may also refer by digest to compiler-derived source artifacts stored outside the Translation Store. |
+| **Stored / Selectable / Selected / Release-admitted** | Localized-candidate lifecycle: visible as a validated Store artifact; eligible under pinned policy and approval evidence; named by the active Selection Decision; then bound to a capability-admitted target output in one Release snapshot. A compiler-derived source artifact bypasses `stored` and becomes selectable through source-admission policy. |
 | **Message Linker** | Language-neutral tool that resolves references, message locale fallback, coverage, reachability, and delivery placement before export. |
-| **Target Profile** | Versioned deployment-target requirements including semantic specification, Runtime ABI, locale-service profile, supported capabilities, and output model. |
+| **Target Profile** | Versioned deployment-target requirements including semantic specification, applicable Runtime ABI or native resource profile, locale-service profile, supported capabilities, and output model. |
 | **Locale Negotiation Profile** | Versioned rules for choosing one supported requested locale from application-supplied preferences. It is separate from message locale fallback. |
-| **Locale Service Profile** | Versioned identity and reproducibility class of the locale-data and formatting services used by one target runtime. |
+| **Locale Service Profile** | Versioned identity and reproducibility class of the locale-data and formatting services used by one target execution path. |
 | **Target Exporter** | Generator that turns checked link results into target-specific code, manifests, locale assets, and native resources. |
-| **Message Handle** | Compiler-generated checked identity used by generated application code and runtime artifacts. |
+| **Message Handle** | Compiler-generated checked identity used by generated application code and target artifacts. It may remain a runtime handle or lower ahead of time to a native resource reference. |
 | **Source Locale** | Locale in which one Message Intent's source message is authored. A project default applies only when the Intent does not declare one; libraries retain their own source locales. |
 | **Requested Locale** | Supported locale selected for a user or operation and used as the requirement, coverage, and emitted-artifact unit. |
 | **Default Requested Locale** | Locale selected when negotiation cannot match application-supplied preferences. It is independent of the default source locale. |
 | **Fallback Locale** | Locale considered by the Message Linker when the requested locale has no eligible definition. Runtime does not search this chain. |
 | **Definition Locale** | Locale of the message definition selected by the Linker. It may differ from the requested locale and supplies the language context for MF2 evaluation. |
-| **Release Snapshot** | Immutable localization release manifest binding one compatibility group of generated bindings and one or more Target Profile output sets to their exact project, Store, source-message, bundle-plan, manifest, specification, and Runtime ABI identities. |
-| **Localization Execution Layer** | Logical target-side responsibility that admits one release, binds locale and artifacts, resolves handles, and evaluates selected messages through a conforming physical engine. |
+| **Release Snapshot** | Immutable localization release manifest binding one compatibility group of generated bindings and one or more Target Profile output sets to their exact project, Store, source-message, bundle-plan, manifest, specification, and applicable Runtime ABI or native resource-profile identities. |
+| **Localization Execution Layer** | Logical cross-phase responsibility that preserves release compatibility, selected-message and locale semantics, scoped locale state, safe output, and failure behavior. Export, packaging, a runtime, or a target-native engine may discharge its guarantees. |
 | **Localization Runtime** | One physical target-facing implementation of the Localization Execution Layer. |
 | **MF2 Runtime Core** | Language-neutral physical evaluator for one already selected, checked MF2 message; a conforming target-native engine may fulfill the same semantic role. |
 
@@ -291,11 +300,11 @@ The diagram contains seven labeled areas arranged across six numbered stages. St
 
 1. **1 — Application authoring surfaces** — source-first UI, explicit Message Intent declarations, and standalone MF2 messages.
 2. **2 — Host-specific Intent Frontends and Producers** — recognizes host-language and framework syntax, then emits portable compiler inputs.
-3. **3 — Language-neutral compiler model and shared tooling** — resolves the project profile, provides portable message artifacts and MF2 language services, plans finite localization requirements, and exposes structured tooling queries.
-4. **4A — Explicit localization synchronization** — consumes a requirement plan, obtains requested-locale candidates through Provider or TMS adapters, validates them, records approval separately, and atomically publishes a Translation Store snapshot.
-5. **4B — Deterministic application build** — recomputes the requirement plan, pins a Store snapshot, performs final linking, source lowering, and authoritative target-capability admission, then passes complete target output sets to Release Assembly without remote side effects.
+3. **3 — Language-neutral compiler model and shared tooling** — resolves the project profile, provides portable message artifacts and MF2 language services, plans finite direct-localization demand with coverage modes, and exposes structured tooling queries.
+4. **4A — Explicit localization synchronization and governance** — consumes a requirement plan, obtains requested-locale candidates through Provider or TMS adapters, validates them, records approval, selection, and revocation evidence separately, and atomically publishes a Translation Store snapshot.
+5. **4B — Deterministic application build** — recomputes the requirement plan, pins a Store snapshot, verifies Selection Decisions, performs final linking, source lowering, and authoritative target-capability admission, then passes complete target output sets to Release Assembly without remote side effects.
 6. **5 — Generated target outputs and release assembly** — contains application bindings, Web/server artifacts, mobile/native resources, Runtime metadata, and one Release snapshot binding the output sets in a deployment compatibility group.
-7. **6 — Conforming localization execution** — admits one compatible release, binds a locale selected by the application or optional Locale Negotiator, and formats selected messages through an Intlify runtime or a capability-checked conforming target-native engine.
+7. **6 — Conforming localization execution** — preserves one compatible release, the application-selected locale, and the Linker-selected message semantics through either a runtime-backed path or a capability-checked ahead-of-time target-native path.
 
 `4A` and `4B` are connected by a Translation Store snapshot, but they are not sequential steps of every build. Synchronization updates stored compiler inputs explicitly; the normal application build pins one exact snapshot and never follows a changing `latest` view while code generation is running.
 
@@ -359,7 +368,7 @@ Requirement planning happens before remote synchronization. The Message Linker c
 ```text
 source and reference artifacts + Localization Project Profile
   -> plan localization requirements
-  -> LocalizationRequirementPlan
+  -> LocalizationRequirementPlan with direct demand + coverage mode
   -> intlify sync
   -> find missing or stale reachable Intent revision × locale requirements
   -> call configured Provider or TMS adapter
@@ -368,6 +377,7 @@ source and reference artifacts + Localization Project Profile
   -> derive required capabilities and optionally preflight Target Profiles
   -> stage immutable LocalizedMessageArtifacts
   -> attach automatic or human approval evidence when available
+  -> publish an automatic or authorized Selection Decision when chosen
   -> atomically publish a TranslationStoreSnapshot
 ```
 
@@ -375,9 +385,11 @@ source and reference artifacts + Localization Project Profile
 
 Synchronization processes only requirements in the plan. It does not decide final message locale fallback selection, silently broaden the reachable application graph, or make one target-specific wording variant for the same Intent revision and requested locale.
 
-The plan identifies the reachable Intent revisions, requested locales, delivery units, and applicable policy inputs needed for explicit synchronization. A normal build recomputes and validates it against current source and profile inputs. A stale plan never triggers implicit synchronization.
+The plan identifies reachable Intent revisions, direct requested-locale localization demand, delivery units, applicable policy inputs, and whether direct localization is required or fallback is release-acceptable. It does not select a definition locale. A direct request equal to the Intent's source locale is already satisfied by the compiler-derived source artifact and is excluded from Provider work. A normal build recomputes and validates the plan against current source and profile inputs. A stale plan never triggers implicit synchronization.
 
-Validated artifacts may be published before human approval so that review can be asynchronous. Store publication makes an artifact visible; applicable validation and approval evidence makes it selectable. Automatic approval may publish both in one snapshot, while later human approval produces a new immutable snapshot.
+Synchronization continues to seek missing direct-localization demand even when fallback is release-acceptable. If no direct artifact exists, the Linker may release an approved fallback according to coverage policy while retaining an explainable coverage-debt finding. Direct-required demand remains a blocking build requirement.
+
+Validated artifacts may be published before human approval so that review can be asynchronous. Store publication makes an artifact visible; applicable validation and approval evidence makes it selectable. A governance workflow then publishes one active Selection Decision per Intent revision and candidate definition locale when a candidate is chosen. Automatic policy may publish the artifact, evidence, and decision together, while later human approval, override, supersession, or revocation produces a new immutable snapshot.
 
 ### Deterministic build, link, and export stage
 
@@ -388,6 +400,7 @@ The normal application build owns:
 - resolved `LocalizationProjectProfile` and pinned Translation Store snapshot reads;
 - recomputation and freshness validation of the `LocalizationRequirementPlan`;
 - stale, missing, incompatible, or unapproved artifact checks;
+- active Selection Decision verification;
 - finite requested-locale and delivery-unit requirements;
 - message reference and definition resolution;
 - message locale fallback materialization;
@@ -397,27 +410,27 @@ The normal application build owns:
 - target code and locale-asset generation;
 - Runtime Manifest, loader, binding, and source-map generation;
 - handoff of one or more complete Target Profile output sets to Release Assembly;
-- `ReleaseSnapshot` generation over the complete deployment compatibility group; and
-- registration of output artifacts with the host build system.
+- invocation of Release Assembly after the complete deployment compatibility group is available;
+- registration of the resulting `ReleaseSnapshot` and output artifacts with the host build system.
 
 The build is deterministic for the same checked inputs, resolved configuration, tool versions, and artifact revisions. A missing or stale localization emits a diagnostic that points to the explicit synchronization workflow; it does not trigger hidden remote generation.
 
 ### Localization execution stage
 
-The logical Localization Execution Layer owns only deployed execution concerns:
+The logical Localization Execution Layer owns observable guarantees rather than one mandatory runtime mechanism:
 
-- immutable artifact and ABI admission;
-- exact requested-locale binding after application-owned or optional Intlify locale negotiation;
-- delivery-unit loading;
-- generated Message Handle lookup;
-- prepared-message caching;
-- MF2 evaluation;
-- plain text or safe structured-parts output; and
-- typed runtime diagnostics and bounded resource use.
+- exact use of content admitted by one compatible Release;
+- requested-locale binding after application-owned or optional Intlify locale negotiation;
+- use of the Linker-selected definition without production message locale fallback;
+- declared MF2, parameter, locale-service, parts, and failure semantics;
+- application-, request-, scene-, task-, or operation-scoped locale state;
+- plain text or safe structured-parts output;
+- bounded resource behavior; and
+- no Provider, TMS, credential, or approval connection.
 
-Browser applications bind locale to an application tree. Servers bind locale to a request or task. Mobile and native adapters bind locale to an application, scene, view tree, job, or explicit operation.
+A runtime-backed physical path may perform artifact and ABI admission, delivery-unit loading, generated Message Handle lookup, prepared-message caching, MF2 evaluation, and typed runtime diagnostics after deployment. A target-native or ahead-of-time path may instead perform compatibility admission, capability checking, and handle-to-resource resolution during export or packaging, then execute generated code or platform resources without an Intlify Runtime component. Package composition may enforce release consistency where no active runtime admission step exists.
 
-The physical path may use the Intlify Localization Runtime and MF2 Runtime Core or a conforming target-native implementation admitted through the same target capability and release checks. The detailed split between Runtime Engine, locale-bound Localizer, application adapter, and MF2 Runtime Core is defined by [015](./015-ox-mf2-runtime-design.md).
+Browser applications bind locale to an application tree. Servers bind locale to a request or task. Mobile and native adapters bind locale to an application, scene, view tree, job, or explicit operation. The detailed reference split between Runtime Engine, locale-bound Localizer, application adapter, and MF2 Runtime Core is defined by [015](./015-ox-mf2-runtime-design.md).
 
 ## Localization Project Profile
 
@@ -524,16 +537,16 @@ application and library source
   -> host-specific producers
   -> MessageIntentArtifact + MessageReferenceArtifact
   -> compiler-derived SourceLocaleMessageArtifact
-  -> LocalizationRequirementPlan
+  -> LocalizationRequirementPlan with direct demand + coverage mode
   -> intlify sync
   -> Provider / TMS candidate acquisition
   -> MF2 + parameter + integrity validation
   -> stored LocalizedMessageArtifact
-  -> separate policy validation and approval evidence
+  -> separate policy validation, approval, and selection evidence
   -> atomic TranslationStoreSnapshot publication
 ```
 
-Only missing, changed, stale, explicitly refreshed, or policy-invalid requirements need synchronization. A validated artifact may be stored before approval; it becomes selectable only when the pinned project policy finds all required evidence in the snapshot.
+Only missing, changed, stale, explicitly refreshed, or policy-invalid direct-localization demand needs synchronization. Source-equal demand creates no Provider work. A validated artifact may be stored before approval; it becomes selectable only when the pinned project policy finds all required evidence in the snapshot, and selected only when the snapshot contains its active Selection Decision. Fallback-allowed demand remains visible coverage debt until a direct artifact is selected.
 
 ### Normal application build
 
@@ -542,7 +555,7 @@ source/reference/source-locale artifacts
   + resolved LocalizationProjectProfile
   + pinned TranslationStoreSnapshot
   -> recompute and verify LocalizationRequirementPlan
-  -> coverage, freshness, validation, and approval checks
+  -> coverage-mode, freshness, validation, approval, and Selection Decision checks
   -> final reference, message locale fallback, reachability, and delivery linking
   -> MF2 export preparation
   -> target source lowering and authoritative Target Profile admission
@@ -556,11 +569,11 @@ The build does not contact a Provider or TMS. It either produces a complete comp
 ### Production localization execution
 
 ```text
-generated bindings + one admitted ReleaseSnapshot
+generated bindings or target-native references + one admitted ReleaseSnapshot
   -> application preference resolution
   -> optional Locale Negotiator or directly selected supported locale
   -> application-, request-, or operation-scoped localization context
-  -> generated Message Handle resolution
+  -> runtime Message Handle or ahead-of-time native-resource resolution
   -> already selected message
   -> conforming Localization Execution Layer
   -> string or structured parts
@@ -594,13 +607,14 @@ Localization Provider execution is not lexical or semantic compilation. It is an
 | `MessageIntentArtifact` | Source-first producer | Sync inventory, validation, planning | Portable specification of localizable communication |
 | `SourceLocaleMessageArtifact` | Compiler from one Message Intent | Linker, export, Release snapshot | Deterministic source-locale definition without Provider synchronization |
 | `MessageReferenceArtifact` | Application or library producer | Linker | Portable reachability and delivery evidence |
-| `LocalizationRequirementPlan` | Requirement-planning operation | Synchronization and build verification | Finite reachable set of Intent revision × requested-locale work, with one localized message requirement per pair |
+| `LocalizationRequirementPlan` | Final-application requirement-planning operation | Synchronization and build verification | Finite direct-localization demand for reachable Intent revision × requested locale, including direct-required or fallback-allowed coverage mode and excluding source-equal Provider work |
 | `LocalizedMessageArtifact` | Candidate-validation pipeline | Translation Store and build | Checked localized MF2 payload for an exact Intent revision and locale |
-| Validation and approval evidence | Validator, policy engine, or reviewer | Store publication and build | Separate decisions that can make a stored artifact selectable under pinned policy |
-| `TranslationStoreSnapshot` | Store publication transaction | Deterministic build | Atomic immutable view of validated artifacts and applicable evidence, including artifacts not yet selectable |
+| Validation and approval evidence | Validator, policy engine, source admission, or reviewer | Store publication and build | Separate digest-bound decisions that can make a stored localized candidate or compiler-derived source artifact selectable under pinned policy |
+| `SelectionDecision` | Localization governance or deterministic automatic policy | Store publication and build | Exact binding from one Intent revision and candidate definition locale to one selectable localized-artifact digest |
+| `TranslationStoreSnapshot` | Store publication transaction | Deterministic build | Atomic immutable view of validated artifacts, evidence, and active Selection Decisions, including artifacts not yet selectable or selected |
 | `MessageBundlePlan` | Message linker | Export preparation | Resolved requested-locale and delivery-unit selections |
 | `TargetProfile` | Project-profile resolution | Sync preflight and Target Exporter | Target semantics, Runtime ABI, locale services, capabilities, and output model |
-| Generated Message Handle | Target code generator | Application binding and runtime | Checked internal runtime identity |
+| Generated Message Handle or native reference | Target code generator | Application binding and execution integration | Checked target identity, retained for runtime lookup or lowered ahead of time to a native resource reference |
 | Locale Capsule / target resource | Target Exporter | Localization Execution Layer | Immutable deployable localization data for one conforming physical path |
 | Runtime Manifest / loader map | Target Exporter | Runtime and build host | Compatibility, locale, delivery, and loading metadata |
 | `ReleaseSnapshot` | Release Assembly | Deployment and target admission | Atomic identity of one compatibility group containing one or more Target Profile output sets |
@@ -619,9 +633,9 @@ These artifacts and their specifications must be:
 
 `MessageIntentArtifact` is the source of truth for the source-locale message. The compiler deterministically derives a `SourceLocaleMessageArtifact` for the Intent revision and source locale.
 
-The source-locale artifact is not translated through a Provider or manually maintained in the Translation Store. It is regenerated from source and participates in the same checked message-locale-fallback and release path as localized artifacts without pretending that source text came from a Provider.
+The source-locale artifact is not translated through a Provider or manually maintained in the Translation Store. It is regenerated from source and participates in the same checked message-locale-fallback and release path as localized artifacts without pretending that source text came from a Provider. Its payload remains a compiler input rather than a stored localization candidate.
 
-Source code admission acts as the default source approval. A project may require separate source review by publishing an Approval Record bound to the source artifact.
+Source code admission acts as the default source approval. A project may require separate source review by publishing an Approval Record bound to the exact source-artifact digest. The Store snapshot may carry that evidence by digest without storing the source payload. A source change creates a new digest and makes prior approval inapplicable. Compiler-derived source artifacts therefore bypass the localized candidate's `stored` state but must still satisfy source-admission policy before they are selectable.
 
 ### Intent identity and revision
 
@@ -666,17 +680,19 @@ The build must consume a stable, complete snapshot. It must not rely on eventual
 
 Synchronization publishes one immutable `TranslationStoreSnapshot` atomically. A failed publication leaves the previously visible snapshot unchanged, and a build pins one exact snapshot rather than following a changing view during compilation. Local, remote, and TMS-backed stores may use different physical protocols as long as readers never observe a partial snapshot or silent last-write-wins result.
 
-A snapshot may contain validated artifacts without approval. Those artifacts are stored for inspection and review but remain unselectable until applicable evidence is published in the same or a later snapshot. Exact transaction, conflict, retention, and partitioning protocols belong to the Store design.
+A snapshot may contain validated artifacts without approval and multiple historical or competing candidates for the same Intent revision and candidate definition locale. Those artifacts are stored for inspection and review but remain unselectable until applicable evidence is published. Eligibility alone does not choose a winner: one active Selection Decision in the same or a later snapshot identifies the selected digest. Exact transaction, conflict, retention, and partitioning protocols belong to the Store design.
 
 ### Human review
 
-Human-authored messages use the same candidate and validation path as any other source. Approval remains separate immutable evidence bound to exact content and applicable policy inputs. An authorized reviewer can therefore approve a stored artifact without mutating it, and a later policy change can stale approval evidence without pretending that the message bytes or Intent semantics changed.
+Human-authored messages use the same candidate and validation path as any other source. Approval remains separate immutable evidence bound to exact content and applicable policy inputs. An authorized reviewer can therefore approve a stored artifact without mutating it and, when authorized, publish a Selection Decision that supersedes an earlier automatic or human choice. A later policy change can stale approval evidence without pretending that the message bytes or Intent semantics changed.
+
+Revocation is also new immutable evidence. Publishing it creates a new Store snapshot in which the affected artifact is no longer selectable and any active Selection Decision naming it is invalid. The artifact, old evidence, and old snapshots remain immutable for audit. Revocation prevents future selection; it does not rewrite an already assembled Release.
 
 ### Authority and permissions
 
-Candidate supply, deterministic validation, approval, Store publication, release assembly, and deployment are separate powers. A Provider cannot approve merely by supplying a candidate, and an AI agent acts only with the permissions of its authenticated automation identity. Policy may allow low-risk automatic approval and require a distinct human reviewer for high-risk content.
+Candidate supply, deterministic validation, approval, candidate selection, Store publication, release assembly, release withdrawal, and deployment are separate powers. A Provider cannot approve or select merely by supplying a candidate, and an AI agent acts only with the permissions of its authenticated automation identity. Policy may allow low-risk automatic approval and selection and require a distinct human reviewer for high-risk content.
 
-Intlify consumes actor identity and authorization from the surrounding development, CI, TMS, or organizational system rather than becoming an identity provider. Store adapters enforce publication authority, builds verify applicable evidence, and the production Localization Execution Layer receives neither credentials nor approval power. Exact roles, scopes, signatures, revocation, and evidence schemas belong to the synchronization and governance design.
+Intlify consumes actor identity and authorization from the surrounding development, CI, TMS, or organizational system rather than becoming an identity provider. Store adapters enforce approval, selection, revocation, and publication authority; builds verify applicable evidence and decisions; and the production Localization Execution Layer receives neither credentials nor governance power. Exact roles, scopes, signatures, and evidence schemas belong to the synchronization and governance design.
 
 ## Developer, Editor, and AI-Agent Tooling
 
@@ -709,7 +725,7 @@ Public names should communicate semantics clearly to both developers and coding 
 
 ### Development workflow
 
-Normal development remains remote-side-effect free. The compiler derives a `DevelopmentBundlePlan` from the current source and pinned Store snapshot:
+Normal development remains remote-side-effect free. The Linker derives a development-mode `MessageBundlePlan` and associated development findings from the current source and pinned Store snapshot:
 
 - source locale renders from the compiler-derived source-locale artifact;
 - a valid approved target artifact renders normally;
@@ -735,16 +751,16 @@ Functions have versioned identities, checked inputs and options, declared locale
 
 ## Localization Execution Model Summary
 
-The Localization Execution Layer is downstream of all localization authority.
+The Localization Execution Layer is downstream of all localization authority. Its guarantees may be discharged partly before deployment rather than by one mandatory runtime component.
 
 ```text
-build/runtime boundary
+build/production-execution boundary
   -> one admitted ReleaseSnapshot and immutable target artifacts
-  -> conforming Localization Execution Layer
   -> application-selected locale or optional Locale Negotiator
-  -> locale-bound execution context
-  -> generated Message Handle lookup
-  -> selected-message evaluation
+  -> conforming Localization Execution Layer
+     -> runtime-backed handle lookup and MF2 evaluation
+        or
+     -> ahead-of-time native-resource reference and platform execution
   -> text or structured parts
 ```
 
@@ -755,15 +771,15 @@ Required invariants are:
 - locale negotiation is separate from message locale fallback and single-message evaluation;
 - browser localization is application-scoped;
 - server localization is request- or task-scoped;
-- immutable artifacts and compatible prepared messages may be shared;
-- loading may be asynchronous, but formatting after readiness is synchronous;
 - linker-materialized message locale fallback is authoritative;
 - translated markup remains inert until an allowlisted adapter projects it; and
-- missing or incompatible deployed data is an explicit artifact/integration failure.
+- missing or incompatible deployed data is an explicit artifact/integration failure;
+- runtime-backed paths may share immutable artifacts and compatible prepared messages, load asynchronously, and format synchronously after readiness; and
+- ahead-of-time paths may satisfy compatibility, reference resolution, and release consistency through exporter and package admission without shipping an Intlify Runtime.
 
 The application, framework, HTTP layer, or platform obtains user or request locale preferences. It may select a supported requested locale directly or pass those preferences to an optional Intlify Locale Negotiator. Negotiation chooses one requested locale before formatting; it is independent of the source locale, Linker-selected definition locale, and message locale fallback policy.
 
-The Runtime Manifest records supported requested locales, the locale-negotiation profile revision, and the locale-artifact map. Once a locale is selected, execution loads only that requested-locale artifact. The selected record retains its definition locale for language-sensitive MF2 evaluation. The execution layer never searches another locale artifact.
+For runtime-backed paths, the Runtime Manifest records supported requested locales, the locale-negotiation profile revision, and the locale-artifact map. Once a locale is selected, execution loads only that requested-locale artifact. Ahead-of-time paths encode equivalent locale and selected-definition bindings into generated code, native resource identifiers, or package metadata. In either path, the selected record retains its definition locale for language-sensitive evaluation and production execution never searches another locale definition.
 
 An Intlify Runtime Engine and locale-bound Localizer are the reference physical model described in [015](./015-ox-mf2-runtime-design.md). A target-native path may replace that physical engine only when its exporter, adapter, capabilities, and conformance evidence preserve the same logical responsibilities.
 
@@ -788,25 +804,29 @@ Locale-dependent number, date, time, plural, and similar operations run through 
 - A `pinned` profile must produce the same locale-dependent parts and diagnostics for the same complete semantic input and profile revision.
 - A `platform-managed` profile preserves artifact selection, MF2 semantics, result schemas, and failure classification but permits only explicitly declared locale-dependent output variation from the platform service.
 
-Each `TargetProfile` records the semantic-specification version, Runtime ABI version, Locale Service Profile, supported capabilities, and output model. Each physical implementation must pass the applicable conformance tests and report its capabilities. If a target runtime or native resource format cannot preserve a required Intlify or MF2 feature, the Target Exporter must select a compatible representation or report the unsupported feature instead of silently changing the result.
+Each `TargetProfile` records the semantic-specification version, Locale Service Profile, supported capabilities, output model, and either the applicable Runtime ABI version or native resource-format profile. Each physical implementation must pass the applicable conformance tests and report its capabilities. If a target runtime or native resource format cannot preserve a required Intlify or MF2 feature, the Target Exporter must select a compatible representation or report the unsupported feature instead of silently changing the result.
 
 ## Library and Open-World Composition
 
-A library cannot know the final application's requested locales, Provider routing, message locale fallback, approval policy, Target Profiles, or delivery topology. A source-first library therefore publishes a versioned language-neutral manifest containing its Message Intents, source-locale artifacts, references, requirements, and package identity. It does not precompute the final application bundle plan.
+A library cannot know the final application's requested locales, Provider routing, message locale fallback, approval policy, Target Profiles, or delivery topology. A source-first library therefore publishes a versioned language-neutral manifest containing its package identity, Message Intents, source-locale artifacts, references, exported message entry points, and declared semantic or capability needs. It may include localized artifacts as optional candidates, but it does not publish a locale-specific `LocalizationRequirementPlan` or precompute the final application bundle plan.
 
-The final application composes direct and transitive library manifests with application artifacts before requirement planning. The library owns source message semantics; the application owns requested locales, message locale fallback, coverage, Provider routing, trust, final reachability, and release approval. A library may include localized artifacts as optional candidates, but application policy decides whether their provenance and approval evidence are admissible.
+The final application composes direct and transitive library Message Intents and references with application artifacts, computes final reachability, then derives the only authoritative `LocalizationRequirementPlan`. The library owns source message semantics; the application owns requested locales, message locale fallback, coverage, Provider routing, trust, final reachability, and release approval. Application policy decides whether the provenance and approval evidence of any library-supplied localized candidate is admissible.
+
+Compiler-derived library source artifacts follow the same digest-bound source-admission model as application source. Application trust policy decides whether package provenance or signature is sufficient, or whether an explicit source Approval Record is required before a library source definition becomes selectable.
 
 Package and Intent identity prevent collisions when multiple library versions coexist, and each library Intent retains its own source locale. The final application admits supported manifest specification versions and never silently rewrites incompatible semantics. Initial implementation targets build-known static composition; admission of modules unknown at application-build time remains a separate later design.
 
 ## Release Assembly and Deployment
 
-Each Target Exporter produces a complete, capability-admitted output set for one Target Profile. Host build integration then invokes Release Assembly after all outputs in one deployment compatibility group are available. Release Assembly creates one immutable `ReleaseSnapshot` over the pinned project and Store inputs, source-locale artifacts, Message Bundle Plan, generated bindings, one or more Target Profile output sets, manifests, semantic specifications, and Runtime ABIs.
+Each Target Exporter produces a complete, capability-admitted output set for one Target Profile. Host build integration then invokes Release Assembly after all outputs in one deployment compatibility group are available. Release Assembly creates one immutable `ReleaseSnapshot` over the pinned project and Store inputs, source-locale artifacts, Message Bundle Plan, generated bindings, one or more Target Profile output sets, manifests, semantic specifications, and applicable Runtime ABIs or native resource profiles.
 
 The compatibility group follows deployment coupling rather than product family: Browser and SSR outputs that must hydrate consistently may share a Release snapshot, while independently built Web and mobile applications may use separate snapshots. A Release snapshot is a localization release manifest, not the application's complete deployment manifest.
 
-Intlify does not own a project's CDN, application store, or deployment orchestrator. It provides immutable artifact naming, integrity data, compatibility admission, and the Release snapshot needed for a consistent rollout. A deployment uploads and verifies versioned artifacts before activating the corresponding manifest or release pointer. Target execution rejects handles, manifests, or locale artifacts from another release instead of rendering a mixed revision.
+Intlify does not own a project's CDN, application store, or deployment orchestrator. It provides immutable artifact naming, integrity data, compatibility admission, and the Release snapshot needed for a consistent rollout. A deployment uploads and verifies versioned artifacts before activating the corresponding manifest or release pointer. Runtime admission or statically checked package composition prevents handles, native references, manifests, or locale artifacts from different releases from being combined.
 
 Packaged mobile and native applications may obtain this atomicity from the application package itself. Web, server, OTA, and remotely loaded locale deployments use versioned release namespaces and activate the manifest last. Previous releases remain addressable long enough for rollback and already-running clients, then may be garbage-collected by deployment policy.
+
+Approval revocation publishes a new Store snapshot, prevents the affected artifact from being selected by future builds, and can be traced to every Release that already contains it. It does not mutate an immutable deployed Release. Removing revoked content from production requires a replacement Release or a deployment-owned withdrawal and rollback. Offline or packaged clients cannot be revoked immediately without an application or resource update. Online revocation checks are not part of the core production execution path.
 
 ## Conceptual Product Surfaces
 
@@ -816,12 +836,12 @@ Exact commands and package names are deferred, but Intlify needs coherent surfac
 | --- | --- |
 | `intlify fmt` | Format source-authored MF2 and supported localization interchange content |
 | `intlify lint` / `check` | Report syntax, semantics, policy, localization coverage, and project findings |
-| `intlify sync` | Execute a finite requirement plan and atomically publish validated localized artifacts and evidence |
+| `intlify sync` | Execute finite direct-localization demand and atomically publish validated localized artifacts, evidence, and authorized Selection Decisions |
 | `intlify dev` / `intlify dev --sync` | Run side-effect-free development diagnostics or opt into trusted incremental synchronization |
 | Build integration | Run producers, pin profiles and Store snapshots, link, lower source, export, and assemble a Release snapshot |
-| Inspect/explain API | Expose identity, dependency invalidation, requirements, message locale fallback, reachability, provenance, and stale reasons |
+| Inspect/explain API | Expose identity, dependency invalidation, requirements, selection, revocation impact, message locale fallback, reachability, provenance, and stale reasons |
 | Editor/agent service | Return structured semantic queries, diagnostics, references, and edits |
-| Runtime API | Create locale-bound execution contexts and format generated handles through the reference runtime path |
+| Execution integration | Provide locale-bound reference Runtime APIs or generated target-native integration while preserving the same logical execution guarantees |
 
 No command in this table is reserved merely by appearing here. The fixed property is the separation between explicit synchronization, deterministic build, and production localization execution.
 
@@ -832,7 +852,7 @@ No command in this table is reserved merely by appearing here. The fixed propert
 - AI prompts and responses are candidate-generation inputs, not executable compiler instructions.
 - Parse and validate all returned MF2 with the shared implementation.
 - Check declared parameters, selectors, functions, markup, and policy before Store publication; derive required capabilities for preflight and perform authoritative Target Profile admission before target or Release publication.
-- Bind provenance and approval to exact revisions and content digests.
+- Bind provenance, approval, selection, and revocation to exact revisions and content digests.
 - Keep localized-message payloads logically separate from validation, approval, and revocation evidence.
 - Canonicalize artifact field ordering, message ordering, locale ordering, and digest inputs.
 - Pin Provider configuration and revision when reproducibility requires it; do not regenerate approved output implicitly.
@@ -852,16 +872,18 @@ Intlify should make localization failures early and actionable.
 | Dynamic message source | Compile diagnostic; no hidden runtime translation |
 | Invalid source or target MF2 | Parser/semantic finding with mapped source or artifact evidence |
 | Missing or unexpected parameter | Compile/export diagnostic where provable; typed runtime failure only for unchecked external calls |
-| Missing or stale localized artifact | Build diagnostic that identifies the requirement and synchronization action |
+| Missing direct localized artifact | Blocking build finding when direct-required; otherwise approved fallback plus an explicit coverage-debt finding |
+| Missing, stale, or invalid Selection Decision | Build diagnostic that identifies the candidate, governance decision, and synchronization or review action |
 | Store publication conflict or incomplete transaction | Keep the previous snapshot visible and require retry, replanning, or explicit merge |
 | Unapproved high-risk candidate | Block release according to project policy |
 | Missing requested-locale definition with configured message locale fallback | Linker materializes the selected definition and retains its definition locale |
 | Unresolved required message | Blocking linker/build finding |
 | Unsupported target feature | Export capability error before publishing partial outputs |
-| Mixed-release handle, manifest, or locale artifact | Target execution admission failure; never combine releases |
+| Revoked artifact selected by a future build | Selection verification failure that identifies the revocation and affected prior Releases |
+| Mixed-release handle, native reference, manifest, or locale artifact | Runtime or package admission failure; never combine releases |
 | Missing deployed handle or incompatible artifact | Target integration failure; no Provider call or invented message locale fallback |
 
-Diagnostics should explain not only what failed, but also which producer, Intent revision, locale requirement, Provider/store artifact, policy or approval revision, dependency edge, message locale fallback decision, delivery unit, Target Profile capability, Store snapshot, Release snapshot, or execution compatibility edge caused it.
+Diagnostics should explain not only what failed, but also which producer, Intent revision, locale requirement or coverage mode, Provider/store artifact, policy, approval, selection, or revocation revision, dependency edge, message locale fallback decision, delivery unit, Target Profile capability, Store snapshot, Release snapshot, or execution compatibility edge caused it.
 
 ## Current Foundation and Gaps
 
@@ -878,9 +900,9 @@ As of this overview:
 | JavaScript producer | OXC-based producer direction and implementation foundations | Hybrid UI-sink, `intent()`, and `mf2` source-first production specification |
 | Source-first flow | Isolated end-to-end PoC in PR #183 | Resolved project profile, stable identity, production MF2, requirement planning, versioned artifacts, and target integration |
 | Editor and AI-agent tooling | LSP/editor and agent integration designs | One shared structured semantic/query service and host-language projections |
-| Localization synchronization | Provider concepts proven by PoC and design discussion | Provider/TMS/store APIs, atomic snapshots, validation gates, provenance, scoped approval, and CLI workflow |
-| Localization execution | Reference runtime architecture in 015 | Portable values and functions, locale profiles and negotiation, production MF2 Runtime Core, target-native conformance, and adapters |
-| Libraries | Existing package and linker foundations | Source-first library manifests, final-application composition, trust, and optional future dynamic-module admission |
+| Localization synchronization | Provider concepts proven by PoC and design discussion | Provider/TMS/store APIs, atomic snapshots, validation gates, provenance, scoped approval, selection, revocation, and CLI workflow |
+| Localization execution | Reference runtime architecture in 015 | Portable values and functions, locale profiles and negotiation, production MF2 Runtime Core, target-native conformance, adapters, and measurable execution footprints |
+| Libraries | Existing package and linker foundations | Source-first Intent/reference manifests, final-application requirement planning, trust, and optional future dynamic-module admission |
 | Mobile and native | Architecture direction and target strategy | Producers, capability-checked exporters, native resources/bindings, Runtime adapters, and Release snapshot integration |
 
 The New Concept is therefore an integration direction over foundations already present in the repository, not a claim that every architectural area is implemented.
@@ -902,7 +924,7 @@ The architecture succeeds when:
 - **O1 — Natural source authoring:** a developer can add ordinary static UI text without creating a message key or editing locale catalogs.
 - **O2 — Explicit power when needed:** advanced, parameterized, reusable, or headless messages have a predictable MF2-based authoring path.
 - **O3 — Provider-neutral supply:** requested-locale messages can come from AI, MT, TMS, rules, or humans without changing compiler or execution specifications.
-- **O4 — Governed localization:** stored, selectable, and release-admitted states are distinct, and every selected message is validated, traceable, and approved according to pinned policy.
+- **O4 — Governed localization:** stored, selectable, selected, and release-admitted states are distinct; every selected definition is validated, traceable, and approved according to pinned policy; and revocation prevents future selection without rewriting history.
 - **O5 — Offline, artifact-driven delivery:** normal builds and production formatting work from pinned artifacts without Provider or TMS network access.
 - **O6 — Early, explainable failure:** missing, stale, invalid, unapproved, unreachable, and unsupported states are diagnosed before deployment with their dependency cause.
 - **O7 — Finite delivery:** only reachable messages, requested locales, and required delivery units are emitted.
@@ -910,9 +932,10 @@ The architecture succeeds when:
 - **O9 — Shared tooling semantics:** editors and AI-agent tools query the same semantics, evidence, and findings as the compiler.
 - **O10 — Source-first integrity:** reuse and compatibility work remains isolated from source-first interfaces and artifact specifications.
 - **O11 — Cross-platform meaning:** Web, mobile, and native targets use the same language-neutral semantic, value, function, artifact, and logical execution specifications while allowing conforming physical engines.
-- **O12 — Consistent releases:** generated bindings, locale outputs, manifests, specifications, and Runtime ABIs for one deployment compatibility group are deployed and admitted as one Release snapshot.
-- **O13 — Library composition:** application and transitive library localization requirements compose before final synchronization, linking, and release policy.
+- **O12 — Consistent releases:** generated bindings, locale outputs, manifests, specifications, and applicable Runtime ABIs or native resource profiles for one deployment compatibility group are deployed and admitted as one Release snapshot.
+- **O13 — Library composition:** application and transitive library Message Intents and references compose before the final application derives localization requirements, linking, and release policy.
 - **O14 — Incremental operation:** source, policy, locale, target, and dependency changes invalidate only affected work and are explainable through typed dependency edges.
+- **O15 — Proportionate execution footprint:** emitted localization data, locale services, functions, and execution components are proportional to reachable messages, requested locales, delivery units, and required target capabilities, with measurable size and execution costs.
 
 ## Roadmap
 
@@ -921,21 +944,23 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 ### I0: Shared interfaces and artifact specifications
 
 - Ratify this product boundary and glossary.
-- Define the shared project, locale, Message Intent, requirement, artifact-state, Store, target-output, Release, and execution specifications.
+- Define the shared project, locale, Message Intent, direct-demand and coverage-mode requirement, artifact-state, approval, selection, revocation, Store, target-output, Release, and execution specifications.
 - Define explicit specification-version and capability admission plus deterministic toolchain migration.
 - Define requirement planning, final output linking, and static library composition boundaries.
 - Establish language-neutral conformance fixtures shared across producers, stores, linkers, exporters, locale services, and execution engines.
+- Define common artifact-size, initialization, loading, formatting, and memory measurement categories without freezing target-specific budgets.
 
 ### I1: JavaScript/Web vertical slice
 
 - Replace the PoC placeholder parser with `ox-mf2`.
 - Implement bounded JavaScript/TypeScript UI-sink recognition plus explicit `intent()` and standalone `mf2` authoring.
 - Generate stable Intent identity metadata and compiler-derived source-locale artifacts.
-- Add explicit local or fixture-backed `intlify sync` over a finite Requirement Plan.
-- Materialize stored and selectable artifacts through an atomic local Store snapshot.
+- Add explicit local or fixture-backed `intlify sync` over finite direct-localization demand and coverage modes.
+- Materialize stored, selectable, and selected artifacts through an atomic local Store snapshot.
 - Reuse or adapt the current linker and ESM exporter while keeping source-first interfaces normative.
 - Implement the reference Web execution path from 015 and assemble a local Web Release snapshot.
 - Add development message-locale-fallback diagnostics and dependency-digest incremental processing.
+- Record a Web baseline for emitted artifacts, execution components, initialization, locale loading, hot formatting, and memory.
 
 ### I2: Vue, SSR, editor, and agent integration
 
@@ -948,11 +973,11 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 ### I3: TMS and production synchronization
 
 - Add at least one real TMS/Localization Provider adapter.
-- Define pull, push, conflict, refresh, retry, rate-limit, scoped-actor, and approval workflows.
+- Define pull, push, conflict, refresh, retry, rate-limit, scoped-actor, approval, selection, supersession, and revocation workflows.
 - Support local, TMS-backed, and hybrid Translation Store topologies with atomic snapshot publication.
 - Add integrity-pinned CI synchronization, concurrent-publication checks, and deterministic build fixtures.
 - Prove sparse human review and override without returning to hand-maintained full catalogs.
-- Prove versioned Release publication and rollback through a deployment integration fixture.
+- Prove versioned Release publication, revocation impact queries, withdrawal, and rollback through a deployment integration fixture.
 
 ### I4: Mobile targets
 
@@ -960,6 +985,7 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 - Generate `.xcstrings`, Android resources, or portable Locale Capsules through authoritative capability-checked exporters.
 - Add application/scene-equivalent execution adapters and portable value bindings.
 - Reuse shared artifact, locale-service-profile, and MF2 conformance fixtures across Web, iOS, and Android.
+- Compare runtime-backed and ahead-of-time target-native artifact and execution footprints.
 
 ### I5: Native and system-language composition
 
@@ -968,6 +994,7 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 - Add C ABI or conforming native execution bindings.
 - Generate native or baked target artifacts without changing shared message semantics.
 - Prove bounded dynamic references, final-binary reachability evidence, and offline deployment.
+- Prove capability-based pruning of unused runtime components, functions, and locale data.
 - Consider self-contained runtime module admission only after static composition is stable.
 
 ### Outcome traceability
@@ -977,7 +1004,7 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 | O1 | I0 authoring specification | I1 Web | I4–I5 mobile and native |
 | O2 | I0 message specification | I1 explicit MF2 | I4–I5 host-language authoring |
 | O3 | I0 Provider specification | I1 fixture Provider | I3 real Provider/TMS |
-| O4 | I0 state and evidence specifications | I1 local Store | I3 production workflow |
+| O4 | I0 state, evidence, and decision specifications | I1 local Store | I3 production governance workflow |
 | O5 | I0 build/execution boundary | I1 offline Web | I3–I5 production and native paths |
 | O6 | I0 finding specification | I1 Web diagnostics | I2–I5 integrations and targets |
 | O7 | I0 planning/linking specification | I1 Web pruning | I5 final-binary evidence |
@@ -988,6 +1015,7 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 | O12 | I0 Release specification | I1 local Web release | I3–I5 deployment groups |
 | O13 | I0 library composition specification | I5 static composition | Later dynamic-module work |
 | O14 | I0 dependency specification | I1 local incremental flow | I2–I3 project and Store workflows |
+| O15 | I0 measurement specification | I1 Web footprint baseline | I4–I5 runtime-backed and target-native comparison |
 
 ## Deferred Follow-Up Notes
 
@@ -995,9 +1023,9 @@ The following need dedicated designs and do not block this overview:
 
 - source authoring and identity: producer recognition, `intent()` and `mf2` APIs, source mapping, persistent-ID encoding, and reconciliation;
 - shared inputs: exact project-profile, artifact, dependency, capability, version-admission, and migration schemas;
-- synchronization and governance: Provider/TMS transport, Store protocol, review, policy, approval, actor scope, conflict, retention, and credentials;
+- synchronization and governance: Provider/TMS transport, Store protocol, review, policy, approval, selection, supersession, revocation, actor scope, conflict, retention, and credentials;
 - linking and generation: requirement-plan and final-link APIs, source lowering, bundler integration, and target capability matrices;
-- target execution: Locale Capsule, Runtime Manifest, Message Handle, portable values, parts, function ABI, locale services, bindings, and conformance;
+- target execution: Locale Capsule, Runtime Manifest, Message Handle, portable values, parts, function ABI, locale services, bindings, conformance, and target-specific size/performance budgets;
 - tooling: LSP, editor, agent, inspect, and suggested-edit query protocols;
 - composition and release: library manifests, package identity, optional dynamic modules, Release wire format, signing, deployment adapters, retention, and rollback; and
 - migration and packaging: existing catalog import and translation-memory association, commands, configuration layout, packages, and release sequencing.
