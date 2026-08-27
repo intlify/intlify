@@ -4,7 +4,7 @@
 
 This document defines the high-level product architecture for Intlify as a compiler-based localization toolchain with offline, artifact-driven production execution.
 
-It is one abstraction level above the component designs in this repository. In particular, [015](./015-ox-mf2-runtime-design.md) defines the runtime-side responsibility split, while this document explains how authoring, MF2 language services, localization synchronization, linking, target generation, editor and agent tooling, and runtime delivery form one Intlify system.
+It is one abstraction level above the component designs in this repository. In particular, [027](./027-intlify-reference-runtime-design.md) defines the runtime-side responsibility split, while this document explains how authoring, MF2 language services, localization synchronization, linking, target generation, editor and agent tooling, and runtime delivery form one Intlify system.
 
 The source-first PoC in [PR #183](https://github.com/intlify/intlify/pull/183) and its review discussion are design evidence, not a frozen public API. This document fixes the overall direction and responsibility boundaries. It does not yet freeze:
 
@@ -430,7 +430,7 @@ The logical Localization Execution Layer owns observable guarantees rather than 
 
 A runtime-backed physical path may perform artifact and ABI admission, delivery-unit loading, generated Message Handle lookup, prepared-message caching, MF2 evaluation, and typed runtime diagnostics after deployment. A target-native or ahead-of-time path may instead perform compatibility admission, capability checking, and handle-to-resource resolution during export or packaging, then execute generated code or platform resources without an Intlify Runtime component. Package composition may enforce release consistency where no active runtime admission step exists.
 
-Browser applications bind locale to an application tree. Servers bind locale to a request or task. Mobile and native adapters bind locale to an application, scene, view tree, job, or explicit operation. The detailed reference split between Runtime Engine, locale-bound Localizer, application adapter, and MF2 Runtime Core is defined by [015](./015-ox-mf2-runtime-design.md).
+Browser applications bind locale to an application tree. Servers bind locale to a request or task. Mobile and native adapters bind locale to an application, scene, view tree, job, or explicit operation. The detailed reference split between Runtime Engine, locale-bound Localizer, application adapter, and MF2 Runtime Core is defined by [027](./027-intlify-reference-runtime-design.md).
 
 ## Localization Project Profile
 
@@ -781,7 +781,7 @@ The application, framework, HTTP layer, or platform obtains user or request loca
 
 For runtime-backed paths, the Runtime Manifest records supported requested locales, the locale-negotiation profile revision, and the locale-artifact map. Once a locale is selected, execution loads only that requested-locale artifact. Ahead-of-time paths encode equivalent locale and selected-definition bindings into generated code, native resource identifiers, or package metadata. In either path, the selected record retains its definition locale for language-sensitive evaluation and production execution never searches another locale definition.
 
-An Intlify Runtime Engine and locale-bound Localizer are the reference physical model described in [015](./015-ox-mf2-runtime-design.md). A target-native path may replace that physical engine only when its exporter, adapter, capabilities, and conformance evidence preserve the same logical responsibilities.
+An Intlify Runtime Engine and locale-bound Localizer are the reference physical model described in [027](./027-intlify-reference-runtime-design.md). A target-native path may replace that physical engine only when its exporter, adapter, capabilities, and conformance evidence preserve the same logical responsibilities.
 
 ## Language and Target Strategy
 
@@ -901,7 +901,7 @@ As of this overview:
 | Source-first flow | Isolated end-to-end PoC in PR #183 | Resolved project profile, stable identity, production MF2, requirement planning, versioned artifacts, and target integration |
 | Editor and AI-agent tooling | LSP/editor and agent integration designs | One shared structured semantic/query service and host-language projections |
 | Localization synchronization | Provider concepts proven by PoC and design discussion | Provider/TMS/store APIs, atomic snapshots, validation gates, provenance, scoped approval, selection, revocation, and CLI workflow |
-| Localization execution | Reference runtime architecture in 015 | Portable values and functions, locale profiles and negotiation, production MF2 Runtime Core, target-native conformance, adapters, and measurable execution footprints |
+| Localization execution | Reference runtime architecture in 027 | Portable values and functions, locale profiles and negotiation, production MF2 Runtime Core, target-native conformance, adapters, and measurable execution footprints |
 | Libraries | Existing package and linker foundations | Source-first Intent/reference manifests, final-application requirement planning, trust, and optional future dynamic-module admission |
 | Mobile and native | Architecture direction and target strategy | Producers, capability-checked exporters, native resources/bindings, Runtime adapters, and Release snapshot integration |
 
@@ -958,7 +958,7 @@ The Roadmap is ordered by implementation dependencies. It records product-level 
 - Add explicit local or fixture-backed `intlify sync` over finite direct-localization demand and coverage modes.
 - Materialize stored, selectable, and selected artifacts through an atomic local Store snapshot.
 - Reuse or adapt the current linker and ESM exporter while keeping source-first interfaces normative.
-- Implement the reference Web execution path from 015 and assemble a local Web Release snapshot.
+- Implement the reference Web execution path from 027 and assemble a local Web Release snapshot.
 - Add development message-locale-fallback diagnostics and dependency-digest incremental processing.
 - Record a Web baseline for emitted artifacts, execution components, initialization, locale loading, hot formatting, and memory.
 
@@ -1046,5 +1046,26 @@ No dormant field, package, command, API, wire tag, or format name is reserved me
 | [012-ox-mf2-parser-semantic-validation-design.md](./012-ox-mf2-parser-semantic-validation-design.md) | Owns parser-backed MF2 semantic validation reused across authoring, sync, export, and runtime preparation. |
 | [013-ox-mf2-resource-catalog-adapter-design.md](./013-ox-mf2-resource-catalog-adapter-design.md) | Documents the current resource/catalog implementation. Its format parsing, source mapping, validation, and write-back capabilities are reuse candidates; it does not define the target source-first authoring model. |
 | [014-ox-mf2-message-linker-design.md](./014-ox-mf2-message-linker-design.md) | Owns current reference/definition resolution, message locale fallback, reachability, delivery planning, export preparation, and current ESM output. Source-first integration must explicitly adapt or evolve its catalog-oriented definition input. |
-| [015-ox-mf2-runtime-design.md](./015-ox-mf2-runtime-design.md) | Owns the detailed runtime-side architecture below the build/runtime boundary. |
+| [015-intlify-project-profile-and-locale-policy-design.md](./015-intlify-project-profile-and-locale-policy-design.md) | Planned detailed design for the resolved project profile, locale roles, negotiation, message locale fallback, coverage, and revision-pinned policy inputs. |
+| [016-intlify-source-authoring-and-intent-identity-design.md](./016-intlify-source-authoring-and-intent-identity-design.md) | Planned detailed design for ordinary UI, `intent()`, and `mf2` authoring, Intent identity and revision, reconciliation, and source evidence. |
+| [017-intlify-shared-artifact-and-version-admission-design.md](./017-intlify-shared-artifact-and-version-admission-design.md) | Planned detailed design for shared Intent, reference, source-message, localized-message, dependency, digest, specification-version, capability-admission, and migration schemas. |
+| [018-intlify-security-trust-and-provenance-design.md](./018-intlify-security-trust-and-provenance-design.md) | Planned detailed design for trust boundaries, actor powers, credential isolation, untrusted inputs, provenance, signatures, and artifact integrity. |
+| [019-intlify-project-graph-query-and-incremental-design.md](./019-intlify-project-graph-query-and-incremental-design.md) | Planned detailed design for the project dependency graph, inventory, typed invalidation, caching, explainability, and shared tooling queries. |
+| [020-intlify-requirement-planning-and-linking-design.md](./020-intlify-requirement-planning-and-linking-design.md) | Planned source-first evolution of requirement planning and final linking, including reachability, coverage, fallback materialization, delivery placement, and pruning. |
+| [021-intlify-translation-store-and-governance-design.md](./021-intlify-translation-store-and-governance-design.md) | Planned detailed design for immutable Store snapshots and the stored, selectable, selected, approval, supersession, and revocation lifecycle. |
+| [022-intlify-provider-and-localization-sync-design.md](./022-intlify-provider-and-localization-sync-design.md) | Planned detailed design for Provider-neutral candidate supply and explicit finite localization synchronization into an atomic Store snapshot. |
+| [023-intlify-localization-execution-specification-design.md](./023-intlify-localization-execution-specification-design.md) | Planned logical execution specification shared by runtime-backed, ahead-of-time, and target-native physical implementations. |
+| [024-intlify-target-profile-and-export-design.md](./024-intlify-target-profile-and-export-design.md) | Planned detailed design for Target Profiles, capability admission, generated handles and bindings, Locale Capsules, manifests, and native-resource export. |
+| [025-intlify-release-assembly-and-deployment-design.md](./025-intlify-release-assembly-and-deployment-design.md) | Planned detailed design for Release Assembly, deployment compatibility groups, immutable publication, rollout, withdrawal, and rollback. |
+| [026-intlify-conformance-and-measurement-design.md](./026-intlify-conformance-and-measurement-design.md) | Planned detailed design for language-neutral conformance fixtures and common artifact-size, initialization, loading, formatting, and memory measurements. |
+| [027-intlify-reference-runtime-design.md](./027-intlify-reference-runtime-design.md) | Owns the detailed runtime-side architecture below the build/runtime boundary. |
+| [028-intlify-javascript-web-vertical-slice-design.md](./028-intlify-javascript-web-vertical-slice-design.md) | Planned integration design for the first JavaScript/Web source-first vertical slice and its observable I1 evidence. |
+| [029-intlify-product-workflow-and-packaging-design.md](./029-intlify-product-workflow-and-packaging-design.md) | Planned detailed design for product commands, deterministic build integration, configuration, workspaces, packages, CI, and release sequencing. |
+| [030-intlify-vue-ssr-tooling-integration-design.md](./030-intlify-vue-ssr-tooling-integration-design.md) | Planned integration design for Vue production, client and request-safe SSR lowering, hydration, and shared editor and agent tooling. |
+| [031-intlify-tms-production-sync-integration-design.md](./031-intlify-tms-production-sync-integration-design.md) | Planned production integration design for a real TMS adapter, review workflow, conflicts, CI synchronization, and Store publication. |
+| [032-intlify-ios-target-design.md](./032-intlify-ios-target-design.md) | Planned iOS design for Swift and Apple UI authoring, generated resources or capsules, portable bindings, and scoped execution. |
+| [033-intlify-android-target-design.md](./033-intlify-android-target-design.md) | Planned Android design for Kotlin, Java, Compose, and Views authoring, generated resources or capsules, portable bindings, and scoped execution. |
+| [034-intlify-library-composition-design.md](./034-intlify-library-composition-design.md) | Planned detailed design for source-first library manifests, package and Intent identity, transitive composition, trust, and final-application planning. |
+| [035-intlify-native-system-target-design.md](./035-intlify-native-system-target-design.md) | Planned native and system-language design for producers, C ABI or conforming bindings, baked outputs, final-binary reachability, and capability pruning. |
+| [036-intlify-resource-migration-and-compatibility-design.md](./036-intlify-resource-migration-and-compatibility-design.md) | Planned decision on reuse of the current resource implementation, catalog migration, key and translation-history association, legacy adapters, and compatibility duration. |
 | [PR #183](https://github.com/intlify/intlify/pull/183) | Provides the isolated source-first PoC and review feedback used to clarify this overview; it does not freeze production APIs. |
