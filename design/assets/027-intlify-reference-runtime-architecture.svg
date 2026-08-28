@@ -1,0 +1,221 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1280" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Intlify reference runtime architecture</title>
+<desc id="desc">The Intlify toolchain plans finite localization requirements, synchronizes translations into an atomic Store snapshot, performs final message locale fallback, linking, and target capability admission, then passes complete target output sets to Release Assembly. Downstream of the static build, an authorized publication transaction creates a Release Publication Record, and the host verifies that record before activating a Release reference. This diagram details the reference Intlify runtime physical path within the logical Localization Execution Layer; a capability-checked target-native engine may provide an alternative conforming path. Application and framework adapters bind compiler-lowered calls and explicit APIs to a locale-scoped Localizer and convert host values into portable Message Values. The Localization Runtime execution-admits one deployment-selected Release Snapshot and matching artifacts, resolves opaque message handles, loads delivery units, and caches prepared messages. It does not publish or activate Releases. The language-neutral MF2 Runtime Core evaluates one already selected message through an immutable function registry and declared Locale Service Profile, returning text or structured parts with typed diagnostics. Production execution never calls a Localization Provider or TMS and never repeats Linker-owned message locale fallback.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .panel { fill:#ffffff; stroke:#cbd5e1; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .delivery-group { fill:#faf5ff; stroke:#7c3aed; }
+    .runtime-boundary { fill:#f8fafc; stroke:#64748b; stroke-dasharray:10 8; }
+    .tool { fill:#334155; }
+    .sync { fill:#b45309; }
+    .linker { fill:#0f766e; }
+    .artifact { fill:#475569; }
+    .adapter { fill:#0369a1; }
+    .localizer { fill:#1d4ed8; }
+    .service { fill:#7c3aed; }
+    .core { fill:#0f766e; }
+    .operation { fill:#e2e8f0; stroke:#cbd5e1; }
+    .context { fill:#334155; }
+    .arrow { stroke:#64748b; }
+    .boundary-line { stroke:#b45309; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    .operation-text { fill:#334155; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .panel { fill:#111827; stroke:#475569; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .delivery-group { fill:#1e1233; stroke:#a78bfa; }
+      .runtime-boundary { fill:#0f172a; stroke:#94a3b8; }
+      .operation { fill:#1e293b; stroke:#475569; }
+      .operation-text { fill:#e2e8f0; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1240" height="1280" fill="none"/>
+
+<text x="620" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Intlify reference runtime architecture</text>
+<text x="620" y="70" font-size="13" text-anchor="middle" class="subtitle">Build immutable outputs; publish and activate through the host; execution-admit through a conforming path.</text>
+
+<!-- Toolchain side -->
+<rect x="40" y="105" width="1160" height="230" rx="14" class="group" stroke-width="2"/>
+<text x="620" y="135" font-size="17" font-weight="700" text-anchor="middle" class="label">Intlify toolchain — build-time authority</text>
+
+<rect x="70" y="160" width="240" height="125" rx="9" class="tool"/>
+<text x="190" y="186" font-size="13" font-weight="700" text-anchor="middle" class="white">Authoring inputs</text>
+<text x="190" y="211" font-size="10.5" text-anchor="middle" class="soft-white">source-first producers</text>
+<text x="190" y="232" font-size="10.5" text-anchor="middle" class="soft-white">source-first artifacts · explicit intent</text>
+<text x="190" y="253" font-size="10.5" text-anchor="middle" class="soft-white">MF2 formatter · linter</text>
+<text x="190" y="274" font-size="10.5" text-anchor="middle" class="soft-white">application references</text>
+
+<path d="M 310 222 L 345 222" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="345" y="160" width="240" height="125" rx="9" class="sync"/>
+<text x="465" y="186" font-size="13" font-weight="700" text-anchor="middle" class="white">Explicit localization sync</text>
+<text x="465" y="211" font-size="10.5" text-anchor="middle" class="soft-white">Provider · TMS · AI · MT · human</text>
+<text x="465" y="232" font-size="10.5" text-anchor="middle" class="soft-white">candidate validation · governance evidence</text>
+<text x="465" y="253" font-size="10.5" text-anchor="middle" class="soft-white">atomic Translation Store snapshot</text>
+<text x="465" y="274" font-size="10.5" text-anchor="middle" class="soft-white">never a production execution call</text>
+
+<path d="M 585 222 L 620 222" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="620" y="160" width="260" height="125" rx="9" class="linker"/>
+<text x="750" y="186" font-size="13" font-weight="700" text-anchor="middle" class="white">Final link + export</text>
+<text x="750" y="211" font-size="10.5" text-anchor="middle" class="soft-white">message locale fallback resolution</text>
+<text x="750" y="232" font-size="10.5" text-anchor="middle" class="soft-white">reachability · delivery placement</text>
+<text x="750" y="253" font-size="10.5" text-anchor="middle" class="soft-white">MF2 validation · message compilation</text>
+<text x="750" y="274" font-size="10.5" text-anchor="middle" class="soft-white">Target Profile admission · registration</text>
+
+<path d="M 880 222 L 915 222" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="915" y="160" width="255" height="125" rx="9" class="artifact"/>
+<text x="1042" y="186" font-size="13" font-weight="700" text-anchor="middle" class="white">Immutable release outputs</text>
+<text x="1042" y="211" font-size="10.5" text-anchor="middle" class="soft-white">target output sets · Runtime Manifests</text>
+<text x="1042" y="232" font-size="10.5" text-anchor="middle" class="soft-white">Release Assembly · Release Snapshot</text>
+<text x="1042" y="253" font-size="10.5" text-anchor="middle" class="soft-white">generated Message Handles</text>
+<text x="1042" y="274" font-size="10.5" text-anchor="middle" class="soft-white">provisional bridge: data-only ESM 0.1</text>
+
+<!-- Static build / downstream delivery boundary -->
+<path d="M 40 365 L 1200 365" fill="none" class="boundary-line" stroke-width="2.2" stroke-dasharray="12 8"/>
+<rect x="420" y="347" width="400" height="36" rx="18" class="panel" stroke-width="1.5"/>
+<text x="620" y="370" font-size="11.5" font-weight="700" text-anchor="middle" class="label">static build / downstream Release delivery boundary</text>
+
+<!-- Host-owned release delivery -->
+<rect x="40" y="400" width="1160" height="115" rx="14" class="delivery-group" stroke-width="2"/>
+<text x="620" y="426" font-size="15.5" font-weight="700" text-anchor="middle" class="label">Host-owned Release delivery · specified by 025</text>
+
+<path d="M 1042 285 L 1042 385 L 235 385 L 235 445" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="70" y="445" width="330" height="50" rx="8" class="service"/>
+<text x="235" y="466" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Authorized Release publication</text>
+<text x="235" y="484" font-size="8.9" text-anchor="middle" class="soft-white">manifest + ReleasePublicationRecord · exact checked view</text>
+
+<path d="M 400 470 L 450 470" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="450" y="445" width="300" height="50" rx="8" class="adapter"/>
+<text x="600" y="466" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Deployment activation</text>
+<text x="600" y="484" font-size="8.9" text-anchor="middle" class="soft-white">host verifies record · activates pointer, route, or package</text>
+
+<path d="M 750 470 L 800 470" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="800" y="445" width="370" height="50" rx="8" class="artifact"/>
+<text x="985" y="466" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Deployment-selected ReleaseSnapshot</text>
+<text x="985" y="484" font-size="8.9" text-anchor="middle" class="soft-white">publication and mutable activation state remain outside the Runtime</text>
+
+<!-- Application entry points -->
+<rect x="40" y="550" width="1160" height="165" rx="14" class="group" stroke-width="2"/>
+<text x="620" y="580" font-size="17" font-weight="700" text-anchor="middle" class="label">Application adapters for the reference runtime path</text>
+
+<rect x="70" y="605" width="240" height="78" rx="9" class="adapter"/>
+<text x="190" y="631" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Compiler-lowered UI calls</text>
+<text x="190" y="656" font-size="10.2" text-anchor="middle" class="soft-white">generated handle + portable arguments</text>
+<text x="190" y="675" font-size="9.7" text-anchor="middle" class="soft-white">no runtime intent() parsing</text>
+
+<rect x="345" y="605" width="240" height="78" rx="9" class="adapter"/>
+<text x="465" y="631" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Explicit Localizer API</text>
+<text x="465" y="656" font-size="10.2" text-anchor="middle" class="soft-white">server · worker · CLI · email</text>
+<text x="465" y="675" font-size="9.7" text-anchor="middle" class="soft-white">format(handle, arguments)</text>
+
+<rect x="620" y="605" width="240" height="78" rx="9" class="adapter"/>
+<text x="740" y="631" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Generated accessor bridge</text>
+<text x="740" y="656" font-size="10.2" text-anchor="middle" class="soft-white">typed accessor · optional legacy adapter</text>
+<text x="740" y="675" font-size="9.7" text-anchor="middle" class="soft-white">legacy surface only if retained by 036</text>
+
+<rect x="895" y="605" width="275" height="78" rx="9" class="adapter"/>
+<text x="1032" y="631" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Framework / platform lifecycle</text>
+<text x="1032" y="656" font-size="10.2" text-anchor="middle" class="soft-white">preload · locale negotiation · SSR</text>
+<text x="1032" y="675" font-size="9.7" text-anchor="middle" class="soft-white">parts → safe UI/native output</text>
+
+<path d="M 190 683 L 190 740 L 430 740 L 430 775" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 465 683 L 465 775" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 740 683 L 740 740 L 520 740 L 520 775" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1032 683 L 1032 740 L 610 740 L 610 775" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<!-- Localization Runtime -->
+<rect x="75" y="755" width="1090" height="225" rx="14" class="runtime-boundary" stroke-width="2"/>
+<text x="620" y="786" font-size="17" font-weight="700" text-anchor="middle" class="label">Reference Localization Runtime</text>
+<text x="620" y="808" font-size="11.2" text-anchor="middle" class="muted">One physical implementation of the logical Localization Execution Layer.</text>
+
+<rect x="110" y="835" width="220" height="105" rx="9" class="service"/>
+<text x="220" y="862" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Shared Runtime Engine</text>
+<text x="220" y="887" font-size="10.2" text-anchor="middle" class="soft-white">immutable capabilities</text>
+<text x="220" y="908" font-size="10.2" text-anchor="middle" class="soft-white">functions · Locale Service Profile</text>
+<text x="220" y="929" font-size="9.7" text-anchor="middle" class="soft-white">shareable engine state</text>
+
+<rect x="365" y="835" width="240" height="105" rx="9" class="localizer"/>
+<text x="485" y="862" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Locale-bound Localizer</text>
+<text x="485" y="887" font-size="10.2" text-anchor="middle" class="soft-white">exact requested locale</text>
+<text x="485" y="908" font-size="10.2" text-anchor="middle" class="soft-white">server: request-scoped</text>
+<text x="485" y="929" font-size="9.7" text-anchor="middle" class="soft-white">no process-global mutable locale</text>
+
+<rect x="640" y="835" width="220" height="105" rx="9" class="artifact"/>
+<text x="750" y="862" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Artifact registry + loader</text>
+<text x="750" y="887" font-size="9.7" text-anchor="middle" class="soft-white">selected ReleaseSnapshot · manifest</text>
+<text x="750" y="908" font-size="9.7" text-anchor="middle" class="soft-white">capsule · delivery unit availability</text>
+<text x="750" y="929" font-size="9.4" text-anchor="middle" class="soft-white">execution admission · handle lookup</text>
+
+<rect x="895" y="835" width="235" height="105" rx="9" class="service"/>
+<text x="1012" y="862" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Preparation + diagnostics</text>
+<text x="1012" y="887" font-size="10.2" text-anchor="middle" class="soft-white">Prepared Message cache</text>
+<text x="1012" y="908" font-size="10.2" text-anchor="middle" class="soft-white">typed runtime policy</text>
+<text x="1012" y="929" font-size="9.7" text-anchor="middle" class="soft-white">stable fresh / cached behavior</text>
+
+<path d="M 330 887 L 365 887" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 640 887 L 605 887" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 860 887 L 895 887" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 985 495 L 1180 495 L 1180 735 L 750 735 L 750 835" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<!-- MF2 Runtime Core -->
+<path d="M 485 940 L 485 1005" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+<path d="M 1012 940 L 1012 975 L 755 975 L 755 1005" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="130" y="1005" width="980" height="170" rx="14" class="core"/>
+<text x="620" y="1036" font-size="17" font-weight="700" text-anchor="middle" class="white">Language-neutral MF2 Runtime Core</text>
+<text x="620" y="1058" font-size="11.2" text-anchor="middle" class="soft-white">Evaluate one selected message; no handle lookup, message locale fallback chain, loading, or framework state.</text>
+
+<rect x="165" y="1082" width="200" height="65" rx="8" class="operation" stroke-width="1.5"/>
+<text x="265" y="1108" font-size="12" font-weight="700" text-anchor="middle" class="operation-text">Prepare</text>
+<text x="265" y="1130" font-size="10.1" text-anchor="middle" class="operation-text">checked source / Runtime IR</text>
+
+<rect x="400" y="1082" width="200" height="65" rx="8" class="operation" stroke-width="1.5"/>
+<text x="500" y="1108" font-size="12" font-weight="700" text-anchor="middle" class="operation-text">Resolve + select</text>
+<text x="500" y="1130" font-size="10.1" text-anchor="middle" class="operation-text">Message Values · functions · variants</text>
+
+<rect x="635" y="1082" width="200" height="65" rx="8" class="operation" stroke-width="1.5"/>
+<text x="735" y="1108" font-size="12" font-weight="700" text-anchor="middle" class="operation-text">Format output</text>
+<text x="735" y="1130" font-size="10.1" text-anchor="middle" class="operation-text">text · parts · bidi</text>
+
+<rect x="870" y="1082" width="200" height="65" rx="8" class="operation" stroke-width="1.5"/>
+<text x="970" y="1108" font-size="12" font-weight="700" text-anchor="middle" class="operation-text">Typed outcome</text>
+<text x="970" y="1130" font-size="10.1" text-anchor="middle" class="operation-text">value · recoverable diagnostics</text>
+
+<!-- Runtime contexts -->
+<path d="M 620 1175 L 620 1205" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="150" y="1205" width="270" height="50" rx="8" class="context"/>
+<text x="285" y="1226" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Browser application context</text>
+<text x="285" y="1244" font-size="9.5" text-anchor="middle" class="soft-white">reactive adapter owns replacement</text>
+
+<rect x="485" y="1205" width="270" height="50" rx="8" class="context"/>
+<text x="620" y="1226" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Server request context</text>
+<text x="620" y="1244" font-size="9.5" text-anchor="middle" class="soft-white">immutable artifacts shared safely</text>
+
+<rect x="820" y="1205" width="270" height="50" rx="8" class="context"/>
+<text x="955" y="1226" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Mobile / native context</text>
+<text x="955" y="1244" font-size="9.5" text-anchor="middle" class="soft-white">scene, view tree, task, or process</text>
+</svg>
