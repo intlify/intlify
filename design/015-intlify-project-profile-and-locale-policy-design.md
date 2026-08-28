@@ -1,47 +1,44 @@
 # Intlify Project Profile and Locale Policy Design
 
-## Status
-
-This document is an initial detailed-design scaffold. It inherits the product direction and terminology from [000](./000-intlify-overview-design.md), but it does not yet make decisions beyond that overview.
-
-The sections below identify the specification areas, responsibility splits, evidence, and open questions that must be resolved before this design becomes normative. Placeholder headings and candidate categories do not reserve a public field, type, configuration key, command, wire tag, or package name.
-
 ## Purpose
 
-This document defines the language-neutral resolved project input consumed by shared Intlify compiler stages and the locale-policy semantics needed to produce it.
+This design defines how one canonical project configuration becomes the complete, checked `LocalizationProjectProfile` consumed by shared Intlify compiler stages. The primary repository input is `intlify.config.json`, described by a versioned JSON Schema. An optional programmatic frontend, such as a future `defineIntlifyConfig()`, may construct the same JSON-compatible `IntlifyConfig` data model, but it does not create a second configuration language or bypass validation.
 
-Host tooling may accept JavaScript, TypeScript, TOML, YAML, framework configuration, workspace metadata, or another host-specific format. Before shared compilation begins, that tooling resolves the host input into one checked `LocalizationProjectProfile`. Shared planning, synchronization, linking, export, Release Assembly, tooling, and execution integrations consume that resolved profile rather than interpreting host configuration independently.
+In practical terms, the profile gives every downstream stage the same answers to four questions:
 
-Conceptually:
+- which localization project and Selection Scope are being processed;
+- which source and requested locales apply, including project defaults, target subsets, and effective defaults;
+- which Target Profiles, Deployment Compatibility Groups, and delivery inputs belong to the selected build; and
+- which versioned negotiation, fallback, coverage, Provider, governance, trust, and resource policies apply.
 
-```text
-host-specific configuration and workspace inputs
-  -> host configuration discovery and parsing
-  -> project-profile resolution and validation
-  -> one language-neutral LocalizationProjectProfile
-     -> project graph and queries
-     -> requirement planning and linking
-     -> synchronization and governance inputs
-     -> target export and Release Assembly
-     -> locale negotiation and localization execution inputs
-```
+![High-level role of the Intlify Localization Project Profile](./assets/015-intlify-project-profile-and-locale-policy-overview.svg)
+
+The following example shows the file-first path and the optional programmatic path converging before shared compilation. The programmatic API name is illustrative; its input semantics are not separate from `intlify.config.json`.
+
+![Canonical configuration resolution into one Localization Project Profile before cross-platform compilation](./assets/015-intlify-cross-platform-project-profile-resolution.svg)
+
+The shared resolver owns JSON-compatible input admission, semantic validation, normalization, and default resolution. Planning, synchronization, linking, export, Release Assembly, tooling, and execution integrations consume the resulting settings IR instead of rereading configuration or inventing their own defaults. Cross-platform Producers, Lowering Backends, Target Exporters, and Runtime integrations begin downstream of this common configuration boundary. Credentials and other secrets remain outside the profile.
 
 ## Goals
 
 - Define what one resolved `LocalizationProjectProfile` represents and how it is identified.
-- Define the semantic split between host-facing configuration and the language-neutral resolved profile.
+- Define the semantic split between author-facing `IntlifyConfig` and the checked `LocalizationProjectProfile` settings IR.
+- Define `intlify.config.json` and its versioned JSON Schema as the primary repository configuration surface.
+- Require file-based and optional programmatic inputs to enter the same resolver with the same semantics.
 - Define project requested locales, source-locale defaults, requested-locale defaults, Target Profile subsets, target overrides, and effective defaults.
 - Keep requested-locale negotiation separate from message locale fallback and single-message evaluation.
 - Define the profile inputs for coverage, Provider routing, approval, Glossary Sets, delivery, trust, and resource policies without taking ownership from their detailed designs.
 - Define how Target Profiles form one or more Deployment Compatibility Groups.
 - Define deterministic resolution, validation, Finding production, and consumer-visible dependency inputs.
 - Make invalid, ambiguous, incomplete, or incompatible configuration fail before synchronization, linking, export, or production execution.
-- Provide language-neutral fixtures that host configuration resolvers and downstream consumers can share.
+- Provide paired `IntlifyConfig`, resolved-profile, and Finding fixtures that the shared resolver and downstream consumers can use.
 
 ## Non-Goals
 
-- Freezing the user-facing JavaScript, TOML, YAML, framework, workspace, or CLI configuration syntax.
-- Defining configuration-file discovery, command-line option precedence, or workspace UX owned by [029](./029-intlify-product-workflow-and-packaging-design.md).
+- Defining TOML, YAML, framework-specific, or platform-specific configuration formats equivalent to `intlify.config.json`.
+- Freezing the name, package, or language binding of an optional programmatic configuration helper such as `defineIntlifyConfig()`; those product-facing details belong to [029](./029-intlify-product-workflow-and-packaging-design.md).
+- Defining repository-root discovery, workspace profile selection, command-line option precedence, or configuration UX owned by [029](./029-intlify-product-workflow-and-packaging-design.md).
+- Defining formatter, linter, or other unrelated tool-specific sections that may coexist in the root Intlify configuration schema.
 - Defining source authoring, `intent()`, `mf2`, Intent identity, or source-evidence rules owned by [016](./016-intlify-source-authoring-and-intent-identity-design.md).
 - Defining the complete shared-artifact wire encoding, canonical digest framing, specification-version admission, or migration mechanism owned by [017](./017-intlify-shared-artifact-and-version-admission-design.md).
 - Defining trust roots, credentials, signatures, actor authorization, or provenance evidence owned by [018](./018-intlify-security-trust-and-provenance-design.md).
@@ -60,8 +57,10 @@ It defines the information that downstream specifications may rely on. It does n
 
 | Area | Responsibility relative to this design |
 | --- | --- |
-| Host configuration integration | Discovers and parses host-facing configuration, resolves host-specific references, and invokes the profile resolver |
-| 015 project-profile resolver | Normalizes and validates one language-neutral profile according to this specification |
+| Canonical configuration input | Uses `intlify.config.json` as the primary repository surface and one JSON-compatible `IntlifyConfig` data model for every resolver entry path |
+| JSON Schema validation | Validates the structural shape of the 015-owned project-profile input before semantic resolution |
+| Optional programmatic frontend | Constructs the same `IntlifyConfig` value for embedded use; exact API naming, packaging, and language bindings remain 029-owned |
+| 015 project-profile resolver | Semantically validates, normalizes, and resolves one complete `LocalizationProjectProfile` according to this specification |
 | 016 source authoring | Supplies Intent source-locale declarations and uses the resolved default only when source authoring omits one |
 | 017 shared artifacts | Defines shared encodings, version admission, canonical identities, and migration for the resolved model |
 | 018 trust and provenance | Defines trust inputs, delegation, credentials, signatures, and authorization referenced by the profile |
@@ -72,13 +71,13 @@ It defines the information that downstream specifications may rely on. It does n
 | 023 localization execution | Consumes locale-negotiation, locale-service, and scoped-locale semantics |
 | 024 target export | Owns Target Profile capability and output details referenced by this design |
 | 025 Release and deployment | Owns Release behavior for the Deployment Compatibility Groups declared here |
-| 029 product workflow | Owns public configuration syntax, discovery, workspace behavior, commands, and packaging |
+| 029 product workflow | Owns file discovery, workspace selection, commands, schema packaging, optional helper API UX, and product packaging without defining alternate configuration semantics |
 
 ## Inherited Decisions from 000
 
 The following are fixed inputs from the overview and are not open questions in this document:
 
-- shared compiler stages consume a resolved language-neutral profile rather than host configuration objects;
+- shared compiler stages consume a resolved language-neutral profile rather than unchecked authoring configuration;
 - each Message Intent has exactly one source locale;
 - a project default source locale applies only when source authoring omits an Intent source locale;
 - libraries retain the source locale of each published Intent;
@@ -94,11 +93,14 @@ The following are fixed inputs from the overview and are not open questions in t
 
 ## Terminology to Refine
 
-The definitions in 000 remain authoritative while this design is incomplete. This section will refine only the profile-specific semantics and relationships needed by consumers.
+The product-wide definitions in 000 remain authoritative while this design is incomplete, except for the narrower configuration decision explicitly recorded here and awaiting follow-up alignment in 000. This section will refine only the profile-specific semantics and relationships needed by consumers.
 
 | Term | Profile-specific question to resolve |
 | --- | --- |
-| Localization Project Profile | Exact project scope, identity, required sections, and completeness rules |
+| `IntlifyConfig` | JSON-compatible, author-facing input model shared by `intlify.config.json` and optional programmatic frontends |
+| `intlify.config.json` | Primary repository configuration document whose project-profile fields enter the shared resolver |
+| Programmatic configuration frontend | Optional typed or embedded API that constructs `IntlifyConfig` without introducing different semantics |
+| Localization Project Profile | Checked project-configuration IR, including exact project scope, identity, required sections, and completeness rules |
 | Project requested-locale set | Membership, ordering, canonicalization, duplicate handling, and empty-set rules |
 | Default source locale | Defaulting conditions and interaction with application and library Intent sources |
 | Default requested locale | Project-level negotiation default and validation rules |
@@ -113,6 +115,16 @@ The definitions in 000 remain authoritative while this design is incomplete. Thi
 
 ## Design Overview
 
+The author-facing configuration and the compiler-facing settings IR are distinct models:
+
+```text
+intlify.config.json -----------------------+
+                                            +-> JSON-compatible IntlifyConfig
+optional programmatic frontend ------------+      -> JSON Schema validation
+                                                   -> semantic resolution
+                                                   -> LocalizationProjectProfile
+```
+
 The resolved profile has four conceptual groups. Their exact representation remains to be designed.
 
 ```text
@@ -123,7 +135,7 @@ LocalizationProjectProfile
   + versioned references to delivery, Provider, governance, trust, and resource policies
 ```
 
-This design must keep the semantic model independent of host configuration syntax while preserving enough source evidence for actionable Findings.
+The resolver must discard authoring conveniences that have no semantic meaning while preserving enough file, JSON Pointer, or programmatic-call evidence for actionable Findings.
 
 ## Profile Scope and Identity
 
@@ -136,19 +148,37 @@ This section will define:
 - whether profile composition is allowed and, if so, which layer owns it; and
 - completeness requirements before a profile can be consumed.
 
-## Configuration Resolution Responsibility Split
+## Canonical Configuration Input and Resolution
 
-### Host-facing inputs
+### Primary repository input
 
-This subsection will define which facts a host integration supplies to the language-neutral resolver, including source provenance and host-location evidence, without freezing a public config format.
+`intlify.config.json` is the primary and only normative repository configuration format for the project-profile input defined here. The exact repository-root discovery, workspace selection, and command UX remain owned by 029. Intlify does not require platform-specific configuration DSLs for Web, Apple, Android, JVM, native, or system targets; cross-platform behavior is expressed by Target Profiles and downstream integrations after profile resolution.
 
-### Discovery, layering, and precedence
+An external tool may generate `intlify.config.json`, but TOML, YAML, executable framework configuration, and platform-native objects are not additional configuration semantics recognized by the shared resolver.
 
-This subsection will decide whether discovery, inheritance, workspace defaults, environment overlays, command-line overrides, and framework defaults are entirely 029-owned or require language-neutral precedence semantics here.
+### `IntlifyConfig` and JSON Schema
+
+`IntlifyConfig` is the unchecked, JSON-compatible authoring model. The 015-owned project-profile fields are described by a versioned JSON Schema so files, editors, CLI tooling, and optional APIs share one structural definition. Root-schema composition and package publication remain coordinated with 029 and existing tooling specifications.
+
+JSON Schema validation admits structural shape, primitive types, required fields, and closed or versioned field sets. The semantic resolver remains responsible for locale canonicalization, cross-field membership, reference admission, default resolution, Target Profile subsets, Deployment Compatibility Groups, and deterministic Findings. Schema success alone never creates a `LocalizationProjectProfile`.
+
+### Optional programmatic frontend
+
+An embedding API may accept or construct the same `IntlifyConfig` value without first writing a file. A helper provisionally illustrated as `defineIntlifyConfig()` may provide static typing and editor completion, but its result remains unchecked input to the shared resolver.
+
+The programmatic path must satisfy these invariants:
+
+- it produces only JSON-compatible data covered by the same schema;
+- it cannot carry functions, class instances, platform handles, credentials, or hidden process state into the profile;
+- it cannot directly construct or assert a checked `LocalizationProjectProfile`;
+- it runs the same semantic resolver and produces the same Findings as equivalent file input; and
+- reproducibility depends on the materialized `IntlifyConfig` value and admitted references, not host-language object identity.
+
+The exact helper name, language bindings, and embedding ergonomics belong to 029.
 
 ### Resolved output
 
-This subsection will define the success and failure boundary of profile resolution, including whether warnings can accompany a usable profile and which failures prevent any partial output.
+`LocalizationProjectProfile` is a complete, checked settings IR and the only configuration model consumed by shared compiler stages. This subsection will define the success and failure boundary of profile resolution, including whether warnings can accompany a usable profile and which failures prevent any partial output.
 
 ## LocalizationProjectProfile Semantic Model
 
@@ -176,7 +206,7 @@ This section will define:
 - duplicate and alias handling;
 - treatment of extensions, private-use subtags, and implementation-specific locale identifiers;
 - whether canonicalization changes identity or only presentation; and
-- the evidence retained when a host spelling is normalized or rejected.
+- the file and JSON Pointer or programmatic-call evidence retained when an authoring spelling is normalized or rejected.
 
 ## Source Locale Defaults
 
@@ -293,16 +323,17 @@ The exact Target Profile capability schema belongs to 024. Release Assembly and 
 
 This section will define an ordered fail-complete resolution pipeline, expected to cover:
 
-1. admit host-supplied configuration facts and source evidence;
-2. resolve project identity and Selection Scope;
-3. validate and canonicalize locale identifiers;
-4. resolve project locale sets and defaults;
-5. admit policy references and revisions;
-6. resolve Target Profile references and requested-locale subsets;
-7. form and validate Deployment Compatibility Groups;
-8. resolve each effective default requested locale;
-9. validate cross-target locale and hydration requirements;
-10. produce deterministic Findings or one complete resolved profile.
+1. admit one materialized `IntlifyConfig` value and its file or programmatic source evidence;
+2. validate the applicable JSON Schema version and reject non-JSON or structurally invalid input;
+3. resolve project identity and Selection Scope;
+4. validate and canonicalize locale identifiers;
+5. resolve project locale sets and defaults;
+6. admit policy references and revisions;
+7. resolve Target Profile references and requested-locale subsets;
+8. form and validate Deployment Compatibility Groups;
+9. resolve each effective default requested locale;
+10. validate cross-target locale and hydration requirements;
+11. produce deterministic Findings or one complete resolved profile.
 
 The final order, independent-error collection, and cascade-suppression rules remain open.
 
@@ -327,9 +358,9 @@ For each Finding, the completed design must define stable code, severity, blocki
 
 ## Dependency, Invalidation, and Reproducibility
 
-This section will define which exact identities and revisions make the resolved profile stale, including locale sets, target membership, policy references, and host configuration evidence.
+This section will define which exact identities and revisions make the resolved profile stale, including the materialized `IntlifyConfig`, schema version, locale sets, target membership, policy references, and configuration source evidence.
 
-It will specify semantic equality and deterministic resolution inputs while leaving shared digest framing and cache implementation to 017 and 019. Two resolution executions over the same admitted facts, tool/specification versions, and referenced revisions must not disagree because of map order, filesystem enumeration, concurrency, or host-language object identity.
+It will specify semantic equality and deterministic resolution inputs while leaving shared digest framing and cache implementation to 017 and 019. Two resolution executions over the same materialized `IntlifyConfig`, tool/specification versions, and referenced revisions must not disagree because of JSON member order, filesystem enumeration, concurrency, optional frontend implementation, or host-language object identity.
 
 ## Security and Credential Handling
 
@@ -353,12 +384,14 @@ This section will define the exact subset of profile facts each downstream stage
 | Release Assembly | One selected Deployment Compatibility Group and its compatibility declarations |
 | Execution integration | Supported locales, effective default, and locale-negotiation profile reference |
 
-The completed design must prevent consumers from silently applying their own defaults or reinterpreting unresolved host configuration.
+The completed design must prevent consumers from silently applying their own defaults or reinterpreting unchecked `IntlifyConfig` input.
 
 ## Conformance and Fixtures
 
-The fixture plan will include language-neutral resolved-profile fixtures and host-resolver projection fixtures for at least:
+The fixture plan will include `intlify.config.json`, equivalent programmatic-value, resolved-profile, and Finding fixtures for at least:
 
+- JSON Schema success and failure, including missing, unknown, incorrectly typed, and incompatible-version fields;
+- byte-distinct JSON documents and programmatic values that materialize the same `IntlifyConfig` semantics;
 - one Browser target;
 - hydration-coupled Browser and SSR targets;
 - independently released Web and mobile groups;
@@ -368,20 +401,20 @@ The fixture plan will include language-neutral resolved-profile fixtures and hos
 - locale negotiation distinct from message locale fallback;
 - versioned Provider, governance, Glossary Set, delivery, trust, and resource references;
 - duplicate, invalid, missing, stale, unsupported, and cross-target-incompatible inputs;
-- deterministic ordering under permuted host input; and
+- deterministic ordering under permuted JSON object member order; and
 - exact and first-over resource-limit cases.
 
-The completed design will assign each fixture to the owning component and identify the conformance evidence required from third-party host configuration resolvers.
+The completed design will assign each fixture to the JSON Schema validator, semantic resolver, or downstream consumer. Optional programmatic frontends must demonstrate that an equivalent materialized `IntlifyConfig` produces the same profile or Findings as file input; platform-specific configuration resolvers are not a conformance extension point.
 
 ## Implementation Phasing
 
 The implementation plan will be defined after the semantic decisions above are complete. The intended design checkpoints are:
 
-1. profile scope, identity, locale model, and inherited invariants;
-2. locale-policy inputs and deterministic resolution;
+1. `IntlifyConfig` project-profile schema, profile scope, identity, and inherited invariants;
+2. JSON Schema admission, locale-policy inputs, and deterministic semantic resolution;
 3. Target Profile and Deployment Compatibility Group validation;
-4. Findings, limits, dependency identity, and conformance fixtures; and
-5. host resolver and downstream-consumer integration evidence.
+4. Findings, limits, dependency identity, and paired configuration/profile fixtures; and
+5. file loader, optional programmatic frontend, and downstream-consumer integration evidence.
 
 These checkpoints do not reserve package names, commands, or public APIs.
 
@@ -391,13 +424,18 @@ Resolved decisions will be recorded here as the design proceeds.
 
 | ID | Decision | Status | Rationale | Affected sections |
 | --- | --- | --- | --- | --- |
-| — | No 015-specific decisions have been made yet | Open | Initial scaffold only | All |
+| 015-001 | Use `intlify.config.json` as the primary and only normative repository format for project-profile configuration | Accepted | A repository-scoped declarative input is sufficient across target platforms and avoids platform-specific configuration DSLs and resolvers | Purpose; Goals; Canonical Configuration Input and Resolution; Conformance and Fixtures |
+| 015-002 | Keep `IntlifyConfig` and `LocalizationProjectProfile` as separate models | Accepted | The authoring model may omit defaults or contain unnormalized values, while compiler consumers require a complete, checked settings IR | Design Overview; LocalizationProjectProfile Semantic Model; Deterministic Resolution Algorithm |
+| 015-003 | Allow optional programmatic frontends only as equivalent constructors of JSON-compatible `IntlifyConfig` | Accepted | Embedded and typed use cases remain possible without creating alternate semantics or bypassing the shared resolver | Purpose; Canonical Configuration Input and Resolution; Dependency, Invalidation, and Reproducibility |
+| 015-004 | Use JSON Schema for structural admission and the shared resolver for semantic validation | Accepted | Cross-field locale, target, policy, and default invariants cannot be delegated to structural validation alone | Ownership and Dependencies; Canonical Configuration Input and Resolution; Findings and Failure Model |
 
 ## Deferred Follow-Up Notes
 
 The following remain in their owning designs unless a concrete 015 semantic dependency requires a narrower interface here:
 
-- exact host configuration syntax, discovery, workspace inheritance, commands, and packaging: 029;
+- repository-root discovery, workspace profile selection, commands, schema publication, optional helper API UX, and packaging: 029;
+- alignment of 000's broader illustrative host-configuration wording with the canonical JSON decision recorded here: 000;
+- compatibility disposition for the existing `intlify.config.jsonc` discovery described by 006; if retained, it must materialize the same `IntlifyConfig` and remains non-primary: 029 and the compatibility specification;
 - source authoring and Intent source-locale evidence: 016;
 - artifact encoding, digest framing, version migration, and capability admission: 017;
 - trust roots, actor powers, credentials, signatures, and provenance: 018;
@@ -406,37 +444,37 @@ The following remain in their owning designs unless a concrete 015 semantic depe
 - Store, governance, Provider, TMS, and synchronization workflows: 021 and 022;
 - locale-service execution semantics and portable values: 023;
 - Target Profile capability and output schemas: 024;
-- Release publication, deployment, and execution admission: 025; and
-- public product workflow and configuration UX: 029.
+- Release publication, deployment, and execution admission: 025.
 
-No dormant field, type, package, configuration key, command, wire tag, or format name is reserved merely by appearing as a candidate in this scaffold.
+Only the configuration boundary recorded in the Decision Log is fixed here. No unaccepted field, package, helper name, command, wire tag, or additional format is reserved merely by appearing as a candidate in this scaffold.
 
 ## Open Questions
 
 The design will resolve these questions one at a time and move each accepted answer into its owning section and the Decision Log.
 
 1. What exact unit does one `LocalizationProjectProfile` represent?
-2. Which configuration layering and precedence semantics belong here rather than 029?
-3. What locale-identifier domain, canonicalization, equality, and ordering rules are normative?
-4. When is the project default source locale required, and how is omission represented?
-5. What are the minimum and maximum project requested-locale sets?
-6. How are project defaults, Target Profile overrides, and effective defaults resolved?
-7. What exact inputs constitute a Locale Negotiation Profile?
-8. What profile inputs define message locale fallback without moving the Linker algorithm into 015?
-9. How are coverage rules scoped and ordered?
-10. How are Provider, approval, Glossary Set, trust, and resource policies referenced by revision?
-11. Which delivery-topology facts belong in the profile rather than the host build graph?
-12. How are Target Profiles assigned to Deployment Compatibility Groups, including hydration coupling?
-13. Which failures are independently reportable, and which must suppress dependent Findings?
-14. Which identities and revisions determine profile equality, staleness, and reproducibility?
-15. Which conformance fixtures are sufficient to admit a third-party host configuration resolver?
+2. Does one `intlify.config.json` describe exactly one project profile, or can 029 select among named profiles in one repository document?
+3. Which JSON Schema version-admission, unknown-field, and configuration source-evidence rules are normative?
+4. What locale-identifier domain, canonicalization, equality, and ordering rules are normative?
+5. When is the project default source locale required, and how is omission represented?
+6. What are the minimum and maximum project requested-locale sets?
+7. How are project defaults, Target Profile overrides, and effective defaults resolved?
+8. What exact inputs constitute a Locale Negotiation Profile?
+9. What profile inputs define message locale fallback without moving the Linker algorithm into 015?
+10. How are coverage rules scoped and ordered?
+11. How are Provider, approval, Glossary Set, trust, and resource policies referenced by revision?
+12. Which delivery-topology facts belong in the profile rather than the host build graph?
+13. How are Target Profiles assigned to Deployment Compatibility Groups, including hydration coupling?
+14. Which failures are independently reportable, and which must suppress dependent Findings?
+15. Which identities and revisions determine profile equality, staleness, and reproducibility?
+16. Which paired file, programmatic-value, profile, and Finding fixtures are sufficient to prove resolver conformance?
 
 ## Relationship to Other Documents
 
 | Document | Relationship |
 | --- | --- |
-| [000 — Intlify overview](./000-intlify-overview-design.md) | Defines the product-wide architecture, terminology, inherited locale invariants, Roadmap, and Expected Outcomes refined here. |
-| [006 — Tooling foundation](./006-ox-mf2-phase-3a-tooling-foundation-design.md) | Provides existing CLI and project-configuration implementation experience; it does not freeze the new source-first resolved profile. |
+| [000 — Intlify overview](./000-intlify-overview-design.md) | Defines the product-wide architecture, terminology, inherited locale invariants, Roadmap, and Expected Outcomes refined here. Its broader illustrative configuration-format wording requires alignment with the canonical JSON decision recorded by 015. |
+| [006 — Tooling foundation](./006-ox-mf2-phase-3a-tooling-foundation-design.md) | Provides existing JSON/JSONC discovery, JSON Schema, CLI, and project-configuration implementation experience. 015 makes strict JSON primary and leaves the compatibility disposition of JSONC to follow-up product design. |
 | [014 — Message linker](./014-ox-mf2-message-linker-design.md) | Provides current locale, fallback, delivery, and resolved-policy implementation experience; 020 owns the source-first linker evolution that consumes this profile. |
 | [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns Intent source-locale declarations and evidence that use the project default defined here only when omitted. |
 | [017 — Shared artifacts and version admission](./017-intlify-shared-artifact-and-version-admission-design.md) | Owns shared encodings, identities, version admission, and migration for the semantic model defined here. |
@@ -449,4 +487,4 @@ The design will resolve these questions one at a time and move each accepted ans
 | [024 — Target Profile and export](./024-intlify-target-profile-and-export-design.md) | Owns Target Profile capabilities and output semantics referenced by project and group declarations. |
 | [025 — Release Assembly and deployment](./025-intlify-release-assembly-and-deployment-design.md) | Owns Release behavior for the Deployment Compatibility Groups declared and validated here. |
 | [027 — Reference Runtime](./027-intlify-reference-runtime-design.md) | Implements one physical execution path that consumes the effective requested-locale and negotiation inputs defined here through 023–025. |
-| [029 — Product workflow and packaging](./029-intlify-product-workflow-and-packaging-design.md) | Owns public configuration syntax, discovery, workspaces, commands, packaging, and user-facing workflow. |
+| [029 — Product workflow and packaging](./029-intlify-product-workflow-and-packaging-design.md) | Owns `intlify.config.json` discovery, workspace selection, schema packaging, optional programmatic helper UX, commands, packaging, and user-facing workflow without introducing alternate configuration semantics. |

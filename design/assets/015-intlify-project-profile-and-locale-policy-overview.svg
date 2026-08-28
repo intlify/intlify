@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">High-level role of the Intlify Localization Project Profile</title>
+<desc id="desc">The primary intlify.config.json repository file and an optional programmatic frontend share one JSON-compatible IntlifyConfig authoring model and versioned JSON Schema. The shared project-profile resolver admits that model with source evidence, performs structural and semantic validation, canonicalizes locale information, resolves defaults, validates target compatibility, and either produces deterministic Findings or one complete Localization Project Profile. The checked settings intermediate representation contains project scope and identity, locale sets and effective defaults, target groups and delivery inputs, and immutable policy references. Shared tooling, planning, synchronization, linking, export, Release Assembly, and execution integrations consume the same profile without rereading configuration. Credentials and unchecked values remain outside the profile.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .profile-group { fill:#f0fdfa; stroke:#0f766e; }
+    .input { fill:#334155; }
+    .resolver { fill:#1d4ed8; }
+    .profile { fill:#0f766e; }
+    .consumer { fill:#475569; }
+    .card { fill:#ffffff; stroke:#cbd5e1; }
+    .note { fill:#e2e8f0; stroke:#94a3b8; }
+    .note-text { fill:#334155; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .profile-group { fill:#071b1a; stroke:#2dd4bf; }
+      .card { fill:#111827; stroke:#475569; }
+      .note { fill:#1e293b; stroke:#64748b; }
+      .note-text { fill:#e2e8f0; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1440" height="760" fill="none"/>
+
+<text x="720" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">One checked project profile for every Intlify stage</text>
+<text x="720" y="70" font-size="13" text-anchor="middle" class="subtitle">Start from one JSON-compatible authoring model; resolve locale, target, delivery, and policy decisions exactly once.</text>
+
+<!-- Canonical authoring inputs -->
+<rect x="40" y="110" width="290" height="510" rx="14" class="group" stroke-width="2"/>
+<rect x="60" y="135" width="250" height="74" rx="9" class="input"/>
+<text x="185" y="163" font-size="14" font-weight="700" text-anchor="middle" class="white">Canonical authoring inputs</text>
+<text x="185" y="186" font-size="10.5" text-anchor="middle" class="soft-white">one JSON-compatible IntlifyConfig model</text>
+
+<rect x="70" y="235" width="230" height="62" rx="8" class="card"/>
+<text x="185" y="259" font-size="11.5" font-weight="700" text-anchor="middle" class="label">intlify.config.json</text>
+<text x="185" y="280" font-size="9.8" text-anchor="middle" class="muted">primary repository configuration</text>
+
+<rect x="70" y="315" width="230" height="62" rx="8" class="card"/>
+<text x="185" y="339" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Versioned JSON Schema</text>
+<text x="185" y="360" font-size="9.8" text-anchor="middle" class="muted">structure · types · editor support</text>
+
+<rect x="70" y="395" width="230" height="62" rx="8" class="card"/>
+<text x="185" y="419" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Optional programmatic frontend</text>
+<text x="185" y="440" font-size="9.8" text-anchor="middle" class="muted">defineIntlifyConfig() · illustrative</text>
+
+<rect x="70" y="475" width="230" height="62" rx="8" class="card"/>
+<text x="185" y="499" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Configuration source evidence</text>
+<text x="185" y="520" font-size="9.8" text-anchor="middle" class="muted">file + JSON Pointer · programmatic call</text>
+
+<text x="185" y="581" font-size="10.3" font-weight="700" text-anchor="middle" class="muted">No platform-specific config DSLs.</text>
+
+<!-- Shared resolution owned by 015 -->
+<path d="M 330 365 L 375 365" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="375" y="110" width="290" height="510" rx="14" class="group" stroke-width="2"/>
+<rect x="395" y="135" width="250" height="74" rx="9" class="resolver"/>
+<text x="520" y="163" font-size="14" font-weight="700" text-anchor="middle" class="white">Shared profile resolver</text>
+<text x="520" y="186" font-size="10.5" text-anchor="middle" class="soft-white">structural admission + semantic resolution</text>
+
+<rect x="405" y="235" width="230" height="62" rx="8" class="card"/>
+<text x="425" y="260" font-size="11.5" font-weight="700" class="label">1 · Admit IntlifyConfig</text>
+<text x="425" y="280" font-size="9.8" class="muted">file or materialized API value</text>
+
+<rect x="405" y="315" width="230" height="62" rx="8" class="card"/>
+<text x="425" y="340" font-size="11.5" font-weight="700" class="label">2 · Validate JSON Schema</text>
+<text x="425" y="360" font-size="9.8" class="muted">structure and schema version</text>
+
+<rect x="405" y="395" width="230" height="62" rx="8" class="card"/>
+<text x="425" y="420" font-size="11.5" font-weight="700" class="label">3 · Resolve semantics</text>
+<text x="425" y="440" font-size="9.8" class="muted">canonicalize locales · resolve defaults</text>
+
+<rect x="405" y="475" width="230" height="62" rx="8" class="card"/>
+<text x="425" y="500" font-size="11.5" font-weight="700" class="label">4 · Produce one outcome</text>
+<text x="425" y="520" font-size="9.8" class="muted">complete profile or deterministic Findings</text>
+
+<text x="520" y="581" font-size="10.3" font-weight="700" text-anchor="middle" class="muted">Same input semantics for every path.</text>
+
+<!-- Checked profile -->
+<path d="M 665 365 L 710 365" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="710" y="90" width="340" height="550" rx="14" class="profile-group" stroke-width="2.5"/>
+<rect x="730" y="120" width="300" height="88" rx="9" class="profile"/>
+<text x="880" y="151" font-size="15" font-weight="700" text-anchor="middle" class="white">LocalizationProjectProfile</text>
+<text x="880" y="175" font-size="10.8" text-anchor="middle" class="soft-white">one complete, checked settings IR</text>
+<text x="880" y="194" font-size="9.5" text-anchor="middle" class="soft-white">language-neutral · deterministic</text>
+
+<rect x="740" y="235" width="280" height="62" rx="8" class="card"/>
+<text x="880" y="259" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Project scope + identity</text>
+<text x="880" y="280" font-size="9.8" text-anchor="middle" class="muted">project · Selection Scope · dependencies</text>
+
+<rect x="740" y="315" width="280" height="62" rx="8" class="card"/>
+<text x="880" y="339" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Locale sets + effective defaults</text>
+<text x="880" y="360" font-size="9.8" text-anchor="middle" class="muted">source · requested · per-target subsets</text>
+
+<rect x="740" y="395" width="280" height="62" rx="8" class="card"/>
+<text x="880" y="419" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Targets + delivery inputs</text>
+<text x="880" y="440" font-size="9.8" text-anchor="middle" class="muted">Target Profiles · compatibility groups</text>
+
+<rect x="740" y="475" width="280" height="62" rx="8" class="card"/>
+<text x="880" y="499" font-size="11.5" font-weight="700" text-anchor="middle" class="label">Immutable policy references</text>
+<text x="880" y="520" font-size="9.8" text-anchor="middle" class="muted">negotiation · fallback · governance · limits</text>
+
+<text x="880" y="581" font-size="10.3" font-weight="700" text-anchor="middle" class="muted">No credentials or unchecked config.</text>
+
+<!-- Shared consumers -->
+<path d="M 1050 365 L 1095 365" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="1095" y="110" width="305" height="510" rx="14" class="group" stroke-width="2"/>
+<rect x="1115" y="135" width="265" height="74" rx="9" class="consumer"/>
+<text x="1247" y="163" font-size="14" font-weight="700" text-anchor="middle" class="white">Shared consumers</text>
+<text x="1247" y="186" font-size="10.5" text-anchor="middle" class="soft-white">all read the same resolved decisions</text>
+
+<rect x="1125" y="225" width="245" height="52" rx="8" class="card"/>
+<text x="1247" y="247" font-size="11.3" font-weight="700" text-anchor="middle" class="label">Project graph + tooling</text>
+<text x="1247" y="265" font-size="9.5" text-anchor="middle" class="muted">queries · Findings · explanations</text>
+
+<rect x="1125" y="292" width="245" height="52" rx="8" class="card"/>
+<text x="1247" y="314" font-size="11.3" font-weight="700" text-anchor="middle" class="label">Planning + linking</text>
+<text x="1247" y="332" font-size="9.5" text-anchor="middle" class="muted">requirements · fallback · placement</text>
+
+<rect x="1125" y="359" width="245" height="52" rx="8" class="card"/>
+<text x="1247" y="381" font-size="11.3" font-weight="700" text-anchor="middle" class="label">Synchronization + governance</text>
+<text x="1247" y="399" font-size="9.5" text-anchor="middle" class="muted">Provider routing · policies · Store scope</text>
+
+<rect x="1125" y="426" width="245" height="52" rx="8" class="card"/>
+<text x="1247" y="448" font-size="11.3" font-weight="700" text-anchor="middle" class="label">Export + Release Assembly</text>
+<text x="1247" y="466" font-size="9.5" text-anchor="middle" class="muted">target outputs · compatible release sets</text>
+
+<rect x="1125" y="493" width="245" height="52" rx="8" class="card"/>
+<text x="1247" y="515" font-size="11.3" font-weight="700" text-anchor="middle" class="label">Execution integration</text>
+<text x="1247" y="533" font-size="9.5" text-anchor="middle" class="muted">supported locales · negotiation input</text>
+
+<text x="1247" y="581" font-size="10.3" font-weight="700" text-anchor="middle" class="muted">No stage rereads authoring config.</text>
+
+<!-- Responsibility summary -->
+<rect x="190" y="675" width="1060" height="54" rx="27" class="note" stroke-width="1.5"/>
+<text x="720" y="699" font-size="11.5" font-weight="700" text-anchor="middle" class="note-text">015 specifies the resolved meaning and validation rules.</text>
+<text x="720" y="718" font-size="10.2" text-anchor="middle" class="note-text">File discovery and helper UX remain 029-owned; downstream algorithms remain in their owning specifications.</text>
+</svg>

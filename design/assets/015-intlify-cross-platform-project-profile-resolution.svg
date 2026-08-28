@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<title id="title">Canonical configuration to cross-platform compilation</title>
+<desc id="desc">The primary repository path loads strict JSON from intlify.config.json. An optional embedded or typed frontend, provisionally illustrated as defineIntlifyConfig, constructs the same JSON-compatible value. Both paths materialize one unchecked IntlifyConfig. The shared pipeline validates its versioned JSON Schema, performs 015 semantic normalization and validation, and produces one complete Localization Project Profile settings intermediate representation. Cross-platform source Producers, planning and linking, synchronization and governance, Target Exporters, and Runtime integrations consume that profile downstream. Platform-specific configuration languages are not required.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
+  </marker>
+  <style>
+    .title { fill:#111827; }
+    .subtitle { fill:#4b5563; }
+    .label { fill:#111827; }
+    .muted { fill:#4b5563; }
+    .group { fill:#f8fafc; stroke:#cbd5e1; }
+    .card { fill:#ffffff; stroke:#cbd5e1; }
+    .file { fill:#0369a1; }
+    .api { fill:#7c3aed; }
+    .input { fill:#334155; }
+    .schema { fill:#0369a1; }
+    .resolver { fill:#1d4ed8; }
+    .profile { fill:#0f766e; }
+    .consumer { fill:#475569; }
+    .note { fill:#e2e8f0; stroke:#94a3b8; }
+    .note-text { fill:#334155; }
+    .arrow { stroke:#64748b; }
+    .arrow-fill { fill:#64748b; }
+    .white { fill:#ffffff; }
+    .soft-white { fill:#e5e7eb; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill:#f8fafc; }
+      .subtitle { fill:#cbd5e1; }
+      .label { fill:#f1f5f9; }
+      .muted { fill:#cbd5e1; }
+      .group { fill:#0f172a; stroke:#475569; }
+      .card { fill:#111827; stroke:#475569; }
+      .note { fill:#1e293b; stroke:#64748b; }
+      .note-text { fill:#e2e8f0; }
+      .arrow { stroke:#cbd5e1; }
+      .arrow-fill { fill:#cbd5e1; }
+    }
+  </style>
+</defs>
+
+<rect x="0" y="0" width="1440" height="900" fill="none"/>
+
+<text x="720" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Canonical configuration to cross-platform compilation</text>
+<text x="720" y="70" font-size="13" text-anchor="middle" class="subtitle">File-first by default; optionally programmatic; always one JSON-compatible input model and one shared resolver.</text>
+
+<!-- Two authoring entry paths -->
+<rect x="40" y="105" width="1360" height="240" rx="14" class="group" stroke-width="2"/>
+<text x="720" y="135" font-size="17" font-weight="700" text-anchor="middle" class="label">Two entry paths, one authoring model</text>
+<text x="720" y="157" font-size="10.8" text-anchor="middle" class="muted">The repository file is primary. The optional API is an equivalent constructor, not a second configuration language.</text>
+
+<rect x="90" y="180" width="520" height="135" rx="10" class="card" stroke-width="1.5"/>
+<rect x="110" y="198" width="480" height="48" rx="8" class="file"/>
+<text x="350" y="227" font-size="13.5" font-weight="700" text-anchor="middle" class="white">Primary repository path</text>
+<text x="350" y="273" font-size="13" font-weight="700" text-anchor="middle" class="label">intlify.config.json</text>
+<text x="350" y="295" font-size="10.2" text-anchor="middle" class="muted">strict JSON · versioned JSON Schema · repository-owned</text>
+
+<rect x="830" y="180" width="520" height="135" rx="10" class="card" stroke-width="1.5"/>
+<rect x="850" y="198" width="480" height="48" rx="8" class="api"/>
+<text x="1090" y="227" font-size="13.5" font-weight="700" text-anchor="middle" class="white">Optional embedded / typed path</text>
+<text x="1090" y="273" font-size="13" font-weight="700" text-anchor="middle" class="label">defineIntlifyConfig({ ... })</text>
+<text x="1090" y="295" font-size="10.2" text-anchor="middle" class="muted">illustrative helper · same JSON-compatible value · still unchecked</text>
+
+<!-- Shared resolution pipeline -->
+<path d="M 350 315 L 350 375" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 1090 315 L 1090 375" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 350 375 L 1090 375" fill="none" class="arrow" stroke-width="2.2"/>
+
+<rect x="40" y="410" width="1360" height="210" rx="14" class="group" stroke-width="2"/>
+<text x="720" y="440" font-size="17" font-weight="700" text-anchor="middle" class="label">One shared configuration-resolution pipeline</text>
+<text x="720" y="462" font-size="10.8" text-anchor="middle" class="muted">Every entry path receives identical structural admission, semantic validation, normalization, and Findings.</text>
+
+<rect x="60" y="490" width="300" height="100" rx="9" class="input"/>
+<text x="210" y="519" font-size="13" font-weight="700" text-anchor="middle" class="white">IntlifyConfig</text>
+<text x="210" y="543" font-size="10.2" text-anchor="middle" class="soft-white">unchecked · JSON-compatible</text>
+<text x="210" y="565" font-size="9.7" text-anchor="middle" class="soft-white">file or materialized programmatic value</text>
+
+<path d="M 360 540 L 390 540" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="390" y="490" width="300" height="100" rx="9" class="schema"/>
+<text x="540" y="519" font-size="13" font-weight="700" text-anchor="middle" class="white">JSON Schema admission</text>
+<text x="540" y="543" font-size="10.2" text-anchor="middle" class="soft-white">structure · types · schema version</text>
+<text x="540" y="565" font-size="9.7" text-anchor="middle" class="soft-white">schema success is not semantic success</text>
+
+<path d="M 690 540 L 720 540" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="720" y="490" width="300" height="100" rx="9" class="resolver"/>
+<text x="870" y="519" font-size="13" font-weight="700" text-anchor="middle" class="white">015 semantic resolver</text>
+<text x="870" y="543" font-size="10.2" text-anchor="middle" class="soft-white">canonicalize locales · resolve defaults</text>
+<text x="870" y="565" font-size="9.7" text-anchor="middle" class="soft-white">validate references · targets · compatibility groups</text>
+
+<path d="M 1020 540 L 1050 540" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="1050" y="490" width="330" height="100" rx="9" class="profile"/>
+<text x="1215" y="519" font-size="13" font-weight="700" text-anchor="middle" class="white">LocalizationProjectProfile</text>
+<text x="1215" y="543" font-size="10.2" text-anchor="middle" class="soft-white">complete, checked settings IR</text>
+<text x="1215" y="565" font-size="9.7" text-anchor="middle" class="soft-white">deterministic · language-neutral · no credentials</text>
+
+<path d="M 720 375 L 720 392 L 210 392 L 210 490" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<!-- Cross-platform downstream consumers -->
+<path d="M 1215 590 L 1215 650 L 720 650 L 720 680" fill="none" class="arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+<rect x="40" y="680" width="1360" height="175" rx="14" class="group" stroke-width="2"/>
+<text x="720" y="710" font-size="17" font-weight="700" text-anchor="middle" class="label">Cross-platform compiler and product integrations begin here</text>
+<text x="720" y="731" font-size="10.8" text-anchor="middle" class="muted">Platforms vary in source analysis, lowering, export, and execution—not in project-configuration semantics.</text>
+
+<rect x="65" y="755" width="245" height="75" rx="9" class="consumer"/>
+<text x="187" y="782" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Source Producers</text>
+<text x="187" y="806" font-size="9.6" text-anchor="middle" class="soft-white">JS/TS · Swift · Kotlin · native</text>
+
+<rect x="330" y="755" width="245" height="75" rx="9" class="consumer"/>
+<text x="452" y="782" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Planning + linking</text>
+<text x="452" y="806" font-size="9.6" text-anchor="middle" class="soft-white">requirements · fallback · placement</text>
+
+<rect x="595" y="755" width="245" height="75" rx="9" class="consumer"/>
+<text x="717" y="782" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Sync + governance</text>
+<text x="717" y="806" font-size="9.6" text-anchor="middle" class="soft-white">Provider routing · Store policies</text>
+
+<rect x="860" y="755" width="245" height="75" rx="9" class="consumer"/>
+<text x="982" y="782" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Target Exporters</text>
+<text x="982" y="806" font-size="9.6" text-anchor="middle" class="soft-white">Web · mobile · native outputs</text>
+
+<rect x="1125" y="755" width="245" height="75" rx="9" class="consumer"/>
+<text x="1247" y="782" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Runtime integrations</text>
+<text x="1247" y="806" font-size="9.6" text-anchor="middle" class="soft-white">locale negotiation · execution</text>
+
+<rect x="310" y="870" width="820" height="24" rx="12" class="note" stroke-width="1.2"/>
+<text x="720" y="887" font-size="10.2" font-weight="700" text-anchor="middle" class="note-text">One repository format · one JSON-compatible input model · one checked settings IR</text>
+</svg>
