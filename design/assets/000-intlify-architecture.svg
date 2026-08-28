@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1440" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 2020" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
 <title id="title">Intlify overview: compiler-based localization architecture</title>
-<desc id="desc">Source-first UI, explicit Message Intent declarations, standalone MF2 messages, and library manifests enter host-specific producers. Producers emit portable Message Intent and reference artifacts into shared MF2 semantics, a resolved project profile, and finite direct-localization demand with coverage modes. Explicit synchronization and governance communicate with Provider and TMS systems, validate candidates, record digest-bound approval for source or localized artifacts plus selection and revocation evidence, and atomically publish a Translation Store snapshot. A separate deterministic build verifies the plan, pinned snapshot, and Selection Decisions, then performs final message locale fallback, reachability, delivery linking, and authoritative target capability admission. Release Assembly is the sole producer of a Release snapshot over one or more complete target output sets. A bounded Localization Execution Layer preserves the same release, selected-message, locale, output, and failure guarantees through either a runtime-backed path or a capability-checked ahead-of-time target-native path without a Provider or TMS connection.</desc>
+<desc id="desc">Source-first UI, explicit Message Intent declarations, and standalone MF2 messages enter host-specific producers. Prebuilt Library Manifests enter the language-neutral compiler model directly. The checked graph and complete requirement plan feed both explicit localization synchronization and deterministic application build workflows. Synchronization separates candidate validation, governance decisions, and atomic Store publication. The Store snapshot feeds build verification. Final linking branches into a Host Lowering Backend and Target Exporter. Their matching target outputs converge at Release Assembly, the final static compiler stage, which emits one immutable Release Snapshot. Downstream, an authorized publication transaction creates a Release Publication Record, the host verifies that record and activates a Release reference, and execution admission checks the deployment-selected Release. One Release Snapshot may have multiple publication records for different destinations. Conforming production execution then uses the admitted Release and matching outputs through either a runtime-backed or capability-checked ahead-of-time path.</desc>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
     <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -14,6 +14,7 @@
     .group { fill:#f8fafc; stroke:#cbd5e1; }
     .sync-group { fill:#fffbeb; stroke:#d97706; }
     .build-group { fill:#f0fdfa; stroke:#0f766e; }
+    .delivery-group { fill:#faf5ff; stroke:#7c3aed; }
     .runtime-group { fill:#eff6ff; stroke:#2563eb; }
     .source { fill:#0369a1; }
     .explicit { fill:#7c3aed; }
@@ -24,11 +25,17 @@
     .plan { fill:#4f46e5; }
     .tooling { fill:#e2e8f0; stroke:#94a3b8; }
     .sync { fill:#b45309; }
+    .candidate { fill:#a16207; }
+    .governance { fill:#9a3412; }
     .external { fill:#92400e; stroke:#fbbf24; stroke-dasharray:7 5; }
     .store { fill:#7c2d12; }
     .build { fill:#0f766e; }
     .export { fill:#047857; }
     .output { fill:#475569; }
+    .release { fill:#4338ca; }
+    .publication { fill:#6d28d9; }
+    .activation { fill:#1d4ed8; }
+    .admission { fill:#0f766e; }
     .adapter { fill:#0369a1; }
     .runtime { fill:#1d4ed8; }
     .core { fill:#0f766e; }
@@ -50,6 +57,7 @@
       .group { fill:#0f172a; stroke:#475569; }
       .sync-group { fill:#1c1917; stroke:#f59e0b; }
       .build-group { fill:#071b1a; stroke:#2dd4bf; }
+      .delivery-group { fill:#1e1233; stroke:#a78bfa; }
       .runtime-group { fill:#0c1729; stroke:#60a5fa; }
       .tooling { fill:#1e293b; stroke:#64748b; }
       .tooling-text { fill:#e2e8f0; }
@@ -61,12 +69,12 @@
   </style>
 </defs>
 
-<rect x="0" y="0" width="1320" height="1440" fill="none"/>
+<rect x="0" y="0" width="1320" height="2020" fill="none"/>
 
 <text x="660" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Intlify compiler-based localization architecture</text>
-<text x="660" y="70" font-size="13" text-anchor="middle" class="subtitle">Source-first authoring → direct-demand planning → governed selection → release assembly → bounded target execution</text>
+<text x="660" y="70" font-size="13" text-anchor="middle" class="subtitle">Source-first authoring → governed localization → Release Snapshot → publication and activation → bounded execution</text>
 
-<!-- Authoring surfaces -->
+<!-- 1: Authoring surfaces -->
 <rect x="40" y="100" width="1240" height="190" rx="14" class="group" stroke-width="2"/>
 <text x="660" y="130" font-size="17" font-weight="700" text-anchor="middle" class="label">1 · Application authoring surfaces</text>
 <text x="660" y="151" font-size="10.8" text-anchor="middle" class="muted">Application-owned messages are authored in source; simple UI can remain ordinary host-language text.</text>
@@ -74,7 +82,7 @@
 <rect x="70" y="175" width="350" height="88" rx="9" class="source"/>
 <text x="245" y="201" font-size="13" font-weight="700" text-anchor="middle" class="white">Source-first UI</text>
 <text x="245" y="225" font-size="10.5" text-anchor="middle" class="soft-white">template text · HTML · known UI sinks</text>
-<text x="245" y="246" font-size="10.2" text-anchor="middle" class="soft-white">simple messages without an i18n API call</text>
+<text x="245" y="246" font-size="9.8" text-anchor="middle" class="soft-white">ordinary messages · explicit non-localizable marker</text>
 
 <rect x="485" y="175" width="350" height="88" rx="9" class="explicit"/>
 <text x="660" y="201" font-size="13" font-weight="700" text-anchor="middle" class="white">Explicit Message Intent</text>
@@ -86,7 +94,7 @@
 <text x="1075" y="225" font-size="10.5" text-anchor="middle" class="soft-white">mf2 source · reusable declarations</text>
 <text x="1075" y="246" font-size="10.2" text-anchor="middle" class="soft-white">headless · multiline · advanced MF2</text>
 
-<!-- Producers -->
+<!-- 2: Producers and lowering backends -->
 <path d="M 245 263 L 245 315" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 660 263 L 660 315" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 1075 263 L 1075 315" fill="none" class="arrow" stroke-width="2.2"/>
@@ -96,164 +104,258 @@
 <path d="M 1060 315 L 1060 395" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
 
 <rect x="40" y="345" width="1240" height="140" rx="14" class="group" stroke-width="2"/>
-<text x="660" y="375" font-size="17" font-weight="700" text-anchor="middle" class="label">2 · Host-specific Intent Frontends and Producers</text>
+<text x="660" y="375" font-size="17" font-weight="700" text-anchor="middle" class="label">2 · Host-specific Producers and Lowering Backends</text>
 
 <rect x="90" y="395" width="340" height="65" rx="8" class="producer"/>
-<text x="260" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">Web producers</text>
-<text x="260" y="443" font-size="9.8" text-anchor="middle" class="soft-white">JS/TS · Vue · HTML</text>
+<text x="260" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">Web frontend / producer</text>
+<text x="260" y="442" font-size="9.6" text-anchor="middle" class="soft-white">JS/TS · Vue · HTML · paired lowering backend</text>
 
 <rect x="490" y="395" width="340" height="65" rx="8" class="producer"/>
-<text x="660" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">Mobile producers</text>
-<text x="660" y="443" font-size="9.8" text-anchor="middle" class="soft-white">Swift · Kotlin · native UI</text>
+<text x="660" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">Mobile frontend / producer</text>
+<text x="660" y="442" font-size="9.6" text-anchor="middle" class="soft-white">Swift · Kotlin · native UI · paired lowering backend</text>
 
 <rect x="890" y="395" width="340" height="65" rx="8" class="producer"/>
-<text x="1060" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">System producers</text>
-<text x="1060" y="443" font-size="9.8" text-anchor="middle" class="soft-white">Rust · JVM · C/C++ · Go · .NET</text>
+<text x="1060" y="420" font-size="12" font-weight="700" text-anchor="middle" class="white">System frontend / producer</text>
+<text x="1060" y="442" font-size="9.6" text-anchor="middle" class="soft-white">Rust · JVM · C/C++ · Go · .NET · lowering backend</text>
 
-<!-- Shared compiler model -->
+<!-- 3: Shared compiler model -->
 <path d="M 260 460 L 260 510" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 660 460 L 660 510" fill="none" class="arrow" stroke-width="2.2"/>
 <path d="M 1060 460 L 1060 510" fill="none" class="arrow" stroke-width="2.2"/>
-<path d="M 255 510 L 1060 510" fill="none" class="arrow" stroke-width="2.2"/>
-<path d="M 255 510 L 255 590" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
+<path d="M 260 510 L 1060 510" fill="none" class="arrow" stroke-width="2.2"/>
+<path d="M 260 510 L 260 550 L 205 550 L 205 590" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)"/>
 
-<rect x="40" y="535" width="1240" height="200" rx="14" class="group" stroke-width="2"/>
+<rect x="40" y="535" width="1240" height="215" rx="14" class="group" stroke-width="2"/>
 <text x="660" y="565" font-size="17" font-weight="700" text-anchor="middle" class="label">3 · Language-neutral compiler model and shared tooling</text>
 
-<rect x="75" y="590" width="360" height="88" rx="9" class="specification"/>
-<text x="255" y="616" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Portable message artifacts</text>
-<text x="255" y="640" font-size="10.1" text-anchor="middle" class="soft-white">application + library Intents · references</text>
-<text x="255" y="661" font-size="10.1" text-anchor="middle" class="soft-white">parameter specifications · source evidence</text>
+<rect x="70" y="590" width="270" height="88" rx="9" class="specification"/>
+<text x="205" y="616" font-size="12.2" font-weight="700" text-anchor="middle" class="white">Application artifacts</text>
+<text x="205" y="640" font-size="9.8" text-anchor="middle" class="soft-white">Intents · references · source definitions</text>
+<text x="205" y="661" font-size="9.8" text-anchor="middle" class="soft-white">parameters · source evidence</text>
 
-<path d="M 435 634 L 475 634" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="370" y="590" width="270" height="88" rx="9" class="semantic"/>
+<text x="505" y="616" font-size="12.2" font-weight="700" text-anchor="middle" class="white">ox-mf2 language services</text>
+<text x="505" y="640" font-size="9.8" text-anchor="middle" class="soft-white">parse · semantics · format · lint</text>
+<text x="505" y="661" font-size="9.8" text-anchor="middle" class="soft-white">parameters · Findings · source maps</text>
 
-<rect x="475" y="590" width="330" height="88" rx="9" class="semantic"/>
-<text x="640" y="616" font-size="12.5" font-weight="700" text-anchor="middle" class="white">ox-mf2 language services</text>
-<text x="640" y="640" font-size="10.1" text-anchor="middle" class="soft-white">parse · semantics · format · lint</text>
-<text x="640" y="661" font-size="10.1" text-anchor="middle" class="soft-white">parameters · diagnostics · source maps</text>
+<rect x="670" y="590" width="360" height="88" rx="9" class="plan"/>
+<text x="850" y="614" font-size="12.2" font-weight="700" text-anchor="middle" class="white">Checked graph + complete requirement plan</text>
+<text x="850" y="638" font-size="9.8" text-anchor="middle" class="soft-white">project profile · identity · target/locale applicability</text>
+<text x="850" y="659" font-size="9.4" text-anchor="middle" class="soft-white">all reachable Intent revisions × requested locales</text>
 
-<path d="M 805 634 L 845 634" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="1060" y="590" width="190" height="88" rx="9" class="specification"/>
+<text x="1155" y="614" font-size="11.8" font-weight="700" text-anchor="middle" class="white">LibraryManifest</text>
+<text x="1155" y="638" font-size="9.4" text-anchor="middle" class="soft-white">prebuilt package input</text>
+<text x="1155" y="659" font-size="9.1" text-anchor="middle" class="soft-white">direct graph composition</text>
 
-<rect x="845" y="590" width="400" height="88" rx="9" class="plan"/>
-<text x="1045" y="616" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Checked graph + requirement planning</text>
-<text x="1045" y="640" font-size="10.1" text-anchor="middle" class="soft-white">project profile · identity · Target Profiles</text>
-<text x="1045" y="661" font-size="10.1" text-anchor="middle" class="soft-white">direct Intent × locale demand · coverage mode · delivery</text>
+<path d="M 340 634 L 370 634" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 640 634 L 670 634" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1060 634 L 1030 634" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="75" y="694" width="1170" height="25" rx="12" class="tooling" stroke-width="1.3"/>
-<text x="660" y="711" font-size="10.3" font-weight="700" text-anchor="middle" class="tooling-text">Shared structured clients: CLI · compiler diagnostics · formatter · linter · LSP/editor adapter · AI-agent queries</text>
+<rect x="70" y="704" width="760" height="28" rx="14" class="tooling" stroke-width="1.3"/>
+<text x="450" y="723" font-size="9.8" font-weight="700" text-anchor="middle" class="tooling-text">Shared clients: CLI · diagnostics · formatter · linter · LSP/editor</text>
+<rect x="870" y="704" width="380" height="28" rx="14" class="tooling" stroke-width="1.3"/>
+<text x="1060" y="723" font-size="9.8" font-weight="700" text-anchor="middle" class="tooling-text">Same Findings + queries for build and AI agents</text>
 
-<!-- Sync and deterministic build workflows -->
-<path d="M 255 678 L 255 800 L 145 800 L 145 850" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<path d="M 1045 678 L 1045 800 L 760 800 L 760 850" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<!-- Graph branches to both sibling workflows -->
+<path d="M 850 678 L 850 775 L 145 775 L 145 870" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 850 678 L 850 775 L 790 775 L 790 870" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="40" y="775" width="580" height="245" rx="14" class="sync-group" stroke-width="2"/>
-<text x="330" y="806" font-size="17" font-weight="700" text-anchor="middle" class="label">4A · Localization synchronization + governance</text>
-<text x="330" y="827" font-size="10.5" text-anchor="middle" class="muted">Network, candidate acquisition, approval, selection, and revocation live here.</text>
+<!-- 4A: Synchronization, governance, and Store publication -->
+<rect x="40" y="800" width="600" height="365" rx="14" class="sync-group" stroke-width="2"/>
+<text x="340" y="831" font-size="17" font-weight="700" text-anchor="middle" class="label">4A · Explicit localization synchronization</text>
+<text x="340" y="852" font-size="10.2" text-anchor="middle" class="muted">Candidate supply, governance authority, and Store publication remain distinct.</text>
 
-<rect x="70" y="850" width="150" height="72" rx="8" class="sync"/>
-<text x="145" y="877" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Requirement plan</text>
-<text x="145" y="900" font-size="8.9" text-anchor="middle" class="soft-white">direct demand · coverage mode</text>
+<rect x="65" y="870" width="160" height="72" rx="8" class="sync"/>
+<text x="145" y="895" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Requirement plan</text>
+<text x="145" y="916" font-size="8.8" text-anchor="middle" class="soft-white">derive Provider-work subset</text>
+<text x="145" y="931" font-size="8.5" text-anchor="middle" class="soft-white">source-equal stays visible</text>
 
-<path d="M 220 886 L 245 886" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 225 906 L 245 906" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="245" y="850" width="160" height="72" rx="8" class="external" stroke-width="2"/>
-<text x="325" y="877" font-size="12" font-weight="700" text-anchor="middle" class="white">Provider / TMS</text>
-<text x="325" y="900" font-size="9.7" text-anchor="middle" class="soft-white">AI · MT · rule · human</text>
+<rect x="245" y="870" width="150" height="72" rx="8" class="external" stroke-width="2"/>
+<text x="320" y="895" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Provider / TMS</text>
+<text x="320" y="916" font-size="9.2" text-anchor="middle" class="soft-white">AI · MT · rule · human</text>
+<text x="320" y="931" font-size="8.5" text-anchor="middle" class="soft-white">or explicit candidate import</text>
 
-<path d="M 405 886 L 430 886" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 395 906 L 415 906" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="430" y="850" width="160" height="72" rx="8" class="sync"/>
-<text x="510" y="874" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Validate + govern</text>
-<text x="510" y="897" font-size="9.2" text-anchor="middle" class="soft-white">MF2 · parameters · integrity</text>
-<text x="510" y="913" font-size="8.4" text-anchor="middle" class="soft-white">approval · selection · revocation</text>
+<rect x="415" y="870" width="200" height="72" rx="8" class="candidate"/>
+<text x="515" y="895" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Candidate Validation</text>
+<text x="515" y="916" font-size="8.9" text-anchor="middle" class="soft-white">MF2 · parameters · integrity</text>
+<text x="515" y="931" font-size="8.5" text-anchor="middle" class="soft-white">technically valid candidate</text>
 
-<path d="M 510 922 L 510 948 L 435 948" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 515 942 L 515 970 L 220 970 L 220 985" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 565 942 L 565 970 L 525 970 L 525 985" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="200" y="944" width="250" height="62" rx="8" class="store"/>
-<text x="325" y="965" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Atomic Store snapshot</text>
-<text x="325" y="983" font-size="9.1" text-anchor="middle" class="soft-white">stored · selectable · selected</text>
-<text x="325" y="998" font-size="8.6" text-anchor="middle" class="soft-white">immutable decisions · history retained</text>
+<rect x="105" y="985" width="230" height="72" rx="8" class="governance"/>
+<text x="220" y="1010" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Governance Decisions</text>
+<text x="220" y="1031" font-size="8.9" text-anchor="middle" class="soft-white">trust · approval · scoped selection</text>
+<text x="220" y="1046" font-size="8.5" text-anchor="middle" class="soft-white">supersession · revocation</text>
 
-<rect x="660" y="775" width="620" height="245" rx="14" class="build-group" stroke-width="2"/>
-<text x="970" y="806" font-size="17" font-weight="700" text-anchor="middle" class="label">4B · Deterministic application build</text>
-<text x="970" y="827" font-size="10.5" text-anchor="middle" class="muted">Stored checked inputs only; no implicit Provider, TMS, model, credential, or network call.</text>
+<path d="M 335 1021 L 360 1021" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="685" y="850" width="150" height="72" rx="8" class="build"/>
-<text x="760" y="877" font-size="11.2" font-weight="700" text-anchor="middle" class="white">Verify plan + snapshot</text>
-<text x="760" y="900" font-size="8.9" text-anchor="middle" class="soft-white">coverage · selection · freshness</text>
+<rect x="360" y="985" width="230" height="72" rx="8" class="store"/>
+<text x="475" y="1010" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Store Publication</text>
+<text x="475" y="1031" font-size="8.9" text-anchor="middle" class="soft-white">authorized atomic commit</text>
+<text x="475" y="1046" font-size="8.5" text-anchor="middle" class="soft-white">artifacts · evidence · decisions</text>
 
-<path d="M 835 886 L 860 886" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 475 1057 L 475 1080 L 445 1080" fill="none" class="sync-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="860" y="850" width="185" height="72" rx="8" class="build"/>
-<text x="952" y="874" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Final message linking</text>
-<text x="952" y="897" font-size="9.4" text-anchor="middle" class="soft-white">reference · message locale fallback</text>
-<text x="952" y="913" font-size="9.4" text-anchor="middle" class="soft-white">delivery placement</text>
+<rect x="205" y="1080" width="240" height="62" rx="8" class="store"/>
+<text x="325" y="1103" font-size="11.3" font-weight="700" text-anchor="middle" class="white">TranslationStoreSnapshot</text>
+<text x="325" y="1124" font-size="8.9" text-anchor="middle" class="soft-white">immutable snapshot · history retained</text>
 
-<path d="M 1045 886 L 1070 886" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<!-- 4B: Deterministic application build -->
+<rect x="680" y="800" width="600" height="365" rx="14" class="build-group" stroke-width="2"/>
+<text x="980" y="831" font-size="17" font-weight="700" text-anchor="middle" class="label">4B · Deterministic application build</text>
+<text x="980" y="852" font-size="10.2" text-anchor="middle" class="muted">Pinned checked inputs only; no implicit Provider, TMS, credential, model, or network call.</text>
 
-<rect x="1070" y="850" width="185" height="72" rx="8" class="export"/>
-<text x="1162" y="874" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Target Exporter</text>
-<text x="1162" y="897" font-size="8.9" text-anchor="middle" class="soft-white">authoritative capability admission</text>
-<text x="1162" y="913" font-size="9.4" text-anchor="middle" class="soft-white">handles · complete target output sets</text>
+<rect x="705" y="870" width="170" height="72" rx="8" class="build"/>
+<text x="790" y="895" font-size="11.1" font-weight="700" text-anchor="middle" class="white">Verify plan + snapshot</text>
+<text x="790" y="916" font-size="8.6" text-anchor="middle" class="soft-white">source admission · scoped selection</text>
+<text x="790" y="931" font-size="8.5" text-anchor="middle" class="soft-white">coverage · freshness</text>
 
-<path d="M 450 975 L 640 975 L 640 952 L 952 952 L 952 922" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="700" y="965" font-size="9.8" font-weight="700" class="muted">pinned Store snapshot</text>
+<path d="M 875 906 L 900 906" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<!-- Generated outputs -->
-<path d="M 1162 922 L 1162 1040 L 660 1040 L 660 1060" fill="none" class="build-arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
+<rect x="900" y="870" width="170" height="72" rx="8" class="build"/>
+<text x="985" y="895" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Final message linking</text>
+<text x="985" y="916" font-size="8.8" text-anchor="middle" class="soft-white">definition + fallback selection</text>
+<text x="985" y="931" font-size="8.5" text-anchor="middle" class="soft-white">reachability · delivery placement</text>
 
-<rect x="40" y="1060" width="1240" height="145" rx="14" class="group" stroke-width="2"/>
-<text x="660" y="1090" font-size="17" font-weight="700" text-anchor="middle" class="label">5 · Generated target outputs and Release Assembly</text>
+<path d="M 1070 906 L 1095 906" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="70" y="1115" width="270" height="65" rx="8" class="output"/>
-<text x="205" y="1139" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Application bindings</text>
-<text x="205" y="1162" font-size="9.5" text-anchor="middle" class="soft-white">lowered calls · handles · native references</text>
+<rect x="1095" y="870" width="160" height="72" rx="8" class="export"/>
+<text x="1175" y="895" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Target Exporter</text>
+<text x="1175" y="916" font-size="8.6" text-anchor="middle" class="soft-white">Capability admission</text>
+<text x="1175" y="931" font-size="8.3" text-anchor="middle" class="soft-white">outputs + lowering plan</text>
 
-<rect x="370" y="1115" width="270" height="65" rx="8" class="output"/>
-<text x="505" y="1139" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Web / server artifacts</text>
-<text x="505" y="1162" font-size="9.7" text-anchor="middle" class="soft-white">Browser ESM · SSR modules · capsule</text>
+<path d="M 1175 942 L 1175 970 L 830 970 L 830 990" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1175 942 L 1175 990" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="670" y="1115" width="270" height="65" rx="8" class="output"/>
-<text x="805" y="1139" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Mobile / native resources</text>
-<text x="805" y="1162" font-size="9.7" text-anchor="middle" class="soft-white">iOS · Android · baked/native data</text>
+<rect x="715" y="990" width="230" height="72" rx="8" class="producer"/>
+<text x="830" y="1015" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Host Lowering Backend</text>
+<text x="830" y="1036" font-size="8.9" text-anchor="middle" class="soft-white">apply checked SourceLoweringPlan</text>
+<text x="830" y="1051" font-size="8.5" text-anchor="middle" class="soft-white">bindings · transformed source · maps</text>
 
-<rect x="970" y="1115" width="280" height="65" rx="8" class="output"/>
-<text x="1110" y="1139" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Release Assembly</text>
-<text x="1110" y="1162" font-size="9.7" text-anchor="middle" class="soft-white">sole snapshot producer · group integrity</text>
+<rect x="1010" y="990" width="220" height="72" rx="8" class="export"/>
+<text x="1120" y="1015" font-size="11.3" font-weight="700" text-anchor="middle" class="white">Complete target outputs</text>
+<text x="1120" y="1036" font-size="8.9" text-anchor="middle" class="soft-white">capsules · resources · manifests</text>
+<text x="1120" y="1051" font-size="8.5" text-anchor="middle" class="soft-white">one or more Target Profiles</text>
 
-<!-- Build/runtime boundary -->
-<path d="M 40 1240 L 1280 1240" fill="none" class="boundary-line" stroke-width="2.2" stroke-dasharray="12 8"/>
-<rect x="470" y="1222" width="380" height="36" rx="18" class="panel" stroke-width="1.5"/>
-<text x="660" y="1245" font-size="11.5" font-weight="700" text-anchor="middle" class="label">explicit build / production-execution boundary</text>
+<!-- Store snapshot explicitly feeds verification -->
+<path d="M 445 1111 L 660 1111 L 660 906 L 705 906" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="500" y="1098" font-size="9.5" font-weight="700" class="muted">pinned Store snapshot</text>
 
-<path d="M 205 1180 L 205 1285" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<path d="M 505 1180 L 505 1285" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<path d="M 805 1180 L 805 1285" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
-<path d="M 1110 1180 L 1110 1268 L 635 1268 L 635 1285" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<!-- 5: Target outputs and Release Assembly -->
+<path d="M 830 1062 L 830 1185 L 200 1185 L 200 1260" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1120 1062 L 1120 1195 L 495 1195 L 495 1260" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 790 1195 L 790 1260" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<!-- Localization execution -->
-<rect x="40" y="1285" width="1240" height="125" rx="14" class="runtime-group" stroke-width="2"/>
-<text x="660" y="1313" font-size="17" font-weight="700" text-anchor="middle" class="label">6 · Conforming Localization Execution</text>
+<rect x="40" y="1210" width="1240" height="275" rx="14" class="group" stroke-width="2"/>
+<text x="660" y="1240" font-size="17" font-weight="700" text-anchor="middle" class="label">5 · Generated target outputs and Release Assembly</text>
 
-<rect x="70" y="1335" width="250" height="55" rx="8" class="adapter"/>
-<text x="195" y="1357" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Target / framework adapter</text>
-<text x="195" y="1377" font-size="9.4" text-anchor="middle" class="soft-white">preference · negotiation · UI lifecycle</text>
+<rect x="70" y="1260" width="260" height="70" rx="8" class="output"/>
+<text x="200" y="1286" font-size="11.4" font-weight="700" text-anchor="middle" class="white">Application bindings</text>
+<text x="200" y="1307" font-size="9.1" text-anchor="middle" class="soft-white">lowered code · handles · native refs</text>
+<text x="200" y="1322" font-size="8.5" text-anchor="middle" class="soft-white">source maps · host metadata</text>
 
-<path d="M 320 1362 L 350 1362" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="365" y="1260" width="260" height="70" rx="8" class="output"/>
+<text x="495" y="1286" font-size="11.4" font-weight="700" text-anchor="middle" class="white">Web / server outputs</text>
+<text x="495" y="1307" font-size="9.1" text-anchor="middle" class="soft-white">ESM · capsules · manifests</text>
+<text x="495" y="1322" font-size="8.5" text-anchor="middle" class="soft-white">complete Target Profile set</text>
 
-<rect x="350" y="1335" width="280" height="55" rx="8" class="runtime"/>
-<text x="490" y="1357" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Localization Execution Layer</text>
-<text x="490" y="1377" font-size="8.9" text-anchor="middle" class="soft-white">release · locale · selected definition · failure</text>
+<rect x="660" y="1260" width="260" height="70" rx="8" class="output"/>
+<text x="790" y="1286" font-size="11.4" font-weight="700" text-anchor="middle" class="white">Mobile / native outputs</text>
+<text x="790" y="1307" font-size="9.1" text-anchor="middle" class="soft-white">resources · capsules · baked data</text>
+<text x="790" y="1322" font-size="8.5" text-anchor="middle" class="soft-white">complete Target Profile set</text>
 
-<path d="M 630 1362 L 660 1362" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<!-- All matching outputs converge before release assembly -->
+<path d="M 200 1330 L 200 1350 L 550 1350" fill="none" class="build-arrow" stroke-width="2.3"/>
+<path d="M 495 1330 L 495 1350" fill="none" class="build-arrow" stroke-width="2.3"/>
+<path d="M 790 1330 L 790 1350 L 550 1350" fill="none" class="build-arrow" stroke-width="2.3"/>
+<path d="M 550 1350 L 550 1370" fill="none" class="build-arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
-<rect x="660" y="1335" width="270" height="55" rx="8" class="core"/>
-<text x="795" y="1357" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Conforming execution path</text>
-<text x="795" y="1377" font-size="8.9" text-anchor="middle" class="soft-white">runtime-backed · ahead-of-time target-native</text>
+<rect x="385" y="1370" width="330" height="72" rx="8" class="release"/>
+<text x="550" y="1396" font-size="11.8" font-weight="700" text-anchor="middle" class="white">Release Assembly</text>
+<text x="550" y="1417" font-size="9.2" text-anchor="middle" class="soft-white">verify one Deployment Compatibility Group</text>
+<text x="550" y="1432" font-size="8.6" text-anchor="middle" class="soft-white">sole ReleaseSnapshot producer</text>
 
-<path d="M 930 1362 L 960 1362" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 715 1406 L 760 1406" fill="none" class="build-arrow" stroke-width="2.4" marker-end="url(#arrow)"/>
 
-<rect x="960" y="1335" width="290" height="55" rx="8" class="result"/>
-<text x="1105" y="1357" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Localized UI / host output</text>
-<text x="1105" y="1377" font-size="9.4" text-anchor="middle" class="soft-white">text · safe structured parts</text>
+<rect x="760" y="1370" width="330" height="72" rx="8" class="release"/>
+<text x="925" y="1396" font-size="12" font-weight="700" text-anchor="middle" class="white">ReleaseSnapshot</text>
+<text x="925" y="1417" font-size="9.2" text-anchor="middle" class="soft-white">immutable release identity + exact inputs</text>
+<text x="925" y="1432" font-size="8.6" text-anchor="middle" class="soft-white">one immutable compatibility-group manifest</text>
+
+<!-- Static compiler / downstream delivery boundary -->
+<path d="M 40 1530 L 1280 1530" fill="none" class="boundary-line" stroke-width="2.2" stroke-dasharray="12 8"/>
+<rect x="430" y="1512" width="460" height="36" rx="18" class="panel" stroke-width="1.5"/>
+<text x="660" y="1535" font-size="11.5" font-weight="700" text-anchor="middle" class="label">static Locale Compiler / downstream Release delivery boundary</text>
+
+<!-- Downstream release delivery lifecycle -->
+<rect x="40" y="1570" width="1240" height="240" rx="14" class="delivery-group" stroke-width="2"/>
+<text x="660" y="1601" font-size="17" font-weight="700" text-anchor="middle" class="label">Downstream Release delivery lifecycle</text>
+<text x="660" y="1622" font-size="10.2" text-anchor="middle" class="muted">Consumes the ReleaseSnapshot and matching outputs; publication evidence, host activation, and execution admission remain distinct.</text>
+
+<path d="M 925 1442 L 925 1550 L 195 1550 L 195 1650" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="70" y="1650" width="250" height="105" rx="8" class="publication"/>
+<text x="195" y="1677" font-size="11.6" font-weight="700" text-anchor="middle" class="white">Release publication</text>
+<text x="195" y="1700" font-size="9.1" text-anchor="middle" class="soft-white">authorized exact-revocation-view check</text>
+<text x="195" y="1720" font-size="8.7" text-anchor="middle" class="soft-white">stage and verify immutable artifacts</text>
+<text x="195" y="1740" font-size="8.7" text-anchor="middle" class="soft-white">manifest + record become visible atomically</text>
+
+<path d="M 320 1702 L 350 1702" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="350" y="1650" width="250" height="105" rx="8" class="publication"/>
+<text x="475" y="1677" font-size="11.3" font-weight="700" text-anchor="middle" class="white">ReleasePublicationRecord</text>
+<text x="475" y="1700" font-size="9.1" text-anchor="middle" class="soft-white">immutable destination-bound evidence</text>
+<text x="475" y="1720" font-size="8.7" text-anchor="middle" class="soft-white">exact checked view · publisher · integrity</text>
+<text x="475" y="1740" font-size="8.7" text-anchor="middle" class="soft-white">one snapshot may have multiple records</text>
+
+<path d="M 600 1702 L 630 1702" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="630" y="1650" width="250" height="105" rx="8" class="activation"/>
+<text x="755" y="1677" font-size="11.6" font-weight="700" text-anchor="middle" class="white">Deployment activation</text>
+<text x="755" y="1700" font-size="9.1" text-anchor="middle" class="soft-white">host verifies the publication record</text>
+<text x="755" y="1720" font-size="8.7" text-anchor="middle" class="soft-white">activate pointer · route · package</text>
+<text x="755" y="1740" font-size="8.7" text-anchor="middle" class="soft-white">activation state remains host-owned</text>
+
+<path d="M 880 1702 L 910 1702" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="910" y="1650" width="300" height="105" rx="8" class="admission"/>
+<text x="1060" y="1677" font-size="11.6" font-weight="700" text-anchor="middle" class="white">Execution admission</text>
+<text x="1060" y="1700" font-size="9.1" text-anchor="middle" class="soft-white">deployment-selected ReleaseSnapshot</text>
+<text x="1060" y="1720" font-size="8.7" text-anchor="middle" class="soft-white">Runtime load or AOT / package checks</text>
+<text x="1060" y="1740" font-size="8.7" text-anchor="middle" class="soft-white">compatibility · integrity · exact outputs</text>
+
+<path d="M 1060 1755 L 1060 1840 L 490 1840 L 490 1905" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="775" y="1832" font-size="9.4" font-weight="700" text-anchor="middle" class="muted">execution-admitted Release + matching target outputs</text>
+
+<!-- 6: Localization execution -->
+<rect x="40" y="1870" width="1240" height="125" rx="14" class="runtime-group" stroke-width="2"/>
+<text x="660" y="1898" font-size="17" font-weight="700" text-anchor="middle" class="label">6 · Conforming Localization Execution</text>
+
+<rect x="70" y="1920" width="250" height="55" rx="8" class="adapter"/>
+<text x="195" y="1942" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Target / framework adapter</text>
+<text x="195" y="1962" font-size="9.1" text-anchor="middle" class="soft-white">preference · locale ownership · UI lifecycle</text>
+
+<path d="M 320 1947 L 350 1947" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="350" y="1920" width="280" height="55" rx="8" class="runtime"/>
+<text x="490" y="1942" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Localization Execution Layer</text>
+<text x="490" y="1962" font-size="8.8" text-anchor="middle" class="soft-white">admitted release · locale · definition · failure</text>
+
+<path d="M 630 1947 L 660 1947" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="660" y="1920" width="270" height="55" rx="8" class="core"/>
+<text x="795" y="1942" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Conforming execution path</text>
+<text x="795" y="1962" font-size="8.7" text-anchor="middle" class="soft-white">runtime-backed · ahead-of-time target-native</text>
+
+<path d="M 930 1947 L 960 1947" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+<rect x="960" y="1920" width="290" height="55" rx="8" class="result"/>
+<text x="1105" y="1942" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Localized UI / host output</text>
+<text x="1105" y="1962" font-size="9.2" text-anchor="middle" class="soft-white">text · safe structured parts</text>
 </svg>
