@@ -159,30 +159,9 @@ The product-wide definitions in 000 remain authoritative while this design is in
 
 The author-facing configuration and the compiler-facing settings IR are distinct models:
 
-```text
-intlify_cli repository adapter -> intlify.config.json --+
-optional programmatic frontend -------------------------+-> JSON-compatible IntlifyConfig
+![Design overview of project-profile inputs, resolution, outcomes, and semantic groups](./assets/015-intlify-project-profile-design-overview.svg)
 
-JSON-compatible IntlifyConfig --------------------------+
-admitted Locale Canonicalization -----------------------+-> intlify_config
-Specification + data provider                                  -> admit schemaVersion "0"
-                                                               -> JSON Schema validation
-                                                               -> select exactly one named profile
-                                                               -> admit specification + provider data
-                                                               -> locale canonicalization
-                                                               -> semantic resolution
-                                                               -> LocalizationProjectProfile
-```
-
-The resolved profile has four conceptual groups. Their exact representation remains to be designed.
-
-```text
-LocalizationProjectProfile
-  + project and Selection Scope identity
-  + locale model, canonicalization dependency identity, and locale-policy inputs
-  + Target Profile and Deployment Compatibility Group declarations
-  + versioned references to delivery, Provider, governance, trust, and resource policies
-```
+The lower panel summarizes four conceptual groups in the checked profile. This design fixes their semantics without reserving an exact public struct or wire representation.
 
 The resolver must discard authoring conveniences that have no semantic meaning while preserving enough file, JSON Pointer, or programmatic-call evidence for actionable Findings.
 
