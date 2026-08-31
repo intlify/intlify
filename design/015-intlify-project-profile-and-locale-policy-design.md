@@ -40,7 +40,7 @@ Planning, synchronization, linking, export, Release Assembly, tooling, and execu
 - Define deterministic resolution, validation, Finding production, and consumer-visible dependency inputs.
 - Keep the reusable `intlify_config` core free of embedded CLDR-derived data by admitting canonicalization through a versioned provider and separate data artifact.
 - Make invalid, ambiguous, incomplete, or incompatible configuration fail before synchronization, linking, export, or production execution.
-- Provide paired `IntlifyConfig`, resolved-profile, and Finding fixtures that the shared resolver and downstream consumers can use.
+- Provide paired `IntlifyConfig`, resolved-profile, and Finding fixtures for the shared resolver, plus explicitly owned handoff vectors that downstream consumers can use without making their behavior part of resolver conformance.
 
 ## Non-Goals
 
@@ -69,11 +69,12 @@ It defines the information that downstream specifications may rely on. It does n
 | Area | Responsibility relative to this design |
 | --- | --- |
 | Canonical configuration input | Defines the exact closed version-`"0"` `intlify.config.json` project-profile members and admits every entry path into one structurally admitted `IntlifyConfig` model |
-| `intlify_config` crate | Owns the authoring model, configuration-schema version, JSON Schema generation, structural admission, profile selection, semantic resolver, canonicalization-provider and Profile Resolution Artifact Set input boundaries, configuration Findings, checked profile IR, and the 015 conformance-suite harness and traceability check without embedding CLDR-derived data or acquiring artifacts |
+| `intlify_config` crate | Owns the authoring model, configuration-schema version, JSON Schema generation, structural admission, profile selection, semantic resolver, canonicalization-provider and Profile Resolution Artifact Set input boundaries, Check/Finding Registries, configuration Findings, checked profile IR, Resolver Conformance Suite harness, producer-side Handoff Vector validation, and traceability check without embedding CLDR-derived data or acquiring artifacts |
 | JSON Schema validation | Runs through `intlify_config` and validates the structural shape of the 015-owned project-profile input before semantic resolution |
 | `intlify_cli` adapter | Owns repository discovery, file I/O, CLI selector acquisition, acquired canonicalization/Profile Resolution Artifact Set assembly, command integration, and outcome rendering without owning configuration semantics |
 | Optional programmatic frontend | Constructs the same JSON-compatible configuration value for embedded use and enters the shared `IntlifyConfig` admission path; exact API naming, packaging, and language bindings remain 029-owned |
 | 015 project-profile resolver | Is implemented by `intlify_config`; selects one named profile, then applies dependency-aware fail-complete validation and returns either one complete `LocalizationProjectProfile` or a blocked outcome with no partial profile |
+| 015 Handoff Vector Set | Fixes producer profile facts and consumer-input relationships without executing downstream behavior; `intlify_config` validates producer facts and each named downstream owner validates its own relationship |
 | Locale canonicalization provider | Supplies one already acquired, immutable data artifact through a read-only boundary; it performs no implicit network access and cannot select alternate semantics |
 | Profile Resolution Artifact Set input | Supplies one finite set of already acquired immutable Policy and Target Profile artifacts; `intlify_config` checks exact reference resolution and 015-owned normalized facts while each artifact specification owns body admission |
 | ICU4X reference adapter | Initial physical implementation using `icu_locale` without default compiled data and an explicit ICU4X data provider; it remains subordinate to Intlify conformance |
@@ -120,16 +121,20 @@ The product-wide definitions in 000 remain authoritative. This section defines t
 | Configuration schema version | Configuration-specific string version admitted by `intlify_config`; its initial value is `"0"` and it is independent of CLI reporter and shared-artifact versions |
 | Profile ID | Configuration-scoped opaque name used to select one profile declaration; it is not inferred from a package path, target, or Selection Scope |
 | Target ID | Project-scoped semantic identity for one Target Profile use inside a selected project; it is independent from the exact Target Profile artifact identity and is included in profile equality and digest inputs |
-| Configuration source evidence | Non-semantic origin and location data for file input, programmatic input, and Profile ID selectors, retained for Findings and source maps |
+| Configuration source evidence | Umbrella term for non-semantic Entry Source Evidence and Materialized Value Evidence retained for Findings and source maps |
+| Entry Source Evidence | Origin and best available location information that exists before a JSON-compatible value is materialized; it never requires a JSON Pointer when parsing or host-value admission cannot establish one |
+| Materialized Value Evidence | Origin plus an RFC 6901 JSON Pointer into a materialized JSON-compatible value and an optional source range or call-site span |
 | Resolution outcome | Conceptual result of one resolver invocation: either one complete checked profile with only non-blocking Findings, or a blocked result with no profile, accumulated Findings, and evaluation status; these labels do not reserve a public API shape |
 | Evaluation status | Deterministic record of which specified phase and subject checks were evaluated or not evaluated, including the causal blocking Finding Keys for each dependency-suppressed check; an unevaluated check is not itself a synthetic Finding |
 | Localization Project Profile Specification | Intlify-owned semantic specification for the normalized checked-profile model; its initial revision is `"0"` and its version domain is independent of configuration schema, artifact encoding, package, and Runtime ABI versions |
 | Profile semantic equality | Equality of the Profile Specification identity/revision and every field in the canonical semantic projection; digest equality is an implementation aid under the same framing specification rather than a substitute for this definition |
 | Resolution staleness | State in which an admission or source dependency changed and the resolver must run again; a stale resolution input does not imply that the newly resolved profile has different semantics |
-| Entry Admission Input Set | Inputs required to reproduce entry-specific admission: raw UTF-8 bytes, source identity, parser specification, and bootstrap capability for file input; or submitted host value, frontend identity/version, and source label/call site for programmatic input |
-| Materialized Resolution Input Set | Finite immutable set of the JSON-compatible configuration value, selector, admitted semantic specifications and data, referenced artifacts, resource and capability admission needed to reproduce shared structural and semantic resolution |
+| Entry Admission Input Set | Inputs required to reproduce entry-specific admission and Finding Occurrence Keys: raw UTF-8 bytes, Entry Source Evidence, parser specification, and bootstrap capability for file input; or submitted host value, frontend identity/version, Entry Source Evidence, and bootstrap capability for programmatic input |
+| Materialized Resolution Input Set | Finite immutable set of the JSON-compatible configuration value, selector, admitted semantic specifications and data, the complete submitted Profile Resolution Artifact Set including unreferenced artifacts, and resource and capability admission needed to reproduce shared structural and semantic resolution |
 | Profile Resolution Artifact Set | Closed finite immutable input containing every Policy artifact and Target Profile artifact available to one resolver invocation; it is already acquired and performs no lookup or I/O |
 | Project Profile Resolver Conformance Suite | Versioned machine-readable fixture suite for the 015-owned resolver semantics; revision `"0"` binds each case's inputs, entry-path applicability, expected outcome, evidence, dependency status, and traceability without defining a public profile wire format |
+| Project Profile Handoff Vector Set | Versioned machine-readable vectors that bind checked profile facts to separately owned downstream inputs and expected relationships; each vector names its verification owner and is not an `intlify_config` resolver pass/fail case |
+| Cross-Version Conformance Obligation | Conditional traceability record activated only when the required configuration or semantic revisions coexist and an executable comparison can be constructed |
 | Localization Project Profile | Checked project-configuration IR for one final-application localization project, including its exact scope, identity, required sections, and completeness rules |
 | Locale identifier | Valid Unicode BCP 47 Locale Identifier as defined by UTS #35, used as the shared semantic locale namespace across project configuration and downstream specifications |
 | Locale Canonicalization Specification | Versioned Intlify-owned semantic specification that identifies the exact UTS #35 algorithm and CLDR-derived data requirements and fixes the conformance fixtures used to derive canonical locale identity |
@@ -161,7 +166,8 @@ The product-wide definitions in 000 remain authoritative. This section defines t
 | Delivery Unit identity | Project-contextual logical identity of one graph node; it is not a path, filename, URL, content hash, numeric chunk ID, or globally published artifact identity |
 | Physical delivery output | 024-owned realization of selected placement as paths, chunks, resources, hashes, URLs, loader IDs, eager/lazy relationships, generated code, or native package metadata |
 | Selection Scope | Governance namespace selected by the project profile without inferring target semantics |
-| Finding Key | Stable identity of one Finding derived from the owning specification and revision, phase ID, check ID, code, canonical subject, reason, and primary evidence identity; message text and list position are excluded |
+| Finding Key | Entry-path-independent semantic identity of one Finding derived from the owning specification and revision, phase ID, check ID, code, canonical subject identity or logical subject path, and reason; source evidence, message text, and list position are excluded |
+| Finding Occurrence Key | Identity of one diagnostic occurrence derived from a Finding Key plus primary evidence identity; it supports editor and incremental tracking without becoming a suppression cause or shared semantic identity |
 
 ## Design Overview
 
@@ -291,7 +297,7 @@ The closed root object has this shape:
 }
 ```
 
-`schemaVersion` and `profiles` are required. `$schema` is optional editor metadata. `profiles` is a non-empty object whose keys are Profile IDs. A Profile ID is the only selector-facing name; no selector member exists inside the file. The selected profile object has this closed, flat shape:
+`schemaVersion` and `profiles` are required. `$schema` is optional editor metadata. `profiles` is a non-empty object whose keys are Profile IDs. A Profile ID is the only selector-facing name; no selector member exists inside the file. Valid Profile IDs are traversed by ascending unsigned UTF-8 bytes for deterministic structural diagnostics and selection evidence, but this order and the IDs themselves do not enter profile semantics. An invalid map key uses its logical subject path in diagnostic traversal. The selected profile object has this closed, flat shape:
 
 ```json
 {
@@ -395,7 +401,7 @@ The required `targetProfiles` object is non-empty and closed at every target ent
 }
 ```
 
-Each object key is a project-scoped Target ID. `profile` is a required exact `TargetProfileReference` whose shared representation is owned by 017 and semantic body by 024. `requestedLocales` is required and `defaultRequestedLocale` is optional. Target IDs are semantic profile identities: two Target IDs may reference the same Target Profile artifact, but they remain distinct project targets and no platform, package, path, or artifact identity is inferred from the key.
+Each object key is a project-scoped Target ID. `profile` is a required exact `TargetProfileReference` whose shared representation is owned by 017 and semantic body by 024. `requestedLocales` is required and `defaultRequestedLocale` is optional. Target IDs are semantic profile identities: two Target IDs may reference the same Target Profile artifact, but they remain distinct project targets and no platform, package, path, or artifact identity is inferred from the key. After ID admission, Target entries are canonically ordered by ascending unsigned UTF-8 Target ID bytes.
 
 The required `deploymentGroups` object is non-empty:
 
@@ -413,7 +419,7 @@ The required `deploymentGroups` object is non-empty:
 }
 ```
 
-Each key is a project-scoped Deployment Compatibility Group ID. Every closed group requires a non-empty `members` array of Target IDs. `hydrationRelations` is optional and defaults to an empty array; each closed relation requires `server` and `client` Target IDs. Group, member, and relation authoring order is non-semantic and is canonicalized after validation. The groups must form the exact target partition defined below.
+Each key is a project-scoped Deployment Compatibility Group ID. Every closed group requires a non-empty `members` array of Target IDs. `hydrationRelations` is optional and defaults to an empty array; each closed relation requires `server` and `client` Target IDs. Group, member, and relation authoring order is non-semantic. After ID, duplicate, endpoint, and membership validation, Group entries are ordered by Group ID, member sets by Target ID, and hydration relations lexicographically by `(server Target ID, client Target ID)`, using ascending unsigned UTF-8 bytes for every ID comparison. The groups must form the exact target partition defined below.
 
 The optional delivery object is closed:
 
@@ -431,28 +437,36 @@ Omission, `{}`, and explicit `duplicate` are equivalent. Revision `"0"` rejects 
 
 `intlify_config` must preserve enough non-semantic origin and location information to explain every configuration Finding and allow CLI, editor, LSP, and agent integrations to identify the exact input to change. This evidence belongs to Finding records and the source map returned with the resolution outcome; it is not a semantic member of `LocalizationProjectProfile`.
 
-For file input, evidence consists of:
+Evidence has two stages. Entry Source Evidence is available before a JSON-compatible value exists and therefore does not require a JSON Pointer. Materialized Value Evidence is available only after entry admission and requires an RFC 6901 JSON Pointer into the materialized value. A Finding uses the most precise admitted form available for its phase; failure to materialize a value never forces an implementation to invent a pointer.
+
+For file input, Entry Source Evidence consists of:
 
 - a configuration-root identity supplied by the product adapter;
 - a slash-normalized path relative to that configuration root;
-- an RFC 6901 JSON Pointer into the materialized JSON-compatible value; and
-- a half-open UTF-8 byte range when a corresponding source token exists.
+- an optional logical input path when the parser can establish one without a complete materialized value; and
+- a half-open UTF-8 byte range when an offending token, duplicate key, malformed byte sequence, or end-of-input position can be identified.
 
-Line and column positions, along with other client-specific position forms, are derived by the presenting adapter from the source text and byte range. A missing-member Finding points to the nearest owning object. An invalid member or value points to the applicable key or value token. A cross-field Finding may have one primary evidence item and related evidence for the other relevant locations.
+After file materialization, Materialized Value Evidence adds the required JSON Pointer and retains a byte range when a corresponding token exists. Line and column positions, along with other client-specific position forms, are derived by the presenting adapter from the source text and byte range. A missing-member Finding points to the nearest owning object. An invalid member or value points to the applicable key or value token. A cross-field Finding may have one primary evidence item and related evidence for the other relevant locations.
 
-For programmatic input, evidence consists of:
+For programmatic input, Entry Source Evidence consists of:
 
 - a stable source label or URI supplied by the frontend;
-- the JSON Pointer into the materialized JSON-compatible value; and
+- an optional logical input path identifying the first rejected host-value edge or value when traversal can establish one; and
 - an optional call-site span when the frontend can provide one.
 
-Programmatic evidence must not depend on a stack trace, function identity, class instance, object address, or hidden process state. The absence of a call-site span does not change a Finding's code, severity, semantic reason, or subject.
+After programmatic materialization, Materialized Value Evidence contains the stable source label or URI, a required JSON Pointer, and the optional call-site span. Programmatic evidence must not depend on a stack trace, function identity, class instance, object address, or hidden process state. The absence of a logical path or call-site span does not change a Finding's code, severity, semantic reason, subject, or Finding Key.
+
+Malformed UTF-8 and strict JSON syntax Findings normally use file Entry Source Evidence with an offending byte range and no JSON Pointer. Duplicate-member Findings use the duplicate key's logical path and the applicable key ranges without requiring a materialized value. A non-JSON-compatible host-value Finding uses the stable source label, the first discoverable logical input path when available, and the optional call-site span. Schema and semantic Findings over an admitted JSON-compatible value use Materialized Value Evidence.
 
 Profile-selector evidence records the selector value and its origin, such as a CLI option or programmatic argument. A selector Finding relates that origin to applicable profile declarations when those declarations are available.
 
+Specification, canonicalization-data, Profile Resolution Artifact Set, and implementation-capability admission Findings use evidence for that explicit resolver input rather than pretending that every failure has a configuration JSON Pointer. The Finding Registry fixes whether one of these resolver-input evidence kinds or a configuration reference occurrence is primary and which other records may be related. 017 and 019 own their common encoded envelopes; 015 owns the semantic selection rule for each 015 Finding.
+
 029 discovers the configuration root, and each adapter supplies its root identity and relative path to `intlify_config`. Portable evidence never embeds an absolute host path. File evidence is canonically ordered by unsigned UTF-8 source-identity bytes, unsigned UTF-8 JSON Pointer bytes, span absence before span presence, start byte, and end byte. Programmatic evidence uses the equivalent stable source label or URI in the source-identity position.
 
-Equivalent file and programmatic inputs produce the same Finding code, severity, semantic reason, and subject. Their origin and location evidence may differ. Evidence is excluded from profile semantic equality, profile digest, and checked-profile serialization. It may be retained separately by 019 for diagnostics and dependency explanation, but it must not embed an entire source file, credentials, absolute host paths, or arbitrary host objects. The common Finding envelope and exact evidence encoding remain owned by 019.
+Entry evidence without a JSON Pointer is ordered by source identity, logical input path absence before presence, logical input path bytes when present, span absence before presence, start byte, and end byte. Materialized Value Evidence uses source identity, JSON Pointer bytes, span absence before presence, start byte, and end byte. Resolver-input evidence uses its registry-defined stable input identity followed by its canonical local locator. These evidence orders affect only occurrence presentation and related-evidence ordering, not Finding Key ordering.
+
+Equivalent file and programmatic inputs produce the same Finding Key, code, severity, semantic reason, and subject. Their origin and location evidence and therefore their Finding Occurrence Keys may differ. Evidence is excluded from profile semantic equality, profile digest, and checked-profile serialization. It may be retained separately by 019 for diagnostics and dependency explanation, but it must not embed an entire source file, credentials, absolute host paths, or arbitrary host objects. The common Finding envelope and exact evidence encoding remain owned by 019.
 
 ### Optional programmatic frontend
 
@@ -598,7 +612,7 @@ Revision `"0"` defines no product-wide fixed maximum cardinality. Instead, resol
 
 Raw entry bytes and decoding remain subject to bootstrap limits, while `maxLocaleOccurrences` and the materialized-value bounds count every submitted occurrence before canonical duplicate detection. Repeated duplicates therefore cannot bypass resource protection merely because they collapse to fewer semantic identities. A tool whose declared implementation capability cannot satisfy the admitted resource-limit policy rejects capability or policy admission; it does not silently replace the pinned maximum with a host-memory-derived or implementation-default value.
 
-Target Profile subset validation, independently released group subsets, downstream invalidation, and the classification of intentional locale exclusions versus localization debt remain to be completed in their applicable sections below.
+Exclusion from one Target ID's requested-locale subset is explicit target applicability, not localization debt. No Requirement edge exists for that Target ID and excluded locale, so coverage debt cannot arise for that pair. Coverage debt can arise only after planning creates a requirement whose locale belongs to the target's checked subset and direct fulfillment fails under the applicable coverage mode. Revision `"0"` does not require the union of all Target ID subsets to cover every project requested locale: a project locale unused by current targets is valid staged configuration, remains a project semantic input, and may be reported by a future linter but never blocks profile resolution merely because it is currently unused.
 
 ## Requested-Locale Default Resolution
 
@@ -853,80 +867,84 @@ A project that requires no additional human approval still references an explici
 
 Every bound below is a required positive finite integer. Revision `"0"` defines no numeric default. Unknown groups or bounds are rejected.
 
-`configurationInput` bounds the shared materialized value after either entry path:
+`configurationInput` bounds the complete shared materialized root after either entry path. The external Profile ID selector is the sole non-root value rechecked by this group:
 
-| Bound                  | Meaning                                                            |
-| ---------------------- | ------------------------------------------------------------------ |
-| `maxNodes`             | Maximum logical JSON value nodes                                   |
-| `maxDepth`             | Maximum object/array nesting depth                                 |
-| `maxCollectionEntries` | Maximum total object-member and array-element occurrences          |
-| `maxTotalStringBytes`  | Maximum total UTF-8 bytes across all string values and object keys |
-| `maxSingleStringBytes` | Maximum UTF-8 bytes in one string value or object key              |
-| `maxProfiles`          | Maximum declarations in `profiles`                                 |
-| `maxProfileIdBytes`    | Maximum UTF-8 bytes in one Profile ID                              |
+| Bound | Scope | Counting unit | Stage | Duplicate handling |
+| --- | --- | --- | --- | --- |
+| `maxNodes` | Complete materialized root | One logical JSON value; the root counts as one and object keys are not nodes | Immediately after materialization | Every array/object value occurrence counts independently |
+| `maxDepth` | Complete materialized root | Maximum value level with the root at depth one | Immediately after materialization | Not applicable |
+| `maxCollectionEntries` | Complete materialized root | One object-member or array-element occurrence | After duplicate-member rejection | Every admitted occurrence counts |
+| `maxTotalStringBytes` | Complete materialized root | One UTF-8 byte in every string value and object key | Immediately after materialization | Repeated strings and keys in different objects count again |
+| `maxSingleStringBytes` | Complete materialized root | UTF-8 byte length of one string value or object key | Immediately after materialization | Each occurrence is checked independently |
+| `maxProfiles` | Root `profiles` object | One profile declaration | Before Profile ID selection | Every declaration counts |
+| `maxProfileIdBytes` | Every declared Profile ID and a present external selector | UTF-8 byte length of one raw ID | Before ID syntax admission and selection | Each declaration key and the selector are checked independently |
 
-Raw file bytes and parser work are protected by the 018-owned bootstrap envelope rather than this semantic group. The same logical value receives the same `configurationInput` accounting through file and programmatic entry paths.
+Raw file bytes and parser work are protected by the 018-owned bootstrap envelope rather than this semantic group. The same logical value and selector receive the same `configurationInput` accounting through file and programmatic entry paths.
 
-`localeResolution` bounds submitted locale and locale-policy work:
+`localeResolution` bounds locale and locale-policy work in the selected profile declaration:
 
-| Bound | Meaning |
-| --- | --- |
-| `maxLocaleIdentifierBytes` | Maximum bytes in both raw and canonical locale spelling |
-| `maxLocaleOccurrences` | Maximum raw locale occurrences before canonical duplicate detection |
-| `maxRequestedLocales` | Maximum canonical project requested-locale cardinality after collision checks |
-| `maxNegotiationAliases` | Maximum submitted negotiation alias entries |
-| `maxFallbackSources` | Maximum submitted message-fallback mapping keys |
-| `maxFallbackCandidatesPerSource` | Maximum candidates in one fallback sequence |
-| `maxCoverageRules` | Maximum submitted coverage rules |
-| `maxCoverageLocaleSelectorOccurrences` | Maximum raw requested-locale selector occurrences across coverage rules |
-| `maxCoverageSurfaceSelectorOccurrences` | Maximum raw surface-class selector occurrences across coverage rules |
-| `maxCoverageDecisionCells` | Maximum canonical requested-locale × surface-class cells |
-| `maxCoverageRuleCellComparisons` | Maximum rule-to-cell comparisons during coverage resolution |
+| Bound | Scope | Counting unit | Stage | Duplicate handling |
+| --- | --- | --- | --- | --- |
+| `maxLocaleIdentifierBytes` | Every raw and successfully canonicalized locale occurrence in the selected declaration | UTF-8 bytes in one spelling | Raw spelling before parsing and canonical spelling before retention | Every occurrence is checked independently |
+| `maxLocaleOccurrences` | All locale-bearing fields enumerated below | One raw locale spelling | Before validation, canonicalization, and collision detection | Every occurrence counts, including exact and canonical duplicates |
+| `maxRequestedLocales` | Canonical project requested-locale set | One unique canonical locale identity | After validation and collision detection, before profile construction | Duplicates remain blocking but do not increase semantic cardinality |
+| `maxNegotiationAliases` | Submitted negotiation alias map | One raw map entry | Before canonical key collision detection | Every submitted entry counts |
+| `maxFallbackSources` | Submitted fallback map | One raw mapping-key occurrence | Before canonical key collision detection | Every submitted entry counts |
+| `maxFallbackCandidatesPerSource` | One submitted fallback sequence | One candidate occurrence of either admitted kind | Before candidate duplicate checks | Every occurrence counts |
+| `maxCoverageRules` | Submitted coverage rule array | One rule occurrence | Before selector validation and duplicate-domain detection | Every rule occurrence counts |
+| `maxCoverageLocaleSelectorOccurrences` | All coverage locale selectors | One raw selector item | Before locale validation and canonicalization | Every item counts |
+| `maxCoverageSurfaceSelectorOccurrences` | All coverage surface selectors | One raw selector item | Before vocabulary admission and duplicate checks | Every item counts |
+| `maxCoverageDecisionCells` | Resolved project locale × surface-class domain | One canonical Cartesian-product cell | Before decision-table construction using checked multiplication | No semantic duplicate cells exist |
+| `maxCoverageRuleCellComparisons` | Submitted rules × semantic decision cells | One logical rule-to-cell predicate evaluation | Preflighted as `submitted rule count × semantic cell count` before physical evaluation | Submitted duplicate rules still contribute; implementation optimization never changes accounting |
+
+`maxLocaleOccurrences` counts every project `requestedLocales` item; present `defaultSourceLocale`; project `defaultRequestedLocale`; negotiation-alias key and value; message-fallback mapping key and literal candidate; coverage requested-locale selector item; Target ID `requestedLocales` item; and present Target ID `defaultRequestedLocale`. The `intent-source-locale` marker is not a locale spelling and does not count. Locale occurrences inside supplied artifacts belong to their artifact specifications rather than this selected-declaration counter.
 
 `maxLocalePreferences` belongs to 023 because preferences are dynamic execution input. `maxFallbackResolutionProbes` belongs to 020 because probes depend on checked Intents and transaction requirements.
 
 `artifactAdmission` bounds the complete submitted Profile Resolution Artifact Set before referenced/unreferenced filtering:
 
-| Bound | Meaning |
-| --- | --- |
-| `maxArtifacts` | Maximum total submitted artifacts |
-| `maxPolicyArtifacts` | Maximum submitted Policy artifacts |
-| `maxTargetProfileArtifacts` | Maximum submitted Target Profile artifacts |
-| `maxArtifactReferences` | Maximum exact artifact-reference occurrences in the selected declaration |
-| `maxSingleArtifactCanonicalBytes` | Maximum canonical bytes of one artifact |
-| `maxTotalArtifactCanonicalBytes` | Maximum canonical bytes across all submitted artifacts |
-| `maxSingleReferenceCanonicalBytes` | Maximum canonical bytes of one reference |
-| `maxTotalReferenceCanonicalBytes` | Maximum canonical bytes across all reference occurrences |
+| Bound | Scope | Counting unit | Stage | Duplicate handling |
+| --- | --- | --- | --- | --- |
+| `maxArtifacts` | Complete submitted set | One submitted artifact envelope | Before kind, identity, or reference filtering | Every submitted envelope counts |
+| `maxPolicyArtifacts` | Complete submitted set | One artifact declaring an admitted Policy kind | Before reference filtering | Every submitted Policy envelope counts |
+| `maxTargetProfileArtifacts` | Complete submitted set | One artifact declaring Target Profile kind | Before reference filtering | Every submitted Target Profile envelope counts |
+| `maxArtifactReferences` | Selected declaration | One Policy or Target Profile reference occurrence | Before exact-reference resolution | Repeated references count independently |
+| `maxSingleArtifactCanonicalBytes` | Each submitted artifact | 017-defined canonical bytes of one envelope and body | During bounded artifact admission | Each artifact is checked independently |
+| `maxTotalArtifactCanonicalBytes` | Complete submitted set | One canonical byte across submitted artifacts | During bounded set admission in canonical artifact identity order | Duplicate/conflicting envelopes still contribute before rejection |
+| `maxSingleReferenceCanonicalBytes` | Each reference occurrence in the selected declaration | 017-defined canonical bytes of one reference | Before reference resolution | Each occurrence is checked independently |
+| `maxTotalReferenceCanonicalBytes` | All reference occurrences in the selected declaration | One canonical byte across references | Before reference resolution in logical subject order | Repeated references contribute again |
 
 017 defines canonical byte measurement. Each artifact body's owning specification defines additional body-complexity bounds. Bootstrap admission opens the resource-limit artifact under implementation capability and then reapplies the admitted policy to the complete submitted set, including that resource-limit artifact.
 
-`targetGrouping` bounds target and group declarations:
+`targetGrouping` bounds target and group declarations in the selected profile:
 
-| Bound | Meaning |
-| --- | --- |
-| `maxTargetProfiles` | Maximum Target ID entries |
-| `maxTargetIdBytes` | Maximum UTF-8 bytes in one Target ID |
-| `maxDeploymentGroups` | Maximum Deployment Compatibility Groups |
-| `maxGroupIdBytes` | Maximum UTF-8 bytes in one Group ID |
-| `maxMembersPerGroup` | Maximum Target ID occurrences in one group |
-| `maxMembershipOccurrences` | Maximum submitted member occurrences across all groups before duplicate checks |
-| `maxHydrationRelations` | Maximum submitted hydration relation occurrences |
-| `maxStaticCompatibilityChecks` | Maximum statically knowable target/hydration compatibility checks |
+| Bound | Scope | Counting unit | Stage | Duplicate handling |
+| --- | --- | --- | --- | --- |
+| `maxTargetProfiles` | Submitted Target ID map | One Target ID entry | Before Target ID and reference admission | Every entry counts |
+| `maxTargetIdBytes` | Every submitted Target ID key | UTF-8 bytes in one raw ID | Before ID syntax admission | Each key is checked independently |
+| `maxDeploymentGroups` | Submitted Group map | One Group entry | Before Group ID and partition validation | Every entry counts |
+| `maxGroupIdBytes` | Every submitted Group ID key | UTF-8 bytes in one raw ID | Before ID syntax admission | Each key is checked independently |
+| `maxMembersPerGroup` | One submitted Group member array | One Target ID occurrence | Before duplicate and membership checks | Every occurrence counts |
+| `maxMembershipOccurrences` | All submitted Group member arrays | One Target ID occurrence | Before duplicate and partition checks | Every occurrence counts, including duplicates and overlaps |
+| `maxHydrationRelations` | All submitted hydration relation arrays | One relation occurrence | Before duplicate, endpoint, role, and compatibility checks | Every occurrence counts |
 
-The compiler-transaction Group ID selector bound belongs to 020 because it is not profile-resolution input.
+Revision `"0"` defines a fixed 015 check set for each hydration relation, so `maxHydrationRelations` bounds the resolver's relation-proportional work. The former open-ended `maxStaticCompatibilityChecks` bound is not part of revision `"0"`; variable capability-body work belongs to the applicable 024/026 artifact and conformance bounds. The compiler-transaction Group ID selector bound belongs to 020 because it is not profile-resolution input.
 
 `diagnostics` bounds ordinary resolution reporting:
 
-| Bound                            | Meaning                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| `maxFindings`                    | Maximum ordinary Finding records                            |
-| `maxRelatedEvidencePerFinding`   | Maximum related-evidence records on one Finding             |
-| `maxRelatedEvidenceOccurrences`  | Maximum related-evidence occurrences before deduplication   |
-| `maxSingleEvidenceBytes`         | Maximum canonical bytes in one evidence record              |
-| `maxTotalEvidenceBytes`          | Maximum canonical bytes across ordinary Finding evidence    |
-| `maxEvaluationStatusEntries`     | Maximum ordinary evaluation-status records                  |
-| `maxSuppressionCausesPerStatus`  | Maximum causal Finding Keys on one suppressed status        |
-| `maxSuppressionCauseOccurrences` | Maximum causal Finding Key occurrences before deduplication |
+| Bound | Scope | Counting unit | Stage | Duplicate handling |
+| --- | --- | --- | --- | --- |
+| `maxFindingOccurrences` | All ordinary Finding candidates | One candidate occurrence | Before Finding Key deduplication | Every candidate counts |
+| `maxFindings` | Canonical ordinary Finding set | One distinct Finding Key | After Finding Key deduplication, before result commit | Equal keys merge and count once |
+| `maxRelatedEvidencePerFinding` | One deduplicated Finding | One distinct related-evidence record | After evidence merge and deduplication | Equal evidence records count once |
+| `maxRelatedEvidenceOccurrences` | All ordinary Finding candidates | One related-evidence occurrence | Before evidence deduplication | Every occurrence counts |
+| `maxSingleEvidenceBytes` | Every primary or related evidence occurrence | 019-defined canonical bytes of one evidence record | Before evidence retention | Each occurrence is checked independently |
+| `maxTotalEvidenceBytes` | All ordinary primary and related evidence occurrences | One canonical evidence byte | Before Finding and evidence deduplication | Repeated evidence contributes again |
+| `maxEvaluationStatusEntries` | All ordinary evaluation units | One evaluated or not-evaluated status | Before result commit | One status per phase/subject/check unit |
+| `maxSuppressionCausesPerStatus` | One not-evaluated status | One distinct causal Finding Key | After cause-set deduplication | Equal Finding Keys count once |
+| `maxSuppressionCauseOccurrences` | All not-evaluated status candidates | One causal Finding Key occurrence | Before cause-set deduplication | Every occurrence counts |
+
+All accounting uses checked integer arithmetic. An exact-bound value is admitted. Collections and products are preflighted before proportional work when their cardinalities are already known; streamed totals increment in the canonical traversal order. The first cumulative value greater than the limit is the Finding's `actual` value, which may therefore jump by more than one for byte totals. No implementation computes a wrapped value, substitutes a host-sized maximum, or continues solely to discover a larger final total.
 
 019 defines canonical evidence representation. Implementations reserve, outside these ordinary project limits but inside bootstrap capability, capacity for one terminal `project-profile-reporting-limit-exceeded` Finding and one terminal incomplete evaluation-status record. No limit truncates input into an authoritative checked prefix.
 
@@ -992,6 +1010,8 @@ Delivery Graph Specification identity/revision and Delivery Placement Policy ide
 
 A profile contains a finite non-empty map from project-scoped Target IDs to checked Target Profile references and resolved target locale facts, plus one or more finite non-empty Deployment Compatibility Groups. Each Group ID is project-scoped semantic identity and each group contains a non-empty semantic set of Target IDs. Target IDs and Group IDs participate in profile equality and digest inputs; their authoring order is non-semantic. A Profile ID remains only a non-semantic selector name.
 
+Revision `"0"` uses one canonical identity order throughout these collections. Valid Target IDs and Group IDs are ordered by ascending unsigned UTF-8 bytes. Group member sets use Target ID order. A directed hydration relation is ordered lexicographically by server Target ID and then client Target ID under the same byte order. Duplicate and validity checks occur before canonical ordering. 015 owns these semantic collection orders; 017 preserves them when encoding the canonical profile projection.
+
 Revision `"0"` requires the group member sets to form an exact partition of the complete Target ID set. Every Target ID belongs to exactly one group. An empty group, unknown member, duplicate member, target omitted from all groups, or target assigned to several groups is blocking. Membership is never inferred from platform family, Target Profile capability, package, directory, output path, graph applicability, hydration relation, or declaration order. A single-target group is valid.
 
 015 defines Group ID syntax, group semantics, exact-partition validation, hydration relations, and normative selection test vectors. 020 owns compiler-transaction selector admission: one group permits omission, several groups require one exact selector, and unknown, multiple, or target-subset selectors are rejected. The compiler never chooses a first group, combines groups named by several selectors, selects a group from a Target ID or Target Profile artifact identity, or treats a subset of one group as a transaction group.
@@ -1008,7 +1028,7 @@ A group may contain a finite semantic set of explicit directed hydration relatio
 SSR Target ID -> Browser hydration-client Target ID
 ```
 
-Each endpoint is a distinct Target ID member of the same group. The source endpoint's referenced artifact must expose the 024-owned checked SSR-renderer capability and the destination endpoint's artifact the checked Browser hydration-client capability. Exact capability names and schemas remain owned by 024. Relation pairs are duplicate-free and authoring order is non-semantic. Fan-out and fan-in are valid, but one Target ID cannot appear in both server and client roles inside the same revision-`"0"` group. The relation set is therefore explicitly bipartite and finite; no relation is inferred from names, platform labels, graph edges, import relations, output formats, or co-membership alone.
+Each endpoint is a distinct Target ID member of the same group. The source endpoint's referenced artifact must expose the 024-owned checked SSR-renderer capability and the destination endpoint's artifact the checked Browser hydration-client capability. Exact capability names and schemas remain owned by 024. Relation pairs are duplicate-free, authoring order is non-semantic, and the checked relation set uses the canonical tuple order above. Fan-out and fan-in are valid, but one Target ID cannot appear in both server and client roles inside the same revision-`"0"` group. The relation set is therefore explicitly bipartite and finite; no relation is inferred from names, platform labels, graph edges, import relations, output formats, or co-membership alone.
 
 For every hydration relation, revision `"0"` requires the two Target Profiles to have:
 
@@ -1027,7 +1047,7 @@ The two Target Profiles may use different physical engines, output formats, Deli
 
 Hydration-free group members still share the group's Release compatibility boundary but have no implied render-equivalence relation. Independently grouped Web, mobile, native, worker, service, or other targets may use different requested-locale subsets, effective defaults, negotiation outcomes, graphs, output formats, publication cadence, and rollback history as allowed by their own checked profiles.
 
-`projectProfileResolution.targetGrouping` supplies positive finite bounds for Target ID count/bytes, Group ID count/bytes, members per group, total submitted membership occurrences, hydration-relation occurrences, and static compatibility checks. Profile resolution checks the complete partition and relation set without truncation, dropping an unassigned target, deleting an overlapping membership, or retaining only a compatible prefix. The 020-owned transaction input separately bounds the Group ID selector.
+`projectProfileResolution.targetGrouping` supplies positive finite bounds for Target ID count/bytes, Group ID count/bytes, members per group, total submitted membership occurrences, and hydration-relation occurrences. A hydration relation invokes a fixed revision-`"0"` set of 015 checks, so relation count bounds 015 work; variable Target Profile capability work remains bounded by its owning artifact specification. Profile resolution checks the complete partition and relation set without truncation, dropping an unassigned target, deleting an overlapping membership, or retaining only a compatible prefix. The 020-owned transaction input separately bounds the Group ID selector.
 
 024 owns exact Target Profile capability and Locale Service Profile schemas. 020 owns selected-group planning, graph-partition admission, shared Linker selection, and initial message applicability. 025 owns Release Assembly and coupled execution admission. 026 owns cross-target equivalence conformance, and 030 owns Browser/SSR framework hydration projection.
 
@@ -1055,9 +1075,43 @@ Every specified check declares the typed values and earlier checks it requires. 
 
 An unsupported configuration version, a non-materializable root value, or failure to admit the specification, data, or safe resource bounds needed by a later phase may suppress a broad dependent phase because that phase has no safe typed interpretation or execution envelope. This is dependency suppression, not discretionary fail-fast behavior. The evaluation status records the exact causal blocking Finding Keys, and the resolver does not emit synthetic cascade Findings for facts it could not prove.
 
-Every normative check has a stable check ID, such as `locale.requested-set.non-empty`, `locale.default-requested.member`, `target.requested-locales.project-subset`, `group.membership.exact-partition`, or `hydration.locale-policy.compatible`. Phase and check meaning may change only with a new Profile Specification revision; prose algorithm numbering is editorial.
+Revision `"0"` has one complete machine-readable Check Registry. Every normative executable check has one row containing:
 
-Evaluation traverses phases by the fixed revision-`"0"` rank above, then subjects in specification-defined canonical order. Emitted Findings are ordered by phase rank, canonical subject identity when available, stable Finding code, and canonical source-evidence order. Invalid subjects without a canonical identity use canonical source-evidence order. Filesystem enumeration, JSON member order, worker completion, and concurrency do not affect the outcome, Finding order, or suppression causes.
+```text
+checkId
+phaseId
+ruleId
+subjectKind
+subjectKindRank
+checkRank
+prerequisiteCheckIds
+possibleFindingCodes
+```
+
+Check IDs include `locale.requested-set.non-empty`, `locale.default-requested.member`, `target.requested-locales.project-subset`, `group.membership.exact-partition`, and `hydration.locale-policy.compatible`. A normative executable rule ID is the check ID prefixed with `015.`, while a non-executable ownership or packaging rule names its verification owner instead. Phase, subject-kind, check, and rule meaning may change only with a new Profile Specification revision; prose algorithm numbering is editorial. The registry contains every check rather than treating these examples as the registry.
+
+One atomic evaluation unit is one `(phase, subject kind, canonical subject key, check)` tuple. Evaluation and result commit use this total order:
+
+1. phase rank from the list above;
+2. `subjectKindRank` from the Check Registry, unique within one phase;
+3. canonical subject key by ascending unsigned UTF-8 bytes;
+4. `checkRank`, which is unique within its phase and subject-kind domain.
+
+A valid semantic subject uses its canonical identity as its subject key. A subject that cannot acquire a canonical identity uses its entry-path-independent logical subject path; a missing member's path includes the escaped missing member name rather than stopping at the owning object. A phase-global input uses a registry-defined singleton subject key. Source URI, byte range, call-site span, and other evidence are never subject keys.
+
+An evaluation unit commits all of its ordinary Finding candidates and its one evaluation-status record atomically. If any applicable diagnostic bound cannot admit the complete unit, none of that unit's ordinary records are committed and the terminal cursor points to it. Implementations may compute independent units concurrently, but they commit units only in canonical order and discard speculative results at or after a terminal cursor.
+
+After Finding Key deduplication, emitted Findings use this total order:
+
+1. phase rank;
+2. subject-kind rank;
+3. canonical subject key;
+4. check rank;
+5. stable Finding code by ascending unsigned UTF-8 bytes;
+6. `details.reason`, with absence before presence and present values ordered by ascending unsigned UTF-8 bytes; and
+7. canonical Finding Key bytes as a final tie-breaker.
+
+Primary and related evidence are ordered separately by the evidence rules above and do not reorder Findings. Filesystem enumeration, JSON member order, entry path, source position, worker completion, and concurrency therefore do not affect Finding Key order or suppression causes.
 
 Profile resolution validates every declared group but does not select a group or admit host graph artifacts. 015 supplies Group ID semantics and normative selector test vectors to 020. Before 020 plans requirements, its transaction admission applies the exact selection rule, restricts the transaction to the complete selected member set, and admits a graph-artifact applicability partition for that set. Selection and graph admission never rewrite the checked profile.
 
@@ -1066,6 +1120,24 @@ Profile resolution validates every declared group but does not select a group or
 Findings are successful resolver analysis data, not operational errors. 015-owned codes are stable kebab-case ASCII strings prefixed with `project-profile-` and have no numeric aliases. Human-readable messages are non-stable. The registry fixes each code's owner, phase/check ID, severity, blocking behavior, allowed subject kinds, allowed `details.reason` values, primary and related evidence, safe suggestion shape, and ordering behavior. Revision `"0"` assigns severity `error` to every blocking code and `warning` to `project-profile-locale-non-canonical`; severity and blocking remain separate fields.
 
 One code represents one actionable correction or blocking semantic condition. The same correction across fields uses one code plus `details.field`. Subconditions with the same correction use a stable `details.reason`; the registry freezes the allowed code/reason combinations, and adding a reason requires a Profile Specification revision.
+
+The complete revision-`"0"` Finding Registry is a machine-readable artifact. Each row contains:
+
+```text
+code
+allowedCheckIds
+severity
+blocking
+allowedSubjectKinds
+allowedReasons
+primaryEvidenceKind
+relatedEvidenceKinds
+suggestionKind
+```
+
+The admitted evidence kinds are `entry-source`, `configuration-value`, `profile-selector`, `specification-input`, `artifact-input`, and `implementation-capability`. The registry determines whether a configuration reference occurrence or an explicitly supplied resolver input is primary and which additional occurrences may be related. `suggestionKind` is closed and includes at least `none` and `canonical-locale-replacement`; a new suggestion shape requires a Profile Specification revision.
+
+The Check and Finding Registries are versioned with Profile Specification revision `"0"`, canonically digested, and validated together. Every `possibleFindingCodes` entry in the Check Registry must have a Finding Registry row that permits that check, and every allowed check/code/reason combination must be reachable from one normative rule. The tables below are the human-readable code summary and do not replace the complete registries. Resolver implementation, generated documentation, and Conformance Suite traceability must validate against the same registry artifacts rather than maintaining independent lists.
 
 Revision `"0"` owns these entry, schema, and selection codes; all are blocking:
 
@@ -1158,13 +1230,14 @@ Each Finding has a stable Finding Key composed of:
 - owning specification identity and revision;
 - phase ID and check ID;
 - stable Finding code;
-- canonical subject identity;
-- stable `details.reason` when present; and
-- primary evidence identity.
+- canonical subject identity or entry-path-independent logical subject path; and
+- stable `details.reason` when present.
 
-Human message text, emitted-list index, and related-evidence order are excluded. Findings with the same key are deduplicated and their related evidence is merged in canonical evidence order. Suppression causes refer to Finding Keys. Source-evidence changes may therefore change diagnostic identity without changing profile semantics. 019 owns the common envelope and 017 owns canonical encoding and digest framing for these records.
+Source identity, JSON Pointer evidence, byte range, call-site span, primary evidence identity, human message text, emitted-list index, and related-evidence order are excluded. Every Finding candidate has a Finding Occurrence Key composed of its Finding Key plus primary evidence identity. Findings with the same Finding Key are deduplicated: the lowest registry-permitted candidate primary evidence in canonical evidence order becomes the emitted primary evidence, and every other distinct candidate or related evidence record is merged as related evidence in canonical order. Suppression causes refer only to Finding Keys.
 
-The `projectProfileResolution.diagnostics` group supplies the exact Finding, related-evidence, evidence-byte, evaluation-status, and suppression-cause bounds. Before that policy is admitted, equivalent bootstrap bounds come from implementation-capability admission. Traversal and admission use the deterministic order above and reserve capacity for one typed blocking reporting-limit Finding and terminal incomplete-evaluation status. On the first over-limit item, the resolver retains the already admitted canonical prefix only as explicitly incomplete diagnostic output, emits that limit Finding, marks all remaining specified checks not evaluated because of it, and returns a blocked outcome. It never presents the prefix as a complete report or produces a profile.
+Equivalent file and programmatic semantic failures therefore have the same Finding Key and suppression dependency but may have different Finding Occurrence Keys. A presentation-evidence-only edit that preserves the logical subject path can change occurrence identity without changing semantic diagnostic identity or profile semantics. 019 owns the common envelope, the retained occurrence identities, and incremental occurrence tracking, while 017 owns canonical encoding and digest framing for these records.
+
+The `projectProfileResolution.diagnostics` group supplies the exact Finding-occurrence, deduplicated-Finding, related-evidence, evidence-byte, evaluation-status, and suppression-cause bounds. Before that policy is admitted, equivalent bootstrap bounds come from implementation-capability admission. Traversal and admission use the deterministic order above and reserve capacity for one typed blocking reporting-limit Finding and terminal incomplete-evaluation status. When the next atomic evaluation unit would exceed a bound, the resolver retains the already committed canonical prefix only as explicitly incomplete diagnostic output, emits that limit Finding, marks that unit and every later specified unit not evaluated because of it, and returns a blocked outcome. It never commits part of an evaluation unit, presents the prefix as a complete report, or produces a profile.
 
 The terminal incomplete aggregate has this semantic shape:
 
@@ -1172,13 +1245,14 @@ The terminal incomplete aggregate has this semantic shape:
 complete: false
 nextCheckCursor:
   phase: <phase ID>
-  subject: <canonical subject identity>
+  subjectKind: <subject kind>
+  subject: <canonical subject key>
   check: <check ID>
 cause: <project-profile-reporting-limit-exceeded Finding Key>
 omittedDomain: all checks at or after nextCheckCursor
 ```
 
-The canonical prefix before `nextCheckCursor` is retained; concurrently computed records at or after the cursor are discarded. The terminal Finding and aggregate occupy the bootstrap-reserved slots rather than ordinary `maxFindings` and `maxEvaluationStatusEntries` capacity.
+The canonical prefix before `nextCheckCursor` is retained; the atomic unit at the cursor and concurrently computed records after it are discarded. The terminal Finding and aggregate occupy the bootstrap-reserved slots rather than ordinary `maxFindingOccurrences`, `maxFindings`, and `maxEvaluationStatusEntries` capacity.
 
 An accepted non-canonical locale spelling produces a non-blocking Locale identity Finding whose primary evidence is the authoring occurrence and whose suggested action is the exact canonical spelling. A canonical-identity collision within one uniqueness scope produces a blocking Locale identity Finding: one occurrence is selected deterministically as primary evidence, every other conflicting occurrence is related evidence, and the canonical identity is reported. Exact duplicates and alias collisions have the same blocking semantics. The resolver never applies first-wins behavior or silent deduplication.
 
@@ -1234,7 +1308,7 @@ Profile equality is defined by canonical projection equality, not by source-byte
 
 Revision `"0"` profile equality includes `projectId` and `selectionScope`; Target IDs; canonical locale sets and defaults; locale, fallback, coverage, delivery, trust, governance, Provider, Glossary, and resource-policy semantics; Target Profile references and their exact semantic capability revisions; Group IDs, Deployment Compatibility Groups, and hydration relations; canonicalization-specification and dataset identity; and every other exact semantic reference enumerated below.
 
-It excludes Profile ID and selector; configuration `schemaVersion`; Conformance Suite revision, case IDs, and fixture metadata; raw JSON bytes, member order, accepted authoring spelling, Coverage Decision Evidence, and source positions; Findings and evaluation status; tool binary, package, host-library, adapter-object, and physical provider representation versions; implementation capacity beyond semantic capability references; acquisition, cache, transport, and credential metadata; and compiler-transaction or execution inputs such as selected Group ID, Delivery Unit Graphs, normalized user preferences, Store inventory, Provider results, physical outputs, and Release activation state.
+It excludes Profile ID and selector; configuration `schemaVersion`; Conformance Suite revision, Resolver Case IDs, Handoff Vector IDs, Conditional Obligation IDs, and fixture metadata; raw JSON bytes, member order, accepted authoring spelling, Coverage Decision Evidence, and source positions; Findings and evaluation status; tool binary, package, host-library, adapter-object, and physical provider representation versions; implementation capacity beyond semantic capability references; acquisition, cache, transport, and credential metadata; and compiler-transaction or execution inputs such as selected Group ID, Delivery Unit Graphs, normalized user preferences, Store inventory, Provider results, physical outputs, and Release activation state.
 
 Configuration source evidence is retained separately as diagnostic and dependency-location metadata. Its path or URI, JSON Pointer, and range do not participate in profile semantic equality, the profile digest, or checked-profile serialization. A product adapter or 019 project graph may use the underlying source identity and content revision to schedule re-resolution, but changing only the presentation evidence must not change the resulting checked-profile semantics.
 
@@ -1283,11 +1357,11 @@ Reproducibility has two explicit layers:
 ```text
 Entry Admission Input Set
   file:
-    raw UTF-8 bytes + source identity + parser specification
+    raw UTF-8 bytes + Entry Source Evidence + parser specification
     + bootstrap implementation capability
   programmatic:
     submitted host value + frontend identity/version
-    + source label/call site
+    + Entry Source Evidence + bootstrap implementation capability
 
 Materialized Resolution Input Set
   JSON-compatible configuration value + Profile ID selector
@@ -1299,7 +1373,7 @@ Materialized Resolution Input Set
 
 The Entry Admission Input Set reproduces entry-specific syntax, duplicate-member, JSON-compatibility, and source-map behavior. An arbitrary invalid host object need not have a portable serialization; its programmatic adapter and frontend-version-specific case reproduce that boundary. The Materialized Resolution Input Set reproduces shared structural admission and semantic resolution after entry success.
 
-The same Materialized Resolution Input Set must produce the same checked-or-blocked shared outcome, byte-identical canonical profile projection when checked, ordered Finding semantics, and evaluated/not-evaluated dependency structure. Exact reproduction of diagnostic locations additionally requires the applicable Entry Admission Input Set and source evidence. Raw whitespace, JSON member order, newline style, and frontend object identity are non-semantic. Provider representation, filesystem enumeration, concurrency, conforming tool binary, and host locale-library version cannot change the semantic result under the same admitted specifications.
+The same Materialized Resolution Input Set must produce the same checked-or-blocked shared outcome, byte-identical canonical profile projection when checked, ordered Finding Keys and semantic payloads, and evaluated/not-evaluated dependency structure with the same causal Finding Keys. Exact reproduction of Finding Occurrence Keys and diagnostic locations additionally requires the applicable Entry Admission Input Set and source evidence. Raw whitespace, JSON member order, newline style, and frontend object identity are non-semantic and cannot change Finding Keys or suppression dependencies. Provider representation, filesystem enumeration, concurrency, conforming tool binary, and host locale-library version cannot change the semantic result under the same admitted specifications.
 
 Profile equality excludes both raw entry inputs and source evidence. Unreferenced artifacts remain in bounded set-admission and staleness dependencies but not the canonical profile projection. Exact referenced artifact identities, revisions, specification revisions, and semantic digests remain semantic where this specification requires them.
 
@@ -1315,7 +1389,7 @@ A canonicalization provider is a pure input to one resolver invocation. It canno
 
 Raw file bytes, parser work, and pre-policy decoded allocation are bounded by the 018-owned bootstrap envelope. After materialization, `configurationInput` bounds logical nodes, depth, collection entries, string bytes, profile count, and Profile ID bytes, while `localeResolution` separately bounds locale bytes and occurrences plus locale-policy cardinalities. Limit checks occur before the work they protect, use explicit admitted values or implementation capabilities, and fail closed without truncating input or consulting ambient host-memory heuristics.
 
-Finding count, related-evidence counts and bytes, evaluation-status entries, and suppression-cause counts are independently bounded by `projectProfileResolution.diagnostics`. The resolver reserves enough bootstrap capacity to report one terminal reporting-limit Finding and incomplete evaluation status even when the semantic resource-limit artifact cannot be admitted. A reporting overrun is blocking, exposes no profile, and never disguises a bounded diagnostic prefix as complete evaluation.
+Finding-candidate occurrences, deduplicated Finding Keys, related-evidence occurrences and records, evidence bytes, evaluation-status entries, and suppression-cause occurrences and sets are independently bounded by `projectProfileResolution.diagnostics`. The resolver reserves enough bootstrap capacity to report one terminal reporting-limit Finding and incomplete evaluation status even when the semantic resource-limit artifact cannot be admitted. A reporting overrun is blocking, exposes no profile, commits no partial evaluation unit, and never disguises a bounded diagnostic prefix as complete evaluation.
 
 Negotiation alias count is bounded during profile resolution. Per-invocation normalized-preference count belongs to the 023 resource section. An execution adapter parses and bounds raw protocol input before materializing the normalized sequence; the core negotiator then enforces its own semantic sequence and work bounds before matching. Neither layer may truncate input and treat the truncated prefix as authoritative.
 
@@ -1333,7 +1407,7 @@ Host graph inputs are untrusted bounded artifacts. Graph-artifact count, encoded
 
 A graph failure is fail-complete for its planning/linking transaction. The host and 020 never remove a cycle edge, deduplicate a conflicting occurrence, drop an unknown target or unbound reference, collapse units into `["main"]`, split a graph to fit a bound, or substitute a previous cached graph. Evidence is bounded and refers to logical identities and non-secret host source locations without serializing arbitrary build-system objects.
 
-Target count and ID bytes, Group count and ID bytes, submitted membership occurrences, members per group, hydration-relation occurrences, and static compatibility checks are bounded by `projectProfileResolution.targetGrouping`. Relation endpoints use the same Target ID byte bound. Group selector and graph-applicability bounds belong to 020. Checks account for every submitted occurrence before duplicate collapse and use checked arithmetic and deterministic canonical order. A limit failure never truncates a group, drops a target or relation, selects only the first group, or treats an incomplete membership partition as authoritative.
+Target count and ID bytes, Group count and ID bytes, submitted membership occurrences, members per group, and hydration-relation occurrences are bounded by `projectProfileResolution.targetGrouping`. Relation endpoints use the same Target ID byte bound, and each relation invokes the fixed revision-`"0"` 015 check set. Variable Target Profile capability work belongs to 024/026 rather than an open-ended 015 compatibility counter. Group selector and graph-applicability bounds belong to 020. Checks account for every submitted occurrence before duplicate collapse and use checked arithmetic and deterministic canonical order. A limit failure never truncates a group, drops a target or relation, selects only the first group, or treats an incomplete membership partition as authoritative.
 
 ## Consumer Input Boundaries
 
@@ -1355,58 +1429,161 @@ Every consumer must reject a missing required operation input rather than reread
 
 ## Conformance and Fixtures
 
-The Project Profile Resolver Conformance Suite is a versioned machine-readable suite whose initial revision is `"0"`. It tests the 015-owned semantic resolver independently of a specific CLI, binding API, physical canonicalization provider, or public checked-profile encoding.
+The Project Profile Resolver Conformance Suite is a versioned machine-readable suite whose initial revision is `"0"`. It tests only the 015-owned semantic resolver independently of a specific CLI, binding API, physical canonicalization provider, downstream consumer, or public checked-profile encoding. Downstream behavior is represented separately by the Project Profile Handoff Vector Set and is never counted as an `intlify_config` resolver pass/fail result.
 
-### Case manifest and expected outcome
+Revision `"0"` has three machine-readable artifact families:
 
-Every case has one stable `015-`-prefixed kebab-case ID and a closed machine-readable manifest validated by Conformance Suite JSON Schema revision `"0"`:
+1. one Suite Index;
+2. closed Resolver Case, Handoff Vector, and Conditional Obligation manifests; and
+3. the complete Check and Finding Registries defined above.
+
+### Suite Index
+
+The closed Suite Index pins the registry artifacts and enumerates each artifact class explicitly:
+
+```json
+{
+  "suiteRevision": "0",
+  "profileSpecificationRevision": "0",
+  "caseSchemaRevision": "0",
+  "checkRegistryDigest": "<sha256>",
+  "findingRegistryDigest": "<sha256>",
+  "resolverCases": ["015-locale-default-not-in-project"],
+  "handoffVectors": ["015-handoff-group-selection"],
+  "conditionalObligations": ["015-XV-001"]
+}
+```
+
+Every listed ID occurs exactly once, every referenced manifest passes its applicable closed schema, and every registry digest matches the canonical checked-in artifact. Array order is canonical ID order and duplicate IDs are invalid.
+
+### Resolver Case manifest and expected outcome
+
+Every Resolver Case has one stable `015-`-prefixed kebab-case ID and a closed manifest validated by Conformance Suite Case Schema revision `"0"`:
 
 ```json
 {
   "suiteRevision": "0",
   "caseId": "015-locale-default-not-in-project",
-  "entryPaths": ["file", "programmatic"],
-  "inputs": {},
+  "entries": {
+    "file": {
+      "fixturePath": "fixtures/locale-default-not-in-project.json",
+      "sha256": "<sha256>",
+      "expectedOccurrences": []
+    },
+    "programmatic": {
+      "value": {},
+      "expectedOccurrences": []
+    }
+  },
+  "inputs": {
+    "profileSelector": {},
+    "profileSpecification": {},
+    "canonicalizationSpecification": {},
+    "canonicalizationData": {},
+    "profileResolutionArtifactSet": {},
+    "implementationCapability": {}
+  },
   "expected": {
     "outcome": "blocked",
+    "profile": null,
     "findings": [],
-    "evaluationStatus": []
+    "evaluationStatus": [],
+    "semanticDependencies": [],
+    "resolutionDependencies": []
   },
   "traceability": {
     "decisionIds": ["015-028"],
-    "ruleIds": ["015.locale.default-requested.member"]
+    "ruleIds": ["015.locale.default-requested.member"],
+    "checkIds": ["locale.default-requested.member"]
   }
 }
 ```
 
-Normative rule IDs use `015.<domain>.<rule>`. Executable checks use the same ID as their normative rule; non-executable ownership or packaging requirements may still have rule IDs and a named verification owner. `inputs` contains entry-path-specific source and selector evidence, the Profile Specification, canonicalization specification/data, complete Profile Resolution Artifact Set, resource policy, and implementation capability needed by the case. Raw-file cases reference a checked-in fixture path and full SHA-256 digest; ordinary JSON-compatible values are inline.
+`expected.findings` contains source-evidence-independent Finding Keys and their semantic payloads. Each `entries.*.expectedOccurrences` collection contains the entry-specific Finding Occurrence Keys and primary/related evidence. Shared evaluation status refers to Finding Keys, so paired entries can have equal suppression dependencies even when their occurrence evidence differs.
 
-A checked expected outcome contains the fixture-only canonical JSON view of the complete profile semantic projection, its Profile Specification identity/revision and digest inputs, any ordered non-blocking Findings, complete evaluation status, and the expected re-resolution and semantic dependency sets. A blocked expected outcome contains no profile and records ordered Findings, evaluated/not-evaluated status with canonical suppression causes, and the dependency facts admitted before blocking.
+The `expected` object is a closed discriminated union. A checked outcome requires the fixture-only canonical JSON view of the complete profile semantic projection, its Profile Specification identity/revision and digest inputs, ordered non-blocking Findings, complete evaluation status, and the expected semantic and resolution dependency sets. A blocked outcome requires `profile: null`, ordered Findings, evaluated/not-evaluated status with canonical Finding Key causes, and dependency facts admitted before blocking. No case may omit a field by relying on a harness default.
 
-The profile JSON view is a fixture-only canonical test representation ordered by the 015 semantics. It does not reserve a Rust type, public field spelling, shared-artifact encoding, or wire compatibility rule; 017 remains the owner of canonical artifact encoding and digest framing. Finding expectations assert code, severity, blocking state, semantic subject, stable reason, Finding Key, primary and related evidence, safe suggestion when present, canonical order, and causal Finding Keys.
+The profile JSON view is a fixture-only canonical test representation ordered by 015 semantics. It does not reserve a Rust type, public field spelling, shared-artifact encoding, or wire compatibility rule; 017 remains the owner of canonical artifact encoding and digest framing. Its complete field structure and collection orders are fixed by Case Schema revision `"0"`. Finding expectations assert code, severity, blocking state, semantic subject, stable reason, Finding Key, safe suggestion when present, canonical order, and causal Finding Keys; occurrence expectations assert evidence and Finding Occurrence Keys separately.
 
 ### File and programmatic pairing
 
-Every case whose input can be represented as a JSON-compatible value runs through both a file-value adapter and a programmatic-value adapter. Both paths must produce the same semantic outcome, canonical profile projection, Finding semantics and order, evaluation status, and dependency sets. Their expected origin, path or URI, byte range, call-site span, and other source-evidence fields are stored as entry-path-specific expectations and may differ.
+Every case whose input can be represented as a JSON-compatible value runs through both a file-value adapter and a programmatic-value adapter. Both paths must produce the same semantic outcome, canonical profile projection, Finding Keys and semantic order, evaluation status with the same causal Finding Keys, and dependency sets. Their Finding Occurrence Keys, origin, path or URI, byte range, call-site span, and other source-evidence fields are stored as entry-specific expectations and may differ.
 
 Raw JSON syntax failures, duplicate object members, malformed encoding, and exact token-range behavior are file-only because no materialized JSON-compatible programmatic value can preserve them. Programmatic source-label, call-site, and host-value-boundary cases may be programmatic-only. Every unpaired case declares the reason and its adapter owner in the manifest; an unpaired semantic-resolver case is invalid. Platform-specific configuration semantics are not an allowed exception.
+
+An unpaired entry is a closed object containing one registry-defined reason and one verification owner. It cannot be represented by omission alone. A file-only or programmatic-only entry failure that has a representable post-entry semantic value must also map to a paired Resolver Case for that shared value.
+
+### Project Profile Handoff Vector Set
+
+A Handoff Vector fixes an 015-produced checked profile fact, the separately supplied consumer input, and the relationship that the owning downstream specification must verify. It is not executed as part of `intlify_config` conformance:
+
+```text
+vectorId
+producerProfileFacts
+consumerInputs
+expectedRelationship
+verificationOwner
+relatedDecisionIds
+relatedRuleIds
+```
+
+Revision `"0"` admits the following verification owners:
+
+| Owner | Handoff domain |
+| --- | --- |
+| 016 | Intent source-locale/default-source consumption |
+| 019 | Resolution Evidence, dependency, and incremental-query consumption |
+| 020 | Group selection, Requirement planning, graph admission, linking, fallback selection, and coverage debt |
+| 021 | Translation Store and governance-policy consumption |
+| 022 | Provider routing and synchronization |
+| 023 | Negotiation execution and direct locale selection |
+| 024 | Target Profile capability consumption and target export |
+| 025 | group-scoped Release Assembly and same-Release admission |
+| 026 | cross-target logical render equivalence |
+| 027 | reference Runtime consumption |
+| 030 | Vue/SSR hydration projection |
+
+`intlify_config` CI validates each Handoff Vector schema and reproduces its `producerProfileFacts`. The named owner validates `consumerInputs -> expectedRelationship` in that specification's suite. A Handoff Vector never makes a downstream Finding, output artifact, Provider operation, Runtime result, or Release state part of the Resolver Conformance Suite.
+
+### Conditional cross-version obligations
+
+Suite revision `"0"` records Cross-Version Obligation `015-XV-001` instead of pretending that a second configuration schema revision already exists:
+
+```text
+id: 015-XV-001
+activation: at least two configuration schema revisions are admitted
+requirement:
+  authoring under different configuration revisions that resolves to the same
+  Profile Specification revision and canonical semantic projection produces
+  profile semantic equality
+additional expectation:
+  the configuration revisions remain distinct Materialized Resolution Input
+  Set and resolution-staleness dependencies
+verificationOwner: intlify_config
+```
+
+Until activation, the traceability report records `verificationStatus: not-applicable` and `reason: no-second-admitted-configuration-schema-revision`. When activated, the obligation must be replaced or supplemented by an ordinary paired Resolver Case. A conditional obligation is explicit traceability, not a silently unmapped rule or a passing synthetic fixture.
 
 ### Sufficiency and traceability
 
 Suite revision `"0"` is sufficient only when its generated traceability report satisfies all of these conditions:
 
 - every testable Accepted Decision and normative 015 invariant maps to at least one positive case and, where rejection or suppression is meaningful, at least one negative case;
-- every non-fixture ownership, packaging, static-generation, or integration decision maps to an explicit verification owner and check instead of being silently marked covered;
+- every executable 015 rule and check resolves through the complete Check and Finding Registries to at least one Resolver Case;
+- every non-resolver ownership, packaging, static-generation, integration, or downstream-consumer decision maps to an explicit verification owner and either a check or Handoff Vector instead of being silently marked covered;
 - every resource bound has an exact-bound case and a first-over case;
 - every class of non-semantic input has an equivalence relation proving an unchanged profile, while every semantic dependency class has a mutation relation proving the expected equality or invalidation change;
 - Finding independence and each dependency-suppression class have cases that assert both emitted Findings and checks deliberately left not evaluated;
 - each raw-file-only or programmatic-only exception has a machine-readable reason and a paired semantic case when the underlying semantic value is representable;
 - every generated corpus records its normative source identity, revision, complete source digest, generator revision, projection rule, and all explicit outside-domain cases, with zero unexplained omissions or mismatches; and
-- no Accepted Decision, normative rule, or declared case relation remains unmapped.
+- every conditional obligation records its activation state, verification owner, status, and closed reason when not applicable; and
+- no Accepted Decision, normative rule, check, Resolver Case, Handoff Vector, conditional obligation, or declared relation remains unexplained or unmapped.
 
-The suite and traceability report run in CI for `intlify_config`; each future binding or product adapter runs the applicable entry-path subset, and each alternate physical resolver implementation runs the complete shared semantic subset. A semantic change to checked profile expectations, Finding semantics, suppression behavior, or dependency identity requires a corresponding Accepted design decision or Profile Specification revision. A Conformance Suite revision alone may add coverage, provenance, or non-semantic fixture metadata, but it cannot silently redefine resolver semantics.
+The Resolver Conformance Suite and traceability report run in CI for `intlify_config`; each future binding or product adapter runs the applicable entry-path subset, and each alternate physical resolver implementation runs the complete shared semantic subset. Handoff owners run only their applicable vectors in their own suites. A semantic change to checked profile expectations, Finding semantics, suppression behavior, or dependency identity requires a corresponding Accepted design decision or Profile Specification revision. A Conformance Suite revision alone may add coverage, provenance, or non-semantic fixture metadata, but it cannot silently redefine resolver semantics.
 
-Suite revision `"0"` includes at least the following coverage:
+### Coverage inventory
+
+Revision `"0"` includes at least the following combined coverage inventory. The machine-readable Suite Index is authoritative about classification: an item whose expected result is wholly produced by the 015 resolver is a Resolver Case; an item that requires behavior owned by a downstream specification in the table above is a Handoff Vector with that owner. Merely mentioning a downstream result in this inventory never moves it into resolver conformance.
 
 - the exact closed root `$schema`/`schemaVersion`/`profiles` shape and every required, optional, defaulted, and explicitly nullable project-profile member;
 - Profile, Target, and Group ID map-key admission plus `projectId` and `selectionScope` admission under the common syntax and applicable byte bounds;
@@ -1415,21 +1592,21 @@ Suite revision `"0"` includes at least the following coverage:
 - omission-equivalence cases for locale negotiation, message fallback, coverage, and delivery, plus explicit absence and no-implicit-default cases for every required policy member;
 - complete Profile Resolution Artifact Set admission, including referenced and unreferenced Policy and Target Profile artifacts, exact-reference matching, closed artifact kinds, and absence of resolver I/O;
 - exact and first-over cases for every `projectProfileResolution` bound, including complete-set counting before artifact filtering and raw locale occurrence counting before duplicate detection;
-- every 015-owned Finding code/reason combination, phase/check ID, Finding Key, canonical evidence order, deduplication, and terminal incomplete-reporting cursor;
+- every Check/Finding Registry row and allowed code/reason combination, semantic Finding Key, entry-specific Finding Occurrence Key, canonical semantic/evidence order, deduplication, and atomic terminal incomplete-reporting cursor;
 - coverage decision-table equality under rule reordering while separate Coverage Decision Evidence changes only when its source evidence changes; and
 - Group ID selector vectors handed to 020 without making the selector or selected group part of profile equality;
 - JSON Schema success and failure, including missing, unknown, incorrectly typed, and incompatible-version fields;
 - exact configuration `schemaVersion: "0"`, unsupported explicit versions, and `$schema` values that do not alter resolver semantics;
 - unknown root and nested fields rejected at exact evidence, including the same Finding through file and programmatic paths;
-- file evidence containing a configuration-root identity, configuration-root-relative path, JSON Pointer, and UTF-8 byte range, with line and column positions derived by an adapter;
-- programmatic evidence containing a stable source label or URI and JSON Pointer, both with and without an optional call-site span;
+- file Entry Source Evidence for malformed input without a required JSON Pointer, duplicate-key logical paths and ranges, and Materialized Value Evidence containing a configuration-root identity, configuration-root-relative path, JSON Pointer, and optional UTF-8 byte range, with line and column positions derived by an adapter;
+- programmatic Entry Source Evidence with and without a discoverable logical input path, plus Materialized Value Evidence containing a stable source label or URI and JSON Pointer, both with and without an optional call-site span;
 - profile-selector evidence originating from both a CLI option and a programmatic argument;
-- equivalent file and programmatic failures with the same Finding semantics but different origin and location evidence;
+- equivalent file and programmatic failures with the same Finding Keys, semantic order, evaluation status, and suppression dependencies but entry-specific Finding Occurrence Keys and origin/location evidence;
 - source evidence excluded from profile semantic equality, profile digest, and checked-profile serialization;
 - Profile Specification revision `"0"` admitted independently of configuration `schemaVersion`, with either revision changing only its own version domain;
 - missing, unsupported, or incompatible Profile Specification identity/revision producing a blocking admission Finding;
 - two declarations with different Profile IDs and selectors but the same checked project identity and canonical semantic projection producing equal profiles and digest inputs;
-- a future configuration schema revision and revision `"0"` authoring that resolve to the same Profile Specification revision and canonical projection producing equal profiles, while both remain distinct re-resolution inputs;
+- inactive `015-XV-001` cross-version traceability with its closed not-applicable reason until a second configuration schema revision is admitted, followed by a paired equality/staleness Resolver Case when activated;
 - changes to any canonical semantic field or exact semantic reference identity, revision, specification revision, or content digest changing profile equality;
 - raw JSON encoding, object order, accepted spelling, source evidence, Finding presentation, conforming tool binary, host library, and physical provider representation changes leaving profile equality unchanged;
 - selected Group ID, Delivery Unit Graph, normalized user preferences, Store inventory, Provider results, physical outputs, and Release activation excluded from profile equality while remaining dependencies of their owning transactions;
@@ -1444,7 +1621,7 @@ Suite revision `"0"` includes at least the following coverage:
 - unsupported configuration version, non-materializable root shape, missing canonicalization semantics, or missing safe resource bounds suppressing every downstream check that cannot be interpreted or bounded safely;
 - dependency-suppressed checks appearing only as not evaluated with canonical causal Finding Keys, never as fabricated cascade Findings;
 - identical outcome, Finding order, and suppression-cause sets under permuted JSON members, filesystem enumeration, worker scheduling, and concurrency;
-- exact reporting-bound and first-over cases for Finding count, related evidence, evidence bytes, evaluation-status entries, and diagnostic work, with reserved terminal limit evidence and no profile on overrun;
+- exact reporting-bound and first-over cases for Finding occurrences before deduplication, distinct Finding Keys after deduplication, related evidence, evidence bytes, evaluation-status entries, and suppression causes, with atomic-unit rollback, reserved terminal limit evidence, and no profile on overrun;
 - future recognized schema sections admitted only after an explicit schema and implementation update, with no generic pass-through extension behavior;
 - equivalent CLI-adapter and direct-`intlify_config` inputs that produce the same profile or Findings;
 - one declared profile with an omitted or explicit valid selector;
@@ -1505,7 +1682,7 @@ Suite revision `"0"` includes at least the following coverage:
 - one Target Profile in one valid single-target Deployment Compatibility Group;
 - several Target Profiles partitioned exactly once across independently released Web, mobile, native, or service groups;
 - missing or duplicate Group IDs, empty groups, unknown or duplicate members, unassigned targets, and overlapping group membership producing blocking configuration Findings with no inferred or partial group;
-- group and member declaration permutations producing the same canonical profile ordering and digest inputs;
+- Target map, Group map, member-set, and hydration-relation permutations producing the same canonical profile ordering and digest inputs under unsigned UTF-8 ID and `(server, client)` tuple order;
 - omitted selection and explicit exact selection being equivalent for a one-group profile;
 - omitted selection with several groups, an unknown Group ID, multiple selectors, and a target-subset selector failing 020 transaction admission without invalidating the profile;
 - one selected group producing exactly one group-scoped Requirement Plan, Message Bundle Plan, complete member-output set, and Release Snapshot without publishing a valid member prefix after another member fails;
@@ -1524,7 +1701,7 @@ Suite revision `"0"` includes at least the following coverage:
 - relation-free co-members sharing Release compatibility without acquiring an implicit render-equivalence relation;
 - independently grouped targets retaining separate plans, Releases, publication, activation, and rollback authority while compatible synchronization may deduplicate Provider demand without merging those authorities;
 - group membership and hydration relations participating in profile semantics while the selected Group ID remains compiler-transaction input; and
-- exact and first-over Target Profile, group, Group ID byte, membership, hydration relation, graph-applicability, and compatibility-work limits without truncation or prefix selection;
+- exact and first-over Target Profile, Target/Group ID byte, membership, and hydration-relation resolver limits without truncation or prefix selection, plus separately owned handoff vectors for graph-applicability and variable capability-work limits;
 - a single-locale application with exactly one explicit `requestedLocales` member;
 - missing and empty `requestedLocales` rejected without inference from source defaults, requested defaults, Target Profiles, source Intents, host locale state, CLDR coverage, or Provider availability;
 - wildcard, `all`, language-range, query, and other dynamically expanded requested-locale declarations rejected in revision `"0"`;
@@ -1535,6 +1712,7 @@ Suite revision `"0"` includes at least the following coverage:
 - a required canonical project `defaultRequestedLocale`, including a single-locale project that does not infer the sole `requestedLocales` member;
 - a project `defaultRequestedLocale` outside the canonical project requested-locale set rejected without selecting another member;
 - each Target ID entry declaring a non-empty requested-locale subset of the project set;
+- one Target explicitly excluding a project locale without creating a Requirement edge or coverage debt for that pair, including a valid staged profile in which one project locale is currently present in no Target subset;
 - a target override taking precedence over the project default and being accepted only when it belongs to that target's subset;
 - a Target ID entry without an override inheriting the project default only when that default belongs to its subset, and otherwise producing a blocking Finding without first-member, sole-member, sorted-member, or negotiated-locale inference;
 - independently released Target IDs resolving different effective defaults through explicit overrides;
@@ -1639,9 +1817,10 @@ The accepted semantic decisions establish the following implementation dependenc
 1. establish `intlify_config`, extract the reusable existing configuration behavior, and define the version-`"0"` `IntlifyConfig` project-profile schema;
 2. define the Locale Canonicalization Specification, provider boundary, data-artifact admission requirements, and a data-free `intlify_config` integration, then evaluate the ICU4X reference adapter against conformance fixtures;
 3. define profile scope, named-profile selection, identity, inline locale-policy inputs, typed Policy and Target Profile references, Profile Resolution Artifact Set admission, delivery-specification and placement-policy resolution, and deterministic semantic resolution;
-4. exact Target ID partitioning into Deployment Compatibility Groups, hydration-relation validation, and Group ID selection semantics and test-vector handoff to 020;
-5. dependency-aware Finding collection, checked/blocked outcomes, evaluation status, reporting limits, profile equality, re-resolution staleness, the Entry Admission and Materialized Resolution Input Sets, and Conformance Suite revision-`"0"` case manifest, paired-entry harness, golden expectations, and traceability report; and
-6. file loader, optional programmatic frontend, canonicalization-data product integration, host Delivery Unit Graph handoff, and downstream-consumer evidence.
+4. exact Target ID partitioning into Deployment Compatibility Groups, canonical Target/Group/member/relation ordering, hydration-relation validation, and Group ID selection-vector handoff to 020;
+5. the complete Check and Finding Registries; Entry and Materialized evidence stages; semantic Finding and occurrence identity; dependency-aware Finding collection; atomic evaluation status and reporting limits; exact resource accounting; profile equality; and re-resolution staleness;
+6. Conformance Suite revision-`"0"` Suite Index, closed Resolver Case manifests, paired-entry harness, fixture-only profile view, golden expectations, Handoff Vector manifests, conditional cross-version obligations, and traceability report; and
+7. file loader, optional programmatic frontend, canonicalization-data product integration, host Delivery Unit Graph handoff, and downstream-consumer evidence.
 
 Apart from the accepted internal Rust crate name `intlify_config`, these checkpoints do not reserve package names, commands, or public APIs.
 
@@ -1696,6 +1875,13 @@ This table records the accepted decisions fixed by this design.
 | 015-043 | Keep only requested locale, Intent surface class, and effective mode in each semantic coverage cell, and store rule/default explanations as separate Coverage Decision Evidence | Accepted | Reordering equivalent authoring rules may change source evidence but must not change profile equality or digest inputs, while planners and users still need explainability | Terminology; Coverage Policy Inputs; Dependency, Invalidation, and Reproducibility; Consumer Input Boundaries; Conformance and Fixtures |
 | 015-044 | Let 015 define Group ID semantics, project partitioning, hydration validation, and selection test vectors while 020 owns compiler-transaction Group ID selector admission | Accepted | The profile must contain stable groups without treating a later transaction choice as project identity or duplicating planner admission responsibility | Ownership and Dependencies; Target Profiles and Deployment Compatibility Groups; Deterministic Resolution Algorithm; Consumer Input Boundaries; Conformance and Fixtures; Implementation Phasing |
 | 015-045 | Define consumer boundaries as checked profile facts plus separately named operation, transaction, credential, evidence, graph, Store, target-output, and Release inputs | Accepted | Downstream stages need more than the profile, but naming those inputs explicitly prevents them from being mistaken for profile semantics or reconstructed from unchecked configuration | Consumer Input Boundaries; Dependency, Invalidation, and Reproducibility; Security and Credential Handling |
+| 015-046 | Include the complete submitted Profile Resolution Artifact Set, including unreferenced artifacts, in the Materialized Resolution Input Set while including only required exact referenced semantic artifacts in the canonical profile projection | Accepted | Complete-set admission, bounded work, blocked-outcome reproduction, and staleness depend on unreferenced input, but unused artifacts must not change checked profile semantics merely by being available | Terminology; Provider, Governance, and Glossary References; Dependency, Invalidation, and Reproducibility; Conformance and Fixtures |
+| 015-047 | Split configuration evidence into pre-materialization Entry Source Evidence and post-materialization Materialized Value Evidence, and admit explicit evidence kinds for selectors, specifications, artifacts, and implementation capability | Accepted | Syntax and host-value failures cannot truthfully point into a materialized value, while schema and semantic failures need exact JSON Pointers and non-configuration resolver inputs need their own actionable identities | Terminology; Canonical Configuration Input and Resolution; Findings and Failure Model; Conformance and Fixtures |
+| 015-048 | Separate the entry-independent semantic Finding Key from the evidence-bearing Finding Occurrence Key; define complete machine-readable Check and Finding Registries; and order atomic evaluation units and deduplicated Findings by fixed phase, subject, check, code, reason, and key ranks | Accepted | Stable suppression and paired-entry conformance require evidence-independent causes, while editors still need occurrence identity; complete registries and a total commit order remove implementation-defined diagnostics and partial-check reporting | Terminology; Deterministic Resolution Algorithm; Findings and Failure Model; Dependency, Invalidation, and Reproducibility; Conformance and Fixtures; Implementation Phasing |
+| 015-049 | Canonically order valid Profile, Target, and Group IDs by ascending unsigned UTF-8 bytes, Group members by Target ID, and hydration relations lexicographically by `(server Target ID, client Target ID)` after validity and duplicate checks | Accepted | Authoring order is non-semantic, so 015 must define the collection order that 017 preserves rather than leaving profile projection, digest inputs, and diagnostics to host map iteration | Canonical Configuration Input and Resolution; Target Profiles and Deployment Compatibility Groups; Deterministic Resolution Algorithm; Dependency, Invalidation, and Reproducibility; Conformance and Fixtures |
+| 015-050 | Define every `projectProfileResolution` bound by exact scope, unit, counting stage, and duplicate handling; add pre-dedup `maxFindingOccurrences`; define post-dedup `maxFindings`; use checked arithmetic and logical coverage work; and remove open-ended `maxStaticCompatibilityChecks` | Accepted | Exact and first-over behavior must be reproducible and resistant to duplicate-heavy input, while fixed per-relation 015 checks and owning capability bounds make an unspecified compatibility-work counter unnecessary | Provider, Governance, and Glossary References; Deterministic Resolution Algorithm; Findings and Failure Model; Security and Credential Handling; Conformance and Fixtures |
+| 015-051 | Structure conformance as a closed Suite Index, Resolver Case manifests, complete registries, a separately owned Project Profile Handoff Vector Set, and activation-gated cross-version obligations including `015-XV-001` | Accepted | `intlify_config` must prove only resolver behavior, downstream owners must verify their own relationships, and a future-version equality requirement cannot masquerade as an executable revision-`"0"` case before another configuration revision exists | Terminology; Goals; Ownership and Dependencies; Conformance and Fixtures; Implementation Phasing |
+| 015-052 | Treat exclusion from one Target ID's requested-locale subset as explicit target applicability rather than coverage debt, and allow a project locale to be absent from every current Target subset in revision `"0"` | Accepted | Coverage debt applies only to an existing requirement edge; permitting an unused project locale supports staged configuration without weakening subset checks or inventing target demand | Requested Locale Set; Requested-Locale Default Resolution; Coverage Policy Inputs; Target Profiles and Deployment Compatibility Groups; Conformance and Fixtures |
 
 ## Deferred Follow-Up Notes
 
