@@ -1,5 +1,7 @@
 # Intlify Conformance and Measurement Design
 
+**Intlify Conformance and Measurement Specification Revision:** `"0"`
+
 ## Purpose
 
 This design defines how Intlify proves two different properties without confusing them:
@@ -43,7 +45,7 @@ This separation lets the 015 minimum implementation record projection-ready meas
 - Define common artifact-size, delivery-topology, initialization, loading, formatting, host-boundary, toolchain, and memory categories while retaining finer owner-specific operations.
 - Make process reuse, engine reuse, preparation state, cache state, runtime-compilation state, managed-heap state, scratch reuse, output-buffer reuse, text, structured-parts, and optional-output paths explicit.
 - Define immutable baseline selection and reproducible regression and budget evaluation.
-- Allow deterministic size and topology budgets to gate ordinary CI while limiting every environment-sensitive numeric decision to admitted, sufficiently stable runner classes.
+- Allow deterministic size and topology budgets to gate ordinary CI while requiring admitted qualification and preflight for methods classified `qualified-runner`.
 - Define capability evidence that proves every claimed required capability through applicable conformance cases.
 - Define common Finding-projection verification without making presentation text the semantic source of truth.
 - Define exact logical-render equivalence for hydration-coupled Browser and SSR targets and controlled equivalence for other cross-target execution paths.
@@ -210,7 +212,7 @@ Canonical measurement meaning uses integer nanoseconds, octets, and counts. Sign
 
 The first implementation of a component records the stable identities, semantic checksum, exact quantities, samples, and environment needed by later comparison. Initially, physical values MAY be observational while CI gates schema, required cases, interval integrity, and deterministic output.
 
-Numeric gates activate only after the Measurement Method's Numeric Decision Eligibility, Statistic Selection, Performance Budget limits/tolerance, and Workflow Disposition are explicit. A baseline-relative gate additionally requires its Comparison Profile and baseline lifecycle; a `qualified-runner` method additionally requires a reviewed Runner Class Specification, valid Runner Qualification Evidence, and eligible per-run preflight.
+Numeric gates activate only after the Measurement Method's Numeric Decision Eligibility, Statistic Selection, Performance Budget limits/tolerance, and Workflow Policy Evaluation are explicit. A baseline-relative gate additionally requires its Comparison Profile and baseline lifecycle; a `qualified-runner` method additionally requires a reviewed Runner Class Specification, valid Runner Qualification Evidence, and eligible per-run preflight.
 
 ### Remove work before accelerating work
 
@@ -266,7 +268,8 @@ Numeric cross-target comparison is admitted only for a deliberately paired exper
 | **Measurement Case** | One exact owner phase/cost, fixture, variant, scale, subject, workload, execution model, metric, and measurement-method combination |
 | **Observation Sample** | One ordinal measured value covering a declared positive repetition count after warmup |
 | **Measurement Evidence Set** | Immutable admitted set containing common metadata and samples while retaining exact owner-result identity and semantic observations |
-| **Measurement Run Evaluation** | Immutable result that inventories required Measurement Cases and records whether each attempt measured, was not applicable, was unavailable, or was invalid |
+| **Measurement Run Plan** | Preissued immutable identity binding one Measurement Run to its profile, subject/build, full selected case inventory, and planned runner |
+| **Measurement Run Evaluation** | Immutable result that inventories every selected required or optional Measurement Case and records whether each attempt measured, was not applicable, was unavailable, or was invalid |
 | **Performance Surface** | One physical inclusion boundary such as core computation, host-language projection, generated-output delivery, or an end-to-end workflow; memory coverage is expressed separately by a Memory Observation Domain |
 | **Memory Observation Domain** | Versioned descriptor of the observer, included and excluded storage classes, runtime/process coverage, and reuse state for one memory measurement |
 | **Measurement Method Descriptor** | Versioned description of a metric provider, observation domain, event taxonomy, counting/conversion semantics, concurrency coverage, and overflow behavior |
@@ -278,16 +281,19 @@ Numeric cross-target comparison is admitted only for a deliberately paired exper
 | **Profiling Build** | Explicit non-default build or execution mode that enables diagnostic instrumentation and is distinct from the uninstrumented build used for performance comparison |
 | **Environment Class** | Versioned comparison-relevant machine, OS, runtime, toolchain, build, and measurement-method facts selected by a Comparison Profile |
 | **Statistic Selection** | Immutable choice of exact value or order statistic, minimum sample count, and deterministic-measurement requirement used to derive one scalar from an evidence set |
-| **Comparison Profile** | Immutable rules that decide whether two evidence sets are compatible, select a Statistic Selection, and derive a difference and ratio; it does not own budget tolerance or workflow disposition |
+| **Comparison Profile** | Immutable rules that decide whether two evidence sets are compatible, select a Statistic Selection, and derive a difference and ratio; it does not own budget tolerance or workflow response |
 | **Cross-Platform Report Profile** | Immutable descriptive selection, grouping, ordering, and context rules for side-by-side evidence that produces no numeric comparison or budget decision |
 | **Baseline** | Explicit immutable reference to an admitted Measurement Evidence Set selected for a named comparison scope |
-| **Performance Budget** | Versioned target- or product-owned upper, lower, range, exact, or baseline-relative requirement that owns its limits, tolerances, and advisory/gating disposition |
+| **Performance Budget** | Versioned target- or product-owned upper, lower, range, exact, or baseline-relative requirement that owns its applicability, input kind, limits, and tolerances but not workflow response |
 | **Runner Context** | `local-uncontrolled`, `controlled-unqualified`, or `qualified` status recorded for the environment that produced an observation |
 | **Runner Qualification Evidence** | Immutable result proving whether a runner instance satisfies one versioned Runner Class Specification and its noise, drift, control, and validity rules |
-| **Runner Preflight Evaluation** | Immutable per-run result proving whether a qualified runner remains eligible immediately before a gating measurement |
+| **Runner Preflight Evaluation** | Immutable per-run result proving whether a qualified runner remains eligible immediately before an advisory or gating measurement |
 | **Numeric Decision Eligibility** | Measurement-method classification that requires deterministic proof, a qualified runner, or observational-only use before a numeric decision |
-| **Verification Record Envelope** | Common identity, schema, owner, integrity, and producer fields carried by every top-level verification, evaluation, diagnostic, baseline, and report record |
-| **Evaluation Outcome** | Evidence-derived fact such as `satisfied`, `exceeded`, or an unavailable reason; it remains separate from the `report`, `warn`, or `block` Workflow Disposition |
+| **Verification Record Envelope** | Common record identity, schema, governing-specification, integrity, and producer fields carried by every top-level verification, evaluation, diagnostic, baseline, and report record |
+| **Evaluation Input Resolution** | Common tagged state distinguishing a resolved record/case, unavailable expected input, and malformed submitted input before an evaluator proceeds |
+| **Verification Reason** | Canonically ordered machine-readable reason with a common or owner-specific code, evaluation stage, affected reference, related references, and typed detail |
+| **Evaluation Outcome** | Evidence-derived fact such as `satisfied`, `exceeded`, or an unavailable reason; it remains separate from workflow response |
+| **Workflow Policy Evaluation** | Immutable application of one workflow policy to one source evaluation, producing `report`, `warn`, or `block` without changing the source fact |
 | **Logical Render Equivalence** | Equality or explicitly bounded equivalence of canonical text/parts and diagnostics for the same selected message, locale context, values, and execution specification |
 
 ## Architecture
@@ -316,13 +322,13 @@ Console output, Criterion reports, Markdown tables, browser traces, and profiler
 - a Conformance Campaign Evaluation;
 - physical Measurement Evidence;
 - positive Capability Evidence derived from complete applicable passing conformance cases; or
-- a cross-target Logical Render Equivalence Evaluation whose `equivalent` outcome can serve as positive evidence.
+- a cross-target Logical Render Equivalence Evaluation whose `evaluated { equivalent }` outcome can serve as positive evidence.
 
 Evidence admission checks integrity and internal consistency. It does not yet declare a performance regression or budget pass.
 
 ### 4. Comparison, budget, and reporting
 
-A Comparison Profile selects compatible evidence and derives exact statistics. A Performance Budget MAY then evaluate those statistics and owns its tolerance and Workflow Disposition. A Cross-Platform Report Profile separately produces descriptive side-by-side rows without numeric comparison. Structured reports expose evaluation facts, dispositions, and reasons, while human presentation MAY render milliseconds, MiB, ratios, trends, and charts where admitted.
+A Comparison Profile selects compatible evidence and derives exact statistics. A Performance Budget MAY then evaluate decision-eligible statistics and owns its applicability, limit, and tolerance. A Workflow Policy Evaluation independently selects the workflow response. A Cross-Platform Report Profile separately produces descriptive side-by-side rows without numeric comparison. Structured reports expose evaluation facts, policy responses, and reasons, while human presentation MAY render milliseconds, MiB, ratios, trends, and charts where admitted.
 
 The report MUST keep these result kinds visually and structurally distinct:
 
@@ -515,16 +521,35 @@ InstrumentationIsolationEvidence {
   record envelope
   ordinary build identity
   profiling feature identity
-  representative call-site set
+  call-site coverage:
+    exhaustive-inventory {
+      canonical ordered call-site identities
+      inventory digest
+    }
+    | construction-proof {
+        macro, transform, or compiler identity
+        build matrix identity
+        proof fixture identity
+        canonical representative instantiations
+      }
   compile-time erasure method
   dependency-closure result
   artifact symbol, import, registry, and section result
-  call-site code-generation result
-  argument-evaluation result
+  ordered check results {
+    check identity
+    outcome: pass | fail | incomplete | invalid
+    typed reasons
+  }
+  outcome: pass | fail | incomplete | invalid
+  typed reasons
 }
 ```
 
-The check MUST establish that the ordinary artifact has no linked profiler runtime or recorder, profiler-only symbol/import/registry/section/thread-local state, or evaluation of disabled span arguments. Representative call sites MUST contain no instrumentation branch, atomic operation, thread-local access, allocation, or recorder call. An owner MAY prove erasure through macro or transform expansion, compiler IR, normalized disassembly, linked-artifact inspection, dependency-graph inspection, and a side-effecting argument probe. Whole-artifact byte equality is not required.
+The evidence MUST cover every profiler feature, supported ordinary-build target, instrumentation dependency, and instrumentation call site. Coverage MAY be established by an exhaustive call-site inventory or by one complete construction proof showing that a shared macro, transform, or compiler path erases every admissible call-site form across the declared build matrix. A construction proof still records representative instantiations for every syntax form and argument-evaluation class; sampling a convenient subset without proving construction coverage is insufficient.
+
+The checks MUST establish that the ordinary artifact has no linked profiler runtime or recorder, profiler-only symbol/import/registry/section/thread-local state, or evaluation of disabled span arguments. Covered call sites MUST contain no instrumentation branch, atomic operation, thread-local access, allocation, or recorder call. An owner MAY prove erasure through macro or transform expansion, compiler IR, normalized disassembly, linked-artifact inspection, dependency-graph inspection, and a side-effecting argument probe. Whole-artifact byte equality is not required.
+
+A failed check makes the evidence outcome `fail`; absent required coverage or an unavailable check makes it `incomplete`; malformed, contradictory, or integrity-invalid input makes it `invalid`. Only `pass` establishes the zero-required-runtime-work capability.
 
 This is build-isolation conformance evidence, not Measurement Evidence. An implementation that does not prove compile-time erasure MAY still offer diagnostic profiling, but it MUST NOT claim the 026 zero-required-runtime-work capability.
 
@@ -550,7 +575,28 @@ ProfilerObservation {
       ordered context streams
     }
     | aggregate-table { ordered aggregate span records }
-  truncation and profiler diagnostics
+  recording outcome:
+    complete
+    | truncated {
+        bound kind and configured limit
+        retained and omitted counts or bytes when observable
+        first affected sequence when observable
+      }
+    | recorder-failed {
+        failure stage
+        recorder status
+      }
+  profiler diagnostics
+}
+
+ProfilerObservationEvaluation {
+  record envelope
+  Profiler Observation identity
+  result:
+    admitted-complete
+    | admitted-truncated { typed reasons }
+    | recorder-failed { typed reasons }
+    | invalid { typed reasons }
 }
 
 ProfilerContextStream {
@@ -605,13 +651,13 @@ ProfilerDiagnosticCounter {
 
 ```
 
-An event-trace context stream is ordered by span-start sequence within that context. Separate thread, task, or worker contexts do not acquire an invented total order unless explicit context propagation and a common clock make that order observable. Occurrence identities are unique within one Profiler Observation, every parent reference resolves without a cycle, and observed end timestamps do not precede their starts. A structural violation makes the Profiler Observation invalid.
+An event-trace context stream is ordered by span-start sequence within that context. Separate thread, task, or worker contexts do not acquire an invented total order unless explicit context propagation and a common clock make that order observable. Occurrence identities are unique within one Profiler Observation, every parent reference resolves without a cycle, and observed end timestamps do not precede their starts. A structural violation produces `ProfilerObservationEvaluation { invalid }`; it MUST NOT be represented as an admitted truncated or recorder-failed observation.
 
-An aggregate duration is the total across all complete occurrences; it is not an implicit average or maximum. Per-occurrence distributions require `event-trace`. A non-complete span is retained as diagnostic state where possible but is not mixed into complete occurrence or allocation totals. Its partial duration MAY be retained only with its completion state. The started occurrence count MUST equal the sum of the completion counts in a complete aggregate report. A recorder that does not preserve this invariant marks the observation `truncated` or `recorder-failed`; it MUST NOT infer successful completion for an unrecorded occurrence.
+An aggregate duration is the total across all complete occurrences; it is not an implicit average or maximum. Per-occurrence distributions require `event-trace`. A non-complete span is retained as diagnostic state where possible but is not mixed into complete occurrence or allocation totals. Its partial duration MAY be retained only with its completion state. The started occurrence count MUST equal the sum of the completion counts in a complete aggregate report. A recorder that cannot preserve this invariant records the exact `truncated` or `recorder-failed` outcome and its known bounds; it MUST NOT infer successful completion for an unrecorded occurrence.
 
 An incomplete child makes its parent's self duration unavailable, and a process failure that prevents report finalization is a profiler execution failure.
 
-The physical representation MAY be a tree, table, or event stream consistent with the declared recorder mode. It MUST retain enough parent/context information to distinguish nested work from repeated sibling work and MUST report when limits truncate the observation. Different recorder modes or registry revisions are not treated as equivalent perturbation or directly comparable diagnostic shapes.
+The physical representation MAY be a tree, table, or event stream consistent with the declared recorder mode. It MUST retain enough parent/context information to distinguish nested work from repeated sibling work and MUST preserve the exact recording outcome and known truncation bounds. Different recorder modes or registry revisions are not treated as equivalent perturbation or directly comparable diagnostic shapes.
 
 Recording favors fixed IDs and preallocated or reusable bounded storage. Human labels, sorting, aggregation across roots, and report formatting occur after the profiled workload where practical. The profiler reports its own recorder mode so a full event trace is not compared as though it had the same perturbation as aggregate counters.
 
@@ -673,8 +719,10 @@ Every top-level verification, evaluation, diagnostic, baseline-selection, and re
 VerificationRecordEnvelope {
   record kind
   record schema revision
-  026 specification revision
-  owner ID and owner specification revision
+  governing specification {
+    specification ID
+    specification revision
+  }
   immutable record identity
   integrity digest
   producing tool identity
@@ -687,7 +735,11 @@ VerificationRecord<T> {
 }
 ```
 
-This envelope applies to Conformance Evidence, Conformance Campaign Evaluation, Capability Evidence, Logical Render Equivalence Evaluation, Measurement Evidence Set, Measurement Run Evaluation, Comparison Evaluation, Budget Evaluation, Runner Qualification Evidence, Runner Preflight Evaluation, Cross-Platform Report Evaluation, Instrumentation Isolation Evidence, Profiler Observation, Baseline Selection, and Structured Report records.
+For every common record kind defined by this document, `governing specification` is `intlify-design-026` revision `"0"`. The `record schema revision` independently versions the physical schema for that record kind. Owner-result references, policy owners, Verification Subjects, and producing tools retain their separate identities; they MUST NOT be substituted for the governing specification. A Campaign or report that aggregates multiple owners therefore still has 026 as its governing specification and carries the ordered owner-result and policy references in its body.
+
+A normative change to an outcome, semantic type, admission rule, or calculation advances the 026 specification revision. A physical record-schema change advances the applicable record schema revision. An owner profile or projection change advances its owner/profile/projection revision. Editorial corrections and translation synchronization that do not change meaning do not advance a semantic revision. 017 owns compatibility and migration across those revisions.
+
+This envelope applies to Conformance Evidence, Conformance Campaign Evaluation, Capability Evidence, Logical Render Equivalence Evaluation, Measurement Evidence Set, Measurement Run Plan, Measurement Run Evaluation, Comparison Evaluation, Budget Evaluation, Workflow Policy Evaluation, Runner Qualification Evidence, Runner Preflight Evaluation, Cross-Platform Report Evaluation, Instrumentation Isolation Evidence, Profiler Observation, Profiler Observation Evaluation, Baseline Selection, and Structured Report records.
 
 The body binds the complete applicable owner-result identity and integrity digest; Verification Subject and implementation revision; suite, benchmark, fixture, and profile identities; Target Profile, Locale Service Profile, Release, artifact, or capability identities; exact input-record references; and canonical result body. Fields that do not apply to a record kind are absent rather than filled with guessed values.
 
@@ -699,6 +751,53 @@ NestedRecordReference {
   local record identity
 }
 ```
+
+Every evaluator resolves a referenced top-level record or nested case through one common tagged input state:
+
+```text
+EvaluationInputResolution {
+  expected record, case, or selector identity
+  result:
+    resolved {
+      evidence identity
+      nested case identity | not-applicable
+    }
+    | unavailable {
+        source evaluation references
+        reason
+      }
+    | invalid {
+        submitted input reference when available
+        typed reasons
+      }
+}
+```
+
+`resolved` means that the complete integrity-valid input exists and the requested nested case resolves. `unavailable` means that an expected input is absent, stale, unsupported, failed, projection-ineligible, or otherwise unavailable without making a submitted record structurally invalid. `invalid` means that a submitted record, reference, selector binding, schema, digest, or internal relationship is malformed or inconsistent.
+
+Evaluation reasons use one common machine-readable shape:
+
+```text
+VerificationReason {
+  code:
+    common { code }
+    | owner-specific { owner identity; owner revision; code }
+  evaluation stage
+  affected record or nested-record reference
+  ordered related references
+  typed detail
+}
+```
+
+Human explanation is presentation and MUST NOT be the only reason representation. Revision `"0"` defines these common reason families:
+
+- incomplete: `missing-evidence`, `missing-required-case`, `skipped-required-case`, `unsupported-measurement`, `failed-invocation`, `projection-ineligible`, `runner-not-qualified`, `measurement-not-decision-eligible`, and `stale-evidence`;
+- invalid: `schema-invalid`, `integrity-digest-mismatch`, `inconsistent-record`, `duplicate-case`, `unknown-case`, `invalid-state-combination`, `invalid-profile`, `invalid-budget`, `arithmetic-overflow`, `non-deterministic-generation`, and `ambiguous-binding`; and
+- incompatible: `case-dimension-mismatch`, `environment-mismatch`, `method-mismatch`, `interval-mismatch`, `sampling-policy-mismatch`, and `semantic-observation-mismatch`.
+
+An outcome MUST use a reason from its applicable family. Non-applicability uses an applicability-rule identity rather than a Verification Reason. An owner-specific reason MAY refine diagnostics but MUST NOT change the common outcome required by the same facts. Every non-success outcome carries at least one reason; success-only diagnostics remain separate from failure reasons.
+
+Reasons are canonically ordered by evaluation-stage ordinal, code namespace, owner identity, code, affected reference, and ordered related references, then deduplicated by complete semantic content. The first retained reason is the primary reason. 019 owns any later projection from these evaluation reasons into Findings; a Finding code is not substituted for a Verification Reason.
 
 Wall-clock creation time is optional report context. It MUST NOT participate in semantic result equality, Measurement Case identity, comparison compatibility, or product cache identity.
 
@@ -775,15 +874,21 @@ Logical-render comparison produces a structured evaluation for both positive and
 LogicalRenderEquivalenceEvaluation {
   record envelope
   equivalence relation identity
-  left and right execution-observation references
-  compared logical-result identities
-  applied exact-equality or typed-variation rule
-  outcome: equivalent | not-equivalent | incomplete | invalid
+  left input: EvaluationInputResolution
+  right input: EvaluationInputResolution
+  result:
+    evaluated {
+      compared logical-result identities
+      applied exact-equality or typed-variation rule
+      outcome: equivalent | not-equivalent
+    }
+    | unavailable
+    | invalid
   typed reasons
 }
 ```
 
-Only `equivalent` can satisfy a positive Release evidence requirement. The other outcomes remain immutable structured results for diagnosis and policy decisions.
+Evaluation proceeds only when both inputs are `resolved`. `unavailable` is required when either input is unavailable, and `invalid` is required when either input is invalid or the relation/evaluation itself is malformed. Only `evaluated { equivalent }` can satisfy a positive Release evidence requirement. The other outcomes remain immutable structured results for diagnosis and policy decisions.
 
 ### Measurement evidence
 
@@ -792,6 +897,7 @@ Conceptually:
 ```text
 MeasurementEvidenceSet {
   record envelope
+  Measurement Run identity
   measurement profile identity
   projection identity
   owner result identity
@@ -821,12 +927,30 @@ The common evidence retains samples rather than only a precomputed average. A pr
 Measurement Evidence contains only admitted successful samples. The result of attempting a required set of cases is represented separately:
 
 ```text
+MeasurementRunPlan {
+  record envelope
+  Measurement Run identity
+  Measurement Profile identity
+  Verification Subject and build identity
+  full selected case inventory: ordered MeasurementCaseInventoryEntry
+  planned runner class identity | none
+  privacy-safe runner instance identity
+}
+
+MeasurementCaseInventoryEntry {
+  Measurement Case identity
+  requirement: required | optional
+  applicability rule identity when conditional
+}
+
 MeasurementRunEvaluation {
   record envelope
+  Measurement Run identity
+  Measurement Run Plan identity
   measurement profile identity
   verification subject
   owner result identity
-  required case inventory
+  full selected case inventory: ordered MeasurementCaseInventoryEntry
   ordered Measurement Case Evaluations
   outcome: complete | incomplete | invalid
   typed reasons
@@ -857,7 +981,11 @@ MeasurementCaseEvaluation {
 }
 ```
 
-A partial observation is diagnostic only and MUST NOT enter a numeric statistic. The required-case inventory detects a missing case without inventing an empty sample. `not-applicable` requires an explicit profile applicability rule; runner or method failure is not relabeled as non-applicability.
+A partial observation is diagnostic only and MUST NOT enter a numeric statistic. The full selected-case inventory detects a missing, duplicate, or unknown case without inventing an empty sample. Every selected case has exactly one inventory entry and exactly one case evaluation. An absent inventory entry, duplicate or unknown case, invalid case result, malformed reference, or contradictory inventory/evaluation relationship makes the owner result and run `invalid`.
+
+A required `unavailable` case makes the run `incomplete`. An optional unavailable case remains diagnostic and does not by itself make the run incomplete. A valid measured or proven `not-applicable` result satisfies inventory completeness; `not-applicable` requires the conditional applicability rule named by its inventory entry, and an unconditional required case without such a rule cannot be relabeled as non-applicable. A run with only valid not-applicable cases is `complete`, but it supplies no numeric input when no Measurement Evidence exists. Run aggregation uses the precedence `invalid` over `incomplete` over `complete`.
+
+Record absence and record corruption are different. A referenced record that is missing or cannot be retrieved produces incomplete `missing-evidence`; a present record with an invalid schema, integrity digest, or internal relationship produces `invalid`. A valid record invalidated by an age or dependency condition produces incomplete `stale-evidence`. A semantic observation mismatch fails conformance but invalidates a benchmark case. Proven non-applicability remains `not-applicable`; an environment or invocation failure is `unavailable`, never non-applicable.
 
 ### Comparison and budget evaluations
 
@@ -868,8 +996,8 @@ ComparisonEvaluation {
   record envelope
   comparison profile identity
   comparison mode
-  baseline evidence and case identity
-  candidate evidence and case identity
+  baseline input: EvaluationInputResolution
+  candidate input: EvaluationInputResolution
   result:
     comparable {
       Statistic Selection identity
@@ -877,6 +1005,7 @@ ComparisonEvaluation {
       exact baseline and candidate statistics
       signed difference
       exact ratio
+      decisionEligible: true | false
     }
     | not-comparable {
       typed compatibility reasons
@@ -893,32 +1022,61 @@ BudgetEvaluation {
   performance budget identity
   input:
     direct {
-      Measurement Evidence and case identity
+      candidate: EvaluationInputResolution
       Statistic Selection identity
     }
     | relative {
-        candidate evidence and case identity
+        candidate: EvaluationInputResolution
         Comparison Profile and baseline-scope identity
-        Baseline Selection identity | absent
-        Comparison Evaluation identity | absent
+        baseline selection: EvaluationInputResolution
+        comparison evaluation: EvaluationInputResolution
       }
-  workflow disposition: report | warn | block
   result:
     evaluated {
-      evaluated limit
-      tolerance when applicable
+      evaluated requirement:
+        maximum { limit }
+        | minimum { limit }
+        | range { lower; upper }
+        | exact { expected }
+        | baseline-relative-maximum {
+            baseline statistic
+            absolute tolerance
+            relative tolerance ppm
+            relative increase
+            allowed increase
+            computed limit
+          }
+      candidate statistic
       outcome: satisfied | exceeded
     }
     | unavailable {
-      reason: not-comparable | unbaselined | incomplete | invalid-evidence
+      reason:
+        not-comparable |
+        unbaselined |
+        incomplete |
+        invalid-evidence |
+        runner-not-qualified |
+        measurement-not-decision-eligible
       typed reasons
     }
+    | invalid { typed reasons }
+}
+
+WorkflowPolicyEvaluation {
+  record envelope
+  workflow policy identity and revision
+  source evaluation identity
+  source outcome
+  disposition: report | warn | block
+  typed reason
 }
 ```
 
-`not-comparable` is reserved for two valid evidence inputs that fail declared compatibility. Missing, skipped, unsupported, failed, or projection-ineligible required measurements produce `unavailable { kind: incomplete }`; malformed evidence or projection produces `unavailable { kind: invalid-evidence }`. `unbaselined` is a relative Budget Evaluation state because no Comparison Evaluation can begin until a baseline has been selected.
+`comparable` and `not-comparable` both require two valid `resolved` inputs. `not-comparable` is reserved for those inputs failing a declared compatibility rule. A Comparison Evaluation is `unavailable` when either input is unavailable or invalid: missing, skipped, unsupported, failed, stale, or projection-ineligible input maps to `incomplete`, while a malformed evidence record or projection maps to `invalid-evidence`. `unbaselined` is a relative Budget Evaluation state because no Comparison Evaluation can begin until a baseline has been selected.
 
-Evaluation fact and Workflow Disposition are independent. For example, the same `exceeded` result may be reported by a local workflow, warned by an advisory workflow, or blocked by a Release workflow. Human `pass`, `warning`, and `blocked` labels are derived presentation, not stored Budget Evaluation outcomes.
+A Budget Evaluation is `evaluated` only when every input required by its budget kind is `resolved`, the selected statistic is valid, and the source measurement or comparison is eligible for a numeric decision. An observational-only comparison may still be `comparable` and derive statistics, difference, and ratio, but it records `decisionEligible: false`; attempting to use it for a budget produces `unavailable { measurement-not-decision-eligible }`.
+
+Evaluation fact and workflow policy are independent. The same immutable Budget Evaluation may therefore be consumed by separate local, advisory, and Release `WorkflowPolicyEvaluation` records. Human `pass`, `warning`, and `blocked` labels are derived presentation, not stored Budget Evaluation outcomes.
 
 Neither record copies observations and then treats the copy as new evidence. It references exact admitted inputs.
 
@@ -1101,8 +1259,8 @@ A campaign produces one of:
 
 - `pass` — every required applicable case passed and every required relation was satisfied;
 - `fail` — at least one applicable case or relation produced a different logical result;
-- `incomplete` — required evidence was missing, stale, corrupt, or could not be executed; or
-- `invalid` — the campaign, suite closure, subject declaration, or result was malformed or inconsistent.
+- `incomplete` — required evidence was absent, unretrievable, stale, or could not be executed; or
+- `invalid` — the campaign, suite closure, subject declaration, or a present evidence schema, integrity digest, or internal relationship was malformed or inconsistent.
 
 Only `pass` is positive conformance evidence. `incomplete` MUST NOT be converted into `pass` because a platform or runner was unavailable.
 
@@ -1148,8 +1306,8 @@ The implementation revision is retained on each evidence set so different implem
 | `initialization` | `process`, `engine`, `release_admission`, `localizer`, `binding` | Startup work before artifact loading or message formatting, with each owned operation kept separate |
 | `loading` | `io`, `decode`, `integrity`, `admission`, `registration`, `complete` | Retrieval and admission of an immutable manifest, delivery unit, locale artifact, or native resource |
 | `formatting` | `preparation`, `cache_lookup`, `cold_text`, `hot_text`, `cold_parts`, `hot_parts`, `application_e2e` | Selected-message preparation and synchronous evaluation under an explicit cache/output state |
-| `boundary` | `encode`, `decode`, `marshal`, `call`, `batch`, `materialize`, `application_e2e` | Host-language, process, worker, or managed/native boundary work kept distinct from the underlying core operation |
-| `memory` | `peak_live`, `retained_live`, `peak_rss`, `cache_resident`, `artifact_resident` | Memory observations whose provider and lifetime are explicit |
+| `boundary` | `encode`, `decode`, `marshal`, `call`, `batch`, `transfer`, `materialize`, `application_e2e` | Host-language, process, worker, or managed/native boundary work kept distinct from the underlying core operation |
+| `memory` | `allocation`, `reallocation`, `peak_live`, `retained_live`, `peak_rss`, `cache_resident`, `artifact_resident` | Memory observations whose provider and lifetime are explicit |
 
 The categories are for common reports and budget selection. They do not imply that every target implements every operation class.
 
@@ -1176,6 +1334,7 @@ Revision `"0"` admits these common metric meanings:
 | `allocation_count`            | count          | non-negative unsigned quantity |
 | `reallocation_count`          | count          | non-negative unsigned quantity |
 | `boundary_call_count`         | count          | non-negative unsigned quantity |
+| `boundary_transfer_bytes`     | octet          | non-negative unsigned quantity |
 | `materialized_object_count`   | count          | non-negative unsigned quantity |
 | `generated_file_count`        | count          | non-negative unsigned quantity |
 | `delivery_unit_count`         | count          | non-negative unsigned quantity |
@@ -1203,7 +1362,7 @@ MeasurementMethodDescriptor {
 }
 ```
 
-For `allocation_count` and `reallocation_count`, the descriptor defines zero-size allocation, in-place growth and shrink, profiler/observer self-allocation, deallocation relationships, and thread/process coverage. For `boundary_call_count`, it defines both endpoints, host-to-native/native-to-host/callback inclusion, and batch semantics. For `materialized_object_count`, it fixes an object-taxonomy revision and eager/lazy materialization rules.
+For `allocation_count` and `reallocation_count`, the descriptor defines zero-size allocation, in-place growth and shrink, profiler/observer self-allocation, deallocation relationships, and thread/process coverage; they map respectively to `memory / allocation` and `memory / reallocation`. For `boundary_call_count`, it defines both endpoints, host-to-native/native-to-host/callback inclusion, and batch semantics. For `boundary_transfer_bytes`, it defines transfer direction, framing, callback inclusion, batch semantics, and whether input bytes, output bytes, or both are counted. This boundary metric is distinct from artifact-size `transfer_bytes`. For `materialized_object_count`, the descriptor fixes an object-taxonomy revision and eager/lazy materialization rules.
 
 Revision `"0"` compares such counts only when descriptor identities match or a versioned compatibility rule proves equivalent meaning. A value without a complete descriptor remains an owner-specific diagnostic and is not projected into a common metric.
 
@@ -1220,7 +1379,7 @@ NumericDecisionEligibility =
 - `qualified-runner` additionally requires valid Runner Qualification Evidence and an eligible per-run Runner Preflight Evaluation.
 - `observational-only` permits reporting but no advisory or gating numeric decision.
 
-Duration and memory methods use `qualified-runner` in revision `"0"`. Artifact-size and delivery-topology methods use `deterministic-proof`. Allocation, reallocation, boundary-call, and materialized-object count methods use `qualified-runner` unless their descriptor selects `deterministic_value`, pins every environment-sensitive provider/runtime fact, and requires a successful `semantic-operation` Determinism Proof. A Measurement Profile, Comparison Profile, or Performance Budget MAY impose a stricter class but MUST NOT weaken the descriptor's class.
+Duration and memory methods use `qualified-runner` in revision `"0"`. Artifact-size and delivery-topology methods use `deterministic-proof`. Allocation, reallocation, boundary-call, boundary-transfer, and materialized-object methods use `qualified-runner` unless their descriptor selects `deterministic_value`, pins every environment-sensitive provider/runtime fact, and requires a successful `semantic-operation` Determinism Proof. A Measurement Profile, Comparison Profile, or Performance Budget MAY impose a stricter class but MUST NOT weaken the descriptor's class.
 
 ### Owner-specific diagnostic metrics and promotion
 
@@ -1409,6 +1568,8 @@ A host-boundary case identifies both sides of the boundary and separates, where 
 
 `boundary_call_count` counts actual crossings made by the declared operation, including callback crossings when the profile includes them. A batch invocation is one crossing plus its declared item count; it is not relabeled as one logical item.
 
+`boundary_transfer_bytes` counts bytes crossing the declared boundary according to the method's direction, framing, callback, batch, and input/output inclusion rules. It measures runtime boundary traffic and MUST NOT be substituted for the `artifact_size / transfer` metric `transfer_bytes`.
+
 `materialized_object_count` requires an owner-defined object domain. For example, a host object, array, string, part, or wrapper MAY each be a counted object if the method declares that taxonomy. Values from different taxonomies or instrumentation revisions are not comparable.
 
 A transfer case records representation and version, framing, copy/ownership mode where observable, batch size, input and output bytes, and whether consumer access is eager or lazy. A format described as binary, compact, shared, or zero-copy receives no special comparison status without these observations.
@@ -1423,20 +1584,47 @@ Cache temperature, process reuse, JIT warmup, and managed-heap state are indepen
 ExecutionState {
   processState: fresh-process | reused-process
   engineState: fresh | reused
-  preparationState: absent | resident
-  cacheState: disabled | empty | miss | hit
+  initialPreparationState: absent | resident
+  cacheState: CacheExecutionState
   runtimeCompilationState:
     not-applicable | ahead-of-time | interpreter |
     jit-cold | jit-warmed | platform-managed
   managedHeapState:
     not-applicable | natural | forced-collection-before-case |
-    forced-collection-before-sample | declared-precondition
-  scratchReuseState
-  outputBufferReuseState
+    forced-collection-before-sample |
+    declared-precondition { precondition identity }
+  scratchReuseState: ScratchReuseState
+  outputBufferState: OutputBufferState
+}
+
+CacheExecutionState =
+  disabled
+  | enabled {
+      initialEntryState:
+        empty | required-entry-absent | required-entry-resident
+      accessObservation:
+        not-observed | miss | hit |
+        declared-sequence { policy identity }
+    }
+
+ScratchReuseState =
+  not-applicable
+  | fresh
+  | reset-reused { reset policy identity }
+
+OutputBufferState =
+  not-applicable
+  | applicable {
+      ownership: producer-owned | caller-owned | recycle-pool
+      reuse:
+        fresh | reset-reused { reset policy identity }
+    }
 }
 ```
 
 An owner Measurement Method Descriptor records any concrete JIT tier, warmup termination rule, garbage collector and configuration, heap-occupancy precondition, concurrent-GC behavior, and whether GC pauses are inside the measured interval. Different runtime-compilation or managed-heap states are not comparable unless a Comparison Profile explicitly permits and interprets the difference.
+
+A disabled cache has no access observation. `initialEntryState: empty` with `hit`, and `required-entry-resident` with `miss`, are invalid state combinations unless a declared access-sequence policy explicitly contains and explains the transition. A hot formatting case requires `initialPreparationState: resident` and, when a cache is enabled, a hit or a declared sequence whose required entry is hit. A cold formatting case starts with absent preparation and MUST NOT claim an unexplained resident entry. Every reset-reused scratch or output buffer references its reset policy. A `not-applicable` state carries no ownership, reuse, reset, or access detail. Comparison requires equal execution-state fields unless its Comparison Profile explicitly permits and interprets a difference.
 
 ### Formatting measurement
 
@@ -1610,11 +1798,11 @@ Revision `"0"` admits only these metric and aggregation combinations:
 | `generated_file_count`, `delivery_unit_count`, `initial_load_request_count`, `complete_load_request_count` | `deterministic_value` |
 | `peak_live_bytes`, `peak_rss_bytes` | `peak_over_batch` |
 | `retained_live_bytes`, `cache_resident_bytes`, `artifact_resident_bytes` | `terminal_value` |
-| `allocation_count`, `reallocation_count`, `boundary_call_count`, `materialized_object_count` | `batch_total`, or `deterministic_value` when the Measurement Method Descriptor defines deterministic-generation semantics |
+| `allocation_count`, `reallocation_count`, `boundary_call_count`, `boundary_transfer_bytes`, `materialized_object_count` | `batch_total`, or `deterministic_value` when the Measurement Method Descriptor defines deterministic-generation semantics |
 
 The matrix permits a combination; it does not imply that every owner supports it. A combination outside the matrix is `projection-ineligible` when detected during projection and `invalid-evidence` when found in an admitted record.
 
-Numeric comparison of `batch_total` samples requires the same positive fixed repetition count on baseline and candidate. `peak_over_batch` additionally requires the same reset/reuse policy so both sides have the same number and kind of peak-observation opportunities. `terminal_value` requires the same positive fixed repetition count, initial state, state-transition policy, and reset policy. An automatic calibration MAY select a repetition count before measurement, but a gating run freezes it across admitted samples and applies it to both sides. Per-operation rational values are presentation-only in revision `"0"`.
+Numeric comparison of `batch_total` samples requires the same positive fixed repetition count on baseline and candidate. `peak_over_batch` requires the same positive fixed repetition count, initial Execution State, reset/reuse policy, observer cadence, and number and kind of peak-observation opportunities. `terminal_value` requires the same positive fixed repetition count, initial Execution State, state-transition policy, and reset policy. `deterministic_value` always has `repetitionCount = 1`. An automatic calibration MAY select a repetition count before measurement, but a numeric-decision run freezes it across admitted samples and applies it to both sides. Per-operation rational values are presentation-only in revision `"0"`.
 
 Each `deterministic_value` generation is retained as an independent sample with `repetitionCount = 1`. A deterministic gate requires at least two independently generated samples and one applicable proof:
 
@@ -1636,6 +1824,8 @@ DeterminismProof =
       semantic observation identity
     }
 ```
+
+Independent generation requires distinct invocation identities. Each invocation newly materializes and validates its output from the same checked input, build, and generation configuration, uses a clean or separately identified output destination, follows the same declared process/cache policy, and MUST NOT reuse a prior invocation's produced output as its own result. The Optimization Barrier or externally materialized output proof establishes that the generation work occurred. Independence does not require a process restart unless the Measurement Profile declares one.
 
 Artifact-size and delivery-topology cases use `artifact-generation`. Content identity covers the exact measured representation stage: payload, package, or compression/framing output as applicable. A multi-artifact proof covers the canonical member order and each member content identity. Semantic equality alone MUST NOT substitute for artifact byte determinism.
 
@@ -1685,9 +1875,19 @@ RunnerContext =
 
 The Environment Observation uses controlled identifiers, not a raw environment dump. Hostname, username, home directory, repository path, arbitrary environment variables, access tokens, and command-line secrets are forbidden.
 
-The complete observation is retained for diagnosis. A Comparison Profile selects which fields form its Environment Class and which MAY differ. Omitted required fields make the pair not comparable.
+The complete observation is retained for diagnosis. A Comparison Profile selects which fields form its Environment Class and which MAY differ. Missing a required field makes the evaluation input unavailable; a present but incompatible field makes two otherwise valid inputs not comparable.
 
-`local-uncontrolled` evidence requires no controlled runner-class identity and remains observational. `controlled-unqualified` records a candidate Runner Class Specification and any failed or incomplete qualification/preflight attempt but MUST NOT gate. `qualified` references both valid Runner Qualification Evidence and the eligible preflight for that measurement run. It MUST be used whenever the Measurement Method Descriptor declares `qualified-runner`; deterministic-proof methods do not acquire that requirement merely because they participate in a direct budget.
+Runner Context records a fact about the environment in which evidence was produced; it is not by itself the final numeric-decision eligibility result. `local-uncontrolled` requires no controlled runner-class identity. `controlled-unqualified` records a candidate Runner Class Specification and any failed or incomplete qualification/preflight attempt. `qualified` references both valid Runner Qualification Evidence and the eligible preflight for that Measurement Run.
+
+Numeric use follows this matrix:
+
+| Numeric Decision Eligibility | Permitted Runner Context and use |
+| --- | --- |
+| `deterministic-proof` | Any Runner Context MAY be used after its Determinism Proof and every required build, method, execution, and environment predicate succeeds. |
+| `qualified-runner` | Only `qualified` MAY make an advisory or gating numeric decision, and it requires valid qualification and eligible preflight for the same Measurement Run. |
+| `observational-only` | Any Runner Context MAY produce observations and compatible comparison statistics, but it MUST NOT produce an evaluated Performance Budget or advisory/gating numeric decision. |
+
+Restrictions on `local-uncontrolled` and `controlled-unqualified` apply to methods that require `qualified-runner`; they do not add an undeclared stable-runner requirement to deterministic-proof methods.
 
 ### Build and subject identity
 
@@ -1730,14 +1930,36 @@ A Comparison Profile is immutable, versioned policy. It declares:
 - admitted owner schema/profile and Measurement Projection revisions;
 - selected Measurement Case or finite case group;
 - required common category, operation class, metric, and unit;
-- equal case dimensions;
-- explicitly permitted subject or target differences;
-- Environment Class fields and compatibility predicates;
+- exactly one Case Dimension Rule for every revision-`"0"` Measurement Case dimension;
+- exactly one Environment Field Rule for every retained Environment Observation field;
 - sampling and pairing requirements;
 - Statistic Selection; and
 - baseline-selection scope.
 
 There are no implicit defaults. A missing Statistic Selection, sample minimum, or environment rule makes the profile invalid. A finite case group expands into an independent Comparison Evaluation for each selected Measurement Case; it does not average or merge unlike cases. An aggregate comparison requires an aggregate subject to exist as its own Measurement Case.
+
+```text
+CaseDimensionRule =
+  equal
+  | permitted-difference {
+      reason
+      interpretation
+    }
+  | equivalent-by {
+      Logical Render Equivalence Evaluation identity
+    }
+
+EnvironmentFieldRule =
+  equal
+  | compatible-by { compatibility rule identity and revision }
+  | permitted-difference {
+      reason
+      interpretation
+    }
+  | diagnostic-only
+```
+
+Every known dimension and retained environment field has exactly one rule. A duplicate, missing, or unknown rule makes the Comparison Profile invalid; evaluators MUST NOT infer an ignore or equality default. An `equivalent-by` rule resolves an actual `evaluated { equivalent }` Logical Render Equivalence Evaluation for the exact compared evidence. A compatibility rule is either closed equality, a finite set of allowed value pairs, or a versioned owner rule with a deterministic evaluator and fixture digest. Arbitrary embedded executable code is not a compatibility rule.
 
 ### Statistic Selection
 
@@ -1754,9 +1976,11 @@ StatisticSelection {
 }
 ```
 
-Measurement Profiles own collection, Comparison Profiles own compatibility and paired/unpaired comparison, and Performance Budgets own limits, tolerances, and advisory/gating disposition. A Statistic Selection is the shared rule for deriving one scalar without moving those responsibilities between layers.
+Measurement Profiles own collection, Comparison Profiles own compatibility and paired/unpaired comparison, Performance Budgets own limits and tolerances, and Workflow Policy Evaluations own workflow response. A Statistic Selection is the shared rule for deriving one scalar without moving those responsibilities between layers.
 
 `exact` is valid only when `deterministic-measurement requirement` is enabled, the minimum sample count is satisfied, and every admitted sample has the same exact quantity and applicable Determinism Proof. The selected scalar is that common quantity. It does not select the first sample or statistically reduce unequal samples; disagreement produces `invalid-evidence / non-deterministic-generation`.
+
+`minimum sample count` MUST be at least one. Statistics use only admitted successful sample quantities, and the number of those quantities MUST meet the selected minimum.
 
 ### Compatibility procedure
 
@@ -1768,12 +1992,12 @@ Before calculating a statistic, the evaluator checks in this order:
 4. any differing target, engine, artifact, or implementation fields are explicitly permitted;
 5. semantic observation identities match or satisfy the declared logical equivalence relation;
 6. metric, unit, Measurement Method Descriptor, interval meaning, Sample Aggregation Kind, and sampling model are compatible;
-7. every required Environment Class field is present and compatible;
+7. every required Environment Class field is present and satisfies its exhaustive Environment Field Rule;
 8. both evidence sets satisfy sample-count, fixed repetition, fixture-reset, and pairing requirements; and
-9. neither input is failed, incomplete, unsupported, stale, or observational-only when a numeric decision is requested; and
-10. both inputs satisfy the Measurement Method Descriptor's Numeric Decision Eligibility and applicable runner/preflight or Determinism Proof requirements.
+9. neither input is failed, incomplete, unsupported, stale, or projection-ineligible; and
+10. the evaluator separately determines `decisionEligible` from the Measurement Method Descriptor, applicable runner/preflight or Determinism Proof, and all required decision predicates.
 
-The first failure is retained together with all other safely detectable reasons. Two admitted valid inputs that fail a compatibility rule produce `not-comparable`. Missing, skipped, unsupported, failed, stale, projection-ineligible, or runner-ineligible required input produces `unavailable { kind: incomplete }`. Malformed evidence or projection produces `unavailable { kind: invalid-evidence }`. No numeric statistic is emitted for any non-comparable or unavailable result.
+The first failure is retained together with all other safely detectable reasons. A missing required field or referenced equivalence record produces `unavailable { kind: incomplete }`. A present value that fails a Case Dimension or Environment Field Rule produces `not-comparable`. Malformed evidence, a malformed profile, or an invalid equivalence record produces `unavailable { kind: invalid-evidence }`. Missing, skipped, unsupported, failed, stale, or projection-ineligible required input produces `unavailable { kind: incomplete }`. Runner qualification or decision-eligibility failure does not erase otherwise valid analysis: the Comparison Evaluation remains comparable with `decisionEligible: false`, and a Budget Evaluation MUST reject it. No statistic is emitted for a non-comparable or unavailable result.
 
 ### Comparison modes
 
@@ -1781,7 +2005,7 @@ Revision `"0"` defines three numeric comparison modes:
 
 | Mode | Use |
 | --- | --- |
-| `same_environment_regression` | Compare implementation revisions for the same case on one compatible controlled runner class |
+| `same_environment_regression` | Compare implementation revisions for the same case under one compatible Environment Class; a qualified runner is required only when the Measurement Method requires `qualified-runner` |
 | `paired_implementation` | Interleave baseline and candidate on the same runner to reduce drift while preserving separate raw samples |
 | `paired_target_path` | Compare runtime-backed, ahead-of-time, or platform-native paths when one profile explicitly names allowed target/path differences and semantic equivalence |
 
@@ -1794,6 +2018,7 @@ CrossPlatformReportProfile {
   identity and revision
   admitted 026 specification revision
   admitted owner-result and Measurement Projection revisions
+  evidence age policy: current-only | historical-with-stale-label
   ordered row specifications [
     stable row ID
     required | optional
@@ -1814,13 +2039,23 @@ CrossPlatformReportEvaluation {
   ordered row results [
     row ID
     result:
-      available {
+      current {
         exact evidence and case reference
         exact stored quantities
         required execution and environment context
       }
+      | historical-stale {
+          exact evidence and case reference
+          exact stored quantities
+          required execution and environment context
+          invalidating relation or trigger
+          required current identity when applicable
+          observed identity
+        }
       | unavailable {
-        kind: missing | unsupported | failed | projection-ineligible
+        kind:
+          missing | unsupported | failed |
+          projection-ineligible | stale
         typed reasons
       }
   ]
@@ -1829,9 +2064,9 @@ CrossPlatformReportEvaluation {
 }
 ```
 
-Report assembly binds each row to an exact evidence and nested Measurement Case reference. It MUST NOT select an implicit latest result. More than one eligible record for a row without an explicit unique binding makes the evaluation invalid. A missing required row makes it incomplete; a missing optional row remains explicitly unavailable without making the report incomplete.
+Report assembly binds each row to an exact evidence and nested Measurement Case reference. It MUST NOT select an implicit latest result. More than one eligible record for a row without an explicit unique binding makes the evaluation invalid. A missing required row makes it incomplete; a missing optional row remains explicitly unavailable without making the report incomplete. Under `current-only`, stale evidence produces `unavailable { stale }`. Under `historical-with-stale-label`, the same valid historical evidence MAY produce `historical-stale` and the report can remain complete.
 
-The profile has no Baseline, Statistic Selection, tolerance, difference, ratio, ranking, or numeric pass/fail result. A deterministic case MAY display its admitted exact value; a non-deterministic case displays its ordered raw-sample vector without inventing an average or percentile. Stable ordering uses declared metadata keys rather than quantity-based ranking.
+The profile has no Baseline, Statistic Selection, tolerance, difference, ratio, ranking, or numeric pass/fail result. A deterministic current case MAY display its admitted exact value; a non-deterministic current case displays its ordered raw-sample vector without inventing an average or percentile. A `historical-stale` row is descriptive only and MUST NOT enter a comparison, statistic, difference, ratio, ranking, Performance Budget, Capability Evidence, or Release decision. Stable ordering uses declared metadata keys rather than quantity-based ranking.
 
 Such a report MAY contain unlike environments and targets, but each incompatible row is visibly labeled descriptive and non-comparable. A numeric cross-target experiment instead uses `paired_target_path` under one explicit Comparison Profile.
 
@@ -1846,7 +2081,7 @@ Duration, memory, and non-deterministic sampled count comparisons select one of 
 - `nearest_rank_p50`; or
 - `nearest_rank_p95`.
 
-Nearest-rank percentile for `p` over `N` ordered quantities selects the one-based element at `ceil(p × N)`. No interpolation or floating point is used. `p50` and `p95` therefore have identical results across implementations for the same sample vector.
+The evaluator sorts admitted unsigned sample quantities in ascending numeric order. For numerator `pNum`, denominator `pDen`, and sample count `N`, nearest rank is the one-based index `ceil(N × pNum / pDen)`, calculated as `(N × pNum + pDen - 1) / pDen` with checked wide-integer arithmetic. `nearest_rank_p50` uses `50 / 100`; `nearest_rank_p95` uses `95 / 100`. No interpolation or floating point is used. Overflow makes the evaluation invalid with `arithmetic-overflow`; it MUST NOT wrap or saturate. The same sample vector therefore produces the same percentile across implementations.
 
 A profile MUST justify `minimum` if used for gating because it emphasizes ideal rather than typical behavior. Runtime hot-format budgets normally use `nearest_rank_p50` and MAY additionally report `nearest_rank_p95`. Peak-memory budgets normally use `maximum`. These are guidance, not hidden defaults.
 
@@ -1908,10 +2143,43 @@ When an Environment Class or Measurement Profile changes, the old baseline remai
 
 A Performance Budget is supplied by the applicable target, Runtime, product, or release design. 026 defines its evaluation shape.
 
+```text
+PerformanceBudget {
+  identity and revision
+  owner identity
+  applicability {
+    Verification Subject selector
+    Target or Release selector
+    Measurement Case selector
+  }
+  input:
+    direct {
+      Direct Measurement Admission identity
+      Statistic Selection identity
+    }
+    | relative {
+        Comparison Profile identity
+        baseline-scope identity
+      }
+  requirement:
+    maximum { limit }
+    | minimum { limit }
+    | range { lower; upper }
+    | exact { expected }
+    | baseline-relative-maximum {
+        absolute tolerance
+        relative tolerance ppm
+      }
+}
+```
+
+Direct input admits `maximum`, `minimum`, `range`, and `exact`. Relative input admits only `baseline-relative-maximum`. `range` requires `lower <= upper`. Every quantity uses the selected metric's canonical unit. `exact` requires deterministic-proof eligibility and `StatisticSelection { exact }`. An incompatible input/requirement combination or invalid bound makes the Performance Budget invalid; it is not evaluated by guessing a default.
+
 A direct budget references one candidate Measurement Evidence Set, Measurement Case, Statistic Selection, and complete admission policy:
 
 ```text
 DirectMeasurementAdmission {
+  identity and revision
   admitted Measurement Profile and Measurement Method Descriptor identities
   required Measurement Case and Execution State
   required build and environment predicates
@@ -1919,9 +2187,9 @@ DirectMeasurementAdmission {
 }
 ```
 
-A direct budget is not a way to bypass comparison admission or runner stability. It MUST satisfy the descriptor's Numeric Decision Eligibility. A deterministic direct budget requires the applicable Determinism Proof and exact admission predicates; a `qualified-runner` direct budget requires valid qualification and the eligible preflight referenced by that run.
+A direct budget is not a way to bypass numeric-decision admission. It MUST satisfy the descriptor's Numeric Decision Eligibility. A deterministic direct budget requires the applicable Determinism Proof and exact admission predicates; a `qualified-runner` direct budget requires valid qualification and the eligible preflight referenced by that run.
 
-A baseline-relative budget references one Comparison Evaluation whose Comparison Profile has already derived compatible baseline and candidate statistics. The budget owns its exact limits and tolerances plus the `report`, `warn`, or `block` Workflow Disposition for exceeded and unavailable outcomes.
+A baseline-relative budget references one Comparison Evaluation whose Comparison Profile has already derived compatible baseline and candidate statistics. The budget owns only its exact limits and tolerances; workflow response is evaluated separately.
 
 Revision `"0"` admits:
 
@@ -1929,7 +2197,7 @@ Revision `"0"` admits:
 - `minimum` — candidate statistic MUST be greater than or equal to an exact quantity;
 - `range` — candidate statistic MUST fall within inclusive exact lower and upper quantities;
 - `exact` — candidate quantity MUST equal an exact deterministic value; and
-- `baseline_relative_maximum` — candidate regression over a selected baseline MUST remain within exact absolute and relative tolerance.
+- `baseline-relative-maximum` — candidate regression over a selected baseline MUST remain within exact absolute and relative tolerance.
 
 Duration, size, allocation, materialization, boundary-call, delivery-topology, and memory costs normally use upper bounds. A minimum is available for metrics where larger is intentionally better, but revision `"0"` defines no canonical throughput metric.
 
@@ -1946,7 +2214,7 @@ A performance result MUST NOT permit a Resource Limit Policy violation.
 
 ### Relative tolerance calculation
 
-For `baseline_relative_maximum`, the budget contains:
+For `baseline-relative-maximum`, the budget contains:
 
 - `absoluteTolerance` in the metric's canonical unit; and
 - `relativeTolerancePpm` as an integer parts-per-million value in the inclusive range `0..=1_000_000`.
@@ -1961,26 +2229,35 @@ allowedIncrease = max(absoluteTolerance, relative)
 limit = baseline + allowedIncrease
 ```
 
-The multiplication uses an unsigned integer representation of at least 128 bits, or arbitrary-precision arithmetic with equivalent semantics. No floating-point operation participates in the decision. Implementations SHOULD calculate the ceiling through checked quotient and remainder operations. The final relative value, allowed increase, and limit MUST fit the common `u64` quantity domain. Any failure is `invalid-budget-arithmetic-overflow`; an implementation MUST NOT wrap or saturate it.
+The multiplication uses an unsigned integer representation of at least 128 bits, or arbitrary-precision arithmetic with equivalent semantics. No floating-point operation participates in the decision. Implementations SHOULD calculate the ceiling through checked quotient and remainder operations. The final relative value, allowed increase, and limit MUST fit the common `u64` quantity domain. Any failure makes the Budget Evaluation `invalid` with `arithmetic-overflow`; an implementation MUST NOT wrap or saturate it.
 
 The Budget Evaluation outcome is `satisfied` when `candidate <= limit` and `exceeded` otherwise. The evaluation retains the exact baseline, candidate, absolute tolerance, relative tolerance, computed increase, and limit.
 
 Using the maximum of absolute and relative tolerance prevents noise near zero from making a small absolute change look catastrophic while preserving proportional control for larger values. A target MAY set either tolerance to zero explicitly.
 
-### Evaluation outcome and workflow disposition
+### Evaluation outcome and workflow policy
 
 Evaluation records state facts; workflow policy states the response:
+
+- Measurement Evidence and Measurement Run Evaluation are observations and collection-state facts;
+- Comparison Evaluation is analysis over resolved compatible observations;
+- Budget Evaluation is a numeric policy fact over a decision-eligible direct input or comparison; and
+- Workflow Policy Evaluation chooses the response to an existing source evaluation.
+
+| Numeric Decision Eligibility | Observation | Comparison statistics/difference/ratio | Evaluated Budget |
+| --- | --- | --- | --- |
+| `deterministic-proof` | allowed | allowed when admission predicates and proof succeed | allowed |
+| `qualified-runner` | allowed | allowed when qualification/preflight and admission succeed | allowed |
+| `observational-only` | allowed | allowed with `decisionEligible: false` | forbidden; result is unavailable with `measurement-not-decision-eligible` |
 
 - a Budget Evaluation is `evaluated { satisfied | exceeded }` or `unavailable`;
 - a Comparison Evaluation is `comparable`, `not-comparable`, or `unavailable`;
 - `unbaselined` exists only as an unavailable relative Budget Evaluation reason; and
 - Measurement Run and other evaluation records retain their own closed outcomes.
 
-Typed `incomplete` reasons include `missing-evidence`, `missing-required-case`, `skipped-required-case`, `unsupported-measurement`, `failed-invocation`, `projection-ineligible`, `runner-not-qualified`, `measurement-not-decision-eligible`, and `stale-evidence`. An unavailable input remains distinct from invalid input merely because it does not satisfy a gate.
-
 `stale-evidence` means that an immutable record was valid when produced but is no longer admitted for the current campaign, comparison, budget, or Release because a referenced validity condition ended or an identity/dependency invalidation was observed. The reason retains the stale record identity, invalidating relation or trigger, required current identity when applicable, and observed identity. The original record is not mutated. Historical or descriptive reporting MAY retain it with an explicit stale label, but it MUST NOT produce a positive Capability Evidence, conformance pass, comparison statistic, or budget satisfaction. A malformed schema or digest mismatch remains `invalid-evidence`, not stale evidence.
 
-Workflow Disposition is independently `report`, `warn`, or `block`. The same `exceeded` fact may therefore be reported locally, warned by advisory CI, or blocked by Release policy. Release-gating policy MUST block `exceeded`, `not-comparable`, `unbaselined`, and `incomplete`; a local observational workflow MAY report them without failing. Human `pass`, `warning`, and `blocked` labels are derived from the evaluation fact plus this disposition.
+A Workflow Policy Evaluation independently selects `report`, `warn`, or `block` for one source evaluation outcome. The same `exceeded` Budget Evaluation may therefore be reported locally, warned by advisory CI, or blocked by Release policy without changing the budget or its evaluation. Release-gating policy MUST block `exceeded`, `not-comparable`, `unbaselined`, `incomplete`, `invalid`, `invalid-evidence`, and `measurement-not-decision-eligible`; a local observational workflow MAY report them without failing. Human `pass`, `warning`, and `blocked` labels are derived from the evaluation fact plus the Workflow Policy Evaluation.
 
 ### Budget ownership and aggregation
 
@@ -2008,17 +2285,14 @@ StructuredReportSection =
     campaign and evidence identities
   }
   | measurement-observation {
-      Measurement Evidence and Measurement Run Evaluation identities
+      Measurement Run Evaluation identity
+      Measurement Evidence Set identities
     }
   | comparison {
       Comparison Evaluation identity
-      Statistic Selection identity
-      baseline and candidate identities
       optional Budget Evaluation identities
     }
   | direct-budget {
-      Measurement Evidence identity
-      Statistic Selection identity
       Budget Evaluation identity
     }
   | cross-platform-descriptive {
@@ -2026,7 +2300,7 @@ StructuredReportSection =
     }
 ```
 
-Fields are required only by their section kind. In particular, a cross-platform descriptive section has no Statistic Selection, baseline, budget, difference, ratio, ranking, or numeric decision. Across its applicable sections, a structured report contains:
+Fields are required only by their section kind. A measurement-observation section MAY contain zero Measurement Evidence Set identities when its Measurement Run Evaluation is complete with only valid non-applicable cases, or incomplete/invalid with no admitted sample. In particular, a cross-platform descriptive section has no Statistic Selection, baseline, budget, difference, ratio, ranking, or numeric decision. Across its applicable sections, a structured report contains:
 
 - report specification revision;
 - exact selected evidence and applicable profile, statistic, baseline, and budget identities;
@@ -2093,7 +2367,7 @@ A measurement Finding references evidence and policy identities. It does not cop
 | `integrity` | Validate suite/result schemas, required cases, registry and interval topology, fixture identities, checksums, deterministic outputs, projection mappings, and report generation |
 | `observational` | Collect physical samples and publish trends without a numeric pass/fail decision |
 | `advisory` | Compare against an admitted baseline/budget and report warnings without blocking the ordinary change |
-| `gating` | Apply an explicitly approved stable-runner policy and block the configured CI or Release decision on failure, missing evidence, or incompatibility |
+| `gating` | Apply an explicitly approved numeric-decision and workflow policy and block the configured CI or Release decision on failure, missing evidence, or incompatibility; runner qualification is required only for `qualified-runner` methods |
 
 Every implementation MUST begin with `integrity`. It MAY add `observational` immediately. `advisory` and `gating` require the applicable direct or comparison admission and Numeric Decision Eligibility; only baseline-relative decisions require a baseline lifecycle, and only `qualified-runner` methods require runner qualification/preflight lifecycle operations.
 
@@ -2121,45 +2395,62 @@ Values from a `qualified-runner` Measurement Method are observational until a Ru
 A stable runner is defined by an immutable Runner Class Specification:
 
 ```text
+QualificationCheckSpecification {
+  check identity and revision
+  workload identity
+  measurement method identity
+  sampling policy
+  Statistic Selection identity
+  acceptance threshold
+  requirement: required | optional
+}
+
 RunnerClassSpecification {
   identity and revision
   required environment predicates
   required control settings
-  qualification workload
-  noise and drift statistic
-  acceptance thresholds
-  preflight checks
+  ordered qualification check specifications
+  ordered preflight check specifications
   qualification validity policy
   invalidation triggers
 }
+
+RunnerEnvironmentSnapshot {
+  Environment Observation fields except Runner Context
+}
 ```
+
+Threshold arithmetic uses checked integers and exact ratios. An owner-defined threshold rule MUST have a stable identity and revision, deterministic evaluator identity, and fixture digest; arbitrary executable policy embedded in a result is invalid.
 
 Qualification produces:
 
 ```text
 RunnerQualificationEvidence {
   record envelope
+  Measurement Run identity
+  Measurement Run Plan identity
   runner class identity
   privacy-safe runner instance identity
-  Environment Observation
-  ordered qualification samples
-  selected statistic
-  outcome: qualified | unqualified | incomplete | invalid
-  typed reasons
-  validity condition:
-    single-run {
-      Measurement Run identity
+  Runner Environment Snapshot
+  ordered qualification-check results
+  result:
+    qualified {
+      validity condition:
+        single-run { Measurement Run identity }
+        | sequence-window {
+            qualification epoch
+            first gating-run sequence
+            last gating-run sequence
+          }
+        | time-window {
+            clock authority identity
+            valid from
+            valid until
+          }
     }
-    | sequence-window {
-        qualification epoch
-        first gating-run sequence
-        last gating-run sequence
-      }
-    | time-window {
-        clock authority identity
-        valid from
-        valid until
-      }
+    | unqualified { typed reasons }
+    | incomplete { typed reasons }
+    | invalid { typed reasons }
 }
 ```
 
@@ -2171,20 +2462,21 @@ The platform or product owner supplies the concrete thresholds; 026 owns this sh
 - controlled CPU governor, power, thermal, and background-load policy where applicable;
 - exclusive or declared contention behavior;
 - calibrated monotonic clock or memory observer;
-- retained Environment Observations;
+- retained Runner Environment Snapshots and later Environment Observations;
 - periodic noise and drift checks; and
 - an explicit baseline refresh process.
 
-Every gating run produces exactly one preflight evaluation after qualification/environment admission and before measured samples:
+Every run intended to make an advisory or gating numeric decision for a `qualified-runner` method produces exactly one preflight evaluation after qualification/environment admission and before measured samples:
 
 ```text
 RunnerPreflightEvaluation {
   record envelope
+  Measurement Run Plan identity
   runner class specification identity
   Runner Qualification Evidence identity
   privacy-safe runner instance identity
   Measurement Run identity
-  Environment Observation identity
+  Runner Environment Snapshot
   qualification validity evaluation
   ordered check results [
     check identity and revision
@@ -2197,21 +2489,35 @@ RunnerPreflightEvaluation {
 }
 ```
 
-`eligible` requires that the qualification remains valid, the runner instance and Environment Class still match, required observers remain usable, thermal/power/background-load controls remain in policy, the noise/drift probe remains within threshold, and every required preflight check passes. Any other outcome makes the run unavailable for a numeric decision that requires a qualified runner.
+The required execution sequence is `MeasurementRunPlan -> RunnerQualificationEvidence -> RunnerPreflightEvaluation -> samples -> MeasurementEvidenceSet -> MeasurementRunEvaluation`. Every record in that sequence MUST reference the same Measurement Run identity; that identity is distinct from each record envelope's immutable record identity. Qualification and preflight use Runner Environment Snapshots so they do not depend cyclically on an Environment Observation that already contains final Runner Context. The later Measurement Evidence constructs its full Environment Observation from the snapshot plus the resulting qualified Runner Context and preflight reference.
 
-Preflight occurs for every gating run. Full requalification occurs when the typed validity condition ends or an invalidation trigger fires. `single-run` binds qualification to one Measurement Run. `sequence-window` uses a controller-issued qualification epoch and monotonic gating-run sequence. `time-window` requires `valid from` and `valid until` observations from the named clock authority. Generic optional evidence creation time MUST NOT be used to prove any of these validity conditions.
+A qualification result aggregates check outcomes with precedence `invalid` over `incomplete` over `unqualified` over `qualified`; only `qualified` carries a validity condition. A preflight aggregates with precedence `invalid` over `incomplete` over `ineligible` over `eligible`. A malformed check result is invalid, inability to execute a required check is incomplete, a completed required threshold failure is unqualified or ineligible, and only all required passing checks can produce qualified or eligible. Optional failed or unavailable checks remain diagnostic unless the Runner Class Specification explicitly makes them decision-relevant.
+
+`eligible` also requires that the qualification remains valid, the runner instance and Environment Class still match, required observers remain usable, thermal/power/background-load controls remain in policy, and every required preflight check passes. Any other outcome makes the run unavailable for a numeric decision that requires a qualified runner.
+
+Preflight occurs for every advisory or gating `qualified-runner` run. Full requalification occurs when the typed validity condition ends or an invalidation trigger fires. `single-run` binds qualification to one Measurement Run. `sequence-window` uses a controller-issued qualification epoch and monotonic gating-run sequence. `time-window` requires `valid from` and `valid until` observations from the named clock authority. Generic optional evidence creation time MUST NOT be used to prove any of these validity conditions.
+
+For `sequence-window` and `time-window`, each planned Measurement Run receives its own immutable run-bound Runner Qualification Evidence that retains the shared qualification epoch/check references and evaluates the window for that run. Reusing a qualification window does not reuse one top-level record with a different Measurement Run identity.
 
 An applicable hardware, OS, runtime, toolchain, allocator, clock, power-policy, runner-instance, or Runner Class Specification change; threshold failure; or validity-window end invalidates qualification regardless of the selected validity kind. Authentication of a sequence controller or clock authority remains an 018-owned trust decision.
 
 Gating executed-work benchmarks run with diagnostic profiling disabled unless their Measurement Profile defines the instrumentation itself as the measured subject. A separate Profiling Build MAY accompany a regression for diagnosis but MUST NOT replace the uninstrumented evidence.
 
-A run that fails preflight remains visible as observational Measurement Evidence but MUST NOT make an advisory or gating numeric decision. Its Measurement Run or Budget Evaluation is `incomplete` with `runner-not-qualified`; it is not deleted or mislabeled as a budget regression.
+A run that fails preflight remains visible as observational Measurement Evidence and retains its case-completeness result, but it MUST NOT make an advisory or gating numeric decision. A Budget Evaluation that attempts to consume it is unavailable with `runner-not-qualified`; the evidence is not deleted or mislabeled as a budget regression.
 
 Mobile physical-device farms and browser runners MAY use target-specific stability checks. Simulator/emulator evidence remains a distinct Environment Class.
 
 ### Release evidence
 
-025 MAY require exact Conformance Evidence, Capability Evidence, an `equivalent` Logical Render Equivalence Evaluation, and Budget Evidence before Release publication or deployment activation. Such evidence is admissible only when:
+025 MAY require exact Conformance Evidence, Capability Evidence, an `evaluated { equivalent }` Logical Render Equivalence Evaluation, and Budget Evaluations before Release publication or deployment activation. A Budget Evaluation satisfies a Release requirement only when:
+
+- it is `evaluated { satisfied }`;
+- its Performance Budget applies to the exact subject, Target or Release, and Measurement Case;
+- every governing specification, record schema, profile, projection, budget, and policy revision is current and admitted;
+- its Numeric Decision Eligibility requirements are satisfied; and
+- a Release-gating Workflow Policy Evaluation consumes it with the required policy.
+
+An exceeded, unavailable, invalid, not-comparable, unbaselined, incomplete, stale, or measurement-not-decision-eligible result does not satisfy a Release requirement. A `report` or `warn` disposition is not Release-gating evidence. All required Release evidence is otherwise admissible only when:
 
 - its subject identities match the Release and Target output identities;
 - every applicable suite and policy revision is admitted;
@@ -2306,19 +2612,21 @@ With those fields, later work can add an immutable baseline and Comparison Profi
 1. Measurement Projection admission and rejection;
 2. exact numeric/unit and duration-conversion behavior;
 3. Measurement Method Descriptor and Memory Observation Domain admission;
-4. Environment Class and Runner Context compatibility;
+4. Environment Class, exhaustive dimension/field rules, and Runner Context compatibility;
 5. Sample Aggregation Kind, repetition, and Statistic Selection derivation;
 6. baseline and budget lifecycle;
 7. Capability Declaration coverage;
 8. Finding projection preservation;
 9. logical execution equivalence;
 10. Browser/SSR hydration render equivalence;
-11. profiler feature isolation, hierarchy, completion, and bounded recording;
+11. profiler feature isolation, call-site coverage, hierarchy, completion, evaluation, and bounded recording;
 12. performance-surface, Artifact Set Scope, and delivery-topology identity;
 13. Runner Qualification Evidence; and
 14. comparison versus descriptive-report separation and report determinism;
-15. Verification Record Envelope identity and nested-record references; and
-16. Measurement Run Evaluation completeness and typed attempt results.
+15. Verification Record Envelope identity, governing-specification revision, and nested-record references;
+16. Measurement Run Plan/Evaluation completeness and typed attempt results;
+17. Evaluation Input Resolution and Verification Reason taxonomy; and
+18. Workflow Policy Evaluation separation from Budget Evaluation.
 
 Component specifications own the semantic fixture bodies imported by those campaigns.
 
@@ -2337,7 +2645,7 @@ Every Measurement Projection includes cases for:
 - missing or incomplete Measurement Method Descriptor;
 - missing or unknown Sample Aggregation Kind;
 - every admitted and rejected metric/Sample Aggregation Kind combination;
-- inconsistent Execution State;
+- every valid and invalid cache, preparation, managed-heap, scratch, and output-buffer Execution State combination;
 - missing required or invalid Optimization Barrier Policy;
 - exact zero and `u64::MAX` quantity;
 - first-over or lossy numeric input rejection;
@@ -2348,7 +2656,8 @@ Every Measurement Projection includes cases for:
 - missing environment field;
 - unsupported measurement method;
 - owner failure or partial prefix;
-- measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, and invalid Measurement Case Evaluations;
+- full required/optional inventory with measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, stale, and invalid Measurement Case Evaluations;
+- missing inventory entry, duplicate/unknown case, malformed reference, and the `invalid > incomplete > complete` aggregation precedence;
 - allowed optional owner metadata; and
 - deterministic output under input-order permutation where the owner permits permutation.
 
@@ -2357,7 +2666,7 @@ Every Measurement Projection includes cases for:
 Profiling fixtures cover:
 
 - an ordinary build with instrumentation call sites disabled and no required profiler recorder dependency;
-- Instrumentation Isolation Evidence covering dependency closure, symbols/imports/registries/sections, representative code generation, and non-evaluation of disabled arguments;
+- Instrumentation Isolation Evidence covering exhaustive-inventory and construction-proof call-site coverage, dependency closure, symbols/imports/registries/sections, code generation, and non-evaluation of disabled arguments;
 - enabled/disabled logical-result and deterministic-artifact equality;
 - event-trace and aggregate-table recorder modes;
 - nested sibling and repeated spans with correct started/completion counts, inclusive-total, and self-total relationships;
@@ -2367,7 +2676,7 @@ Profiling fixtures cover:
 - explicit propagated context when asynchronous parentage is supported;
 - static registry rejection of an unknown span ID;
 - record-count, depth, retained-byte, and report-size exact-boundary and first-over behavior;
-- explicit truncation propagation;
+- complete, bounded-truncated, recorder-failed, and structurally invalid Profiler Observation Evaluations with exact known truncation bounds;
 - allocation observation with declared included and excluded domains;
 - counter overflow or observer failure without silent saturation;
 - absence of source content and dynamic user values from ordinary shared span labels; and
@@ -2379,11 +2688,11 @@ Comparison fixtures cover:
 
 - identical evidence;
 - permitted implementation revision difference;
-- each incompatible case dimension;
-- each missing Environment Class field;
+- equal, permitted-difference, and equivalent-by rules for every case dimension, including duplicate, missing, and unknown rule rejection;
+- equal, compatible-by, permitted-difference, and diagnostic-only rules for every Environment Observation field, including each missing and mismatched field;
 - equal and unequal semantic observations;
 - one-sample observational ineligibility;
-- exact percentile selection for odd and even sample counts;
+- exact percentile selection for odd and even sample counts, minimum-sample validation, ascending unsigned ordering, and checked nearest-rank overflow;
 - exact selection over identical deterministic samples and rejection of unequal quantities or Determinism Proofs;
 - fixed versus mismatched repetition counts for each Sample Aggregation Kind;
 - `AB`, `BA`, and explicitly two-pair `ABBA` behavior;
@@ -2402,22 +2711,26 @@ Comparison fixtures cover:
 - transfer-representation mismatch without an explicitly paired profile;
 - generated-file, Delivery Unit, initial-load-request, and complete-load-request exact counts;
 - separate `comparable`, `not-comparable`, `unavailable / incomplete`, and `unavailable / invalid-evidence` results;
-- independent `satisfied`/`exceeded` Budget Evaluation and `report`/`warn`/`block` Workflow Disposition;
+- every valid and invalid direct/relative Performance Budget requirement combination and exact evaluated-value retention;
+- independent `satisfied`/`exceeded` Budget Evaluation and `report`/`warn`/`block` Workflow Policy Evaluation;
 - `incomplete` outcomes for each typed missing/unsupported/failed/projection/runner/stale/decision-eligibility reason;
-- direct-budget deterministic-proof, qualified-runner, and observational-only admission;
-- Cross-Platform Report Profile required, optional, missing, and ambiguous row binding with no Comparison Evaluation, Statistic Selection, ratio, ranking, or budget result; and
+- direct-budget deterministic-proof, qualified-runner, and observational-only admission, including a comparable observational analysis rejected from budget evaluation;
+- Cross-Platform Report Profile `current-only` and `historical-with-stale-label` behavior, required/optional/missing/stale/ambiguous rows, and prohibition of stale-row statistics, ranking, budgets, capability, or Release use; and
 - stable report ordering.
 
 ### Required runner-qualification fixtures
 
 Runner fixtures cover:
 
-- local-uncontrolled, controlled-unqualified, and qualified Runner Contexts;
+- preissued Measurement Run Plan identity through qualification, preflight, evidence, and run evaluation;
+- local-uncontrolled, controlled-unqualified, and qualified Runner Contexts under deterministic-proof, qualified-runner, and observational-only methods;
+- Runner Environment Snapshot construction without a Runner Context cycle;
+- required and optional Qualification Check Specifications, checked integer/exact-ratio thresholds, and deterministic owner-rule fixtures;
 - exact qualification threshold and first-over failure;
 - valid and expired `single-run`, `sequence-window`, and `time-window` qualification;
 - each environment-change invalidation trigger;
 - sequence-window and time-window exact boundary and first-over behavior;
-- exactly one eligible preflight produced before gating samples;
+- exactly one eligible preflight produced before advisory or gating qualified-runner samples;
 - preflight noise, thermal, power, background-load, clock, and memory-observer failure; and
 - retention of failed-preflight observations with `incomplete / runner-not-qualified` evaluation.
 
@@ -2458,13 +2771,14 @@ component suites
 Candidate internal components are:
 
 - a language-neutral evidence model and validator;
+- common Evaluation Input Resolution and Verification Reason validators;
 - a registry of versioned owner Measurement Projections;
 - exact quantity/statistic helpers;
-- Measurement Method Descriptor, Memory Observation Domain, Execution State, and Statistic Selection validators;
+- Measurement Method Descriptor, Memory Observation Domain, Execution State, Statistic Selection, Measurement Run Plan, and full case-inventory validators;
 - optional static span registry, bounded profiler recorder, and diagnostic report projection;
 - Instrumentation Isolation Evidence adapters for supported build systems;
-- a comparison and budget evaluator;
-- Runner Class Specification and qualification/preflight evaluator;
+- a comparison, budget, and Workflow Policy evaluator;
+- Runner Class Specification, Qualification Check Specification, qualification/preflight, and Runner Environment Snapshot evaluators;
 - Cross-Platform Report Profile projection;
 - a conformance campaign planner and evidence validator;
 - shared fixture codecs;
@@ -2494,28 +2808,28 @@ Each phase completion statement includes the applicable required fixture familie
 
 ### Phase 1 — Common measurement foundation and 015 adoption
 
-- Define revision-`"0"` Verification Record Envelopes, performance surfaces, Memory Observation Domains, Artifact Set Scopes, categories, metrics, Measurement Method Descriptors, Numeric Decision Eligibility, Execution State, Sample Aggregation Kinds and their metric matrix, exact quantities, duration conversion, Environment Observation, Runner Context, and projection validation.
-- Implement Statistic Selection, exact difference/ratio, fixed-repetition, overflow, and compatibility primitives.
-- Implement Measurement Run and Measurement Case Evaluations for measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, and invalid attempts.
+- Define revision-`"0"` Verification Record Envelopes and governing-specification revision, Evaluation Input Resolution, Verification Reasons, performance surfaces, Memory Observation Domains, Artifact Set Scopes, categories, metrics, Measurement Method Descriptors, Numeric Decision Eligibility, Execution State, Sample Aggregation Kinds and their metric matrix, exact quantities, duration conversion, Environment Observation, Runner Context, and projection validation.
+- Implement Statistic Selection, checked nearest-rank selection, exact difference/ratio, fixed-repetition/reset semantics, overflow, and exhaustive compatibility-rule primitives.
+- Implement Measurement Run Plans, full required/optional case inventories, and Measurement Run/Case Evaluations for measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, stale, and invalid attempts.
 - Define a compile-time-disabled span facade and bounded optional hierarchical timing recorder whose event-trace and aggregate modes preserve Span completion state; keep allocation observation a separately enabled capability.
 - Add the initial 015 Measurement Projection and projection fixtures.
 - Make 015 benchmark smoke results retain projection-ready raw samples, checksum, workload, reuse state, build, and environment data.
 - Add Instrumentation Isolation Evidence and feature-matrix tests for profiling-disabled ordinary builds and profiling-enabled semantic equivalence.
 - Gate integrity and deterministic behavior; keep physical values observational.
 
-Phase 1 is complete when one 015 result can be validated, projected, and reported; every required and optional case attempt has the specified typed result; all applicable projection, aggregation, numeric, record-envelope, and profiler fixtures pass; every partial observation is excluded from numeric statistics; and profiling can be enabled for diagnosis without changing any 015 semantic operation boundary, the ordinary build's logical result, or its required runtime path.
+Phase 1 is complete when one planned 015 run can be validated, projected, and reported; every required and optional case attempt has the specified typed result; all applicable projection, aggregation, numeric, record-envelope, reason, and profiler fixtures pass; every partial observation is excluded from numeric statistics; and profiling can be enabled for diagnosis without changing any 015 semantic operation boundary, the ordinary build's logical result, or its required runtime path.
 
 ### Phase 2 — Baseline, comparison, and budget evaluation
 
 - Implement immutable Baseline Selection.
 - Implement all three revision-`"0"` numeric Comparison Profile modes and their `comparable`, `not-comparable`, and unavailable results.
 - Implement Cross-Platform Report Profiles and Evaluations with exact row binding and descriptive-only output.
-- Implement exact direct and baseline-relative budget evaluation.
-- Keep Budget Evaluation fact separate from Workflow Disposition.
-- Implement Runner Class Specification, Qualification Evidence, typed validity conditions, per-run Preflight Evaluation, invalidation, and structured reasons.
+- Implement exact Performance Budget validation and direct/baseline-relative Budget Evaluation.
+- Implement Workflow Policy Evaluation separately from Budget Evaluation facts.
+- Implement Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions, per-run Preflight Evaluation, invalidation, and structured reasons.
 - Establish an advisory resolver baseline on a controlled runner without making it a revision-`"0"` normal-CI gate.
 
-Phase 2 is complete when direct and relative budgets produce deterministic evaluations; qualified, expired, invalidated, and failed-preflight runner cases pass; a `qualified-runner` numeric decision MUST NOT proceed without an eligible preflight; Cross-Platform Report Evaluations produce stable rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable comparison, tolerance, overflow, baseline-lifecycle, runner, and reporting fixtures pass.
+Phase 2 is complete when direct and relative budgets produce deterministic evaluations independent from their Workflow Policy Evaluations; qualified, expired, invalidated, and failed-preflight runner cases pass; a `qualified-runner` numeric decision MUST NOT proceed without an eligible preflight; observational-only comparisons can report analysis but cannot produce an evaluated budget; Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable comparison, tolerance, overflow, baseline-lifecycle, runner, and reporting fixtures pass.
 
 ### Phase 3 — Common conformance campaign foundation
 
@@ -2524,7 +2838,7 @@ Phase 2 is complete when direct and relative budgets produce deterministic evalu
 - Import component-owned suites without copying their semantic authority.
 - Add complete/incomplete/invalid campaign behavior.
 
-Phase 3 is complete when one multi-suite campaign proves capability coverage and Finding preservation with no implicit skip or directory-discovered authority, and Logical Render Equivalence fixtures cover `equivalent`, `not-equivalent`, `incomplete`, and `invalid`, including pinned exact equality and every admitted or rejected platform-managed variation.
+Phase 3 is complete when one multi-suite campaign proves capability coverage and Finding preservation with no implicit skip or directory-discovered authority, and Logical Render Equivalence fixtures cover `evaluated { equivalent | not-equivalent }`, `unavailable`, and `invalid`, including pinned exact equality and every admitted or rejected platform-managed variation.
 
 ### Phase 4 — Execution, Web, and reference Runtime evidence
 
@@ -2551,7 +2865,8 @@ Phase 5 is complete when Web, mobile, and native implementations can use the sam
 The implementation validates:
 
 - schema and version admission;
-- Verification Record Envelope identity, integrity, and nested-record references;
+- Verification Record Envelope identity, governing-specification/record-schema revision separation, integrity, and nested-record references;
+- Evaluation Input Resolution and canonical Verification Reason family, ordering, and deduplication;
 - complete content-addressed suite closure;
 - owner authority preservation;
 - projection losslessness;
@@ -2559,24 +2874,24 @@ The implementation validates:
 - deterministic duration conversion and checked measurement overflow;
 - interval and overlap topology;
 - semantic checksum stability;
-- Measurement Run and Measurement Case outcome completeness without admitting partial samples;
+- Measurement Run Plan identity and full required/optional Measurement Case inventory completeness without admitting partial samples;
 - Optimization Barrier applicability, invocation preservation, and lifetime behavior independent from semantic checksum validation;
-- the metric/Sample Aggregation Kind matrix, fixed repetition/reset semantics, Determinism Proof, and Statistic Selection behavior;
+- the metric/Sample Aggregation Kind matrix, fixed repetition/reset/state/cadence semantics, independent Determinism Proof generations, minimum admitted samples, and checked Statistic Selection behavior;
 - performance-surface identity and core/boundary separation;
 - Memory Observation Domain, Artifact Set Scope, and Execution State identity;
 - deterministic generated-file, Delivery Unit, initial-load-request, and complete-load-request counting;
 - profiling enabled/disabled logical equivalence;
 - Instrumentation Isolation Evidence and absence of profiler runtime work/dependencies from ordinary product feature selection;
-- profiler recorder mode, span completion, aggregate total, self/inclusive-time, context, bound, and truncation behavior;
+- profiler recorder mode, span completion, aggregate total, self/inclusive-time, context, bound, exact truncation/recorder-failure state, and Profiler Observation Evaluation behavior;
 - allocation-profiler domain and self-observation disclosure;
 - rejection of profiler output presented directly as benchmark evidence;
-- comparison compatibility and comparable/not-comparable/unavailable separation;
+- exhaustive case/environment compatibility rules and comparable/not-comparable/unavailable input-resolution separation;
 - exact difference/ratio direction, ppm bounds, and checked wide-intermediate arithmetic;
-- Evaluation Outcome versus Workflow Disposition separation;
+- Evaluation Outcome versus Workflow Policy Evaluation separation;
 - Numeric Decision Eligibility for direct and baseline-relative decisions;
-- numeric comparison versus Cross-Platform Report Profile row-binding and result-shape separation;
-- Runner Qualification Evidence, typed validity conditions, invalidation, and per-run preflight behavior;
-- stale-evidence admission and historical-report handling;
+- numeric comparison versus Cross-Platform Report Profile row-binding, evidence-age policy, and result-shape separation;
+- Qualification Check Specification, Runner Environment Snapshot, Runner Qualification Evidence, typed validity conditions, invalidation, and per-run preflight behavior;
+- stale-evidence admission and current-only versus labeled-historical report handling;
 - baseline and policy immutability;
 - budget arithmetic;
 - Finding projection;
@@ -2623,7 +2938,7 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-029 | Keep descriptive cross-platform reports outside numeric Comparison Profile modes | Accepted | A side-by-side report has no baseline, statistic, tolerance, ratio, or numeric pass/fail claim |
 | 026-030 | Apply the same statistic independently to paired baseline and candidate vectors in revision `"0"` | Accepted | Explicit pairing can reduce acquisition drift without introducing an underspecified statistic over signed differences |
 | 026-031 | Add typed unavailable and incomplete results for missing, stale, unsupported, failed, projection, runner, and decision-eligibility reasons | Accepted | Unavailable input is neither a valid incompatible pair nor necessarily malformed evidence |
-| 026-032 | Separate collection, statistic selection, comparison, Budget Evaluation fact, and Workflow Disposition responsibilities | Accepted | The same exceeded fact may be reported, warned, or blocked without changing evidence |
+| 026-032 | Separate collection, statistic selection, comparison, Budget Evaluation fact, and workflow-response responsibilities | Accepted | The same exceeded fact may be reported, warned, or blocked without changing evidence |
 | 026-033 | Separate Memory Observation Domain from Performance Surface | Accepted | A memory measurement must preserve both its execution boundary and its included storage/runtime domain |
 | 026-034 | Separate artifact representation stage from Artifact Set Scope | Accepted | Initial/eager and complete closures are set scopes, not representation operations |
 | 026-035 | Permit declared deterministic rounding into canonical nanoseconds and retain clock resolution/conversion identity | Accepted | Browser and platform clocks are quantized even though stored evidence quantities must remain lossless |
@@ -2645,6 +2960,24 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-051 | Use typed artifact-generation or semantic-operation Determinism Proofs | Accepted | Artifact byte identity and semantic equality are different proof obligations and cannot be used interchangeably |
 | 026-052 | Classify every Measurement Method as deterministic-proof, qualified-runner, or observational-only for numeric decisions | Accepted | Metric names and direct budgets alone cannot determine environmental stability or gating eligibility |
 | 026-053 | Make phase completion depend on applicable positive, negative, boundary, reporting, runner, and equivalence fixtures | Accepted | A phase is not complete when only its happy path is implemented |
+| 026-054 | Preserve RFC 2119/8174 keywords beside every corresponding normative clause in the Japanese translation | Accepted | Readers must be able to audit normative force without inferring it from translation tone |
+| 026-055 | Use one Evaluation Input Resolution union for comparison, budget, and logical-equivalence inputs | Accepted | Missing input and malformed submitted input must not collapse into incompatibility |
+| 026-056 | Treat Runner Context as observed environment state and derive numeric-decision eligibility from the method and its proof predicates | Accepted | Deterministic evidence does not inherently require a stable runner, while qualified-runner evidence does |
+| 026-057 | Classify absent or unretrievable evidence as incomplete and present malformed or integrity-invalid evidence as invalid | Accepted | Collection failure and structurally untrustworthy input require different remediation |
+| 026-058 | Give cross-platform report profiles an explicit current-only or labeled-historical stale-evidence policy | Accepted | Historical values can remain useful descriptively without entering current decisions |
+| 026-059 | Add closed allocation/reallocation operation classes and a boundary-transfer byte metric distinct from artifact transfer size | Accepted | Common labels must preserve the measured domain rather than overload similar byte/count names |
+| 026-060 | Require Release evidence to consume satisfied applicable Budget Evaluations through Release-gating Workflow Policy Evaluations | Accepted | A budget record or advisory disposition alone does not establish Release acceptance |
+| 026-061 | Inventory every selected required or optional Measurement Case and aggregate run outcomes with invalid-before-incomplete precedence | Accepted | Missing inventory structure and unavailable execution are different conditions |
+| 026-062 | Give Performance Budget a closed applicability, input-kind, and requirement schema independent from workflow response | Accepted | Invalid budget combinations must be rejected before evaluation and reusable facts must not embed CI behavior |
+| 026-063 | Model cache, preparation, heap precondition, scratch reuse, and output-buffer ownership as explicit validated Execution State unions | Accepted | Ambiguous hot/cold and reuse labels otherwise admit incomparable measurements |
+| 026-064 | Define admitted-sample minimums, checked nearest-rank arithmetic, aggregation-specific comparability, and independent deterministic generation | Accepted | Statistics and proofs must produce identical results and workload semantics across implementations |
+| 026-065 | Require exhaustive versioned rules for every Comparison Profile case dimension and environment field | Accepted | Implicit ignore/default behavior can silently make unlike evidence comparable |
+| 026-066 | Separate measurement observation, comparison analysis, Budget Evaluation, and Workflow Policy Evaluation | Accepted | Observational analysis may remain useful while being forbidden from numeric policy decisions |
+| 026-067 | Preissue a Measurement Run Plan and preserve one run identity through qualification, preflight, samples, evidence, and evaluation | Accepted | Runner eligibility and collected evidence must bind to the exact planned run without identity cycles |
+| 026-068 | Prove instrumentation isolation through exhaustive call-site inventory or complete construction proof | Accepted | Representative samples alone cannot support a zero-required-runtime-work capability claim |
+| 026-069 | Represent profiler completion, bounded truncation, recorder failure, and structural invalidity as distinct evaluated states | Accepted | Diagnostic loss must be explicit and malformed traces must not masquerade as bounded truncation |
+| 026-070 | Standardize machine-readable Verification Reasons, outcome families, ordering, and deduplication independently from Findings | Accepted | Evaluators need deterministic causes before 019 projects them into user-facing diagnostics |
+| 026-071 | Bind every common record to governing specification `intlify-design-026` revision `"0"` separately from record-schema, owner, subject, policy, and tool revisions | Accepted | Semantic evolution and physical encoding evolution require independent compatibility decisions |
 
 ## Deferred Follow-Up Notes
 
