@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1240" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
   <title id="title">Intlify conformance and measurement architecture</title>
-  <desc id="desc">Component and target specifications own semantic fixtures, benchmark phase and cost names, interval boundaries, workload dimensions, checksums, capabilities, and target budget values. Owner harnesses emit checked conformance and benchmark results. Intlify design 026 imports conformance results through campaigns and benchmark results through versioned lossless measurement projections without renaming owner operations. It creates separate semantic conformance, capability, and logical render equivalence evidence and physical measurement evidence containing exact samples, units, workloads, builds, and environments. Explicit comparison profiles, immutable baselines, and target-owned budgets then produce structured reports and CI or Release decisions. Semantic conformance and physical speed remain separate.</desc>
+  <desc id="desc">Component and target specifications own semantic fixtures, benchmark phase and cost names, interval boundaries, workload dimensions, checksums, capabilities, and target budget values. Owner harnesses emit checked conformance and benchmark results. Intlify design 026 imports conformance results through campaigns and benchmark results through versioned lossless measurement projections without renaming owner operations. It creates separate semantic conformance, capability, and logical render equivalence evidence and physical measurement evidence containing exact samples, units, workloads, builds, and environments. Explicit profiles then produce comparison facts, direct or relative budget evaluations, cross-platform descriptive reports, and separate workflow dispositions for CI or Release. Semantic conformance and physical speed remain separate.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill"/>
@@ -141,26 +141,22 @@
 
   <rect x="265" y="1035" width="910" height="105" rx="12" class="policy-panel" stroke-width="2"/>
   <rect x="290" y="1055" width="250" height="55" rx="8" class="policy-head"/>
-  <text x="415" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Comparison Profile</text>
-  <text x="415" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">compatibility · statistic · runner class</text>
-
-  <text x="568" y="1089" font-size="20" font-weight="700" text-anchor="middle" class="muted">+</text>
+  <text x="415" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Comparison Evaluation</text>
+  <text x="415" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">profile · compatibility · statistic</text>
 
   <rect x="595" y="1055" width="250" height="55" rx="8" class="policy-head"/>
-  <text x="720" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Immutable Baseline</text>
-  <text x="720" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">explicit selection · no implicit latest</text>
-
-  <text x="873" y="1089" font-size="20" font-weight="700" text-anchor="middle" class="muted">+</text>
+  <text x="720" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Budget Evaluation</text>
+  <text x="720" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">direct or comparison-backed</text>
 
   <rect x="900" y="1055" width="250" height="55" rx="8" class="policy-head"/>
-  <text x="1025" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Target-owned Budget</text>
-  <text x="1025" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">exact or baseline-relative requirement</text>
+  <text x="1025" y="1078" font-size="11.5" font-weight="700" text-anchor="middle" class="white">Descriptive Reporting</text>
+  <text x="1025" y="1098" font-size="9.8" text-anchor="middle" class="soft-white">cross-platform rows · no ranking</text>
 
   <path d="M 720 1140 L 720 1170" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
   <rect x="305" y="1170" width="830" height="45" rx="22" class="outcome-head"/>
-  <text x="720" y="1190" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Structured report · pass / warn / fail / not-comparable / unbaselined / incomplete</text>
-  <text x="720" y="1207" font-size="9.7" text-anchor="middle" class="soft-white">local observation · CI decision · capability evidence · Release admission input</text>
+  <text x="720" y="1190" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Evaluation facts · workflow disposition · descriptive reports</text>
+  <text x="720" y="1207" font-size="9.7" text-anchor="middle" class="soft-white">satisfied / exceeded / unavailable · report / warn / block · CI or Release decision</text>
 
   <rect x="40" y="1038" width="190" height="96" rx="10" class="note" stroke-width="1.7"/>
   <text x="135" y="1065" font-size="11" font-weight="700" text-anchor="middle" class="label">Never conflated</text>

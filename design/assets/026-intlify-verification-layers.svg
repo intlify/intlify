@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1120" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
   <title id="title">Intlify four verification layers</title>
-  <desc id="desc">Four layers flow from owner-defined semantics and measurement points, through checked owner results and common evidence admission, to comparison, budgets, structured reporting, and CI or Release decisions. Semantic conformance and physical measurement remain distinct throughout the flow.</desc>
+  <desc id="desc">Four layers flow from owner-defined semantics and measurement points, through checked owner results and common evidence admission, to comparison facts, direct or relative budget evaluations, cross-platform descriptive reporting, and separate workflow dispositions. Semantic conformance and physical measurement remain distinct throughout the flow.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill" />
@@ -143,23 +143,23 @@
   <text x="82" y="849" font-size="20" font-weight="700" text-anchor="middle" class="white">4</text>
   <text x="115" y="837" font-size="15" font-weight="700" class="white">Comparison, budget,</text>
   <text x="115" y="859" font-size="15" font-weight="700" class="white">and reporting</text>
-  <text x="68" y="905" font-size="10.5" class="soft-white">Compatible evidence is evaluated through</text>
-  <text x="68" y="925" font-size="10.5" class="soft-white">explicit immutable policy and baselines.</text>
+  <text x="68" y="905" font-size="10.5" class="soft-white">Evidence is evaluated or described through</text>
+  <text x="68" y="925" font-size="10.5" class="soft-white">explicit immutable policy.</text>
 
   <rect x="355" y="825" width="300" height="105" rx="10" class="policy-card" stroke-width="1.8" />
-  <text x="505" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Comparison Profile</text>
-  <text x="505" y="883" font-size="10.6" text-anchor="middle" class="label">compatibility · statistic</text>
-  <text x="505" y="906" font-size="10.4" text-anchor="middle" class="muted">environment and case rules</text>
+  <text x="505" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Comparison Evaluation</text>
+  <text x="505" y="883" font-size="10.6" text-anchor="middle" class="label">profile · compatibility · statistic</text>
+  <text x="505" y="906" font-size="10.4" text-anchor="middle" class="muted">comparable · not-comparable · unavailable</text>
 
   <rect x="685" y="825" width="300" height="105" rx="10" class="policy-card" stroke-width="1.8" />
-  <text x="835" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Immutable Baseline</text>
-  <text x="835" y="883" font-size="10.6" text-anchor="middle" class="label">explicit evidence selection</text>
-  <text x="835" y="906" font-size="10.4" text-anchor="middle" class="muted">reviewable lifecycle</text>
+  <text x="835" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Budget Evaluation</text>
+  <text x="835" y="883" font-size="10.6" text-anchor="middle" class="label">direct or baseline-relative</text>
+  <text x="835" y="906" font-size="10.4" text-anchor="middle" class="muted">satisfied · exceeded · unavailable</text>
 
   <rect x="1015" y="825" width="345" height="105" rx="10" class="policy-card" stroke-width="1.8" />
-  <text x="1187" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Target-owned Budget</text>
-  <text x="1187" y="883" font-size="10.6" text-anchor="middle" class="label">exact or baseline-relative</text>
-  <text x="1187" y="906" font-size="10.4" text-anchor="middle" class="muted">advisory or gating policy</text>
+  <text x="1187" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Descriptive Reporting</text>
+  <text x="1187" y="883" font-size="10.6" text-anchor="middle" class="label">cross-platform rows</text>
+  <text x="1187" y="906" font-size="10.4" text-anchor="middle" class="muted">no ratio · ranking · numeric decision</text>
 
   <path d="M 505 930 L 505 945" fill="none" class="arrow" stroke-width="2.2" />
   <path d="M 835 930 L 835 945" fill="none" class="arrow" stroke-width="2.2" />
@@ -168,8 +168,8 @@
   <path d="M 857 945 L 857 958" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)" />
 
   <rect x="355" y="960" width="1005" height="70" rx="12" class="outcome-card" stroke-width="2" />
-  <text x="857" y="989" font-size="13" font-weight="700" text-anchor="middle" class="label">Structured report and evaluation outcome</text>
-  <text x="857" y="1015" font-size="10.8" text-anchor="middle" class="muted">pass · warn · fail · not-comparable · unbaselined · incomplete · CI or Release decision</text>
+  <text x="857" y="989" font-size="13" font-weight="700" text-anchor="middle" class="label">Evaluation facts, workflow disposition, and reports</text>
+  <text x="857" y="1015" font-size="10.8" text-anchor="middle" class="muted">satisfied · exceeded · unavailable | report · warn · block | descriptive output</text>
 
   <text x="720" y="1092" font-size="11" text-anchor="middle" class="subtitle">Conformance may pass without being fast; performance may pass without proving conformance.</text>
 </svg>
