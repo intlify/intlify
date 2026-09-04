@@ -169,7 +169,7 @@
 
   <rect x="355" y="960" width="1005" height="70" rx="12" class="outcome-card" stroke-width="2" />
   <text x="857" y="989" font-size="13" font-weight="700" text-anchor="middle" class="label">Structured report and evaluation outcome</text>
-  <text x="857" y="1015" font-size="10.8" text-anchor="middle" class="muted">pass · warn · fail · not-comparable · unbaselined · CI or Release decision</text>
+  <text x="857" y="1015" font-size="10.8" text-anchor="middle" class="muted">pass · warn · fail · not-comparable · unbaselined · incomplete · CI or Release decision</text>
 
   <text x="720" y="1092" font-size="11" text-anchor="middle" class="subtitle">Conformance may pass without being fast; performance may pass without proving conformance.</text>
 </svg>

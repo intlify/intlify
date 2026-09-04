@@ -159,7 +159,7 @@
   <path d="M 720 1140 L 720 1170" fill="none" class="arrow" stroke-width="2.3" marker-end="url(#arrow)"/>
 
   <rect x="305" y="1170" width="830" height="45" rx="22" class="outcome-head"/>
-  <text x="720" y="1190" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Structured report · pass / warn / fail / not-comparable / unbaselined</text>
+  <text x="720" y="1190" font-size="12.5" font-weight="700" text-anchor="middle" class="white">Structured report · pass / warn / fail / not-comparable / unbaselined / incomplete</text>
   <text x="720" y="1207" font-size="9.7" text-anchor="middle" class="soft-white">local observation · CI decision · capability evidence · Release admission input</text>
 
   <rect x="40" y="1038" width="190" height="96" rx="10" class="note" stroke-width="1.7"/>
