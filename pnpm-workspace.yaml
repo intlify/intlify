@@ -17,13 +17,13 @@ catalogMode: prefer
 catalog:
   '@types/node': ^24
   typescript: ^6.0.0
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.8
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vue: ^3.5.39
   '@vitejs/plugin-vue': ^6.0.7
   monaco-editor: ^0.55.1
   vize: ^0.302.0
   void: ^0.10.0
-  vite-plus: 0.2.8
+  vite-plus: 0.3.0
   '@kazupon/vp-config': ^0.5.1
   wasm-pack: 0.15.0
   bumpp: ^12.0.0
