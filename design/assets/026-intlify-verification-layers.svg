@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1265" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
+  <title id="title">Intlify four verification layers</title>
+  <desc id="desc">Four layers flow from owner-defined semantics and measurement points through structurally complete case inventories and common evidence admission to source evaluations. Within layer four, comparison, budget, and descriptive evaluations feed a separate Workflow Policy Evaluation. It resolves the exact source and applies an exhaustive outcome rule, producing applied report, warn, allow, or block, or an unavailable or invalid evaluation. Structured reports, CI, and Release consume these records. Only the required policy's applied allow satisfies that policy's gate. Semantic conformance and physical measurement remain distinct throughout.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill" />
+    </marker>
+    <style>
+      .canvas { fill:#ffffff; }
+      .title { fill:#111827; }
+      .subtitle { fill:#4b5563; }
+      .panel { fill:#f8fafc; stroke:#cbd5e1; }
+      .layer-head { fill:#334155; }
+      .card { fill:#ffffff; stroke:#cbd5e1; }
+      .semantic-card { fill:#f0fdfa; stroke:#0f766e; }
+      .physical-card { fill:#eff6ff; stroke:#1d4ed8; }
+      .policy-card { fill:#faf5ff; stroke:#7c3aed; }
+      .outcome-card { fill:#fff7ed; stroke:#c2410c; }
+      .label { fill:#111827; }
+      .muted { fill:#4b5563; }
+      .white { fill:#ffffff; }
+      .soft-white { fill:#e5e7eb; }
+      .semantic { fill:#0f766e; }
+      .physical { fill:#1d4ed8; }
+      .policy { fill:#7c3aed; }
+      .arrow { stroke:#64748b; }
+      .arrow-fill { fill:#64748b; }
+      @media (prefers-color-scheme: dark) {
+        .canvas { fill:#020617; }
+        .title { fill:#f8fafc; }
+        .subtitle { fill:#cbd5e1; }
+        .panel { fill:#0f172a; stroke:#475569; }
+        .layer-head { fill:#1e293b; }
+        .card { fill:#111827; stroke:#475569; }
+        .semantic-card { fill:#071b1a; stroke:#2dd4bf; }
+        .physical-card { fill:#0b1733; stroke:#60a5fa; }
+        .policy-card { fill:#1e1233; stroke:#a78bfa; }
+        .outcome-card { fill:#2a160b; stroke:#fb923c; }
+        .label { fill:#f1f5f9; }
+        .muted { fill:#cbd5e1; }
+        .semantic { fill:#5eead4; }
+        .physical { fill:#93c5fd; }
+        .policy { fill:#c4b5fd; }
+        .arrow { stroke:#cbd5e1; }
+        .arrow-fill { fill:#cbd5e1; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1440" height="1265" class="canvas" />
+
+  <text x="720" y="42" font-size="24" font-weight="700" text-anchor="middle" class="title">Four verification layers</text>
+  <text x="720" y="70" font-size="13" text-anchor="middle" class="subtitle">Authority flows downward; semantic conformance and physical measurement remain distinct.</text>
+
+  <!-- Layer 1 -->
+  <rect x="40" y="100" width="1360" height="185" rx="14" class="panel" stroke-width="2" />
+  <rect x="40" y="100" width="285" height="185" rx="14" class="layer-head" />
+  <circle cx="82" cy="142" r="22" fill="#ffffff" opacity="0.16" />
+  <text x="82" y="149" font-size="20" font-weight="700" text-anchor="middle" class="white">1</text>
+  <text x="115" y="137" font-size="15" font-weight="700" class="white">Owner-defined semantics</text>
+  <text x="115" y="159" font-size="15" font-weight="700" class="white">and measurement points</text>
+  <text x="68" y="205" font-size="10.5" class="soft-white">Each owning specification defines meaning,</text>
+  <text x="68" y="225" font-size="10.5" class="soft-white">operation boundaries, and required cases.</text>
+
+  <rect x="355" y="125" width="300" height="132" rx="10" class="semantic-card" stroke-width="1.8" />
+  <text x="505" y="154" font-size="13" font-weight="700" text-anchor="middle" class="semantic">Semantic fixtures</text>
+  <text x="505" y="184" font-size="10.8" text-anchor="middle" class="label">expected logical results</text>
+  <text x="505" y="207" font-size="10.8" text-anchor="middle" class="label">required and applicable cases</text>
+  <text x="505" y="230" font-size="10.4" text-anchor="middle" class="muted">Finding · capability · equivalence</text>
+
+  <rect x="685" y="125" width="300" height="132" rx="10" class="physical-card" stroke-width="1.8" />
+  <text x="835" y="154" font-size="13" font-weight="700" text-anchor="middle" class="physical">Measurement points</text>
+  <text x="835" y="184" font-size="10.8" text-anchor="middle" class="label">phase / cost · interval boundary</text>
+  <text x="835" y="207" font-size="10.8" text-anchor="middle" class="label">workload · semantic checksum</text>
+  <text x="835" y="230" font-size="10.4" text-anchor="middle" class="muted">metric method · required cases</text>
+
+  <rect x="1015" y="125" width="345" height="132" rx="10" class="policy-card" stroke-width="1.8" />
+  <text x="1187" y="154" font-size="13" font-weight="700" text-anchor="middle" class="policy">Target and product policy</text>
+  <text x="1187" y="184" font-size="10.8" text-anchor="middle" class="label">claimed capabilities · runner classes</text>
+  <text x="1187" y="207" font-size="10.8" text-anchor="middle" class="label">comparison eligibility</text>
+  <text x="1187" y="230" font-size="10.4" text-anchor="middle" class="muted">target-owned budget values</text>
+
+  <path d="M 720 285 L 720 322" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)" />
+
+  <!-- Layer 2 -->
+  <rect x="40" y="325" width="1360" height="175" rx="14" class="panel" stroke-width="2" />
+  <rect x="40" y="325" width="285" height="175" rx="14" class="layer-head" />
+  <circle cx="82" cy="367" r="22" fill="#ffffff" opacity="0.16" />
+  <text x="82" y="374" font-size="20" font-weight="700" text-anchor="middle" class="white">2</text>
+  <text x="115" y="362" font-size="15" font-weight="700" class="white">Owner-produced</text>
+  <text x="115" y="384" font-size="15" font-weight="700" class="white">checked results</text>
+  <text x="68" y="430" font-size="10.5" class="soft-white">Natural component and target harnesses</text>
+  <text x="68" y="450" font-size="10.5" class="soft-white">retain their versioned result schemas.</text>
+
+  <rect x="380" y="350" width="450" height="125" rx="10" class="semantic-card" stroke-width="1.8" />
+  <text x="605" y="380" font-size="13" font-weight="700" text-anchor="middle" class="semantic">Checked conformance result</text>
+  <text x="605" y="409" font-size="10.8" text-anchor="middle" class="label">suite · fixture · subject · applicability</text>
+  <text x="605" y="432" font-size="10.8" text-anchor="middle" class="label">expected and observed logical result</text>
+  <text x="605" y="455" font-size="10.3" text-anchor="middle" class="muted">complete inventory · result or typed attempt</text>
+
+  <rect x="880" y="350" width="450" height="125" rx="10" class="physical-card" stroke-width="1.8" />
+  <text x="1105" y="380" font-size="13" font-weight="700" text-anchor="middle" class="physical">Checked benchmark result</text>
+  <text x="1105" y="409" font-size="10.8" text-anchor="middle" class="label">owner phase / cost · exact samples</text>
+  <text x="1105" y="432" font-size="10.8" text-anchor="middle" class="label">workload · build · environment</text>
+  <text x="1105" y="455" font-size="10.3" text-anchor="middle" class="muted">semantic checksum · method identity</text>
+
+  <path d="M 720 500 L 720 537" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)" />
+
+  <!-- Layer 3 -->
+  <rect x="40" y="540" width="1360" height="220" rx="14" class="panel" stroke-width="2" />
+  <rect x="40" y="540" width="285" height="220" rx="14" class="layer-head" />
+  <circle cx="82" cy="582" r="22" fill="#ffffff" opacity="0.16" />
+  <text x="82" y="589" font-size="20" font-weight="700" text-anchor="middle" class="white">3</text>
+  <text x="115" y="577" font-size="15" font-weight="700" class="white">Common evidence</text>
+  <text x="115" y="599" font-size="15" font-weight="700" class="white">admission</text>
+  <text x="68" y="645" font-size="10.5" class="soft-white">026 validates integrity and adds common</text>
+  <text x="68" y="665" font-size="10.5" class="soft-white">meaning without renaming owner work.</text>
+
+  <rect x="355" y="565" width="300" height="140" rx="10" class="semantic-card" stroke-width="1.8" />
+  <text x="505" y="594" font-size="13" font-weight="700" text-anchor="middle" class="semantic">Conformance campaign</text>
+  <text x="505" y="623" font-size="10.6" text-anchor="middle" class="label">suite closure · applicability</text>
+  <text x="505" y="646" font-size="10.6" text-anchor="middle" class="label">logical-result comparison</text>
+  <text x="505" y="679" font-size="10.5" font-weight="700" text-anchor="middle" class="semantic">Semantic evidence</text>
+
+  <rect x="685" y="565" width="300" height="140" rx="10" class="physical-card" stroke-width="1.8" />
+  <text x="835" y="594" font-size="13" font-weight="700" text-anchor="middle" class="physical">Measurement projection</text>
+  <text x="835" y="623" font-size="10.6" text-anchor="middle" class="label">lossless units · raw samples</text>
+  <text x="835" y="646" font-size="10.6" text-anchor="middle" class="label">surface · category · operation</text>
+  <text x="835" y="679" font-size="10.5" font-weight="700" text-anchor="middle" class="physical">Physical evidence</text>
+
+  <rect x="1015" y="565" width="345" height="140" rx="10" class="policy-card" stroke-width="1.8" />
+  <text x="1187" y="594" font-size="13" font-weight="700" text-anchor="middle" class="policy">Evidence integrity</text>
+  <text x="1187" y="623" font-size="10.6" text-anchor="middle" class="label">subject · build · target identity</text>
+  <text x="1187" y="646" font-size="10.6" text-anchor="middle" class="label">profile revisions · completeness</text>
+  <text x="1187" y="679" font-size="10.5" font-weight="700" text-anchor="middle" class="policy">Admitted or typed rejection</text>
+
+  <path d="M 720 760 L 720 797" fill="none" class="arrow" stroke-width="2.5" marker-end="url(#arrow)" />
+
+  <!-- Layer 4 -->
+  <rect x="40" y="800" width="1360" height="405" rx="14" class="panel" stroke-width="2" />
+  <rect x="40" y="800" width="285" height="405" rx="14" class="layer-head" />
+  <circle cx="82" cy="842" r="22" fill="#ffffff" opacity="0.16" />
+  <text x="82" y="849" font-size="20" font-weight="700" text-anchor="middle" class="white">4</text>
+  <text x="115" y="837" font-size="15" font-weight="700" class="white">Comparison, budget,</text>
+  <text x="115" y="859" font-size="15" font-weight="700" class="white">and reporting</text>
+  <text x="68" y="905" font-size="10.5" class="soft-white">Evidence is evaluated or described through</text>
+  <text x="68" y="925" font-size="10.5" class="soft-white">explicit immutable policy.</text>
+
+  <rect x="355" y="825" width="300" height="105" rx="10" class="policy-card" stroke-width="1.8" />
+  <text x="505" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Comparison Evaluation</text>
+  <text x="505" y="883" font-size="10.6" text-anchor="middle" class="label">profile · compatibility · statistic</text>
+  <text x="505" y="906" font-size="10.4" text-anchor="middle" class="muted">comparable · not-comparable · unavailable</text>
+
+  <rect x="685" y="825" width="300" height="105" rx="10" class="policy-card" stroke-width="1.8" />
+  <text x="835" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Budget Evaluation</text>
+  <text x="835" y="883" font-size="10.6" text-anchor="middle" class="label">direct or baseline-relative</text>
+  <text x="835" y="906" font-size="10.1" text-anchor="middle" class="muted">satisfied · exceeded · unavailable · invalid</text>
+
+  <rect x="1015" y="825" width="345" height="105" rx="10" class="policy-card" stroke-width="1.8" />
+  <text x="1187" y="854" font-size="13" font-weight="700" text-anchor="middle" class="policy">Descriptive Reporting</text>
+  <text x="1187" y="883" font-size="10.6" text-anchor="middle" class="label">cross-platform rows</text>
+  <text x="1187" y="906" font-size="10.4" text-anchor="middle" class="muted">no ratio · ranking · numeric decision</text>
+
+  <path d="M 505 930 L 505 955" fill="none" class="arrow" stroke-width="2.2" />
+  <path d="M 835 930 L 835 955" fill="none" class="arrow" stroke-width="2.2" />
+  <path d="M 1187 930 L 1187 955" fill="none" class="arrow" stroke-width="2.2" />
+  <path d="M 505 955 L 1187 955" fill="none" class="arrow" stroke-width="2.2" />
+  <path d="M 857 955 L 857 985" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)" />
+
+  <rect x="510" y="985" width="695" height="95" rx="12" class="policy-card" stroke-width="2" />
+  <text x="857" y="1013" font-size="14" font-weight="700" text-anchor="middle" class="policy">Workflow Policy Evaluation</text>
+  <text x="857" y="1037" font-size="10.8" text-anchor="middle" class="label">source reference · exhaustive outcome mapping · applied rule identity</text>
+  <text x="857" y="1061" font-size="10.8" text-anchor="middle" class="muted">applied: report / warn / allow / block · unavailable · invalid</text>
+
+  <path d="M 857 1080 L 857 1115" fill="none" class="arrow" stroke-width="2.2" marker-end="url(#arrow)" />
+  <rect x="355" y="1115" width="1005" height="60" rx="12" class="outcome-card" stroke-width="2" />
+  <text x="857" y="1141" font-size="13" font-weight="700" text-anchor="middle" class="label">Structured Report · CI gate · Release policy</text>
+  <text x="857" y="1163" font-size="10.6" text-anchor="middle" class="muted">Only the required policy's applied allow satisfies that gate, not every Release condition.</text>
+
+  <text x="720" y="1240" font-size="11" text-anchor="middle" class="subtitle">Conformance may pass without being fast; performance may pass without proving conformance.</text>
+</svg>
