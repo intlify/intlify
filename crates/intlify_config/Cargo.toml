@@ -13,12 +13,17 @@ workspace = true
 [features]
 default = []
 # Measurement support is excluded from ordinary configuration consumers.
-benchmark = []
+benchmark = ["dep:blake3", "dep:rustix"]
 
 [dependencies]
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+blake3 = { version = "=1.8.7", optional = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# Reuse the locked safe clock API; this never enters the ordinary config graph.
+rustix = { version = "=1.1.4", features = ["time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.

@@ -511,7 +511,9 @@ dependencies = [
 name = "intlify_config"
 version = "0.14.0-alpha.12"
 dependencies = [
+ "blake3",
  "jsonschema",
+ "rustix",
  "schemars",
  "serde",
  "serde_json",

@@ -11,7 +11,7 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
 - Outer admission selects configuration version `"0"`, preflights profile count/ID byte bounds, and retains independently admitted fields. Only complete structural success can construct `IntlifyConfig`; the root has no raw `Deserialize` route.
 - Private provisional selection handles omission, exact matching, invalid/unknown/over-limit inputs, and unavailable structural prerequisites without choosing from repository layout or a filtered profile map.
-- Feature-isolated 026 numeric helpers retain exact `u64` quantities and positive repetition counts as shortest decimal JSON strings, with checked nanosecond conversion. No benchmark samples or common evidence are produced yet.
+- Feature-isolated measurement support retains exact quantities, acquires the reported monotonic-clock resolution, measures four actual core operations, captures raw samples, and validates owner-local method/interval/execution descriptors. It does not yet produce complete Owner Results or common evidence.
 - Locale resolution and the remaining 026 harness/record/validation path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
@@ -20,7 +20,7 @@ This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a pub
 
 Design 017 has not yet fixed the JSON encodings of `PolicyReference` and `TargetProfileReference`. The authoring model must not invent those encodings or replace their validation with an open `serde_json::Value`.
 
-The test fixtures use closed `$testPolicy` / `$testTarget` objects with finite token enums. They exist only under `cfg(test)`; they are not fallback production inputs, artifact identities, or deployment data. The generated test schema keeps those fixture type names.
+The test fixtures use closed `$testPolicy` / `$testTarget` objects with finite token enums. They exist only under `cfg(test)` or the non-default `benchmark` feature; they are not fallback production inputs, artifact identities, or deployment data. The generated test schema keeps those fixture type names.
 
 Accordingly, this step intentionally does **not** create `schema/project-profile-config-v0.schema.json`, a public project-profile schema generator, or a published schema path. Completing that artifact and its freshness gate requires the admitted shared reference definitions. The existing CLI schema is unchanged.
 
@@ -76,7 +76,17 @@ The non-default `benchmark` feature isolates the measurement code from ordinary 
 
 The initial numeric helper follows 026's full `0..=u64::MAX` quantity domain, rather than reusing 015's smaller positive resource-bound domain. JSON values are shortest unsigned decimal strings, including values above JavaScript's safe-integer range. Repetition counts must be positive. A reversed interval, nanosecond conversion overflow, or accumulation overflow is a typed failure, never a zero, saturated, or wrapped sample. Zero duration remains a valid observation rather than being replaced with a fabricated clock minimum.
 
-Clock/provider identity and resolution, method and interval descriptors, sample integrity, case inventory, projection, and reporting still need implementation. Exact integer storage does not establish physical clock accuracy, a measured performance result, or numeric-decision eligibility.
+The measurement-only clock uses the pinned safe `rustix` API on Linux and macOS. It obtains `CLOCK_MONOTONIC` resolution from `clock_getres`, rather than inferring resolution from nanosecond storage or an observed latency. Full raw timestamp subtraction precedes checked conversion to `u64` nanoseconds. Other platforms remain explicitly unsupported by this initial clock provider; ordinary configuration code is unaffected. Neither `rustix` nor the observation codec's `blake3` dependency enters the default normal-dependency graph.
+
+Prepared calls measure strict file materialization, structural analysis, complete authoring-model construction, and provisional profile selection. Dispatch and immutable-handle preparation precede the start marker. The preserved indirect invocation and complete-output black box are inside the interval; observation encoding, validation, and destruction are outside. These unavoidable included costs are declared and never removed through estimated subtraction. Outputs stay owned through the end marker and observation.
+
+The bounded sampler excludes warmup, retains ordered raw samples, and validates every repetition against a separately supplied fixture observation. Per-sample durations are checked sums of separately measured single-invocation intervals, not a continuous workflow duration or a precomputed average. Panic, clock failure, overflow, or unexpected output withholds the complete case; earlier samples are diagnostic prefixes only. Failure-only mismatch payloads keep both complete observations without making ordinary calls carry their large inline storage.
+
+The observation codec covers the complete applicable ordinary output, including normalized values, schema/fragment/issue information, or selected identity/reference and typed failure facts. Shared semantics and entry-specific source facts use separate framed checksum domains. Raw source is observed only for the finite owner-controlled successful materialization fixtures; rejected selector/key/scalar text is not copied into diagnostics. These checksums are not shared-artifact digests, Profile identities, or authenticity proofs.
+
+Owner-local descriptors fix each active phase/cost, interval markers and non-overlap, conversion and aggregation, barrier placement, and independent process/engine/preparation/cache/heap/scratch/output states. A duration method retains 026's `qualified-runner` eligibility class; the eventual observational profile must separately prohibit numeric decisions. Clock resolution remains an acquisition observation, not part of the semantic checksum. Revalidation compares decoded descriptors and samples to separately supplied operation, acquisition, sampling, run/case, and expected-output inputs. A record cannot select its own validation expectations.
+
+`collect_operation` connects the acquired provider, actual core calls, descriptors, and sampler into a serializable owner fragment. Native-clock tests exercise all four operations and reject missing, unknown, mutated, or cross-run/cross-case data. This fragment is not a complete Owner Result, Measurement Evidence Set, or admitted Run Plan. The production fixture/case registry, complete logical work vectors, Build/Environment records, run/case accounting, common projection/report validation, standalone harness, and CI smoke still need implementation. Unit-test fixture preparation is not a substitute for that registry or its independently checked expected results.
 
 ## Verification
 
@@ -109,6 +119,11 @@ Relevant traceability:
 | 015-089 / 015-090 / provisional portion of 015-091 | Closed top-level selector types, exact UTF-8 limits, redacted unknown/invalid observations, no retained provisional Evidence |
 | 026 invocation isolation | Shared immutable schema/input; complete roots and selections survive producer release; failures do not contaminate repeated calls |
 | 026 exact numeric representation | `benchmark::quantity::tests`: JSON precision, decimal canonicality, positive repetitions, reversed clock, exact/first-over duration and accumulation overflow |
+| 026 clock and interval boundaries | `benchmark::clock::tests`, `benchmark::measure::tests`: acquired resolution, wide subtraction, first-over conversion, invocation/lifetime markers, panic and failed-clock paths |
+| 015 complete semantic observation | `benchmark::operation::tests`: actual four operations, full output mutation, member permutations, separate entry facts, content-free rejected selectors, iterative deep-document encoding |
+| 026 raw sample capture | `benchmark::sample::tests`: warmup exclusion, fixed repetitions, diagnostic-only failure prefixes, checked aggregation/capacity, raw ordering, exact run/case/sample binding |
+| 026 method and execution descriptors | `benchmark::descriptor::tests`: all descriptor leaves, missing/unknown fields, marker/overlap mutation, actual clock binding, independent reuse states, duration eligibility |
+| Connected owner observation | `benchmark::collect::tests`: native-clock capture for all four pairs, serialization and separate-input revalidation, cross-case/run rejection, no successful failure prefix |
 
 From the repository root:
 
@@ -122,4 +137,4 @@ rtk proxy cargo test -p intlify_cli --test config --test schema
 rtk proxy vp run schema:cli:check
 ```
 
-No runtime benchmark, common Measurement Evidence, or full 015/026 conformance claim is made by these tests. PR 3 remains incomplete until the applicable benchmark projection/report checks are implemented and verified. The shared-reference schema gate separately prevents claiming Phase 1 completion.
+No standalone benchmark result, common Measurement Evidence, or full 015/026 conformance claim is made by these tests. PR 3 remains incomplete until the applicable benchmark registry, records, and projection/report checks are implemented and verified. The shared-reference schema gate separately prevents claiming Phase 1 completion.

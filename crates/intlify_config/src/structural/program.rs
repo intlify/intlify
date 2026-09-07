@@ -127,6 +127,11 @@ impl SchemaProgram {
     pub(super) fn identity_values(&self, owner: SchemaId) -> Option<SchemaId> {
         self.resolved(owner).identity_values
     }
+
+    #[cfg(feature = "benchmark")]
+    pub(super) fn locations(&self) -> impl Iterator<Item = (SchemaId, &str)> {
+        self.locations.iter().map(|(path, &id)| (id, path.as_str()))
+    }
 }
 
 struct Compiler<'schema> {

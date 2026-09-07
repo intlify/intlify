@@ -23,6 +23,9 @@ mod eval;
 mod program;
 pub(crate) mod selection;
 
+#[cfg(feature = "benchmark")]
+mod observation;
+
 /// Explicit bounds for this stage, not a default or a formal capability body.
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_field_names, reason = "mirror the 015 bound IDs")]

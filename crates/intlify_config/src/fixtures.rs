@@ -4,7 +4,8 @@
 //! Finite test-owned reference encodings. These are not 017 artifacts.
 //!
 //! The fixture discriminants intentionally advertise their non-product scope;
-//! neither type is compiled into the ordinary library.
+//! neither type is compiled into the ordinary library. The non-default benchmark
+//! feature uses the same bounded fixtures, not a second test reference encoding.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
