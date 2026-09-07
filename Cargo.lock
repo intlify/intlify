@@ -492,6 +492,7 @@ dependencies = [
  "file-id",
  "getrandom 0.4.3",
  "glob",
+ "intlify_config",
  "intlify_contract",
  "intlify_export",
  "intlify_format",
@@ -504,6 +505,15 @@ dependencies = [
  "serde_json",
  "tempfile",
  "unicode-normalization",
+]
+
+[[package]]
+name = "intlify_config"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
