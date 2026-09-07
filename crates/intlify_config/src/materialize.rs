@@ -223,6 +223,20 @@ pub(crate) fn materialize_file(
 
 mod lex;
 mod parse;
+mod typed;
+
+pub(crate) use typed::DecodeError;
+
+impl MaterializedDocument {
+    /// Internal bridge for structurally admitted authoring fragments. A caller
+    /// must not interpret successful deserialization as complete root admission.
+    pub(crate) fn decode<T: serde::de::DeserializeOwned>(
+        &self,
+        id: NodeId,
+    ) -> Result<T, DecodeError> {
+        typed::decode(self, id)
+    }
+}
 
 struct ParsedIndex {
     tokens: Vec<Token>,

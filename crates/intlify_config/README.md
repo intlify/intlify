@@ -8,7 +8,8 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - The private authoring model covers the complete **015-owned** field vocabulary: named declarations, locale inputs, coverage, policy slots, targets, groups, and delivery.
 - Policy and Target Profile reference representations remain generic type parameters. The only current instantiations use explicitly test-owned types.
 - Private strict file materialization validates UTF-8, JSON syntax, decoded duplicate keys, Unicode scalars, and Portable JSON Numbers while retaining raw bytes and key/value/container spans.
-- Dependency-aware structural analysis, selection, locale resolution, and the 026 measurement path are not implemented yet. The strict materializer is not connected to the authoring constructor or a product entry.
+- An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
+- The outer configuration-version/profile-bound admission, guarded complete-authoring constructor, selection, locale resolution, and 026 measurement path are not implemented yet. The lower-level schema evaluator is not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
@@ -32,7 +33,7 @@ The model preserves authoring state rather than resolving semantics.
 
 `Presence<T>` and `RequiredNullable<T>` encode these different rules. No locale, policy preset, target default, or delivery policy is inferred by structural deserialization.
 
-Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences; duplicate locales, alias collisions, membership, and group partition checks are later semantic work. A malformed sibling prevents construction of the complete root. Retaining independently valid fragments after that failure belongs to the separate structural-analysis step.
+Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences; duplicate locales, alias collisions, membership, and group partition checks are later semantic work. A malformed sibling prevents construction of the complete root. The schema evaluator separately records admitted/invalid/type-unavailable fragments; a failing sibling does not erase a valid declaration or field.
 
 The legacy JSON helper is **not** the 015 strict materializer. Its serde-based numeric behavior is preserved for CLI compatibility. The new `materialize` module admits numbers as finite binary64 values within magnitude `9007199254740991`, normalizes negative zero, and keeps the unchanged raw token separately.
 
@@ -42,11 +43,21 @@ The file entry takes immutable shared bytes and explicit finite input limits. A 
 
 The second pass consumes the admitted token index; it does not tokenize input again. Value nodes refer to children by indices, and the source map stores half-open UTF-8 byte coordinates. Deep input and failure cleanup therefore do not recurse through a Rust value tree. Returned documents retain their own values and share only immutable raw source. Parser scratch is invocation-owned and discarded; this step introduces no workspace, arena allocator, global cache, or claimed capacity reuse.
 
-Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection and the remaining profile/selector/structural-work limits belong to later admission work. Error observations never include rejected key or scalar text.
+Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection and the remaining profile/selector limits belong to later admission work. Error observations never include rejected key or scalar text.
+
+## Internal schema evaluation
+
+The compiler accepts only the keyword/reference/pattern vocabulary explicitly implemented for the generated authoring model. Unrecognized behavior, external or dangling references, cycles, and unsupported dialects fail closed. It is not a general-purpose JSON Schema implementation, and it does not acquire schema bodies or accept `$schema` metadata as authority. The actual reference instantiations remain test-owned.
+
+Evaluation counts one applicable schema-keyword occurrence per logical subject. Annotation keywords are excluded; a wrong type suppresses dependent constraints and descendants, while independent siblings continue in unsigned UTF-8 member order. Every `anyOf` alternative is visited for deterministic accounting. Unmatched alternatives retain contextual observations only when the aggregate fails; they do not create blocking issues for an accepted alternative.
+
+A count-only traversal preflights the complete applicable domain before allocating fragment/issue records. The recording traversal must produce the same work count. Exact limits succeed; an overrun returns the exact complete total and no evaluation prefix. Records are private schema observations, not a substitute for version admission, profile/selector limits, typed configuration admission, or the final Finding Registry.
+
+Owned authoring deserialization uses the normalized flat tree directly. It preserves positive-zero normalization and admitted binary64 rounding, rejects unconsumed collection tails, and never embeds serde's rejected values/keys in errors. Successful deserialization alone is not proof that the outer admission prerequisites have succeeded.
 
 ## Verification
 
-`src/model_tests.rs` records an explicit inventory of every fixed object's fields and checks positive, negative, omission, null, wrong-type, empty-collection, identity, and sibling-failure fixtures. It compares typed deserialization with the independently compiled Draft 7 schema. The schema validator is a pinned dev dependency with HTTP/file retrieval, TLS, and IDNA data disabled; it is not part of the normal dependency graph.
+`src/model_tests.rs` records an explicit inventory of every fixed object's fields and checks positive, negative, omission, null, wrong-type, empty-collection, identity, and sibling-failure fixtures. It compares the internal evaluator, typed deserialization, and the independently compiled Draft 7 schema. The external schema oracle is a pinned dev dependency with HTTP/file retrieval, TLS, and IDNA data disabled; it is not part of the normal dependency graph.
 
 Relevant traceability:
 
@@ -65,6 +76,10 @@ Relevant traceability:
 | 015-128 / logical input accounting | Resource-bound parsing, complete aggregate / exact / first-over / ordering tests |
 | 026 storage ownership | Owned result isolation, 20,000-level arrays and 10,000-level objects including failure cleanup; no shared mutable workspace or cache |
 | Parser / materializer agreement | Finite generated corpus, Unicode escape lengths, and single-byte mutation tests against the independent JSON decoder |
+| Schema-guided fragment admission | `bad_sibling_does_not_erase_a_fully_admitted_declaration`, missing-field/source-span and type-prerequisite tests |
+| Structural work limit | `work_limit_uses_complete_exact_total_and_returns_no_evaluation_prefix`, order/repeated-invocation tests |
+| Generated schema source | All definitions compiled; unsupported keyword/dialect/pattern/reference, cycle and malformed-schema tests |
+| Normalized typed input | Complete owned model, negative zero / binary64 rounding, tuple-tail and content-free error tests in `materialize::typed` |
 
 From the repository root:
 

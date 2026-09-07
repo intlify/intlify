@@ -35,6 +35,8 @@ mod model;
 mod input_limits;
 #[allow(dead_code)]
 mod materialize;
+#[allow(dead_code)]
+mod structural;
 
 #[cfg(test)]
 mod fixtures;

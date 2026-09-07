@@ -11,7 +11,7 @@ use crate::materialize::{
 };
 
 // Explicit test-owned capacity, not a product default or admitted capability.
-fn limits() -> InputLimits {
+pub(crate) fn limits() -> InputLimits {
     InputLimits {
         raw: RawInputLimits {
             max_file_bytes: Bound::new(1_000_000).unwrap(),

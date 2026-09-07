@@ -152,6 +152,7 @@ fn schema_and_runtime_identity_patterns_agree_on_control_character_boundaries() 
 }
 
 fn admitted(value: Value) -> FixtureConfig {
+    assert!(crate::structural::test_schema_accepts(&value));
     assert!(
         schema_validator().is_valid(&value),
         "schema rejected positive structural fixture"
@@ -160,6 +161,7 @@ fn admitted(value: Value) -> FixtureConfig {
 }
 
 fn rejected(value: Value) {
+    assert!(!crate::structural::test_schema_accepts(&value));
     assert!(
         !schema_validator().is_valid(&value),
         "schema accepted negative structural fixture"
