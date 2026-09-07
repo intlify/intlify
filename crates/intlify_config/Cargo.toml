@@ -10,6 +10,11 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+default = []
+# Measurement support is excluded from ordinary configuration consumers.
+benchmark = []
+
 [dependencies]
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }

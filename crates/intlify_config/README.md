@@ -11,7 +11,8 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
 - Outer admission selects configuration version `"0"`, preflights profile count/ID byte bounds, and retains independently admitted fields. Only complete structural success can construct `IntlifyConfig`; the root has no raw `Deserialize` route.
 - Private provisional selection handles omission, exact matching, invalid/unknown/over-limit inputs, and unavailable structural prerequisites without choosing from repository layout or a filtered profile map.
-- Locale resolution and the 026 measurement path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
+- Feature-isolated 026 numeric helpers retain exact `u64` quantities and positive repetition counts as shortest decimal JSON strings, with checked nanosecond conversion. No benchmark samples or common evidence are produced yet.
+- Locale resolution and the remaining 026 harness/record/validation path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
@@ -69,6 +70,14 @@ Omission uses the original profile count, including malformed declarations. Exac
 
 This is provisional bootstrap selection only. Resource Policy admission/recheck, confirmed selection, final selector Evidence, and checked Profile construction are not implemented or implied.
 
+## Measurement support in progress
+
+The non-default `benchmark` feature isolates the measurement code from ordinary library builds. Unit tests may also compile these helpers. There is no public benchmark facade or runnable benchmark harness yet.
+
+The initial numeric helper follows 026's full `0..=u64::MAX` quantity domain, rather than reusing 015's smaller positive resource-bound domain. JSON values are shortest unsigned decimal strings, including values above JavaScript's safe-integer range. Repetition counts must be positive. A reversed interval, nanosecond conversion overflow, or accumulation overflow is a typed failure, never a zero, saturated, or wrapped sample. Zero duration remains a valid observation rather than being replaced with a fabricated clock minimum.
+
+Clock/provider identity and resolution, method and interval descriptors, sample integrity, case inventory, projection, and reporting still need implementation. Exact integer storage does not establish physical clock accuracy, a measured performance result, or numeric-decision eligibility.
+
 ## Verification
 
 `src/model_tests.rs` records an explicit inventory of every fixed object's fields and checks positive, negative, omission, null, wrong-type, empty-collection, identity, and sibling-failure fixtures. It compares the internal evaluator, typed deserialization, and the independently compiled Draft 7 schema. The external schema oracle is a pinned dev dependency with HTTP/file retrieval, TLS, and IDNA data disabled; it is not part of the normal dependency graph.
@@ -99,11 +108,13 @@ Relevant traceability:
 | 015 external selector / provisional selection | `structural::selection::tests`: omission, exact match, original-map count, structural prerequisites, explicit bootstrap-bound binding |
 | 015-089 / 015-090 / provisional portion of 015-091 | Closed top-level selector types, exact UTF-8 limits, redacted unknown/invalid observations, no retained provisional Evidence |
 | 026 invocation isolation | Shared immutable schema/input; complete roots and selections survive producer release; failures do not contaminate repeated calls |
+| 026 exact numeric representation | `benchmark::quantity::tests`: JSON precision, decimal canonicality, positive repetitions, reversed clock, exact/first-over duration and accumulation overflow |
 
 From the repository root:
 
 ```sh
 rtk proxy cargo test -p intlify_config --all-targets
+rtk proxy cargo test -p intlify_config --all-targets --all-features
 rtk proxy cargo test -p intlify_config --doc
 rtk proxy cargo check -p intlify_config --lib --no-default-features
 rtk proxy cargo clippy -p intlify_config --all-targets --all-features -- -D warnings

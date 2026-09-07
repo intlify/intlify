@@ -38,6 +38,10 @@ mod materialize;
 #[allow(dead_code)]
 mod structural;
 
+#[cfg(any(test, feature = "benchmark"))]
+#[allow(dead_code)]
+mod benchmark;
+
 #[cfg(test)]
 mod fixtures;
 #[cfg(test)]
