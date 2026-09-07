@@ -10,7 +10,9 @@ use std::sync::OnceLock;
 
 use serde_json::{json, Value};
 
-use crate::fixtures::{complete_config, minimal_config, FixtureConfig};
+use crate::fixtures::{
+    complete_config, minimal_config, FixtureConfig, FixturePolicyReference, FixtureTargetReference,
+};
 use crate::model::{Presence, RequiredNullable, CONFIGURATION_SCHEMA_VERSION};
 
 fn schema_validator() -> &'static jsonschema::Validator {
@@ -157,7 +159,15 @@ fn admitted(value: Value) -> FixtureConfig {
         schema_validator().is_valid(&value),
         "schema rejected positive structural fixture"
     );
-    serde_json::from_value(value).expect("complete structural fixture")
+    let config = crate::structural::admission_tests::analyze_fixture(&value)
+        .construct()
+        .unwrap()
+        .expect("complete structural fixture");
+    assert!(crate::model::test_root_shape_accepts::<
+        FixturePolicyReference,
+        FixtureTargetReference,
+    >(value));
+    config
 }
 
 fn rejected(value: Value) {
@@ -166,7 +176,14 @@ fn rejected(value: Value) {
         !schema_validator().is_valid(&value),
         "schema accepted negative structural fixture"
     );
-    assert!(serde_json::from_value::<FixtureConfig>(value).is_err());
+    assert!(crate::structural::admission_tests::analyze_fixture(&value)
+        .construct()
+        .unwrap()
+        .is_none());
+    assert!(!crate::model::test_root_shape_accepts::<
+        FixturePolicyReference,
+        FixtureTargetReference,
+    >(value));
 }
 
 #[test]
@@ -189,10 +206,10 @@ fn generated_fixture_schema_is_deterministic_and_keeps_its_test_identity() {
 fn complete_and_minimum_shapes_are_admitted_without_semantic_defaults() {
     let minimum = admitted(minimal_config());
     assert_eq!(
-        minimum.schema_version.as_str(),
+        minimum.schema_version().as_str(),
         CONFIGURATION_SCHEMA_VERSION
     );
-    let declaration = minimum.profiles.values().next().unwrap();
+    let declaration = minimum.profiles().values().next().unwrap();
     assert!(matches!(
         declaration.default_source_locale,
         Presence::Absent
@@ -433,7 +450,7 @@ fn identical_profiles_remain_independent_named_declarations() {
     let mut value = minimal_config();
     value["profiles"]["other-app"] = value["profiles"]["app"].clone();
     let config = admitted(value);
-    assert_eq!(config.profiles.len(), 2);
+    assert_eq!(config.profiles().len(), 2);
 }
 
 #[test]

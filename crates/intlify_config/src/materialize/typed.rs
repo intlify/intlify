@@ -153,7 +153,7 @@ fn visit_number<'de, V: Visitor<'de>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::fixtures::{complete_config, minimal_config, FixtureConfig};
+    use crate::fixtures::{complete_config, minimal_config};
     use crate::materialize::materialize_file;
     use crate::materialize_tests::limits;
     use serde::Deserialize;
@@ -166,10 +166,9 @@ mod tests {
     #[test]
     fn complete_owned_authoring_types_decode_from_normalized_values() {
         for value in [minimal_config(), complete_config()] {
-            let source = serde_json::to_vec(&value).unwrap();
-            let materialized = doc(&source);
-            let typed: FixtureConfig = materialized.decode(materialized.root()).unwrap();
-            drop(materialized);
+            let analysis = crate::structural::admission_tests::analyze_fixture(&value);
+            let typed = analysis.construct().unwrap().unwrap();
+            drop(analysis);
             assert_eq!(serde_json::to_value(typed).unwrap(), value);
         }
     }
@@ -218,10 +217,8 @@ mod tests {
     fn type_failure_does_not_produce_partial_owned_configuration() {
         let mut value = complete_config();
         value["profiles"]["app"]["defaultRequestedLocale"] = false.into();
-        let materialized = doc(&serde_json::to_vec(&value).unwrap());
-        assert!(materialized
-            .decode::<FixtureConfig>(materialized.root())
-            .is_err());
+        let analysis = crate::structural::admission_tests::analyze_fixture(&value);
+        assert!(analysis.construct().unwrap().is_none());
     }
 
     #[test]

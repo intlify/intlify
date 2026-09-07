@@ -9,7 +9,9 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - Policy and Target Profile reference representations remain generic type parameters. The only current instantiations use explicitly test-owned types.
 - Private strict file materialization validates UTF-8, JSON syntax, decoded duplicate keys, Unicode scalars, and Portable JSON Numbers while retaining raw bytes and key/value/container spans.
 - An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
-- The outer configuration-version/profile-bound admission, guarded complete-authoring constructor, selection, locale resolution, and 026 measurement path are not implemented yet. The lower-level schema evaluator is not a complete configuration resolver or product entry.
+- Outer admission selects configuration version `"0"`, preflights profile count/ID byte bounds, and retains independently admitted fields. Only complete structural success can construct `IntlifyConfig`; the root has no raw `Deserialize` route.
+- Private provisional selection handles omission, exact matching, invalid/unknown/over-limit inputs, and unavailable structural prerequisites without choosing from repository layout or a filtered profile map.
+- Locale resolution and the 026 measurement path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
@@ -33,7 +35,7 @@ The model preserves authoring state rather than resolving semantics.
 
 `Presence<T>` and `RequiredNullable<T>` encode these different rules. No locale, policy preset, target default, or delivery policy is inferred by structural deserialization.
 
-Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences; duplicate locales, alias collisions, membership, and group partition checks are later semantic work. A malformed sibling prevents construction of the complete root. The schema evaluator separately records admitted/invalid/type-unavailable fragments; a failing sibling does not erase a valid declaration or field.
+Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences; duplicate locales, alias collisions, membership, and group partition checks are later semantic work. A malformed sibling prevents construction of the complete root. The schema evaluator separately records admitted/invalid/type-unavailable/resource-unavailable fragments; a failing sibling does not erase a valid declaration or field.
 
 The legacy JSON helper is **not** the 015 strict materializer. Its serde-based numeric behavior is preserved for CLI compatibility. The new `materialize` module admits numbers as finite binary64 values within magnitude `9007199254740991`, normalizes negative zero, and keeps the unchanged raw token separately.
 
@@ -43,7 +45,7 @@ The file entry takes immutable shared bytes and explicit finite input limits. A 
 
 The second pass consumes the admitted token index; it does not tokenize input again. Value nodes refer to children by indices, and the source map stores half-open UTF-8 byte coordinates. Deep input and failure cleanup therefore do not recurse through a Rust value tree. Returned documents retain their own values and share only immutable raw source. Parser scratch is invocation-owned and discarded; this step introduces no workspace, arena allocator, global cache, or claimed capacity reuse.
 
-Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection and the remaining profile/selector limits belong to later admission work. Error observations never include rejected key or scalar text.
+Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection remains later work. Profile and selector bounds are applied by the subsequent private admission stages. Error observations never include rejected key or scalar text.
 
 ## Internal schema evaluation
 
@@ -51,9 +53,21 @@ The compiler accepts only the keyword/reference/pattern vocabulary explicitly im
 
 Evaluation counts one applicable schema-keyword occurrence per logical subject. Annotation keywords are excluded; a wrong type suppresses dependent constraints and descendants, while independent siblings continue in unsigned UTF-8 member order. Every `anyOf` alternative is visited for deterministic accounting. Unmatched alternatives retain contextual observations only when the aggregate fails; they do not create blocking issues for an accepted alternative.
 
-A count-only traversal preflights the complete applicable domain before allocating fragment/issue records. The recording traversal must produce the same work count. Exact limits succeed; an overrun returns the exact complete total and no evaluation prefix. Records are private schema observations, not a substitute for version admission, profile/selector limits, typed configuration admission, or the final Finding Registry.
+A count-only traversal preflights the complete applicable domain before allocating fragment/issue records. The recording traversal must produce the same work count. Exact limits succeed; an overrun returns the exact complete total and no evaluation prefix. Records are private schema observations, not the final Finding Registry.
 
 Owned authoring deserialization uses the normalized flat tree directly. It preserves positive-zero normalization and admitted binary64 rounding, rejects unconsumed collection tails, and never embeds serde's rejected values/keys in errors. Successful deserialization alone is not proof that the outer admission prerequisites have succeeded.
+
+## Configuration admission and provisional selection
+
+An immutable `AuthoringSchema<Policy, Target>` binds the generated schema to its authoring/reference types. `StructuralAnalysis` owns the materialized document and shares that schema binding. Missing, invalid, or unsupported `schemaVersion` suppresses schema-dependent work; `$schema` is metadata only. Profile count and decoded ID byte lengths are checked before affected descendant validation. Independent sibling checks continue, but any failure withholds the complete root.
+
+`IntlifyConfig` wraps a private field definition used by schema generation and owned decoding. Its constructor needs an internal complete-root proof that only a successful analysis can create. A passing `anyOf` branch at the same node is insufficient for a typed field: the field's exact enclosing schema edge must be admitted. Tests also prevent accidentally adding `Deserialize` to the root.
+
+Selection uses a separate normalized input with an explicit matching bootstrap bound. It accepts absence, a complete bounded Rust string, an over-limit marker, or an invalid top-level JSON type tag. Over-limit values are not copied and retain only the smallest first-over witness, not their final length; invalid containers have no contents in this input. No live-host inspection is implemented here.
+
+Omission uses the original profile count, including malformed declarations. Exact matching needs the admitted version, a bounded non-empty profile container, an admitted declared ID, the selected declaration's immediate object shape, and its independently admitted `resourceLimits` reference. Invalid nested fields or unrelated profiles may leave those prerequisites available, but never produce a partial `IntlifyConfig`. Selection outputs own their selected ID/reference and survive release of the analysis. Unknown or rejected selector text is never exposed in the content-free failure observations.
+
+This is provisional bootstrap selection only. Resource Policy admission/recheck, confirmed selection, final selector Evidence, and checked Profile construction are not implemented or implied.
 
 ## Verification
 
@@ -80,6 +94,11 @@ Relevant traceability:
 | Structural work limit | `work_limit_uses_complete_exact_total_and_returns_no_evaluation_prefix`, order/repeated-invocation tests |
 | Generated schema source | All definitions compiled; unsupported keyword/dialect/pattern/reference, cycle and malformed-schema tests |
 | Normalized typed input | Complete owned model, negative zero / binary64 rounding, tuple-tail and content-free error tests in `materialize::typed` |
+| Outer version/profile admission | `structural::admission_tests`: absent/invalid/unsupported version, metadata isolation, exact/first-over count and decoded-ID bounds |
+| Complete root construction | Sealed proof and no-`Deserialize` assertion; independent typed siblings, aggregate `anyOf` proof, work-overrun suppression |
+| 015 external selector / provisional selection | `structural::selection::tests`: omission, exact match, original-map count, structural prerequisites, explicit bootstrap-bound binding |
+| 015-089 / 015-090 / provisional portion of 015-091 | Closed top-level selector types, exact UTF-8 limits, redacted unknown/invalid observations, no retained provisional Evidence |
+| 026 invocation isolation | Shared immutable schema/input; complete roots and selections survive producer release; failures do not contaminate repeated calls |
 
 From the repository root:
 
@@ -92,4 +111,4 @@ rtk proxy cargo test -p intlify_cli --test config --test schema
 rtk proxy vp run schema:cli:check
 ```
 
-No runtime benchmark, common Measurement Evidence, or full 015/026 conformance claim is made by these tests. PR 3 remains incomplete until structural admission, selection, and the applicable benchmark projection/report checks are implemented and verified.
+No runtime benchmark, common Measurement Evidence, or full 015/026 conformance claim is made by these tests. PR 3 remains incomplete until the applicable benchmark projection/report checks are implemented and verified. The shared-reference schema gate separately prevents claiming Phase 1 completion.

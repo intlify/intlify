@@ -231,17 +231,73 @@ impl ConfigurationVersion {
     }
 }
 
+/// Constructible only with the structural stage's sealed complete-root proof.
+/// It intentionally does not implement Deserialize or expose field mutation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub(crate) struct IntlifyConfig<Policy, Target>(AuthoringRoot<Policy, Target>);
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct IntlifyConfig<Policy, Target> {
+struct AuthoringRoot<Policy, Target> {
     #[serde(
         rename = "$schema",
         default,
         skip_serializing_if = "Presence::is_absent"
     )]
-    pub(crate) schema: Presence<String>,
-    pub(crate) schema_version: ConfigurationVersion,
-    pub(crate) profiles: NonEmptyMap<ProfileId, ProfileDeclaration<Policy, Target>>,
+    schema: Presence<String>,
+    schema_version: ConfigurationVersion,
+    profiles: NonEmptyMap<ProfileId, ProfileDeclaration<Policy, Target>>,
+}
+
+impl<Policy, Target> IntlifyConfig<Policy, Target> {
+    pub(crate) const fn schema(&self) -> &Presence<String> {
+        &self.0.schema
+    }
+    pub(crate) const fn schema_version(&self) -> ConfigurationVersion {
+        self.0.schema_version
+    }
+    pub(crate) fn profiles(&self) -> &NonEmptyMap<ProfileId, ProfileDeclaration<Policy, Target>> {
+        &self.0.profiles
+    }
+}
+
+impl<Policy: de::DeserializeOwned, Target: de::DeserializeOwned> IntlifyConfig<Policy, Target> {
+    pub(crate) fn from_complete(
+        proof: &crate::structural::CompleteRoot<'_, Policy, Target>,
+    ) -> Result<Self, crate::materialize::DecodeError> {
+        let doc = proof.document();
+        doc.decode(doc.root()).map(Self)
+    }
+}
+
+impl<Policy: JsonSchema, Target: JsonSchema> JsonSchema for IntlifyConfig<Policy, Target> {
+    fn schema_name() -> Cow<'static, str> {
+        "IntlifyConfig".into()
+    }
+    fn schema_id() -> Cow<'static, str> {
+        format!(
+            "intlify_config::IntlifyConfig<{},{}>",
+            Policy::schema_id(),
+            Target::schema_id()
+        )
+        .into()
+    }
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        // Delegate the one field definition directly, keeping the generated
+        // root object shape rather than introducing a transparent-wrapper $ref.
+        AuthoringRoot::<Policy, Target>::json_schema(generator)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn test_root_shape_accepts<
+    Policy: de::DeserializeOwned,
+    Target: de::DeserializeOwned,
+>(
+    value: serde_json::Value,
+) -> bool {
+    serde_json::from_value::<AuthoringRoot<Policy, Target>>(value).is_ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

@@ -107,6 +107,26 @@ impl SchemaProgram {
     pub(super) fn location(&self, pointer: &str) -> Option<SchemaId> {
         self.locations.get(pointer).copied()
     }
+
+    pub(super) fn resolved(&self, mut id: SchemaId) -> &SchemaNode {
+        while let Some(reference) = self.node(id).reference {
+            id = reference;
+        }
+        self.node(id)
+    }
+
+    /// Known owned-field edges only. No input string selects an external schema.
+    pub(super) fn property(&self, owner: SchemaId, field: &str) -> Option<SchemaId> {
+        self.resolved(owner)
+            .properties
+            .as_ref()?
+            .get(field)
+            .copied()
+    }
+
+    pub(super) fn identity_values(&self, owner: SchemaId) -> Option<SchemaId> {
+        self.resolved(owner).identity_values
+    }
 }
 
 struct Compiler<'schema> {
