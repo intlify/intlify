@@ -3,8 +3,8 @@
 
 //! Finite owner case declarations for the four active minimum boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
-//! Preparation must still bind exact limits, checked expected output, logical
-//! work, and method/execution metadata before a declaration can be measured.
+//! Preparation yields an unadmitted candidate; the separate fixture registry
+//! binds its exact input/result/work before method-bound collection can use it.
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,9 @@ use super::operation::Operation;
 
 mod inputs;
 pub(super) use inputs::Recipe;
+mod context;
 pub(super) mod prepare;
+pub(super) mod registry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -80,6 +82,7 @@ pub(super) struct Declaration {
     pub(super) operation: Operation,
     pub(super) fixture: Recipe,
     pub(super) fixture_revision: String,
+    #[serde(deserialize_with = "Option::deserialize")]
     pub(super) limit: Option<(LimitKind, LimitEdge)>,
     pub(super) selector: Selector,
     pub(super) expected_kind: ExpectedKind,

@@ -249,3 +249,30 @@ fn arbitrary_or_mutated_declarations_cannot_acquire_fixture_preparation() {
         Err(PreparationFailure::UndeclaredCase)
     ));
 }
+
+#[test]
+fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectations() {
+    let registry = super::registry::Registry::load().unwrap();
+    let mut contexts = BTreeSet::new();
+    for declaration in declarations() {
+        let fixture = registry
+            .prepare(&declaration)
+            .unwrap_or_else(|error| panic!("{declaration:?}: {error:?}"));
+        assert_eq!(fixture.declaration(), &declaration);
+        assert!(contexts.insert(fixture.input_context()));
+        let repeated = fixture
+            .prepared()
+            .once(&crate::benchmark::clock::tests::ScriptedClock::nanos([
+                0, 1,
+            ]))
+            .unwrap()
+            .output;
+        assert_eq!(repeated.observe().unwrap(), fixture.expected());
+        assert!(
+            crate::benchmark::work::LogicalWork::observe(fixture.prepared(), &repeated)
+                .unwrap()
+                .matches_expected(fixture.expected_work())
+        );
+    }
+    assert_eq!(contexts.len(), 77);
+}

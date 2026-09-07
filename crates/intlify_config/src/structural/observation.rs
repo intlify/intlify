@@ -15,6 +15,10 @@ use super::program::SchemaId;
 use super::{FragmentState, StructuralAnalysis, StructuralFailure};
 
 impl<Policy, Target> StructuralAnalysis<Policy, Target> {
+    pub(crate) const fn benchmark_profile_id_bound(&self) -> crate::input_limits::Bound {
+        self.limits.max_profile_id_bytes
+    }
+
     pub(crate) fn benchmark_structural_units(&self) -> Option<u64> {
         self.structural_units().or_else(|| {
             self.issues.iter().find_map(|issue| match issue.reason {

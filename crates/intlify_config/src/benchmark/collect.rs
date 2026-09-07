@@ -3,14 +3,15 @@
 
 //! Connect actual owner calls, acquired clock metadata, and bounded capture.
 //! The retained fragment is intentionally not a complete Owner Result or common
-//! Evidence Set: registry, work vector, build/environment, Run Plan, projection,
+//! Evidence Set: common case identities, build/environment, Run Plan, projection,
 //! and report validation are additional mandatory harness responsibilities.
 
 use serde::{Deserialize, Serialize};
 
+use super::cases::registry::AdmittedFixture;
 use super::clock::{ClockDescription, MonotonicClock};
 use super::descriptor::{DescriptorIssue, Descriptors};
-use super::observation::Observation;
+use super::observation::{Digest, Observation};
 use super::operation::{Operation, Prepared};
 use super::sample::{
     collect_with_work, validate_capture, Capture, CaptureBinding, CaptureFailure,
@@ -22,6 +23,7 @@ use super::work::LogicalWork;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CollectedOperation {
+    fixture_input_context: Digest,
     descriptors: Descriptors,
     logical_work: LogicalWork,
     capture: Capture,
@@ -29,6 +31,7 @@ pub(super) struct CollectedOperation {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CollectionIssue {
+    FixtureInputContext,
     Descriptor(DescriptorIssue),
     LogicalWork,
     Sample(SampleIntegrityIssue),
@@ -45,9 +48,30 @@ pub(super) enum CollectionFailure {
 /// remain test inputs to the lower-level sampler, never a runtime method option.
 pub(super) fn collect_operation(
     clock: &MonotonicClock,
+    fixture: &AdmittedFixture,
+    sampling: Sampling,
+    binding: CaptureBinding,
+) -> Result<CollectedOperation, CollectionFailure> {
+    collect_prepared(
+        clock,
+        fixture.prepared(),
+        fixture.expected(),
+        fixture.expected_work(),
+        fixture.input_context(),
+        sampling,
+        binding,
+    )
+}
+
+// Free-form prepared calls and expectations are an implementation detail, used
+// directly only by this module's negative tests. Normal collection needs the
+// immutable fixture token constructed by the checked-in expectation gate.
+fn collect_prepared(
+    clock: &MonotonicClock,
     prepared: &Prepared,
     expected: Observation,
     expected_work: &LogicalWork,
+    fixture_input_context: Digest,
     sampling: Sampling,
     binding: CaptureBinding,
 ) -> Result<CollectedOperation, CollectionFailure> {
@@ -60,11 +84,12 @@ pub(super) fn collect_operation(
     let capture = collect_with_work(clock, prepared, expected, expected_work, sampling, binding)
         .map_err(CollectionFailure::Capture)?;
     let collected = CollectedOperation {
+        fixture_input_context,
         descriptors,
         logical_work: expected_work.clone(),
         capture,
     };
-    let issues = collected.validate(
+    let issues = collected.validate_against(
         operation,
         clock.description(),
         expected,
@@ -79,10 +104,32 @@ pub(super) fn collect_operation(
 }
 
 impl CollectedOperation {
+    pub(super) fn validate(
+        &self,
+        fixture: &AdmittedFixture,
+        acquisition: ClockDescription,
+        sampling: Sampling,
+        binding: CaptureBinding,
+    ) -> Vec<CollectionIssue> {
+        let mut issues = Vec::new();
+        if self.fixture_input_context != fixture.input_context() {
+            issues.push(CollectionIssue::FixtureInputContext);
+        }
+        issues.extend(self.validate_against(
+            fixture.prepared().operation(),
+            acquisition,
+            fixture.expected(),
+            fixture.expected_work(),
+            sampling,
+            binding,
+        ));
+        issues
+    }
+
     /// Rebind decoded data to separately supplied fixture/run/method inputs.
     /// A record cannot choose its own expected checksum, sample count, operation,
     /// run/case identities, or the clock resolution used to validate itself.
-    pub(super) fn validate(
+    fn validate_against(
         &self,
         operation: Operation,
         acquisition: ClockDescription,

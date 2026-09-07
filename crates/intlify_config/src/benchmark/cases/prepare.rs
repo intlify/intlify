@@ -19,6 +19,7 @@ use super::{declarations, Declaration, ExpectedKind, LimitEdge, LimitKind, Selec
 
 pub(in crate::benchmark) struct Candidate {
     pub(in crate::benchmark) declaration: Declaration,
+    pub(super) input_limits: InputLimits,
     pub(in crate::benchmark) prepared: Prepared,
     pub(in crate::benchmark) output: Output,
     pub(in crate::benchmark) observation: Observation,
@@ -147,17 +148,7 @@ pub(in crate::benchmark) fn prepare(
                     .analyze(doc, structural_limits)
                     .map_err(|_| PreparationFailure::CoreInvariant)?;
                 let bound = structural_limits.max_profile_id_bytes;
-                let selector = match declaration.selector {
-                    Selector::Absent => SelectorInput::absent(bound),
-                    Selector::App => SelectorInput::string("app", bound),
-                    Selector::Unknown => SelectorInput::string("unknown", bound),
-                    Selector::InvalidSyntax => SelectorInput::string("APP", bound),
-                    Selector::InvalidType => {
-                        SelectorInput::invalid_type(InvalidSelectorType::Object, bound)
-                    }
-                    Selector::ExactByteLimit => SelectorInput::string(&"z".repeat(256), bound),
-                    Selector::FirstOverByteLimit => SelectorInput::string(&"z".repeat(257), bound),
-                };
+                let selector = selector_input(declaration.selector, bound);
                 Prepared::Select { analysis, selector }
             }
             Operation::FileMaterialization => unreachable!(),
@@ -203,9 +194,23 @@ pub(in crate::benchmark) fn prepare(
         LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
     Ok(Candidate {
         declaration: declaration.clone(),
+        input_limits,
         prepared,
         output,
         observation,
         logical_work,
     })
+}
+
+/// Only finite, non-secret owner fixture literals enter this constructor.
+pub(super) fn selector_input(selector: Selector, bound: Bound) -> SelectorInput {
+    match selector {
+        Selector::Absent => SelectorInput::absent(bound),
+        Selector::App => SelectorInput::string("app", bound),
+        Selector::Unknown => SelectorInput::string("unknown", bound),
+        Selector::InvalidSyntax => SelectorInput::string("APP", bound),
+        Selector::InvalidType => SelectorInput::invalid_type(InvalidSelectorType::Object, bound),
+        Selector::ExactByteLimit => SelectorInput::string(&"z".repeat(256), bound),
+        Selector::FirstOverByteLimit => SelectorInput::string(&"z".repeat(257), bound),
+    }
 }

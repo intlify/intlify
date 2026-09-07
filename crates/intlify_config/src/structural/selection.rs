@@ -47,6 +47,22 @@ pub(crate) struct SelectorInput {
 }
 
 impl SelectorInput {
+    /// Equality with a finite fixture input without exporting, hashing, or
+    /// rendering a potentially secret selector. Available to benchmark code only.
+    #[cfg(feature = "benchmark")]
+    pub(crate) fn benchmark_matches_fixture(&self, expected: &Self) -> bool {
+        self.bound == expected.bound
+            && match (&self.kind, &expected.kind) {
+                (SelectorKind::Absent, SelectorKind::Absent)
+                | (SelectorKind::OverLimitString, SelectorKind::OverLimitString) => true,
+                (SelectorKind::String(left), SelectorKind::String(right)) => left == right,
+                (SelectorKind::InvalidType(left), SelectorKind::InvalidType(right)) => {
+                    left == right
+                }
+                _ => false,
+            }
+    }
+
     #[cfg(feature = "benchmark")]
     pub(crate) fn benchmark_id_bytes(&self) -> SelectorByteObservation {
         match &self.kind {

@@ -79,11 +79,12 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
     for prepared in operations() {
         let operation = prepared.operation();
         let (expected, work) = fixture_observation(&prepared);
-        let collected = collect_operation(
+        let collected = collect_prepared(
             &clock,
             &prepared,
             expected,
             &work,
+            id("collector-unit-test-context"),
             sampling(),
             binding(operation),
         )
@@ -98,7 +99,7 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
         let decoded: CollectedOperation = serde_json::from_slice(&wire).unwrap();
         assert_eq!(decoded, collected);
         assert!(decoded
-            .validate(
+            .validate_against(
                 operation,
                 clock.description(),
                 expected,
@@ -116,11 +117,12 @@ fn wrong_expected_semantics_returns_failure_not_a_serializable_success_prefix() 
     let prepared = operations().into_iter().next().unwrap();
     let (mut expected, work) = fixture_observation(&prepared);
     expected.shared = id("deliberately-incorrect-fixture-observation");
-    let error = collect_operation(
+    let error = collect_prepared(
         &clock,
         &prepared,
         expected,
         &work,
+        id("collector-unit-test-context"),
         sampling(),
         binding(prepared.operation()),
     )
@@ -142,16 +144,17 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
     let (expected, work) = fixture_observation(&prepared);
-    let collected = collect_operation(
+    let collected = collect_prepared(
         &clock,
         &prepared,
         expected,
         &work,
+        id("collector-unit-test-context"),
         sampling(),
         binding(operation),
     )
     .unwrap();
-    let other_case = collected.validate(
+    let other_case = collected.validate_against(
         Operation::AuthoringConstruction,
         clock.description(),
         expected,
@@ -168,7 +171,7 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     let mut other_run = binding(operation);
     other_run.run = id("another-run");
     assert!(!collected
-        .validate(
+        .validate_against(
             operation,
             clock.description(),
             expected,
@@ -185,11 +188,12 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
     let (expected, work) = fixture_observation(&prepared);
-    let collected = collect_operation(
+    let collected = collect_prepared(
         &clock,
         &prepared,
         expected,
         &work,
+        id("collector-unit-test-context"),
         sampling(),
         binding(operation),
     )
@@ -225,7 +229,7 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
         *tampered.pointer_mut(path).unwrap() = value;
         let decoded: CollectedOperation = serde_json::from_value(tampered).unwrap();
         assert!(!decoded
-            .validate(
+            .validate_against(
                 operation,
                 clock.description(),
                 expected,
@@ -235,4 +239,69 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
             )
             .is_empty());
     }
+}
+
+#[test]
+fn all_pinned_cases_collect_and_revalidate_through_the_admitted_fixture_path() {
+    let registry = crate::benchmark::cases::registry::Registry::load().unwrap();
+    let clock = MonotonicClock::acquire().unwrap();
+    for declaration in crate::benchmark::cases::declarations() {
+        let fixture = registry.prepare(&declaration).unwrap();
+        // Test-only binding; the fixture context is not a common Case ID codec.
+        let binding = CaptureBinding {
+            run: id("pinned-fixture-test-run"),
+            case: fixture.input_context(),
+        };
+        let collected = collect_operation(&clock, &fixture, sampling(), binding).unwrap();
+        assert_eq!(collected.fixture_input_context, fixture.input_context());
+        let decoded: CollectedOperation =
+            serde_json::from_slice(&serde_json::to_vec(&collected).unwrap()).unwrap();
+        assert!(decoded
+            .validate(&fixture, clock.description(), sampling(), binding)
+            .is_empty());
+        let mut altered = decoded;
+        altered.fixture_input_context = id("another-fixture-input-context");
+        assert_eq!(
+            altered.validate(&fixture, clock.description(), sampling(), binding),
+            vec![CollectionIssue::FixtureInputContext]
+        );
+    }
+}
+
+#[test]
+fn equal_outputs_and_work_cannot_rebind_a_record_to_different_input_bounds() {
+    use crate::benchmark::cases::{declarations, LimitEdge, LimitKind, Recipe};
+    let registry = crate::benchmark::cases::registry::Registry::load().unwrap();
+    let cases = declarations();
+    let base = registry
+        .prepare(
+            cases
+                .iter()
+                .find(|case| {
+                    case.operation == Operation::FileMaterialization
+                        && case.fixture == Recipe::Minimal
+                        && case.limit.is_none()
+                })
+                .unwrap(),
+        )
+        .unwrap();
+    let exact = registry
+        .prepare(
+            cases
+                .iter()
+                .find(|case| case.limit == Some((LimitKind::FileBytes, LimitEdge::Exact)))
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(base.expected(), exact.expected());
+    assert!(base.expected_work().matches_expected(exact.expected_work()));
+    assert_ne!(base.input_context(), exact.input_context());
+    let clock = MonotonicClock::acquire().unwrap();
+    let binding = binding(Operation::FileMaterialization);
+    let collected = collect_operation(&clock, &base, sampling(), binding).unwrap();
+    // Even retaining the same run/case labels cannot conceal a changed context.
+    assert_eq!(
+        collected.validate(&exact, clock.description(), sampling(), binding),
+        vec![CollectionIssue::FixtureInputContext]
+    );
 }

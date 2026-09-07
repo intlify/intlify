@@ -64,6 +64,7 @@ impl<'de> Deserialize<'de> for Digest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Observation {
     pub(crate) shared: Digest,
+    #[serde(deserialize_with = "Option::deserialize")]
     pub(crate) entry: Option<Digest>,
 }
 
