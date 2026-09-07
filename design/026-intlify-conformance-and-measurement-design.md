@@ -566,6 +566,7 @@ A Profiler Observation conceptually contains one explicitly selected recorder mo
 ```text
 ProfilerObservation {
   record envelope
+  profiling execution identity
   profiler and registry revision
   Verification Subject and Profiling Build identity
   fixture and workload identity
@@ -657,13 +658,15 @@ ProfilerDiagnosticCounter {
 
 ```
 
+The harness MUST issue a fresh profiling execution identity before each profiling invocation. Every resulting Profiler Observation MUST retain that identity, including truncated and recorder-failed records with no recording data. A rerun of the same build and fixture MUST receive a new execution identity. This identity names the invocation, not the stored record instance; it MUST NOT participate in semantic-result equality.
+
 An event-trace context stream is ordered by span-start sequence within that context. Separate thread, task, or worker contexts do not acquire an invented total order unless explicit context propagation and a common clock make that order observable. Occurrence identities are unique within one Profiler Observation, every parent reference resolves without a cycle, and observed end timestamps do not precede their starts. A structural violation produces `ProfilerObservationEvaluation { invalid }`; it MUST NOT be represented as an admitted truncated or recorder-failed observation.
 
 An aggregate duration is the total across all complete occurrences; it is not an implicit average or maximum. Per-occurrence distributions require `event-trace`. A non-complete span is retained as diagnostic state where possible but is not mixed into complete occurrence or allocation totals. Its partial duration MAY be retained only with its completion state. The started occurrence count MUST equal the sum of the completion counts in a complete aggregate report. A recorder that cannot preserve this invariant records the exact `truncated` or `recorder-failed` outcome and its known bounds; it MUST NOT infer successful completion for an unrecorded occurrence.
 
 An incomplete child makes its parent's self duration unavailable, and a process failure that prevents report finalization is a profiler execution failure. A valid recorder-failed record can omit recording data when initialization failed before any data existed. Truncation details retain the bound kind, configured limit, retained/omitted counts or bytes, and first affected sequence wherever observable. If truncation is followed by recorder failure, `recorder-failed` takes precedence and retains the known truncation details.
 
-The observation input resolves the expected execution's record. A valid complete, truncated, or recorder-failed record maps to its corresponding evaluation outcome. A missing record produces `unavailable` with `failed-invocation` when execution failure is known, otherwise `missing-evidence`. A malformed record, reference, or execution binding produces `invalid`, which takes precedence over recording failure or truncation; absence is not a fabricated recorder-failed record.
+The observation input resolves the expected execution's record. The evaluator MUST match the observation's profiling execution identity to its expected profiling execution identity and verify the required subject, build, fixture, and workload bindings. Matching fixture or build identity alone does not establish the execution binding. A valid complete, truncated, or recorder-failed record maps to its corresponding evaluation outcome. A missing record produces `unavailable` with `failed-invocation` when execution failure is known, otherwise `missing-evidence`. A malformed record, reference, or execution binding produces `invalid`, which takes precedence over recording failure or truncation; absence is not a fabricated recorder-failed record.
 
 The physical representation MAY be a tree, table, or event stream consistent with the declared recorder mode. It MUST retain enough parent/context information to distinguish nested work from repeated sibling work and MUST preserve the exact recording outcome and known truncation bounds. Different recorder modes or registry revisions are not treated as equivalent perturbation or directly comparable diagnostic shapes.
 
@@ -809,9 +812,20 @@ Human explanation is presentation and MUST NOT be the only reason representation
 
 Every place that stores failure causes uses `reasons: ordered VerificationReason[]`. A non-success or unavailable/invalid result MUST retain at least one common cause; an owner-specific reason MAY refine it but MUST NOT replace it or change the outcome required by the evaluator. Non-applicability retains its applicability-rule identity, success-only diagnostics remain separate, and workflow rule selection retains its applied rule identity rather than pretending to be an execution failure.
 
-The evaluator maps causes to outcomes. In particular, `semantic-observation-mismatch` produces conformance `fail`, invalid benchmark evidence, or `not-comparable` for two valid comparison inputs that fail their relation. An observed duration/counter/repetition/conversion overflow produces an unavailable failed case with `failed-invocation` and its typed overflow subtype. Derived comparison or budget arithmetic overflow uses `arithmetic-overflow` and the evaluator's invalid-result representation. A completed budget, qualification, or isolation check that fails its declared requirement uses `requirement-not-satisfied` with the exact requirement/check and observations. Profiler truncation and recorder failure use their corresponding common diagnostic-loss causes. `insufficient-samples` retains the affected input and required and available sample counts.
+The evaluator maps causes to outcomes. In particular, `semantic-observation-mismatch` produces conformance `fail`, invalid benchmark evidence, or `not-comparable` for two valid comparison inputs that fail their relation. An observed duration/counter/repetition/conversion overflow produces an unavailable failed case with `failed-invocation` and its typed overflow subtype. Derived comparison or budget arithmetic overflow produces that evaluator's explicit `invalid` result with `arithmetic-overflow`; it does not invalidate the original measurement observations. A completed budget, qualification, or isolation check that fails its declared requirement uses `requirement-not-satisfied` with the exact requirement/check and observations. Profiler truncation and recorder failure use their corresponding common diagnostic-loss causes. `insufficient-samples` retains the affected input and required and available sample counts.
 
-Reasons are canonically ordered by evaluation-stage ordinal, code namespace, owner identity, code, affected reference, and ordered related references, then deduplicated by complete semantic content. The first retained reason is the primary reason. 019 owns any later projection from these evaluation reasons into Findings; a Finding code is not substituted for a Verification Reason.
+Reasons MUST be ordered lexicographically by evaluation-stage ordinal, code namespace, owner identity, code, affected reference, and ordered related references, preserving that priority. Ties MUST be broken by owner revision and then typed detail, so distinct semantic contents always have a defined order. Only reasons with completely equal semantic content are deduplicated; the first remaining reason is the primary reason.
+
+Each admitted evaluator specification MUST fix an ordered stage registry for its revision. A stage ordinal is its zero-based position in that registry, not discovery order or thread execution order. Unknown stages MUST be rejected as invalid rather than assigned a position during collection.
+
+The comparison MUST use the following fixed semantic rules rather than object insertion order or human-formatted text:
+
+- A semantic schema fixes field order and type/variant tag order; comparison recursively follows those orders.
+- Exact integers compare numerically, booleans use `false < true`, and identifiers, strings, and byte sequences compare lexicographically by unsigned bytes; strings use their exact UTF-8 encoding.
+- Absent optional values precede present values. Sequences compare element by element, with a shorter equal prefix first.
+- Maps compare entries after ordering keys by their declared semantic type's comparator, never by insertion or hash-table iteration order.
+
+These rules apply to references, owner revisions, and typed detail as well as the leading keys. Implementations MUST produce the same reason order and primary reason for every permutation of the same semantic reason collection. 017 still owns physical encoding; 019 owns later Finding projection, and a Finding code is not substituted for a Verification Reason.
 
 Wall-clock creation time is optional report context. It MUST NOT participate in semantic result equality, Measurement Case identity, comparison compatibility, or product cache identity.
 
@@ -1054,6 +1068,7 @@ ComparisonEvaluation {
       source evaluation references
       reasons: ordered VerificationReason[]
     }
+    | invalid { reasons: ordered VerificationReason[] }
 }
 
 BudgetEvaluation {
@@ -1118,7 +1133,11 @@ WorkflowPolicyEvaluation {
 
 `comparable` and `not-comparable` both require two valid `resolved` inputs. `not-comparable` is reserved for those inputs failing a declared compatibility rule. A Comparison Evaluation is `unavailable` when either input is unavailable or invalid: missing, skipped, unsupported, failed, stale, or projection-ineligible input maps to `incomplete`, while a malformed evidence record or projection maps to `invalid-evidence`. `unbaselined` is a relative Budget Evaluation state because no Comparison Evaluation can begin until a baseline has been selected.
 
+A Comparison Evaluation whose own derived arithmetic overflows MUST produce `invalid` with `arithmetic-overflow`, without statistics, difference, or ratio. Overflow during measurement remains a failed measurement input and maps to `unavailable / incomplete`; malformed submitted evidence remains `unavailable / invalid-evidence`. An invalid derived evaluation MUST NOT relabel otherwise valid source measurements as corrupt.
+
 A Budget Evaluation is `evaluated` only when every input required by its budget kind is `resolved`, the selected statistic is valid, and the source measurement or comparison is eligible for a numeric decision. An observational-only comparison may still be `comparable` and derive statistics, difference, and ratio, but it records decision eligibility `ineligible` with its reasons; attempting to use it for a budget produces `unavailable { measurement-not-decision-eligible }`.
+
+A structurally valid Comparison Evaluation recording `invalid` can resolve as an input record, but a Budget consuming it MUST produce `unavailable / invalid-evidence` and retain the source evaluation reference and its arithmetic-overflow cause. This classification describes the unusable comparison result, not corruption of the original measurements. It MUST NOT produce an evaluated Budget.
 
 When multiple conditions coexist, evaluators use the following precedence, from highest to lowest, while retaining all safely detected reasons and per-case failures:
 
@@ -1127,7 +1146,7 @@ When multiple conditions coexist, evaluators use the following precedence, from 
 | Conformance Campaign / Instrumentation Isolation | `invalid > incomplete > fail > pass` |
 | Measurement Run / Cross-Platform Report | `invalid > incomplete > complete` |
 | Logical Render Equivalence | `invalid > unavailable > evaluated` |
-| Comparison | `unavailable / invalid-evidence > unavailable / incomplete > not-comparable > comparable` |
+| Comparison | `invalid > unavailable / invalid-evidence > unavailable / incomplete > not-comparable > comparable` |
 | Budget | `invalid > unavailable > evaluated` |
 
 Budget `invalid` covers malformed budget policy, contradictory evaluation relationships, or derived arithmetic overflow. Malformed submitted measurement/comparison evidence instead produces `unavailable / invalid-evidence`. Within Budget `unavailable`, the primary classification is `invalid-evidence > unbaselined > incomplete > not-comparable > runner-not-qualified > measurement-not-decision-eligible`. This classification does not discard the separately canonically ordered reasons. Evaluators do not invent errors for stages they cannot execute because earlier required inputs are absent.
@@ -1790,7 +1809,9 @@ Every executed-work Measurement Case records a deterministic semantic observatio
 
 The observation excludes time, memory, sample ordinal, worker identity, pointer identity, environment metadata, and report time.
 
-All repetitions within one sample and all samples in one evidence set MUST produce the same semantic observation unless the owner benchmark profile and applicable platform-managed Locale Service Profile explicitly define a finite output family. Any unexpected difference invalidates the complete case.
+Within each Measurement Case in one Evidence Set, all repetitions within one sample and all samples of that same case MUST produce the same semantic observation, unless the owner benchmark profile and applicable platform-managed Locale Service Profile explicitly define a finite output family. Any unexpected difference invalidates the complete case.
+
+Distinct cases in the same Evidence Set MUST each be checked against their own fixture's expected semantic result; their observations need not equal one another. This does not waive an explicitly required relation between cases, such as cold/hot semantic equivalence.
 
 Semantic checksums verify logical results and detect non-determinism. They do not by themselves prevent compiler constant folding, dead-work elimination, loop hoisting, or premature lifetime end, and they are not authentication, artifact identity, or evidence of translation quality.
 
@@ -1910,7 +1931,7 @@ Artifact-size and delivery-topology cases use `artifact-generation`. Content ide
 
 A deterministic non-artifact count uses `semantic-operation`. All proof fields and exact quantities MUST match across the independent samples. The proof applies within each baseline or candidate evidence set; baseline and candidate artifacts are not required to have identical bytes. Any mismatch is `invalid-evidence / non-deterministic-generation`, not a performance regression.
 
-All duration conversion, counter accumulation, repetition handling, and derived arithmetic use checked operations. `measurement-overflow`, `counter-overflow`, `repetition-overflow`, and `duration-conversion-overflow` are typed subtypes of an observed measurement failure, recorded with common `failed-invocation`; no wrapped or saturated `u64::MAX` sample is emitted. Derived evaluation arithmetic instead uses `arithmetic-overflow` and the evaluator's invalid-result representation.
+All duration conversion, counter accumulation, repetition handling, and derived arithmetic use checked operations. `measurement-overflow`, `counter-overflow`, `repetition-overflow`, and `duration-conversion-overflow` are typed subtypes of an observed measurement failure, recorded with common `failed-invocation`; no wrapped or saturated `u64::MAX` sample is emitted. Derived comparison or budget arithmetic instead produces that evaluator's explicit `invalid` result with `arithmetic-overflow`.
 
 Revision `"0"` requires raw ordered sample retention for any evidence used by common numeric comparison or a Performance Budget. A local smoke profile MAY use one measured sample; it remains observational and MUST NOT satisfy a numeric gate.
 
@@ -2095,7 +2116,7 @@ Measurement Profiles own collection, Comparison Profiles own compatibility and p
 
 `exact` is valid only when `deterministic-measurement requirement` is enabled, the minimum sample count is satisfied, and every admitted sample has the same exact quantity and applicable Determinism Proof. The selected scalar is that common quantity. It does not select the first sample or statistically reduce unequal samples; disagreement produces `invalid-evidence / non-deterministic-generation`.
 
-For `exact`, `minimum sample count` MUST be at least two independent samples; a configured minimum of one is an invalid selection. Other statistic kinds require an explicit minimum of at least one, subject to additional method/profile/budget obligations. A deterministic-proof Budget Evaluation requires at least two independent samples per input even if another statistic is selected. The higher applicable minimum is never reduced. Statistics use only admitted successful sample quantities; fewer than the valid required minimum produces `unavailable / incomplete` with `insufficient-samples`, not a fabricated statistic. Baseline and candidate each meet the minimum independently, after complete-pair selection when paired.
+For `exact`, `minimum sample count` MUST be at least two independent samples; a configured minimum of one is an invalid selection. Other statistic kinds require an explicit minimum of at least one, subject to additional method/profile/budget obligations. A deterministic-proof Budget Evaluation requires at least two independent samples per input even if another statistic is selected. The higher applicable minimum is never reduced. Statistics use only admitted successful sample quantities; fewer than the valid required minimum produces `unavailable / incomplete` with `insufficient-samples`, not a fabricated statistic. Baseline and candidate each meet the minimum independently, after full scheduled acquisition and complete-pair binding when paired. The minimum is a statistical lower bound, not permission to stop a planned schedule early.
 
 ### Compatibility procedure
 
@@ -2112,7 +2133,7 @@ Before calculating a statistic, the evaluator checks in this order:
 9. neither input is failed, incomplete, unsupported, stale, or projection-ineligible; and
 10. the evaluator separately derives effective per-input decision requirements and evaluates eligibility from the Measurement Method Descriptor, profiles, applicable runner/preflight and Determinism Proof obligations, retaining any ineligibility reasons.
 
-All safely detectable reasons are retained in canonical order, and the common outcome precedence determines the aggregate. A required environment value recorded unavailable or an absent referenced equivalence record produces `unavailable { kind: incomplete }`. A present incompatible value produces `not-comparable`. A missing registry entry, malformed evidence/profile, or invalid equivalence record produces `unavailable { kind: invalid-evidence }`. Missing, skipped, unsupported, failed, stale, or projection-ineligible required input produces `unavailable { kind: incomplete }`. Runner qualification or decision-eligibility failure does not erase otherwise valid analysis: the Comparison Evaluation remains comparable with eligibility `ineligible` and its reasons, and a Budget Evaluation MUST reject it. No statistic is emitted for a non-comparable or unavailable result.
+All safely detectable reasons are retained in canonical order, and the common outcome precedence determines the aggregate. A required environment value recorded unavailable or an absent referenced equivalence record produces `unavailable { kind: incomplete }`. A present incompatible value produces `not-comparable`. A missing registry entry, malformed evidence/profile, or invalid equivalence record produces `unavailable { kind: invalid-evidence }`. Missing, skipped, unsupported, failed, stale, or projection-ineligible required input produces `unavailable { kind: incomplete }`. Runner qualification or decision-eligibility failure does not erase otherwise valid analysis: the Comparison Evaluation remains comparable with eligibility `ineligible` and its reasons, and a Budget Evaluation MUST reject it. Derived arithmetic overflow produces `invalid` with `arithmetic-overflow`. No statistic, difference, or ratio is emitted for a not-comparable, unavailable, or invalid result.
 
 ### Comparison modes
 
@@ -2173,6 +2194,9 @@ CrossPlatformReportEvaluation {
           projection-ineligible | stale
         reasons: ordered VerificationReason[]
       }
+      | invalid {
+          reasons: ordered VerificationReason[]
+        }
   ]
   outcome: complete | incomplete | invalid
   reasons: ordered VerificationReason[]
@@ -2180,6 +2204,8 @@ CrossPlatformReportEvaluation {
 ```
 
 Report assembly binds each row to an exact evidence and nested Measurement Case reference. It MUST NOT select an implicit latest result. More than one eligible record for a row without an explicit unique binding makes the evaluation invalid. A required row with missing evidence makes it incomplete; an optional row with missing evidence remains explicitly unavailable without making the report incomplete. A missing selected row-result entry is structurally invalid. Under `current-only`, stale evidence produces `unavailable { stale }`. Under `historical-with-stale-label`, the same valid historical evidence MAY produce `historical-stale` and the report can remain complete. Aggregation uses `invalid > incomplete > complete`, preserving row-level reasons.
+
+A malformed schema, integrity-digest mismatch, or ambiguous or contradictory evidence/case binding MUST produce an `invalid` row, retaining the affected reference and causes in Verification Reasons. An invalid row MUST make the report `invalid`, whether the row is required or optional. The row MUST remain present without admitted quantity fields; safely retained details remain diagnostic, and other valid rows remain available for diagnosis. Missing or unretrievable evidence remains `unavailable`, not `invalid`.
 
 The profile has no Baseline, Statistic Selection, tolerance, difference, ratio, ranking, or numeric pass/fail result. A deterministic current case MAY display its admitted exact value; a non-deterministic current case displays its ordered raw-sample vector without inventing an average or percentile. A `historical-stale` row is descriptive only and MUST NOT enter a comparison, statistic, difference, ratio, ranking, Performance Budget, Capability Evidence, or Release decision. Stable ordering uses declared metadata keys rather than quantity-based ranking.
 
@@ -2196,7 +2222,7 @@ Duration, memory, and non-deterministic sampled count comparisons select one of 
 - `nearest_rank_p50`; or
 - `nearest_rank_p95`.
 
-The evaluator sorts admitted unsigned sample quantities in ascending numeric order. For numerator `pNum`, denominator `pDen`, and sample count `N`, nearest rank is the one-based index `ceil(N × pNum / pDen)`, calculated as `(N × pNum + pDen - 1) / pDen` with checked wide-integer arithmetic. `nearest_rank_p50` uses `50 / 100`; `nearest_rank_p95` uses `95 / 100`. No interpolation or floating point is used. Overflow makes the evaluation invalid with `arithmetic-overflow`; it MUST NOT wrap or saturate. The same sample vector therefore produces the same percentile across implementations.
+The evaluator sorts admitted unsigned sample quantities in ascending numeric order. For numerator `pNum`, denominator `pDen`, and sample count `N`, nearest rank is the one-based index `ceil(N × pNum / pDen)`, calculated as `(N × pNum + pDen - 1) / pDen` with checked wide-integer arithmetic. `nearest_rank_p50` uses `50 / 100`; `nearest_rank_p95` uses `95 / 100`. No interpolation or floating point is used. Overflow MUST produce the explicit `invalid` result of the Comparison or direct Budget Evaluation with `arithmetic-overflow`; it MUST NOT wrap or saturate. The same sample vector therefore produces the same percentile across implementations.
 
 A profile MUST justify `minimum` if used for gating because it emphasizes ideal rather than typical behavior. Runtime hot-format budgets normally use `nearest_rank_p50` and MAY additionally report `nearest_rank_p95`. Peak-memory budgets normally use `maximum`. These are guidance, not hidden defaults.
 
@@ -2224,9 +2250,11 @@ PairedMeasurementSchedule {
 
 The schedule consists of complete repetitions of the selected pattern. Slot identities are unique within the schedule, and every pair has exactly one baseline and one candidate slot. Each sample's schedule, pair, side, slot, Plan, and case binding MUST agree; a duplicate, unknown, or contradictory binding is invalid. Each pair uses the same repetition count and compatible declared fixture reset, Execution State, and Environment Observation under the profile's exhaustive rules. `paired_implementation` uses the same runner; `paired_target_path` admits only its explicitly declared path/environment differences. Acquisition order is checked against the schedule, not inferred after collection.
 
-The evaluator creates baseline and candidate vectors from complete pairs, applies the same Statistic Selection independently to both vectors, and derives the signed difference and exact ratio from those two scalar statistics. Pairing controls acquisition order and incomplete-sample handling in revision `"0"`; the evaluator does not apply a percentile to a vector of pair differences. A future difference-distribution method requires a later specification revision. Samples MUST be joined only by explicit pair identity, not timestamp or array position.
+The evaluator MUST verify successful completion of every scheduled slot for both selected cases before creating baseline and candidate vectors from those complete pairs. It applies the same Statistic Selection independently to both vectors and derives the signed difference and exact ratio from those two scalar statistics. Pairing controls acquisition order and incomplete-sample handling in revision `"0"`; the evaluator does not apply a percentile to a vector of pair differences. A future difference-distribution method requires a later specification revision. Samples MUST be joined only by explicit pair identity, not timestamp or array position.
 
-An interrupted pair is incomplete and contributes neither side to a common paired statistic. Its partial observations remain available for diagnosis but MUST NOT be re-paired with another run. Minimum-sample requirements are checked on each side after selecting complete pairs; interruption does not reduce the configured minimum.
+Revision `"0"` requires complete acquisition of the preissued schedule for the selected Measurement Case pair. If that acquisition is interrupted, the Comparison Evaluation MUST be `unavailable / incomplete`, subject to the common higher-priority invalidity rules. All observations from the interrupted selected-case acquisition, including previously completed pairs, MUST remain diagnostic and MUST NOT enter common statistics or a Budget. Unrelated cases that completed successfully in the same run are not invalidated solely by that interruption.
+
+The minimum sample count is checked only after full scheduled acquisition and successful pair admission. Meeting that minimum MUST NOT authorize early termination, shortening a schedule, or admitting a completed prefix. For example, a ten-pair schedule with a five-sample minimum remains incomplete if interrupted after eight completed pairs. A retry MUST use new Measurement Run identities, Plans, and a new Paired Measurement Schedule; observations MUST NOT be combined across the old and new runs.
 
 ### Cross-target interpretation
 
@@ -2397,7 +2425,7 @@ Evaluation records state facts; workflow policy states the response:
 | `observational-only` | allowed | allowed with decision eligibility `ineligible` and reasons | forbidden; result is unavailable with `measurement-not-decision-eligible` |
 
 - a Budget Evaluation is `evaluated { satisfied | exceeded }`, `unavailable`, or `invalid`;
-- a Comparison Evaluation is `comparable`, `not-comparable`, or `unavailable`;
+- a Comparison Evaluation is `comparable`, `not-comparable`, `unavailable`, or `invalid`;
 - `unbaselined` exists only as an unavailable relative Budget Evaluation reason; and
 - Measurement Run and other evaluation records retain their own closed outcomes.
 
@@ -2418,6 +2446,8 @@ WorkflowPolicy {
 ```
 
 Exactly one rule MUST cover each applicable source outcome. A missing or overlapping mapping makes the policy invalid. `report` publishes the fact, `warn` calls attention to it, `allow` satisfies this policy's gate condition, and `block` rejects that condition. `allow` does not assert that every other Release condition passed. A Budget-gating policy maps `evaluated / satisfied` to `allow`, `evaluated / exceeded` to `block`, every `unavailable` reason to `block` (including `runner-not-qualified`), and `invalid` to `block`. Other source kinds similarly require a complete explicit mapping for their applicable gate outcomes.
+
+A policy consuming Comparison Evaluations MUST cover the `invalid` outcome explicitly. A Comparison-gating policy MUST map that outcome to `block`; a valid record describing an invalid comparison remains resolvable so its rule and original causes can be reported.
 
 Workflow Policy Evaluation resolves its source through Evaluation Input Resolution. It derives the source outcome from that record, not an independently authoritative copy. Missing source input produces workflow `unavailable`; corrupt input or invalid policy produces workflow `invalid`. A valid source evaluation whose own outcome is `unavailable` still resolves and applies the corresponding rule, such as `block`. The applied result retains the exact rule identity and disposition. Only `applied { allow }` under the required gate policy is positive evidence for that policy; an unavailable or invalid workflow evaluation cannot satisfy it.
 
@@ -2676,7 +2706,7 @@ Preflight occurs for every advisory or gating run whose effective requirements i
 
 For `sequence-window` and `time-window`, each planned Measurement Run receives its own immutable run-bound Runner Qualification Evidence that retains the shared qualification epoch, references original check results directly through Nested Record References, and evaluates the window for that run. Each original check result has a stable local identity. Reuse verifies the same runner instance, class, and applicable environment, does not extend the original validity condition, and does not reuse one top-level record with a different Measurement Run identity.
 
-An applicable hardware, OS, runtime, toolchain, allocator, clock, power-policy, runner-instance, or Runner Class Specification change; threshold failure; or validity-window end invalidates qualification regardless of the selected validity kind. Authentication of a sequence controller or clock authority remains an 018-owned trust decision.
+An applicable hardware, OS, runtime, toolchain, allocator, clock, power-policy, runner-instance, or Runner Class Specification change; a required check's threshold failure; or validity-window end invalidates qualification regardless of the selected validity kind. A valid optional check failure or inability to execute an optional check MUST NOT by itself invalidate qualification; malformed optional results still make the evaluation `invalid`. Authentication of a sequence controller or clock authority remains an 018-owned trust decision.
 
 Gating executed-work benchmarks run with diagnostic profiling disabled unless their Measurement Profile defines the instrumentation itself as the measured subject. A separate Profiling Build MAY accompany a regression for diagnosis but MUST NOT replace the uninstrumented evidence.
 
@@ -2829,6 +2859,7 @@ Every Measurement Projection includes cases for:
 - exact and rounded duration conversion plus NaN, infinity, reversal, and overflow rejection;
 - absent required raw samples;
 - checksum mismatch;
+- one Evidence Set containing distinct cases with different expected semantic results, within-case sample/repetition mismatch, and preservation of declared finite output families and required cross-case relations;
 - interval-boundary mismatch;
 - missing, duplicate, unknown, wrong-type, or forbidden-state environment entry versus a correctly recorded unavailable value;
 - unsupported measurement method;
@@ -2849,6 +2880,7 @@ Profiling fixtures cover:
 - Instrumentation Isolation Evidence covering exhaustive-inventory and construction-proof call-site coverage, dependency closure, symbols/imports/registries/sections, code generation, and non-evaluation of disabled arguments;
 - enabled/disabled logical-result and deterministic-artifact equality;
 - event-trace and aggregate-table recorder modes;
+- preissued profiling execution identity on complete, truncated, and data-less recorder-failed observations; missing/mismatched identities, fresh rerun identities, preserved subject/build/fixture/workload checks, and exclusion of execution identity from semantic equality;
 - nested sibling and repeated spans with correct started/completion counts, inclusive-total, and self-total relationships;
 - cancelled, unwound, truncated, and recorder-failed span completion;
 - unmatched occurrence counts, invalid parent references, timestamp reversal, and cross-context ordering behavior;
@@ -2879,7 +2911,7 @@ Comparison fixtures cover:
 - exact selection with a configured minimum of at least two independent samples; rejection of minimum one, insufficient actual samples, repeated invocation identities, unequal quantities, or unequal Determinism Proofs;
 - fixed versus mismatched repetition counts for each Sample Aggregation Kind;
 - preissued Paired Measurement Schedules, `AB`, `BA`, and explicitly two-pair `ABBA` behavior, slot/pair/side/Plan binding, and unknown/duplicate/mismatched schedule references;
-- paired independent baseline/candidate Statistic Selection and interrupted-pair behavior;
+- paired independent baseline/candidate Statistic Selection only after complete scheduled acquisition; interruption below, at, or above the sample minimum, rejection of completed prefixes, new Run/Plan/Schedule identities for retries, no cross-run mixing, and preservation of unrelated completed cases;
 - baseline zero;
 - exact `candidate / baseline` ratio direction and undefined zero-denominator representation;
 - candidate larger, equal, and smaller;
@@ -2893,14 +2925,17 @@ Comparison fixtures cover:
 - profiling versus uninstrumented build mismatch;
 - transfer-representation mismatch without an explicitly paired profile;
 - generated-file, Delivery Unit, initial-load-request, and complete-load-request exact counts;
-- separate `comparable`, `not-comparable`, `unavailable / incomplete`, and `unavailable / invalid-evidence` results;
+- separate `comparable`, `not-comparable`, `unavailable / incomplete`, `unavailable / invalid-evidence`, and intrinsic `invalid` results;
+- Comparison-derived arithmetic overflow with no statistics/difference/ratio, distinct measurement-time overflow and corrupt-input outcomes, downstream Budget `unavailable / invalid-evidence` with source causes, and explicit Comparison-gating `invalid -> block` mapping;
 - every valid and invalid direct/relative Performance Budget requirement combination and exact evaluated-value retention;
 - independent Budget outcomes and `report`/`warn`/`allow`/`block` workflow dispositions; exhaustive non-overlapping rules, applied rule identity, missing/corrupt sources, and a valid unavailable source applying `block`;
 - evaluator-specific outcome precedence and canonical retention of all safely detected reasons, including multiple unavailable Budget classifications and intrinsic evaluation versus submitted-evidence invalidity;
+- reason ties differing only in owner revision or typed detail, exact-content deduplication, fixed evaluator-stage ordinals, unknown-stage rejection, and identical ordering/primary reason under reason, detail-map insertion, and detection-order permutations;
 - every Budget-gating unavailable reason, including runner-not-qualified, maps to block; only the required policy's applied allow is positive gate evidence;
 - direct-budget deterministic-proof, qualified-runner, and observational-only admission, including a comparable observational analysis rejected from budget evaluation;
 - per-input OR composition of proof/runner obligations, preserved numeric-decision prohibitions, ineligibility reason retention, and Budget-added requirements after an eligible comparison;
-- Cross-Platform Report Profile `current-only` and `historical-with-stale-label` behavior, required/optional/missing/stale/ambiguous rows, and prohibition of stale-row statistics, ranking, budgets, capability, or Release use; and
+- Cross-Platform Report Profile `current-only` and `historical-with-stale-label` behavior, required/optional/missing/stale/ambiguous rows, and prohibition of stale-row statistics, ranking, budgets, capability, or Release use;
+- required and optional invalid report rows for malformed schema, digest mismatch, and ambiguous/contradictory binding; retained row identity/causes without admitted quantities, invalid aggregate precedence, preserved valid rows, and distinction from missing/unretrievable evidence; and
 - stable report ordering.
 
 ### Required runner-qualification fixtures
@@ -2916,7 +2951,7 @@ Runner fixtures cover:
 - each environment-change invalidation trigger;
 - sequence-window and time-window exact boundary and first-over behavior, run-bound reuse with original check references and unchanged validity, and rejection of single-run reuse;
 - shared advisory/gating numeric-decision sequences, failure/cancellation consumption, observed authority clock time, epoch/instance/class/environment binding, and no sequence-number reuse;
-- valid optional check failure/unavailability as diagnostic only, required check failure as decision-relevant, and malformed optional results as invalid;
+- valid optional check failure/unavailability as diagnostic only, no qualification invalidation from a valid optional threshold failure alone, required threshold failure as an invalidation trigger, and malformed optional results as invalid;
 - exactly one eligible preflight produced before advisory or gating qualified-runner samples;
 - preflight noise, thermal, power, background-load, clock, and memory-observer failure; and
 - retention of failed-preflight observations with `incomplete / runner-not-qualified` evaluation.
@@ -3002,7 +3037,7 @@ Each phase completion statement includes the applicable required fixture familie
 - Define revision-`"0"` Verification Record Envelopes and governing-specification revision, Evaluation Input Resolution, Verification Reasons, performance surfaces, Memory Observation Domains, Artifact Set Scopes, categories, metrics, Measurement Method Descriptors, Numeric Decision Eligibility, Execution State, Sample Aggregation Kinds and their metric matrix, exact quantities, duration conversion, Environment Observation, Runner Context, and projection validation.
 - Implement Statistic Selection, checked nearest-rank selection, exact difference/ratio, fixed-repetition/reset semantics, overflow, and exhaustive compatibility-rule primitives.
 - Implement Measurement Run Plans, full required/optional case inventories, and Measurement Run/Case Evaluations for measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, stale, and invalid attempts.
-- Define a compile-time-disabled span facade and bounded optional hierarchical timing recorder whose event-trace and aggregate modes preserve Span completion state; keep allocation observation a separately enabled capability.
+- Define a compile-time-disabled span facade and bounded optional hierarchical timing recorder whose event-trace and aggregate modes preserve Span completion state and preissued profiling execution identity; keep allocation observation a separately enabled capability.
 - Add the initial 015 Measurement Projection and projection fixtures.
 - Make 015 benchmark smoke results retain projection-ready raw samples, checksum, workload, reuse state, build, and environment data.
 - Add Instrumentation Isolation Evidence and feature-matrix tests for profiling-disabled ordinary builds and profiling-enabled semantic equivalence.
@@ -3010,18 +3045,22 @@ Each phase completion statement includes the applicable required fixture familie
 
 Phase 1 is complete when one planned 015 run can be validated, projected, and reported; every required and optional case attempt has the specified typed result; all applicable projection, aggregation, numeric, record-envelope, reason, and profiler fixtures pass; every partial observation is excluded from numeric statistics; and profiling can be enabled for diagnosis without changing any 015 semantic operation boundary, the ordinary build's logical result, or its required runtime path.
 
+Completion includes different expected semantic results across cases in one Evidence Set without weakening within-case checks, deterministic reason ordering through typed-detail ties, and exact profiler execution binding for successful and failed recording.
+
 ### Phase 2 — Logical equivalence foundation, baseline, comparison, and budget evaluation
 
 - First implement shared Logical Result observation forms, exact-equality/typed-variation relation specifications, and Logical Render Equivalence Evaluation. Verify them with synthetic checked observations before comparison work depends on them; no real Runtime is required for this foundation.
 - Implement immutable Baseline Selection.
-- Then implement all three revision-`"0"` numeric Comparison Profile modes, Paired Measurement Schedules, semantic relation binding, and their `comparable`, `not-comparable`, and unavailable results.
-- Implement Cross-Platform Report Profiles and Evaluations with exact row binding and descriptive-only output.
+- Then implement all three revision-`"0"` numeric Comparison Profile modes, Paired Measurement Schedules, semantic relation binding, complete scheduled acquisition, and their `comparable`, `not-comparable`, `unavailable`, and `invalid` results.
+- Implement Cross-Platform Report Profiles and Evaluations with exact row binding, explicit invalid-row results, and descriptive-only output.
 - Implement exact Performance Budget validation and direct/baseline-relative Budget Evaluation.
 - Implement Workflow Policy Evaluation separately from Budget Evaluation facts.
 - Implement Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions, per-run Preflight Evaluation, invalidation, and structured reasons.
 - Establish an advisory resolver baseline on a controlled runner without making it a revision-`"0"` normal-CI gate.
 
 Phase 2 is complete when shared equivalence fixtures cover exact equality, permitted/rejected typed variation, equivalent/not-equivalent outcomes, missing/stale/invalid inputs, relation revisions, and exact baseline/candidate binding; direct and relative budgets produce deterministic evaluations independent from their Workflow Policy Evaluations; qualified, expired, invalidated, and failed-preflight runner cases pass; any effective runner-qualified numeric decision MUST NOT proceed without an eligible preflight; observational-only comparisons can report analysis but cannot produce an evaluated budget; Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable equivalence-foundation, comparison, tolerance, overflow, baseline-lifecycle, runner, workflow-gate, and reporting fixtures pass.
+
+Completion also verifies that an interrupted paired schedule cannot yield a statistic even after meeting the minimum sample count; intrinsic invalid Comparison results preserve their causes through Budget and Workflow evaluation; an invalid required or optional report row invalidates the report without removing valid rows; and valid optional threshold failures alone do not invalidate runner qualification.
 
 ### Phase 3 — Common conformance campaign foundation
 
@@ -3058,14 +3097,14 @@ The implementation validates:
 
 - schema and version admission;
 - Verification Record Envelope identity, governing-specification/record-schema revision separation, integrity, and nested-record references;
-- generic top-level/nested Evaluation Input Resolution, evaluator-specific cause/outcome mapping, precedence, and canonical Verification Reason ordering/deduplication;
+- generic top-level/nested Evaluation Input Resolution, evaluator-specific cause/outcome mapping, precedence, and total Verification Reason ordering through owner-revision/typed-detail ties, fixed evaluator-stage order, and exact-content deduplication;
 - complete content-addressed suite closure;
 - owner authority preservation;
 - projection losslessness;
 - exact unit and numeric handling across Rust and JavaScript;
 - deterministic duration conversion and checked measurement overflow;
 - interval and overlap topology;
-- semantic checksum stability;
+- per-case semantic checksum stability, independently validated expected results across cases, and preservation of explicitly required cross-case relations;
 - Measurement Run Plan identity and full required/optional Measurement Case inventory completeness without admitting partial samples;
 - Optimization Barrier applicability, invocation preservation, and lifetime behavior independent from semantic checksum validation;
 - the metric/Sample Aggregation Kind matrix, fixed repetition/reset/state/cadence semantics, independent Determinism Proof generations, minimum admitted samples, and checked Statistic Selection behavior;
@@ -3077,11 +3116,11 @@ The implementation validates:
 - profiler recorder mode, span completion, aggregate total, self/inclusive-time, context, bound, exact truncation/recorder-failure state, and Profiler Observation Evaluation behavior;
 - allocation-profiler domain and self-observation disclosure;
 - rejection of profiler output presented directly as benchmark evidence;
-- exhaustive case/environment compatibility rules and comparable/not-comparable/unavailable input-resolution separation;
+- exhaustive case/environment compatibility rules and comparable/not-comparable/unavailable input-resolution separation, with intrinsic Comparison arithmetic failure represented separately as `invalid`;
 - exact difference/ratio direction, ppm bounds, and checked wide-intermediate arithmetic;
 - Evaluation Outcome versus Workflow Policy Evaluation separation;
 - Numeric Decision Eligibility for direct and baseline-relative decisions;
-- numeric comparison versus Cross-Platform Report Profile row-binding, evidence-age policy, and result-shape separation;
+- numeric comparison versus Cross-Platform Report Profile row-binding, evidence-age policy, invalid-row retention, and result-shape separation;
 - Qualification Check Specification, Runner Environment Snapshot, Runner Qualification Evidence, typed validity conditions, invalidation, and per-run preflight behavior;
 - stale-evidence admission and current-only versus labeled-historical report handling;
 - baseline and policy immutability;
@@ -3188,6 +3227,13 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-087 | Unify profiler recording data with its completion state and resolve missing observations explicitly | Accepted | Initialization failure and lost records must not fabricate complete recording data |
 | 026-088 | Add explicit workflow allow, exhaustive outcome rules, and report/Release references | Accepted | Only the required policy's applied allow proves that policy's gate condition |
 | 026-089 | Implement shared Logical Render Equivalence in Phase 2 before comparison integration | Accepted | Comparison modes must not depend on a foundation first implemented in a later phase |
+| 026-090 | Scope repeated semantic-observation equality to each Measurement Case within an Evidence Set | Accepted | Distinct fixtures may have different expected results without weakening within-case or explicit cross-case checks |
+| 026-091 | Restrict threshold-triggered runner invalidation to required checks | Accepted | Valid optional failures remain diagnostic; malformed optional results still invalidate evaluation |
+| 026-092 | Add explicit invalid Cross-Platform Report rows and retain their causes | Accepted | Corrupt or ambiguously bound inputs must be represented without fabricated quantities or dropped rows |
+| 026-093 | Add intrinsic Comparison invalidity and preserve it through Budget and Workflow evaluation | Accepted | Derived arithmetic failure is distinct from unavailable or corrupt measurement input |
+| 026-094 | Require full scheduled acquisition before any paired statistic in revision 0 | Accepted | A sample minimum does not authorize accepting an interrupted prefix or mixing retries |
+| 026-095 | Make Verification Reason ordering total through owner revision and typed detail | Accepted | Reason order and primary reason must not depend on detection, insertion, or thread execution order |
+| 026-096 | Bind every Profiler Observation to a preissued profiling execution identity | Accepted | Repeated invocations of the same build and fixture must not be confused with one another or with record identity |
 
 ## Deferred Follow-Up Notes
 
