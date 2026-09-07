@@ -1698,7 +1698,6 @@ OutputBufferState =
       reuse:
         fresh | reset-reused { reset policy identity }
     }
-}
 ```
 
 An owner Measurement Method Descriptor records any concrete JIT tier, warmup termination rule, garbage collector and configuration, heap-occupancy precondition, concurrent-GC behavior, and whether GC pauses are inside the measured interval. Different runtime-compilation or managed-heap states are not comparable unless a Comparison Profile explicitly permits and interprets the difference.
