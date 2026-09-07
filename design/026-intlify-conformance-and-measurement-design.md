@@ -2637,7 +2637,7 @@ RunnerQualificationEvidence {
   qualification validity evaluation {
     applicable validity condition
     observed numeric-decision run sequence or clock time when applicable
-    result: valid | expired | invalidated | unavailable | invalid
+    result: valid | not-yet-valid | expired | invalidated | unavailable | invalid
     reasons: ordered VerificationReason[]
   }
   result:
@@ -2698,11 +2698,31 @@ RunnerPreflightEvaluation {
 
 The required execution sequence is `MeasurementRunPlan -> RunnerQualificationEvidence -> RunnerPreflightEvaluation -> samples -> MeasurementEvidenceSet -> MeasurementRunEvaluation`. Every record in that sequence MUST reference the same Measurement Run identity; that identity is distinct from each record envelope's immutable record identity. Qualification and preflight use Runner Environment Snapshots so they do not depend cyclically on an Environment Observation that already contains final Runner Context. The later Measurement Evidence constructs its full Environment Observation from the snapshot plus the resulting qualified Runner Context and preflight reference.
 
-A qualification result aggregates check outcomes with precedence `invalid` over `incomplete` over `unqualified` over `qualified`; only `qualified` carries an admitted validity condition, while the validity evaluation retains the attempted condition and result. A preflight aggregates with precedence `invalid` over `incomplete` over `ineligible` over `eligible`. A malformed check result, including an optional one, is invalid. Inability to execute a required check is incomplete, a completed required threshold failure is unqualified or ineligible, and only all required passing checks can produce qualified or eligible. Valid optional failed or unavailable checks are diagnostic only. A check that affects the decision MUST be declared required; there is no optional-but-decision-relevant exception.
+A qualification result aggregates validity evaluation and check outcomes with precedence `invalid` over `incomplete` over `unqualified` over `qualified`; only `qualified` carries an admitted validity condition, while the validity evaluation retains the attempted condition and result. A preflight aggregates validity evaluation and check outcomes with precedence `invalid` over `incomplete` over `ineligible` over `eligible`. A malformed check result, including an optional one, is invalid. Inability to execute a required check is incomplete, a completed required threshold failure is unqualified or ineligible, and only all required passing checks can produce qualified or eligible. Valid optional failed or unavailable checks are diagnostic only. A check that affects the decision MUST be declared required; there is no optional-but-decision-relevant exception.
+
+Validity evaluation contributes to the final qualification and preflight results as follows:
+
+| Validity result | Qualification contribution   | Preflight contribution       |
+| --------------- | ---------------------------- | ---------------------------- |
+| `valid`         | Determined by check outcomes | Determined by check outcomes |
+| `not-yet-valid` | `unqualified`                | `ineligible`                 |
+| `expired`       | `unqualified`                | `ineligible`                 |
+| `invalidated`   | `unqualified`                | `ineligible`                 |
+| `unavailable`   | `incomplete`                 | `incomplete`                 |
+| `invalid`       | `invalid`                    | `invalid`                    |
+
+The evaluator MUST aggregate the mapped validity contribution and check outcomes with the precedence above, retaining all safely established reasons. `valid` does not establish qualification or eligibility by itself. If all required checks pass but validity is `expired`, the final result is `unqualified` or `ineligible`; a simultaneous inability to execute a required check raises it to `incomplete`, and a malformed input raises it to `invalid`. `not-yet-valid` identifies a run before the start of a well-formed window; it is distinct from expiration and from unavailable observations.
 
 `eligible` also requires that the qualification remains valid, the runner instance and Environment Class still match, required observers remain usable, thermal/power/background-load controls remain in policy, and every required preflight check passes. Any other outcome makes the run unavailable for a numeric decision that requires a qualified runner.
 
 Preflight occurs for every advisory or gating run whose effective requirements include runner qualification. Full requalification occurs when the typed validity condition ends or an invalidation trigger fires. `single-run` binds qualification to one Measurement Run and cannot be reused for another run. `sequence-window` uses a controller-issued qualification epoch and monotonic numeric-decision run sequence shared by advisory and gating runs. The controller issues the sequence when the Plan is created; failures and cancellations consume it, and numbers are not reused. `time-window` retains the evaluated run time from the named clock authority as well as `valid from` and `valid until`. Generic optional evidence creation time MUST NOT be used to prove any of these validity conditions.
+
+Window bounds and their boundary outcomes are fixed in revision `"0"`:
+
+- `time-window` includes `valid from` and excludes `valid until`: `valid from <= evaluated run time < valid until`. A well-formed window requires `valid from < valid until`. A time before `valid from` is `not-yet-valid`; a time equal to or later than `valid until` is `expired`.
+- `sequence-window` includes both the first and last numeric-decision run sequences: `first <= observed sequence <= last`. A well-formed window requires `first <= last`, so equal bounds admit a single sequence number. A sequence before `first` is `not-yet-valid`; one after `last` is `expired`.
+
+A time window with `valid from >= valid until`, or a sequence window with `first > last`, is malformed and MUST produce validity `invalid`, not `not-yet-valid` or `expired`. If an otherwise well-formed validity condition cannot be assessed because a required observation is unavailable, its validity result is `unavailable`. Passing a window predicate does not override runner/environment matching or independent invalidation triggers.
 
 For `sequence-window` and `time-window`, each planned Measurement Run receives its own immutable run-bound Runner Qualification Evidence that retains the shared qualification epoch, references original check results directly through Nested Record References, and evaluates the window for that run. Each original check result has a stable local identity. Reuse verifies the same runner instance, class, and applicable environment, does not extend the original validity condition, and does not reuse one top-level record with a different Measurement Run identity.
 
@@ -2949,7 +2969,10 @@ Runner fixtures cover:
 - exact qualification threshold and first-over failure;
 - valid and expired `single-run`, `sequence-window`, and `time-window` qualification;
 - each environment-change invalidation trigger;
-- sequence-window and time-window exact boundary and first-over behavior, run-bound reuse with original check references and unchanged validity, and rejection of single-run reuse;
+- sequence-window before-first `not-yet-valid`, inclusive first/last sequences, first-over `expired`, valid equal bounds, and invalid reversed bounds;
+- time-window before-start `not-yet-valid`, inclusive start, exclusive end with expiration at or after that end, and invalid equal or reversed bounds;
+- all six validity-result mappings to qualification/preflight, expiration despite all required checks passing, mixed validity/check outcome precedence, and retention of all safely established causes;
+- run-bound reuse with original check references and unchanged validity, and rejection of single-run reuse;
 - shared advisory/gating numeric-decision sequences, failure/cancellation consumption, observed authority clock time, epoch/instance/class/environment binding, and no sequence-number reuse;
 - valid optional check failure/unavailability as diagnostic only, no qualification invalidation from a valid optional threshold failure alone, required threshold failure as an invalidation trigger, and malformed optional results as invalid;
 - exactly one eligible preflight produced before advisory or gating qualified-runner samples;
@@ -3055,10 +3078,10 @@ Completion includes different expected semantic results across cases in one Evid
 - Implement Cross-Platform Report Profiles and Evaluations with exact row binding, explicit invalid-row results, and descriptive-only output.
 - Implement exact Performance Budget validation and direct/baseline-relative Budget Evaluation.
 - Implement Workflow Policy Evaluation separately from Budget Evaluation facts.
-- Implement Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions, per-run Preflight Evaluation, invalidation, and structured reasons.
+- Implement Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions with fixed window bounds and validity-to-result mapping including `not-yet-valid`, per-run Preflight Evaluation, invalidation, and structured reasons.
 - Establish an advisory resolver baseline on a controlled runner without making it a revision-`"0"` normal-CI gate.
 
-Phase 2 is complete when shared equivalence fixtures cover exact equality, permitted/rejected typed variation, equivalent/not-equivalent outcomes, missing/stale/invalid inputs, relation revisions, and exact baseline/candidate binding; direct and relative budgets produce deterministic evaluations independent from their Workflow Policy Evaluations; qualified, expired, invalidated, and failed-preflight runner cases pass; any effective runner-qualified numeric decision MUST NOT proceed without an eligible preflight; observational-only comparisons can report analysis but cannot produce an evaluated budget; Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable equivalence-foundation, comparison, tolerance, overflow, baseline-lifecycle, runner, workflow-gate, and reporting fixtures pass.
+Phase 2 is complete when shared equivalence fixtures cover exact equality, permitted/rejected typed variation, equivalent/not-equivalent outcomes, missing/stale/invalid inputs, relation revisions, and exact baseline/candidate binding; direct and relative budgets produce deterministic evaluations independent from their Workflow Policy Evaluations; runner cases cover all six validity outcomes, exact window endpoints, malformed bounds, validity/check aggregation with retained causes, and failed preflight; any effective runner-qualified numeric decision MUST NOT proceed without an eligible preflight; observational-only comparisons can report analysis but cannot produce an evaluated budget; Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable equivalence-foundation, comparison, tolerance, overflow, baseline-lifecycle, runner, workflow-gate, and reporting fixtures pass.
 
 Completion also verifies that an interrupted paired schedule cannot yield a statistic even after meeting the minimum sample count; intrinsic invalid Comparison results preserve their causes through Budget and Workflow evaluation; an invalid required or optional report row invalidates the report without removing valid rows; and valid optional threshold failures alone do not invalidate runner qualification.
 
@@ -3121,7 +3144,7 @@ The implementation validates:
 - Evaluation Outcome versus Workflow Policy Evaluation separation;
 - Numeric Decision Eligibility for direct and baseline-relative decisions;
 - numeric comparison versus Cross-Platform Report Profile row-binding, evidence-age policy, invalid-row retention, and result-shape separation;
-- Qualification Check Specification, Runner Environment Snapshot, Runner Qualification Evidence, typed validity conditions, invalidation, and per-run preflight behavior;
+- Qualification Check Specification, Runner Environment Snapshot, Runner Qualification Evidence, typed validity conditions with exact window endpoints and malformed-bound rejection, all six validity-to-result mappings and check-aggregation precedence, invalidation, and per-run preflight behavior;
 - stale-evidence admission and current-only versus labeled-historical report handling;
 - baseline and policy immutability;
 - budget arithmetic;
@@ -3234,6 +3257,8 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-094 | Require full scheduled acquisition before any paired statistic in revision 0 | Accepted | A sample minimum does not authorize accepting an interrupted prefix or mixing retries |
 | 026-095 | Make Verification Reason ordering total through owner revision and typed detail | Accepted | Reason order and primary reason must not depend on detection, insertion, or thread execution order |
 | 026-096 | Bind every Profiler Observation to a preissued profiling execution identity | Accepted | Repeated invocations of the same build and fixture must not be confused with one another or with record identity |
+| 026-097 | Include the start but exclude the end of time windows; include both bounds of sequence windows | Accepted | Exact-boundary fixtures need fixed outcomes, with empty time windows rejected and single-sequence windows admitted |
+| 026-098 | Map all validity outcomes explicitly into qualification and preflight results, including not-yet-valid | Accepted | Passing checks cannot admit a run outside its validity window; aggregation must preserve precedence and all safely established causes |
 
 ## Deferred Follow-Up Notes
 
