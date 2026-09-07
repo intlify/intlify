@@ -16,3 +16,7 @@ extend-exclude = [
   "tools/mf-parser-bench/results/**",
   "crates/ox_mf2_parser/fixtures/**"
 ]
+
+[default.extend-words]
+# Paired benchmark schedules use A/B ordering such as AB, BA, and ABBA.
+BA = "BA"
