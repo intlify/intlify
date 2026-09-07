@@ -35,6 +35,8 @@ The common projection is intentionally not one universal benchmark runner. Exist
 
 This separation lets the 015 minimum implementation record projection-ready measurements from its first implementation phase. Numeric performance gates can be admitted later without changing the resolver's semantic APIs, measurement points, or result meaning.
 
+026 supplies cross-cutting performance, conformance, and measurement requirements. Component and target designs and their implementation plans own adoption scope and delivery sequencing; this document does not introduce a separate 026 implementation schedule.
+
 ## Goals
 
 - Define one language-neutral model for conformance evidence, physical measurement evidence, comparisons, budgets, and their outcomes.
@@ -3018,7 +3020,7 @@ component suites
 Candidate internal components are:
 
 - a language-neutral evidence model and validator;
-- shared Logical Result observation forms and an exact/typed-variation equivalence evaluator available before comparison integration;
+- shared Logical Result observation forms and an exact/typed-variation equivalence evaluator used by equivalence-dependent comparisons and campaign relations;
 - common Evaluation Input Resolution and Verification Reason validators;
 - a registry of versioned owner Measurement Projections;
 - exact quantity/statistic helpers;
@@ -3039,79 +3041,100 @@ Instrumentation is test/benchmark-only or guarded behind non-default implementat
 
 The profiler recorder and benchmark sample collector remain separate components. They MAY share clocks or allocation-observer adapters, but a profiler report MUST NOT be passed directly to evidence admission as though it were an owner benchmark result.
 
-## Implementation Phasing
+## Adoption and Verification Requirements
 
-Implementation phases are dependency-ordered capability slices, not Runtime phases, Roadmap milestones, PR boundaries, or a promise that all targets land together.
+026 is a cross-cutting specification adopted by component, target, and product-workflow implementations. It does not define its own implementation phases, delivery order, or completion milestone. Owning designs and their implementation plans manage work breakdown, scheduling, and PR boundaries.
 
-A phase is complete only when:
+Each adopting plan identifies the 026 capabilities it uses, their applicable dependencies and fixture families, and the owner of any shared implementation work. Common validators, quantity/statistic helpers, profiler infrastructure, and evaluators can be introduced with the component that needs them and reused by other consumers; they do not require a separate 026 implementation project. Starting a component implementation does not require every 026 capability to be implemented.
 
-- every semantic record and validator introduced by that phase is implemented;
+The groups below are organized by use, not by implementation sequence. Dependencies are prerequisites for using a capability, not gates requiring unrelated groups or all target platforms to be completed.
+
+To claim support for an adopted capability, an implementation MUST satisfy the following verification requirements:
+
+- every semantic record and validator required by that capability is implemented or supplied by a verified shared implementation;
 - all applicable positive, negative, exact-boundary, and first-over fixtures pass;
 - incomplete, invalid, unsupported, or unavailable input MUST NOT be promoted to success;
 - structured output traces every result to its exact evidence and policy inputs;
 - repeated evaluation of identical inputs and policy is deterministic; and
-- every dependency on a later phase is explicitly deferred rather than represented by a guessed placeholder.
+- unavailable dependencies and deferred capabilities remain explicit rather than represented by guessed placeholders or unsupported success claims.
 
-Each phase completion statement includes the applicable required fixture families defined by this document, even when the statement does not repeat every fixture name.
+These requirements include all applicable required fixture families defined by this document, even when a group does not repeat every fixture name.
 
-### Phase 1 — Common measurement foundation and 015 adoption
+### Common measurement and component adoption
 
-- Define revision-`"0"` Verification Record Envelopes and governing-specification revision, Evaluation Input Resolution, Verification Reasons, performance surfaces, Memory Observation Domains, Artifact Set Scopes, categories, metrics, Measurement Method Descriptors, Numeric Decision Eligibility, Execution State, Sample Aggregation Kinds and their metric matrix, exact quantities, duration conversion, Environment Observation, Runner Context, and projection validation.
-- Implement Statistic Selection, checked nearest-rank selection, exact difference/ratio, fixed-repetition/reset semantics, overflow, and exhaustive compatibility-rule primitives.
-- Implement Measurement Run Plans, full required/optional case inventories, and Measurement Run/Case Evaluations for measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, stale, and invalid attempts.
-- Define a compile-time-disabled span facade and bounded optional hierarchical timing recorder whose event-trace and aggregate modes preserve Span completion state and preissued profiling execution identity; keep allocation observation a separately enabled capability.
-- Add the initial 015 Measurement Projection and projection fixtures.
-- Make 015 benchmark smoke results retain projection-ready raw samples, checksum, workload, reuse state, build, and environment data.
-- Add Instrumentation Isolation Evidence and feature-matrix tests for profiling-disabled ordinary builds and profiling-enabled semantic equivalence.
-- Gate integrity and deterministic behavior; keep physical values observational.
+This group applies when a component projects its checked owner results into common Measurement Evidence. It includes the initial 015 observational profile.
 
-Phase 1 is complete when one planned 015 run can be validated, projected, and reported; every required and optional case attempt has the specified typed result; all applicable projection, aggregation, numeric, record-envelope, reason, and profiler fixtures pass; every partial observation is excluded from numeric statistics; and profiling can be enabled for diagnosis without changing any 015 semantic operation boundary, the ordinary build's logical result, or its required runtime path.
+- Use the applicable revision-`"0"` Verification Record Envelopes and governing-specification revision, Evaluation Input Resolution, Verification Reasons, performance surfaces, Memory Observation Domains, Artifact Set Scopes, categories, metrics, Measurement Method Descriptors, Numeric Decision Eligibility, Execution State, Sample Aggregation Kinds and their metric matrix, exact quantities, duration conversion, Environment Observation, Runner Context, and projection validation.
+- Preserve fixed-repetition/reset semantics, checked overflow behavior, and the owner-defined semantic operation boundaries.
+- Bind Measurement Run Plans, full required/optional case inventories, and Measurement Run/Case Evaluations for measured, not-applicable, missing, skipped, unsupported, failed, projection-ineligible, stale, and invalid attempts.
+- Retain projection-ready raw samples, checksum, workload, reuse state, build, and environment data in the owner result. For 015, use the initial Measurement Projection and projection fixtures defined above.
+- Verify that a planned run can be validated, projected, and reported; every required and optional case attempt has its specified typed result; and every partial observation is excluded from numeric statistics.
+- Cover different expected semantic results across cases in one Evidence Set without weakening within-case checks, and deterministic reason ordering through typed-detail ties.
 
-Completion includes different expected semantic results across cases in one Evidence Set without weakening within-case checks, deterministic reason ordering through typed-detail ties, and exact profiler execution binding for successful and failed recording.
+The initial 015 adoption gates integrity and deterministic behavior while keeping physical values observational. Its implementation plan incorporates the applicable measurement requirements alongside the resolver work; it does not wait for unrelated comparison, Runtime, or target integrations.
 
-### Phase 2 — Logical equivalence foundation, baseline, comparison, and budget evaluation
+### Profiling diagnostics
 
-- First implement shared Logical Result observation forms, exact-equality/typed-variation relation specifications, and Logical Render Equivalence Evaluation. Verify them with synthetic checked observations before comparison work depends on them; no real Runtime is required for this foundation.
-- Implement immutable Baseline Selection.
-- Then implement all three revision-`"0"` numeric Comparison Profile modes, Paired Measurement Schedules, semantic relation binding, complete scheduled acquisition, and their `comparable`, `not-comparable`, `unavailable`, and `invalid` results.
-- Implement Cross-Platform Report Profiles and Evaluations with exact row binding, explicit invalid-row results, and descriptive-only output.
-- Implement exact Performance Budget validation and direct/baseline-relative Budget Evaluation.
-- Implement Workflow Policy Evaluation separately from Budget Evaluation facts.
-- Implement Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions with fixed window bounds and validity-to-result mapping including `not-yet-valid`, per-run Preflight Evaluation, invalidation, and structured reasons.
-- Establish an advisory resolver baseline on a controlled runner without making it a revision-`"0"` normal-CI gate.
+This group applies when an implementation provides 026 profiling diagnostics. The zero-required-runtime-work claim additionally requires the specified Instrumentation Isolation Evidence.
 
-Phase 2 is complete when shared equivalence fixtures cover exact equality, permitted/rejected typed variation, equivalent/not-equivalent outcomes, missing/stale/invalid inputs, relation revisions, and exact baseline/candidate binding; direct and relative budgets produce deterministic evaluations independent from their Workflow Policy Evaluations; runner cases cover all six validity outcomes, exact window endpoints, malformed bounds, validity/check aggregation with retained causes, and failed preflight; any effective runner-qualified numeric decision MUST NOT proceed without an eligible preflight; observational-only comparisons can report analysis but cannot produce an evaluated budget; Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome; and all applicable equivalence-foundation, comparison, tolerance, overflow, baseline-lifecycle, runner, workflow-gate, and reporting fixtures pass.
+- Use a bounded hierarchical timing recorder whose selected event-trace or aggregate mode preserves span completion state and preissued profiling execution identity. Keep allocation observation a separately enabled capability.
+- Verify the compile-time-disabled span facade and ordinary-build erasure when claiming zero required runtime work, with the applicable call-site coverage and feature-matrix tests.
+- Check profiling-enabled/disabled semantic equivalence and preserve owner measurement boundaries, ordinary-build logical results, and the required runtime path.
+- Cover exact execution binding for successful, truncated, and failed recording; hierarchy and context rules; incomplete spans; bounded truncation; recorder failure; and rejection of malformed observations.
 
-Completion also verifies that an interrupted paired schedule cannot yield a statistic even after meeting the minimum sample count; intrinsic invalid Comparison results preserve their causes through Budget and Workflow evaluation; an invalid required or optional report row invalidates the report without removing valid rows; and valid optional threshold failures alone do not invalidate runner qualification.
+For 015, enabling profiling for diagnosis does not redefine its semantic operations or benchmark intervals. Profiler observations remain diagnostic and separate from admitted benchmark samples.
 
-### Phase 3 — Common conformance campaign foundation
+### Comparison, budgets, and descriptive reporting
 
-- Integrate 017 artifact/version admission and 019 Finding projection.
-- Implement suite/campaign selection, complete case inventories and attempt records, Conformance Campaign Evaluation, tagged applicability, and Capability Evidence, reusing Phase 2's Logical Result and equivalence evaluator.
+This group applies to the selected numeric comparison, Budget Evaluation, Workflow Policy Evaluation, or Cross-Platform Report capability.
+
+- Numeric comparison and Budget Evaluation use the applicable verified Statistic Selection, checked nearest-rank selection, exact difference/ratio arithmetic, and exhaustive compatibility-rule primitives.
+- Baseline-relative use requires immutable Baseline Selection. A selected revision-`"0"` Comparison Profile mode requires its applicable Paired Measurement Schedule, semantic relation binding, complete scheduled acquisition, and `comparable`, `not-comparable`, `unavailable`, and `invalid` outcomes.
+- Keep exact Performance Budget validation and direct/baseline-relative Budget Evaluation separate from Workflow Policy Evaluation.
+- Descriptive reporting uses Cross-Platform Report Profiles and Evaluations with exact row binding, explicit invalid-row results, and descriptive-only output; it does not require Statistic Selection or numeric comparison.
+- Where effective requirements include runner qualification, use Runner Class Specification, Qualification Check Specification, Runner Environment Snapshot, Qualification Evidence, typed validity conditions with fixed window bounds and validity-to-result mapping including `not-yet-valid`, per-run Preflight Evaluation, invalidation, and structured reasons.
+
+An `equivalent-by` comparison requires verified shared Logical Result observation forms, exact-equality/typed-variation relation specifications, and Logical Render Equivalence Evaluation. Synthetic checked observations can validate this prerequisite without a real Runtime. Checks cover permitted/rejected typed variation, equivalent/not-equivalent outcomes, missing/stale/invalid inputs, relation revisions, and exact baseline/candidate binding. This is a functional dependency, not a prescribed implementation phase.
+
+Verification covers deterministic direct/relative budgets independent from Workflow Policy Evaluation; all six runner-validity outcomes, exact window endpoints, malformed bounds, validity/check aggregation with retained causes, and failed preflight; and every applicable equivalence-foundation, comparison, tolerance, overflow, baseline-lifecycle, runner, workflow-gate, and reporting fixture. An effective runner-qualified numeric decision MUST NOT proceed without an eligible preflight.
+
+Observational-only comparisons can report analysis but cannot produce an evaluated budget. Cross-Platform Report Evaluations produce stable current or explicitly stale rows without a Comparison Evaluation, ratio, ranking, or budget outcome. An interrupted paired schedule cannot yield a statistic even after meeting the minimum sample count. Intrinsic invalid Comparison results preserve their causes through Budget and Workflow evaluation; an invalid required or optional report row invalidates the report without removing valid rows; and valid optional threshold failures alone do not invalidate runner qualification.
+
+An advisory 015 resolver baseline, when adopted by its implementation plan, uses the applicable controlled-runner admission and does not itself introduce a revision-`"0"` normal-CI numeric gate.
+
+### Conformance campaigns
+
+This group applies when component-owned suite results are imported into a common Conformance Campaign or used to establish Capability Evidence.
+
+- Integrate applicable 017 artifact/version admission and 019 Finding projection.
+- Use suite/campaign selection, complete case inventories and attempt records, Conformance Campaign Evaluation, tagged applicability, and Capability Evidence.
 - Import component-owned suites without copying their semantic authority.
-- Add complete/incomplete/invalid campaign behavior.
+- Reuse the verified shared Logical Result and equivalence evaluator for the campaign's required logical relations.
+- Verify `pass`, `fail`, `incomplete`, and `invalid` campaign behavior, including selected inventory, case attempts, required relations, and aggregation.
 
-Phase 3 is complete when one multi-suite campaign proves capability coverage and Finding preservation with no implicit skip or directory-discovered authority; its selected inventory, case attempts, required relations, and aggregation fixtures pass; and campaign integration reuses the already verified Phase 2 equivalence foundation. Real Runtime/target relations and Browser/SSR hydration fixtures are added in Phases 4–5.
+Verification includes a multi-suite fixture proving capability coverage and Finding preservation without implicit skips or directory-discovered authority. Real Runtime/target relations and Browser/SSR hydration claims additionally require the applicable execution and target inputs described below; they are not prerequisites for unrelated component-suite checks.
 
-### Phase 4 — Execution, Web, and reference Runtime evidence
+### Execution, Web, and reference Runtime integration
 
-- Integrate 023–025 logical execution, target, and Release identities.
-- Add reference Runtime initialization, loading, preparation, cold/hot formatting, parts, cache, runtime-compilation/managed-heap states, artifact-size, delivery-topology, boundary, and memory profiles.
-- Compare core-only and host-materialized paths and retain transfer representation, boundary call, and object-materialization observations.
-- Establish Web baseline evidence for the I1 vertical slice.
-- Add Runtime-backed versus ahead-of-time equivalence and measurement reports.
+This group applies to execution and target integrations such as 027 and 028. Their checks depend on the applicable 023–025 logical execution, target, and Release identities.
 
-Phase 4 is complete when 027/028 can prove semantic conformance, establish at least one Runtime-backed versus ahead-of-time Logical Render Equivalence relation, and emit the I1 footprint baseline required by 000 without conflating owner phases or environment classes.
+- Cover the selected reference Runtime initialization, loading, preparation, cold/hot formatting, parts, cache, runtime-compilation/managed-heap state, artifact-size, delivery-topology, boundary, and memory profiles.
+- Compare core-only and host-materialized paths with their declared semantic relationship, retaining transfer representation, boundary-call, and object-materialization observations.
+- Produce Runtime-backed versus ahead-of-time equivalence and measurement reports for the applicable integration scope.
 
-### Phase 5 — Cross-target and Release evidence
+For the 027/028 Web integration, verification includes semantic conformance, at least one Runtime-backed versus ahead-of-time Logical Render Equivalence relation, and the I1 footprint baseline required by 000. Owner phases and Environment Classes remain distinct. The owning integration plans determine delivery sequencing; this requirement does not create a separate 026 milestone.
 
-- Add Browser/SSR hydration equivalence campaigns.
-- Add iOS, Android, and native runner/environment profiles.
-- Add paired target-path comparisons where physically meaningful.
-- Add target-owned budgets and group-level Release evidence.
-- Keep unrelated platforms descriptive rather than synthetically normalized.
+### Cross-target and Release verification
 
-Phase 5 is complete when Web, mobile, and native implementations can use the same evidence semantics; each claimed capability is covered; Browser/SSR hydration equality and mismatch are verified; a hydration mismatch MUST NOT satisfy required Release Evidence; unrelated target environments remain descriptive; and every numeric comparison is backed by an admitted Comparison Profile.
+This group applies to claimed cross-target, Browser/SSR hydration, or Release-evidence use. The applicable target and Release specifications supply the required inputs, runner/environment profiles, capability scope, and budget values.
+
+- Use the same common evidence semantics for the Web, mobile, and native targets in the declared scope, with coverage for every claimed capability.
+- Verify Browser/SSR hydration equality and mismatch where a hydration relation is required. A hydration mismatch MUST NOT satisfy required Release Evidence.
+- Apply the relevant iOS, Android, or native runner/environment profiles and target-owned budgets, including group-level Release evidence where required.
+- Use paired target-path comparisons only where physically meaningful and backed by an admitted Comparison Profile.
+- Keep unrelated target environments descriptive rather than synthetically normalized.
+
+Verification follows the declared capability and Release scope; it does not require all platform implementations to be delivered together.
 
 ## Validation Strategy
 
@@ -3212,7 +3235,7 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-050 | Represent stale evidence as an immutable historical record rejected through typed incomplete admission | Accepted | Expiry or dependency invalidation does not make the original record malformed or mutable |
 | 026-051 | Use typed artifact-generation or semantic-operation Determinism Proofs | Accepted | Artifact byte identity and semantic equality are different proof obligations and cannot be used interchangeably |
 | 026-052 | Classify every Measurement Method as deterministic-proof, qualified-runner, or observational-only for numeric decisions | Accepted | Metric names and direct budgets alone cannot determine environmental stability or gating eligibility |
-| 026-053 | Make phase completion depend on applicable positive, negative, boundary, reporting, runner, and equivalence fixtures | Accepted | A phase is not complete when only its happy path is implemented |
+| 026-053 | Require applicable positive, negative, boundary, reporting, runner, and equivalence fixtures for adopted capabilities | Accepted | Successful-path implementation alone does not establish capability support |
 | 026-054 | Preserve RFC 2119/8174 keywords beside every corresponding normative clause in the Japanese translation | Accepted | Readers must be able to audit normative force without inferring it from translation tone |
 | 026-055 | Use one Evaluation Input Resolution union for comparison, budget, and logical-equivalence inputs | Accepted | Missing input and malformed submitted input must not collapse into incompatibility |
 | 026-056 | Treat Runner Context as observed environment state and derive numeric-decision eligibility from the method and its proof predicates | Accepted | Deterministic evidence does not inherently require a stable runner, while qualified-runner evidence does |
@@ -3248,7 +3271,7 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-086 | Record qualification reuse, epoch, original checks, and numeric-decision sequence or clock observations | Accepted | Advisory and gating reuse must respect the same original validity conditions |
 | 026-087 | Unify profiler recording data with its completion state and resolve missing observations explicitly | Accepted | Initialization failure and lost records must not fabricate complete recording data |
 | 026-088 | Add explicit workflow allow, exhaustive outcome rules, and report/Release references | Accepted | Only the required policy's applied allow proves that policy's gate condition |
-| 026-089 | Implement shared Logical Render Equivalence in Phase 2 before comparison integration | Accepted | Comparison modes must not depend on a foundation first implemented in a later phase |
+| 026-089 | Require verified shared Logical Render Equivalence for equivalence-dependent comparisons and campaign relations | Accepted | Consumers depend on checked logical relations, not on a numbered implementation phase or a real Runtime |
 | 026-090 | Scope repeated semantic-observation equality to each Measurement Case within an Evidence Set | Accepted | Distinct fixtures may have different expected results without weakening within-case or explicit cross-case checks |
 | 026-091 | Restrict threshold-triggered runner invalidation to required checks | Accepted | Valid optional failures remain diagnostic; malformed optional results still invalidate evaluation |
 | 026-092 | Add explicit invalid Cross-Platform Report rows and retain their causes | Accepted | Corrupt or ambiguously bound inputs must be represented without fabricated quantities or dropped rows |
@@ -3258,6 +3281,7 @@ Shared vectors MUST cover exact quantity parsing, percentile selection, differen
 | 026-096 | Bind every Profiler Observation to a preissued profiling execution identity | Accepted | Repeated invocations of the same build and fixture must not be confused with one another or with record identity |
 | 026-097 | Include the start but exclude the end of time windows; include both bounds of sequence windows | Accepted | Exact-boundary fixtures need fixed outcomes, with empty time windows rejected and single-sequence windows admitted |
 | 026-098 | Map all validity outcomes explicitly into qualification and preflight results, including not-yet-valid | Accepted | Passing checks cannot admit a run outside its validity window; aggregation must preserve precedence and all safely established causes |
+| 026-099 | Organize 026 by adoption and verification requirements rather than independent implementation phases | Accepted | Owning designs and plans manage delivery while preserving shared prerequisites, fixture coverage, and reusable implementations |
 
 ## Deferred Follow-Up Notes
 
