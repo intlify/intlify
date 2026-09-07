@@ -14,6 +14,7 @@ use super::measure::MeasurementFailure;
 use super::observation::{Digest, Frame, Observation};
 use super::operation::{OutputFailure, Prepared};
 use super::quantity::{Quantity, Repetitions};
+use super::work::{LogicalWork, WorkFailure};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct CaptureCapacity {
@@ -131,6 +132,8 @@ pub(super) enum CaptureFailureCause {
     Output(OutputFailure),
     ObservationPanicked,
     SemanticObservationMismatch(Box<ObservationMismatch>),
+    LogicalWorkObservation(WorkFailure),
+    LogicalWorkMismatch(Box<WorkMismatch>),
     MeasurementOverflow,
 }
 
@@ -140,6 +143,12 @@ pub(super) enum CaptureFailureCause {
 pub(super) struct ObservationMismatch {
     pub(super) expected: Observation,
     pub(super) actual: Observation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct WorkMismatch {
+    pub(super) expected: LogicalWork,
+    pub(super) actual: LogicalWork,
 }
 
 /// Values here are diagnostic prefixes only, never admitted successful samples.
@@ -155,6 +164,9 @@ pub(super) struct CaptureFailure {
     pub(super) accumulated_nanoseconds: Quantity,
 }
 
+/// Lower-level sampler tests may isolate semantic observations from work facts.
+/// Ordinary collection uses `collect_with_work` and cannot skip work validation.
+#[cfg(test)]
 pub(super) fn collect(
     clock: &impl Clock,
     operation: &Prepared,
@@ -167,7 +179,24 @@ pub(super) fn collect(
         sampling,
         binding,
         expected,
-        || observe_invocation(clock, operation, expected),
+        || observe_invocation(clock, operation, expected, None),
+    )
+}
+
+pub(super) fn collect_with_work(
+    clock: &impl Clock,
+    operation: &Prepared,
+    expected: Observation,
+    expected_work: &LogicalWork,
+    sampling: Sampling,
+    binding: CaptureBinding,
+) -> Result<Capture, Box<CaptureFailure>> {
+    collect_inner(
+        operation.prerequisites_admitted(),
+        sampling,
+        binding,
+        expected,
+        || observe_invocation(clock, operation, expected, Some(expected_work)),
     )
 }
 
@@ -253,6 +282,7 @@ fn observe_invocation(
     clock: &impl Clock,
     operation: &Prepared,
     expected: Observation,
+    expected_work: Option<&LogicalWork>,
 ) -> Result<Quantity, CaptureFailureCause> {
     let measured = operation
         .once(clock)
@@ -264,6 +294,21 @@ fn observe_invocation(
         return Err(CaptureFailureCause::SemanticObservationMismatch(Box::new(
             ObservationMismatch { expected, actual },
         )));
+    }
+    if let Some(expected) = expected_work {
+        let actual = catch_unwind(AssertUnwindSafe(|| {
+            LogicalWork::observe(operation, &measured.output)
+        }))
+        .map_err(|_| CaptureFailureCause::ObservationPanicked)?
+        .map_err(CaptureFailureCause::LogicalWorkObservation)?;
+        if !actual.matches_expected(expected) {
+            return Err(CaptureFailureCause::LogicalWorkMismatch(Box::new(
+                WorkMismatch {
+                    expected: expected.clone(),
+                    actual,
+                },
+            )));
+        }
     }
     // Observation and destruction occur after the end marker; no estimated
     // checksum/teardown cost is subtracted from the recorded component duration.

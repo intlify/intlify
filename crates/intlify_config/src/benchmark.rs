@@ -7,6 +7,8 @@
 mod quantity;
 
 #[cfg(feature = "benchmark")]
+mod cases;
+#[cfg(feature = "benchmark")]
 mod clock;
 #[cfg(feature = "benchmark")]
 mod collect;
@@ -20,3 +22,5 @@ pub(crate) mod observation;
 mod operation;
 #[cfg(feature = "benchmark")]
 mod sample;
+#[cfg(feature = "benchmark")]
+mod work;

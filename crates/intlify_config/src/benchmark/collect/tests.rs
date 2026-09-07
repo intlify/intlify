@@ -47,7 +47,7 @@ fn binding(operation: Operation) -> CaptureBinding {
 // The synthetic interval has no physical value; check known fixture semantics
 // before deriving its observation. No measured sample supplies its own expected
 // checksum, and the fixed fake duration is never included in collected samples.
-fn fixture_observation(prepared: &Prepared) -> Observation {
+fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
     use crate::benchmark::operation::Output;
     let output = prepared.once(&ScriptedClock::nanos([0, 1])).unwrap().output;
     match &output {
@@ -67,7 +67,10 @@ fn fixture_observation(prepared: &Prepared) -> Observation {
         }
         _ => panic!("fixture preparation did not produce its known result"),
     }
-    output.observe().unwrap()
+    (
+        output.observe().unwrap(),
+        LogicalWork::observe(prepared, &output).unwrap(),
+    )
 }
 
 #[test]
@@ -75,9 +78,16 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
     let clock = MonotonicClock::acquire().unwrap();
     for prepared in operations() {
         let operation = prepared.operation();
-        let expected = fixture_observation(&prepared);
-        let collected =
-            collect_operation(&clock, &prepared, expected, sampling(), binding(operation)).unwrap();
+        let (expected, work) = fixture_observation(&prepared);
+        let collected = collect_operation(
+            &clock,
+            &prepared,
+            expected,
+            &work,
+            sampling(),
+            binding(operation),
+        )
+        .unwrap();
         assert_eq!(collected.capture.warmup_completed.get(), 1);
         assert_eq!(collected.capture.samples.len(), 2);
         for sample in &collected.capture.samples {
@@ -92,6 +102,7 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
                 operation,
                 clock.description(),
                 expected,
+                &work,
                 sampling(),
                 binding(operation)
             )
@@ -103,12 +114,13 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
 fn wrong_expected_semantics_returns_failure_not_a_serializable_success_prefix() {
     let clock = MonotonicClock::acquire().unwrap();
     let prepared = operations().into_iter().next().unwrap();
-    let mut expected = fixture_observation(&prepared);
+    let (mut expected, work) = fixture_observation(&prepared);
     expected.shared = id("deliberately-incorrect-fixture-observation");
     let error = collect_operation(
         &clock,
         &prepared,
         expected,
+        &work,
         sampling(),
         binding(prepared.operation()),
     )
@@ -129,13 +141,21 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     let clock = MonotonicClock::acquire().unwrap();
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
-    let expected = fixture_observation(&prepared);
-    let collected =
-        collect_operation(&clock, &prepared, expected, sampling(), binding(operation)).unwrap();
+    let (expected, work) = fixture_observation(&prepared);
+    let collected = collect_operation(
+        &clock,
+        &prepared,
+        expected,
+        &work,
+        sampling(),
+        binding(operation),
+    )
+    .unwrap();
     let other_case = collected.validate(
         Operation::AuthoringConstruction,
         clock.description(),
         expected,
+        &work,
         sampling(),
         binding(Operation::AuthoringConstruction),
     );
@@ -152,6 +172,7 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
             operation,
             clock.description(),
             expected,
+            &work,
             sampling(),
             other_run
         )
@@ -163,9 +184,16 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
     let clock = MonotonicClock::acquire().unwrap();
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
-    let expected = fixture_observation(&prepared);
-    let collected =
-        collect_operation(&clock, &prepared, expected, sampling(), binding(operation)).unwrap();
+    let (expected, work) = fixture_observation(&prepared);
+    let collected = collect_operation(
+        &clock,
+        &prepared,
+        expected,
+        &work,
+        sampling(),
+        binding(operation),
+    )
+    .unwrap();
     let original = serde_json::to_value(&collected).unwrap();
     for path in ["", "/capture", "/capture/samples/0"] {
         for key in original.pointer(path).unwrap().as_object().unwrap().keys() {
@@ -191,6 +219,7 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
         ("/capture/samples", json!([])),
         ("/capture/warmupCompleted", json!("0")),
         ("/descriptors/method/canonicalUnit", json!("millisecond")),
+        ("/logicalWork/facts/0/observation/value", json!("0")),
     ] {
         let mut tampered = original.clone();
         *tampered.pointer_mut(path).unwrap() = value;
@@ -200,6 +229,7 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
                 operation,
                 clock.description(),
                 expected,
+                &work,
                 sampling(),
                 binding(operation)
             )

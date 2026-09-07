@@ -15,6 +15,32 @@ use super::program::SchemaId;
 use super::{FragmentState, StructuralAnalysis, StructuralFailure};
 
 impl<Policy, Target> StructuralAnalysis<Policy, Target> {
+    pub(crate) fn benchmark_structural_units(&self) -> Option<u64> {
+        self.structural_units().or_else(|| {
+            self.issues.iter().find_map(|issue| match issue.reason {
+                StructuralFailure::StructuralWorkLimit { actual, .. } => Some(actual),
+                _ => None,
+            })
+        })
+    }
+
+    pub(crate) fn benchmark_retained_record_counts(&self) -> (u64, u64, u64) {
+        let admission = u64::try_from(self.issues.len()).expect("bounded admission issues");
+        let Some(evaluation) = &self.evaluation else {
+            // Actual retained record counts are zero. This does not assert that
+            // an unavailable schema traversal had zero applicable work units.
+            return (admission, 0, 0);
+        };
+        let fragments = u64::try_from(evaluation.fragments.len()).expect("bounded fragments");
+        let mut issues = 0_u64;
+        let mut pending: Vec<_> = evaluation.issues.iter().collect();
+        while let Some(issue) = pending.pop() {
+            issues = issues.checked_add(1).expect("addressable retained issues");
+            pending.extend(issue.alternatives.iter());
+        }
+        (admission, fragments, issues)
+    }
+
     pub(crate) fn benchmark_input_counts(&self) -> InputCounts {
         self.doc.counts()
     }

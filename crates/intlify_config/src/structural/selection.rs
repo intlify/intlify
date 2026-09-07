@@ -31,6 +31,14 @@ enum SelectorKind {
     InvalidType(InvalidSelectorType),
 }
 
+#[cfg(feature = "benchmark")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SelectorByteObservation {
+    NotApplicable,
+    Exact(u64),
+    AtLeast(u64),
+}
+
 /// No Debug/Serialize: a bounded string can still contain an arbitrary secret.
 /// The explicit bound belongs to the same bootstrap context as structural input.
 pub(crate) struct SelectorInput {
@@ -39,6 +47,20 @@ pub(crate) struct SelectorInput {
 }
 
 impl SelectorInput {
+    #[cfg(feature = "benchmark")]
+    pub(crate) fn benchmark_id_bytes(&self) -> SelectorByteObservation {
+        match &self.kind {
+            SelectorKind::Absent | SelectorKind::InvalidType(_) => {
+                SelectorByteObservation::NotApplicable
+            }
+            SelectorKind::String(value) => SelectorByteObservation::Exact(
+                u64::try_from(value.len()).expect("bounded selector length"),
+            ),
+            // Keep the admitted marker's witness, not the discarded raw length.
+            SelectorKind::OverLimitString => SelectorByteObservation::AtLeast(self.bound.get() + 1),
+        }
+    }
+
     pub(crate) const fn absent(bound: Bound) -> Self {
         Self {
             bound,
