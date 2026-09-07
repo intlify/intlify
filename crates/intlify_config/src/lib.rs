@@ -30,7 +30,15 @@ pub mod schema;
 #[allow(dead_code)]
 mod model;
 
+// Separate from the compatibility decoder: strict 015 entry is still internal.
+#[allow(dead_code)]
+mod input_limits;
+#[allow(dead_code)]
+mod materialize;
+
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod materialize_tests;
 #[cfg(test)]
 mod model_tests;

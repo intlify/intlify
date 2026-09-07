@@ -7,7 +7,8 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - The CLI uses the shared duplicate-aware JSON compatibility decoder, byte positions, Draft 7 generation, and deterministic schema formatting.
 - The private authoring model covers the complete **015-owned** field vocabulary: named declarations, locale inputs, coverage, policy slots, targets, groups, and delivery.
 - Policy and Target Profile reference representations remain generic type parameters. The only current instantiations use explicitly test-owned types.
-- Strict project-profile materialization, dependency-aware structural analysis, selection, locale resolution, and the 026 measurement path are not implemented yet.
+- Private strict file materialization validates UTF-8, JSON syntax, decoded duplicate keys, Unicode scalars, and Portable JSON Numbers while retaining raw bytes and key/value/container spans.
+- Dependency-aware structural analysis, selection, locale resolution, and the 026 measurement path are not implemented yet. The strict materializer is not connected to the authoring constructor or a product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
@@ -33,7 +34,15 @@ The model preserves authoring state rather than resolving semantics.
 
 Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences; duplicate locales, alias collisions, membership, and group partition checks are later semantic work. A malformed sibling prevents construction of the complete root. Retaining independently valid fragments after that failure belongs to the separate structural-analysis step.
 
-The legacy JSON helper is **not** the 015 strict materializer. Its serde-based numeric behavior is preserved for CLI compatibility; Portable JSON Number admission and complete source mapping require the new entry implementation.
+The legacy JSON helper is **not** the 015 strict materializer. Its serde-based numeric behavior is preserved for CLI compatibility. The new `materialize` module admits numbers as finite binary64 values within magnitude `9007199254740991`, normalizes negative zero, and keeps the unchanged raw token separately.
+
+## Strict file entry and ownership
+
+The file entry takes immutable shared bytes and explicit finite input limits. A bounded iterative lexer/parser first retains a raw token index, scoped duplicate-key indexes, and complete logical counts. String tokens carry decoded byte lengths without allocating their values; only member names needed for duplicate checks are decoded during parsing. Logical node/depth/entry/string limits are checked before a second pass constructs owned value nodes.
+
+The second pass consumes the admitted token index; it does not tokenize input again. Value nodes refer to children by indices, and the source map stores half-open UTF-8 byte coordinates. Deep input and failure cleanup therefore do not recurse through a Rust value tree. Returned documents retain their own values and share only immutable raw source. Parser scratch is invocation-owned and discarded; this step introduces no workspace, arena allocator, global cache, or claimed capacity reuse.
+
+Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection and the remaining profile/selector/structural-work limits belong to later admission work. Error observations never include rejected key or scalar text.
 
 ## Verification
 
@@ -51,7 +60,11 @@ Relevant traceability:
 | Coverage selector structure | `coverage_requires_a_mode_and_at_least_one_constrained_dimension` |
 | No partial authoring root | `an_invalid_sibling_never_constructs_a_partial_root` |
 | Semantic checks remain separate | `semantic_duplicates_and_references_are_not_silently_normalized` |
-| 026 storage ownership | Owned decoder results and repeated failure/success tests; no shared mutable workspace or cache |
+| Strict file entry / Portable JSON Number | `portable_numbers_use_binary64_values_and_preserve_raw_tokens`, strict syntax / UTF-8 / Unicode / duplicate tests |
+| Portable Source Span byte coordinates | `source_map_retains_key_value_container_and_eof_positions`, malformed UTF-8 byte-span tests |
+| 015-128 / logical input accounting | Resource-bound parsing, complete aggregate / exact / first-over / ordering tests |
+| 026 storage ownership | Owned result isolation, 20,000-level arrays and 10,000-level objects including failure cleanup; no shared mutable workspace or cache |
+| Parser / materializer agreement | Finite generated corpus, Unicode escape lengths, and single-byte mutation tests against the independent JSON decoder |
 
 From the repository root:
 
@@ -64,4 +77,4 @@ rtk proxy cargo test -p intlify_cli --test config --test schema
 rtk proxy vp run schema:cli:check
 ```
 
-No runtime benchmark, common Measurement Evidence, or 015/026 conformance claim is made by the authoring-model tests. Those checks activate with the corresponding resolver operations.
+No runtime benchmark, common Measurement Evidence, or full 015/026 conformance claim is made by these tests. PR 3 remains incomplete until structural admission, selection, and the applicable benchmark projection/report checks are implemented and verified.
