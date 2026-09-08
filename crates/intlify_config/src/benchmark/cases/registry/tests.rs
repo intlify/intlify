@@ -186,7 +186,7 @@ fn operation_and_preparation_bounds_are_bound_even_when_output_would_not_change(
     );
 
     let mut preparation = prepare(&declaration).unwrap();
-    preparation.input_limits.value.max_nodes = Bound::new(100_001).unwrap();
+    preparation.input_limits.as_mut().unwrap().value.max_nodes = Bound::new(100_001).unwrap();
     assert_eq!(
         registry.admit_candidate(preparation).err(),
         Some(FixtureFailure::InputContextMismatch)
@@ -290,7 +290,7 @@ fn cached_candidate_summaries_cannot_replace_reobservation_of_actual_output() {
     let mut candidate = prepare(&declaration).unwrap();
     candidate.output = Output::Entry(materialize_file(
         Arc::from(&b"null"[..]),
-        candidate.input_limits,
+        candidate.input_limits.unwrap(),
     ));
     // Leave the cached summaries equal to the pinned row deliberately.
     assert_eq!(

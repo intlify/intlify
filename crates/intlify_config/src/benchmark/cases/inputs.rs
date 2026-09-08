@@ -40,12 +40,16 @@ pub(in crate::benchmark) enum Recipe {
     InvalidSibling,
     InvalidResourceReference,
     DenseInvalid,
+    Locale(super::LocaleRecipe),
 }
 
 impl Recipe {
     /// No file reads, ambient config, arbitrary payloads, or network acquisition.
     /// All allocation scales are finite owner fixture constants outside intervals.
     pub(in crate::benchmark) fn source(self) -> Arc<[u8]> {
+        if let Self::Locale(recipe) = self {
+            return Arc::from(recipe.spelling().as_bytes());
+        }
         let raw: Option<&[u8]> = match self {
             Self::PortableMaximum => Some(b"9007199254740991"),
             Self::NegativeZero => Some(b"-0.0"),

@@ -11,12 +11,15 @@ use crate::input_limits::InputLimits;
 use crate::structural::StructuralLimits;
 
 use super::prepare::{selector_input, Candidate};
+use super::Recipe;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::benchmark) enum ContextFailure {
     Encoding,
     OperationMismatch,
     SelectorMismatch,
+    PreparationLimitsMismatch,
+    LocaleInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -28,7 +31,13 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         .json(&serde_json::to_value(&candidate.declaration).map_err(|_| ContextFailure::Encoding)?);
     // Pin the limits used before the measured operation too. These describe
     // fixture preparation, not additional work inside a component interval.
-    input_limits(&mut frame, candidate.input_limits);
+    match (&candidate.prepared, candidate.input_limits) {
+        (Prepared::Locale { .. }, None) => frame.text("no-file-preparation"),
+        (Prepared::Locale { .. }, Some(_)) | (_, None) => {
+            return Err(ContextFailure::PreparationLimitsMismatch)
+        }
+        (_, Some(limits)) => input_limits(&mut frame, limits),
+    }
     frame.text(candidate.prepared.operation().boundary());
     match &candidate.prepared {
         Prepared::Entry { source, limits } => {
@@ -60,6 +69,21 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             // The declaration already names the fixed non-secret selector
             // recipe. Never hash or disclose an arbitrary submitted string.
             frame.digest(analysis.benchmark_observation().identity());
+        }
+        Prepared::Locale { core, input } => {
+            let Recipe::Locale(recipe) = candidate.declaration.fixture else {
+                return Err(ContextFailure::LocaleInputMismatch);
+            };
+            if input.as_ref() != recipe.spelling() {
+                return Err(ContextFailure::LocaleInputMismatch);
+            }
+            // Only the known, non-secret fixture spelling is observed. Full
+            // actual table content and every binding/limit/reuse fact are pinned.
+            frame.text(recipe.spelling());
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(core))
+                    .map_err(|_| ContextFailure::Encoding)?,
+            );
         }
     }
     Ok(frame.finish())

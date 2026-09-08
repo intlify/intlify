@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the four active minimum boundaries.
+//! Finite owner case declarations for the five active minimum boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -29,6 +29,8 @@ pub(super) enum LimitKind {
     Profiles,
     ProfileIdBytes,
     StructuralUnits,
+    LocaleRawIdentifierBytes,
+    LocaleCanonicalIdentifierBytes,
 }
 
 impl LimitKind {
@@ -74,6 +76,74 @@ pub(super) enum ExpectedKind {
     Selected,
     SelectionRejected,
     SelectionUnavailable,
+    LocaleCanonicalized,
+    LocaleRejected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum LocaleRecipe {
+    Language,
+    Region,
+    Casing,
+    Alias,
+    CanonicalAlias,
+    ExtensionOrdering,
+    CanonicalExtensions,
+    ExpandingAlias,
+    CanonicalExpandedAlias,
+    InvalidLegacy,
+    InvalidValidity,
+    InvalidExtension,
+    InvalidPrivate,
+}
+
+impl LocaleRecipe {
+    const ALL: [Self; 13] = [
+        Self::Language,
+        Self::Region,
+        Self::Casing,
+        Self::Alias,
+        Self::CanonicalAlias,
+        Self::ExtensionOrdering,
+        Self::CanonicalExtensions,
+        Self::ExpandingAlias,
+        Self::CanonicalExpandedAlias,
+        Self::InvalidLegacy,
+        Self::InvalidValidity,
+        Self::InvalidExtension,
+        Self::InvalidPrivate,
+    ];
+
+    pub(super) const fn spelling(self) -> &'static str {
+        match self {
+            Self::Language => "en",
+            Self::Region => "en-US",
+            Self::Casing => "EN-us",
+            Self::Alias => "iw-IL",
+            Self::CanonicalAlias => "he-IL",
+            Self::ExtensionOrdering => "en-u-nu-latn-ca-gregory",
+            Self::CanonicalExtensions => "en-u-ca-gregory-nu-latn",
+            Self::ExpandingAlias => "und-u-ca-islamicc",
+            Self::CanonicalExpandedAlias => "und-u-ca-islamic-civil",
+            Self::InvalidLegacy => "en_US",
+            Self::InvalidValidity => "zz",
+            Self::InvalidExtension => "en-u-ca-madeup",
+            Self::InvalidPrivate => "en-x-brand",
+        }
+    }
+
+    /// Owner-declared expected result, not learned from a provider invocation.
+    pub(super) const fn canonical(self) -> Option<&'static str> {
+        match self {
+            Self::Language => Some("en"),
+            Self::Region | Self::Casing => Some("en-US"),
+            Self::Alias | Self::CanonicalAlias => Some("he-IL"),
+            Self::ExtensionOrdering | Self::CanonicalExtensions => Some("en-u-ca-gregory-nu-latn"),
+            Self::ExpandingAlias | Self::CanonicalExpandedAlias => Some("und-u-ca-islamic-civil"),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,7 +180,12 @@ pub(super) fn declarations() -> Vec<Declaration> {
     let mut cases = Vec::new();
     // Independently scale bytes, strings, declarations, and locale occurrences;
     // the latter are authoring input only, not canonicalized locale work.
-    for operation in Operation::ALL {
+    for operation in [
+        Operation::FileMaterialization,
+        Operation::StructuralAnalysis,
+        Operation::AuthoringConstruction,
+        Operation::ProfileSelection,
+    ] {
         for fixture in [
             Recipe::Minimal,
             Recipe::ReversedMembers,
@@ -124,6 +199,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::StructuralAnalysis => ExpectedKind::StructuralComplete,
                 Operation::AuthoringConstruction => ExpectedKind::AuthoringComplete,
                 Operation::ProfileSelection => ExpectedKind::Selected,
+                Operation::LocaleCanonicalization => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -271,8 +347,46 @@ pub(super) fn declarations() -> Vec<Declaration> {
             }
         }
     }
+    // Append the new operation without changing the existing 77 declarations.
+    for recipe in LocaleRecipe::ALL {
+        cases.push(declaration(
+            Operation::LocaleCanonicalization,
+            Recipe::Locale(recipe),
+            Selector::Absent,
+            if recipe.canonical().is_some() {
+                ExpectedKind::LocaleCanonicalized
+            } else {
+                ExpectedKind::LocaleRejected
+            },
+        ));
+    }
+    for (limit, recipe) in [
+        (LimitKind::LocaleRawIdentifierBytes, LocaleRecipe::Region),
+        (
+            LimitKind::LocaleCanonicalIdentifierBytes,
+            LocaleRecipe::ExpandingAlias,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::LocaleCanonicalization,
+                Recipe::Locale(recipe),
+                Selector::Absent,
+                if edge == LimitEdge::Exact {
+                    ExpectedKind::LocaleCanonicalized
+                } else {
+                    ExpectedKind::LocaleRejected
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
     cases
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod locale_tests;

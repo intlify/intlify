@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 4] {
+pub(crate) fn operations() -> [Prepared; 5] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -56,6 +56,17 @@ pub(crate) fn operations() -> [Prepared; 4] {
         Prepared::Select {
             analysis: analysis(&minimal_config()),
             selector: SelectorInput::absent(capacity().max_profile_id_bytes),
+        },
+        Prepared::Locale {
+            core: Arc::new(
+                crate::locale::Canonicalizer::bind(
+                    &crate::locale::fixtures::fixture_binding(),
+                    Some(crate::locale::fixtures::FixtureProvider::new()),
+                    Bound::new(128).unwrap(),
+                )
+                .unwrap(),
+            ),
+            input: Arc::from("EN-us"),
         },
     ]
 }
@@ -88,6 +99,10 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                     json!({"$testPolicy":"resource-limits"})
                 );
             }
+            Output::Locale(Ok(result)) => {
+                assert_eq!(result.locale().as_str(), "en-US");
+                assert_eq!(result.suggested_replacement(), Some("en-US"));
+            }
             _ => panic!("unexpected owner operation result"),
         }
         // Encoding requires no additional clock read and does not destroy output.
@@ -99,7 +114,7 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
 
 #[test]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn real_clock_runs_all_four_pairs_without_numeric_performance_gates() {
+fn real_clock_runs_all_active_pairs_without_numeric_performance_gates() {
     let clock = MonotonicClock::acquire().unwrap();
     for prepared in operations() {
         let first = prepared.once(&clock).unwrap();

@@ -1,13 +1,14 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Workload facts for the active input/structural/selection slice. These are not
-//! physical metrics, formal Resource Policy observations, or future locale/target
-//! work. Later phases must extend the owner workload profile explicitly.
+//! Versioned workload facts for input/structural/selection and the single-locale
+//! canonicalization slice. These are not physical metrics, formal Resource
+//! Policy observations, or whole-profile locale-policy / target work.
 
 use serde::{Deserialize, Serialize};
 
 use crate::input_limits::ValueCounts;
+use crate::locale::{CanonicalizationFailure, ProviderFailure, Spelling};
 use crate::materialize::{InputCounts, MaterializationError};
 use crate::structural::selection::SelectorByteObservation;
 
@@ -31,10 +32,15 @@ pub(super) enum WorkKind {
     RetainedSchemaFragments,
     RetainedSchemaIssuesIncludingAlternatives,
     SelectorIdBytes,
+    LocaleOccurrences,
+    RawLocaleIdentifierBytes,
+    CanonicalLocaleIdentifierBytes,
+    RetainedCanonicalLocaleValues,
+    LocaleCorrectionSuggestions,
 }
 
 impl WorkKind {
-    pub(super) const ALL: [Self; 14] = [
+    const INPUT: [Self; 14] = [
         Self::RawFileBytes,
         Self::ParserTokensVisited,
         Self::LogicalValueNodes,
@@ -51,13 +57,31 @@ impl WorkKind {
         Self::SelectorIdBytes,
     ];
 
+    const LOCALE: [Self; 5] = [
+        Self::LocaleOccurrences,
+        Self::RawLocaleIdentifierBytes,
+        Self::CanonicalLocaleIdentifierBytes,
+        Self::RetainedCanonicalLocaleValues,
+        Self::LocaleCorrectionSuggestions,
+    ];
+
+    pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
+        if operation == Operation::LocaleCanonicalization {
+            &Self::LOCALE
+        } else {
+            &Self::INPUT
+        }
+    }
+
     const fn unit(self) -> WorkUnit {
         match self {
             Self::RawFileBytes => WorkUnit::Octet,
             Self::TotalDecodedStringBytes
             | Self::MaximumDecodedStringBytes
             | Self::MaximumDeclaredProfileIdBytes
-            | Self::SelectorIdBytes => WorkUnit::Utf8Octet,
+            | Self::SelectorIdBytes
+            | Self::RawLocaleIdentifierBytes
+            | Self::CanonicalLocaleIdentifierBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes => WorkUnit::LogicalValue,
             Self::MaximumValueDepth => WorkUnit::ValueLevel,
@@ -67,6 +91,9 @@ impl WorkKind {
             Self::RetainedAdmissionIssues
             | Self::RetainedSchemaFragments
             | Self::RetainedSchemaIssuesIncludingAlternatives => WorkUnit::RetainedRecord,
+            Self::LocaleOccurrences => WorkUnit::LocaleOccurrence,
+            Self::RetainedCanonicalLocaleValues => WorkUnit::CanonicalLocaleValue,
+            Self::LocaleCorrectionSuggestions => WorkUnit::CorrectionSuggestion,
         }
     }
 }
@@ -83,6 +110,9 @@ enum WorkUnit {
     ProfileDeclaration,
     ApplicableKeywordSubject,
     RetainedRecord,
+    LocaleOccurrence,
+    CanonicalLocaleValue,
+    CorrectionSuggestion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,6 +129,7 @@ enum UnavailableWork {
     RawInputNotComplete,
     ProfileContainerNotAdmitted,
     SchemaPrerequisiteUnavailable,
+    LocaleNotCanonicalized,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,17 +171,23 @@ pub(super) struct LogicalWork {
 pub(super) enum WorkFailure {
     OperationMismatch,
     InvalidOrdinaryResult,
+    UnrepresentableCounter,
 }
 
 impl LogicalWork {
     pub(super) fn observe(prepared: &Prepared, output: &Output) -> Result<Self, WorkFailure> {
         let mut work = Self {
-            profile_identity: "intlify-config-minimum-input-work".into(),
+            profile_identity: if prepared.operation() == Operation::LocaleCanonicalization {
+                "intlify-config-minimum-single-locale-work"
+            } else {
+                "intlify-config-minimum-input-work"
+            }
+            .into(),
             profile_revision: "0".into(),
             operation: prepared.operation(),
-            facts: WorkKind::ALL
-                .into_iter()
-                .map(|kind| WorkFact {
+            facts: WorkKind::for_operation(prepared.operation())
+                .iter()
+                .map(|&kind| WorkFact {
                     kind,
                     unit: kind.unit(),
                     stage: WorkStage::NotApplicable,
@@ -195,6 +232,61 @@ impl LogicalWork {
             | (Prepared::Authoring(_), Output::Authoring(_))
             | (Prepared::Select { .. }, Output::Select(Err(_))) => {
                 return Err(WorkFailure::InvalidOrdinaryResult);
+            }
+            (Prepared::Locale { input, .. }, Output::Locale(result)) => {
+                work.set(
+                    WorkKind::LocaleOccurrences,
+                    WorkStage::PreparedInput,
+                    WorkValue::exact(1),
+                );
+                work.set(
+                    WorkKind::RawLocaleIdentifierBytes,
+                    WorkStage::PreparedInput,
+                    WorkValue::exact(
+                        u64::try_from(input.len())
+                            .map_err(|_| WorkFailure::UnrepresentableCounter)?,
+                    ),
+                );
+                let bytes = match result {
+                    Ok(value) => WorkValue::exact(
+                        u64::try_from(value.locale().as_str().len())
+                            .map_err(|_| WorkFailure::UnrepresentableCounter)?,
+                    ),
+                    Err(CanonicalizationFailure::ByteLimit {
+                        spelling: Spelling::Canonical,
+                        actual,
+                        ..
+                    }) => WorkValue::exact(*actual),
+                    Err(
+                        CanonicalizationFailure::ByteLimit {
+                            spelling: Spelling::Raw,
+                            ..
+                        }
+                        | CanonicalizationFailure::Provider(ProviderFailure::InvalidIdentifier),
+                    ) => WorkValue::Unavailable {
+                        reason: UnavailableWork::LocaleNotCanonicalized,
+                    },
+                    _ => return Err(WorkFailure::InvalidOrdinaryResult),
+                };
+                work.set(
+                    WorkKind::CanonicalLocaleIdentifierBytes,
+                    WorkStage::OperationResult,
+                    bytes,
+                );
+                work.set(
+                    WorkKind::RetainedCanonicalLocaleValues,
+                    WorkStage::OperationResult,
+                    WorkValue::exact(u64::from(result.is_ok())),
+                );
+                work.set(
+                    WorkKind::LocaleCorrectionSuggestions,
+                    WorkStage::OperationResult,
+                    WorkValue::exact(u64::from(
+                        result
+                            .as_ref()
+                            .is_ok_and(|value| value.suggested_replacement().is_some()),
+                    )),
+                );
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

@@ -8,7 +8,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::clock::ClockDescription;
-use super::operation::Operation;
+use super::locale::InputFacts;
+use super::operation::{Operation, Prepared};
 use super::quantity::Quantity;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,15 +196,15 @@ pub(super) struct Execution {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct OutputBuffer {
-    state: String,
-    ownership: String,
-    reuse: String,
+#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
+enum OutputBuffer {
+    NotApplicable {},
+    Applicable { ownership: String, reuse: String },
 }
 
 impl Execution {
-    pub(super) fn prepared_core() -> Self {
+    pub(super) fn prepared_core(operation: Operation) -> Self {
+        let locale = operation == Operation::LocaleCanonicalization;
         Self {
             // The harness invokes prepared calls in its existing process. Its
             // compiled core and immutable preparation are retained, not rebuilt
@@ -214,11 +215,14 @@ impl Execution {
             cache_state: "disabled".into(),
             runtime_compilation_state: "ahead-of-time".into(),
             managed_heap_state: "not-applicable".into(),
-            scratch_reuse_state: "fresh".into(),
-            output_buffer_state: OutputBuffer {
-                state: "applicable".into(),
-                ownership: "caller-owned".into(),
-                reuse: "fresh".into(),
+            scratch_reuse_state: if locale { "not-applicable" } else { "fresh" }.into(),
+            output_buffer_state: if locale {
+                OutputBuffer::NotApplicable {}
+            } else {
+                OutputBuffer::Applicable {
+                    ownership: "caller-owned".into(),
+                    reuse: "fresh".into(),
+                }
             },
         }
     }
@@ -231,6 +235,8 @@ pub(super) struct Descriptors {
     method: Method,
     clock_observation: ClockObservation,
     execution: Execution,
+    #[serde(deserialize_with = "Option::deserialize")]
+    locale_input: Option<InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -240,26 +246,33 @@ pub(super) enum DescriptorIssue {
     ClockBindingMismatch,
     InvalidClockObservation,
     ExecutionMismatch,
+    LocaleInputBindingMismatch,
 }
 
 impl Descriptors {
-    /// Only the actual provider acquisition is authority for resolution here.
-    /// Decoded record fields must never be used to manufacture that authority.
-    pub(super) fn for_acquisition(operation: Operation, clock: ClockDescription) -> Self {
+    /// Actual preparation and clock acquisition supply the validation inputs.
+    /// Decoded record fields must never manufacture their own expected binding.
+    pub(super) fn for_acquisition(prepared: &Prepared, clock: ClockDescription) -> Self {
+        let operation = prepared.operation();
         Self {
             boundary: Boundary::for_operation(operation),
             method: Method::monotonic_invocation(),
             clock_observation: clock.into(),
-            execution: Execution::prepared_core(),
+            execution: Execution::prepared_core(operation),
+            locale_input: match prepared {
+                Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
+                _ => None,
+            },
         }
     }
 
     pub(super) fn validate(
         &self,
-        operation: Operation,
+        prepared: &Prepared,
         acquisition: ClockDescription,
     ) -> Vec<DescriptorIssue> {
         let mut issues = Vec::new();
+        let operation = prepared.operation();
         if self.boundary != Boundary::for_operation(operation) {
             issues.push(DescriptorIssue::BoundaryMismatch);
         }
@@ -280,8 +293,15 @@ impl Descriptors {
         {
             issues.push(DescriptorIssue::InvalidClockObservation);
         }
-        if self.execution != Execution::prepared_core() {
+        if self.execution != Execution::prepared_core(operation) {
             issues.push(DescriptorIssue::ExecutionMismatch);
+        }
+        let expected_locale = match prepared {
+            Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
+            _ => None,
+        };
+        if self.locale_input != expected_locale {
+            issues.push(DescriptorIssue::LocaleInputBindingMismatch);
         }
         issues
     }

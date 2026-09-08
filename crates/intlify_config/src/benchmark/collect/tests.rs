@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use crate::benchmark::clock::tests::ScriptedClock;
 use crate::benchmark::observation::{Digest, Frame};
 use crate::benchmark::operation::tests::operations;
+use crate::benchmark::operation::Operation;
 use crate::benchmark::quantity::{Quantity, Repetitions};
 use crate::benchmark::sample::{CaptureCapacity, CaptureFailureCause, CaptureStage};
 use crate::fixtures::minimal_config;
@@ -65,6 +66,10 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
                 json!({"$testPolicy": "resource-limits"})
             );
         }
+        Output::Locale(Ok(result)) => {
+            assert_eq!(result.locale().as_str(), "en-US");
+            assert_eq!(result.suggested_replacement(), Some("en-US"));
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (
@@ -74,7 +79,7 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
 }
 
 #[test]
-fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
+fn all_active_real_pairs_produce_revalidated_serializable_owner_fragments() {
     let clock = MonotonicClock::acquire().unwrap();
     for prepared in operations() {
         let operation = prepared.operation();
@@ -100,7 +105,7 @@ fn all_four_real_pairs_produce_revalidated_serializable_owner_fragments() {
         assert_eq!(decoded, collected);
         assert!(decoded
             .validate_against(
-                operation,
+                &prepared,
                 clock.description(),
                 expected,
                 &work,
@@ -139,6 +144,45 @@ fn wrong_expected_semantics_returns_failure_not_a_serializable_success_prefix() 
 }
 
 #[test]
+fn unsupported_locale_input_cannot_be_recorded_as_a_successful_expected_failure() {
+    use crate::benchmark::operation::OutputFailure;
+    use std::sync::Arc;
+
+    let clock = MonotonicClock::acquire().unwrap();
+    let mut prepared = operations().into_iter().last().unwrap();
+    let (expected, work) = fixture_observation(&prepared);
+    let Prepared::Locale { input, .. } = &mut prepared else {
+        unreachable!()
+    };
+    *input = Arc::from("pt-BR"); // Valid locales outside the finite fixture are unsupported.
+    let output = prepared.once(&ScriptedClock::nanos([0, 1])).unwrap().output;
+    assert_eq!(
+        output.observe(),
+        Err(OutputFailure::LocaleProviderUnavailable)
+    );
+    assert!(LogicalWork::observe(&prepared, &output).is_err());
+    let error = collect_prepared(
+        &clock,
+        &prepared,
+        expected,
+        &work,
+        id("unsupported-locale-unit-test-context"),
+        sampling(),
+        binding(prepared.operation()),
+    )
+    .unwrap_err();
+    let CollectionFailure::Capture(failure) = error else {
+        panic!("expected capture failure")
+    };
+    assert_eq!(failure.stage, CaptureStage::Warmup);
+    assert_eq!(
+        failure.cause,
+        CaptureFailureCause::Output(OutputFailure::LocaleProviderUnavailable)
+    );
+    assert!(failure.complete_sample_prefix.is_empty());
+}
+
+#[test]
 fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     let clock = MonotonicClock::acquire().unwrap();
     let prepared = operations().into_iter().next().unwrap();
@@ -155,7 +199,7 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     )
     .unwrap();
     let other_case = collected.validate_against(
-        Operation::AuthoringConstruction,
+        &operations()[2],
         clock.description(),
         expected,
         &work,
@@ -172,7 +216,7 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
     other_run.run = id("another-run");
     assert!(!collected
         .validate_against(
-            operation,
+            &prepared,
             clock.description(),
             expected,
             &work,
@@ -230,7 +274,7 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
         let decoded: CollectedOperation = serde_json::from_value(tampered).unwrap();
         assert!(!decoded
             .validate_against(
-                operation,
+                &prepared,
                 clock.description(),
                 expected,
                 &work,
@@ -303,5 +347,45 @@ fn equal_outputs_and_work_cannot_rebind_a_record_to_different_input_bounds() {
     assert_eq!(
         collected.validate(&exact, clock.description(), sampling(), binding),
         vec![CollectionIssue::FixtureInputContext]
+    );
+}
+
+#[test]
+fn equal_locale_results_cannot_conceal_a_changed_provider_input_byte_bound() {
+    use crate::benchmark::cases::{declarations, LimitEdge, LimitKind, LocaleRecipe, Recipe};
+    let registry = crate::benchmark::cases::registry::Registry::load().unwrap();
+    let cases = declarations();
+    let base = registry
+        .prepare(
+            cases
+                .iter()
+                .find(|case| {
+                    case.fixture == Recipe::Locale(LocaleRecipe::Region) && case.limit.is_none()
+                })
+                .unwrap(),
+        )
+        .unwrap();
+    let exact = registry
+        .prepare(
+            cases
+                .iter()
+                .find(|case| {
+                    case.limit == Some((LimitKind::LocaleRawIdentifierBytes, LimitEdge::Exact))
+                })
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(base.expected(), exact.expected());
+    assert!(base.expected_work().matches_expected(exact.expected_work()));
+    assert_ne!(base.input_context(), exact.input_context());
+    let clock = MonotonicClock::acquire().unwrap();
+    let binding = binding(Operation::LocaleCanonicalization);
+    let collected = collect_operation(&clock, &base, sampling(), binding).unwrap();
+    assert_eq!(
+        collected.validate(&exact, clock.description(), sampling(), binding),
+        vec![
+            CollectionIssue::FixtureInputContext,
+            CollectionIssue::Descriptor(DescriptorIssue::LocaleInputBindingMismatch),
+        ]
     );
 }

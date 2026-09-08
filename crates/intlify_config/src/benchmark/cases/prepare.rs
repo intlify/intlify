@@ -8,6 +8,8 @@
 use std::sync::Arc;
 
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
+use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
@@ -15,11 +17,11 @@ use crate::structural::StructuralLimits;
 use super::super::observation::Observation;
 use super::super::operation::{Operation, Output, Prepared, Schema};
 use super::super::work::LogicalWork;
-use super::{declarations, Declaration, ExpectedKind, LimitEdge, LimitKind, Selector};
+use super::{declarations, Declaration, ExpectedKind, LimitEdge, LimitKind, Recipe, Selector};
 
 pub(in crate::benchmark) struct Candidate {
     pub(in crate::benchmark) declaration: Declaration,
-    pub(super) input_limits: InputLimits,
+    pub(super) input_limits: Option<InputLimits>,
     pub(in crate::benchmark) prepared: Prepared,
     pub(in crate::benchmark) output: Output,
     pub(in crate::benchmark) observation: Observation,
@@ -68,6 +70,9 @@ pub(in crate::benchmark) fn prepare(
     if !declarations().contains(declaration) {
         return Err(PreparationFailure::UndeclaredCase);
     }
+    if declaration.operation == Operation::LocaleCanonicalization {
+        return prepare_locale(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -97,6 +102,9 @@ pub(in crate::benchmark) fn prepare(
                 }
                 .ok_or(PreparationFailure::PrerequisiteUnavailable)?
             }
+            LimitKind::LocaleRawIdentifierBytes | LimitKind::LocaleCanonicalIdentifierBytes => {
+                return Err(PreparationFailure::UndeclaredCase);
+            }
         };
         let limit = match edge {
             LimitEdge::Exact => Some(actual),
@@ -115,6 +123,9 @@ pub(in crate::benchmark) fn prepare(
             LimitKind::Profiles => structural_limits.max_profiles = limit,
             LimitKind::ProfileIdBytes => structural_limits.max_profile_id_bytes = limit,
             LimitKind::StructuralUnits => structural_limits.max_structural_analysis_units = limit,
+            LimitKind::LocaleRawIdentifierBytes | LimitKind::LocaleCanonicalIdentifierBytes => {
+                unreachable!()
+            }
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -151,7 +162,7 @@ pub(in crate::benchmark) fn prepare(
                 let selector = selector_input(declaration.selector, bound);
                 Prepared::Select { analysis, selector }
             }
-            Operation::FileMaterialization => unreachable!(),
+            Operation::FileMaterialization | Operation::LocaleCanonicalization => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -167,6 +178,7 @@ pub(in crate::benchmark) fn prepare(
         } => Output::Structural(schema.analyze(Arc::clone(doc), *limits)),
         Prepared::Authoring(analysis) => Output::Authoring(analysis.construct()),
         Prepared::Select { analysis, selector } => Output::Select(analysis.select(selector)),
+        Prepared::Locale { .. } => unreachable!("locale preparation has no file stages"),
     };
     let kind = match &output {
         Output::Entry(Ok(_)) => ExpectedKind::Materialized,
@@ -194,7 +206,64 @@ pub(in crate::benchmark) fn prepare(
         LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
     Ok(Candidate {
         declaration: declaration.clone(),
-        input_limits,
+        input_limits: Some(input_limits),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+fn prepare_locale(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    let Recipe::Locale(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let limit = if let Some((kind, edge)) = declaration.limit {
+        let count = match kind {
+            LimitKind::LocaleRawIdentifierBytes => recipe.spelling().len(),
+            LimitKind::LocaleCanonicalIdentifierBytes => recipe
+                .canonical()
+                .ok_or(PreparationFailure::PrerequisiteUnavailable)?
+                .len(),
+            _ => return Err(PreparationFailure::UndeclaredCase),
+        };
+        let count =
+            u64::try_from(count).map_err(|_| PreparationFailure::UnrepresentableCounterEdge)?;
+        let count = match edge {
+            LimitEdge::Exact => Some(count),
+            LimitEdge::FirstOver => count.checked_sub(1),
+        };
+        count
+            .and_then(Bound::new)
+            .ok_or(PreparationFailure::UnrepresentableCounterEdge)?
+    } else {
+        Bound::new(128).expect("explicit finite locale fixture capacity")
+    };
+    let core = Arc::new(
+        Canonicalizer::bind(&fixture_binding(), Some(FixtureProvider::new()), limit)
+            .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+    );
+    let input: Arc<str> = Arc::from(recipe.spelling());
+    let output = Output::Locale(core.canonicalize(&input));
+    let kind = match &output {
+        Output::Locale(Ok(_)) => ExpectedKind::LocaleCanonicalized,
+        Output::Locale(Err(_)) => ExpectedKind::LocaleRejected,
+        _ => unreachable!(),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let prepared = Prepared::Locale { core, input };
+    // Unsupported coverage or provider malfunction cannot yield an expected
+    // successful capture, even if a caller supplies a matching failure value.
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
         prepared,
         output,
         observation,

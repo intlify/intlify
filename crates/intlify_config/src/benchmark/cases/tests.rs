@@ -24,7 +24,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 77);
+    assert_eq!(cases.len(), 94);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -42,7 +42,14 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     for operation in Operation::ALL {
         assert!(cases.iter().any(|case| case.operation == operation));
     }
-    for limit in LimitKind::ENTRY.into_iter().chain(LimitKind::STRUCTURAL) {
+    for limit in LimitKind::ENTRY
+        .into_iter()
+        .chain(LimitKind::STRUCTURAL)
+        .chain([
+            LimitKind::LocaleRawIdentifierBytes,
+            LimitKind::LocaleCanonicalIdentifierBytes,
+        ])
+    {
         for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
             assert_eq!(
                 cases
@@ -61,7 +68,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
     let oracle = jsonschema::draft7::new(schema.schema_body()).unwrap();
     for case in declarations()
         .into_iter()
-        .filter(|case| case.limit.is_none())
+        .filter(|case| case.limit.is_none() && case.operation != Operation::LocaleCanonicalization)
     {
         let source = case.fixture.source();
         let input = materialize_file(Arc::clone(&source), crate::materialize_tests::limits());
@@ -120,7 +127,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
                 };
                 assert_eq!(actual, case.expected_kind, "{case:?}");
             }
-            Operation::FileMaterialization => unreachable!(),
+            Operation::FileMaterialization | Operation::LocaleCanonicalization => unreachable!(),
         }
     }
 }
@@ -153,7 +160,7 @@ fn raw_scaling_and_member_permutation_preserve_logical_input_but_not_source_iden
 }
 
 #[test]
-fn every_finite_case_prepares_its_exact_result_and_work_including_twenty_limit_edges() {
+fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edges() {
     use crate::benchmark::clock::tests::ScriptedClock;
     use crate::benchmark::operation::Output;
     use crate::benchmark::work::LogicalWork;
@@ -195,12 +202,17 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_twenty_limit_e
                         };
                         assert_eq!(actual, limit.get() + 1);
                     }
+                    Output::Locale(Err(crate::locale::CanonicalizationFailure::ByteLimit {
+                        limit,
+                        actual,
+                        ..
+                    })) => assert_eq!(*actual, limit.get() + 1),
                     _ => panic!("first-over must fail its owning stage"),
                 }
             }
         }
     }
-    assert_eq!(edges, 20);
+    assert_eq!(edges, 24);
 }
 
 #[test]
@@ -274,5 +286,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 77);
+    assert_eq!(contexts.len(), 94);
 }

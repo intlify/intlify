@@ -51,7 +51,7 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
         assert_eq!(work.operation, prepared.operation());
         assert_eq!(
             work.facts.iter().map(|fact| fact.kind).collect::<Vec<_>>(),
-            WorkKind::ALL
+            WorkKind::for_operation(prepared.operation())
         );
         for fact in &work.facts {
             assert_eq!(fact.unit, fact.kind.unit());
@@ -64,7 +64,27 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
         } else {
             WorkStage::PreparedInput
         };
-        assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
+        if prepared.operation() == Operation::LocaleCanonicalization {
+            assert_eq!(work.facts.len(), 5);
+            assert_eq!(
+                fact(&work, WorkKind::LocaleOccurrences).stage,
+                WorkStage::PreparedInput
+            );
+            assert_eq!(
+                fact(&work, WorkKind::RawLocaleIdentifierBytes).stage,
+                WorkStage::PreparedInput
+            );
+            for kind in [
+                WorkKind::CanonicalLocaleIdentifierBytes,
+                WorkKind::RetainedCanonicalLocaleValues,
+                WorkKind::LocaleCorrectionSuggestions,
+            ] {
+                assert_eq!(fact(&work, kind).stage, WorkStage::OperationResult);
+            }
+        } else {
+            assert_eq!(work.facts.len(), 14);
+            assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
+        }
         if prepared.operation() == Operation::StructuralAnalysis {
             assert_eq!(
                 fact(&work, WorkKind::StructuralAnalysisUnits).stage,
@@ -77,6 +97,63 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 WorkStage::PreparedInput
             );
         }
+    }
+}
+
+#[test]
+fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_values() {
+    use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+    use crate::locale::Canonicalizer;
+
+    // Independent expected lengths include an alias whose canonical form grows.
+    for (input, bound, canonical_bytes, retained, suggestions) in [
+        ("en-US", 128, Some(5), 1, 0),
+        ("EN-us", 128, Some(5), 1, 1),
+        ("und-u-ca-islamicc", 128, Some(22), 1, 1),
+        ("en-US", 4, None, 0, 0),
+        ("und-u-ca-islamicc", 21, Some(22), 0, 0),
+        ("en_US", 128, None, 0, 0),
+    ] {
+        let core = Canonicalizer::bind(
+            &fixture_binding(),
+            Some(FixtureProvider::new()),
+            Bound::new(bound).unwrap(),
+        )
+        .unwrap();
+        let prepared = Prepared::Locale {
+            core: Arc::new(core),
+            input: Arc::from(input),
+        };
+        let work = observe(&prepared);
+        assert_eq!(
+            work.profile_identity,
+            "intlify-config-minimum-single-locale-work"
+        );
+        assert_eq!(
+            fact(&work, WorkKind::LocaleOccurrences).observation,
+            WorkValue::exact(1)
+        );
+        assert_eq!(
+            fact(&work, WorkKind::RawLocaleIdentifierBytes).observation,
+            WorkValue::exact(input.len() as u64)
+        );
+        assert_eq!(
+            fact(&work, WorkKind::CanonicalLocaleIdentifierBytes).observation,
+            canonical_bytes.map_or(
+                WorkValue::Unavailable {
+                    reason: UnavailableWork::LocaleNotCanonicalized
+                },
+                WorkValue::exact
+            )
+        );
+        assert_eq!(
+            fact(&work, WorkKind::RetainedCanonicalLocaleValues).observation,
+            WorkValue::exact(retained)
+        );
+        assert_eq!(
+            fact(&work, WorkKind::LocaleCorrectionSuggestions).observation,
+            WorkValue::exact(suggestions)
+        );
     }
 }
 

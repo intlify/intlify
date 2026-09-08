@@ -1,6 +1,6 @@
 {
   "identity": "intlify-config-minimum-fixture-expectations",
-  "revision": "0",
+  "revision": "1",
   "observationCodec": "intlify-config-minimum-observation/0",
   "rows": [
     {
@@ -1234,6 +1234,312 @@
         "entry": "2a546867fe5c2976c156e5a85e4794d931facf3e0be7b54cfe5b64dcbc1ca422"
       },
       "logicalWork": "6a678784061ce44fb6c1b8400409d9ee899f194b38078673e6cc40df5ba38ce5"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "language"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "6e80207a9ef55057b5baf6f0d31e9cae85daeb771c9fb6257560bb083aa6808b",
+      "result": {
+        "shared": "07a5e62af89ef16f8d1adb9fb9c4f09e63cd0340fd3c55a24d91a77c60775287",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "b07b686a2ed111db3bc5fec467aabac46795e0185a3fba689902094428d54924"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "region"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "39c44f2efca38f9c1214218e0d685e84253de9d69320347d16f9628b0881c8fe",
+      "result": {
+        "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "7c4426b2048cf1c4e4b931623ee237c0eaf0b709910dab42dbcda1f866bcddc9"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "casing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "80324c315579943569c4062be860a97786e74722a0d05e5b9f54241964bd13e4",
+      "result": {
+        "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
+        "entry": "6381d8de68d16d1e5c957fea4ed8d5848f78e11a8f9243686678a008ad02e9ef"
+      },
+      "logicalWork": "c916b0900e93745a639e6710bbd2069a82e15c560a2e3d1385ed36971ac1baf0"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "43815a95bb782241c24dd94d060ececa09e084a0e79c53977b40cfaf393a12bb",
+      "result": {
+        "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
+        "entry": "37b5ad33da489146ca924ffd81668bb30eaa29286211b090ac443cb6e27a5fff"
+      },
+      "logicalWork": "c916b0900e93745a639e6710bbd2069a82e15c560a2e3d1385ed36971ac1baf0"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "canonical-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "9056eedb58bcea2ae0cb2e44f793f634fe4e9bede4219cd2136502f252506b7e",
+      "result": {
+        "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "7c4426b2048cf1c4e4b931623ee237c0eaf0b709910dab42dbcda1f866bcddc9"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "extension-ordering"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "b30dd1fe006591af91425e6558fa3864468ef74b5d4bfe108b0e49c940ce3817",
+      "result": {
+        "shared": "1694a6f2715353d9d2cb18d1e131f3cc14e5206c9ebd8d3119f076bb8f95fedc",
+        "entry": "9d702af8d3fbb6032a01b6e4783ece7e7706553a27139f27df624a5c4a6eb7c1"
+      },
+      "logicalWork": "9cc4d7929a2e1ec03eb661f9a888d8815ce31c2e0194457089c2688b794ef5f5"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "canonical-extensions"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "aa4f9f3890b02b84dcb937f57bc86e3e1460d1fa3ecf01a998fabb22217cc876",
+      "result": {
+        "shared": "1694a6f2715353d9d2cb18d1e131f3cc14e5206c9ebd8d3119f076bb8f95fedc",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "f6f4aba338e326ba0d9554b2fe45ec5338f3a3c9a6eaf0c39cf13f220af98c44"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "700dc986dd2f2fe32460d5a15f095c653e499c1b43bf7347bfa2658a6e2a674f",
+      "result": {
+        "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
+        "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
+      },
+      "logicalWork": "449e7423fc686e2a835b3dad017df4bcbb1c7704c402008ba58f21931a0e7c9b"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "canonical-expanded-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "d44dfb3f91e9ef1ecc597010a2a09aef580f48a5607f2fd075b6b36d7be2de7f",
+      "result": {
+        "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "45983dc2714857f0319a2a37be284d780e9683249cd73846a462d01aa7c42ce3"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "invalid-legacy"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "b9c13de85257a76ede999577640521d265726f0d483fcf6ac79f0045ae1c9e0b",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "9aa1ef29cafae650eba0a24ca284edfd509d1a6fd9debfe33106bed35a1d9314"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "invalid-validity"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "747a5010556aeac22b05390bf02acb07333f114e294890c2e0791e92bbffcc0d",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "c4b7951b8ce67b3c75f317717fed0665c5e03af6629e4c6674c50b0b41e97aa7"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "invalid-extension"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "0d2152ec57326ed3371bdd93313e97ab293f89b070a4dcd725db488087d47c92",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "c17f1be977410ff255e5f07121a275546871a30e2fe648d61bfac8b4c2af40ff"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "invalid-private"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "609dd6a5fc8ab805c24bc6e7f09b980c9f6ca5eda6307ada49b51d39d6358994",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "4c172641355fadd4bee3ddd69c1d7cb64877571aa5bc0ea6cdcd90a13cd80ead"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "region"
+        },
+        "fixtureRevision": "0",
+        "limit": ["locale-raw-identifier-bytes", "exact"],
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "977fd822c0320394320fd1f0464525e48f958a7d6dad78f0f06a4c11560fd3f4",
+      "result": {
+        "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "7c4426b2048cf1c4e4b931623ee237c0eaf0b709910dab42dbcda1f866bcddc9"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "region"
+        },
+        "fixtureRevision": "0",
+        "limit": ["locale-raw-identifier-bytes", "first-over"],
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "ae934436eae226f7559f19590fc468673fd1fde0d5252aee682c63b05428ae75",
+      "result": {
+        "shared": "d03cd3f5eca10b33faeaa1bc863cb4f37942fada0d92cfe1ea60de0eacaf6d92",
+        "entry": null
+      },
+      "logicalWork": "9aa1ef29cafae650eba0a24ca284edfd509d1a6fd9debfe33106bed35a1d9314"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": ["locale-canonical-identifier-bytes", "exact"],
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "a3f056a30ccb1a7ef2f2fe83cf939f2a8de4051251e33f9d595576091768c3a4",
+      "result": {
+        "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
+        "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
+      },
+      "logicalWork": "449e7423fc686e2a835b3dad017df4bcbb1c7704c402008ba58f21931a0e7c9b"
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "locale": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": ["locale-canonical-identifier-bytes", "first-over"],
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "f821c3b0bd47406e9af97e6348e269dd26d4d0ca1d9c3ed1d82536f53a901015",
+      "result": {
+        "shared": "07dad779dd6dec9fd5352ef6c5017f4d1d43d62a6dd89e6b3a70342ad92862ef",
+        "entry": null
+      },
+      "logicalWork": "bac0d251f56698d7ae1ae3adfe90cf37770defa703aa4b564ded931daa6a6a96"
     }
   ]
 }

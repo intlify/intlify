@@ -126,3 +126,22 @@ impl Provider for FixtureProvider {
         }
     }
 }
+
+#[cfg(feature = "benchmark")]
+impl super::Canonicalizer<FixtureProvider> {
+    /// Complete immutable fixture content for untimed observation. Symbolic
+    /// binding pins alone must not stand in for the table actually used.
+    pub(crate) fn fixture_rows(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&'static str, Option<&str>)> {
+        self.provider.rows.iter().map(|(input, answer)| {
+            (
+                *input,
+                match answer {
+                    Answer::Canonical(value) => Some(value.as_ref()),
+                    Answer::Invalid => None,
+                },
+            )
+        })
+    }
+}

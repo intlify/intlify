@@ -20,6 +20,7 @@ use crate::structural::{
 };
 
 use super::clock::Clock;
+use super::locale;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 
@@ -33,20 +34,23 @@ pub(super) enum Operation {
     StructuralAnalysis,
     AuthoringConstruction,
     ProfileSelection,
+    LocaleCanonicalization,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 4] = [
+    pub(super) const ALL: [Self; 5] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
         Self::ProfileSelection,
+        Self::LocaleCanonicalization,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
             Self::FileMaterialization => "profile_entry_materialize",
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
+            Self::LocaleCanonicalization => "profile_locale_resolve",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -55,6 +59,7 @@ impl Operation {
             Self::StructuralAnalysis => "structural_analysis",
             Self::AuthoringConstruction => "authoring_model_construction",
             Self::ProfileSelection => "named_profile_selection",
+            Self::LocaleCanonicalization => "locale_canonicalization",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -63,6 +68,7 @@ impl Operation {
             Self::StructuralAnalysis => "minimum-structural-analysis/0",
             Self::AuthoringConstruction => "minimum-authoring-construction/0",
             Self::ProfileSelection => "minimum-provisional-selection/0",
+            Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
         }
     }
 }
@@ -82,6 +88,10 @@ pub(super) enum Prepared {
         analysis: Analysis,
         selector: SelectorInput,
     },
+    Locale {
+        core: Arc<locale::Core>,
+        input: Arc<str>,
+    },
 }
 
 pub(super) enum Output {
@@ -89,6 +99,7 @@ pub(super) enum Output {
     Structural(Result<Analysis, AdmissionInvariant>),
     Authoring(Result<Option<FixtureConfig>, AdmissionInvariant>),
     Select(Result<Selection<FixturePolicyReference>, SelectionInvariant>),
+    Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +108,8 @@ pub(super) enum OutputFailure {
     SelectionInvariant,
     MissingCompleteRoot,
     ObservationEncoding,
+    LocaleProviderUnavailable,
+    LocaleProviderInvariant,
 }
 
 impl Prepared {
@@ -106,6 +119,7 @@ impl Prepared {
             Self::Structural { .. } => Operation::StructuralAnalysis,
             Self::Authoring(_) => Operation::AuthoringConstruction,
             Self::Select { .. } => Operation::ProfileSelection,
+            Self::Locale { .. } => Operation::LocaleCanonicalization,
         }
     }
 
@@ -153,6 +167,15 @@ impl Prepared {
                     output: Output::Select(measured.output),
                 })
             }
+            Self::Locale { core, input } => {
+                let measured = measure(clock, (core.as_ref(), input.as_ref()), |(core, input)| {
+                    core.canonicalize(input)
+                })?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::Locale(measured.output),
+                })
+            }
         }
     }
 
@@ -186,6 +209,7 @@ impl Output {
             }
             Self::Select(Err(_)) => Err(OutputFailure::SelectionInvariant),
             Self::Select(Ok(selection)) => observe_selection(selection),
+            Self::Locale(result) => locale::observe(result),
         }
     }
 }

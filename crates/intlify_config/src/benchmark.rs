@@ -17,6 +17,8 @@ mod descriptor;
 #[cfg(feature = "benchmark")]
 mod inventory;
 #[cfg(feature = "benchmark")]
+mod locale;
+#[cfg(feature = "benchmark")]
 mod measure;
 #[cfg(feature = "benchmark")]
 pub(crate) mod observation;

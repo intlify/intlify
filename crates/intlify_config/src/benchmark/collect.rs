@@ -12,7 +12,7 @@ use super::cases::registry::AdmittedFixture;
 use super::clock::{ClockDescription, MonotonicClock};
 use super::descriptor::{DescriptorIssue, Descriptors};
 use super::observation::{Digest, Observation};
-use super::operation::{Operation, Prepared};
+use super::operation::Prepared;
 use super::sample::{
     collect_with_work, validate_capture, Capture, CaptureBinding, CaptureFailure,
     SampleIntegrityIssue, Sampling,
@@ -75,9 +75,8 @@ fn collect_prepared(
     sampling: Sampling,
     binding: CaptureBinding,
 ) -> Result<CollectedOperation, CollectionFailure> {
-    let operation = prepared.operation();
-    let descriptors = Descriptors::for_acquisition(operation, clock.description());
-    let issues = descriptors.validate(operation, clock.description());
+    let descriptors = Descriptors::for_acquisition(prepared, clock.description());
+    let issues = descriptors.validate(prepared, clock.description());
     if !issues.is_empty() {
         return Err(CollectionFailure::Descriptor(issues));
     }
@@ -90,7 +89,7 @@ fn collect_prepared(
         capture,
     };
     let issues = collected.validate_against(
-        operation,
+        prepared,
         clock.description(),
         expected,
         expected_work,
@@ -116,7 +115,7 @@ impl CollectedOperation {
             issues.push(CollectionIssue::FixtureInputContext);
         }
         issues.extend(self.validate_against(
-            fixture.prepared().operation(),
+            fixture.prepared(),
             acquisition,
             fixture.expected(),
             fixture.expected_work(),
@@ -131,7 +130,7 @@ impl CollectedOperation {
     /// run/case identities, or the clock resolution used to validate itself.
     fn validate_against(
         &self,
-        operation: Operation,
+        prepared: &Prepared,
         acquisition: ClockDescription,
         expected: Observation,
         expected_work: &LogicalWork,
@@ -139,7 +138,7 @@ impl CollectedOperation {
         binding: CaptureBinding,
     ) -> Vec<CollectionIssue> {
         self.descriptors
-            .validate(operation, acquisition)
+            .validate(prepared, acquisition)
             .into_iter()
             .map(CollectionIssue::Descriptor)
             .chain(
