@@ -27,9 +27,13 @@ pub(crate) mod observation;
 #[cfg(feature = "benchmark")]
 mod operation;
 #[cfg(feature = "benchmark")]
+mod profile;
+#[cfg(feature = "benchmark")]
 mod sample;
 #[cfg(feature = "benchmark")]
 mod work;
 
 #[cfg(all(test, feature = "benchmark"))]
 mod inventory_tests;
+#[cfg(all(test, feature = "benchmark"))]
+mod profile_tests;

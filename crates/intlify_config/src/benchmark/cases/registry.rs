@@ -20,6 +20,14 @@ const REVISION: &str = "2";
 const OBSERVATION_CODEC: &str = "intlify-config-minimum-observation/0";
 const EXPECTATIONS: &str = include_str!("expectations-v2.json");
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(in crate::benchmark) struct RegistryBinding {
+    identity: String,
+    revision: String,
+    observation_codec: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Document {
@@ -61,6 +69,7 @@ pub(in crate::benchmark) enum FixtureFailure {
 /// No Deserialize or external registry override: only the compiled owner
 /// expectations may authorize fixtures used by ordinary benchmark collection.
 pub(in crate::benchmark) struct Registry {
+    binding: RegistryBinding,
     rows: Vec<Row>,
 }
 
@@ -104,8 +113,21 @@ impl Registry {
             return Err(RegistryFailure::Inventory);
         }
         Ok(Self {
+            binding: RegistryBinding {
+                identity: document.identity,
+                revision: document.revision,
+                observation_codec: document.observation_codec,
+            },
             rows: document.rows,
         })
+    }
+
+    pub(in crate::benchmark) fn binding(&self) -> &RegistryBinding {
+        &self.binding
+    }
+
+    pub(in crate::benchmark) fn declarations(&self) -> impl Iterator<Item = &Declaration> {
+        self.rows.iter().map(|row| &row.declaration)
     }
 
     pub(in crate::benchmark) fn prepare(
