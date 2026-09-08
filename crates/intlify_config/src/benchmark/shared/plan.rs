@@ -36,7 +36,7 @@ pub(in crate::benchmark) fn case_schema() -> Result<serde_json::Value, serde_jso
 macro_rules! literal_type {
     ($name:ident, $value:literal) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-        enum $name {
+        pub(super) enum $name {
             #[serde(rename = $value)]
             Value,
         }
@@ -62,9 +62,9 @@ literal_type!(NativeBuildDomain, "build-observation");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Subject {
-    kind: SubjectKind,
-    identity: Token,
+pub(in crate::benchmark) struct Subject {
+    pub(super) kind: SubjectKind,
+    pub(super) identity: Token,
 }
 
 impl Subject {
@@ -127,6 +127,9 @@ struct CaseIdentityInput<'a> {
 }
 
 impl CaseProjection {
+    pub(super) fn phase_cost(&self) -> (&str, &str) {
+        (&self.owner_phase, &self.owner_cost)
+    }
     fn all(registry: &Registry, profile_revision: &str) -> Result<Vec<Self>, PlanFailure> {
         registry
             .expectations()
@@ -184,35 +187,35 @@ impl CaseProjection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct InventoryEntry {
-    local_record_identity: Token,
-    case_identity: CaseIdentity,
-    requirement: Required,
+pub(in crate::benchmark) struct InventoryEntry {
+    pub(super) local_record_identity: Token,
+    pub(super) case_identity: CaseIdentity,
+    pub(super) requirement: Required,
 }
 
 /// This is a content binding to the actual native Build Observation, not a
 /// common record ID, complete compiler attestation, or executable digest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct BuildIdentity {
-    owner_schema: NativeBuildSchema,
-    algorithm: NativeAlgorithm,
-    framing: NativeFraming,
-    domain: NativeBuildDomain,
-    checksum: NativeDigest,
+pub(in crate::benchmark) struct BuildIdentity {
+    pub(super) owner_schema: NativeBuildSchema,
+    pub(super) algorithm: NativeAlgorithm,
+    pub(super) framing: NativeFraming,
+    pub(super) domain: NativeBuildDomain,
+    pub(super) checksum: NativeDigest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Body {
-    measurement_run: RecordIdentity,
-    measurement_profile: VersionedIdentity,
-    verification_subject: Subject,
-    build_identity: BuildIdentity,
-    case_inventory: Vec<InventoryEntry>,
+pub(in crate::benchmark) struct Body {
+    pub(super) measurement_run: RecordIdentity,
+    pub(super) measurement_profile: VersionedIdentity,
+    pub(super) verification_subject: Subject,
+    pub(super) build_identity: BuildIdentity,
+    pub(super) case_inventory: Vec<InventoryEntry>,
     #[serde(deserialize_with = "Option::deserialize")]
-    planned_runner_class: Option<Token>,
-    runner_instance_identity: RecordIdentity,
+    pub(super) planned_runner_class: Option<Token>,
+    pub(super) runner_instance_identity: RecordIdentity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -247,7 +250,7 @@ struct Envelope {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::benchmark) struct RunPlanRecord {
     envelope: Envelope,
-    body: Body,
+    pub(super) body: Body,
 }
 
 impl RunPlanRecord {

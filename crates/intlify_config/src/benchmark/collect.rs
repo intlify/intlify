@@ -23,10 +23,10 @@ use super::work::LogicalWork;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CollectedOperation {
-    fixture_input_context: Digest,
-    descriptors: Descriptors,
-    logical_work: LogicalWork,
-    capture: Capture,
+    pub(super) fixture_input_context: Digest,
+    pub(super) descriptors: Descriptors,
+    pub(super) logical_work: LogicalWork,
+    pub(super) capture: Capture,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

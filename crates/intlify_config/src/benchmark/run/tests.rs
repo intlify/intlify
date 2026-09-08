@@ -233,6 +233,55 @@ fn invalid_benchmark_takes_precedence_over_operational_failure_in_either_order()
 }
 
 #[test]
+fn common_projection_keeps_failed_cases_diagnostic_and_invalid_precedence() {
+    use crate::benchmark::shared::measurement::Outcome;
+    use crate::benchmark::shared::pipeline;
+    for invalid in [false, true] {
+        let recorded = PreparedRun::acquire()
+            .unwrap()
+            .collect_with(|context, ordinal, fixture, binding| {
+                if ordinal.get() == 3 {
+                    return Err(failed_clock_capture());
+                }
+                if invalid && ordinal.get() == 4 {
+                    return Err(ProfileCollectionFailure::CaseSelection);
+                }
+                context.collect(ordinal, fixture, binding)
+            })
+            .unwrap();
+        let artifacts = pipeline::produce(&recorded).unwrap();
+        let admitted = pipeline::validate(&recorded, &artifacts).unwrap();
+        assert_eq!(
+            admitted.outcome,
+            if invalid {
+                Outcome::Invalid
+            } else {
+                Outcome::Incomplete
+            }
+        );
+        assert_eq!(admitted.planned_cases, 127);
+        assert_eq!(admitted.non_measured_cases, if invalid { 2 } else { 1 });
+        assert_eq!(admitted.measured_cases + admitted.non_measured_cases, 127);
+        let evaluation: Value = serde_json::from_slice(&artifacts.evaluation).unwrap();
+        let failed = &evaluation["body"]["cases"][3]["result"];
+        assert_eq!(failed["kind"], "unavailable");
+        assert_eq!(failed["unavailableKind"], "failed");
+        assert_eq!(failed["reasons"][0]["code"]["code"], "failed-invocation");
+        assert_eq!(failed["reasons"][0]["detail"]["subtype"], "clock-failure");
+        assert_eq!(
+            failed["diagnosticPartialObservations"][0]["reference"]["localRecordIdentity"],
+            "attempt-3"
+        );
+        let evidence: Value = serde_json::from_slice(artifacts.evidence.as_ref().unwrap()).unwrap();
+        assert!(evidence["body"]["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|case| case["ownerAttempt"]["reference"]["localRecordIdentity"] != "attempt-3"));
+    }
+}
+
+#[test]
 fn closed_bounded_decode_rejects_extra_missing_duplicate_and_malformed_data() {
     let recorded = PreparedRun::acquire().unwrap().collect().unwrap();
     let raw = serde_json::to_value(&recorded.record).unwrap();

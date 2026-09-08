@@ -15,7 +15,7 @@ use super::quantity::Repetitions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum AcquisitionReason {
+pub(super) enum AcquisitionReason {
     UnsupportedPlatform,
     UnsupportedSystemIdentifier,
     UnsupportedArchitecture,
@@ -27,7 +27,7 @@ enum AcquisitionReason {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
-enum Acquired<T> {
+pub(super) enum Acquired<T> {
     Observed { value: T },
     Unavailable { reason: AcquisitionReason },
 }
@@ -41,14 +41,14 @@ fn observation<T>(value: Result<T, AcquisitionReason>) -> Acquired<T> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum KernelFamily {
+pub(super) enum KernelFamily {
     Linux,
     Darwin,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum TargetOs {
+pub(super) enum TargetOs {
     Linux,
     #[serde(rename = "macos")]
     MacOs,
@@ -60,7 +60,7 @@ enum TargetOs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum Architecture {
+pub(super) enum Architecture {
     X86,
     #[serde(rename = "x86_64")]
     X86_64,
@@ -127,20 +127,20 @@ fn kernel_release(value: &[u8]) -> Acquired<String> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct LibraryTarget {
-    os: Acquired<TargetOs>,
-    architecture: Acquired<Architecture>,
+pub(super) struct LibraryTarget {
+    pub(super) os: Acquired<TargetOs>,
+    pub(super) architecture: Acquired<Architecture>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct KernelView {
-    provider: String,
-    provider_revision: String,
-    method: String,
-    family: Acquired<KernelFamily>,
-    machine: Acquired<Architecture>,
-    release: Acquired<String>,
+pub(super) struct KernelView {
+    pub(super) provider: String,
+    pub(super) provider_revision: String,
+    pub(super) method: String,
+    pub(super) family: Acquired<KernelFamily>,
+    pub(super) machine: Acquired<Architecture>,
+    pub(super) release: Acquired<String>,
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -169,15 +169,15 @@ fn acquire_kernel() -> Acquired<KernelView> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum ParallelismMethod {
+pub(super) enum ParallelismMethod {
     RustStdAvailableParallelism,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ParallelismHint {
-    method: ParallelismMethod,
-    count: Repetitions,
+pub(super) struct ParallelismHint {
+    pub(super) method: ParallelismMethod,
+    pub(super) count: Repetitions,
 }
 
 fn parallelism_hint(value: Result<u64, AcquisitionReason>) -> Acquired<ParallelismHint> {
@@ -195,7 +195,7 @@ fn parallelism_hint(value: Result<u64, AcquisitionReason>) -> Acquired<Paralleli
 /// either controlled or qualified contexts from CI flags or caller strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum RunnerContext {
+pub(super) enum RunnerContext {
     LocalUncontrolled,
 }
 
@@ -205,12 +205,12 @@ enum RunnerContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EnvironmentInputs {
-    codec: String,
-    library_target: LibraryTarget,
-    kernel_view: Acquired<KernelView>,
-    available_parallelism_hint: Acquired<ParallelismHint>,
-    runner: RunnerContext,
-    clock: ClockObservation,
+    pub(super) codec: String,
+    pub(super) library_target: LibraryTarget,
+    pub(super) kernel_view: Acquired<KernelView>,
+    pub(super) available_parallelism_hint: Acquired<ParallelismHint>,
+    pub(super) runner: RunnerContext,
+    pub(super) clock: ClockObservation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

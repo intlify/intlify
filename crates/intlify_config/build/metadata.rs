@@ -176,6 +176,14 @@ pub(super) fn source_snapshot(
     let mut visited = 0;
     gather(&crate_root.join("src"), &mut paths, 0, &mut visited)?;
     gather(&crate_root.join("build"), &mut paths, 0, &mut visited)?;
+    // The standalone owner harness is part of the acquired source inventory,
+    // while configurations predating that target may have no benches directory.
+    let benches = crate_root.join("benches");
+    match std::fs::symlink_metadata(&benches) {
+        Ok(_) => gather(&benches, &mut paths, 0, &mut visited)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(Failure::Io),
+    }
     let mut entries = Vec::with_capacity(paths.len() + 2);
     for path in paths {
         let relative = path
@@ -329,6 +337,7 @@ pub(super) fn emit() {
     for path in [
         "src",
         "build",
+        "benches",
         "Cargo.toml",
         "README.md",
         "../../Cargo.toml",

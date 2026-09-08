@@ -36,10 +36,22 @@
 //! ```compile_fail
 //! use intlify_config::minimum_tests::harness::FixtureRunner;
 //! ```
+//! The optional observation facade cannot expose capture authority:
+//! ```compile_fail
+//! use intlify_config::measurement::RecordedRun;
+//! ```
+//! Completed observations cannot be constructed from arbitrary caller state:
+//! ```compile_fail
+//! let fabricated = intlify_config::measurement::CompletedObservation {};
+//! ```
 
 pub mod json;
 pub mod location;
 pub mod schema;
+
+/// Non-default developer measurements only; no configuration resolver or Profile API.
+#[cfg(feature = "benchmark")]
+pub use benchmark::facade as measurement;
 
 // The production entry will use these private types after structural admission.
 // Formal 017 reference encodings remain distinct from test-only instantiations.

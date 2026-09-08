@@ -35,6 +35,24 @@ pub fn measurement_case_identity_schema() -> Result<Value, serde_json::Error> {
     crate::benchmark::measurement_case_schema()
 }
 
+/// Closed initial-015 Evidence Set representation; not a record constructor.
+#[cfg(feature = "benchmark")]
+pub fn measurement_evidence_set_schema() -> Result<Value, serde_json::Error> {
+    crate::benchmark::evidence_schema()
+}
+
+/// Closed initial-015 Run Evaluation representation, including negative cases.
+#[cfg(feature = "benchmark")]
+pub fn measurement_run_evaluation_schema() -> Result<Value, serde_json::Error> {
+    crate::benchmark::evaluation_schema()
+}
+
+/// Closed initial-015 observational report representation; no numeric policy.
+#[cfg(feature = "benchmark")]
+pub fn measurement_structured_report_schema() -> Result<Value, serde_json::Error> {
+    crate::benchmark::report_schema()
+}
+
 /// Generate an owner model's Draft 7 schema without generator-only root `$id`.
 pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     let root = SchemaSettings::draft07()

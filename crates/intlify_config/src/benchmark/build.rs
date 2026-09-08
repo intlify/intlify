@@ -16,7 +16,7 @@ const EMBEDDED: &str = include_str!(concat!(env!("OUT_DIR"), "/intlify-build-obs
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum AcquisitionReason {
+pub(super) enum AcquisitionReason {
     MissingInput,
     UnsupportedInput,
     Io,
@@ -34,87 +34,87 @@ enum AcquisitionReason {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
-enum Acquisition<T> {
+pub(super) enum Acquisition<T> {
     Observed { value: T },
     Unavailable { reason: AcquisitionReason },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Package {
-    identity: String,
-    revision: String,
+pub(super) struct Package {
+    pub(super) identity: String,
+    pub(super) revision: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SourceSnapshot {
-    algorithm: String,
-    framing: String,
-    digest: Digest,
-    files: Repetitions,
-    bytes: Quantity,
+pub(super) struct SourceSnapshot {
+    pub(super) algorithm: String,
+    pub(super) framing: String,
+    pub(super) digest: Digest,
+    pub(super) files: Repetitions,
+    pub(super) bytes: Quantity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct LockSnapshot {
-    algorithm: String,
-    representation: String,
-    digest: Digest,
-    bytes: Quantity,
+pub(super) struct LockSnapshot {
+    pub(super) algorithm: String,
+    pub(super) representation: String,
+    pub(super) digest: Digest,
+    pub(super) bytes: Quantity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Compiler {
-    identity: String,
-    release: String,
+pub(super) struct Compiler {
+    pub(super) identity: String,
+    pub(super) release: String,
     #[serde(deserialize_with = "Option::deserialize")]
-    commit: Option<String>,
-    llvm: String,
+    pub(super) commit: Option<String>,
+    pub(super) llvm: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CargoInputs {
-    profile: Acquisition<String>,
-    optimization: Acquisition<String>,
-    debug_setting: Acquisition<String>,
-    target: Acquisition<String>,
-    features: Vec<String>,
-    additional_flags_present: bool,
-    compiler_wrapper_present: bool,
-    workspace_compiler_wrapper_present: bool,
+pub(super) struct CargoInputs {
+    pub(super) profile: Acquisition<String>,
+    pub(super) optimization: Acquisition<String>,
+    pub(super) debug_setting: Acquisition<String>,
+    pub(super) target: Acquisition<String>,
+    pub(super) features: Vec<String>,
+    pub(super) additional_flags_present: bool,
+    pub(super) compiler_wrapper_present: bool,
+    pub(super) workspace_compiler_wrapper_present: bool,
 }
 
 /// These capabilities are not attested by a build-script observation. A free
 /// string or open object cannot be submitted as an observed effective build.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
-enum Unattested {
+pub(super) enum Unattested {
     Unavailable { reason: AcquisitionReason },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Execution {
-    debug_assertions: bool,
-    pointer_width_bits: Quantity,
+pub(super) struct Execution {
+    pub(super) debug_assertions: bool,
+    pub(super) pointer_width_bits: Quantity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct BuildObservation {
-    codec: String,
-    package: Package,
-    source: Acquisition<SourceSnapshot>,
-    dependency_lock: Acquisition<LockSnapshot>,
-    compiler: Acquisition<Compiler>,
-    cargo_inputs: CargoInputs,
-    effective_configuration: Unattested,
-    executable: Unattested,
-    execution: Execution,
+    pub(super) codec: String,
+    pub(super) package: Package,
+    pub(super) source: Acquisition<SourceSnapshot>,
+    pub(super) dependency_lock: Acquisition<LockSnapshot>,
+    pub(super) compiler: Acquisition<Compiler>,
+    pub(super) cargo_inputs: CargoInputs,
+    pub(super) effective_configuration: Unattested,
+    pub(super) executable: Unattested,
+    pub(super) execution: Execution,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

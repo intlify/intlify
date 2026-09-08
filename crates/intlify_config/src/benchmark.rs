@@ -7,6 +7,9 @@
 mod quantity;
 
 #[cfg(feature = "benchmark")]
+pub mod facade;
+
+#[cfg(feature = "benchmark")]
 mod build;
 #[cfg(feature = "benchmark")]
 mod cases;
@@ -51,6 +54,21 @@ pub(crate) fn run_plan_schema() -> Result<serde_json::Value, serde_json::Error> 
 #[cfg(feature = "benchmark")]
 pub(crate) fn measurement_case_schema() -> Result<serde_json::Value, serde_json::Error> {
     shared::plan::case_schema()
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn evidence_schema() -> Result<serde_json::Value, serde_json::Error> {
+    shared::measurement::evidence_schema()
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn evaluation_schema() -> Result<serde_json::Value, serde_json::Error> {
+    shared::measurement::evaluation_schema()
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn report_schema() -> Result<serde_json::Value, serde_json::Error> {
+    shared::measurement::report_schema()
 }
 
 #[cfg(all(test, feature = "benchmark"))]

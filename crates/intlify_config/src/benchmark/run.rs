@@ -68,7 +68,7 @@ struct OwnerPlan {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum OwnerOutcome {
+pub(super) enum OwnerOutcome {
     Complete,
     Incomplete,
     Invalid,
@@ -81,7 +81,7 @@ enum OwnerOutcome {
     rename_all = "kebab-case",
     deny_unknown_fields
 )]
-enum AttemptResult {
+pub(super) enum AttemptResult {
     // Boxing is after capture, outside every measured component interval. A
     // failed attempt need not reserve space for the large successful payload.
     Measured(Box<ContextualOperation>),
@@ -91,21 +91,21 @@ enum AttemptResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CaseAttempt {
-    ordinal: Quantity,
-    binding: CaptureBinding,
-    result: AttemptResult,
+pub(super) struct CaseAttempt {
+    pub(super) ordinal: Quantity,
+    pub(super) binding: CaptureBinding,
+    pub(super) result: AttemptResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct OwnerResult {
-    codec: String,
-    record_identity: RecordIdentity,
+pub(super) struct OwnerResult {
+    pub(super) codec: String,
+    pub(super) record_identity: RecordIdentity,
     plan: OwnerPlan,
-    context: ContextObservation,
-    attempts: Vec<CaseAttempt>,
-    outcome: OwnerOutcome,
+    pub(super) context: ContextObservation,
+    pub(super) attempts: Vec<CaseAttempt>,
+    pub(super) outcome: OwnerOutcome,
 }
 
 /// Serializable acquisition output, not self-authenticating evidence. Its
@@ -115,6 +115,27 @@ struct OwnerResult {
 pub(super) struct OwnerRecord {
     checksum: Digest,
     result: OwnerResult,
+}
+
+impl OwnerRecord {
+    pub(super) fn result(&self) -> &OwnerResult {
+        &self.result
+    }
+    pub(super) const fn checksum(&self) -> Digest {
+        self.checksum
+    }
+    pub(super) fn plan_reference(&self) -> &RecordIdentity {
+        &self.result.plan.common_run_plan
+    }
+}
+
+/// Only the separately retained acquisition can issue this borrow. Raw owner
+/// documents remain inspectable but cannot enter the common projection alone.
+pub(super) struct ProjectionSource<'a>(&'a OwnerRecord);
+impl ProjectionSource<'_> {
+    pub(super) fn document(&self) -> &OwnerRecord {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,6 +199,10 @@ pub(super) struct CheckedOwnerRecord(OwnerRecord);
 impl CheckedOwnerRecord {
     pub(super) fn document(&self) -> &OwnerRecord {
         &self.0
+    }
+
+    pub(super) fn projection_source(&self) -> ProjectionSource<'_> {
+        ProjectionSource(&self.0)
     }
 }
 
@@ -322,6 +347,36 @@ impl PreparedRun {
 }
 
 impl RecordedRun {
+    pub(super) fn expected_owner_identity(&self) -> &RecordIdentity {
+        &self.inputs.plan.result_identity
+    }
+
+    pub(super) fn admit_owned(
+        &self,
+        submitted: OwnerRecord,
+    ) -> Result<CheckedOwnerRecord, Vec<RunIssue>> {
+        let issues = self.validate(&submitted);
+        if issues.is_empty() {
+            Ok(CheckedOwnerRecord(submitted))
+        } else {
+            Err(issues)
+        }
+    }
+    pub(super) fn projection_source<'a>(
+        &self,
+        submitted: &'a OwnerRecord,
+    ) -> Result<ProjectionSource<'a>, Vec<RunIssue>> {
+        let issues = self.validate(submitted);
+        if issues.is_empty() {
+            Ok(ProjectionSource(submitted))
+        } else {
+            Err(issues)
+        }
+    }
+
+    pub(super) fn document(&self) -> &OwnerRecord {
+        &self.record
+    }
     pub(super) fn common_plan(&self) -> &IssuedRunPlan {
         &self.inputs.common_plan
     }
@@ -453,6 +508,10 @@ fn outcome(attempts: &[CaseAttempt]) -> OwnerOutcome {
         })
         .max()
         .unwrap_or(OwnerOutcome::Invalid)
+}
+
+pub(super) fn attempt_outcome(attempt: &CaseAttempt) -> OwnerOutcome {
+    outcome(std::slice::from_ref(attempt))
 }
 
 #[cfg(all(test, any(target_os = "linux", target_os = "macos")))]

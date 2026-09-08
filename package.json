@@ -30,6 +30,7 @@
     "bench:messages": "vp run messages-bench#bench",
     "bench:messages:smoke": "vp run messages-bench#bench:smoke",
     "bench:messages:validate": "vp run messages-bench#validate",
+    "bench:config:smoke": "cargo bench -p intlify_config --bench profile_resolver --features benchmark -- --profile smoke --validate",
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",
     "build:cli": "vp run cli#build",
     "schema:cli": "vp run cli#schema",

@@ -157,12 +157,12 @@ impl Method {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ClockObservation {
-    provider: String,
-    provider_revision: String,
-    clock: String,
-    resolution_nanoseconds: Quantity,
-    resolution_source: String,
-    conversion: String,
+    pub(super) provider: String,
+    pub(super) provider_revision: String,
+    pub(super) clock: String,
+    pub(super) resolution_nanoseconds: Quantity,
+    pub(super) resolution_source: String,
+    pub(super) conversion: String,
 }
 
 impl From<ClockDescription> for ClockObservation {
@@ -228,17 +228,17 @@ impl Execution {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Descriptors {
-    boundary: Boundary,
-    method: Method,
-    clock_observation: ClockObservation,
-    execution: Execution,
+    pub(super) boundary: Boundary,
+    pub(super) method: Method,
+    pub(super) clock_observation: ClockObservation,
+    pub(super) execution: Execution,
     #[serde(deserialize_with = "Option::deserialize")]
-    locale_input: Option<InputFacts>,
+    pub(super) locale_input: Option<InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
-    locale_core_input: Option<super::locale_core::InputFacts>,
+    pub(super) locale_core_input: Option<super::locale_core::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

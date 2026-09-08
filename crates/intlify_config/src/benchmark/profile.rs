@@ -26,13 +26,13 @@ struct Revision {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SamplingPolicy {
-    warmup_strategy: String,
-    warmup_repetitions: Quantity,
-    measured_samples: Repetitions,
-    repetitions_per_sample: Repetitions,
-    calibration: String,
-    aggregation: String,
+pub(super) struct SamplingPolicy {
+    pub(super) warmup_strategy: String,
+    pub(super) warmup_repetitions: Quantity,
+    pub(super) measured_samples: Repetitions,
+    pub(super) repetitions_per_sample: Repetitions,
+    pub(super) calibration: String,
+    pub(super) aggregation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,6 +159,10 @@ impl MeasurementProfile {
 
     pub(super) fn identity_revision(&self) -> (&str, &str) {
         (&self.identity, &self.revision)
+    }
+
+    pub(super) fn sampling_policy(&self) -> &SamplingPolicy {
+        &self.sampling
     }
 
     pub(super) fn validate_smoke(&self, registry: &Registry) -> Vec<ProfileIssue> {
@@ -337,8 +341,8 @@ impl AdmittedProfile {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProfiledOperation {
     measurement_profile: Revision,
-    case_ordinal: Quantity,
-    operation: CollectedOperation,
+    pub(super) case_ordinal: Quantity,
+    pub(super) operation: CollectedOperation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

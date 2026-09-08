@@ -73,6 +73,21 @@ fn source_observations_are_path_independent_and_cover_each_declared_input() {
 }
 
 #[test]
+fn standalone_harness_sources_are_covered_when_present() {
+    let (directory, root) = fixture();
+    let before = source_snapshot(&root, directory.path()).unwrap();
+    fs::create_dir(root.join("benches")).unwrap();
+    let path = root.join("benches/profile_resolver.rs");
+    fs::write(&path, b"fn main() {}\n").unwrap();
+    let added = source_snapshot(&root, directory.path()).unwrap();
+    assert_ne!(before.source, added.source);
+    assert_eq!(before.lock, added.lock);
+    fs::write(path, b"fn main() { smoke(); }\n").unwrap();
+    let changed = source_snapshot(&root, directory.path()).unwrap();
+    assert_ne!(added.source, changed.source);
+}
+
+#[test]
 fn enumeration_order_and_timestamps_do_not_change_the_source_observation() {
     let (directory, root) = fixture();
     fs::write(root.join("src/z.rs"), "last").unwrap();

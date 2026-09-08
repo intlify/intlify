@@ -43,3 +43,9 @@ tempfile = "3"
 [[example]]
 name = "generate_measurement_schema"
 required-features = ["benchmark"]
+
+[[bench]]
+name = "profile_resolver"
+harness = false
+test = false
+required-features = ["benchmark"]

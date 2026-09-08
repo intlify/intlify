@@ -20,7 +20,19 @@ fn run() -> Result<(), Box<dyn Error>> {
             "measurement-case-identity-v0.schema.json",
             intlify_config::schema::measurement_case_identity_schema()?,
         ),
-        _ => return Err("usage: generate_measurement_schema <plan|case> [--check|--write]".into()),
+        Some("evidence") => (
+            "measurement-evidence-set-v0.schema.json",
+            intlify_config::schema::measurement_evidence_set_schema()?,
+        ),
+        Some("evaluation") => (
+            "measurement-run-evaluation-v0.schema.json",
+            intlify_config::schema::measurement_run_evaluation_schema()?,
+        ),
+        Some("report") => (
+            "measurement-structured-report-v0.schema.json",
+            intlify_config::schema::measurement_structured_report_schema()?,
+        ),
+        _ => return Err("usage: generate_measurement_schema <plan|case|evidence|evaluation|report> [--check|--write]".into()),
     };
     let output = intlify_config::schema::format_schema(schema)?;
     let artifact = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -34,7 +46,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         [flag] if flag == "--write" => std::fs::write(artifact, output.as_bytes())?,
-        _ => return Err("usage: generate_measurement_schema <plan|case> [--check|--write]".into()),
+        _ => return Err("usage: generate_measurement_schema <plan|case|evidence|evaluation|report> [--check|--write]".into()),
     }
     Ok(())
 }

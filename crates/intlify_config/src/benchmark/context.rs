@@ -33,9 +33,9 @@ pub(super) struct CaptureContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ContextObservation {
-    profile: MeasurementProfile,
-    build: BuildObservation,
-    environment: EnvironmentInputs,
+    pub(super) profile: MeasurementProfile,
+    pub(super) build: BuildObservation,
+    pub(super) environment: EnvironmentInputs,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,9 +149,9 @@ impl Serialize for CaptureContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ContextualOperation {
-    build_observation: Digest,
-    environment_observation: Digest,
-    operation: ProfiledOperation,
+    pub(super) build_observation: Digest,
+    pub(super) environment_observation: Digest,
+    pub(super) operation: ProfiledOperation,
 }
 
 impl ContextualOperation {

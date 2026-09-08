@@ -104,9 +104,7 @@ impl CaseIdentity {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub(in crate::benchmark) enum InstanceDomain {
     #[serde(rename = "intlify-verification-record-v0")]
     Record,
@@ -119,6 +117,27 @@ pub(in crate::benchmark) enum InstanceDomain {
     // Per-run local harness instance, not a machine identity or qualification.
     #[serde(rename = "intlify-config-local-runner-instance-v0")]
     LocalRunnerInstance,
+}
+
+impl InstanceDomain {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Record => "intlify-verification-record-v0",
+            Self::Run => "intlify-measurement-run-v0",
+            Self::NativeOwnerResult => "intlify-config-owner-result-v1",
+            Self::LocalRunnerInstance => "intlify-config-local-runner-instance-v0",
+        }
+    }
+}
+impl Ord for InstanceDomain {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name().as_bytes().cmp(other.name().as_bytes())
+    }
+}
+impl PartialOrd for InstanceDomain {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
