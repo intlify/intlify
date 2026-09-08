@@ -19,6 +19,8 @@ mod context;
 #[cfg(feature = "benchmark")]
 mod descriptor;
 #[cfg(feature = "benchmark")]
+mod environment;
+#[cfg(feature = "benchmark")]
 mod inventory;
 #[cfg(feature = "benchmark")]
 mod locale;
