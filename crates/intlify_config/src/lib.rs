@@ -20,6 +20,10 @@
 //! ```compile_fail
 //! use intlify_config::fixtures::FixtureConfig;
 //! ```
+//! The experimental locale provider is not a public configuration API:
+//! ```compile_fail
+//! use intlify_config::locale::Canonicalizer;
+//! ```
 
 pub mod json;
 pub mod location;
@@ -37,6 +41,10 @@ mod input_limits;
 mod materialize;
 #[allow(dead_code)]
 mod structural;
+
+// Data-free internal provider boundary; no product locale API is reserved.
+#[allow(dead_code)]
+mod locale;
 
 #[cfg(any(test, feature = "benchmark"))]
 #[allow(dead_code)]

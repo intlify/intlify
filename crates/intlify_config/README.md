@@ -14,7 +14,8 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - Feature-isolated measurement support retains exact quantities, acquires the reported monotonic-clock resolution, measures four actual core operations, captures raw samples, and validates owner-local method/interval/execution descriptors. It does not yet produce complete Owner Results or common evidence.
 - Checked-in expectations bind all 77 finite cases to their preparation/input context, complete result observation, and logical work. Ordinary collection requires an immutable admitted fixture rather than caller-chosen expected results.
 - Internal inventory relationship checks distinguish missing evaluation rows from explicit unavailable attempts, enforce planned requirements/bindings, and reject cross-run evidence or unproven non-applicability. They do not issue common Run Plans or admit raw records.
-- Locale resolution and the remaining 026 harness/record/validation path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
+- Private canonicalization binds one read-only provider, checks raw/canonical byte limits, preserves correction suggestions, and distinguishes invalid identifiers from unsupported coverage. Only a finite test-owned provider is implemented.
+- Source/requested/default locale resolution and the remaining 026 harness/record/validation path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
@@ -71,6 +72,16 @@ Selection uses a separate normalized input with an explicit matching bootstrap b
 Omission uses the original profile count, including malformed declarations. Exact matching needs the admitted version, a bounded non-empty profile container, an admitted declared ID, the selected declaration's immediate object shape, and its independently admitted `resourceLimits` reference. Invalid nested fields or unrelated profiles may leave those prerequisites available, but never produce a partial `IntlifyConfig`. Selection outputs own their selected ID/reference and survive release of the analysis. Unknown or rejected selector text is never exposed in the content-free failure observations.
 
 This is provisional bootstrap selection only. Resource Policy admission/recheck, confirmed selection, final selector Evidence, and checked Profile construction are not implemented or implied.
+
+## Internal locale canonicalization
+
+`locale` contains a data-free, crate-private provider boundary. Binding compares every specification, dataset, provider, schema, and transport component against separately supplied expectations. It retains an immutable binding snapshot and rejects a provider that changes it between calls. These non-serialized generic identity values do not define 017 encodings, verify artifact content integrity, or prove an engine's conformance; the enclosing owner must supply the admitted immutable inputs. The production data adapter and artifact admission remain deferred.
+
+The only concrete provider is a finite test/benchmark fixture with closed, immutable rows. Its binding tokens are explicitly symbolic test pins, not real artifact digests. It recognizes declared canonical spellings and aliases, marks declared invalid examples as invalid, and returns unsupported for every unlisted input. It is not a general locale parser or a substitute for the full pinned canonicalization corpus. `en` is not maximized, `en_US` is not repaired, and the shared boundary never consults host locale APIs, CLDR tables, environment variables, files, or the network.
+
+Raw identifier bytes are checked before provider work; an expanded canonical spelling is checked again before a result is retained. A rejected result never becomes a truncated locale. Canonical values own or share immutable storage, while the correction suggestion borrows the already retained canonical string without another string allocation. The finite provider interns its canonical strings once, so aliases and retained results safely share them after the provider is dropped. There is no mutable workspace or invocation cache, and reuse cannot preserve previous failure state.
+
+Unit tests cover exact/first-over byte bounds, UTF-8 counting, expanding aliases, every binding component, provider mutation, bad provider output, invalid/unsupported/unavailable outcomes, secret-free errors, fixed points, canonical byte ordering, fresh/reused equivalence, and retained-output ownership. Interval integration tests use the existing scripted and native monotonic measurement helper around the ordinary canonicalization call. They do not yet register canonicalization in the owner case catalog or provide its complete work vector, result descriptors, common projection, or report validation; those remain PR 4 work alongside the unfinished PR 3 measurement path. Neither Implementation Phase 2 nor the minimum milestone is complete.
 
 ## Measurement support in progress
 
@@ -148,6 +159,8 @@ Relevant traceability:
 | Admitted fixture collection | `benchmark::collect::tests`: all 77 pinned cases through native collection/decode/revalidation; changed input context rejected even when result, logical work, run, and case labels coincide |
 | 026 run inventory relationships | `benchmark::inventory_tests`: required/optional unavailable kinds, missing/duplicate/unknown/reordered rows, exact run/plan/profile/subject/build/case bindings, scoped applicability proof, absent/stale/corrupt/ambiguous evidence, outcome precedence and canonical internal issue ordering |
 | Inventory / owner-collection integration | All 77 pinned native collections accounted for through non-serialized test views; explicit required unavailability is incomplete, a missing attempt is invalid, and diagnostic prefixes never enter successful-reference output |
+| Private locale provider boundary | `locale::tests`: exact binding components, raw/canonical byte bounds, declared aliases and invalid examples versus unsupported coverage, immutable shared output, source corrections, fixed points, byte ordering, and fresh/reused equivalence |
+| Locale / interval integration | `benchmark::measure::tests`: ordinary canonicalization between scripted/native clock markers, expected rejection results, output retained after provider release; not a complete registered owner measurement case |
 
 From the repository root:
 
