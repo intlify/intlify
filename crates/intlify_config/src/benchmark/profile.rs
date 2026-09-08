@@ -106,7 +106,7 @@ impl MeasurementProfile {
         let one = Repetitions::new(1).expect("fixed positive smoke count");
         Self {
             identity: "intlify-config-minimum-smoke".into(),
-            revision: "0".into(),
+            revision: "1".into(),
             adopted_specification: Revision {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),

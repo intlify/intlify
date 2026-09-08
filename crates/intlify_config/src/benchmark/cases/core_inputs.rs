@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::fixtures::{complete_config, minimal_config};
+use crate::profile_fixtures::{complete_config, minimal_config};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

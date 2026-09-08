@@ -11,7 +11,7 @@ use crate::benchmark::operation::tests::operations;
 use crate::benchmark::operation::Operation;
 use crate::benchmark::quantity::{Quantity, Repetitions};
 use crate::benchmark::sample::{CaptureCapacity, CaptureFailureCause, CaptureStage};
-use crate::fixtures::minimal_config;
+use crate::profile_fixtures::{minimal_config, reference};
 use crate::structural::selection::Selection;
 
 use super::*;
@@ -63,7 +63,7 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!(selected.id().as_str(), "app");
             assert_eq!(
                 serde_json::to_value(selected.resource_limits()).unwrap(),
-                json!({"$testPolicy": "resource-limits"})
+                reference("resource-limit-policy")
             );
         }
         Output::Locale(Ok(result)) => {

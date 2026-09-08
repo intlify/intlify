@@ -32,7 +32,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         assert!(identities.insert(encoded.clone()));
         let decoded: Declaration = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, *case);
-        assert_eq!(case.fixture_revision, "0");
+        assert_eq!(case.fixture_revision, "1");
         assert_eq!(case.fixture.source(), case.fixture.source());
         assert!(case.fixture.source().len() < 100_000);
         if !matches!(
@@ -72,7 +72,12 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
 #[test]
 fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semantics() {
     let schema = Schema::for_model().unwrap();
-    let oracle = jsonschema::draft7::new(schema.schema_body()).unwrap();
+    let published: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../schema/project-profile-config-v0.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(schema.schema_body(), &published);
+    let oracle = jsonschema::draft7::new(&published).unwrap();
     for case in declarations().into_iter().filter(|case| {
         case.limit.is_none()
             && !matches!(

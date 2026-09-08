@@ -2,7 +2,7 @@
 
 This is the implementation review index for the test-owned minimum 015 path. It does not admit a configuration schema, shared artifact, Profile, formal Resolver Outcome, or revision-`"0"` conformance suite.
 
-The tests are in [`src/minimum_tests.rs`](../../src/minimum_tests.rs); [`harness.rs`](../../src/minimum_tests/harness.rs) contains only test orchestration over the ordinary component calls. Shared reference shapes come from the closed test types in [`fixtures.rs`](../../src/fixtures.rs). Locale data comes from the finite [`FixtureProvider`](../../src/locale/fixtures.rs), with an explicit binding and no host fallback. `FixtureLimits::finite()` supplies test-owned input/structural/identifier/active-locale bounds; these are not product defaults or full Resource Limit Policy admission.
+The tests are in [`src/minimum_tests.rs`](../../src/minimum_tests.rs); [`harness.rs`](../../src/minimum_tests/harness.rs) contains only test orchestration over the ordinary component calls. Inputs are constructed directly in [`profile_fixtures.rs`](../../src/profile_fixtures.rs) using the formal five-field 017 references; [`references.rs`](../../src/references.rs) and the checked-in [configuration schema](../../schema/project-profile-config-v0.schema.json) own their closed structural representation. No referenced body is acquired or admitted by these fixtures. Locale data comes from the finite [`FixtureProvider`](../../src/locale/fixtures.rs), with an explicit binding and no host fallback. `FixtureLimits::finite()` supplies test-owned input/structural/identifier/active-locale bounds; these are not product defaults or full Resource Limit Policy admission.
 
 ## Scope and traceability
 
@@ -20,6 +20,7 @@ The review labels below are local index labels, not common Case IDs. Expected va
 | MIN-008 | `resource_edges_stop_at_their_owning_stage_without_later_semantic_work` | [Resource limits](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#project-profile-resolution-resource-limits) | File-byte and active-occurrence exact/first-over edges and profile-count failure stop at their owning call and retain the actual bound witness; test-owned active counts do not claim the full 015 locale domain |
 | MIN-009 | `owned_results_survive_interleaved_failures_input_release_and_runner_release` | [Memory ownership](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#memory-ownership-and-reuse) | Raw, structural and locale failures do not contaminate another call; retained result and structural analysis remain valid after input/context release |
 | MIN-010 | `explicit_parallel_callers_keep_fixture_association_and_results_deterministic` | [Memory ownership](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#memory-ownership-and-reuse) | Native caller-created threads can share immutable schema/provider and keep input/result association; the core creates no scheduler or mutable shared workspace. This native scheduling test is not run on Wasm |
+| MIN-011 | `malformed_formal_references_and_legacy_test_tokens_stop_before_locale_work` | [Authoring model](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#intlifyconfig-and-json-schema); [017 references](../../../../design/017-intlify-shared-artifact-and-version-admission-design.md) | Legacy test token, null/scalar, missing revision, unknown kind, truncated digest and extra field stop before construction, selection and locale resolution; no synthetic fallback |
 
 The call trace is local test instrumentation, not Finding/Evidence output or a timer. Construction/selection errors that contradict an admitted test prerequisite fail the test rather than becoming fabricated semantic failures.
 
@@ -31,13 +32,12 @@ Measurement verification remains separate: the [crate's benchmark traceability](
 
 The following gates are still required by the minimum implementation plan:
 
-- formal 017-owned reference schemas and generated configuration-schema freshness;
 - complete common case/build/environment/record inputs, Run Plan issuance, projection/report and their verification;
 - standalone benchmark smoke and its CI integration;
 - the remaining minimum fixture matrix, feature-isolation and handoff audit; and
 - review/merge evidence for the implementation PRs.
 
-This index does not mark those gates, PR 6, Implementation Phase 1, or the minimum milestone complete. Full Phase 2/3 semantics, production locale data/adapter, public Profile output and the Phase 6 conformance suite remain outside this minimum slice.
+Formal 017-owned reference schemas, generated configuration-schema freshness and adoption in this slice are verified locally. This index does not mark the remaining gates, PR 6, Implementation Phase 1, or the minimum milestone complete. Full Phase 2/3 semantics, production locale data/adapter, public Profile output and the Phase 6 conformance suite remain outside this minimum slice.
 
 From the repository root:
 

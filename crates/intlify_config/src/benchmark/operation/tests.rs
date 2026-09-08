@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use crate::benchmark::clock::{tests::ScriptedClock, MonotonicClock};
 use crate::benchmark::quantity::Quantity;
-use crate::fixtures::minimal_config;
 use crate::input_limits::Bound;
+use crate::profile_fixtures::{minimal_config, reference};
 use crate::structural::StructuralFailure;
 
 use super::*;
@@ -119,7 +119,7 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 assert_eq!(selected.id().as_str(), "app");
                 assert_eq!(
                     serde_json::to_value(selected.resource_limits()).unwrap(),
-                    json!({"$testPolicy":"resource-limits"})
+                    reference("resource-limit-policy")
                 );
             }
             Output::Locale(Ok(result)) => {

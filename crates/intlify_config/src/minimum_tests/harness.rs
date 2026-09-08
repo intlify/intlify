@@ -6,18 +6,18 @@
 
 use std::sync::Arc;
 
-use crate::fixtures::{FixturePolicyReference, FixtureTargetReference};
 use crate::input_limits::{Bound, InputLimits};
 use crate::locale::core::{Input, Limits, Resolution};
 use crate::locale::fixtures::{fixture_binding, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::{materialize_file, MaterializationError};
 use crate::model::ProfileId;
+use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{Selection, SelectionFailure, SelectorInput};
 use crate::structural::{AuthoringSchema, StructuralAnalysis, StructuralLimits};
 
-type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
-type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
+type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
+type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
 
 #[derive(Clone, Copy)]
 pub(super) struct FixtureLimits {
@@ -88,7 +88,7 @@ impl FixtureRunner {
     pub(super) fn new(limits: FixtureLimits) -> Self {
         Self {
             limits,
-            schema: Schema::for_model().expect("fixed test reference schemas"),
+            schema: Schema::for_model().expect("formal 015/017 configuration schema"),
             provider: Canonicalizer::bind(
                 &fixture_binding(),
                 Some(FixtureProvider::new()),

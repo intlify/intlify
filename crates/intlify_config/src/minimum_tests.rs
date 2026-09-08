@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::fixtures::minimal_config;
 use crate::locale::core::{Failure, Issue, Location};
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, ProviderFailure};
 use crate::materialize::InputFailure;
+use crate::profile_fixtures::minimal_config;
 use crate::structural::selection::SelectionFailure;
 use crate::structural::StructuralFailure;
 
@@ -138,6 +138,46 @@ fn incomplete_root_and_invalid_sibling_never_reach_selected_profile_resolution()
             panic!("wrong stopping point")
         };
         assert!(analysis.version_selected());
+        assert!(analysis.schema_issue_count() > 0);
+        assert!(analysis.construct().unwrap().is_none());
+    }
+}
+
+#[test]
+fn malformed_formal_references_and_legacy_test_tokens_stop_before_locale_work() {
+    for replacement in [
+        json!({"$testPolicy": "resource-limits"}),
+        Value::Null,
+        json!("resource-limits"),
+        {
+            let mut pin = crate::profile_fixtures::reference("resource-limit-policy");
+            pin.as_object_mut().unwrap().remove("revision");
+            pin
+        },
+        {
+            let mut pin = crate::profile_fixtures::reference("resource-limit-policy");
+            pin["kind"] = json!("unknown-policy");
+            pin
+        },
+        {
+            let mut pin = crate::profile_fixtures::reference("resource-limit-policy");
+            pin["semanticDigest"] = json!("sha256:1");
+            pin
+        },
+        {
+            let mut pin = crate::profile_fixtures::reference("resource-limit-policy");
+            pin["unexpected"] = json!(true);
+            pin
+        },
+    ] {
+        let mut value = minimal_config();
+        value["profiles"]["app"]["policies"]["resourceLimits"] = replacement;
+        let result = runner().run(source(&value), Some("app"));
+        assert_eq!(result.steps, [Step::Materialize, Step::Structural]);
+        assert!(result.selected.is_none());
+        let Outcome::Structural(analysis) = result.outcome else {
+            panic!("formal reference failure did not stop at structural admission")
+        };
         assert!(analysis.schema_issue_count() > 0);
         assert!(analysis.construct().unwrap().is_none());
     }

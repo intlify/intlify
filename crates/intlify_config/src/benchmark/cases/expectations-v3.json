@@ -1,402 +1,402 @@
 {
   "identity": "intlify-config-minimum-fixture-expectations",
-  "revision": "2",
+  "revision": "3",
   "observationCodec": "intlify-config-minimum-observation/0",
   "rows": [
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "eb41ebc09607579ea19831067913dc45e5c9963ca5142f64bee04509c95c47ab",
+      "inputContext": "b355a2240642684619fbb8eb3346c0a7e23309000c7577ae2b78d007e473e3fa",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "reversed-members",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "0c076db3465047d843b3612133279da5b617d3e471513a0c37b1191185578f17",
+      "inputContext": "e42fff082e0f359b35c26200422340e5cd1338adbc3ec65682f2e01544d02092",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "48d5905e85a1ebe1e0044351f24f83c9b5519d795de024b5d500c60f160529b4"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "04a49f204369accc00a514eaf62cd92cc888c34300b0659d08a93a563a17bcb7"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "padded-bytes",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "2ae2f52237fdf79eef235eb4fa596dc768b5917c0841c7f1539d3c17c21f3591",
+      "inputContext": "5f5e902e4685cc1e1a14727d3be392df0460c075e31b7b96c0d4691a0718a907",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "fceb72c80973d84b1b1ab91f311b32ed029d76648b06fc05abc088bebd09a083"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "e9d0726019ffd871f50954448dbbbff416251b96381431de622b82f4ddb3b81d"
       },
-      "logicalWork": "5c6242977bcd0ea3725013e6bd6fd891395a7cf1ccff4eaf219525e32dd35758"
+      "logicalWork": "b337783a0a9de48eb0f3181fea3e139463466d55348a9029924e3513107ff378"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "long-string",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "148621284014d43141312d466bfed1e9af071f2a736aa4cacf1f7a9f25200255",
+      "inputContext": "41c3b218fdbfeeb2913b90b40f55c51bf1292624a4ed02e626f63154cace98bd",
       "result": {
-        "shared": "5228fdc3db52bde7a53599cbcf2262cba5bd06c97e530d019e0db62f645218fa",
-        "entry": "e0f6c106a21d4e0e76bf183ce0b762ef8ec0444b64d0a5c6ab18df85ce2f5eab"
+        "shared": "ca2d436dd8a99c9401f27af138d2afe0023d9d2ede0ec1fb60d21468de0bd3ab",
+        "entry": "a7dbfe1e5adbedbf595cf42553587fe34cee3896f4db4d1c4ec1cf58a081eb8d"
       },
-      "logicalWork": "f90167ae05c9f3db0da19d6ecb156a569e8bf06070a11240e4ffcb8859762615"
+      "logicalWork": "29ac6b038113516628a0b6991adcafed32413c7e87350f96cee7a873abd8330d"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "many-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "3c03982f2caf102e376382613b6dc1b2304cf6c5ee95aa33f997e947099436c5",
+      "inputContext": "9503189b4ce1a63a8ae19b2992e6f9d149d937d7aa694e45b9b7d4140a80f6e9",
       "result": {
-        "shared": "d7bfa5949d5ec3045087b7b4dd0566f1b2565a0015a5d623bb0d11d8e805ef4c",
-        "entry": "2195ebe4b3a9a3f5b244bc1f532e1722525da568e31dde962655783f9cebf7a6"
+        "shared": "39bfde3ef4d3d12a4c9e89326e530dfbdb7d65e7db9759f5a41d19c8d3def1ee",
+        "entry": "6ece10ba0eb75f20a45568690b98e2c179266e20b9ba13582d51925339a8c762"
       },
-      "logicalWork": "a31f59dda5fbbd952ef92ae3029eba65e7c7af83161c9c9ca8457a12268dc900"
+      "logicalWork": "353f72b0e1e8f5089c743b46c3cf56077f67a094e025fa8ceb1914fc0f43dd36"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "many-locale-occurrences",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "8624b717635b92e7c7515aa5e08512553f5d78bb1a3f9e98980079c366ec1170",
+      "inputContext": "e2a414361f06d2cd8c0012014e67d576bcaaac0250d089e787ad19211f6325eb",
       "result": {
-        "shared": "9c5caccc503b219fd3b595ac234ec09c95c055a691dc48902aed8bf163c3f617",
-        "entry": "8fd93303bfa4d6c87744311c5564c6f695b55658c9b7ff7b8998a1e106f3e3a8"
+        "shared": "b07da8aa3a90f477f9156f32c6eb0a0fd897c8155b6ee5d7d692a7c0dee18e4c",
+        "entry": "e66ba92951bcec5030f5ea56f7a415d77a15e116944e68d096a8a923179d4777"
       },
-      "logicalWork": "6473869a2072f2586b4ba1cea32f7428e53d5c2dbf885bac6c6b83c1b01fc674"
+      "logicalWork": "5daf7832f99e189a780ef91729c6d689593dd63b6a064e668d03f790b9dd1aa8"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "cb6669d8de26910abbfc25c425666a81d1ad0e0fc3aa3c51ec03160b69a7c0d2",
+      "inputContext": "7385422fe7c9a555eba814f6de1bc709ef7a3b2c7515bb8c296203242544c7fb",
       "result": {
-        "shared": "f66d887bf92a16fbce0842f15b4cc0ddecd26db51809bd60b6c1cea058463188",
-        "entry": "c2f2d7540624b5e238a8e460f1f76b0499e024fec369f5793c08e8e1178863cb"
+        "shared": "dfcf66811e3f393b5f48569a6e62977f8ed3526e2c5683b27e53fa2ead87c834",
+        "entry": "2012d733479df5da420603d6a728653eb949c85e11c3daf1b3b93ccb78363d47"
       },
-      "logicalWork": "81c0bd2681b46635149ec0cb48f2538cf98c8cff0162d9422ec62857cde71ace"
+      "logicalWork": "5aae81737fc41d36fa88142fa9b07face23b073c5f76af716f79e7f993a6ace0"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "reversed-members",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "c1a13ee01322edce238344553c5ee69562bdb0075f3021ec0055c3a8ba190c01",
+      "inputContext": "8f91086fee4d83a4407582736b602f7af4d5349dc51c99e63ce431a6d743de60",
       "result": {
-        "shared": "f66d887bf92a16fbce0842f15b4cc0ddecd26db51809bd60b6c1cea058463188",
-        "entry": "13c38cfa3cc697520f73dd8d6a3c51a4e4505ad08ffb4dbaddbe666b9dd117e6"
+        "shared": "dfcf66811e3f393b5f48569a6e62977f8ed3526e2c5683b27e53fa2ead87c834",
+        "entry": "8f25002b1712010ed6ca843e3e66b030492ea8b66c2148789bbd1da61662d5f0"
       },
-      "logicalWork": "81c0bd2681b46635149ec0cb48f2538cf98c8cff0162d9422ec62857cde71ace"
+      "logicalWork": "5aae81737fc41d36fa88142fa9b07face23b073c5f76af716f79e7f993a6ace0"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "padded-bytes",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "b4876b0812547531ba8544637c3f8fc18eee69722b8e69b907105a31ba7b6d56",
+      "inputContext": "04ed5d90306bcbadce7f1b16e7843671fa26ab6bed0a6238d337cce18343b242",
       "result": {
-        "shared": "f66d887bf92a16fbce0842f15b4cc0ddecd26db51809bd60b6c1cea058463188",
-        "entry": "0b164e0973ac28d0f07c697bbce1592f12b36ddd01f6b634f057fb6dbcc5ddd2"
+        "shared": "dfcf66811e3f393b5f48569a6e62977f8ed3526e2c5683b27e53fa2ead87c834",
+        "entry": "23fb2789365c97602bc61c4c65e1e2c5b355b4802cb776497b1715dc36ab9ed9"
       },
-      "logicalWork": "ee07cd19444d9fee0125d87d78171df8ce8bef594aec13775b21655c64ff4e1b"
+      "logicalWork": "7dde979c46817a0261a72f36b362e4fb955211438dd0ad94c1519b9c0774ae03"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "long-string",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "ebf9a38df29293defc5bac6a545b8850fdbe60c0b62cc9d6a540d9d0c3a80239",
+      "inputContext": "5103d3663fbc836860021e9a38949d64b14de3b73098aa596bdea5ac80352d64",
       "result": {
-        "shared": "59544dc4f3d63ee332776eb86c8ae95cdf02f340e00f50cc1df34804823725f8",
-        "entry": "de3058b604c1da0d2f580373cde7d7b665d18d9e120d3f3f73ece06284a29c0b"
+        "shared": "119276bb389f169b82f6d5afed9d27df3271fd4a747a6accd987c8b273eb6285",
+        "entry": "8eb3d56f549d28d6a3c3c28f0140b926b369150afa7b68e60bd4017c454e98ec"
       },
-      "logicalWork": "e8deff705b73192f91c2c318607c6ca3631756ec1ce50892a0fedd93a9ca9bcc"
+      "logicalWork": "ffd4aa01a5645eb06a0cc88f663dbe32621ee62ab93f635bf13ab81a4212c51f"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "many-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "921bb270441cfc7e12b78d17f13c3a64243dea1ce885c300d9b2c4ebc572a5f6",
+      "inputContext": "3bad7f0d954127e3e00764d5fde04874124aab6466bf2f0574f24de95f82daa1",
       "result": {
-        "shared": "5142833b7567c0cc38af40e836d198bf0973dedac39f1a3f1fe4a66e630af15f",
-        "entry": "d3d46e66b80f011f494ea7fb41378e269084e07339137f06bc916f5c6247f62d"
+        "shared": "e6ffff53feabe06f21eeb4f95143fce1d5f774b4f55a9cb58591df9bd788eed9",
+        "entry": "5aaeb8fd54e67e6ff3e510784a0738e5f0f00b67ffca198ee0a34d44faaf8d07"
       },
-      "logicalWork": "6110c6d4578e6bee344af6eaccf4a226bc86c3d1f158440ea4a1e8bcaf65262c"
+      "logicalWork": "8cbf83dd502febada70be68cce3a1ab418aac83742cdea6ac4419ae98cc55d29"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "many-locale-occurrences",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "2e81e6508356b0998d35f9fef8132e4256eb1d098782628fe671ea1a7b387c93",
+      "inputContext": "9001ead607daf43e611672331941a8a700a649ba40a9f1141ac4dd6f85111c00",
       "result": {
-        "shared": "69e0ad92f30b5a394988b28a80ef20b63cfcaa0338828ee1195cfa166b400ed8",
-        "entry": "02126854a2ba4296741bb6397ca8cf79511dac8a1d5c8a58f17bfaecca7e98e7"
+        "shared": "7e014cc241b86821df53446802287d1d77585d1fc5b8322697307d85cdac54f8",
+        "entry": "dd6d4f22569ec18c7687b2c7f3179e5a1c593431092abb49702d84332b0188c8"
       },
-      "logicalWork": "7a68c17d8766bd1f0186a57c77852c1373e9a830ee56af3e0282092525ba6cc8"
+      "logicalWork": "b5e64eda57657f82dda5668369d080b31e9a75b8f2162ec95111e28ccd8eb598"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "ee5f0f07ca48ab74f2357a8f9fc6fa74579ac13ec35dbafa83e0bb726976b6ff",
+      "inputContext": "b2f06f09e4f8be9bf2626280c5c84cf0ab007f208bc19abf91cfdef86dddbacf",
       "result": {
-        "shared": "e1588603955848843d1552d0f11c7f30cf65f68ab78ab6feb0417c3084c1cb34",
+        "shared": "1d409067b1f15dd44dd729692836fa24bcbb4c2335911ce21545c57fdc21b214",
         "entry": null
       },
-      "logicalWork": "bd324bfb661b8445bc56b0f051a65bd322e400601d1606ca1af9c43565e19bb7"
+      "logicalWork": "2c26ec586b2bdd2927c8f092d0ea069b3e0d3680c73c55de0a4718a5e3e59312"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "reversed-members",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "f1d97931f082e8aa0291c58a253412542aee79b2a915f7554721ec300f0a2dd2",
+      "inputContext": "09954623c5186ebb115275fe6f5a095f5407012bd65f8114630922acea8c7a1a",
       "result": {
-        "shared": "e1588603955848843d1552d0f11c7f30cf65f68ab78ab6feb0417c3084c1cb34",
+        "shared": "1d409067b1f15dd44dd729692836fa24bcbb4c2335911ce21545c57fdc21b214",
         "entry": null
       },
-      "logicalWork": "bd324bfb661b8445bc56b0f051a65bd322e400601d1606ca1af9c43565e19bb7"
+      "logicalWork": "2c26ec586b2bdd2927c8f092d0ea069b3e0d3680c73c55de0a4718a5e3e59312"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "padded-bytes",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "5797bc70610d1982f4fb99249ee4f244f226dd26b378f8e9d2b2c9dd2100c870",
+      "inputContext": "47b56cdcc00db1cf1d146a67c9a588fe26d235e2855b070499ddc8e15e303e6e",
       "result": {
-        "shared": "e1588603955848843d1552d0f11c7f30cf65f68ab78ab6feb0417c3084c1cb34",
+        "shared": "1d409067b1f15dd44dd729692836fa24bcbb4c2335911ce21545c57fdc21b214",
         "entry": null
       },
-      "logicalWork": "65312e0a61ffaab4a11cceb037dac375046986667bf4544cc42a6477fec9e430"
+      "logicalWork": "a1a3147b4bef66fd0b5a65731abc2d6ae0183b6c3c550b874b379c00ab4852b1"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "long-string",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "678661de6d8d076ac88681583105abe486996582deada669bdb2462ddb555632",
+      "inputContext": "2b22e981ff3e2f30a074b4e27be46cb6c4a97c5dbd5c46abc027148d2f322347",
       "result": {
-        "shared": "682c58787a43799b1af3e1d0b00989deea97a5e9b4546b63ca5c69325a7fe887",
+        "shared": "006d496ddb67d530be392fa5f99b941ac3526f2067b984a2cf145f499280cae3",
         "entry": null
       },
-      "logicalWork": "2fc6472ff41c36c3e95c6a8b170d42d48c2d7a8282ec0408661b9a6b22d5dc59"
+      "logicalWork": "8a8a196cb46588ff7d6a4b7305058bf1c2efdc63d751ebecb6cb87ac2932f62d"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "many-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "68a9a92562c363b1c0d74b152ad952346f84a4441c42cea670ce46d1683ce395",
+      "inputContext": "bf0251e875c885d3c3c4f0e48ed306e7830edac4c6765c1164a821e5ace9d2da",
       "result": {
-        "shared": "b59d31aefdc7c76d9313fa8c3dec533682f74161e5e2e61c2750efbe5d7cd702",
+        "shared": "307106871c966616bf85e1bacfc2cb9304585d2e4eb5b900832966a2d7b1ce1a",
         "entry": null
       },
-      "logicalWork": "dcaa55be8e01f7312bdc0f18bc4da59bb54b95aade04b56c8dfe466f8ac84d93"
+      "logicalWork": "e0247e84a0cb30277c31e286f25d6bb5fc057c3b42e2152dbaceb10bf934a30c"
     },
     {
       "declaration": {
         "operation": "authoring-construction",
         "fixture": "many-locale-occurrences",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "authoring-complete"
       },
-      "inputContext": "ea8147c58c3d54e1d87299844a68913557bcd0a0eaae276de45d5ebc4b284771",
+      "inputContext": "8e416b11287812d7283409532f097d2675596229f0d15347cdcd5a6cc19a705d",
       "result": {
-        "shared": "f98a7a4518266b610ab3ed4b47dd317b57c745b475c23f67e97c59f3dcf16cf4",
+        "shared": "41f4ab984012ae290cd6e64c91eedadeb14c1b3e90c6f4e9a22e3019eacd6b6b",
         "entry": null
       },
-      "logicalWork": "6db53e3e4cc7b2ae1c0f1eb45507b38546882c9c371bbb097260010de8b10889"
+      "logicalWork": "4f34f46dc3f9f29b4f55ff239d6ee16917d2066eb03c3e96f7bd9c9c13714601"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "bb953cbdbf05ba681ae419585b5a27f206957e5369094fc0c42b20b488edd4aa",
+      "inputContext": "c50c06214680db908cc4bebfb2db8879a9382b07848d7004d9fd56dcf139918d",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "e3fee801fab49cf0d92ab44b314aa2ddf701b9e3313f299661f5c22c63d42647"
+      "logicalWork": "e265dc5368b64752cedb412e940fd8d03a99d2a63a1c8f768a2b88750e1162fa"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "reversed-members",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "dde1dda43be9eac2d51671c9db43e7a3ae5c7a0918a14faeddc538f060137527",
+      "inputContext": "3f649e0a4f5b0ffea695a3d3dc1baedb83e23bc92d1f6158dae48e9399f40b50",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "d04932c076f9ed8b8d4b6b9f1bc149575683988f82af19140d131b5a62e901c4"
       },
-      "logicalWork": "e3fee801fab49cf0d92ab44b314aa2ddf701b9e3313f299661f5c22c63d42647"
+      "logicalWork": "e265dc5368b64752cedb412e940fd8d03a99d2a63a1c8f768a2b88750e1162fa"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "padded-bytes",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "da7eeeb4dbd10ae4714409d1dc953dc2d4ebb7ca8ac8f1e6bfa36f07c06a72bf",
+      "inputContext": "3d7226d328301e56199d4bedcb9864d3c8defdb7b9ea54c7245aada21c2e6248",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "07f660832b60759192f49bb1dd7cfc4157f2fd7944c842a50e6b0cc8d014596c"
+      "logicalWork": "92bc890c158a07add3da2092840a27e1c9f46802c73f9a9d345a20df3d489097"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "long-string",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "48f742a11df3ad9a254cecc05a4b15d45dbea8a13d5a941cb9429a14a5f29d05",
+      "inputContext": "dd420846fae476998dd3e0ea5363b1e84bdcab239e7b8f767b9d05ec1977c965",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "13e75b93fd014ac3e7416dfacc69c781d720ba284a20774569e54eea84f480b6"
+      "logicalWork": "038f6e7e839bf43555bfd4cb92696ba2bdbac7bfc5ae379953c260a45c07bf40"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "many-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "01bf70b86173b9eca52273a6cf4912a7add3621bc1c99a0c816bb0e67d53bf68",
+      "inputContext": "36496bc97b9b54674e6c0984bba251573df2141d99f7c49dbfa8a9b045e0d111",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "1f5f737aee53e54c8ad5823d54ed13feb7fd6d54cdb7fd24533df315ca20be7b"
+      "logicalWork": "f64a67f4a5f23618e02a90c4d6c7a37efc47c21f2af8e100ff0c6d1a3346ae48"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "many-locale-occurrences",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "18775badd0a5a6e94cbea40faf7b3d789289c67d6d1fa11891c9a867cbf887c2",
+      "inputContext": "76b8ed7620a86ea39cd93552ff586f1b795cdc3a97229fcfbcdfc946f8de14af",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "339e40f40780a38f41fdacac5a11585e9ea012264f452f42f63181f91d80f01e"
+      "logicalWork": "ff2f720d854854a34234e1516326e562865800d304e06f49e92ec44db590adc0"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "nested-array",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "d8477b4e5c87c83f19b5d13cc9720a8b44e70628ba740583fa4f2f80b341b238",
+      "inputContext": "8ef867a4957808d311cd2fa9b7cbdfd9c2e467333e433a6f09139411dc557c5b",
       "result": {
         "shared": "dbff4c60622a73701651a811d7915c81e0484f89891bcac452b051cd3565ed9d",
         "entry": "8fcc5f2e7375ffb5aa29c6cd8a2544649ccf7191dc64669f2e4945302df82074"
@@ -407,12 +407,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "many-values",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "58552343d5da86aeedaaaaaef559d4e43d2fe8289ce95dda63bcdf23fcb83462",
+      "inputContext": "4a59b1c1c7997dc78055c2a99696284ead569fb1c9a7761d30340ff58ac930db",
       "result": {
         "shared": "49f2642e632cd68b243ff3e35fc7d78c3659fea66002c873c4ff15a723540d52",
         "entry": "065a993d96f42ba18e48120b09f117252184a1710749b46ecb59ede365087e52"
@@ -423,12 +423,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "portable-maximum",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "0acdf4781fda42893d2cd886242772f4e2e544e2192ce51f2fa3c8064428e901",
+      "inputContext": "cdc808eadb98ea695a86990934594a1137c10c7393b89b37113e7592a04db39d",
       "result": {
         "shared": "ad3c7ade72d75c0102979da61ef1a233e9752b08babffe9e2870771a966d63ae",
         "entry": "f09b4dd0ed48c64b437c88a7762aa43b62a4723cfca0e1f20d64590de71d39a2"
@@ -439,12 +439,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "negative-zero",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "5b0c3986699b2e5550d3119e26c9615048de5c2c071fe1befda91806f8b6c12e",
+      "inputContext": "8200848fb10a48b9890e9ad6f6a6f0d3cf4ede5e3ec9d3b2253095140817bf5c",
       "result": {
         "shared": "9d06ebde455ad6b4221517fcd5dc7fe2d8f892a17db65f9631c8b51a134c218e",
         "entry": "d62d4e80571a6b7fc0460779bd722a44c8fbb9bbcf9c6ec5691a287db6c67267"
@@ -455,12 +455,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "invalid-utf8",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "0663f23a976a997b432abecdd106fcd5c1d48a06fe6fe8a4bb76d59297540f1d",
+      "inputContext": "cfc0f6285adffc1ed34e933cec7a121597e10c05bf9a3c523c38eda88f309208",
       "result": {
         "shared": "c01adc5e6402f1d985ddc54ff1703fa19f32a17886f8a66dbfe7e440ee58bc9e",
         "entry": "9dd5043890ec13728514d12885a05df0aedc38cb8698b203ef658d9a2d52f7f7"
@@ -471,12 +471,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "invalid-json",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "dfea1c21b81d94b817b02bc3e1ab5802fcf4dae06ab77866a115c00bece9e697",
+      "inputContext": "97be90089b38c9bc7cb079e7277d05a5bf0e7931d22f9606045ab852fa796984",
       "result": {
         "shared": "938a09836da45bb7fcad0ed1a3712cf214d01d65c4cd2611e4bc53999992c321",
         "entry": "5798e49c986757c10ae2d5869daa02abde2bff527a874daa287f4cd7ceb01137"
@@ -487,12 +487,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "trailing-token",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "916c0e680996df0422929b6cb6e693c80d664f3deda1fe0b993f3326befff22d",
+      "inputContext": "143e71070a698ad7cac334a3390f630e58ac835361f73f118c0ff05e44ccbdb1",
       "result": {
         "shared": "938a09836da45bb7fcad0ed1a3712cf214d01d65c4cd2611e4bc53999992c321",
         "entry": "d478d9fa371b6558585ecae08d5cec00983eb1f4f9c79bcb49792cf9c5cd275b"
@@ -503,12 +503,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "duplicate-key",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "409a73db2d896958e5b364fe3298c505f810b0254a984e620260e1a85c479307",
+      "inputContext": "1afede917ad297f07a66c861445a9c798f0606e06aaaba768aa8f43ce86ea195",
       "result": {
         "shared": "9da5535ac2f3e8909442010e4ff99530bad0a8584926db251540576bef641346",
         "entry": "9a48a55cc264757c2f72fb39508d63addc0f0b34e1d49a574044d4f041f731b3"
@@ -519,12 +519,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "escaped-duplicate-key",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "ec29ce49f31a5a6f65bae7f9c84a173c8a5997c6481a96e04dbbab0ba352e523",
+      "inputContext": "f30b6641141930d1b16f20e4d6b20e7dac5303bcd0fea68b894dec5ae1faa17d",
       "result": {
         "shared": "9da5535ac2f3e8909442010e4ff99530bad0a8584926db251540576bef641346",
         "entry": "5ab170b97d704ddf98528b094eed932255de6741a77a020d301e07ddb934d75e"
@@ -535,12 +535,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "invalid-surrogate",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "84afcb940e52843ee288e50818f8572315508741b35bd1fcae329229e4251f2c",
+      "inputContext": "ccc71610fe321e7a71820c169f0d19d6b4ee211a36f98cdda95fd19c937f79b3",
       "result": {
         "shared": "59a7badffbb7726b61097663012343cf7b86f66486956a47dd9b593f010ccd4c",
         "entry": "3a03addc84d69287e62d5e9824e91302bda89b75f19c08bb371b917b77aa4429"
@@ -551,12 +551,12 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "non-portable-number",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "936bfe5390053f664727e5cd143f5d23a7fad7b5773812433d47436bb1866a4d",
+      "inputContext": "20fb9c090d199a5e19db542b4a30c58782612d4411a4665af4bbf63be82ee340",
       "result": {
         "shared": "7d5a5ce96f4c244db449276ad2b9be207cba9750b6f8993df9783943e5a8af73",
         "entry": "232f20336446c2d8654bbfadda3a90fe5a01734f3ae3d013e2911494b5442ad2"
@@ -567,14 +567,14 @@
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "root-null",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "137eb04f0f35f2bb2843e6a25315e48bd6e84003deffec7c7464a7b6330ffc4e",
+      "inputContext": "e501babf332f527dc01c0a1ecada4aab9bc82b23739caf9604bf45560202a363",
       "result": {
-        "shared": "47f79acad4f4a437818217d245310394ec9c96789a51283cd216e4cfa9d72400",
+        "shared": "0eef7f21527124bccc14a9e9ff540de98dbe3d2577912262360e0f5b31fecb61",
         "entry": "1c3566538da234080a4de24cc906e3950df5e7bf9f7e79519ba792a3aaef6cd3"
       },
       "logicalWork": "59004731103b172c7a797d176ccc9871d9a0db26c7d3896c79488f01e632db64"
@@ -583,62 +583,62 @@
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "missing-version",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "83459dbdd0666573f20889a3d486f85ca9c7bbbf7190d00db00a2c08d1240754",
+      "inputContext": "71b6b9fac1a768ce2db292f7b773c50f712f110007c83a6d5a877a3f5538a914",
       "result": {
-        "shared": "8dad23481dac3b8b23577324bcffa79a3d230a9d402e04a1c19ce9a923dcf8ef",
-        "entry": "5d290f0c96ed1d0aeef9e81819d2021e83f6ebc9e84c67ec7214c6151d30bb03"
+        "shared": "2f7b75bf61ca433630c788532fe83cc4299d6e50deea6ff0ae3783fb82d10ffb",
+        "entry": "d7fee50ccf933b51d2706dd6ab9f2198c8b3e3b146254df7565dd6fcca2d7cc6"
       },
-      "logicalWork": "ffd07a62e74bcf1e39696a9cf964e4f91b79ef2c65e922dc5c5f1d8a1145f63f"
+      "logicalWork": "e6603ad939927fdf0c0b5ced359934817b50ef521355fa3ff336ed4822ea0026"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "wrong-version-type",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "1349b7b31120e86563d2c73ab12e9cbd02783ef2632178b9e26bd28d73149199",
+      "inputContext": "a02038856b38031c588ba9d13b295a1a4c813ad61a2034860a4c44c5e880e97c",
       "result": {
-        "shared": "0ee8210944ad1158da8c0b6266731561df8873a865aebd529867565136d35c77",
-        "entry": "35e8db8a19c32b5cbcb1cc3215dc035a61b95e3ba9ae3d81602e7f92a9c92999"
+        "shared": "3d7fe4b659d720c493ab3c9c40559b3a6ab9da4ab2abb54b87c28e7ae51150d9",
+        "entry": "000db7501ae02a513be9aa021df58c00877a9af778dfce35cd2e58c0631f71da"
       },
-      "logicalWork": "86dc90a06758dcddba1d2809b1af7c5d0097ceebab9b827c628f96d7b8f144fd"
+      "logicalWork": "f6b008bd05791b1d604a412b63a177df8671f4807beacb5abd614a73f3776f80"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "unsupported-version",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "071a925f89915f9f219883a8b300be17caf41978691700d79192a4d8902a1929",
+      "inputContext": "7ba9be11bb7486128f39d1153e64a0802f9711c8c68d6e610682e439ec597cac",
       "result": {
-        "shared": "9f0fb560a32eb0fdf72325c8090a4ab7ead373d65447d0f8eb267f3755bc70fd",
-        "entry": "49058fb47f68faac89954a809a26cffe93c75386758a6ba6cda5114a34ede1fa"
+        "shared": "d83fb9c2033ab34217a735a0e81ef3d1fbb64798f7c28e58efe13abd73c28f14",
+        "entry": "af0a745ace822d64c632fc02090b72ff32a1585b1c56147d2b8ebee3ea7f0a7f"
       },
-      "logicalWork": "3bd16ce34e789b01cbc86f0964b2660f3751ec1562db36b975cd5874305c7e16"
+      "logicalWork": "4d24d89e4824bd6bc6556a0b5bb580dd6a6b92b78bf0bff10810f900cd876434"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "empty-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "93329205bb0a29f14672f8c2b7c46620d79e0b9a4dac4bb84df862d61a65e88a",
+      "inputContext": "5594a1543c0bb28a5c133b8bed739ed629749892326fcd150f91e399b60317a7",
       "result": {
-        "shared": "57856dfb51f1d512c54320d6a8b30497bc5f9f7c099e6790507402f543a27c67",
+        "shared": "91e09b873948c84d3aeaafece8ebf04da2f1e33ef3e5bf84d60466663431d602",
         "entry": "80d846f4caf5e4b14bb2e87a0fc51938087f4e1a7842500bfb1e6c835af7b047"
       },
       "logicalWork": "a9a450affa42899656c3c82e1fcc587615405fa801f431ad4ab75c69a4711da4"
@@ -647,268 +647,268 @@
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "unknown-member",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "20553eb7e02537fad410cfdfb86495c3f0a74049baaec50c10851921d0ffafc2",
+      "inputContext": "964001d152993cf6a230a45485909696b56f1f275b224f7053793ed31f74431d",
       "result": {
-        "shared": "04deedaa893a997b0297b282dd1b7a21925caf1f14bd7fa66b50a768febc17cf",
-        "entry": "5d49b5993878cea5b4aa198829726d07af4f256af90772d16d854691c594caf2"
+        "shared": "d55795c1f39e0a8ff445d85770f5a8791b903926b9b1ff411f0785aff0921179",
+        "entry": "6feb9e8881e2940cafff78f3512c94ba01af87c1b069852cd2d5c3d101f058cb"
       },
-      "logicalWork": "c662852fea79935976c7170925ffd78111b61f057c9a5c8a48feaa931173b662"
+      "logicalWork": "ad9e53fa617b5a445b7a5823341be3f0d26dc62ba6885c380e3b060591bb001e"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "missing-nullable-policy",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "944e84f67def0ba5cf4997034649f15439bb2ea0f4293debfd0f170826f394fe",
+      "inputContext": "39bf3397e324b922b71a3c1568ac3acdf82032f1253eb7980e54918fa82dd2a9",
       "result": {
-        "shared": "a557d347e7dcc11fea54a9faff30bb011679068948b541d112385fc13e7fe9c8",
-        "entry": "7abd0cf266b42b16e9475cbd461c483917316224eb5a1f5e756612f8bf324f6b"
+        "shared": "3b23c58f8c7e3913f4804f6a181573f9f911bcaccd45412913132980ae0f3d23",
+        "entry": "d3991ac86951ee995985c43221d44675ef68bfad9db45abe2a7a55b7787092cb"
       },
-      "logicalWork": "b8c4e9428debdc05d4350821df063935585563f0f8af448a92ccd899347a2cf0"
+      "logicalWork": "68cb4bcd62fdd1aa82d6c1c78562c7ab22224be226f3b68434cae3c623418885"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "null-source-default",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "b0c3f87b3c256a2968370db25c16d781165e240887001d84b2aa063130df35bd",
+      "inputContext": "43e117430854da2fac989ebc2e1c2c8f8786df3fcf3f2a25b3c058eb87d74ad7",
       "result": {
-        "shared": "9b0d654c87fb434e8815c77531a47410e85fb687aecca5c6ad46ba8ba6b56a1c",
-        "entry": "6647f265c55129e410b8340ebc51a8e83784b9d5672f2021f5637b6f315d2e0e"
+        "shared": "7f497c74c7699e973017b0b8284dcba858d0b7e0828fcca8e21cbe5eadacab61",
+        "entry": "cad2dbb470f3067ff79417a103ed515afd037c271ebb77fa3215c5e476ca00f8"
       },
-      "logicalWork": "fcb3ef2476da4691a1fccd30b7f3e991b21fd610af29fa9baf2aa4e231a3ea60"
+      "logicalWork": "b2636c78f331213e0c5c491d46c19d62c1df81c5bc25c98b5c2b271fe2e25545"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "invalid-sibling",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "11067be7d75b06fa102dfa3437da5a7023d9ef06596752bc896c3fbcaf2a7f9e",
+      "inputContext": "8fefacbfb0dc0cbd4065ffeef3907ee75339f118d25cba275766a1cd5db9edfa",
       "result": {
-        "shared": "976fad9cb1f5c8b148d26dae4d270a40e086bb66a82f7652d63437d180c223f2",
-        "entry": "e95646338cfaaf70d9d7fde5a94a7f6bb94bb2ccc9e625543a36099927e512b3"
+        "shared": "4dcbd3baf6fa83d9680d914958b220e0128e1dd4e584e2d29439ebfd0dd3f4d5",
+        "entry": "55190c879064e38df6b49ac54f3e36f87a99d6c83c309ae753589c83735efaf8"
       },
-      "logicalWork": "a1d2891406ade9024c0c994900067d06d9901e3d655526a409ed04d2641db8ce"
+      "logicalWork": "7a8b01f4ee4d4e25c6609671c5d859053beb28326009b4696eec93c32be49479"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "invalid-resource-reference",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "6594e31136c538ae3cd5ba6766c48a7905c97bb98abe25f57e2dc311b8e89926",
+      "inputContext": "bd771e4dca947d911f01415db0ef05cea19a93194e69eefc578ad1774160fe85",
       "result": {
-        "shared": "49238464c9fead2e723a4902ed4a266ffa19147b7532009d9ff8fefdf6b8bb61",
-        "entry": "bc0af581a08a4c617bc58b740744c57713529258a859b516090e694165e012c1"
+        "shared": "56f948cd239baacab45ebda8ea43bb58e5c4d86069c6e5ada66ae5e2ed9c7d00",
+        "entry": "e65d2deb8f3bfd64a849572004febbc167be621440b51ab3acdabfe20e83c159"
       },
-      "logicalWork": "235a15bdb0374e771637e80c324d739ed8e4b27787316cc1d5fa747c0469177d"
+      "logicalWork": "d56b336883750da0b81b3edbeb36d0659fb52f1a33c5dece117977d1925de86c"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "dense-invalid",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "2549dbf2c76a7a9d158698bc92a197d475a55bb4a10590d1efefd9aab8e3e71a",
+      "inputContext": "aef3656cd75cbd52f8a9835fb417469fe8e86b9fb438958cf05526cde5686e73",
       "result": {
-        "shared": "0164c227a257eb891d0c8942fb586359d338f28b35d19db49192c7ad87078af7",
-        "entry": "2d0f6019e66a2efe5149fa0251f582a0e7fc7a1e965c177ecd64bb52cadf431e"
+        "shared": "b0b064bdf0b8db0518790fb2b35a7063f2119e9d2a493d8299e84bd6f9053805",
+        "entry": "c1b12ae9cc84b13a0dc3f9ffde82a9f521f97008381d16d33efb5be2641ce9c1"
       },
-      "logicalWork": "e98694efabfd7371b07029613b2b17666a38d1c46777ccbbd84fca01d9501ac6"
+      "logicalWork": "9cf123989d10b0a8b9d290c985a768cf804af6161bb9b15aea57cc4e6090bd4c"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "selected"
       },
-      "inputContext": "5f8ba0e880c1d547b0880c01582a8e4700694db462e0c42e47183d34472d3140",
+      "inputContext": "1111067dce785fb53abf80751fe63a72919ecc5e2dab1028865d77dde61ff944",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "b5d97c2f39da2ff71d0477a8a3d66bf28ef6aede458aeec2330a462e89de48ac"
+      "logicalWork": "7e30507912de9fbb767016104888d67af782583cf2572c884fec242fa225a3ff"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "many-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "64df3ff29149408f0071c8b81ca2bdb183b8fb331c5ecabd6cecf25a4b6e6949",
+      "inputContext": "bb5aa32aee46c4544bcf8c6a373b64a05fa03ae074247e2a473a0742e9e95367",
       "result": {
         "shared": "8d25d3635e8416082ceed362d7624460a34cfd2c5c6121014246b7b4a9258546",
         "entry": null
       },
-      "logicalWork": "c6585d29de23057894c18ec948515dd19f70970bc50eb2cb5eda13dc7fef68b9"
+      "logicalWork": "816fa0cf66adc8bb741283f612519421016489cfecc810a06cab8e1f9d80dd08"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "unknown",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "8f24b8ade0817827bbf681fae57612e5ef840f0f3b77276ead798ca377442876",
+      "inputContext": "a7eecea766106bfdb2af59dac8ee8893481e0480a49d5e42b07ad3bbec60484b",
       "result": {
         "shared": "95630f318c0f5ef8e0cc1b3ac369aa3319956fd876c11d329d450a5f4ab78929",
         "entry": null
       },
-      "logicalWork": "7a52325e1934e86d5be1bc2e2b6e07cbcbd0935786ef57173c033482395a705c"
+      "logicalWork": "50ebb16679feae03c06c914c8baafbcc5206ceee4b5d7980cffc9ab41366d542"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "invalid-syntax",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "31c812785548dfeb07766c992ee12a2278c6d1e42f468f315f841d39e92b34fc",
+      "inputContext": "d21546aaa2b17465a6273f6971928cd4fd8cf41c1e71411cb01de815839121ec",
       "result": {
         "shared": "027c95f21fc3fd11bb2fb020070c7a65299a50c15ca23b8347059adff05fcc8b",
         "entry": null
       },
-      "logicalWork": "e3fee801fab49cf0d92ab44b314aa2ddf701b9e3313f299661f5c22c63d42647"
+      "logicalWork": "e265dc5368b64752cedb412e940fd8d03a99d2a63a1c8f768a2b88750e1162fa"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "invalid-type",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "e510fa5b6dd1ad36e2ccc68809d5bf20075a3deff886aa4cd73e57a212dec574",
+      "inputContext": "d9b2541672ef54884b2292a4c7f814d796942811798bfb2d24b4fefb3e59f3e6",
       "result": {
         "shared": "375814c270562d85fbdf0cb1eec3b9710d4348f344cafeb8d026b85a525c9af5",
         "entry": null
       },
-      "logicalWork": "b5d97c2f39da2ff71d0477a8a3d66bf28ef6aede458aeec2330a462e89de48ac"
+      "logicalWork": "7e30507912de9fbb767016104888d67af782583cf2572c884fec242fa225a3ff"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "exact-byte-limit",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "e4d347c1ebf17d8c283d47f7fb61cd7ce3e3082a247d983acc02cf8f5600e51f",
+      "inputContext": "8cea3a905cc8670cb972a860f6d8405803123aa67e021ea60b9c26a23191b0eb",
       "result": {
         "shared": "20b61469e36ea279fc2955ecc91900eb738eff83645d70ebb3635f140fbf6d9e",
         "entry": null
       },
-      "logicalWork": "13b8850f4717a9b5ecd21a93fc5866ae9946f32fa8d10ce2cc192b6978a67c71"
+      "logicalWork": "dd1d6768996974591c19cd01bbc4a4ad41efa8aeaac50deedf10cf26c05cfef3"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "first-over-byte-limit",
         "expectedKind": "selection-rejected"
       },
-      "inputContext": "e975c3ffedc7a4de39f765fae6deea4ae0f9e59cdf4d49c132e3dbd64d145dc2",
+      "inputContext": "56aed0b2b2905f9f8b36c63750692ebdc6491e68535e8807e04c8df5829af4d4",
       "result": {
         "shared": "384dd7ed62657bd6763901807d0965aa5726d54cc09abcd4de4f034e6b6efbd1",
         "entry": null
       },
-      "logicalWork": "e28ba998d9b3dbe6a918d71c52d42319d670b33e50e5063626ca0eb210a406d8"
+      "logicalWork": "9ed7adffadf48a5913c74887c05c4e3b0ca9c1ce8625d2b0d3f80876eb1981f2"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "invalid-sibling",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selected"
       },
-      "inputContext": "3c5429b40fc681d52177015b1a6bae0a33b20248b64c7870ecec96d40da03383",
+      "inputContext": "9a09907921934271b59abff3004bd4995f3261afa4b22a150a56387c4bf18c82",
       "result": {
-        "shared": "11fafba84c3da1a0ea6bd84639c39cc67c7cd61075e958da21b721d6218ec6b1",
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
         "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
       },
-      "logicalWork": "244bcd8252d15f534a95e507bd21babd40f8a5aa0265a5be3ffd73b84cb81d28"
+      "logicalWork": "3ab784d8870bfe533a61671e1d7a97f2b96c31123bef989af7bb01d8fa6822e8"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "invalid-resource-reference",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selection-unavailable"
       },
-      "inputContext": "5c329f823719309eeae56af8f2331bb609c800a1cfd76d92ad33739ce26112e2",
+      "inputContext": "a4c2ac96384a68695b6a98abc1504ce38336718b0318bb37cf7b0bfdd26ac3ff",
       "result": {
         "shared": "7a9831259d0b9fe1a66c2c49b2e110ae16fd2d82f4b48a1254690977d6d6372c",
         "entry": null
       },
-      "logicalWork": "3c4a39cae7d54b5a1ef9bf82a85f9a700245253c8bcb39a3a6484a72a0eb7c3a"
+      "logicalWork": "fa250f1601ebcb96babe99e4016751f8fc76915b47288f92bc311569d8821a45"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "missing-version",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "selection-unavailable"
       },
-      "inputContext": "5190aaa004a05982efa7c53cdaafdd3dca9632a727d382d80ad9193d2df30355",
+      "inputContext": "d9a369f0619a6b3af8311e8f62cd1438958c2161619e6546be024078bb1df594",
       "result": {
         "shared": "7e30c316fbd9798676ca440ae831abdcfd1f06201f9a20fbf7840ceab27f4e17",
         "entry": null
       },
-      "logicalWork": "1976f59ab85c421db99b206a0bd0ad9dea688bf89f1ce76b7beb2fc4b5a14776"
+      "logicalWork": "562e1200084d7eef8dca9e49c4cf0a0309967e4b09afb197ed111d61c93439a3"
     },
     {
       "declaration": {
         "operation": "profile-selection",
         "fixture": "empty-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "selection-unavailable"
       },
-      "inputContext": "2cb005f91d9872769815e59fbb23495f1d963db09f62c5a88d71bf07aadbbf2f",
+      "inputContext": "e731fdebdfd53b063c4f70f6a9fb61b248da788e816e301719127bbb54b3a870",
       "result": {
         "shared": "b0a365e34ad132d086ce60bcb3524e5bcb4010ed6c2367906c031d99a1fa8a1d",
         "entry": null
@@ -919,321 +919,321 @@
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["file-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "1e75b5cdc0de8c11c230e54711608efea426f00c55f9b957321246da33a52e5f",
+      "inputContext": "56f16b7cf59cfe147f5348f0c4e2abdbd3dbe6727bb1cfc8043b4b1406128a88",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["file-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "bb51935c602e717a14c534d8e2241dd533453a64147efb3de84e348bb5e6ab6e",
+      "inputContext": "8d5b16d3f3734733ce56499618afa5cff75a01833a8eda92d04c29726680e407",
       "result": {
-        "shared": "edb849419dc33d46a2484922e6da6dc68690cfb1f9ecb413263372afb08ec303",
-        "entry": "b0f2f9e478c0761264e661f115bd906db49199591217c70a0198a2d51cbda0d5"
+        "shared": "07b4179b72754a4bc2c14e1553163b09118999c879e9f8b74fccb5da44054c6f",
+        "entry": "204aef505051b0929bbb15f6090d10cff97d5226c13d21bcdcd576c8b3c5088d"
       },
-      "logicalWork": "2829bc9617366c19bd474f8977470510544675735455d4b0ff5cfc406906a180"
+      "logicalWork": "6fe8d469d24b978b67e9e80c1a2f70d0e14132075634c2a88d2a370df9246d85"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["parser-tokens", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "6f9f78b20bd98230fddafb8c3c8ea0f6e6189fc7da0bd6738c77c379d3eb45b8",
+      "inputContext": "1252bba1034e2409418bfa64978d1d328b9078f9c9d01bc9c7c83cfba6d4b6a2",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["parser-tokens", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "bbcc76d72a899c90400393b29fd076ca87443cb674e1c7b88e6d5c93c050653d",
+      "inputContext": "9aac3eea76b82b7507b6e326e489b6716e0afbf44d81938a4f5d9170f6efafd1",
       "result": {
-        "shared": "29b38bd9eaed7889d684f6957ddfc97c5b41e835895bfa65f27406eeb6fb574d",
-        "entry": "9ae3af3660ed496a33ac3eb360eaf9aebdb855d4ddd7815432b0fea75074cc64"
+        "shared": "6bea5da697881518a79c7e84f3417b8095a91991b71b8fde03ce5e97a5721608",
+        "entry": "0d5ad73f28ac93566889672e940c0434403919973fa6a23d6d1f787e21ca6153"
       },
-      "logicalWork": "a20cd62a848d297fa0053192a74649c4947e87a8af105e676f085f0ad18e704f"
+      "logicalWork": "9b0f3e52f4c80644a39e7403a15ae3745e16dc80df141a10945c96588ba1f8d8"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["nodes", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "37b7cc9c2ac6a764cffdcdd83537afeedabcb2935579e48fac65097fdb327ba5",
+      "inputContext": "9867b8bdc39df45e40287a20492b07aee6e28b8f559bebd3ac53d3ac3b7e2a63",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["nodes", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "6348338ed8adc306a05b2352eb8a86f2fde39a48534e6ba3136ba17fe0fc173a",
+      "inputContext": "44eff2ebf058663e6ffe191a7c82cc5287feefc6a97550b2b3d42f09a0f546ca",
       "result": {
-        "shared": "835d7fc37c892c51d68e9c68f136f98493b931728a39278647810d01bd9013be",
-        "entry": "89d830730b74faa4d63e1ac8fd83414c0d3c9c0be8bb6afff9a7502ce86fe816"
+        "shared": "6128eada649f3760b4493b1bef5ec59e1d060b58400119cb1205b70de6010b4c",
+        "entry": "9ab6fe0b93bc1ead3bf59fb15ca47de9a0ff0bac1eb339f3d2e34b75844fd46d"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["depth", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "eb8385d1a192e471c262d26cd16e37578b7d2bf07aa2d048d41cbe8525b2ff7f",
+      "inputContext": "3a30f909b753ac50494689efe4f99caecac24369abb8f8d858288f985a1567d8",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["depth", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "cda37c6e28957f73aff5dedceee699660b46aee20dd848b2ef35360dabccd0d5",
+      "inputContext": "891969b7e8278a4d08360a786a985cb3a7c7b0be25dc7bf16adb804f27d1215a",
       "result": {
         "shared": "03ae65a2f5522b5ff4f84f84cbac949850fcd465ccbf97fda36100d929e36102",
-        "entry": "89d830730b74faa4d63e1ac8fd83414c0d3c9c0be8bb6afff9a7502ce86fe816"
+        "entry": "9ab6fe0b93bc1ead3bf59fb15ca47de9a0ff0bac1eb339f3d2e34b75844fd46d"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["collection-entries", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "ec2338984d53803f0a6effece983c16fa60117caec11db5a14b9371c05deffac",
+      "inputContext": "519a3408a3f4316eb104bdda79f288bdaf641d182c46eee491b845735c341283",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["collection-entries", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "99f5eed3acb05d85663aefd66301d7e6fa7c9bea06b50173d72eb22aa335c817",
+      "inputContext": "db718ea2f681578ca11293bf0774e6315609e6b8f055757899ba9e35c9ac7c4e",
       "result": {
-        "shared": "0fe9697b82027a99b89be7c609042fa615cda2665a762e3999fe4bb6e096ac46",
-        "entry": "89d830730b74faa4d63e1ac8fd83414c0d3c9c0be8bb6afff9a7502ce86fe816"
+        "shared": "69c50ee9900dd589ded37ec945b171db1537432d220dabf4f6b2e8c4e8c84882",
+        "entry": "9ab6fe0b93bc1ead3bf59fb15ca47de9a0ff0bac1eb339f3d2e34b75844fd46d"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["total-string-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "87deba49a10d295d15b14b4e5c30d220e3daf12e1850b8b3a3b2c21ac4f5ef72",
+      "inputContext": "c906a5cf322b7578685aca749a83e2efb2450e1cb43df0e036b1262275f76cda",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["total-string-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "6fa0275a708f4675cc80092d1625316b297c3bae159f7515d5cfe527b3653c5d",
+      "inputContext": "35757bc6f9dd3eb0bd567e65a563431f29ce2bb0e1cb60333eee03b226d7e39a",
       "result": {
-        "shared": "273c1d5c4da230eef621f5f3322167b51c69e0669062c378fa9cc13ee602b813",
-        "entry": "89d830730b74faa4d63e1ac8fd83414c0d3c9c0be8bb6afff9a7502ce86fe816"
+        "shared": "56fa30067ebf07a9b368439df0db2df73b669526372e7a53001cdc6600329da3",
+        "entry": "9ab6fe0b93bc1ead3bf59fb15ca47de9a0ff0bac1eb339f3d2e34b75844fd46d"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["single-string-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "materialized"
       },
-      "inputContext": "f97c27c4c0e482f625738f60493ad9afc2773fa051df4f73408da548056c621a",
+      "inputContext": "f9336c2e609fcf21cbf144b8d6e205471b8c85f4b37bdf3665569ba4c5ffa8ae",
       "result": {
-        "shared": "5b47a88b61ad412a6be1e8fcf6e721b01db58b2600eaf2ff9a492906de9fa0e3",
-        "entry": "0e7ed4821aed37ed06d1ac20002ff88b71460f61b160f59ef0fe5d4194fa85af"
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "9ff0646b441922e0bf7b32455ab20211879d1107879ae8e7d2109bdd9face302"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "file-materialization",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["single-string-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "entry-failure"
       },
-      "inputContext": "1166491a7ba1d0615203104b4b6e4779a803ae8753ab9d56a3390e57f755cfb1",
+      "inputContext": "3938af98ff0f0c0b5be847a25f8f0e3d92d4aa0d458d172f0cf48f0eb9bd6b4f",
       "result": {
-        "shared": "12a3289a1198e809cb1c969db8cb31bdb3f99aa3de49d439f8cf4713ef51899f",
-        "entry": "89d830730b74faa4d63e1ac8fd83414c0d3c9c0be8bb6afff9a7502ce86fe816"
+        "shared": "94ce60f7ebeacdc10b8d8104967ebc6a3791c92e4d0d73fa69613c6a761d5fd4",
+        "entry": "9ab6fe0b93bc1ead3bf59fb15ca47de9a0ff0bac1eb339f3d2e34b75844fd46d"
       },
-      "logicalWork": "86f2d98d3cb53430aa15f88b488e4471ad376ed1932a4b85cb3e42bb4ca81b67"
+      "logicalWork": "5f23fbdf9965d0435a20c1d114beac2c35107cf99a674cd2e3e62f41990cf272"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "two-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["profiles", "exact"],
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "961772ec77c866d340c056acc366e84593a7a9eb6134ad9f2979e8f2cc46b283",
+      "inputContext": "8d07a1e4c5eece6ec9ac78821bdb42b1bff6d54da921b38a149dd528ad2d1ce2",
       "result": {
-        "shared": "99160e0ccfe185b7c1ab40a890ff88b4011830c95ade838a992264b661a235cf",
-        "entry": "d0d8cc5a253a6c230243ccefdbc5b19855232f2f9e6c68638f1c620e4bf388d8"
+        "shared": "e92890ba054057d47676e6123926dc1ac9848c97d858b9ae10a611a57cf8f384",
+        "entry": "e885ae618ed20a0b93710116c305845d6849ea457a83a8d29c39ea397b72867b"
       },
-      "logicalWork": "2452f532418503b0aac84a82a2bc9c74256d68fbceacd33eb53b3a3bb60b96b2"
+      "logicalWork": "13478ac51ae5560ed1163decf2499f8f03db89dbbf5ccb66f02ec5c706ac14e7"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "two-profiles",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["profiles", "first-over"],
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "4ca31af57cbc55e5d963b32129f6d5a817bb876e055147f7bfb06d964976b569",
+      "inputContext": "e6aadd9a81e68a6e6a78b80b36e238dd2d2f146173f5dd6679aaa9ee4ba2f183",
       "result": {
-        "shared": "4da3449abe2c1ae5f6921736dc1ca21481e66e050601c32fe8c6dd3be3edc48d",
-        "entry": "ceebf74a9291ca8a33c915a7ffbcef8e4b21bd1ce15bd58907532bd6b9926718"
+        "shared": "543314e8e34bd2f03ca83144fc1130bd3ad73d79104cd2d93d2fb8a15b00c357",
+        "entry": "4b3e4cb9d36fe0ef8038a4d470457fe016d8cbbed3b578b84cb4044613899428"
       },
-      "logicalWork": "739519f1b9bcd332a8261bfda0040e66bce8715a9023b5710825907da8a9bdb6"
+      "logicalWork": "b741f4bf9aaafc7787f365dfa0c5cb6efbcd9a3774e3afa88cbe9022f11e287a"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["profile-id-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "c5a70b81c5637a845970247e3f4c48fb53af0ca00630da027c94ef910c2cab16",
+      "inputContext": "1a36bde57f475b80727f3fb4f8b097b7089ce3da4e8ee2d4464999f0b18ac714",
       "result": {
-        "shared": "8815d79a5a1a0b637bda61c2c41e5aff8bf5ef3c39f486ed8dda47eb57fd2426",
-        "entry": "c2f2d7540624b5e238a8e460f1f76b0499e024fec369f5793c08e8e1178863cb"
+        "shared": "78a406e4bdfbd12839f815e86fccda009a7fa61213e0d1cc5307c8335866b717",
+        "entry": "2012d733479df5da420603d6a728653eb949c85e11c3daf1b3b93ccb78363d47"
       },
-      "logicalWork": "81c0bd2681b46635149ec0cb48f2538cf98c8cff0162d9422ec62857cde71ace"
+      "logicalWork": "5aae81737fc41d36fa88142fa9b07face23b073c5f76af716f79e7f993a6ace0"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["profile-id-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "2a281bf57879f391b9ccdb2642eac8527ee4d1fd96aab6a9fc769b6cd8e1a876",
+      "inputContext": "fe2fb24c3b4155f8422fd45bf81a6fa9d70c22129c408b5c28db28f6c33dfb3d",
       "result": {
-        "shared": "fec992197ef2c1c6d6ed8d0322b4a1c74e0bb1cc4c24698cb811098f1e4454f7",
-        "entry": "fea5e65ac87322c8c1d6b25e4f239f48fbb85b26d4b7537653cc458ffa5d228e"
+        "shared": "7ad8606e8f98d8451f02ec7fdb2605d2f7250c2ba779eea92d66f1248e136b26",
+        "entry": "03a60519d4c86bb87294825701f99eb1708e6ecedf5c0b4adb75257b2af0540d"
       },
-      "logicalWork": "6778e2dfc5012c276b19121d22765355d70b8d2a33713c451785bca4b842c3e8"
+      "logicalWork": "ca7ebbf6127e4d3d4164c5ac0517decb3d7aecd2a776bfdc57513a5386ab95d3"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["structural-units", "exact"],
         "selector": "absent",
         "expectedKind": "structural-complete"
       },
-      "inputContext": "a1b82babd05b1df31f59ec9d89a120e1dc973699b296a45ca1ac6b01f4239c2e",
+      "inputContext": "ba218b8979e0e1900a46ff66422a070ab78981685b7bc3f3e46adadb4e86175a",
       "result": {
-        "shared": "f3e133425e7ca6275d684d1e67cf436c6bc75caace0854f90eba6fd5436987a0",
-        "entry": "c2f2d7540624b5e238a8e460f1f76b0499e024fec369f5793c08e8e1178863cb"
+        "shared": "1599f49380ce4d0265085a04e938964feea600ddbaa9d9f6104c2b9d12b3cd22",
+        "entry": "2012d733479df5da420603d6a728653eb949c85e11c3daf1b3b93ccb78363d47"
       },
-      "logicalWork": "81c0bd2681b46635149ec0cb48f2538cf98c8cff0162d9422ec62857cde71ace"
+      "logicalWork": "5aae81737fc41d36fa88142fa9b07face23b073c5f76af716f79e7f993a6ace0"
     },
     {
       "declaration": {
         "operation": "structural-analysis",
         "fixture": "minimal",
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["structural-units", "first-over"],
         "selector": "absent",
         "expectedKind": "structural-blocked"
       },
-      "inputContext": "1234e83ce97491d49e71fd3de507d43425cf083a3f377eae85ab3c1685d64c72",
+      "inputContext": "f91dc1904d3d39cd4a73963a201f49f415ad3dd570af8b34dc9e76f93ef220d6",
       "result": {
-        "shared": "5afc33863768d03b8c81c6b9d9ae935b215fe507368d2fbd01b5b22e01706c27",
-        "entry": "2a546867fe5c2976c156e5a85e4794d931facf3e0be7b54cfe5b64dcbc1ca422"
+        "shared": "5f69acdcbbf3f77638f4d79884993fc9520e0c915f2cd82d131f3f0e5fd8acfe",
+        "entry": "bdcfb58a0fbf2741632805a0a837e9ace295b3aa6125c4aa0a3016db8e35bf9e"
       },
-      "logicalWork": "6a678784061ce44fb6c1b8400409d9ee899f194b38078673e6cc40df5ba38ce5"
+      "logicalWork": "2b5353a8697311f8b4c108e953bd13c70e3e8bc558f0efcffaaad619c49fa6e7"
     },
     {
       "declaration": {
@@ -1241,12 +1241,12 @@
         "fixture": {
           "locale": "language"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "6e80207a9ef55057b5baf6f0d31e9cae85daeb771c9fb6257560bb083aa6808b",
+      "inputContext": "b0662547ae6b5f712ea8567fd11af75277f3b27ebf694f8ec8415a76e042201f",
       "result": {
         "shared": "07a5e62af89ef16f8d1adb9fb9c4f09e63cd0340fd3c55a24d91a77c60775287",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1259,12 +1259,12 @@
         "fixture": {
           "locale": "region"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "39c44f2efca38f9c1214218e0d685e84253de9d69320347d16f9628b0881c8fe",
+      "inputContext": "c2d345c29890eeb2839ecfcf45621f73c4bb18489d7d95a35a9816034ff71af5",
       "result": {
         "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1277,12 +1277,12 @@
         "fixture": {
           "locale": "casing"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "80324c315579943569c4062be860a97786e74722a0d05e5b9f54241964bd13e4",
+      "inputContext": "a0a6f767e023e132af145d7227292dd12a81404ac407d6eadcc07b0cd1d14373",
       "result": {
         "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
         "entry": "6381d8de68d16d1e5c957fea4ed8d5848f78e11a8f9243686678a008ad02e9ef"
@@ -1295,12 +1295,12 @@
         "fixture": {
           "locale": "alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "43815a95bb782241c24dd94d060ececa09e084a0e79c53977b40cfaf393a12bb",
+      "inputContext": "9a43adae529408d8889fbbe3fdfce11d06cb83014fcb242fdcf2bb9ca7e00dd8",
       "result": {
         "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
         "entry": "37b5ad33da489146ca924ffd81668bb30eaa29286211b090ac443cb6e27a5fff"
@@ -1313,12 +1313,12 @@
         "fixture": {
           "locale": "canonical-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "9056eedb58bcea2ae0cb2e44f793f634fe4e9bede4219cd2136502f252506b7e",
+      "inputContext": "68a6968968168b31f69b39ebf2e1365752bbfe36b47766468959189a1d4873e5",
       "result": {
         "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1331,12 +1331,12 @@
         "fixture": {
           "locale": "extension-ordering"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "b30dd1fe006591af91425e6558fa3864468ef74b5d4bfe108b0e49c940ce3817",
+      "inputContext": "a5f5de32ad3748283e5ea372e042cc0d8381badcc83a714946d7ab8f76e38599",
       "result": {
         "shared": "1694a6f2715353d9d2cb18d1e131f3cc14e5206c9ebd8d3119f076bb8f95fedc",
         "entry": "9d702af8d3fbb6032a01b6e4783ece7e7706553a27139f27df624a5c4a6eb7c1"
@@ -1349,12 +1349,12 @@
         "fixture": {
           "locale": "canonical-extensions"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "aa4f9f3890b02b84dcb937f57bc86e3e1460d1fa3ecf01a998fabb22217cc876",
+      "inputContext": "00dc752c518e6aa990503ff18c8b11dec85d51803caf9e727a3680ac8052ef24",
       "result": {
         "shared": "1694a6f2715353d9d2cb18d1e131f3cc14e5206c9ebd8d3119f076bb8f95fedc",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1367,12 +1367,12 @@
         "fixture": {
           "locale": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "700dc986dd2f2fe32460d5a15f095c653e499c1b43bf7347bfa2658a6e2a674f",
+      "inputContext": "b61957be7812d9887fa0420b31d49170cdf9fd0f9dd12f61e37ec90aeb866c8e",
       "result": {
         "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
         "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
@@ -1385,12 +1385,12 @@
         "fixture": {
           "locale": "canonical-expanded-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "d44dfb3f91e9ef1ecc597010a2a09aef580f48a5607f2fd075b6b36d7be2de7f",
+      "inputContext": "e9a1ceaf721aa72efc6479c7e76bcacaab4ff07ae2e5bb3efe1865ce3b1d8ede",
       "result": {
         "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1403,12 +1403,12 @@
         "fixture": {
           "locale": "invalid-legacy"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "b9c13de85257a76ede999577640521d265726f0d483fcf6ac79f0045ae1c9e0b",
+      "inputContext": "7206acfd11d6f269b153d1a53550066ce01f5f79f9b79fa5de77cd7691888da3",
       "result": {
         "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
         "entry": null
@@ -1421,12 +1421,12 @@
         "fixture": {
           "locale": "invalid-validity"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "747a5010556aeac22b05390bf02acb07333f114e294890c2e0791e92bbffcc0d",
+      "inputContext": "6a89c639c39b6fd1260d2910aee2aa577155b09d354d9a9dd89a6c9dc2231a4b",
       "result": {
         "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
         "entry": null
@@ -1439,12 +1439,12 @@
         "fixture": {
           "locale": "invalid-extension"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "0d2152ec57326ed3371bdd93313e97ab293f89b070a4dcd725db488087d47c92",
+      "inputContext": "2f8509816124f57c8ff80987bc12bc5e404223013a3572fefb35eb9d5f788467",
       "result": {
         "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
         "entry": null
@@ -1457,12 +1457,12 @@
         "fixture": {
           "locale": "invalid-private"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "609dd6a5fc8ab805c24bc6e7f09b980c9f6ca5eda6307ada49b51d39d6358994",
+      "inputContext": "32ba48c8edaa77d84ccc25375359be76d24f4c7dbd2f9555204b85e878feb17d",
       "result": {
         "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
         "entry": null
@@ -1475,12 +1475,12 @@
         "fixture": {
           "locale": "region"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["locale-raw-identifier-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "977fd822c0320394320fd1f0464525e48f958a7d6dad78f0f06a4c11560fd3f4",
+      "inputContext": "c0ad122c26d4cb6cc008f713a5ccf25acc14088d1ce9640c72c63d839b61a95c",
       "result": {
         "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
         "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
@@ -1493,12 +1493,12 @@
         "fixture": {
           "locale": "region"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["locale-raw-identifier-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "ae934436eae226f7559f19590fc468673fd1fde0d5252aee682c63b05428ae75",
+      "inputContext": "82c389b84cdf30a43af18382d995aa1d1e6441d0eca71ce4187b5d99995a8f47",
       "result": {
         "shared": "d03cd3f5eca10b33faeaa1bc863cb4f37942fada0d92cfe1ea60de0eacaf6d92",
         "entry": null
@@ -1511,12 +1511,12 @@
         "fixture": {
           "locale": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["locale-canonical-identifier-bytes", "exact"],
         "selector": "absent",
         "expectedKind": "locale-canonicalized"
       },
-      "inputContext": "a3f056a30ccb1a7ef2f2fe83cf939f2a8de4051251e33f9d595576091768c3a4",
+      "inputContext": "923e5b9d9b219ab0710aa2c7afefc12219e123d8d529817f07f923523a7355ba",
       "result": {
         "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
         "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
@@ -1529,12 +1529,12 @@
         "fixture": {
           "locale": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["locale-canonical-identifier-bytes", "first-over"],
         "selector": "absent",
         "expectedKind": "locale-rejected"
       },
-      "inputContext": "f821c3b0bd47406e9af97e6348e269dd26d4d0ca1d9c3ed1d82536f53a901015",
+      "inputContext": "4a50ace1e0058d0f126e6f661ac18cbeed59bbb4d72756561ff882d61f67df94",
       "result": {
         "shared": "07dad779dd6dec9fd5352ef6c5017f4d1d43d62a6dd89e6b3a70342ad92862ef",
         "entry": null
@@ -1547,12 +1547,12 @@
         "fixture": {
           "locale-core": "minimal"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "17908aeb9ab366a4da23ef2a8534c145448ff0837f5fa507c359d1b7d5f59b10",
+      "inputContext": "9bc267c963e4b45aaecec1c69a1aee835b963a51c4b90795ecf790f96202f46f",
       "result": {
         "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1565,12 +1565,12 @@
         "fixture": {
           "locale-core": "source-und"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "8bd071ba00a3f53a1630d6d9a8b6aead1fd8755965528649eb7377bfcb75e41d",
+      "inputContext": "c12e233bec68e921fe0239e976693a5175e47e37bdf437a4d423e40856dc179f",
       "result": {
         "shared": "072db0dfc87ea853ce8d492c4fceb1ac33654e7205da4e1bbd0f2c67920e4fff",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1583,12 +1583,12 @@
         "fixture": {
           "locale-core": "source-en"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "ccf6f5cb1b1dbcfff6bff5e489103491fff7c0cb1e9716881b2836cf3274f3e2",
+      "inputContext": "8065cb04ddd6de43437d53296344ea36cceb3956b46110e2f24a8b3ea2accd96",
       "result": {
         "shared": "288af36991aa0113628eafa74884fed24b8e70474f5f8082ade95125f8103168",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1601,12 +1601,12 @@
         "fixture": {
           "locale-core": "multi"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "d2ab884d43559f7682392cf515ad99c11514fb394c7540a1bac1a6bf6f3201d7",
+      "inputContext": "072a10de7fc4142b5fc9be800ff90c0ba6dc2d0012b28c7ed9528fd2133e2402",
       "result": {
         "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1619,12 +1619,12 @@
         "fixture": {
           "locale-core": "reordered"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "2d98ba359cce45bd306a8465440b3def09dc125b4a4786164e5ffac2ccf1cc05",
+      "inputContext": "87dd088cc86dc7a5ca6df47621224d7a1ddad72e6f329ecb5e05c3af4a475dbe",
       "result": {
         "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1637,12 +1637,12 @@
         "fixture": {
           "locale-core": "aliased"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "e7bf849d447863669aa64746fe69832d226efbb0e0373a2f21fd0bb273873474",
+      "inputContext": "532be38bc8da6a54ff48bb8900449c2bc4018a299f818dff26ef3befddc66ce6",
       "result": {
         "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
         "entry": "cd1b868ac48a4641d3e8d769a5328c393c046fd3c0ad1df72bec16153d2759c7"
@@ -1655,12 +1655,12 @@
         "fixture": {
           "locale-core": "changed-set"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "22957b1012bf2c4923e485faa7f7d9752ec4208ed7539eba744f5024e3e2f096",
+      "inputContext": "c61157f3c920c71db34c72ce058001286ba2318cb9c9451a5fce73b8cfd5b0bd",
       "result": {
         "shared": "9b39c74a3f289cd6703992712b6c004e4dd3d9859c34c7c532d7bccd8bccc7d9",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1673,12 +1673,12 @@
         "fixture": {
           "locale-core": "changed-default"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "5a6b882e1a772b7eb1c3aa9fb3652b14844c0b2bd69bcccd4b75aa5d4c789ad5",
+      "inputContext": "b9f061cc78ff5336d67eae8b4732ad34cc6d9be6032b5474a6b2754216281737",
       "result": {
         "shared": "758ec9510c125b4fd65b5a5a500bc3e62ad92a2db9c612811b50cf2cf1a51333",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1691,12 +1691,12 @@
         "fixture": {
           "locale-core": "changed-source"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "1b5d74349adb4d59012d612136d0e502bf794039b3fb1a54e9b3b23c0f7f9ccb",
+      "inputContext": "3dc3ae7b0fd4b55b3375af3644b196e2fbe54e8860852900c47d72821bc7fd86",
       "result": {
         "shared": "4ad81a84d258af465ccd1da6eaa25a2f1a740c31e92b92c206f8c5e041e4ac99",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1709,12 +1709,12 @@
         "fixture": {
           "locale-core": "absent-source"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "f7c4ddba7be2027812a28d5a30bd4d7bb15abccdde829075fc7bb5fef579c907",
+      "inputContext": "cdd0ea63af31a4679f39342382f965c8d3ad1767e9b8cf64da7f520ba1644b48",
       "result": {
         "shared": "036b1df28a3a99cb8f239ca753428a5812c940a00821201d0ccf2ecf5b8bfca1",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1727,12 +1727,12 @@
         "fixture": {
           "locale-core": "exact-duplicate"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "d705a5697cc58a4b81b30c6a8fc8cdcdc3af5c031025b52388edbbd58fce0d01",
+      "inputContext": "ceceae8e684cb686ea727a90fdc995fe4b42daf5e7aecb090fa24c6e61727c7e",
       "result": {
         "shared": "97f8f2c75e4542968b2e29a8544ff6e04d4a650b58e960dc3d5ec11f896f76fd",
         "entry": "34028243d6a979b8f5c694416a98ed6d00250b51a928eabcd13953f6405d0165"
@@ -1745,12 +1745,12 @@
         "fixture": {
           "locale-core": "alias-duplicate"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "7e4d5cc74a766eea336a7a6712c62513f2cc5dac9ac8dcccaf6a6394aafae6ad",
+      "inputContext": "9e407a287d76a8c0bbd80d118b2a6ed5886efde8ff243a72e211d980a4e2dc48",
       "result": {
         "shared": "97f8f2c75e4542968b2e29a8544ff6e04d4a650b58e960dc3d5ec11f896f76fd",
         "entry": "136b5eeffa67fd1a2e00c2358b44b5670c97386d0094a243dc028e498bfe7dd5"
@@ -1763,12 +1763,12 @@
         "fixture": {
           "locale-core": "multiple-duplicates"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "22dce9e7c6030fd8d8adc7a9a7f95e4514d5b52674850378be4903a267e9afa8",
+      "inputContext": "aa6f2b172a920ce26af7a0ae3b688a7fcb0b93b7006e8d52976eb47fdcfe36a1",
       "result": {
         "shared": "48122821b1d963dca4871ddc96c2bab751b5d6baa144905362d079e5ec36b5ca",
         "entry": "7b4c22b3d36196b260fb05d76a8c47b8ef7e9e50045baf75dc9e3c0ddc1549f7"
@@ -1781,12 +1781,12 @@
         "fixture": {
           "locale-core": "duplicate-heavy"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "6bdeaee7af34a1a903ebb7208c3efa8ea8e0613c9bda9b7dd0ce7969cf43f0e1",
+      "inputContext": "f43e820511c6887b5e4f3dff4bbb2f3f5054a2ff5696bf4dc956b71c0a501e9f",
       "result": {
         "shared": "44d31dcafd381818959fda2684d54a2c5c4654fc1231af464da7e33971d92495",
         "entry": "463a843c66bf695249ee52ebe046fac18fdbdc6f69b2a93351653502cb66e495"
@@ -1799,12 +1799,12 @@
         "fixture": {
           "locale-core": "invalid-source"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "e4b56a7bc5008bd158d336feb67b7fe5f247ee54c45ba91aa78e3065fb5637de",
+      "inputContext": "320817348260891c9664713bd69a70a15ce1535d54b0125bde6c401e10419649",
       "result": {
         "shared": "3663ad545628b4831028fad7bdb36a0d5377f181b68ab003d1ae75164b4a86a6",
         "entry": "933fcde2e02a8aa6a28f7883bfb4477e14ce6d9e1a4330e33748b24f9d68a383"
@@ -1817,12 +1817,12 @@
         "fixture": {
           "locale-core": "invalid-requested"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "1062ade97ea33f1ad53cbb580c3f4ba1b1019dbf9a0b0a5222359d43c406be8c",
+      "inputContext": "ba38fd518ef79a103c41c9ffbebc2f2bc25d24983c742ec0c37f372622f46476",
       "result": {
         "shared": "9a31003c89743f861ab7567110116c6b692e0a325de3fd3609db556c383ddf36",
         "entry": "f0f749dbf96cca65ffa369b46b3bfbcf4cab14d963962c9f6b049422778531b4"
@@ -1835,12 +1835,12 @@
         "fixture": {
           "locale-core": "invalid-default"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "e74624a6d6ee687b6c327d33d7ac474ead8765c7db4e797462efb0ec1338a6db",
+      "inputContext": "0e145e5ffbdcb07a41799895bb757d736ff637cc5add9f6508a11b47d146de1b",
       "result": {
         "shared": "f157387cf90f93c3524f663b614549e73eb5fa3702731ae9c7eee304b77217c1",
         "entry": "bd5263b0e5b4bc0f760222e6b37557195a4767d7b2b053da984a881fdde91997"
@@ -1853,12 +1853,12 @@
         "fixture": {
           "locale-core": "invalid-and-duplicate"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "2fe27a29617d0cdae8f32c8d1d42299b6e89320a49c025ce6fb4873ba4613731",
+      "inputContext": "f5fbf89c79ad6092187fce0c9ae7cc232a575a7e93d111364524d4b58aa4be50",
       "result": {
         "shared": "3a838c18aa0cded116d1432768d49dea7f5f6df4187464c8e18adde3c4eb41a0",
         "entry": "6e7eb7a632aa00e0d11b567cfd42cec2e571b9181ba713bc0434a2cc02081022"
@@ -1871,12 +1871,12 @@
         "fixture": {
           "locale-core": "default-not-member"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "7ecdb2ee56f83531e53805f170c8c72ce1c453ba26874ca5695361d9e9787ca6",
+      "inputContext": "890884d00a6eb933cc7386828ad4c69efd926ce3621db572e405d4498f3b38c5",
       "result": {
         "shared": "f566af71a8f12f7279cb6a53e9ce41606d91dd534aaead5270b5bf2d59e907d1",
         "entry": "a9d860c45ce85c4983ade23f6b75d1f1ef9f936b7bbada7a46c09b04a5cbbdc9"
@@ -1889,12 +1889,12 @@
         "fixture": {
           "locale-core": "unrelated-fields"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "31e27671a1f7d0f47520f632c31b5d4d6f5cab4c0fe47e727865204df467e85e",
+      "inputContext": "4767042659342a00183b713524fe0a2b46eedeea938e661a00295f729ceec193",
       "result": {
         "shared": "288af36991aa0113628eafa74884fed24b8e70474f5f8082ade95125f8103168",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1907,12 +1907,12 @@
         "fixture": {
           "locale-core": "other-profile"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "5c5909873591a97fcfd340245159aecf6a52047c164ad208fa507b6958c7c410",
+      "inputContext": "b623d497cc2814272fd004e60b084dbdb54ea440ad111f47b63efe9b122ae855",
       "result": {
         "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1925,12 +1925,12 @@
         "fixture": {
           "locale-core": "duplicate-reordered"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "5cb28621fa349ea46d91a4ee79131af9820d1d2cdf140ccd843ac921fc29c7bb",
+      "inputContext": "d341b47be7d9635f67803025b1d933231beb8042778fadac216de0eba11e9567",
       "result": {
         "shared": "48122821b1d963dca4871ddc96c2bab751b5d6baa144905362d079e5ec36b5ca",
         "entry": "3b470b7eee901cbfbb3a5815835af59374a263b30816801d96e5b4e3400ceac5"
@@ -1943,12 +1943,12 @@
         "fixture": {
           "locale-core": "invalid-reordered"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "39460bd345f115be7c4f49224220e4e0696b64985a601b46f4abc1ea368e850f",
+      "inputContext": "3f3619ea04cca9418daa7b1ddfd1cff54ad4a2252b8c9dbb96c7d696d7623fa9",
       "result": {
         "shared": "3a838c18aa0cded116d1432768d49dea7f5f6df4187464c8e18adde3c4eb41a0",
         "entry": "3c69009fb4914a2b73b0772b7c8b780bb867bcd24fce53f8e8a920452ad993d6"
@@ -1961,12 +1961,12 @@
         "fixture": {
           "locale-core": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "2b0ce663b8027e214a3a703496447938346d4875a7a84c89d6258f5217be2127",
+      "inputContext": "a6a6cf747bcb56174b0edbf15db0f1f60205982dffc918315c8918b56d7a6ad5",
       "result": {
         "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
         "entry": "d56376acfbc50da5d4f8f0d86005480e43a9e08a99fcf9de0d6653c5ba7adccc"
@@ -1979,12 +1979,12 @@
         "fixture": {
           "locale-core": "expanded-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": null,
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "85d7ae1cafa6ef0bf0f82cc6771dba44b329f9aa67687099a6570d3ba37145a1",
+      "inputContext": "7e2c7b47d485677d2d0da4b45393da7aa4658f7132cb686b3c6a710ed3b6afde",
       "result": {
         "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -1997,12 +1997,12 @@
         "fixture": {
           "locale-core": "multi"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-active-occurrences", "exact"],
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "88a4184b878242e3cd4dd997ae16757c07c8c3e93317f3bbcc911526940ffcbd",
+      "inputContext": "93559ac64ef09574a82b43a2640c056eadd482d43ce8dacbeb89e469fafbf640",
       "result": {
         "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -2015,12 +2015,12 @@
         "fixture": {
           "locale-core": "multi"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-active-occurrences", "first-over"],
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "62b0f891d3756359e5952727d1b6e38a67cfd6ad334e7d58da54a94851454dd7",
+      "inputContext": "19194553323db1b78ba2ec867d8e78ff1a8247065d01e909769c9bd21e5f2419",
       "result": {
         "shared": "d4d95c5c578a3da22e5e7396b344afd3e8ca5d4ecd78026d57a45ec1bb9b89f4",
         "entry": "87e69feadff490b04eb091511116aa2b97c3fe4f2b225eff5dd28856efa52229"
@@ -2033,12 +2033,12 @@
         "fixture": {
           "locale-core": "multi"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-requested-cardinality", "exact"],
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "0f27260c48edd11ef48c739bac3915c208703cffa8aa34d6bcd3e6a0b6cd7910",
+      "inputContext": "65a04dbd761b8f3ff533c3e1892f1b4e4f6e7ccf5d5ae28135cb76a568912aa6",
       "result": {
         "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -2051,12 +2051,12 @@
         "fixture": {
           "locale-core": "multi"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-requested-cardinality", "first-over"],
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "3cdc7e0a8f1d75fc7680f4b46380bc45e137cec9225132f94ac3aafa3941868d",
+      "inputContext": "dff3360d22d7d2af4ef6d5c2342e0e6ee1c2abe3aa171ba66b80d89a9cb48214",
       "result": {
         "shared": "4cab5aecb822a9217651732df904796fbd7db0d71c96d1db3f97c114d6ef967f",
         "entry": "95dacd50509b62d97c31da52e85facb5566b08a7d4b44b0c3ed73435a38a402f"
@@ -2069,12 +2069,12 @@
         "fixture": {
           "locale-core": "minimal"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-raw-identifier-bytes", "exact"],
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "f5559b22dec475db8b0cf9a7c520e0cd12e64dd66cb7701d7503690f46ae986d",
+      "inputContext": "000ffc7d92adccdcbac6e710b5559268e54ec0a19bd7015093962c128f5fdd65",
       "result": {
         "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
         "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
@@ -2087,12 +2087,12 @@
         "fixture": {
           "locale-core": "minimal"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-raw-identifier-bytes", "first-over"],
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "e3d5a60038a8dbcdd064fd46c0e77aca4a141d52b5b0d8ed8eaa1f8997177461",
+      "inputContext": "92fc968e5025a1c96dd24b88f7c1ee3ca40f389116287b6d8a70c4d36fd3da22",
       "result": {
         "shared": "6a4bca866b3571c2669d0f87ed35329a6d71fa2223f4fb481b854cc5befb3891",
         "entry": "6b04d6c44a0217a28d2a1ae2583d1fde7cf6a3c7354347eb0a7603ba2de735ee"
@@ -2105,12 +2105,12 @@
         "fixture": {
           "locale-core": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-canonical-identifier-bytes", "exact"],
         "selector": "app",
         "expectedKind": "locale-core-resolved"
       },
-      "inputContext": "4f7f14b666032dfd061d4c158e5b7022253e2f4180950c3c511a8e02bc9ff280",
+      "inputContext": "4cd8c22fb1172b5776ab33da4cf3dffd354d355d60e7a8c69f7d1f5db2901e50",
       "result": {
         "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
         "entry": "d56376acfbc50da5d4f8f0d86005480e43a9e08a99fcf9de0d6653c5ba7adccc"
@@ -2123,12 +2123,12 @@
         "fixture": {
           "locale-core": "expanding-alias"
         },
-        "fixtureRevision": "0",
+        "fixtureRevision": "1",
         "limit": ["core-canonical-identifier-bytes", "first-over"],
         "selector": "app",
         "expectedKind": "locale-core-rejected"
       },
-      "inputContext": "0b62ed95b9fe31dc9899b22c28982a6868c28d9be4cef2091871a29f28a8aa90",
+      "inputContext": "7395de04335b2d35cdedbf9d76fffa040d4a46f58584972f65d064d32d02a905",
       "result": {
         "shared": "976a844e561399f6844ff34f74223160064514c9f94b71a1a6cf5c751f31a340",
         "entry": "4e3f92279775c7c84efca993281ca67550441b983b8b415c5d1d7c187887eb33"

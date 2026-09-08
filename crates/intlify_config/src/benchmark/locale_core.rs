@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::fixtures::FixtureConfig;
+use super::operation::Config;
 use crate::locale::core::{Failure, Input, Issue, Limits, Location, Resolution};
 use crate::locale::{CanonicalizationFailure, ProviderFailure, Spelling};
 use crate::model::ProfileId;
@@ -20,7 +20,7 @@ use super::quantity::Quantity;
 
 pub(super) struct PreparedCore {
     pub(super) analysis: Analysis,
-    pub(super) config: FixtureConfig,
+    pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) provider: Arc<locale::Core>,
     pub(super) limits: Limits,

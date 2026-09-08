@@ -66,6 +66,10 @@ mod benchmark;
 
 #[cfg(any(test, feature = "benchmark"))]
 #[allow(dead_code)]
+mod profile_fixtures;
+
+#[cfg(test)]
+#[allow(dead_code)]
 mod fixtures;
 #[cfg(test)]
 mod materialize_tests;

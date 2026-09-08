@@ -4,8 +4,9 @@
 //! Finite test-owned reference encodings. These are not 017 artifacts.
 //!
 //! The fixture discriminants intentionally advertise their non-product scope;
-//! neither type is compiled into the ordinary library. The non-default benchmark
-//! feature uses the same bounded fixtures, not a second test reference encoding.
+//! neither type is compiled into ordinary or benchmark-only libraries. These
+//! synthetic types retain generic structural-admission regression coverage;
+//! owner measurements and the minimum vertical slice use `profile_fixtures`.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

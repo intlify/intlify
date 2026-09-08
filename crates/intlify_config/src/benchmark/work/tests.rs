@@ -7,9 +7,9 @@ use serde_json::{json, Value};
 
 use crate::benchmark::clock::tests::ScriptedClock;
 use crate::benchmark::operation::{tests::operations, Schema};
-use crate::fixtures::minimal_config;
 use crate::input_limits::Bound;
 use crate::materialize::materialize_file;
+use crate::profile_fixtures::minimal_config;
 use crate::structural::selection::{InvalidSelectorType, SelectorInput};
 use crate::structural::StructuralLimits;
 
@@ -400,6 +400,90 @@ fn scalar_counts_use_complete_logical_units_not_serialized_byte_lengths() {
         fact(&work, WorkKind::ProfileDeclarations).observation,
         WorkValue::NotApplicable {}
     );
+}
+
+#[test]
+fn formal_configuration_work_agrees_with_an_independent_json_tree_count() {
+    use crate::benchmark::cases::Recipe;
+
+    // This oracle traverses serde_json's separately decoded tree, not the
+    // materializer's nodes, its counts, or freshly printed golden checksums.
+    // Tokens include punctuation and member names; logical nodes exclude keys.
+    fn count(value: &Value, depth: u64, totals: &mut [u64; 6]) {
+        totals[1] += 1;
+        totals[2] = totals[2].max(depth);
+        let string = |text: &str, totals: &mut [u64; 6]| {
+            let bytes = u64::try_from(text.len()).unwrap();
+            totals[4] += bytes;
+            totals[5] = totals[5].max(bytes);
+        };
+        match value {
+            Value::Object(members) => {
+                let len = u64::try_from(members.len()).unwrap();
+                totals[0] += 2 + len.saturating_sub(1) + 2 * len;
+                totals[3] += len;
+                for (key, child) in members {
+                    string(key, totals);
+                    count(child, depth + 1, totals);
+                }
+            }
+            Value::Array(items) => {
+                let len = u64::try_from(items.len()).unwrap();
+                totals[0] += 2 + len.saturating_sub(1);
+                totals[3] += len;
+                for child in items {
+                    count(child, depth + 1, totals);
+                }
+            }
+            _ => {
+                totals[0] += 1;
+                if let Value::String(text) = value {
+                    string(text, totals);
+                }
+            }
+        }
+    }
+
+    for recipe in [
+        Recipe::Minimal,
+        Recipe::ReversedMembers,
+        Recipe::PaddedBytes,
+        Recipe::LongString,
+        Recipe::TwoProfiles,
+        Recipe::ManyProfiles,
+        Recipe::ManyLocaleOccurrences,
+    ] {
+        let source = recipe.source();
+        let value: Value = serde_json::from_slice(&source).unwrap();
+        let mut expected = [0; 6];
+        count(&value, 1, &mut expected);
+        let work = observe(&Prepared::Entry {
+            source: Arc::clone(&source),
+            limits: crate::materialize_tests::limits(),
+        });
+        assert_eq!(
+            fact(&work, WorkKind::RawFileBytes).observation,
+            WorkValue::exact(u64::try_from(source.len()).unwrap())
+        );
+        for (kind, total) in [
+            WorkKind::ParserTokensVisited,
+            WorkKind::LogicalValueNodes,
+            WorkKind::MaximumValueDepth,
+            WorkKind::CollectionEntries,
+            WorkKind::TotalDecodedStringBytes,
+            WorkKind::MaximumDecodedStringBytes,
+        ]
+        .into_iter()
+        .zip(expected)
+        {
+            assert_eq!(
+                fact(&work, kind).observation,
+                WorkValue::exact(total),
+                "{recipe:?}, {kind:?}"
+            );
+            assert_eq!(fact(&work, kind).stage, WorkStage::OperationResult);
+        }
+    }
 }
 
 #[test]

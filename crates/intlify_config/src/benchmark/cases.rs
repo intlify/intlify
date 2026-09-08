@@ -18,6 +18,11 @@ mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
 
+// Revision 1 adopts the formal 015/017 configuration references across the
+// complete fixed inventory. Locale-only spellings and result/work codecs retain
+// their meaning; no old synthetic row may be silently reused as this revision.
+const FIXTURE_REVISION: &str = "1";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum LimitKind {
@@ -175,7 +180,7 @@ fn declaration(
     Declaration {
         operation,
         fixture,
-        fixture_revision: "0".into(),
+        fixture_revision: FIXTURE_REVISION.into(),
         limit: None,
         selector,
         expected_kind,

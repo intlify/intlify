@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::fixtures::{FixtureConfig, FixturePolicyReference, FixtureTargetReference};
 use crate::input_limits::InputLimits;
 use crate::materialize::{materialize_file, MaterializationError, MaterializedDocument};
+use crate::model::IntlifyConfig;
+use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{
     InvalidSelectorType, Selection, SelectionFailure, SelectionInvariant, SelectionPrerequisite,
     SelectorInput,
@@ -24,8 +25,9 @@ use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{locale, locale_core};
 
-pub(super) type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
-pub(super) type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
+pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
+pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
+pub(super) type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -102,8 +104,8 @@ pub(super) enum Prepared {
 pub(super) enum Output {
     Entry(Result<MaterializedDocument, MaterializationError>),
     Structural(Result<Analysis, AdmissionInvariant>),
-    Authoring(Result<Option<FixtureConfig>, AdmissionInvariant>),
-    Select(Result<Selection<FixturePolicyReference>, SelectionInvariant>),
+    Authoring(Result<Option<Config>, AdmissionInvariant>),
+    Select(Result<Selection<PolicyReference>, SelectionInvariant>),
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
     LocaleCore(crate::locale::core::Resolution),
 }
@@ -239,9 +241,7 @@ impl Output {
     }
 }
 
-fn observe_selection(
-    selection: &Selection<FixturePolicyReference>,
-) -> Result<Observation, OutputFailure> {
+fn observe_selection(selection: &Selection<PolicyReference>) -> Result<Observation, OutputFailure> {
     let mut shared = Frame::new("provisional-selection");
     let entry = match selection {
         Selection::Selected(selected) => {

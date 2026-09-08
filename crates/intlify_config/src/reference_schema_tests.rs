@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use crate::input_limits::Bound;
 use crate::materialize::{materialize_file, MaterializedDocument};
 use crate::model::IntlifyConfig;
+use crate::profile_fixtures::{complete_config as config, minimal_config, reference};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AuthoringSchema, StructuralAnalysis, StructuralLimits};
 
@@ -34,34 +35,6 @@ const POLICIES: [(&str, &str); 7] = [
     ("providerRouting", "provider-routing-policy"),
     ("glossarySet", "glossary-set"),
 ];
-
-fn reference(kind: &str) -> Value {
-    // An exact structural pin, not a fabricated admitted artifact body.
-    json!({
-        "kind": kind,
-        "identity": "fixture-artifact",
-        "revision": "1",
-        "specificationRevision": "0",
-        "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-    })
-}
-
-fn config() -> Value {
-    formalize_fixture(crate::fixtures::complete_config())
-}
-
-fn formalize_fixture(mut value: Value) -> Value {
-    let app = &mut value["profiles"]["app"];
-    for (slot, kind) in POLICIES {
-        if !app["policies"][slot].is_null() {
-            app["policies"][slot] = reference(kind);
-        }
-    }
-    for target in app["targetProfiles"].as_object_mut().unwrap().values_mut() {
-        target["profile"] = reference("target-profile");
-    }
-    value
-}
 
 fn schema() -> &'static AuthoringSchema<PolicyReference, TargetProfileReference> {
     static SCHEMA: OnceLock<AuthoringSchema<PolicyReference, TargetProfileReference>> =
@@ -152,8 +125,14 @@ fn formal_schema_is_closed_fresh_and_deterministic() {
 
 #[test]
 fn all_declared_kinds_and_complete_profiles_use_the_same_structural_path() {
+    for (slot, kind) in POLICIES {
+        assert_eq!(
+            config()["profiles"]["app"]["policies"][slot],
+            reference(kind)
+        );
+    }
     agrees(config(), true);
-    agrees(formalize_fixture(crate::fixtures::minimal_config()), true);
+    agrees(minimal_config(), true);
     let mut value = config();
     value["profiles"]["app"]["policies"]["providerRouting"] = Value::Null;
     value["profiles"]["app"]["policies"]["glossarySet"] = Value::Null;
