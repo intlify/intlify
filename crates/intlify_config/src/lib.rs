@@ -28,6 +28,10 @@
 //! ```compile_fail
 //! use intlify_config::locale::core::Core;
 //! ```
+//! The vertical-slice harness is test-only, not a production resolver entry:
+//! ```compile_fail
+//! use intlify_config::minimum_tests::harness::FixtureRunner;
+//! ```
 
 pub mod json;
 pub mod location;
@@ -59,5 +63,7 @@ mod benchmark;
 mod fixtures;
 #[cfg(test)]
 mod materialize_tests;
+#[cfg(test)]
+mod minimum_tests;
 #[cfg(test)]
 mod model_tests;

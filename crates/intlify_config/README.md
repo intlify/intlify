@@ -138,6 +138,12 @@ This checker consumes views supplied by an enclosing admitted record layer. It d
 
 ## Verification
 
+The [minimum vertical-slice fixture index](./fixtures/minimum/README.md) maps the raw-entry tests to their 015 rules and stopping points. Its test-only runner calls the ordinary strict materializer, structural analysis, complete model construction, exact selection, and private locale core; it never reconstructs a partial authoring root from valid fragments. Invalid raw input, invalid root/version/structure, and rejected selection stop before later stages. Locale failure retains its private exact reasons but no core.
+
+The fixtures run without the `benchmark` feature and cover formatting/member/alias equivalence, semantic mutations, selected-profile isolation, scoped limit edges, retained output after failed calls and runner release, and explicitly caller-scheduled parallel invocations on native targets. No repository discovery, file writes, host locale, clock, network, random fixture input, or implicit thread pool enters this path. The harness has no public or serde surface and is absent from both ordinary and benchmark-only library builds.
+
+These tests and their index complete a local portion of minimum vertical-slice verification, not PR 6 or the minimum milestone. Formal shared-reference schema, common record/projection/report, standalone benchmark smoke, CI wiring, and the final handoff/completion audit remain open. The fixture index is not the Phase 6 Suite Index, a new conformance manifest, or `profile_resolve_e2e` evidence.
+
 `src/model_tests.rs` records an explicit inventory of every fixed object's fields and checks positive, negative, omission, null, wrong-type, empty-collection, identity, and sibling-failure fixtures. It compares the internal evaluator, typed deserialization, and the independently compiled Draft 7 schema. The external schema oracle is a pinned dev dependency with HTTP/file retrieval, TLS, and IDNA data disabled; it is not part of the normal dependency graph.
 
 Relevant traceability:
