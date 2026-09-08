@@ -3,8 +3,8 @@
 
 //! 015-owned structural authoring types, not a checked localization profile.
 //!
-//! Policy and target references are type parameters: 017 has not frozen their
-//! wire representations. Only test-owned instantiations exist at this stage.
+//! Policy and target references are type parameters; the formal instantiation
+//! uses 017's closed reference types, independently from synthetic test inputs.
 //! No partial root is returned by deserialization, and semantic normalization
 //! (including locale uniqueness, membership, and defaults) is deliberately later.
 

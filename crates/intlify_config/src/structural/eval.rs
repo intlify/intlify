@@ -236,13 +236,11 @@ impl<'input> Walker<'input> {
                 admitted = false;
             }
         }
-        if schema.identity_pattern && matches!(value, NodeKind::String(_)) {
+        if let (Some(pattern), NodeKind::String(text)) = (schema.string_pattern, value) {
             self.unit()?;
-            if let NodeKind::String(text) = value {
-                if self.collect && !valid_identity(text) {
-                    self.value_issue(IssueKind::ValueInvalid, id, subject);
-                    admitted = false;
-                }
+            if self.collect && !pattern.matches(text) {
+                self.value_issue(IssueKind::ValueInvalid, id, subject);
+                admitted = false;
             }
         }
         match value {

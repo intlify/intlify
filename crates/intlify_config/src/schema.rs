@@ -9,6 +9,19 @@
 use schemars::{generate::SchemaSettings, JsonSchema};
 use serde_json::Value;
 
+/// Generate the complete configuration-version-0 structural schema.
+///
+/// Uses 015's authoring model and 017's formal reference encodings. This helper
+/// exposes schema data, not a partial Profile or a resolver construction API.
+pub fn project_profile_config_schema() -> Result<Value, serde_json::Error> {
+    draft7_schema::<
+        crate::model::IntlifyConfig<
+            crate::references::PolicyReference,
+            crate::references::TargetProfileReference,
+        >,
+    >()
+}
+
 /// Generate an owner model's Draft 7 schema without generator-only root `$id`.
 pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     let root = SchemaSettings::draft07()
@@ -24,7 +37,8 @@ pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
 /// Sort object members by unsigned UTF-8 bytes and produce stable JSON bytes.
 ///
 /// Array order and all field semantics are retained. String arrays use the
-/// repository formatter's compact style, and output has one final newline.
+/// repository formatter's compact style when they fit its 100-column width,
+/// and output has one final newline.
 pub fn format_schema(mut value: Value) -> Result<String, serde_json::Error> {
     sort_object_members(&mut value);
     let output = serde_json::to_string_pretty(&value)?;
@@ -99,7 +113,10 @@ fn compact_string_array_lines(lines: &[&str], start: usize) -> Option<(usize, St
                 .collect::<Vec<_>>()
                 .join(", ");
             let comma = if trailing_comma { "," } else { "" };
-            return Some((cursor + 1, format!("{indent}{property} [{joined}]{comma}")));
+            let compacted = format!("{indent}{property} [{joined}]{comma}");
+            // Keep serde's multiline representation for long required/enum
+            // lists, so regeneration and the repository formatter agree.
+            return (compacted.chars().count() <= 100).then_some((cursor + 1, compacted));
         }
 
         match serde_json::from_str::<String>(value) {
@@ -157,6 +174,18 @@ mod tests {
     fn arrays_keep_order_escaping_and_non_string_elements() {
         let value = json!({"enum": ["z", "a", "a\"b", "a\\b", "\n"], "items": [1, null, true]});
         let output = format_schema(value.clone()).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&output).unwrap(), value);
+        assert_eq!(
+            output,
+            format_schema(serde_json::from_str(&output).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn long_string_arrays_keep_the_multiline_form_without_changing_values() {
+        let value = json!({"required": ["a".repeat(60), "b".repeat(60)]});
+        let output = format_schema(value.clone()).unwrap();
+        assert!(output.contains("\"required\": [\n"));
         assert_eq!(serde_json::from_str::<Value>(&output).unwrap(), value);
         assert_eq!(
             output,

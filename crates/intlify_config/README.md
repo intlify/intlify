@@ -6,7 +6,7 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 
 - The CLI uses the shared duplicate-aware JSON compatibility decoder, byte positions, Draft 7 generation, and deterministic schema formatting.
 - The private authoring model covers the complete **015-owned** field vocabulary: named declarations, locale inputs, coverage, policy slots, targets, groups, and delivery.
-- Policy and Target Profile reference representations remain generic type parameters. The only current instantiations use explicitly test-owned types.
+- The formal structural instantiation uses 017's closed Policy and Target Profile references. It generates a complete checked-in Draft 7 schema without exposing the private authoring root or claiming artifact-body admission.
 - Private strict file materialization validates UTF-8, JSON syntax, decoded duplicate keys, Unicode scalars, and Portable JSON Numbers while retaining raw bytes and key/value/container spans.
 - An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
 - Outer admission selects configuration version `"0"`, preflights profile count/ID byte bounds, and retains independently admitted fields. Only complete structural success can construct `IntlifyConfig`; the root has no raw `Deserialize` route.
@@ -24,13 +24,20 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
 
-## Schema gate
+## Project-profile schema
 
-Design 017 has not yet fixed the JSON encodings of `PolicyReference` and `TargetProfileReference`. The authoring model must not invent those encodings or replace their validation with an open `serde_json::Value`.
+The formal configuration schema is [project-profile-config-v0.schema.json](./schema/project-profile-config-v0.schema.json), generated from the complete 015 authoring model and the five-field references defined by [017](../../design/017-intlify-shared-artifact-and-version-admission-design.md). Each reference retains its kind, identity, exact revision, specification revision, and full SHA-256 semantic-content pin. Structural admission does not acquire or authenticate a body, establish semantic-version support, or resolve a reference's Policy role.
 
-The test fixtures use closed `$testPolicy` / `$testTarget` objects with finite token enums. They exist only under `cfg(test)` or the non-default `benchmark` feature; they are not fallback production inputs, artifact identities, or deployment data. The generated test schema keeps those fixture type names.
+The schema-only workspace helper exposes neither a Profile constructor nor an application-facing resolver. The developer example prints deterministic JSON by default; `--check` verifies the checked-in artifact and `--write` regenerates that one artifact. These commands work independently from the CLI's legacy schema and do not publish a new schema URL:
 
-Accordingly, this step intentionally does **not** create `schema/project-profile-config-v0.schema.json`, a public project-profile schema generator, or a published schema path. Completing that artifact and its freshness gate requires the admitted shared reference definitions. The existing CLI schema is unchanged.
+```sh
+rtk proxy cargo run -p intlify_config --example generate_config_schema -- --check
+rtk proxy cargo run -p intlify_config --example generate_config_schema -- --write
+```
+
+Formal-reference fixtures compare the checked-in schema, typed model, strict materialization, compiled structural evaluator, and guarded root construction. They cover all 015-owned fixed-object fields, closed reference members and kinds, exact digest/token syntax, required-nullable slots, duplicate raw members, independent invalid siblings, and a private locale-core handoff. A unit test enforces schema freshness in the ordinary Rust test command.
+
+Older synthetic `$testPolicy` / `$testTarget` inputs remain isolated under `cfg(test)` or the non-default `benchmark` feature to retain existing regression evidence. They do not appear in the formal schema and are not fallback production inputs. The fixed owner benchmark registry still uses those explicitly synthetic inputs; adopting the formal input representation in that registry and validating the complete common measurement path remain integration work, not proof of Phase 1 completion.
 
 ## Structural rules
 

@@ -1,8 +1,9 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Private schema-guided admission for the minimum profile path. Test-owned
-//! reference schemas are not formal 017 artifacts or construction authority.
+//! Private schema-guided admission for the minimum profile path. Formal 017
+//! references and isolated synthetic fixtures use the same admission mechanism;
+//! neither a generated schema nor a fixture is full construction authority.
 
 use std::collections::BTreeSet;
 use std::marker::PhantomData;
@@ -67,8 +68,8 @@ struct BoundSchema {
     declaration_schema: SchemaId,
 }
 
-/// A type-bound generated schema for the internal minimum path. Only test-owned
-/// reference types instantiate it today. Not a formal Schema Authority Set/RCI.
+/// A type-bound generated schema for the internal minimum path, including the
+/// formal reference types. Not a complete formal Schema Authority Set or RCI.
 pub(crate) struct AuthoringSchema<Policy, Target> {
     binding: Arc<BoundSchema>,
     model: PhantomData<fn() -> (Policy, Target)>,

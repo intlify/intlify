@@ -20,6 +20,10 @@
 //! ```compile_fail
 //! use intlify_config::fixtures::FixtureConfig;
 //! ```
+//! Formal references are internal structural types, not an artifact API:
+//! ```compile_fail
+//! use intlify_config::references::PolicyReference;
+//! ```
 //! The experimental locale provider is not a public configuration API:
 //! ```compile_fail
 //! use intlify_config::locale::Canonicalizer;
@@ -38,9 +42,11 @@ pub mod location;
 pub mod schema;
 
 // The production entry will use these private types after structural admission.
-// Reference encodings remain external type parameters, not placeholder artifacts.
+// Formal 017 reference encodings remain distinct from test-only instantiations.
 #[allow(dead_code)]
 mod model;
+#[allow(dead_code)]
+mod references;
 
 // Separate from the compatibility decoder: strict 015 entry is still internal.
 #[allow(dead_code)]
@@ -67,3 +73,5 @@ mod materialize_tests;
 mod minimum_tests;
 #[cfg(test)]
 mod model_tests;
+#[cfg(test)]
+mod reference_schema_tests;

@@ -24,67 +24,70 @@ fn schema_validator() -> &'static jsonschema::Validator {
 }
 
 // Every fixed 015-owned object's complete field inventory is represented here.
-// The fixture reference rows explicitly belong to tests rather than to 017.
+// Shared by the synthetic and formal-reference structural tests.
+pub(crate) const OWNED_FIELD_INVENTORY: &[(&str, &[&str], &[&str])] = &[
+    ("", &["schemaVersion", "profiles"], &["$schema"]),
+    (
+        "/profiles/app",
+        &[
+            "projectId",
+            "selectionScope",
+            "requestedLocales",
+            "defaultRequestedLocale",
+            "policies",
+            "targetProfiles",
+            "deploymentGroups",
+        ],
+        &[
+            "defaultSourceLocale",
+            "localeNegotiation",
+            "messageFallback",
+            "coverage",
+            "delivery",
+        ],
+    ),
+    ("/profiles/app/localeNegotiation", &[], &["aliases"]),
+    ("/profiles/app/coverage", &[], &["defaultMode", "rules"]),
+    (
+        "/profiles/app/coverage/rules/2",
+        &["mode"],
+        &["requestedLocales", "intentSurfaceClasses"],
+    ),
+    (
+        "/profiles/app/policies",
+        &[
+            "resourceLimits",
+            "trust",
+            "sourceAdmission",
+            "approval",
+            "selection",
+            "providerRouting",
+            "glossarySet",
+        ],
+        &[],
+    ),
+    (
+        "/profiles/app/targetProfiles/browser",
+        &["profile", "requestedLocales"],
+        &["defaultRequestedLocale"],
+    ),
+    (
+        "/profiles/app/deploymentGroups/web",
+        &["members"],
+        &["hydrationRelations"],
+    ),
+    (
+        "/profiles/app/deploymentGroups/web/hydrationRelations/0",
+        &["server", "client"],
+        &[],
+    ),
+    ("/profiles/app/messageFallback/ja/1", &["kind"], &[]),
+    ("/profiles/app/delivery", &[], &["placement"]),
+];
+
 #[test]
 fn field_inventory_matches_required_optional_and_wrong_type_behavior() {
-    let inventory: &[(&str, &[&str], &[&str])] = &[
-        ("", &["schemaVersion", "profiles"], &["$schema"]),
-        (
-            "/profiles/app",
-            &[
-                "projectId",
-                "selectionScope",
-                "requestedLocales",
-                "defaultRequestedLocale",
-                "policies",
-                "targetProfiles",
-                "deploymentGroups",
-            ],
-            &[
-                "defaultSourceLocale",
-                "localeNegotiation",
-                "messageFallback",
-                "coverage",
-                "delivery",
-            ],
-        ),
-        ("/profiles/app/localeNegotiation", &[], &["aliases"]),
-        ("/profiles/app/coverage", &[], &["defaultMode", "rules"]),
-        (
-            "/profiles/app/coverage/rules/2",
-            &["mode"],
-            &["requestedLocales", "intentSurfaceClasses"],
-        ),
-        (
-            "/profiles/app/policies",
-            &[
-                "resourceLimits",
-                "trust",
-                "sourceAdmission",
-                "approval",
-                "selection",
-                "providerRouting",
-                "glossarySet",
-            ],
-            &[],
-        ),
-        (
-            "/profiles/app/targetProfiles/browser",
-            &["profile", "requestedLocales"],
-            &["defaultRequestedLocale"],
-        ),
-        (
-            "/profiles/app/deploymentGroups/web",
-            &["members"],
-            &["hydrationRelations"],
-        ),
-        (
-            "/profiles/app/deploymentGroups/web/hydrationRelations/0",
-            &["server", "client"],
-            &[],
-        ),
-        ("/profiles/app/messageFallback/ja/1", &["kind"], &[]),
-        ("/profiles/app/delivery", &[], &["placement"]),
+    let reference_inventory: &[(&str, &[&str], &[&str])] = &[
         ("/profiles/app/policies/trust", &["$testPolicy"], &[]),
         (
             "/profiles/app/targetProfiles/browser/profile",
@@ -93,7 +96,7 @@ fn field_inventory_matches_required_optional_and_wrong_type_behavior() {
         ),
     ];
 
-    for &(pointer, required, optional) in inventory {
+    for &(pointer, required, optional) in OWNED_FIELD_INVENTORY.iter().chain(reference_inventory) {
         let full = complete_config();
         let actual: std::collections::BTreeSet<_> = full
             .pointer(pointer)

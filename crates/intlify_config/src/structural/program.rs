@@ -11,6 +11,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Map, Value};
 
 use crate::model::ID_PATTERN;
+use crate::references::SEMANTIC_DIGEST_PATTERN;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum StringPattern {
+    Identity,
+    SemanticDigest,
+}
+
+impl StringPattern {
+    pub(super) fn matches(self, value: &str) -> bool {
+        match self {
+            Self::Identity => crate::model::valid_identity(value),
+            Self::SemanticDigest => crate::references::valid_semantic_digest(value),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct SchemaId(usize);
@@ -37,7 +53,7 @@ pub(super) struct SchemaNode {
     pub(super) reference: Option<SchemaId>,
     pub(super) value_type: Option<ValueType>,
     pub(super) enum_strings: Option<BTreeSet<String>>,
-    pub(super) identity_pattern: bool,
+    pub(super) string_pattern: Option<StringPattern>,
     pub(super) min_items: Option<u64>,
     pub(super) min_properties: Option<u64>,
     pub(super) required: Option<BTreeSet<String>>,
@@ -209,9 +225,14 @@ impl Compiler<'_> {
             if node.enum_strings.as_ref().is_some_and(BTreeSet::is_empty) {
                 return Err(ProgramError::MalformedSchema);
             }
-            node.identity_pattern = match object.get("pattern") {
-                None => false,
-                Some(Value::String(pattern)) if pattern == ID_PATTERN => true,
+            node.string_pattern = match object.get("pattern") {
+                None => None,
+                Some(Value::String(pattern)) if pattern == ID_PATTERN => {
+                    Some(StringPattern::Identity)
+                }
+                Some(Value::String(pattern)) if pattern == SEMANTIC_DIGEST_PATTERN => {
+                    Some(StringPattern::SemanticDigest)
+                }
                 Some(_) => return Err(ProgramError::UnsupportedPattern),
             };
             node.min_items = object
