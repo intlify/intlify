@@ -7,11 +7,15 @@
 mod quantity;
 
 #[cfg(feature = "benchmark")]
+mod build;
+#[cfg(feature = "benchmark")]
 mod cases;
 #[cfg(feature = "benchmark")]
 mod clock;
 #[cfg(feature = "benchmark")]
 mod collect;
+#[cfg(feature = "benchmark")]
+mod context;
 #[cfg(feature = "benchmark")]
 mod descriptor;
 #[cfg(feature = "benchmark")]

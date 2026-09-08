@@ -13,7 +13,7 @@ workspace = true
 [features]
 default = []
 # Measurement support is excluded from ordinary configuration consumers.
-benchmark = ["dep:blake3", "dep:rustix"]
+benchmark = ["dep:blake3", "dep:rustix", "dep:serde_json"]
 
 [dependencies]
 schemars = { version = "1.0", features = ["derive"] }
@@ -25,7 +25,13 @@ blake3 = { version = "=1.8.7", optional = true }
 # Reuse the locked safe clock API; this never enters the ordinary config graph.
 rustix = { version = "=1.1.4", features = ["time"], optional = true }
 
+[build-dependencies]
+# Build-time observations are produced only for the benchmark feature.
+blake3 = { version = "=1.8.7", optional = true }
+serde_json = { version = "1.0.106", optional = true }
+
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
 # Reuse the version already locked for intlify_contract's schema tests.
 jsonschema = { version = "=0.52.1", default-features = false }
+tempfile = "3"

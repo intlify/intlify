@@ -3,7 +3,8 @@
 
 //! Benchmark-owned observation codec, revision 0. These hashes are not 017
 //! artifact digests, Profile identities, signatures, or evidence-disclosure tokens.
-//! Only finite fixture operations use this module; it is not a file export API.
+//! Only feature-isolated owner observations and bindings use this module; it is
+//! not a shared artifact or file export API.
 
 use std::collections::BTreeMap;
 use std::fmt;
