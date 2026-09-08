@@ -24,6 +24,10 @@
 //! ```compile_fail
 //! use intlify_config::locale::Canonicalizer;
 //! ```
+//! The minimum locale result is not a consumer Profile or serializable artifact:
+//! ```compile_fail
+//! use intlify_config::locale::core::Core;
+//! ```
 
 pub mod json;
 pub mod location;

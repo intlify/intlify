@@ -172,6 +172,10 @@ impl<T: JsonSchema> JsonSchema for NonEmptyVec<T> {
 pub(crate) struct NonEmptyMap<K: Ord, V>(BTreeMap<K, V>);
 
 impl<K: Ord, V> NonEmptyMap<K, V> {
+    pub(crate) fn get(&self, key: &K) -> Option<&V> {
+        self.0.get(key)
+    }
+
     pub(crate) fn values(&self) -> impl Iterator<Item = &V> {
         self.0.values()
     }

@@ -266,6 +266,8 @@ fn binding_differences<Id: Eq>(
     .collect()
 }
 
+pub(crate) mod core;
+
 #[cfg(any(test, feature = "benchmark"))]
 pub(crate) mod fixtures;
 
