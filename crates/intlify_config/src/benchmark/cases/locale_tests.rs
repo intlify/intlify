@@ -9,21 +9,21 @@ use crate::locale::{CanonicalizationFailure, ProviderFailure};
 #[test]
 fn canonicalization_cases_extend_the_catalog_without_changing_the_original_inventory() {
     let cases = declarations();
-    assert_eq!(cases.len(), 94);
+    assert_eq!(cases.len(), 127);
     assert!(cases[..77]
         .iter()
         .all(|case| case.operation != Operation::LocaleCanonicalization));
-    assert!(cases[77..]
+    assert!(cases[77..94]
         .iter()
         .all(|case| case.operation == Operation::LocaleCanonicalization));
     assert_eq!(
-        cases[77..]
+        cases[77..94]
             .iter()
             .filter(|case| case.limit.is_some())
             .count(),
         4
     );
-    for case in &cases[77..] {
+    for case in &cases[77..94] {
         let candidate = prepare(case).unwrap();
         assert!(
             candidate.input_limits.is_none(),

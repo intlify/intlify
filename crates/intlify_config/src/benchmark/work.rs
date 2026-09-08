@@ -1,8 +1,8 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Versioned workload facts for input/structural/selection and the single-locale
-//! canonicalization slice. These are not physical metrics, formal Resource
+//! Versioned workload facts for input/structural/selection, single-locale
+//! canonicalization, and project locale core. These are not physical metrics, formal Resource
 //! Policy observations, or whole-profile locale-policy / target work.
 
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ use crate::structural::selection::SelectorByteObservation;
 
 use super::operation::{Analysis, Operation, Output, Prepared};
 use super::quantity::Quantity;
+
+mod core;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -37,6 +39,14 @@ pub(super) enum WorkKind {
     CanonicalLocaleIdentifierBytes,
     RetainedCanonicalLocaleValues,
     LocaleCorrectionSuggestions,
+    LocaleCoreOccurrences,
+    LocaleCoreRawIdentifierBytes,
+    LocaleCoreCanonicalRequestedLocales,
+    LocaleCoreRetainedValues,
+    LocaleCoreRetainedValueBytes,
+    LocaleCoreBlockingReasons,
+    LocaleCoreRelatedDuplicateOccurrences,
+    LocaleCoreCorrections,
 }
 
 impl WorkKind {
@@ -65,11 +75,22 @@ impl WorkKind {
         Self::LocaleCorrectionSuggestions,
     ];
 
+    const LOCALE_CORE: [Self; 8] = [
+        Self::LocaleCoreOccurrences,
+        Self::LocaleCoreRawIdentifierBytes,
+        Self::LocaleCoreCanonicalRequestedLocales,
+        Self::LocaleCoreRetainedValues,
+        Self::LocaleCoreRetainedValueBytes,
+        Self::LocaleCoreBlockingReasons,
+        Self::LocaleCoreRelatedDuplicateOccurrences,
+        Self::LocaleCoreCorrections,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
-        if operation == Operation::LocaleCanonicalization {
-            &Self::LOCALE
-        } else {
-            &Self::INPUT
+        match operation {
+            Operation::LocaleCanonicalization => &Self::LOCALE,
+            Operation::LocaleCoreResolution => &Self::LOCALE_CORE,
+            _ => &Self::INPUT,
         }
     }
 
@@ -81,6 +102,8 @@ impl WorkKind {
             | Self::MaximumDeclaredProfileIdBytes
             | Self::SelectorIdBytes
             | Self::RawLocaleIdentifierBytes
+            | Self::LocaleCoreRawIdentifierBytes
+            | Self::LocaleCoreRetainedValueBytes
             | Self::CanonicalLocaleIdentifierBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes => WorkUnit::LogicalValue,
@@ -90,10 +113,17 @@ impl WorkKind {
             Self::StructuralAnalysisUnits => WorkUnit::ApplicableKeywordSubject,
             Self::RetainedAdmissionIssues
             | Self::RetainedSchemaFragments
-            | Self::RetainedSchemaIssuesIncludingAlternatives => WorkUnit::RetainedRecord,
-            Self::LocaleOccurrences => WorkUnit::LocaleOccurrence,
-            Self::RetainedCanonicalLocaleValues => WorkUnit::CanonicalLocaleValue,
-            Self::LocaleCorrectionSuggestions => WorkUnit::CorrectionSuggestion,
+            | Self::RetainedSchemaIssuesIncludingAlternatives
+            | Self::LocaleCoreBlockingReasons => WorkUnit::RetainedRecord,
+            Self::LocaleOccurrences
+            | Self::LocaleCoreOccurrences
+            | Self::LocaleCoreRelatedDuplicateOccurrences => WorkUnit::LocaleOccurrence,
+            Self::RetainedCanonicalLocaleValues
+            | Self::LocaleCoreCanonicalRequestedLocales
+            | Self::LocaleCoreRetainedValues => WorkUnit::CanonicalLocaleValue,
+            Self::LocaleCorrectionSuggestions | Self::LocaleCoreCorrections => {
+                WorkUnit::CorrectionSuggestion
+            }
         }
     }
 }
@@ -130,6 +160,7 @@ enum UnavailableWork {
     ProfileContainerNotAdmitted,
     SchemaPrerequisiteUnavailable,
     LocaleNotCanonicalized,
+    LocaleCoreRequestedNotResolved,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,10 +208,12 @@ pub(super) enum WorkFailure {
 impl LogicalWork {
     pub(super) fn observe(prepared: &Prepared, output: &Output) -> Result<Self, WorkFailure> {
         let mut work = Self {
-            profile_identity: if prepared.operation() == Operation::LocaleCanonicalization {
-                "intlify-config-minimum-single-locale-work"
-            } else {
-                "intlify-config-minimum-input-work"
+            profile_identity: match prepared.operation() {
+                Operation::LocaleCanonicalization => "intlify-config-minimum-single-locale-work",
+                Operation::LocaleCoreResolution => {
+                    "intlify-config-minimum-project-locale-core-work"
+                }
+                _ => "intlify-config-minimum-input-work",
             }
             .into(),
             profile_revision: "0".into(),
@@ -287,6 +320,9 @@ impl LogicalWork {
                             .is_ok_and(|value| value.suggested_replacement().is_some()),
                     )),
                 );
+            }
+            (Prepared::LocaleCore(prepared), Output::LocaleCore(result)) => {
+                work.core(prepared, result)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

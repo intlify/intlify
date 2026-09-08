@@ -70,6 +70,19 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!(result.locale().as_str(), "en-US");
             assert_eq!(result.suggested_replacement(), Some("en-US"));
         }
+        Output::LocaleCore(result) => {
+            let core = result.value().unwrap();
+            assert_eq!(core.source_default(), None);
+            assert_eq!(
+                core.requested()
+                    .iter()
+                    .map(crate::locale::CanonicalLocale::as_str)
+                    .collect::<Vec<_>>(),
+                ["en"]
+            );
+            assert_eq!(core.requested_default().as_str(), "en");
+            assert!(result.corrections().is_empty());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (
@@ -149,7 +162,10 @@ fn unsupported_locale_input_cannot_be_recorded_as_a_successful_expected_failure(
     use std::sync::Arc;
 
     let clock = MonotonicClock::acquire().unwrap();
-    let mut prepared = operations().into_iter().last().unwrap();
+    let mut prepared = operations()
+        .into_iter()
+        .find(|prepared| prepared.operation() == Operation::LocaleCanonicalization)
+        .unwrap();
     let (expected, work) = fixture_observation(&prepared);
     let Prepared::Locale { input, .. } = &mut prepared else {
         unreachable!()
@@ -175,6 +191,40 @@ fn unsupported_locale_input_cannot_be_recorded_as_a_successful_expected_failure(
         panic!("expected capture failure")
     };
     assert_eq!(failure.stage, CaptureStage::Warmup);
+    assert_eq!(
+        failure.cause,
+        CaptureFailureCause::Output(OutputFailure::LocaleProviderUnavailable)
+    );
+    assert!(failure.complete_sample_prefix.is_empty());
+}
+
+#[test]
+fn unsupported_core_input_cannot_supply_samples_even_as_an_expected_failure() {
+    use crate::benchmark::operation::{tests::core_operation, OutputFailure};
+    let clock = MonotonicClock::acquire().unwrap();
+    let (expected, work) = fixture_observation(&core_operation(&minimal_config()));
+    let mut value = minimal_config();
+    value["profiles"]["app"]["requestedLocales"] = json!(["pt-BR"]);
+    let prepared = core_operation(&value);
+    let output = prepared.once(&ScriptedClock::nanos([0, 1])).unwrap().output;
+    assert_eq!(
+        output.observe(),
+        Err(OutputFailure::LocaleProviderUnavailable)
+    );
+    assert!(LogicalWork::observe(&prepared, &output).is_err());
+    let error = collect_prepared(
+        &clock,
+        &prepared,
+        expected,
+        &work,
+        id("unsupported-core-context"),
+        sampling(),
+        binding(prepared.operation()),
+    )
+    .unwrap_err();
+    let CollectionFailure::Capture(failure) = error else {
+        panic!("expected capture failure")
+    };
     assert_eq!(
         failure.cause,
         CaptureFailureCause::Output(OutputFailure::LocaleProviderUnavailable)

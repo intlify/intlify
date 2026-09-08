@@ -15,6 +15,7 @@ use super::quantity::Quantity;
 pub(super) enum MeasurementFailure {
     Clock(ClockFailure),
     InvocationPanicked,
+    PrerequisiteUnavailable,
 }
 
 pub(super) struct Measured<Output> {

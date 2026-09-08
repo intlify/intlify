@@ -1,6 +1,6 @@
 {
   "identity": "intlify-config-minimum-fixture-expectations",
-  "revision": "1",
+  "revision": "2",
   "observationCodec": "intlify-config-minimum-observation/0",
   "rows": [
     {
@@ -1540,6 +1540,600 @@
         "entry": null
       },
       "logicalWork": "bac0d251f56698d7ae1ae3adfe90cf37770defa703aa4b564ded931daa6a6a96"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "minimal"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "17908aeb9ab366a4da23ef2a8534c145448ff0837f5fa507c359d1b7d5f59b10",
+      "result": {
+        "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "5a12a865bff23fb6c3c38a75bcf68dd186b9fc5844f62853a7bf0fe0ce302559"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "source-und"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "8bd071ba00a3f53a1630d6d9a8b6aead1fd8755965528649eb7377bfcb75e41d",
+      "result": {
+        "shared": "072db0dfc87ea853ce8d492c4fceb1ac33654e7205da4e1bbd0f2c67920e4fff",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "af51adb9b80b0093cd95d0cf6916c5851fdbfbdf4ecc9ee0008ce4469d0642aa"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "source-en"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "ccf6f5cb1b1dbcfff6bff5e489103491fff7c0cb1e9716881b2836cf3274f3e2",
+      "result": {
+        "shared": "288af36991aa0113628eafa74884fed24b8e70474f5f8082ade95125f8103168",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "d5b84ba8d7eeac3d2b002d712144f849ce9f83b00ea450e258115c6380648749"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multi"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "d2ab884d43559f7682392cf515ad99c11514fb394c7540a1bac1a6bf6f3201d7",
+      "result": {
+        "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "ab8b8ceafb802517a4ba42b3a536cdefc0004aed9384047a0bd749929e24646f"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "2d98ba359cce45bd306a8465440b3def09dc125b4a4786164e5ffac2ccf1cc05",
+      "result": {
+        "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "ab8b8ceafb802517a4ba42b3a536cdefc0004aed9384047a0bd749929e24646f"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "aliased"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "e7bf849d447863669aa64746fe69832d226efbb0e0373a2f21fd0bb273873474",
+      "result": {
+        "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
+        "entry": "cd1b868ac48a4641d3e8d769a5328c393c046fd3c0ad1df72bec16153d2759c7"
+      },
+      "logicalWork": "26b558588375f6b126ae264046c2159425a5a04bfd696e0035826568dcc16183"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "changed-set"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "22957b1012bf2c4923e485faa7f7d9752ec4208ed7539eba744f5024e3e2f096",
+      "result": {
+        "shared": "9b39c74a3f289cd6703992712b6c004e4dd3d9859c34c7c532d7bccd8bccc7d9",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "51de988cf4137fb6836eff826b89c67a99b65d0893873e2c8f5890255571f1e9"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "changed-default"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "5a6b882e1a772b7eb1c3aa9fb3652b14844c0b2bd69bcccd4b75aa5d4c789ad5",
+      "result": {
+        "shared": "758ec9510c125b4fd65b5a5a500bc3e62ad92a2db9c612811b50cf2cf1a51333",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "c837d58b4d42485b08ada8b2b9933d7806119aa4a42bf289b7234c619dab3f49"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "changed-source"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "1b5d74349adb4d59012d612136d0e502bf794039b3fb1a54e9b3b23c0f7f9ccb",
+      "result": {
+        "shared": "4ad81a84d258af465ccd1da6eaa25a2f1a740c31e92b92c206f8c5e041e4ac99",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "ab8b8ceafb802517a4ba42b3a536cdefc0004aed9384047a0bd749929e24646f"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "absent-source"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "f7c4ddba7be2027812a28d5a30bd4d7bb15abccdde829075fc7bb5fef579c907",
+      "result": {
+        "shared": "036b1df28a3a99cb8f239ca753428a5812c940a00821201d0ccf2ecf5b8bfca1",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "c7d0bced8edfb290a56a58f73b05d421cf2a65d441b9cac388ccf344ddda988d"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "exact-duplicate"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "d705a5697cc58a4b81b30c6a8fc8cdcdc3af5c031025b52388edbbd58fce0d01",
+      "result": {
+        "shared": "97f8f2c75e4542968b2e29a8544ff6e04d4a650b58e960dc3d5ec11f896f76fd",
+        "entry": "34028243d6a979b8f5c694416a98ed6d00250b51a928eabcd13953f6405d0165"
+      },
+      "logicalWork": "f0f0ac40f875085f9288b573d3bc629da412f9c474af0dcae0f4f37e6aed7ee5"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "alias-duplicate"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "7e4d5cc74a766eea336a7a6712c62513f2cc5dac9ac8dcccaf6a6394aafae6ad",
+      "result": {
+        "shared": "97f8f2c75e4542968b2e29a8544ff6e04d4a650b58e960dc3d5ec11f896f76fd",
+        "entry": "136b5eeffa67fd1a2e00c2358b44b5670c97386d0094a243dc028e498bfe7dd5"
+      },
+      "logicalWork": "a6288782cf9d4a76c9b3829ec74c703465d0afc0907691d1b8e9a4e3f7381927"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multiple-duplicates"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "22dce9e7c6030fd8d8adc7a9a7f95e4514d5b52674850378be4903a267e9afa8",
+      "result": {
+        "shared": "48122821b1d963dca4871ddc96c2bab751b5d6baa144905362d079e5ec36b5ca",
+        "entry": "7b4c22b3d36196b260fb05d76a8c47b8ef7e9e50045baf75dc9e3c0ddc1549f7"
+      },
+      "logicalWork": "cc0d3b1603cfd47443d86795ca3976094c7ef33b1efeb380f4980b36d4ba91e3"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "duplicate-heavy"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "6bdeaee7af34a1a903ebb7208c3efa8ea8e0613c9bda9b7dd0ce7969cf43f0e1",
+      "result": {
+        "shared": "44d31dcafd381818959fda2684d54a2c5c4654fc1231af464da7e33971d92495",
+        "entry": "463a843c66bf695249ee52ebe046fac18fdbdc6f69b2a93351653502cb66e495"
+      },
+      "logicalWork": "cb31ec89204af0ff3b3889fd62bd7e6c7ab23b30e3e0939cb906f71bfbbf3828"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "invalid-source"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "e4b56a7bc5008bd158d336feb67b7fe5f247ee54c45ba91aa78e3065fb5637de",
+      "result": {
+        "shared": "3663ad545628b4831028fad7bdb36a0d5377f181b68ab003d1ae75164b4a86a6",
+        "entry": "933fcde2e02a8aa6a28f7883bfb4477e14ce6d9e1a4330e33748b24f9d68a383"
+      },
+      "logicalWork": "b09cd590bfd8ec5f0b108707fcf0cb97c6edb4ff114e78473eb3c130452ca5f5"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "invalid-requested"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "1062ade97ea33f1ad53cbb580c3f4ba1b1019dbf9a0b0a5222359d43c406be8c",
+      "result": {
+        "shared": "9a31003c89743f861ab7567110116c6b692e0a325de3fd3609db556c383ddf36",
+        "entry": "f0f749dbf96cca65ffa369b46b3bfbcf4cab14d963962c9f6b049422778531b4"
+      },
+      "logicalWork": "dfb5e9f6c3ba9aa645594fc64fc42735586189274874bb2cfa3b925f5acdffad"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "invalid-default"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "e74624a6d6ee687b6c327d33d7ac474ead8765c7db4e797462efb0ec1338a6db",
+      "result": {
+        "shared": "f157387cf90f93c3524f663b614549e73eb5fa3702731ae9c7eee304b77217c1",
+        "entry": "bd5263b0e5b4bc0f760222e6b37557195a4767d7b2b053da984a881fdde91997"
+      },
+      "logicalWork": "ec2d787b0a273dff6687b70c028e552a453f3832ad397ee7dfd273a78bb69963"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "invalid-and-duplicate"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "2fe27a29617d0cdae8f32c8d1d42299b6e89320a49c025ce6fb4873ba4613731",
+      "result": {
+        "shared": "3a838c18aa0cded116d1432768d49dea7f5f6df4187464c8e18adde3c4eb41a0",
+        "entry": "6e7eb7a632aa00e0d11b567cfd42cec2e571b9181ba713bc0434a2cc02081022"
+      },
+      "logicalWork": "359fbe9cca6fc4ed3ef41ddc3d043100f248e02d087ec270045f73fac7ef6fb4"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "default-not-member"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "7ecdb2ee56f83531e53805f170c8c72ce1c453ba26874ca5695361d9e9787ca6",
+      "result": {
+        "shared": "f566af71a8f12f7279cb6a53e9ce41606d91dd534aaead5270b5bf2d59e907d1",
+        "entry": "a9d860c45ce85c4983ade23f6b75d1f1ef9f936b7bbada7a46c09b04a5cbbdc9"
+      },
+      "logicalWork": "bc7bfe208d2b08e54e582cbf6bfc4d1a9749c0a79308f02bd0f1ca64a5b426fb"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "unrelated-fields"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "31e27671a1f7d0f47520f632c31b5d4d6f5cab4c0fe47e727865204df467e85e",
+      "result": {
+        "shared": "288af36991aa0113628eafa74884fed24b8e70474f5f8082ade95125f8103168",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "d5b84ba8d7eeac3d2b002d712144f849ce9f83b00ea450e258115c6380648749"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "other-profile"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "5c5909873591a97fcfd340245159aecf6a52047c164ad208fa507b6958c7c410",
+      "result": {
+        "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "5a12a865bff23fb6c3c38a75bcf68dd186b9fc5844f62853a7bf0fe0ce302559"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "duplicate-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "5cb28621fa349ea46d91a4ee79131af9820d1d2cdf140ccd843ac921fc29c7bb",
+      "result": {
+        "shared": "48122821b1d963dca4871ddc96c2bab751b5d6baa144905362d079e5ec36b5ca",
+        "entry": "3b470b7eee901cbfbb3a5815835af59374a263b30816801d96e5b4e3400ceac5"
+      },
+      "logicalWork": "cc0d3b1603cfd47443d86795ca3976094c7ef33b1efeb380f4980b36d4ba91e3"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "invalid-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "39460bd345f115be7c4f49224220e4e0696b64985a601b46f4abc1ea368e850f",
+      "result": {
+        "shared": "3a838c18aa0cded116d1432768d49dea7f5f6df4187464c8e18adde3c4eb41a0",
+        "entry": "3c69009fb4914a2b73b0772b7c8b780bb867bcd24fce53f8e8a920452ad993d6"
+      },
+      "logicalWork": "359fbe9cca6fc4ed3ef41ddc3d043100f248e02d087ec270045f73fac7ef6fb4"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "2b0ce663b8027e214a3a703496447938346d4875a7a84c89d6258f5217be2127",
+      "result": {
+        "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
+        "entry": "d56376acfbc50da5d4f8f0d86005480e43a9e08a99fcf9de0d6653c5ba7adccc"
+      },
+      "logicalWork": "20c1295c2b2282cef6013f93a308f60a151d3e8a9de5c0337220a6be4d56c7eb"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "expanded-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "85d7ae1cafa6ef0bf0f82cc6771dba44b329f9aa67687099a6570d3ba37145a1",
+      "result": {
+        "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "73c6953f179c805e7b5a48011a3886d21745752912887b97b3741efe3f14db8e"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multi"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-active-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "88a4184b878242e3cd4dd997ae16757c07c8c3e93317f3bbcc911526940ffcbd",
+      "result": {
+        "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "ab8b8ceafb802517a4ba42b3a536cdefc0004aed9384047a0bd749929e24646f"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multi"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-active-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "62b0f891d3756359e5952727d1b6e38a67cfd6ad334e7d58da54a94851454dd7",
+      "result": {
+        "shared": "d4d95c5c578a3da22e5e7396b344afd3e8ca5d4ecd78026d57a45ec1bb9b89f4",
+        "entry": "87e69feadff490b04eb091511116aa2b97c3fe4f2b225eff5dd28856efa52229"
+      },
+      "logicalWork": "eb3d00ad2109fe2b83ea51059123d4db4ba1ea8fb26e7f33f349fbcdeaf0f93d"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multi"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-requested-cardinality", "exact"],
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "0f27260c48edd11ef48c739bac3915c208703cffa8aa34d6bcd3e6a0b6cd7910",
+      "result": {
+        "shared": "cc03f13724afd64060fdabd8616014008764d49e5d254b7e29f25a9e6e0682af",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "ab8b8ceafb802517a4ba42b3a536cdefc0004aed9384047a0bd749929e24646f"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "multi"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-requested-cardinality", "first-over"],
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "3cdc7e0a8f1d75fc7680f4b46380bc45e137cec9225132f94ac3aafa3941868d",
+      "result": {
+        "shared": "4cab5aecb822a9217651732df904796fbd7db0d71c96d1db3f97c114d6ef967f",
+        "entry": "95dacd50509b62d97c31da52e85facb5566b08a7d4b44b0c3ed73435a38a402f"
+      },
+      "logicalWork": "f9a778969790eda1ed0931453bf5a15d29589cf6ec526a5face8fd37d0e36fc7"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "minimal"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-raw-identifier-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "f5559b22dec475db8b0cf9a7c520e0cd12e64dd66cb7701d7503690f46ae986d",
+      "result": {
+        "shared": "290a3a8006ed8b387c3f1965fdbddacee3f12f710d24c08764b7aad7dc8ce167",
+        "entry": "559215c50c998600309f6c5dd41d09f8eb0025fd4fb506f2f848ecc05137288a"
+      },
+      "logicalWork": "5a12a865bff23fb6c3c38a75bcf68dd186b9fc5844f62853a7bf0fe0ce302559"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "minimal"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-raw-identifier-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "e3d5a60038a8dbcdd064fd46c0e77aca4a141d52b5b0d8ed8eaa1f8997177461",
+      "result": {
+        "shared": "6a4bca866b3571c2669d0f87ed35329a6d71fa2223f4fb481b854cc5befb3891",
+        "entry": "6b04d6c44a0217a28d2a1ae2583d1fde7cf6a3c7354347eb0a7603ba2de735ee"
+      },
+      "logicalWork": "ebd7b36078067f55509689da5014026ec03a932d55c03a1d001cbc6992ad34b3"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-canonical-identifier-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "locale-core-resolved"
+      },
+      "inputContext": "4f7f14b666032dfd061d4c158e5b7022253e2f4180950c3c511a8e02bc9ff280",
+      "result": {
+        "shared": "ca994c04295c60395984a5e3a80b62e2141e5d097a3bd728c5b0c63876cb6bb6",
+        "entry": "d56376acfbc50da5d4f8f0d86005480e43a9e08a99fcf9de0d6653c5ba7adccc"
+      },
+      "logicalWork": "20c1295c2b2282cef6013f93a308f60a151d3e8a9de5c0337220a6be4d56c7eb"
+    },
+    {
+      "declaration": {
+        "operation": "locale-core-resolution",
+        "fixture": {
+          "locale-core": "expanding-alias"
+        },
+        "fixtureRevision": "0",
+        "limit": ["core-canonical-identifier-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "locale-core-rejected"
+      },
+      "inputContext": "0b62ed95b9fe31dc9899b22c28982a6868c28d9be4cef2091871a29f28a8aa90",
+      "result": {
+        "shared": "976a844e561399f6844ff34f74223160064514c9f94b71a1a6cf5c751f31a340",
+        "entry": "4e3f92279775c7c84efca993281ca67550441b983b8b415c5d1d7c187887eb33"
+      },
+      "logicalWork": "03e0eae141465a72d2282d7bf5b924466b07a26c5c8f81d670a7d1098c803156"
     }
   ]
 }

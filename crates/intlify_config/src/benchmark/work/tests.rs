@@ -81,6 +81,19 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
             ] {
                 assert_eq!(fact(&work, kind).stage, WorkStage::OperationResult);
             }
+        } else if prepared.operation() == Operation::LocaleCoreResolution {
+            assert_eq!(work.facts.len(), 8);
+            for item in &work.facts {
+                let expected = if matches!(
+                    item.kind,
+                    WorkKind::LocaleCoreOccurrences | WorkKind::LocaleCoreRawIdentifierBytes
+                ) {
+                    WorkStage::PreparedInput
+                } else {
+                    WorkStage::OperationResult
+                };
+                assert_eq!(item.stage, expected);
+            }
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
@@ -154,6 +167,214 @@ fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_va
             fact(&work, WorkKind::LocaleCorrectionSuggestions).observation,
             WorkValue::exact(suggestions)
         );
+    }
+}
+
+#[test]
+fn locale_core_work_preserves_each_role_count_and_marks_unresolved_sets_unavailable() {
+    use crate::benchmark::cases::{
+        declarations, prepare::prepare, LimitEdge, LimitKind, LocaleCoreRecipe as R, Recipe,
+    };
+    let over = |kind| Some((kind, LimitEdge::FirstOver));
+    for (recipe, limit, expected) in [
+        (
+            R::Minimal,
+            None,
+            [
+                Some(2),
+                Some(4),
+                Some(1),
+                Some(2),
+                Some(4),
+                Some(0),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::Multi,
+            None,
+            [
+                Some(6),
+                Some(21),
+                Some(4),
+                Some(6),
+                Some(21),
+                Some(0),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::Aliased,
+            None,
+            [
+                Some(6),
+                Some(21),
+                Some(4),
+                Some(6),
+                Some(21),
+                Some(0),
+                Some(0),
+                Some(5),
+            ],
+        ),
+        (
+            R::ExpandingAlias,
+            None,
+            [
+                Some(2),
+                Some(34),
+                Some(1),
+                Some(2),
+                Some(44),
+                Some(0),
+                Some(0),
+                Some(2),
+            ],
+        ),
+        (
+            R::InvalidSource,
+            None,
+            [
+                Some(3),
+                Some(9),
+                Some(1),
+                Some(0),
+                Some(0),
+                Some(1),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::InvalidAndDuplicate,
+            None,
+            [
+                Some(5),
+                Some(19),
+                None,
+                Some(0),
+                Some(0),
+                Some(3),
+                Some(2),
+                Some(1),
+            ],
+        ),
+        (
+            R::DuplicateHeavy,
+            None,
+            [
+                Some(33),
+                Some(66),
+                Some(1),
+                Some(0),
+                Some(0),
+                Some(1),
+                Some(32),
+                Some(0),
+            ],
+        ),
+        (
+            R::ExactDuplicate,
+            None,
+            [
+                Some(3),
+                Some(6),
+                Some(1),
+                Some(0),
+                Some(0),
+                Some(1),
+                Some(2),
+                Some(0),
+            ],
+        ),
+        (
+            R::Multi,
+            over(LimitKind::CoreActiveOccurrences),
+            [
+                Some(6),
+                Some(21),
+                None,
+                Some(0),
+                Some(0),
+                Some(1),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::Multi,
+            over(LimitKind::CoreRequestedCardinality),
+            [
+                Some(6),
+                Some(21),
+                Some(4),
+                Some(0),
+                Some(0),
+                Some(1),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::Minimal,
+            over(LimitKind::CoreRawIdentifierBytes),
+            [
+                Some(2),
+                Some(4),
+                None,
+                Some(0),
+                Some(0),
+                Some(2),
+                Some(0),
+                Some(0),
+            ],
+        ),
+        (
+            R::ExpandingAlias,
+            over(LimitKind::CoreCanonicalIdentifierBytes),
+            [
+                Some(2),
+                Some(34),
+                None,
+                Some(0),
+                Some(0),
+                Some(2),
+                Some(0),
+                Some(0),
+            ],
+        ),
+    ] {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == Recipe::LocaleCore(recipe) && case.limit == limit)
+            .unwrap();
+        let work = prepare(&declaration).unwrap().logical_work;
+        assert_eq!(
+            work.profile_identity,
+            "intlify-config-minimum-project-locale-core-work"
+        );
+        assert_eq!(work.facts.len(), expected.len());
+        for (item, value) in work.facts.iter().zip(expected) {
+            let expected = value.map_or(
+                WorkValue::Unavailable {
+                    reason: UnavailableWork::LocaleCoreRequestedNotResolved,
+                },
+                WorkValue::exact,
+            );
+            assert_eq!(
+                item.observation, expected,
+                "{recipe:?}, {limit:?}, {:?}",
+                item.kind
+            );
+        }
+        // A counter is checked even when the canonical result is unchanged.
+        for index in 0..work.facts.len() {
+            let mut changed = work.clone();
+            changed.facts[index].observation = WorkValue::exact(u64::MAX);
+            assert!(!changed.matches_expected(&work));
+        }
     }
 }
 

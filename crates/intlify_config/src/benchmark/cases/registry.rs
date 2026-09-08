@@ -16,9 +16,9 @@ use super::prepare::{prepare, Candidate, PreparationFailure};
 use super::{declarations, Declaration};
 
 const IDENTITY: &str = "intlify-config-minimum-fixture-expectations";
-const REVISION: &str = "1";
+const REVISION: &str = "2";
 const OBSERVATION_CODEC: &str = "intlify-config-minimum-observation/0";
-const EXPECTATIONS: &str = include_str!("expectations-v1.json");
+const EXPECTATIONS: &str = include_str!("expectations-v2.json");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

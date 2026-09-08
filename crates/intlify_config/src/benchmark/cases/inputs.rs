@@ -41,6 +41,7 @@ pub(in crate::benchmark) enum Recipe {
     InvalidResourceReference,
     DenseInvalid,
     Locale(super::LocaleRecipe),
+    LocaleCore(super::LocaleCoreRecipe),
 }
 
 impl Recipe {
@@ -49,6 +50,15 @@ impl Recipe {
     pub(in crate::benchmark) fn source(self) -> Arc<[u8]> {
         if let Self::Locale(recipe) = self {
             return Arc::from(recipe.spelling().as_bytes());
+        }
+        if let Self::LocaleCore(recipe) = self {
+            let mut value = recipe.value();
+            if recipe == super::LocaleCoreRecipe::Reordered {
+                reverse_objects(&mut value);
+            }
+            return Arc::from(
+                serde_json::to_vec(&value).expect("finite owner locale-core fixture"),
+            );
         }
         let raw: Option<&[u8]> = match self {
             Self::PortableMaximum => Some(b"9007199254740991"),

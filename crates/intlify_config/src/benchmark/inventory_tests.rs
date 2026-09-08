@@ -535,7 +535,7 @@ fn non_applicability_proof_from_a_different_run_plan_profile_subject_or_build_is
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
-fn all_94_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_attempt() {
+fn all_127_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_attempt() {
     use super::cases::{declarations, registry::Registry};
     use super::clock::MonotonicClock;
     use super::collect::collect_operation;
@@ -621,7 +621,7 @@ fn all_94_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing
     };
     let evaluation = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(evaluation.outcome(), Outcome::Complete);
-    assert_eq!(evaluation.successful_references().len(), 94);
+    assert_eq!(evaluation.successful_references().len(), 127);
     assert!(evaluation.issues().is_empty());
     evidence.reverse();
     let reversed = plan.evaluate(&submitted, &evidence, &[]);
@@ -637,7 +637,7 @@ fn all_94_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing
     };
     let incomplete = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(incomplete.outcome(), Outcome::Incomplete);
-    assert_eq!(incomplete.successful_references().len(), 93);
+    assert_eq!(incomplete.successful_references().len(), 126);
     submitted.cases.remove(0);
     let missing = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(missing.outcome(), Outcome::Invalid);

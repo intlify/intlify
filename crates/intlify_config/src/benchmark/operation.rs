@@ -20,9 +20,9 @@ use crate::structural::{
 };
 
 use super::clock::Clock;
-use super::locale;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
+use super::{locale, locale_core};
 
 pub(super) type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
 pub(super) type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
@@ -35,22 +35,24 @@ pub(super) enum Operation {
     AuthoringConstruction,
     ProfileSelection,
     LocaleCanonicalization,
+    LocaleCoreResolution,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 5] = [
+    pub(super) const ALL: [Self; 6] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
         Self::ProfileSelection,
         Self::LocaleCanonicalization,
+        Self::LocaleCoreResolution,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
             Self::FileMaterialization => "profile_entry_materialize",
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
-            Self::LocaleCanonicalization => "profile_locale_resolve",
+            Self::LocaleCanonicalization | Self::LocaleCoreResolution => "profile_locale_resolve",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -60,6 +62,7 @@ impl Operation {
             Self::AuthoringConstruction => "authoring_model_construction",
             Self::ProfileSelection => "named_profile_selection",
             Self::LocaleCanonicalization => "locale_canonicalization",
+            Self::LocaleCoreResolution => "locale_policy_resolution",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -69,6 +72,7 @@ impl Operation {
             Self::AuthoringConstruction => "minimum-authoring-construction/0",
             Self::ProfileSelection => "minimum-provisional-selection/0",
             Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
+            Self::LocaleCoreResolution => "minimum-project-locale-core/0",
         }
     }
 }
@@ -92,6 +96,7 @@ pub(super) enum Prepared {
         core: Arc<locale::Core>,
         input: Arc<str>,
     },
+    LocaleCore(Box<locale_core::PreparedCore>),
 }
 
 pub(super) enum Output {
@@ -100,6 +105,7 @@ pub(super) enum Output {
     Authoring(Result<Option<FixtureConfig>, AdmissionInvariant>),
     Select(Result<Selection<FixturePolicyReference>, SelectionInvariant>),
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
+    LocaleCore(crate::locale::core::Resolution),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,6 +116,7 @@ pub(super) enum OutputFailure {
     ObservationEncoding,
     LocaleProviderUnavailable,
     LocaleProviderInvariant,
+    LocaleCoreInvariant,
 }
 
 impl Prepared {
@@ -120,6 +127,7 @@ impl Prepared {
             Self::Authoring(_) => Operation::AuthoringConstruction,
             Self::Select { .. } => Operation::ProfileSelection,
             Self::Locale { .. } => Operation::LocaleCanonicalization,
+            Self::LocaleCore(_) => Operation::LocaleCoreResolution,
         }
     }
 
@@ -176,12 +184,27 @@ impl Prepared {
                     output: Output::Locale(measured.output),
                 })
             }
+            Self::LocaleCore(prepared) => {
+                let input = prepared
+                    .input()
+                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let measured = measure(
+                    clock,
+                    (&input, prepared.provider.as_ref(), prepared.limits),
+                    |(input, provider, limits)| input.resolve(provider, limits),
+                )?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::LocaleCore(measured.output),
+                })
+            }
         }
     }
 
     pub(super) fn prerequisites_admitted(&self) -> bool {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
+            Self::LocaleCore(prepared) => prepared.input().is_some(),
             _ => true,
         }
     }
@@ -210,6 +233,7 @@ impl Output {
             Self::Select(Err(_)) => Err(OutputFailure::SelectionInvariant),
             Self::Select(Ok(selection)) => observe_selection(selection),
             Self::Locale(result) => locale::observe(result),
+            Self::LocaleCore(result) => locale_core::observe(result),
         }
     }
 }

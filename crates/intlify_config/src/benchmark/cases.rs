@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the five active minimum boundaries.
+//! Finite owner case declarations for the six active minimum boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -12,6 +12,8 @@ use super::operation::Operation;
 
 mod inputs;
 pub(super) use inputs::Recipe;
+mod core_inputs;
+pub(super) use core_inputs::LocaleCoreRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -31,6 +33,10 @@ pub(super) enum LimitKind {
     StructuralUnits,
     LocaleRawIdentifierBytes,
     LocaleCanonicalIdentifierBytes,
+    CoreActiveOccurrences,
+    CoreRequestedCardinality,
+    CoreRawIdentifierBytes,
+    CoreCanonicalIdentifierBytes,
 }
 
 impl LimitKind {
@@ -78,6 +84,8 @@ pub(super) enum ExpectedKind {
     SelectionUnavailable,
     LocaleCanonicalized,
     LocaleRejected,
+    LocaleCoreResolved,
+    LocaleCoreRejected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -199,7 +207,9 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::StructuralAnalysis => ExpectedKind::StructuralComplete,
                 Operation::AuthoringConstruction => ExpectedKind::AuthoringComplete,
                 Operation::ProfileSelection => ExpectedKind::Selected,
-                Operation::LocaleCanonicalization => unreachable!(),
+                Operation::LocaleCanonicalization | Operation::LocaleCoreResolution => {
+                    unreachable!()
+                }
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -382,6 +392,43 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
+    // Append the project locale-core slice without changing any of the 94 rows.
+    for recipe in LocaleCoreRecipe::ALL {
+        cases.push(declaration(
+            Operation::LocaleCoreResolution,
+            Recipe::LocaleCore(recipe),
+            Selector::App,
+            if recipe.resolves() {
+                ExpectedKind::LocaleCoreResolved
+            } else {
+                ExpectedKind::LocaleCoreRejected
+            },
+        ));
+    }
+    for (limit, recipe) in [
+        (LimitKind::CoreActiveOccurrences, LocaleCoreRecipe::Multi),
+        (LimitKind::CoreRequestedCardinality, LocaleCoreRecipe::Multi),
+        (LimitKind::CoreRawIdentifierBytes, LocaleCoreRecipe::Minimal),
+        (
+            LimitKind::CoreCanonicalIdentifierBytes,
+            LocaleCoreRecipe::ExpandingAlias,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::LocaleCoreResolution,
+                Recipe::LocaleCore(recipe),
+                Selector::App,
+                if edge == LimitEdge::Exact {
+                    ExpectedKind::LocaleCoreResolved
+                } else {
+                    ExpectedKind::LocaleCoreRejected
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
     cases
 }
 
@@ -390,3 +437,6 @@ mod tests;
 
 #[cfg(test)]
 mod locale_tests;
+
+#[cfg(test)]
+mod core_tests;

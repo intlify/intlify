@@ -237,6 +237,8 @@ pub(super) struct Descriptors {
     execution: Execution,
     #[serde(deserialize_with = "Option::deserialize")]
     locale_input: Option<InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    locale_core_input: Option<super::locale_core::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,6 +249,7 @@ pub(super) enum DescriptorIssue {
     InvalidClockObservation,
     ExecutionMismatch,
     LocaleInputBindingMismatch,
+    LocaleCoreInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -261,6 +264,11 @@ impl Descriptors {
             execution: Execution::prepared_core(operation),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
+                Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
+                _ => None,
+            },
+            locale_core_input: match prepared {
+                Prepared::LocaleCore(core) => Some(super::locale_core::InputFacts::observe(core)),
                 _ => None,
             },
         }
@@ -298,10 +306,18 @@ impl Descriptors {
         }
         let expected_locale = match prepared {
             Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
+            Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
             _ => None,
         };
         if self.locale_input != expected_locale {
             issues.push(DescriptorIssue::LocaleInputBindingMismatch);
+        }
+        let expected_core = match prepared {
+            Prepared::LocaleCore(core) => Some(super::locale_core::InputFacts::observe(core)),
+            _ => None,
+        };
+        if self.locale_core_input != expected_core {
+            issues.push(DescriptorIssue::LocaleCoreInputBindingMismatch);
         }
         issues
     }

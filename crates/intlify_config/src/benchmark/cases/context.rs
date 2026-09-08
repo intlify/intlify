@@ -85,6 +85,27 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                     .map_err(|_| ContextFailure::Encoding)?,
             );
         }
+        Prepared::LocaleCore(core) => {
+            if !matches!(candidate.declaration.fixture, Recipe::LocaleCore(_))
+                || candidate.declaration.selector != super::Selector::App
+                || core.selected.as_str() != "app"
+                || core.input().is_none()
+            {
+                return Err(ContextFailure::LocaleInputMismatch);
+            }
+            frame.digest(core.analysis.benchmark_observation().identity());
+            frame.json(&serde_json::to_value(&core.config).map_err(|_| ContextFailure::Encoding)?);
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(
+                    &core.provider,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale_core::InputFacts::observe(core))
+                    .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
     }
     Ok(frame.finish())
 }

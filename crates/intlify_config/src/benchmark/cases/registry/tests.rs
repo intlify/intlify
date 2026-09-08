@@ -316,6 +316,87 @@ fn cached_candidate_summaries_cannot_replace_reobservation_of_actual_output() {
 }
 
 #[test]
+fn locale_core_preparation_and_bounds_are_bound_even_when_result_and_work_are_equal() {
+    use crate::benchmark::cases::LocaleCoreRecipe as R;
+    use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+    use crate::locale::Canonicalizer;
+
+    let declaration = case(
+        Operation::LocaleCoreResolution,
+        Recipe::LocaleCore(R::Minimal),
+        Selector::App,
+    );
+    let other = case(
+        Operation::LocaleCoreResolution,
+        Recipe::LocaleCore(R::OtherProfile),
+        Selector::App,
+    );
+    let registry = Registry::load().unwrap();
+    for change in 0..5 {
+        let mut candidate = prepare(&declaration).unwrap();
+        let Prepared::LocaleCore(core) = &mut candidate.prepared else {
+            unreachable!()
+        };
+        match change {
+            0 => core.limits.max_active_occurrences = Bound::new(127).unwrap(),
+            1 => core.limits.max_requested_locales = Bound::new(63).unwrap(),
+            2 => {
+                core.provider = Arc::new(
+                    Canonicalizer::bind(
+                        &fixture_binding(),
+                        Some(FixtureProvider::new()),
+                        Bound::new(127).unwrap(),
+                    )
+                    .unwrap(),
+                );
+            }
+            _ => {
+                let Prepared::LocaleCore(other) = prepare(&other).unwrap().prepared else {
+                    unreachable!()
+                };
+                if change == 3 {
+                    core.analysis = other.analysis;
+                } else {
+                    core.config = other.config;
+                }
+            }
+        }
+        let repeated = candidate
+            .prepared
+            .once(&ScriptedClock::nanos([0, 1]))
+            .unwrap()
+            .output;
+        assert_eq!(repeated.observe().unwrap(), candidate.observation);
+        assert_eq!(
+            LogicalWork::observe(&candidate.prepared, &repeated).unwrap(),
+            candidate.logical_work
+        );
+        assert_eq!(
+            registry.admit_candidate(candidate).err(),
+            Some(FixtureFailure::InputContextMismatch),
+            "change {change}"
+        );
+    }
+    let mut candidate = prepare(&declaration).unwrap();
+    candidate.input_limits = None;
+    assert_eq!(
+        registry.admit_candidate(candidate).err(),
+        Some(FixtureFailure::Context(
+            ContextFailure::PreparationLimitsMismatch
+        ))
+    );
+    let mut candidate = prepare(&declaration).unwrap();
+    let Prepared::LocaleCore(core) = &mut candidate.prepared else {
+        unreachable!()
+    };
+    core.selected = serde_json::from_value(json!("unknown")).unwrap();
+    assert_eq!(
+        registry.admit_candidate(candidate).err(),
+        Some(FixtureFailure::Context(ContextFailure::LocaleInputMismatch))
+    );
+}
+
+#[test]
 fn candidates_cannot_be_relabelled_or_rebound_to_other_operations() {
     let declaration = case(
         Operation::FileMaterialization,

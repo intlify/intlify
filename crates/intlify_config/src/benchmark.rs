@@ -19,6 +19,8 @@ mod inventory;
 #[cfg(feature = "benchmark")]
 mod locale;
 #[cfg(feature = "benchmark")]
+mod locale_core;
+#[cfg(feature = "benchmark")]
 mod measure;
 #[cfg(feature = "benchmark")]
 pub(crate) mod observation;

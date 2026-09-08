@@ -61,8 +61,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 5);
-    assert_eq!(identities.len(), 5);
+    assert_eq!(pairs.len(), 6);
+    assert_eq!(identities.len(), 6);
 }
 
 #[test]
@@ -149,7 +149,10 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
             "/execution",
             "/execution/outputBufferState",
         ];
-        if operation.operation() == Operation::LocaleCanonicalization {
+        if matches!(
+            operation.operation(),
+            Operation::LocaleCanonicalization | Operation::LocaleCoreResolution
+        ) {
             paths.extend([
                 "/localeInput",
                 "/localeInput/specification",
@@ -157,6 +160,9 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
                 "/localeInput/provider",
                 "/localeInput/providerSchema",
             ]);
+        }
+        if operation.operation() == Operation::LocaleCoreResolution {
+            paths.push("/localeCoreInput");
         }
         for path in paths {
             let mut extra = original.clone();
@@ -278,6 +284,41 @@ fn locale_data_is_resident_but_has_no_mutable_scratch_or_output_buffer() {
         changed.validate(operation, clock(1)),
         vec![DescriptorIssue::LocaleInputBindingMismatch]
     );
+}
+
+#[test]
+fn locale_core_descriptor_binds_its_subset_bounds_and_actual_reuse() {
+    let mut operation = prepared(Operation::LocaleCoreResolution);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    assert_eq!(descriptors.execution.cache_state, "disabled");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    assert_eq!(encoded["localeCoreInput"]["activeOccurrenceLimit"], "128");
+    assert_eq!(encoded["localeCoreInput"]["requestedLocaleLimit"], "64");
+    assert_eq!(
+        encoded["localeCoreInput"]["activeOccurrenceDomain"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(encoded["localeCoreInput"]["selectedProfile"], "app");
+    assert_eq!(encoded["localeInput"]["identifierByteLimit"], "128");
+    let Prepared::LocaleCore(core) = &mut operation else {
+        unreachable!()
+    };
+    core.limits.max_active_occurrences = crate::input_limits::Bound::new(127).unwrap();
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::LocaleCoreInputBindingMismatch]
+    );
+    let original = prepared(Operation::LocaleCoreResolution);
+    for field in ["localeCoreInput", "localeInput"] {
+        let mut missing = encoded.clone();
+        missing[field] = Value::Null;
+        let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+        assert!(!decoded.validate(&original, clock(1)).is_empty());
+    }
 }
 
 #[test]
