@@ -21,6 +21,15 @@ use crate::materialize::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Digest([u8; 32]);
 
+impl schemars::JsonSchema for Digest {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "NativeObservationChecksum".into()
+    }
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({"type": "string", "pattern": "^[0-9a-f]{64}$"})
+    }
+}
+
 impl Serialize for Digest {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(&blake3::Hash::from_bytes(self.0).to_hex())

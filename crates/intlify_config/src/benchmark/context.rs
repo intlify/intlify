@@ -73,6 +73,10 @@ impl CaptureContext {
         self.profile.document()
     }
 
+    pub(super) fn build_checksum(&self) -> Digest {
+        self.build.checksum()
+    }
+
     pub(super) fn observation(&self) -> ContextObservation {
         ContextObservation {
             profile: self.profile.document().clone(),

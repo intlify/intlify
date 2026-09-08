@@ -22,6 +22,19 @@ pub fn project_profile_config_schema() -> Result<Value, serde_json::Error> {
     >()
 }
 
+/// Workspace-only schema data for the adopted minimum measurement Run Plan.
+/// Does not expose plan issuance, a partial resolver, or measurement samples.
+#[cfg(feature = "benchmark")]
+pub fn measurement_run_plan_schema() -> Result<Value, serde_json::Error> {
+    crate::benchmark::run_plan_schema()
+}
+
+/// Complete input representation of the adopted minimum Measurement Case ID.
+#[cfg(feature = "benchmark")]
+pub fn measurement_case_identity_schema() -> Result<Value, serde_json::Error> {
+    crate::benchmark::measurement_case_schema()
+}
+
 /// Generate an owner model's Draft 7 schema without generator-only root `$id`.
 pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     let root = SchemaSettings::draft07()

@@ -106,7 +106,7 @@ impl MeasurementProfile {
         let one = Repetitions::new(1).expect("fixed positive smoke count");
         Self {
             identity: "intlify-config-minimum-smoke".into(),
-            revision: "1".into(),
+            revision: "2".into(),
             adopted_specification: Revision {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
@@ -155,6 +155,10 @@ impl MeasurementProfile {
 
     pub(super) fn cases(&self) -> &[Declaration] {
         &self.cases
+    }
+
+    pub(super) fn identity_revision(&self) -> (&str, &str) {
+        (&self.identity, &self.revision)
     }
 
     pub(super) fn validate_smoke(&self, registry: &Registry) -> Vec<ProfileIssue> {

@@ -8,7 +8,9 @@ use serde_json::{json, Value};
 
 use crate::profile_fixtures::minimal_config;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(in crate::benchmark) enum Recipe {
     Minimal,

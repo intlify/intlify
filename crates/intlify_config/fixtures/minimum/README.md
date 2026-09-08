@@ -32,12 +32,12 @@ Measurement verification remains separate: the [crate's benchmark traceability](
 
 The following gates are still required by the minimum implementation plan:
 
-- complete common case/build/environment/record inputs, Run Plan issuance, projection/report and their verification;
+- complete common Build/Environment and Evidence/Evaluation/Report inputs, general record admission, projection/report and their verification;
 - standalone benchmark smoke and its CI integration;
 - the remaining minimum fixture matrix, feature-isolation and handoff audit; and
 - review/merge evidence for the implementation PRs.
 
-Formal 017-owned reference schemas, generated configuration-schema freshness and adoption in this slice are verified locally. This index does not mark the remaining gates, PR 6, Implementation Phase 1, or the minimum milestone complete. Full Phase 2/3 semantics, production locale data/adapter, public Profile output and the Phase 6 conformance suite remain outside this minimum slice.
+Formal 017-owned reference schemas, generated configuration-schema freshness and adoption in this slice are verified locally. The separate benchmark path also issues and retains a common Run Plan with complete Case identities and closed schema companions before capture; its retained-issuer checks do not replace the remaining general admission/projection/report gates. This index does not mark those gates, PR 6, Implementation Phase 1, or the minimum milestone complete. Full Phase 2/3 semantics, production locale data/adapter, public Profile output and the Phase 6 conformance suite remain outside this minimum slice.
 
 From the repository root:
 

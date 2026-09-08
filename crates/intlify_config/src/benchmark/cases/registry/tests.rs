@@ -114,13 +114,43 @@ fn expectation_objects_are_closed_and_nullable_fields_must_be_present() {
 }
 
 #[test]
+fn planning_work_is_complete_and_checked_before_fixture_preparation() {
+    let registry = Registry::load().unwrap();
+    assert_eq!(registry.expectations().len(), 127);
+    for row in registry.expectations() {
+        assert_eq!(work_digest(row.work()).unwrap(), row.logical_work);
+        let fixture = registry.prepare(row.declaration()).unwrap();
+        assert!(fixture.expected_work.matches_expected(row.work()));
+    }
+    let mut bad = original();
+    bad.rows[0].work = bad
+        .rows
+        .iter()
+        .find(|row| row.work != bad.rows[0].work)
+        .expect("the inventory includes distinct complete work vectors")
+        .work
+        .clone();
+    assert_eq!(
+        Registry::admit_document(bad).err(),
+        Some(RegistryFailure::LogicalWork)
+    );
+    let mut bad = original();
+    let mut work = serde_json::to_value(&bad.rows[0].work).unwrap();
+    work["facts"][0]["observation"]["value"] = json!("1561");
+    bad.rows[0].work = serde_json::from_value(work).unwrap();
+    assert_eq!(
+        Registry::admit_document(bad).err(),
+        Some(RegistryFailure::LogicalWork)
+    );
+}
+
+#[test]
 fn changed_pinned_context_result_or_work_does_not_authorize_a_fixture() {
     let declaration = original().rows[0].declaration.clone();
     for (field, expected) in [
         ("/inputContext", FixtureFailure::InputContextMismatch),
         ("/result/shared", FixtureFailure::ResultMismatch),
         ("/result/entry", FixtureFailure::ResultMismatch),
-        ("/logicalWork", FixtureFailure::LogicalWorkMismatch),
     ] {
         let mut value = serde_json::to_value(original()).unwrap();
         *value["rows"][0].pointer_mut(field).unwrap() =
@@ -132,6 +162,12 @@ fn changed_pinned_context_result_or_work_does_not_authorize_a_fixture() {
             "{field}"
         );
     }
+    let mut bad = original();
+    bad.rows[0].logical_work = different_digest();
+    assert_eq!(
+        Registry::admit_document(bad).err(),
+        Some(RegistryFailure::LogicalWork)
+    );
 }
 
 #[test]
@@ -448,6 +484,7 @@ fn print_candidate_expectations_for_review() {
                 input_context: context::observe(&candidate).unwrap(),
                 result: candidate.output.observe().unwrap(),
                 logical_work: work_digest(&candidate.logical_work).unwrap(),
+                work: candidate.logical_work,
             }
         })
         .collect();

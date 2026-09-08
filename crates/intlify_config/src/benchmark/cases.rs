@@ -23,7 +23,7 @@ pub(super) mod registry;
 // their meaning; no old synthetic row may be silently reused as this revision.
 const FIXTURE_REVISION: &str = "1";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum LimitKind {
     FileBytes,
@@ -57,14 +57,14 @@ impl LimitKind {
     const STRUCTURAL: [Self; 3] = [Self::Profiles, Self::ProfileIdBytes, Self::StructuralUnits];
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum LimitEdge {
     Exact,
     FirstOver,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Selector {
     Absent,
@@ -76,7 +76,7 @@ pub(super) enum Selector {
     FirstOverByteLimit,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum ExpectedKind {
     Materialized,
@@ -93,7 +93,9 @@ pub(super) enum ExpectedKind {
     LocaleCoreRejected,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum LocaleRecipe {
     Language,
@@ -159,7 +161,7 @@ impl LocaleRecipe {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Declaration {
     pub(super) operation: Operation,

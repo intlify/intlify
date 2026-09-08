@@ -91,7 +91,7 @@ An artifact revision is a literal pin. There is no range, branch, mutable-tag, t
 
 Common measurement JSON encodes **every** integer quantity, count, repetition, ordinal, and byte offset as `UInt64`, including small values. Field schemas retain their narrower constraints: a repetition is positive, while an ordinal may be zero. JSON numbers, signs, leading zeroes, exponent notation, and fractional spellings are invalid in these common record fields. This does not change 015's Portable JSON Number domain or an existing native owner-result schema.
 
-Fixed objects are closed, tagged unions use an explicit string `kind`, and absent optional members are omitted. `null` is admitted only by an explicitly nullable field. In particular, the two nullable policy slots in 015 remain required members; `null` and omission are not interchangeable.
+Fixed objects are closed, newly defined common tagged unions use an explicit string `kind`, and absent optional members are omitted. Registered native-owner fragments retain the representation specified under Verification Record Representation. `null` is admitted only by an explicitly nullable field. In particular, the two nullable policy slots in 015 remain required members; `null` and omission are not interchangeable.
 
 ## Configuration Reference Representation
 
@@ -197,7 +197,23 @@ VerificationRecord<T> {
 
 Those generated shared schemas are version-controlled companions to this specification, not consumer-selected plugin schemas. All implementations admitting the same tuple must pin the same complete schema and canonical fixtures. A consumer may support fewer tuples, but cannot redefine a supported tuple's fields, Case-identity projection, or canonical variant orders locally. Materializing these schemas and fixtures is part of the adopting implementation work, not permission to infer missing definitions at decode time.
 
-Body member names use lower camel case, literal enum/registry IDs retain their owning spelling, and variant objects use `kind`. Owner phase/cost tokens and the 026 environment-field IDs such as `os_family` are literal IDs, not member names to rename. Schema generation must pin the complete member/variant inventory of each adopted body type and test it with round-trip fixtures; it must not infer a schema or variant order from incoming data.
+Body member names use lower camel case, literal enum/registry IDs retain their owning spelling, and newly defined common variant objects use `kind`. Owner phase/cost tokens and the 026 environment-field IDs such as `os_family` are literal IDs, not member names to rename. Schema generation must pin the complete member/variant inventory of each adopted body type and test it with round-trip fixtures; it must not infer a schema or variant order from incoming data.
+
+An explicitly adopted, closed native-owner fragment retains its pinned owner representation, including native variant tags. This exception is limited to schema-registered fragment paths; it is not an arbitrary JSON payload or a permission to mix owner revisions. For the initial 015 Measurement Case projection, those paths are `intervalBoundary`, `variant`, `executionState`, `workload`, and `measurementMethod`. Their complete schema definitions are included in the Case-identity schema; quantities still satisfy the common exact-string domain. A change to an adopted fragment requires reviewing the owner schema/profile and common projection versions rather than silently changing an existing Case identity's meaning.
+
+### Initial 015 schema companions
+
+The adopting implementation maintains the following generated, closed Draft 7 schema companions. These are repository implementation artifacts, not public schema distribution URLs or an application-facing API:
+
+| Schema companion | Representation fixed by the schema |
+| --- | --- |
+| [Project-profile configuration](../crates/intlify_config/schema/project-profile-config-v0.schema.json) | Complete 015 configuration schema version `"0"`, including the formal reference types defined above |
+| [Measurement Run Plan](../crates/intlify_config/schema/measurement-run-plan-v0.schema.json) | Complete `measurement-run-plan` envelope and body for record-schema revision `"0"` / governing specification `intlify-design-026` revision `"0"` |
+| [Measurement Case identity input](../crates/intlify_config/schema/measurement-case-identity-v0.schema.json) | The complete digest input, including every applicable 026 semantic dimension for the six initial 015 component-duration boundaries |
+
+The Run Plan binds an acquired build observation, subject, profile, runner instance, and the complete ordered inventory before fixture preparation or measurement. Its Case identities use independently fixed complete work vectors, not work observed only after a successful run. Preparation failure therefore does not erase a planned required case. The initial profile makes every selected case required and unconditional; it introduces no optional-case applicability language. `plannedRunnerClass` is a required nullable field in this wire schema, with `null` meaning no qualified class was selected.
+
+The Plan's native build reference preserves the owner schema, checksum algorithm, framing, domain, and value. It is a binding to the acquired Build Observation, not an attestation of the running executable or a substitute for the complete Build and Environment information required when evidence is projected. Likewise, retaining and revalidating an issued Plan against its original independent inputs does not implement the general common-record resolver or establish successful measurement evidence. The remaining Evidence, Evaluation, and Report schemas and their semantic checks are still required by the minimum implementation's end-to-end measurement path.
 
 ### Record and run identities
 
@@ -217,6 +233,10 @@ Measurement Run identity uses the same closed object and byte rule in the separa
 Random instance naming is not a reproducibility failure: revalidation of a retained record uses the retained IDs. Repeated semantic evaluation uses the same owner-defined semantic projection, not equality of newly minted instance IDs.
 
 Native owner-result identities use separately registered owner domains and retain their exact native value and schema association. The projection must retain the native result's complete identity, checksum algorithm/framing revision, checksum value, and source schema/profile revisions. A source format without immutable result identity needs an explicit owner-schema identity rule before it can participate; an arbitrary fixture label or a bare checksum is not silently upgraded into one.
+
+For the initial `intlify_config` owner result schema `intlify-config-owner-run-result/1`, domain `intlify-config-owner-result-v1` uses the same 32-byte OS-random value rule. The identity is reserved before capture, bound into the native plan, and retained by the single completed owner result, including an incomplete or invalid result. The native checksum remains separately recorded with its original algorithm/framing. Changing result content requires a new result instance; recomputing a checksum cannot authorize a replacement observation under the old identity.
+
+The initial local harness also registers `intlify-config-local-runner-instance-v0` with the same random-value rule. This identifies the one local runner invocation fixed in the Run Plan, not a stable machine, a hardware fingerprint, or a qualified Runner Class. These domains are role-specific: a correctly spelled native result or runner identity cannot replace a common record or Measurement Run identity.
 
 ### Top-level and nested references
 
@@ -371,7 +391,7 @@ The following version domains remain independent even when their initial value i
 | Native owner schema/profile and Measurement Projection revisions | The exact source result and its lossless common mapping |
 | Package/tool version | Producer implementation identity, not schema compatibility |
 
-The initial common-record registry accepts exactly the four kind/schema/specification tuples listed above. Unknown kinds or revisions are unsupported, never interpreted as the newest known revision, accepted by dropping fields, or repaired by filling defaults. A syntactically valid reference to a future Policy revision may remain structurally representable; that does not authorize later artifact resolution to accept unsupported semantics.
+The initial common-record vocabulary contains exactly the four kind/schema/specification tuples listed above. A reader admits only the tuples for which it implements the complete registered schema and validator; an unimplemented tuple remains unsupported even if its envelope is recognized. Unknown kinds or revisions are unsupported, never interpreted as the newest known revision, accepted by dropping fields, or repaired by filling defaults. A syntactically valid reference to a future Policy revision may remain structurally representable; that does not authorize later artifact resolution to accept unsupported semantics.
 
 A common reader follows this order:
 

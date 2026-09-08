@@ -132,6 +132,10 @@ fn self_rehashed_metadata_samples_and_status_do_not_replace_acquired_observation
     let recorded = PreparedRun::acquire().unwrap().collect().unwrap();
     let raw = serde_json::to_value(&recorded.record).unwrap();
     for (pointer, replacement) in [
+        ("/result/recordIdentity/value", json!("0".repeat(64))),
+        ("/result/recordIdentity/domain", json!("intlify-measurement-run-v0")),
+        ("/result/plan/resultIdentity/value", json!("0".repeat(64))),
+        ("/result/plan/commonRunPlan/value", json!("0".repeat(64))),
         ("/result/context/environment/clock/resolutionNanoseconds", json!("0")),
         ("/result/context/profile/sampling/measuredSamples", json!("2")),
         ("/result/context/build/package/revision", json!("changed")),

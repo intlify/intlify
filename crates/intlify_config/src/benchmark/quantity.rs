@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 026 exact observations, independent of the smaller 015 `ResourceBoundValue`
-//! domain. JSON uses shortest unsigned decimal strings until 017 owns the wire.
+//! domain. JSON uses 017's shortest unsigned decimal string representation.
 //! Clock resolution and physical accuracy belong to the method descriptor.
 
 use std::fmt;
@@ -13,6 +13,45 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Quantity(u64);
+
+/// The JSON Schema proves the entire u64 domain, not merely decimal syntax.
+/// Twenty-digit alternatives partition all values below the exact maximum.
+fn decimal_schema(positive: bool) -> schemars::Schema {
+    let maximum = u64::MAX.to_string();
+    let mut branches = vec!["[1-9][0-9]{0,18}".to_owned()];
+    if !positive {
+        branches.insert(0, "0".into());
+    }
+    for (index, byte) in maximum.bytes().enumerate() {
+        let digit = byte - b'0';
+        let lower = u8::from(index == 0);
+        if digit > lower {
+            let range = if digit == lower + 1 {
+                lower.to_string()
+            } else {
+                format!("[{lower}-{}]", digit - 1)
+            };
+            let remaining = maximum.len() - index - 1;
+            let suffix = if remaining == 0 {
+                String::new()
+            } else {
+                format!("[0-9]{{{remaining}}}")
+            };
+            branches.push(format!("{}{range}{suffix}", &maximum[..index]));
+        }
+    }
+    branches.push(maximum);
+    schemars::json_schema!({"type": "string", "pattern": format!("^(?:{})$", branches.join("|"))})
+}
+
+impl schemars::JsonSchema for Quantity {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "UInt64".into()
+    }
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        decimal_schema(false)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum QuantityError {
@@ -76,6 +115,15 @@ impl<'de> Deserialize<'de> for Quantity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Repetitions(NonZeroU64);
 
+impl schemars::JsonSchema for Repetitions {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "PositiveUInt64".into()
+    }
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        decimal_schema(true)
+    }
+}
+
 impl Repetitions {
     pub(super) fn new(value: u64) -> Result<Self, QuantityError> {
         NonZeroU64::new(value)
@@ -124,6 +172,59 @@ pub(super) fn elapsed(start: Instant, end: Instant) -> Result<Quantity, Duration
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_decimal_schemas_match_the_full_rust_domains() {
+        for positive in [false, true] {
+            let schema = serde_json::to_value(decimal_schema(positive)).unwrap();
+            let validator = jsonschema::draft7::new(&schema).unwrap();
+            let mut candidates = vec![
+                String::new(),
+                "00".into(),
+                "01".into(),
+                "-1".into(),
+                "+1".into(),
+                "1.0".into(),
+                "1e0".into(),
+                " 1".into(),
+                "１".into(),
+            ];
+            for length in 1..=22 {
+                for digit in ['0', '1', '8', '9'] {
+                    candidates.push(std::iter::repeat_n(digit, length).collect());
+                }
+            }
+            for offset in 0..=32_u128 {
+                candidates.push((u128::from(u64::MAX) - offset).to_string());
+                candidates.push((u128::from(u64::MAX) + offset).to_string());
+            }
+            let maximum = u64::MAX.to_string();
+            for index in 0..maximum.len() {
+                for digit in b'0'..=b'9' {
+                    let mut digits = maximum.as_bytes().to_vec();
+                    digits[index] = digit;
+                    candidates.push(String::from_utf8(digits).unwrap());
+                }
+            }
+            for text in candidates {
+                let expected =
+                    Quantity::parse(&text).is_ok_and(|quantity| !positive || quantity.get() > 0);
+                assert_eq!(
+                    validator.is_valid(&serde_json::json!(text)),
+                    expected,
+                    "{positive}, {text}"
+                );
+            }
+            for non_string in [
+                serde_json::json!(0),
+                serde_json::json!(u64::MAX),
+                serde_json::json!(null),
+                serde_json::json!(true),
+            ] {
+                assert!(!validator.is_valid(&non_string));
+            }
+        }
+    }
 
     #[test]
     fn exact_domain_includes_zero_and_u64_max_beyond_javascript_safe_integers() {

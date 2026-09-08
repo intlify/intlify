@@ -29,7 +29,9 @@ pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
 pub(super) type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Operation {
     FileMaterialization,

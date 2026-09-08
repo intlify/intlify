@@ -22,7 +22,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     }
     let value = serde_json::to_value(document).unwrap();
     assert_eq!(value["identity"], "intlify-config-minimum-smoke");
-    assert_eq!(value["revision"], "1");
+    assert_eq!(value["revision"], "2");
     assert_eq!(
         value["adoptedSpecification"]["identity"],
         "intlify-design-026"
@@ -33,7 +33,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     assert_eq!(value["sampling"]["repetitionsPerSample"], "1");
     assert_eq!(value["sampling"]["aggregation"], "batch_total");
     assert_eq!(value["numericDecisions"], "prohibited-advisory-and-gating");
-    assert_eq!(value["fixtureRegistry"]["revision"], "3");
+    assert_eq!(value["fixtureRegistry"]["revision"], "4");
     assert_eq!(value["ordering"], "fixture-registry-order-no-interleaving");
     assert_eq!(
         value["rawSamples"],
@@ -61,7 +61,7 @@ fn altered_sampling_and_inventories_do_not_select_their_own_validation_rules() {
             ProfileIssue::Identity,
         ),
         ("/revision", json!("0"), ProfileIssue::Identity),
-        ("/revision", json!("2"), ProfileIssue::Identity),
+        ("/revision", json!("1"), ProfileIssue::Identity),
         (
             "/adoptedSpecification/revision",
             json!("1"),

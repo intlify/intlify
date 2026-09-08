@@ -6,8 +6,10 @@
 //! All fixtures, expectations, context, and ordering are fixed before capture.
 //! Failed cases remain in the result; their prefixes never become measured rows.
 //! The acquired run is separate from decoded input, including its original raw
-//! observation checksum. These are owner-local bindings, not 017 identities,
-//! common 026 Run Plans/Evidence, complete Environment Observations, or reports.
+//! observation checksum. A separate 017/026 Run Plan is issued before fixture
+//! preparation, and the native result retains its exact reference and its own
+//! immutable instance identity. Common Evidence/Run Evaluation, the complete
+//! Environment Observation, and report admission remain separate requirements.
 
 use serde::{Deserialize, Serialize};
 
@@ -23,10 +25,12 @@ use super::observation::{Digest, Frame};
 use super::profile::ProfileCollectionFailure;
 use super::quantity::Quantity;
 use super::sample::{CaptureBinding, CaptureFailureCause};
+use super::shared::identity::{InstanceDomain, RecordIdentity};
+use super::shared::plan::{IssuedRunPlan, PlanFailure, RunPlanRecord};
 use super::work::WorkFailure;
 
-const PLAN_CODEC: &str = "intlify-config-owner-run-plan/0";
-const RESULT_CODEC: &str = "intlify-config-owner-run-result/0";
+const PLAN_CODEC: &str = "intlify-config-owner-run-plan/1";
+const RESULT_CODEC: &str = "intlify-config-owner-run-result/1";
 // Private, bounded developer input; not a project Resource Limit Policy default.
 const MAX_RECORD_BYTES: usize = 16 * 1024 * 1024;
 
@@ -55,6 +59,8 @@ enum Preparation {
 struct OwnerPlan {
     codec: String,
     run: Digest,
+    result_identity: RecordIdentity,
+    common_run_plan: RecordIdentity,
     context: Digest,
     preparation: Preparation,
     cases: Vec<PlannedCase>,
@@ -95,6 +101,7 @@ struct CaseAttempt {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OwnerResult {
     codec: String,
+    record_identity: RecordIdentity,
     plan: OwnerPlan,
     context: ContextObservation,
     attempts: Vec<CaseAttempt>,
@@ -115,6 +122,7 @@ pub(super) enum RunFailure {
     Registry(RegistryFailure),
     Context(ContextAcquisitionIssue),
     EntropyUnavailable,
+    SharedPlan(PlanFailure),
     Addressability,
     Allocation,
     PreparedInventory,
@@ -127,6 +135,7 @@ pub(super) enum RunIssue {
     Codec,
     Integrity,
     RecordedObservation,
+    RecordIdentity,
     Plan,
     Context(ContextIssue),
     AttemptCount,
@@ -151,6 +160,7 @@ pub(super) enum DecodeFailure {
 pub(super) struct PreparedRun {
     context: CaptureContext,
     plan: OwnerPlan,
+    common_plan: IssuedRunPlan,
     fixtures: Vec<Result<AdmittedFixture, FixtureFailure>>,
 }
 
@@ -201,6 +211,10 @@ impl PreparedRun {
         let context = CaptureContext::acquire(&registry).map_err(RunFailure::Context)?;
         let context_binding = checksum("owner-run-context", &context.observation())?;
         let run = fresh_run(context_binding)?;
+        let common_plan =
+            IssuedRunPlan::issue(&registry, &context).map_err(RunFailure::SharedPlan)?;
+        let result_identity = RecordIdentity::fresh(InstanceDomain::NativeOwnerResult)
+            .map_err(|_| RunFailure::EntropyUnavailable)?;
         let count = registry.expectations().len();
         u64::try_from(count).map_err(|_| RunFailure::Addressability)?;
         let mut cases = Vec::new();
@@ -232,16 +246,23 @@ impl PreparedRun {
             plan: OwnerPlan {
                 codec: PLAN_CODEC.into(),
                 run,
+                result_identity,
+                common_run_plan: common_plan.document().identity().clone(),
                 context: context_binding,
                 preparation: Preparation::AllFixturesBeforeCapture,
                 cases,
             },
+            common_plan,
             fixtures,
         })
     }
 
     pub(super) fn collect(self) -> Result<RecordedRun, RunFailure> {
         self.collect_with(CaptureContext::collect)
+    }
+
+    pub(super) fn common_plan(&self) -> &IssuedRunPlan {
+        &self.common_plan
     }
 
     // Private injection seam tests orchestration failures; the ordinary entry
@@ -283,6 +304,7 @@ impl PreparedRun {
         }
         let result = OwnerResult {
             codec: RESULT_CODEC.into(),
+            record_identity: self.plan.result_identity.clone(),
             plan: self.plan.clone(),
             context: self.context.observation(),
             outcome: outcome(&attempts),
@@ -300,6 +322,14 @@ impl PreparedRun {
 }
 
 impl RecordedRun {
+    pub(super) fn common_plan(&self) -> &IssuedRunPlan {
+        &self.inputs.common_plan
+    }
+
+    pub(super) fn plan_record(&self) -> &RunPlanRecord {
+        self.inputs.common_plan.document()
+    }
+
     pub(super) fn encode(&self) -> Result<Vec<u8>, RunFailure> {
         let bytes = serde_json::to_vec(&self.record).map_err(|_| RunFailure::Encoding)?;
         if bytes.len() > MAX_RECORD_BYTES {
@@ -327,6 +357,9 @@ impl RecordedRun {
         let result = &submitted.result;
         if result.codec != RESULT_CODEC {
             issues.push(RunIssue::Codec);
+        }
+        if result.record_identity != self.inputs.plan.result_identity {
+            issues.push(RunIssue::RecordIdentity);
         }
         let actual = checksum("owner-run-result", result);
         if actual != Ok(submitted.checksum) {

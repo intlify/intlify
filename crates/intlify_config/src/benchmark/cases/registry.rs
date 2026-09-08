@@ -16,9 +16,9 @@ use super::prepare::{prepare, Candidate, PreparationFailure};
 use super::{declarations, Declaration};
 
 const IDENTITY: &str = "intlify-config-minimum-fixture-expectations";
-const REVISION: &str = "3";
+const REVISION: &str = "4";
 const OBSERVATION_CODEC: &str = "intlify-config-minimum-observation/0";
-const EXPECTATIONS: &str = include_str!("expectations-v3.json");
+const EXPECTATIONS: &str = include_str!("expectations-v4.json");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -44,6 +44,17 @@ pub(in crate::benchmark) struct FixtureExpectation {
     input_context: Digest,
     result: Observation,
     logical_work: Digest,
+    work: LogicalWork,
+}
+
+impl FixtureExpectation {
+    pub(in crate::benchmark) fn declaration(&self) -> &Declaration {
+        &self.declaration
+    }
+
+    pub(in crate::benchmark) fn work(&self) -> &LogicalWork {
+        &self.work
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +64,7 @@ pub(in crate::benchmark) enum RegistryFailure {
     Revision,
     ObservationCodec,
     Inventory,
+    LogicalWork,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,6 +130,12 @@ impl Registry {
         {
             return Err(RegistryFailure::Inventory);
         }
+        for row in &document.rows {
+            if work_digest(&row.work).map_err(|_| RegistryFailure::LogicalWork)? != row.logical_work
+            {
+                return Err(RegistryFailure::LogicalWork);
+            }
+        }
         Ok(Self {
             binding: RegistryBinding {
                 identity: document.identity,
@@ -173,6 +191,7 @@ impl Registry {
         let work = LogicalWork::observe(&candidate.prepared, &candidate.output)
             .map_err(|_| FixtureFailure::ObservationEncoding)?;
         if work_digest(&work)? != row.logical_work
+            || !work.matches_expected(&row.work)
             || !work.matches_expected(&candidate.logical_work)
         {
             return Err(FixtureFailure::LogicalWorkMismatch);
@@ -182,7 +201,7 @@ impl Registry {
             input_context,
             prepared: candidate.prepared,
             expected: row.result,
-            expected_work: work,
+            expected_work: row.work.clone(),
         })
     }
 }

@@ -39,7 +39,19 @@ mod run;
 #[cfg(feature = "benchmark")]
 mod sample;
 #[cfg(feature = "benchmark")]
+mod shared;
+#[cfg(feature = "benchmark")]
 mod work;
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn run_plan_schema() -> Result<serde_json::Value, serde_json::Error> {
+    shared::plan::record_schema()
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn measurement_case_schema() -> Result<serde_json::Value, serde_json::Error> {
+    shared::plan::case_schema()
+}
 
 #[cfg(all(test, feature = "benchmark"))]
 mod inventory_tests;

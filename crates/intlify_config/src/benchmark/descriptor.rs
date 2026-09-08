@@ -12,7 +12,7 @@ use super::locale::InputFacts;
 use super::operation::{Operation, Prepared};
 use super::quantity::Quantity;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Boundary {
     identity: String,
@@ -65,7 +65,7 @@ impl Boundary {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OptimizationBarrier {
     identity: String,
@@ -81,7 +81,7 @@ struct OptimizationBarrier {
     semantic_validation: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Method {
     identity: String,
@@ -154,7 +154,7 @@ impl Method {
 }
 
 /// An actual acquisition fact, not a guessed precision or part of semantic output.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ClockObservation {
     provider: String,
@@ -178,7 +178,7 @@ impl From<ClockDescription> for ClockObservation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[expect(
     clippy::struct_field_names,
@@ -195,7 +195,7 @@ pub(super) struct Execution {
     output_buffer_state: OutputBuffer,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
 enum OutputBuffer {
     NotApplicable {},

@@ -17,7 +17,7 @@ use super::quantity::Quantity;
 
 mod core;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum WorkKind {
     RawFileBytes,
@@ -128,7 +128,7 @@ impl WorkKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 enum WorkUnit {
     Octet,
@@ -145,7 +145,7 @@ enum WorkUnit {
     CorrectionSuggestion,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 enum WorkStage {
     OperationResult,
@@ -153,7 +153,7 @@ enum WorkStage {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 enum UnavailableWork {
     RawInputNotComplete,
@@ -163,7 +163,7 @@ enum UnavailableWork {
     LocaleCoreRequestedNotResolved,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
 enum WorkValue {
     Exact { value: Quantity },
@@ -180,7 +180,7 @@ impl WorkValue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct WorkFact {
     kind: WorkKind,
@@ -189,7 +189,7 @@ struct WorkFact {
     observation: WorkValue,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct LogicalWork {
     profile_identity: String,
@@ -198,7 +198,7 @@ pub(super) struct LogicalWork {
     facts: Vec<WorkFact>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum WorkFailure {
     OperationMismatch,
