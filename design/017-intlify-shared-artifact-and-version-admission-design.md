@@ -15,6 +15,8 @@ The configuration path establishes the shape of a reference, not the validity of
 
 This revision specifies only this minimum shared subset. It does not complete every artifact family assigned to 017 by [000](./000-intlify-overview-design.md), nor does adopting it establish complete 015 Profile Specification revision-`"0"` support.
 
+The adoption scope is 015 Implementation Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice.
+
 ## Goals
 
 - Fix the JSON representation of `PolicyReference` and `TargetProfileReference` used by configuration schema version `"0"`.
@@ -205,7 +207,7 @@ The Evidence schema additionally adopts each case's `observedDescriptors` and ea
 
 ### Initial 015 schema companions
 
-The adopting implementation maintains the following generated, closed Draft 7 schema companions. These are repository implementation artifacts, not public schema distribution URLs or an application-facing API:
+The adopting implementation must provide the following generated, closed Draft 7 schema companions and their canonical fixtures. These are repository implementation artifacts, not public schema distribution URLs or an application-facing API.
 
 | Schema companion | Representation fixed by the schema |
 | --- | --- |
