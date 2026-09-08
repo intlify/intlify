@@ -28,7 +28,8 @@ pub(in crate::benchmark) struct Candidate {
     pub(in crate::benchmark) logical_work: LogicalWork,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(in crate::benchmark) enum PreparationFailure {
     UndeclaredCase,
     PrerequisiteUnavailable,

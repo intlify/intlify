@@ -73,6 +73,14 @@ impl CaptureContext {
         self.profile.document()
     }
 
+    pub(super) fn observation(&self) -> ContextObservation {
+        ContextObservation {
+            profile: self.profile.document().clone(),
+            build: self.build.document().clone(),
+            environment: self.environment.document().clone(),
+        }
+    }
+
     pub(super) fn validate(&self, submitted: &ContextObservation) -> Vec<ContextIssue> {
         let mut issues = Vec::new();
         if submitted.profile != *self.profile.document() {
@@ -107,6 +115,20 @@ impl CaptureContext {
             environment_observation: self.environment.checksum(),
             operation,
         })
+    }
+
+    pub(super) fn validate_failure(
+        &self,
+        ordinal: Quantity,
+        fixture: &AdmittedFixture,
+        binding: CaptureBinding,
+        failure: &ProfileCollectionFailure,
+    ) -> Vec<ContextIssue> {
+        self.profile
+            .validate_failure(ordinal, fixture, binding, failure)
+            .into_iter()
+            .map(ContextIssue::Operation)
+            .collect()
     }
 }
 

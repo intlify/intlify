@@ -443,7 +443,7 @@ fn print_candidate_expectations_for_review() {
         .into_iter()
         .map(|declaration| {
             let candidate = prepare(&declaration).unwrap();
-            Row {
+            FixtureExpectation {
                 declaration,
                 input_context: context::observe(&candidate).unwrap(),
                 result: candidate.output.observe().unwrap(),

@@ -11,7 +11,13 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use super::clock::{Clock, ClockFailure};
 use super::quantity::Quantity;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum MeasurementFailure {
     Clock(ClockFailure),
     InvocationPanicked,

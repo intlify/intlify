@@ -13,7 +13,8 @@ use crate::structural::StructuralLimits;
 use super::prepare::{selector_input, Candidate};
 use super::Recipe;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(in crate::benchmark) enum ContextFailure {
     Encoding,
     OperationMismatch,

@@ -35,6 +35,8 @@ mod operation;
 #[cfg(feature = "benchmark")]
 mod profile;
 #[cfg(feature = "benchmark")]
+mod run;
+#[cfg(feature = "benchmark")]
 mod sample;
 #[cfg(feature = "benchmark")]
 mod work;

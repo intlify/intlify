@@ -34,12 +34,12 @@ struct Document {
     identity: String,
     revision: String,
     observation_codec: String,
-    rows: Vec<Row>,
+    rows: Vec<FixtureExpectation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Row {
+pub(in crate::benchmark) struct FixtureExpectation {
     declaration: Declaration,
     input_context: Digest,
     result: Observation,
@@ -55,7 +55,13 @@ pub(in crate::benchmark) enum RegistryFailure {
     Inventory,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(in crate::benchmark) enum FixtureFailure {
     UndeclaredCase,
     Preparation(PreparationFailure),
@@ -70,7 +76,7 @@ pub(in crate::benchmark) enum FixtureFailure {
 /// expectations may authorize fixtures used by ordinary benchmark collection.
 pub(in crate::benchmark) struct Registry {
     binding: RegistryBinding,
-    rows: Vec<Row>,
+    rows: Vec<FixtureExpectation>,
 }
 
 /// The operation and its expected observations remain immutable and inseparable.
@@ -130,6 +136,10 @@ impl Registry {
         self.rows.iter().map(|row| &row.declaration)
     }
 
+    pub(in crate::benchmark) fn expectations(&self) -> &[FixtureExpectation] {
+        &self.rows
+    }
+
     pub(in crate::benchmark) fn prepare(
         &self,
         declaration: &Declaration,
@@ -139,7 +149,7 @@ impl Registry {
         self.admit_candidate(prepare(declaration).map_err(FixtureFailure::Preparation)?)
     }
 
-    fn row(&self, declaration: &Declaration) -> Result<&Row, FixtureFailure> {
+    fn row(&self, declaration: &Declaration) -> Result<&FixtureExpectation, FixtureFailure> {
         self.rows
             .iter()
             .find(|row| row.declaration == *declaration)

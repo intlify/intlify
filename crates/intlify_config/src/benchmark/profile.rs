@@ -15,7 +15,7 @@ use super::collect::{collect_operation, CollectedOperation, CollectionFailure, C
 use super::descriptor::Execution;
 use super::operation::Operation;
 use super::quantity::{Quantity, Repetitions};
-use super::sample::{CaptureBinding, CaptureCapacity, Sampling};
+use super::sample::{CaptureBinding, CaptureCapacity, FailureIntegrityIssue, Sampling};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -283,6 +283,47 @@ impl AdmittedProfile {
             operation,
         })
     }
+
+    pub(super) fn validate_failure(
+        &self,
+        ordinal: Quantity,
+        fixture: &AdmittedFixture,
+        binding: CaptureBinding,
+        failure: &ProfileCollectionFailure,
+    ) -> Vec<ProfileCollectionIssue> {
+        if !self.contains(ordinal, fixture) {
+            return vec![ProfileCollectionIssue::CaseSelection];
+        }
+        match failure {
+            ProfileCollectionFailure::Collection(CollectionFailure::Capture(failure)) => {
+                super::sample::validate_failure(
+                    failure,
+                    self.sampling,
+                    binding,
+                    fixture.expected(),
+                    fixture.expected_work(),
+                )
+                .into_iter()
+                .map(ProfileCollectionIssue::Failure)
+                .collect()
+            }
+            ProfileCollectionFailure::Collection(CollectionFailure::Descriptor(issues))
+                if issues.is_empty() =>
+            {
+                vec![ProfileCollectionIssue::Failure(
+                    FailureIntegrityIssue::MissingReason,
+                )]
+            }
+            ProfileCollectionFailure::Collection(CollectionFailure::Integrity(issues))
+                if issues.is_empty() =>
+            {
+                vec![ProfileCollectionIssue::Failure(
+                    FailureIntegrityIssue::MissingReason,
+                )]
+            }
+            _ => Vec::new(),
+        }
+    }
 }
 
 /// Retain only the profile reference per case. The enclosing owner result must
@@ -296,7 +337,13 @@ pub(super) struct ProfiledOperation {
     operation: CollectedOperation,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum ProfileCollectionFailure {
     CaseSelection,
     Collection(CollectionFailure),
@@ -307,6 +354,7 @@ pub(super) enum ProfileCollectionIssue {
     ProfileBinding,
     CaseSelection,
     Operation(CollectionIssue),
+    Failure(FailureIntegrityIssue),
 }
 
 impl ProfiledOperation {

@@ -69,7 +69,8 @@ impl Sampling {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CaptureBinding {
     pub(super) run: Digest,
     pub(super) case: Digest,
@@ -117,14 +118,21 @@ pub(super) struct Capture {
     pub(super) samples: Vec<CapturedSample>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(super) enum CaptureStage {
     Preparation,
     Warmup,
     Measured,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum CaptureFailureCause {
     PrerequisiteUnavailable,
     CollectorAllocation,
@@ -139,13 +147,15 @@ pub(super) enum CaptureFailureCause {
 
 /// Preserve both complete observations. The allocation exists only on failure,
 /// after the measured interval; ordinary calls do not carry the large payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ObservationMismatch {
     pub(super) expected: Observation,
     pub(super) actual: Observation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct WorkMismatch {
     pub(super) expected: LogicalWork,
     pub(super) actual: LogicalWork,
@@ -153,7 +163,8 @@ pub(super) struct WorkMismatch {
 
 /// Values here are diagnostic prefixes only, never admitted successful samples.
 /// On any failure the complete capture stays unavailable to numeric consumers.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CaptureFailure {
     pub(super) cause: CaptureFailureCause,
     pub(super) stage: CaptureStage,
@@ -315,7 +326,8 @@ fn observe_invocation(
     Ok(measured.duration)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(super) enum SampleIntegrityKind {
     WarmupCount,
     SampleCount,
@@ -326,10 +338,107 @@ pub(super) enum SampleIntegrityKind {
     SemanticObservation,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct SampleIntegrityIssue {
+    #[serde(deserialize_with = "Option::deserialize")]
     pub(super) sample_index: Option<Quantity>,
     pub(super) kind: SampleIntegrityKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum FailureIntegrityIssue {
+    MissingReason,
+    StageProgress,
+    DiagnosticSamplePrefix,
+    RepetitionProgress,
+    SemanticObservation,
+    LogicalWork,
+}
+
+/// Check the failure's progress against the separately admitted sampling and
+/// fixture, without promoting any diagnostic prefix into a successful capture.
+pub(super) fn validate_failure(
+    failure: &CaptureFailure,
+    sampling: Sampling,
+    binding: CaptureBinding,
+    expected: Observation,
+    expected_work: &LogicalWork,
+) -> Vec<FailureIntegrityIssue> {
+    let mut issues = Vec::new();
+    let zero_progress = failure.attempted_repetitions_in_sample.get() == 0
+        && failure.completed_repetitions_in_sample.get() == 0
+        && failure.accumulated_nanoseconds.get() == 0;
+    let preparation_cause = matches!(
+        failure.cause,
+        CaptureFailureCause::PrerequisiteUnavailable | CaptureFailureCause::CollectorAllocation
+    );
+    let stage_valid = match failure.stage {
+        CaptureStage::Preparation => {
+            preparation_cause
+                && failure.warmup_completed.get() == 0
+                && failure.complete_sample_prefix.is_empty()
+                && zero_progress
+        }
+        CaptureStage::Warmup => {
+            !preparation_cause
+                && failure.warmup_completed < sampling.warmup
+                && failure.complete_sample_prefix.is_empty()
+                && zero_progress
+        }
+        CaptureStage::Measured => !preparation_cause && failure.warmup_completed == sampling.warmup,
+    };
+    if !stage_valid {
+        issues.push(FailureIntegrityIssue::StageProgress);
+    }
+    if failure.stage == CaptureStage::Measured {
+        let attempted = failure.attempted_repetitions_in_sample.get();
+        let completed = failure.completed_repetitions_in_sample.get();
+        if attempted == 0
+            || attempted > sampling.repetitions.get()
+            || completed.checked_add(1) != Some(attempted)
+            || (completed == 0 && failure.accumulated_nanoseconds.get() != 0)
+        {
+            issues.push(FailureIntegrityIssue::RepetitionProgress);
+        }
+    }
+    // A complete successful prefix must still leave a sample that failed.
+    if failure.complete_sample_prefix.len() >= sampling.sample_capacity {
+        issues.push(FailureIntegrityIssue::DiagnosticSamplePrefix);
+    } else {
+        let prefix = Capture {
+            warmup_completed: sampling.warmup,
+            samples: failure.complete_sample_prefix.clone(),
+        };
+        let prefix_sampling = Sampling {
+            sample_capacity: prefix.samples.len(),
+            ..sampling
+        };
+        if !validate_capture(&prefix, prefix_sampling, binding, expected).is_empty() {
+            issues.push(FailureIntegrityIssue::DiagnosticSamplePrefix);
+        }
+    }
+    match &failure.cause {
+        CaptureFailureCause::SemanticObservationMismatch(mismatch)
+            if mismatch.expected != expected || mismatch.actual == expected =>
+        {
+            issues.push(FailureIntegrityIssue::SemanticObservation);
+        }
+        CaptureFailureCause::LogicalWorkMismatch(mismatch)
+            if !mismatch.expected.matches_expected(expected_work)
+                || mismatch.actual.matches_expected(expected_work) =>
+        {
+            issues.push(FailureIntegrityIssue::LogicalWork);
+        }
+        CaptureFailureCause::MeasurementOverflow
+            if failure.stage != CaptureStage::Measured
+                || failure.completed_repetitions_in_sample.get() == 0 =>
+        {
+            issues.push(FailureIntegrityIssue::RepetitionProgress);
+        }
+        _ => {}
+    }
+    issues
 }
 
 /// Independent revalidation for a decoded owner record. It proves only these

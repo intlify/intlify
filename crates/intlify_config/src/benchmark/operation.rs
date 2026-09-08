@@ -108,7 +108,8 @@ pub(super) enum Output {
     LocaleCore(crate::locale::core::Resolution),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(super) enum OutputFailure {
     AdmissionInvariant,
     SelectionInvariant,

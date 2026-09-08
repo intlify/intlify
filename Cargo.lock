@@ -512,6 +512,7 @@ name = "intlify_config"
 version = "0.14.0-alpha.12"
 dependencies = [
  "blake3",
+ "getrandom 0.4.3",
  "jsonschema",
  "rustix",
  "schemars",

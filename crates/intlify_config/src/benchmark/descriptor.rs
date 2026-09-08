@@ -241,7 +241,8 @@ pub(super) struct Descriptors {
     locale_core_input: Option<super::locale_core::InputFacts>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(super) enum DescriptorIssue {
     BoundaryMismatch,
     MethodMismatch,

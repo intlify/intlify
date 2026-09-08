@@ -29,7 +29,13 @@ pub(super) struct CollectedOperation {
     capture: Capture,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum CollectionIssue {
     FixtureInputContext,
     Descriptor(DescriptorIssue),
@@ -37,7 +43,13 @@ pub(super) enum CollectionIssue {
     Sample(SampleIntegrityIssue),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum CollectionFailure {
     Descriptor(Vec<DescriptorIssue>),
     Capture(Box<CaptureFailure>),
