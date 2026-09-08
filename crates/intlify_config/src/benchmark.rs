@@ -15,6 +15,8 @@ mod collect;
 #[cfg(feature = "benchmark")]
 mod descriptor;
 #[cfg(feature = "benchmark")]
+mod inventory;
+#[cfg(feature = "benchmark")]
 mod measure;
 #[cfg(feature = "benchmark")]
 pub(crate) mod observation;
@@ -24,3 +26,6 @@ mod operation;
 mod sample;
 #[cfg(feature = "benchmark")]
 mod work;
+
+#[cfg(all(test, feature = "benchmark"))]
+mod inventory_tests;

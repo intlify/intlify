@@ -13,6 +13,7 @@ Workspace-internal configuration code for [design 015](../../design/015-intlify-
 - Private provisional selection handles omission, exact matching, invalid/unknown/over-limit inputs, and unavailable structural prerequisites without choosing from repository layout or a filtered profile map.
 - Feature-isolated measurement support retains exact quantities, acquires the reported monotonic-clock resolution, measures four actual core operations, captures raw samples, and validates owner-local method/interval/execution descriptors. It does not yet produce complete Owner Results or common evidence.
 - Checked-in expectations bind all 77 finite cases to their preparation/input context, complete result observation, and logical work. Ordinary collection requires an immutable admitted fixture rather than caller-chosen expected results.
+- Internal inventory relationship checks distinguish missing evaluation rows from explicit unavailable attempts, enforce planned requirements/bindings, and reject cross-run evidence or unproven non-applicability. They do not issue common Run Plans or admit raw records.
 - Locale resolution and the remaining 026 harness/record/validation path are not implemented yet. These internal operations are not a complete configuration resolver or product entry.
 
 This is **not Phase 1 completion**, a complete revision-`"0"` resolver, or a public `LocalizationProjectProfile`.
@@ -99,7 +100,11 @@ Input-context observation covers the declared recipe, explicit preparation limit
 
 The ignored `print_candidate_expectations_for_review` developer test prints candidates to stdout and never writes a file or admits its output. Changes require explicit fixture review, passing independent schema/semantic tests, and the affected input/boundary/observation revision decisions before accepting new expectations. Registry mutation tests cover missing/duplicate/reordered declarations, missing nullable fields, changed inputs/limits/results/work, cached-summary substitution, and identical-output selector changes. Fresh preparation of all 77 declarations must continue to match the pinned data.
 
-Complete common case identities and required/optional accounting, Build/Environment records, Run Plans/evaluations, common projection/report validation, standalone harness, and CI smoke remain unfinished. The fixed fixture registry and native collection tests do not by themselves complete those gates or the shared-reference schema gate.
+The non-serialized `inventory` checker freezes an owner-selected ordered case inventory and verifies submission/evidence relationships against it. Missing, duplicate, unknown, reordered, or weakened inventory/evaluation rows are invalid. All six explicit unavailable kinds retain required/optional accounting: a required unavailable case makes the run incomplete, while an optional unavailable case remains diagnostic. Invalid takes precedence over incomplete and complete. An invalid submitted run exposes no successful-reference prefix, while an incomplete run can retain references to independently successful cases; unavailable diagnostic samples are never consumed here.
+
+Measured references must resolve to the exact run, plan, profile, subject, build, and case. Missing or stale evidence remains distinguishable from corrupt or ambiguously bound evidence. Non-applicability requires the planned rule and a separately checked owner fact bound to the same run/plan/profile/subject/build, never an environment-failure label. Lookup indexes are built once, duplicate references never choose a first/last record, and internal issues have deterministic typed ordering. Native integration tests account for all 77 checked fixture collections, then remove an attempt or make it explicitly unavailable to verify the different outcomes.
+
+This checker consumes views supplied by an enclosing admitted record layer. It does not validate full reason bodies, prove applicability, verify sample content/integrity, invent an identity encoding, issue one globally unique immutable Run Plan per run, or create common evidence. The enclosing source records must retain their complete reasons and diagnostic payloads; the relationship view is not their wire representation. Complete common case identities, Build/Environment acquisition and records, Run Plan issuance and common record admission, projection/report validation, standalone harness, and CI smoke remain unfinished. The internal checks do not by themselves complete those gates or the shared-reference schema gate.
 
 ## Verification
 
@@ -141,6 +146,8 @@ Relevant traceability:
 | Finite case catalog and preparation | `benchmark::cases::tests`: 77 unique ordered declarations, independent schema checks, scaled/permuted inputs, 20 exact/first-over edges, exact raw-error kinds, undeclared-case rejection |
 | Fixed expected input/result/work | `benchmark::cases::registry::tests`: closed pinned inventory and nullable presence, actual context/result/work revalidation, changed-but-equivalent inputs, secret-safe selector matching, cached-summary and operation substitution |
 | Admitted fixture collection | `benchmark::collect::tests`: all 77 pinned cases through native collection/decode/revalidation; changed input context rejected even when result, logical work, run, and case labels coincide |
+| 026 run inventory relationships | `benchmark::inventory_tests`: required/optional unavailable kinds, missing/duplicate/unknown/reordered rows, exact run/plan/profile/subject/build/case bindings, scoped applicability proof, absent/stale/corrupt/ambiguous evidence, outcome precedence and canonical internal issue ordering |
+| Inventory / owner-collection integration | All 77 pinned native collections accounted for through non-serialized test views; explicit required unavailability is incomplete, a missing attempt is invalid, and diagnostic prefixes never enter successful-reference output |
 
 From the repository root:
 
