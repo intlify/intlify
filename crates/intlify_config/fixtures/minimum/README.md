@@ -28,21 +28,21 @@ The call trace is local test instrumentation, not Finding/Evidence output or a t
 
 These fixtures apply [026 memory-lifetime and reuse requirements](../../../../design/026-intlify-conformance-and-measurement-design.md#memory-lifetime-classes) and normal-build isolation. Compile-fail documentation keeps the test runner inaccessible to consumers. Running the same matrix with and without `benchmark` verifies that benchmark code is not needed to resolve the minimum test input.
 
-Measurement verification remains separate: the [crate's benchmark traceability](../../README.md#verification) covers six active pairs, 127 fixed owner cases, raw collection, checksum, logical work, descriptors, and inventory relationship checks. The vertical slice is not a complete workflow measurement and does not register `profile_resolve_e2e` or peak-memory cases.
+Measurement verification remains separate; see the [crate's verification commands](../../README.md#verification) and the tests alongside the [measurement implementation](../../src/benchmark.rs). The vertical slice is not a complete workflow measurement and does not register `profile_resolve_e2e` or peak-memory cases.
 
 The local measurement path now provides complete applicable Build and ordered 27-field Environment observations, a pre-capture Run Plan, Evidence, full Run/Case Evaluations and a lossless observational Report. `shared::pipeline::tests` validates native-result projection, complete/negative inventories, schema freshness and an independent Draft 7 oracle, raw quantities, same-run/Plan/nested references, mutation, duplicate/conflicting identities, unsupported inputs and unproven non-applicability. No aggregate-only output or failed numeric prefix replaces retained samples.
 
 `vp run bench:config:smoke` captures all 127 cases across six active boundaries, writes completed records to a fresh directory, rereads them and performs native-backed admission in the same process. Linux CI invokes this same entry. The feature-gated facade returns completed bytes only; the vertical-slice runner, provider fixture and locale core are still not application APIs. Normal builds exclude benchmark collectors, dataset and optional timing/digest dependencies.
 
-The minimum fixtures above cover positive/negative/equivalence/ownership and exact stopping points; the crate traceability table covers component-specific bounds and measurement verification. Local tests and implementation do not establish PR review/merge completion. Full Phase 2/3 semantics, production locale data/adapter, Policy/Target body admission, public Profile output, RCI/replay/Findings, workflow/peak-memory cases and the Phase 6 conformance suite remain outside this minimum. 016 can be designed independently but cannot consume this private result as a checked Profile.
+The minimum fixtures above cover positive/negative/equivalence/ownership and exact stopping points; component tests cover operation-specific bounds and measurement verification. Local tests and implementation do not establish PR review/merge completion. Full Phase 2/3 semantics, production locale data/adapter, Policy/Target body admission, public Profile output, RCI/replay/Findings, workflow/peak-memory cases and the Phase 6 conformance suite remain outside this minimum. 016 can be designed independently but cannot consume this private result as a checked Profile.
 
 From the repository root:
 
 ```sh
-rtk proxy cargo test -p intlify_config --lib minimum_tests
-rtk proxy cargo test -p intlify_config --lib --features benchmark minimum_tests
-rtk proxy cargo test -p intlify_config --doc
-rtk proxy cargo check -p intlify_config --lib --no-default-features
-rtk proxy cargo check -p intlify_config --lib --features benchmark
-rtk proxy vp run bench:config:smoke
+cargo test -p intlify_config --lib minimum_tests
+cargo test -p intlify_config --lib --features benchmark minimum_tests
+cargo test -p intlify_config --doc
+cargo check -p intlify_config --lib --no-default-features
+cargo check -p intlify_config --lib --features benchmark
+vp run bench:config:smoke
 ```
