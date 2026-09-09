@@ -163,6 +163,11 @@ pub(super) fn canonical_nanoseconds(duration: Duration) -> Result<Quantity, Dura
 }
 
 pub(super) fn elapsed(start: Instant, end: Instant) -> Result<Quantity, DurationFailure> {
+    // Windows may smooth a small reversed interval to zero during subtraction.
+    // Check ordering first so an invalid interval cannot become a valid sample.
+    if end < start {
+        return Err(DurationFailure::ReversedClock);
+    }
     let duration = end
         .checked_duration_since(start)
         .ok_or(DurationFailure::ReversedClock)?;
@@ -301,9 +306,16 @@ mod tests {
     #[test]
     fn reversed_clock_is_a_failure_but_zero_is_not_replaced_with_a_fake_minimum() {
         let start = Instant::now();
-        let end = start.checked_add(Duration::from_nanos(7)).unwrap();
-        assert_eq!(elapsed(start, end), Ok(Quantity::new(7)));
-        assert_eq!(elapsed(end, start), Err(DurationFailure::ReversedClock));
+        // Include sub-tick intervals: Windows subtraction may otherwise accept
+        // their reversal as zero even though Instant ordering is unambiguous.
+        for nanoseconds in [1, 7, 1_000_000_000] {
+            let end = start
+                .checked_add(Duration::from_nanos(nanoseconds))
+                .unwrap();
+            assert!(end > start);
+            assert_eq!(elapsed(start, end), Ok(Quantity::new(nanoseconds)));
+            assert_eq!(elapsed(end, start), Err(DurationFailure::ReversedClock));
+        }
         assert_eq!(elapsed(start, start), Ok(Quantity::new(0)));
     }
 
