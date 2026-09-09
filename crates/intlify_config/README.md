@@ -1,320 +1,71 @@
-# Intlify configuration foundations
+# intlify_config
 
-Workspace-internal configuration code for [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md). This crate is unpublished and does not reserve a product configuration or Profile API.
+Shared configuration support for [Intlify](../../design/000-intlify-overview-design.md), a toolchain for compiling localization from application source.
 
-## Current implementation
+> [!IMPORTANT]
+>
+> This crate is currently a minimum implementation. A complete project-profile resolver and an application-facing `LocalizationProjectProfile` API are not yet available. See [Current status](#current-status) for the implemented scope and remaining work.
 
-- The CLI uses the shared duplicate-aware JSON compatibility decoder, byte positions, Draft 7 generation, and deterministic schema formatting.
-- The private authoring model covers the complete **015-owned** field vocabulary: named declarations, locale inputs, coverage, policy slots, targets, groups, and delivery.
-- The formal structural instantiation uses 017's closed Policy and Target Profile references. It generates a complete checked-in Draft 7 schema without exposing the private authoring root or claiming artifact-body admission.
-- Private strict file materialization validates UTF-8, JSON syntax, decoded duplicate keys, Unicode scalars, and Portable JSON Numbers while retaining raw bytes and key/value/container spans.
-- An internal schema compiler/evaluator follows the generated Draft 7 subset, retains independent fragment admission, and bounds applicable structural work. An owned deserialization bridge reads the normalized value tree without re-parsing source.
-- Outer admission selects configuration version `"0"`, preflights profile count/ID byte bounds, and retains independently admitted fields. Only complete structural success can construct `IntlifyConfig`; the root has no raw `Deserialize` route.
-- Private provisional selection handles omission, exact matching, invalid/unknown/over-limit inputs, and unavailable structural prerequisites without choosing from repository layout or a filtered profile map.
-- Feature-isolated measurement support retains exact quantities, acquires the reported monotonic-clock resolution, measures six actual core operations, captures raw samples, and validates owner-local method/interval/execution descriptors. These owner observations are admitted separately before common projection.
-- Checked-in expectations bind all 127 finite cases to their preparation/input context, complete result observation, and logical work. Ordinary collection requires an immutable admitted fixture rather than caller-chosen expected results.
-- An admitted, owner-local smoke Measurement Profile fixes that inventory and its sampling, execution, retention, and numeric-decision policy before capture. Profile-bound collection and revalidation use the same admitted counts rather than accepting counts supplied by a decoded row.
-- A feature-isolated build producer retains bounded source/lock snapshots, controlled compiler metadata and Cargo inputs, and explicit unavailable attestations. Capture context binds every operation to that separately acquired observation; the common projection retains applicable Build facts without inventing attestations.
-- The capture context also owns its native clock and a separately acquired environment-input snapshot. Controlled kernel/target views, an available-parallelism hint, and an unqualified local runner context are bound to all 127 cases with a separate complete 27-field common Environment projection.
-- A one-shot owner-run assembler fixes the complete inventory before capture, retains every case attempt and typed failure, and serializes/revalidates the enclosing result against its acquired inputs and original observations. Common record admission and projection separately check these retained observations.
-- A separate common Run Plan is issued before fixture preparation, with all 127 complete Measurement Case identities, shared instance IDs and SHA-256 integrity. Closed schema companions and the finite common resolver connect this Plan to Evidence, Run Evaluation and the observational Report.
-- Internal inventory relationship checks distinguish missing evaluation rows from explicit unavailable attempts, enforce planned requirements/bindings, and reject cross-run evidence or unproven non-applicability. They do not issue common Run Plans or admit raw records.
-- Private canonicalization binds one read-only provider, checks raw/canonical byte limits, preserves correction suggestions, and distinguishes invalid identifiers from unsupported coverage. Only a finite test-owned provider is implemented.
-- A private locale core resolves the selected project's source default, canonical requested set, and explicit requested default. It retains corrections and independent errors, rejects duplicates and limit/membership failures, and never produces a partial core on failure.
-- The locale-core boundary uses the same owner-local collection and validation path as the first five operations. All six active pairs connect to the same initial common records, projection/report, standalone harness and Linux CI smoke; this is not a complete configuration resolver or product entry.
+`intlify_config` is the Rust crate that brings Intlify's project-configuration rules into one place. Its purpose is to give the CLI and compiler stages a consistent understanding of a project's languages and localization settings, so each tool does not need its own configuration parser or defaults.
 
-This is the local minimum implementation, not a complete revision-`"0"` resolver or a public `LocalizationProjectProfile`. Phase 2/3 remain partial; local verification is separate from review/merge completion.
+## Role in Intlify
 
-## Project-profile schema
+The configuration design separates two things:
 
-The formal configuration schema is [project-profile-config-v0.schema.json](./schema/project-profile-config-v0.schema.json), generated from the complete 015 authoring model and the five-field references defined by [017](../../design/017-intlify-shared-artifact-and-version-admission-design.md). Each reference retains its kind, identity, exact revision, specification revision, and full SHA-256 semantic-content pin. Structural admission does not acquire or authenticate a body, establish semantic-version support, or resolve a reference's Policy role.
+- `intlify.config.json`: the configuration maintained in an application repository.
+- `LocalizationProjectProfile`: the checked, in-memory settings that compiler stages are intended to consume.
 
-The schema-only workspace helper exposes neither a Profile constructor nor an application-facing resolver. The developer example prints deterministic JSON by default; `--check` verifies the checked-in artifact and `--write` regenerates that one artifact. These commands work independently from the CLI's legacy schema and do not publish a new schema URL:
+A profile describes one application's localization project: which languages its messages are written in, which locales the application should support, and which localization policies and output targets apply. One repository configuration can declare several named profiles, for example for different applications in a monorepo.
 
-```sh
-rtk proxy cargo run -p intlify_config --example generate_config_schema -- --check
-rtk proxy cargo run -p intlify_config --example generate_config_schema -- --write
-```
+The CLI or another host is responsible for finding and reading the configuration file. This crate is responsible for interpreting and validating the supplied configuration. The intended result is one checked profile that downstream tools can share.
 
-Formal-reference fixtures compare the checked-in schema, typed model, strict materialization, compiled structural evaluator, and guarded root construction. They cover all 015-owned fixed-object fields, closed reference members and kinds, exact digest/token syntax, required-nullable slots, duplicate raw members, independent invalid siblings, and a private locale-core handoff. A unit test enforces schema freshness in the ordinary Rust test command.
+This crate handles configuration, not message translation or runtime formatting. The complete profile resolver described above is still under development.
 
-Older synthetic `$testPolicy` / `$testTarget` inputs remain isolated under `cfg(test)` to retain generic structural-admission regression evidence. They are absent from benchmark-only and ordinary library builds and are not fallback production inputs. The fixed owner benchmark registry and minimum vertical slice both use `profile_fixtures`, which constructs formal five-field references directly. The same checked-in schema is compared with the benchmark's compiled schema and an independent Draft 7 validator. Structural schema success does not imply Policy/Target body admission or complete Profile semantics.
+## Current status
 
-## Structural rules
+This is an unpublished, workspace-internal crate. It is not yet an application-facing configuration API.
 
-The model preserves authoring state rather than resolving semantics.
+The current implementation includes:
 
-| Field class | Omission | Explicit null |
-| --- | --- | --- |
-| Required declarations and mandatory policy references | Rejected | Rejected |
-| Optional source default, inline declarations, and optional nested fields | Preserved as absence | Rejected |
-| `providerRouting` / `glossarySet` | Rejected | Preserved as explicit absence |
+- Shared JSON decoding, error locations, and JSON Schema utilities already used by the existing Intlify CLI.
+- A generated [JSON Schema for project-profile configuration](./schema/project-profile-config-v0.schema.json).
+- Internal configuration validation, named-profile selection, and normalization of the source, requested, and default locales.
+- Optional developer measurements for the implemented configuration operations.
 
-`Presence<T>` and `RequiredNullable<T>` encode these different rules. No locale, policy preset, target default, or delivery policy is inferred by structural deserialization.
-
-Profile, Project, Selection Scope, Target, and Group identities share the exact ASCII syntax while remaining separate Rust types. Non-empty arrays and maps preserve all admitted occurrences. Duplicate locales, alias collisions, membership, and group partition belong to separate semantic operations; only the minimum project locale core is currently implemented. A malformed sibling prevents construction of the complete root. The schema evaluator separately records admitted/invalid/type-unavailable/resource-unavailable fragments; a failing sibling does not erase a valid declaration or field.
-
-The legacy JSON helper is **not** the 015 strict materializer. Its serde-based numeric behavior is preserved for CLI compatibility. The new `materialize` module admits numbers as finite binary64 values within magnitude `9007199254740991`, normalizes negative zero, and keeps the unchanged raw token separately.
-
-## Strict file entry and ownership
-
-The file entry takes immutable shared bytes and explicit finite input limits. A bounded iterative lexer/parser first retains a raw token index, scoped duplicate-key indexes, and complete logical counts. String tokens carry decoded byte lengths without allocating their values; only member names needed for duplicate checks are decoded during parsing. Logical node/depth/entry/string limits are checked before a second pass constructs owned value nodes.
-
-The second pass consumes the admitted token index; it does not tokenize input again. Value nodes refer to children by indices, and the source map stores half-open UTF-8 byte coordinates. Deep input and failure cleanup therefore do not recurse through a Rust value tree. Returned documents retain their own values and share only immutable raw source. Parser scratch is invocation-owned and discarded; this step introduces no workspace, arena allocator, global cache, or claimed capacity reuse.
-
-Private resource observations distinguish exact complete totals from an `at-least` token-limit witness. Raw byte/token limits and logical value limits are separate explicit inputs, not policy defaults or a partial formal capability. A logical-limit failure retains complete counts but no materialized document. Bound-centric summaries are not Finding records; final per-occurrence evidence projection remains later work. Profile and selector bounds are applied by the subsequent private admission stages. Error observations never include rejected key or scalar text.
-
-## Internal schema evaluation
-
-The compiler accepts only the keyword/reference/pattern vocabulary explicitly implemented for the generated authoring model. Unrecognized behavior, external or dangling references, cycles, and unsupported dialects fail closed. It is not a general-purpose JSON Schema implementation, and it does not acquire schema bodies or accept `$schema` metadata as authority. Formal reference types validate structure; finite fixtures do not claim that their referenced bodies have been admitted.
-
-Evaluation counts one applicable schema-keyword occurrence per logical subject. Annotation keywords are excluded; a wrong type suppresses dependent constraints and descendants, while independent siblings continue in unsigned UTF-8 member order. Every `anyOf` alternative is visited for deterministic accounting. Unmatched alternatives retain contextual observations only when the aggregate fails; they do not create blocking issues for an accepted alternative.
-
-A count-only traversal preflights the complete applicable domain before allocating fragment/issue records. The recording traversal must produce the same work count. Exact limits succeed; an overrun returns the exact complete total and no evaluation prefix. Records are private schema observations, not the final Finding Registry.
-
-Owned authoring deserialization uses the normalized flat tree directly. It preserves positive-zero normalization and admitted binary64 rounding, rejects unconsumed collection tails, and never embeds serde's rejected values/keys in errors. Successful deserialization alone is not proof that the outer admission prerequisites have succeeded.
-
-## Configuration admission and provisional selection
-
-An immutable `AuthoringSchema<Policy, Target>` binds the generated schema to its authoring/reference types. `StructuralAnalysis` owns the materialized document and shares that schema binding. Missing, invalid, or unsupported `schemaVersion` suppresses schema-dependent work; `$schema` is metadata only. Profile count and decoded ID byte lengths are checked before affected descendant validation. Independent sibling checks continue, but any failure withholds the complete root.
-
-`IntlifyConfig` wraps a private field definition used by schema generation and owned decoding. Its constructor needs an internal complete-root proof that only a successful analysis can create. A passing `anyOf` branch at the same node is insufficient for a typed field: the field's exact enclosing schema edge must be admitted. Tests also prevent accidentally adding `Deserialize` to the root.
-
-Selection uses a separate normalized input with an explicit matching bootstrap bound. It accepts absence, a complete bounded Rust string, an over-limit marker, or an invalid top-level JSON type tag. Over-limit values are not copied and retain only the smallest first-over witness, not their final length; invalid containers have no contents in this input. No live-host inspection is implemented here.
-
-Omission uses the original profile count, including malformed declarations. Exact matching needs the admitted version, a bounded non-empty profile container, an admitted declared ID, the selected declaration's immediate object shape, and its independently admitted `resourceLimits` reference. Invalid nested fields or unrelated profiles may leave those prerequisites available, but never produce a partial `IntlifyConfig`. Selection outputs own their selected ID/reference and survive release of the analysis. Unknown or rejected selector text is never exposed in the content-free failure observations.
-
-This is provisional bootstrap selection only. Resource Policy admission/recheck, confirmed selection, final selector Evidence, and checked Profile construction are not implemented or implied.
-
-## Internal locale canonicalization
-
-`locale` contains a data-free, crate-private provider boundary. Binding compares every specification, dataset, provider, schema, and transport component against separately supplied expectations. It retains an immutable binding snapshot and rejects a provider that changes it between calls. These non-serialized generic identity values do not define 017 encodings, verify artifact content integrity, or prove an engine's conformance; the enclosing owner must supply the admitted immutable inputs. The production data adapter and artifact admission remain deferred.
-
-The only concrete provider is a finite test/benchmark fixture with closed, immutable rows. Its binding tokens are explicitly symbolic test pins, not real artifact digests. It recognizes declared canonical spellings and aliases, marks declared invalid examples as invalid, and returns unsupported for every unlisted input. It is not a general locale parser or a substitute for the full pinned canonicalization corpus. `en` is not maximized, `en_US` is not repaired, and the shared boundary never consults host locale APIs, CLDR tables, environment variables, files, or the network.
-
-Raw identifier bytes are checked before provider work; an expanded canonical spelling is checked again before a result is retained. A rejected result never becomes a truncated locale. Canonical values own or share immutable storage, while the correction suggestion borrows the already retained canonical string without another string allocation. The finite provider interns its canonical strings once, so aliases and retained results safely share them after the provider is dropped. There is no mutable workspace or invocation cache, and reuse cannot preserve previous failure state.
-
-Unit tests cover exact/first-over byte bounds, UTF-8 counting, expanding aliases, every binding component, provider mutation, bad provider output, invalid/unsupported/unavailable outcomes, secret-free errors, fixed points, canonical byte ordering, fresh/reused equivalence, and retained-output ownership. Canonicalization now uses the existing owner catalog, ordinary-call interval, work observation, descriptor validation, sampler, and native-clock collection path. Seventeen cases cover canonical values, aliases, declared invalid inputs, and both applications of the identifier-byte limit. These cases traverse the same common projection/report as the other active boundaries; production adapters and complete Phase 2 semantics remain deferred.
-
-The locale descriptor pins the actual specification/data/provider/schema/transport test bindings, identifier bound, immutable reuse state, and a checksum over every actual fixture-table row. This checksum is an owner-local observation, not a 017 artifact digest. The result shares immutable provider storage and has no mutable scratch or reusable output buffer; non-applicable output-buffer state carries no ownership/reuse fields. Canonical value observations are separate from source correction observations, so equivalent spellings agree semantically without hiding a correction. Unsupported coverage, provider unavailability, and invariant failures cannot become successful benchmark samples.
-
-## Minimum project locale core
-
-`locale::core::Input` borrows only the locale fields of a selected declaration inside a complete `IntlifyConfig`. Its constructor requires a declared `ProfileId`; it cannot choose the first profile or accept an arbitrary deserialized partial declaration. Profile lookup and input-view preparation are separate from locale resolution. No raw locale strings, policies, or target structures are cloned into this view.
-
-The operation preserves an omitted source default as absence and never substitutes `und`, the requested default, or a host value. It canonicalizes every active source/requested/default occurrence through the explicitly bound provider, retains non-blocking corrections separately, and collects independent canonicalization failures without disclosing rejected raw strings. Requested occurrences are sorted by canonical bytes and original index; each duplicate canonical identity produces one private issue relating every conflicting index. Cross-role reuse is not a duplicate. The explicit requested default must belong to the canonical project set; an incomplete canonical set suppresses set-dependent checks rather than producing cascade errors.
-
-Internal limits are supplied explicitly. `max_active_occurrences` counts only the source default when present, every project requested occurrence, and the required project default, before any provider call or locale-index allocation. It is deliberately not the complete 015 `maxLocaleOccurrences` domain over negotiation, fallback, coverage, and targets. A separate bound checks the complete unique canonical requested cardinality, without allowing duplicates to bypass the active occurrence bound or silently succeed. Neither limit is a production policy default or formal Resource Limit Policy admission. Unavailable complete counts remain distinct from zero.
-
-Scratch consists of invocation-owned vectors reserved from actual bounded input, with no mutable workspace, global cache, arena, or thread pool. Successful results own/share only canonical values; corrections share that storage, and failures return issues rather than a partial core. Results remain valid after configuration/provider release and are unchanged by prior failed calls. Input, core, and resolution types have no public or serde artifact surface. These private values do not define Profile equality, replay/cache identity, final Findings, or a consumer handoff.
-
-Unit tests cover strict-input/complete-root prerequisites, explicit multi-profile selection, source absence, canonical order and alias equivalence, all duplicate occurrences, exact/first-over bounds, preflight-without-provider-work, membership suppression, independent failures, secret-free diagnostics, semantic mutations, retained ownership, and fresh/reused equivalence. This slice does not implement target defaults, negotiation, fallback, coverage, source-Intent inheritance, or complete Phase 3 semantics. Its 33 owner benchmark cases now retain full result/work observations and use the existing descriptor, sampler, fixed-registry, and native collection path. The common projection/report and separate minimum vertical slice verify this limited scope, not complete Phase 3.
-
-## Measurement support
-
-The non-default `benchmark` feature isolates the measurement code from ordinary library builds. Unit tests may also compile these helpers. A developer facade exposes only completed record bytes and revalidation; a standalone harness performs capture, persistence, reread and common admission.
-
-The initial numeric helper follows 026's full `0..=u64::MAX` quantity domain, rather than reusing 015's smaller positive resource-bound domain. JSON values are shortest unsigned decimal strings, including values above JavaScript's safe-integer range. Repetition counts must be positive. A reversed interval, nanosecond conversion overflow, or accumulation overflow is a typed failure, never a zero, saturated, or wrapped sample. Zero duration remains a valid observation rather than being replaced with a fabricated clock minimum.
-
-The measurement-only clock uses the pinned safe `rustix` API on Linux and macOS. It obtains `CLOCK_MONOTONIC` resolution from `clock_getres`, rather than inferring resolution from nanosecond storage or an observed latency. Full raw timestamp subtraction precedes checked conversion to `u64` nanoseconds. Other platforms remain explicitly unsupported by this initial clock provider; ordinary configuration code is unaffected. Neither `rustix` nor the observation codec's `blake3` dependency enters the default normal-dependency graph.
-
-Prepared calls measure strict file materialization, structural analysis, complete authoring-model construction, provisional profile selection, single-locale canonicalization, and the minimum project locale core. Core profile lookup and borrowed-view construction happen before clock markers; unavailable prerequisites cannot start an interval. Dispatch and immutable-handle preparation precede the start marker. The preserved indirect invocation and complete-output black box are inside the interval; observation encoding, validation, and destruction are outside. These unavoidable included costs are declared and never removed through estimated subtraction. Outputs stay owned through the end marker and observation.
-
-The bounded sampler excludes warmup, retains ordered raw samples, and validates every repetition against a separately supplied fixture observation. Per-sample durations are checked sums of separately measured single-invocation intervals, not a continuous workflow duration or a precomputed average. Panic, clock failure, overflow, or unexpected output withholds the complete case; earlier samples are diagnostic prefixes only. Failure-only mismatch payloads keep both complete observations without making ordinary calls carry their large inline storage.
-
-The observation codec covers the complete applicable ordinary output, including normalized values, schema/fragment/issue information, or selected identity/reference and typed failure facts. Shared semantics and entry-specific source facts use separate framed checksum domains. Raw source is observed only for the finite owner-controlled successful materialization fixtures; rejected selector/key/scalar text is not copied into diagnostics. These checksums are not shared-artifact digests, Profile identities, or authenticity proofs.
-
-Owner-local descriptors fix each active phase/cost, interval markers and non-overlap, conversion and aggregation, barrier placement, and independent process/engine/preparation/cache/heap/scratch/output states. A duration method retains 026's `qualified-runner` eligibility class; the adopted observational profile separately prohibits numeric decisions. Clock resolution remains an acquisition observation, not part of the semantic checksum. Revalidation compares decoded descriptors and samples to separately supplied operation, acquisition, sampling, run/case, and expected-output inputs. A record cannot select its own validation expectations.
-
-`collect_operation` connects the acquired provider, actual core calls, descriptors, logical work, and sampler into a serializable owner fragment. It accepts only an immutable `AdmittedFixture` from the fixed expectation registry; arbitrary prepared calls and expected results are confined to lower-level negative tests. The retained fragment includes the exact fixture-input context, and revalidation requires the admitted fixture separately. Native-clock tests exercise every declared case and reject missing, unknown, mutated, or cross-run/cross-case data, including changed input bounds with identical output and work. The sampler checks logical work independently of the semantic checksum in every repetition; its observation-only test seam is not available in ordinary collection. This fragment is not a complete Owner Result, Measurement Evidence Set, or admitted Run Plan.
-
-The input/structural/selection workload vocabulary retains its 14 ordered facts covering bytes, visited parser tokens, complete logical values/depth/entries/string bytes, profiles and ID bytes, applicable structural work, retained internal records, and selector bytes. Each fact distinguishes the operation's output from previously prepared input, and records its exact counting unit. Incomplete parsing or unavailable schema prerequisites are not fabricated zero totals. Actual empty retained-record collections may have an exact zero count without claiming that unavailable schema work was zero. Over-limit selectors retain only the admitted first-over witness. These internal record counts are not final Finding/Evidence counts.
-
-The single-locale boundary has its own five-fact workload profile: the input occurrence, raw identifier bytes, canonical identifier bytes, retained canonical values, and correction suggestions. Canonical bytes are unavailable when raw admission or identifier validity fails, but an expanded canonical value rejected by its byte limit retains the observed byte count. Rejection retains zero canonical values, not a fake zero-sized canonical string. No file-preparation limits or file/structural work are fabricated for locale cases, and no whole-profile locale-policy or target work is claimed.
-
-The locale-core boundary has a separate eight-fact workload profile: active source/requested/default occurrences, their raw bytes, complete canonical requested cardinality, values and value bytes retained in the returned core, blocking reasons, related duplicate occurrences, and corrections. Core retention counts describe logical role values, not allocation: a failure returns no core even when its reasons or corrections retain canonical strings. An incomplete requested set is unavailable, not empty. This is not the full 015 `maxLocaleOccurrences` domain. The shared failure checksum sorts typed semantic keys while preserving multiplicity; source indices and correction locations remain in the entry observation. Neither sorting hashes nor dropping related occurrences can substitute for that separation. Actual complete preparation, selected ID, provider content/binding, and all core bounds are pinned even when a changed input would produce identical result and work.
-
-The finite case catalog declares 127 ordered cases: 77 input/structural/selection cases, 17 single-locale cases, and 33 project locale-core cases. The existing 94 cases retain their order and complete pinned expectations. The core additions cover 25 complete authoring recipes and eight exact/first-over cases for active occurrences, canonical requested cardinality, raw bytes, and expanded canonical bytes. All fixture and limit preparation is outside measured intervals. Structural validity does not imply successful locale semantics. Tests use an independent Draft 7 oracle and separately specified complete values, corrections, typed failures, and every related duplicate index. Every prepared case agrees with ordinary calls, including all 32 exact/first-over edges.
-
-Preparation produces an explicitly unadmitted `Candidate`. The separate `cases/registry` gate admits it against `cases/expectations-v4.json`, whose closed revisioned document contains the exact ordered declaration inventory, fixture-input context, shared/entry result checksums, and both the complete typed logical-work vector and its checksum. Registry revision `4` retains fixture revision `1`, all 127 ordered declarations, expected outcome kinds and 32 limit edges. Every previous revision-`3` input/result/work checksum is unchanged; the full work vectors are additionally available and checksum-checked before fixture preparation so common Case identity never depends on a successful observation. Formal configuration inputs retain their increased work compared with the historical synthetic fixtures. An independent decoded-tree counter checks their logical input work. These are fixed logical expectations, not checked-in timing or memory baselines. They are compiled only with benchmark/test support and require no runtime file access, network, directory scan, or caller-selected registry.
-
-Input-context observation covers the declared recipe, explicit preparation limits, actual operation input, and its schema/bounds or full prepared structural analysis where applicable. A selector must match its finite fixture input without exporting or hashing an arbitrary rejected string; an over-limit marker remains only its normalized first-over witness. Admission re-observes complete ordinary output and work before comparison with the pinned row, so cached candidate summaries cannot certify themselves. Only success creates the immutable token; no measured sample or failed expectation test supplies a new expected result.
-
-The ignored `print_candidate_expectations_for_review` developer test prints candidates to stdout and never writes a file or admits its output. Changes require explicit fixture review, passing independent schema/semantic tests, and the affected input/boundary/observation revision decisions before accepting new expectations. Registry mutation tests cover missing/duplicate/reordered declarations, missing nullable fields, changed inputs/limits/results/work, cached-summary substitution, and identical-output selector changes. Fresh preparation of all 127 declarations must continue to match the pinned data.
-
-The non-serialized `inventory` checker freezes an owner-selected ordered case inventory and verifies submission/evidence relationships against it. Missing, duplicate, unknown, reordered, or weakened inventory/evaluation rows are invalid. All six explicit unavailable kinds retain required/optional accounting: a required unavailable case makes the run incomplete, while an optional unavailable case remains diagnostic. Invalid takes precedence over incomplete and complete. An invalid submitted run exposes no successful-reference prefix, while an incomplete run can retain references to independently successful cases; unavailable diagnostic samples are never consumed here.
-
-Measured references must resolve to the exact run, plan, profile, subject, build, and case. Missing or stale evidence remains distinguishable from corrupt or ambiguously bound evidence. Non-applicability requires the planned rule and a separately checked owner fact bound to the same run/plan/profile/subject/build, never an environment-failure label. Lookup indexes are built once, duplicate references never choose a first/last record, and internal issues have deterministic typed ordering. Native integration tests account for all 127 checked fixture collections, then remove an attempt or make it explicitly unavailable to verify the different outcomes.
-
-This checker consumes views supplied by an enclosing admitted record layer. It does not validate full reason bodies, prove applicability, verify sample content/integrity, invent an identity encoding, issue a Run Plan, or create common evidence. The enclosing source records must retain their complete reasons and diagnostic payloads; the relationship view is not their wire representation. The separate `shared::plan` producer now issues the common Plan and Case identities. The enclosing `shared::pipeline` performs complete Build/Environment and native-backed record/projection/report checks. Optional/conditional/stale relationship fixtures do not activate those policies in the fixed unconditional smoke profile.
-
-## Minimum observational measurement profile
-
-`benchmark::profile` defines the private `intlify-config-minimum-smoke` revision `2` policy, adopting registry revision `4`, formal configuration inputs and fixed complete work vectors. It pins its adopted 026 revision `0` separately from resolver semantics and retains the admitted fixture registry binding and all 127 ordered declarations. The scope remains configuration foundation plus three project-locale roles, not the complete Phase 3 resolver. Policy or inventory meaning changes require a reviewed profile revision; the profile document itself is not a common record or Measurement Case identity. Old profile revisions `0` and `1` are not silently accepted as this revision.
-
-Each case has one checked warmup invocation, one measured sample, and one repetition. The profile disables calibration and outlier deletion, retains ordered raw samples, declares sequential registry order and immutable input reuse, and takes each operation's scratch/output state from the same execution descriptor used by collection. There is no internal wall-clock deadline: external cancellation or CI timeout terminates the process without a complete result. A failed capture retains only its diagnostic prefix, not successful numeric input.
-
-The smoke profile prohibits both advisory and gating numeric decisions. It does not relabel the duration method's `qualified-runner` class, claim runner qualification, or require a positive measured duration or minimum duration-to-resolution ratio. The acquired clock's positive reported granularity remains validated and retained. There are no profiler, global allocator replacement, runtime cache, or product dependencies added by this profile.
-
-Only a complete match with the compiled owner-selected policy can create `AdmittedProfile`; it has no `Deserialize` or mutable document access. Its collector checks the separately supplied case ordinal and admitted fixture before invoking ordinary collection. Each retained fragment carries only a profile reference and owner inventory ordinal; the enclosing result must retain the complete profile once. Validation reuses the independently admitted profile, fixture, ordinal, clock observation, and run/case binding. Changing the row's declared profile, ordinal, warmup, repetitions, sample count, or clock cannot change its acceptance rules.
-
-The tests capture and revalidate all 127 native cases and reject policy-leaf mutations, missing/unknown fields, inventory changes, wrong locators, and sample-policy substitutions. The owner-run assembler below now enforces the complete attempted inventory for this fixed smoke profile. The enclosing common pipeline separately checks Run/Case identities, Build/Environment, Evidence/Evaluation and Report; the native profile document and its fragments alone do not replace those artifacts.
-
-## Build observation and capture context
-
-The benchmark-only build script records a bounded input snapshot when Cargo builds the crate. It reads the crate manifest, README, build entry, `src/`, `build/`, and present `benches/` trees, plus the workspace manifest and lockfile. Stable logical names and full contents enter a versioned owner-local checksum; absolute paths, traversal order, timestamps, Git state, and runtime checkout contents do not. The successful source and dependency-lock observations use the same read of the lockfile bytes. Changing or renaming a declared input changes the source observation even without a Git commit.
-
-Acquisition is limited to 512 crate files plus two workspace files, 64 MiB of source contents, 64 nested directory levels, and 2048 visited entries. Regular files only are read, with exact/first-over checks and length/modification checks across each read. Symlinks, unsupported names or entries, I/O failures, changes detected during a read, and limit overruns produce closed unavailable causes with no successful-prefix digest or disclosed error path. This is a bounded snapshot of declared inputs, not a filesystem security boundary, compiler dependency attestation, or proof of exactly which bytes a concurrent compiler consumed.
-
-Compiler acquisition invokes Cargo's selected `RUSTC` directly without a shell and retains only controlled release, commit, and LLVM fields from bounded stdout. It drops stderr, paths, host strings, and unrecognized text. A compiler wrapper makes that observation unavailable rather than describing the unwrapped inner compiler as the effective invocation. Cargo profile/optimization/debug/target inputs are whitelisted; additional flags and wrapper settings retain presence only, never their contents. Runtime debug-assertion and pointer-width facts come from the linked library rather than the build script's host settings.
-
-Cargo inputs do not prove the complete effective compiler/linker configuration, and a pathname returned for the executable does not attest the loaded image. Both attestations remain explicitly unavailable. The document, its content checksum, and its reason codes are owner-local observations, not 017 encodings, common Build Identity, signatures, or common Verification Reasons. Unsupported acquisition does not fabricate a value or become evidence of non-applicability.
-
-`benchmark::context` acquires this observation, the admitted smoke profile, its native clock, and the environment inputs once. Each collected operation retains build/environment observation checksums and the existing profile/case binding; the enclosing context retains the full documents without copying their inventories into every row. Decode/revalidation compares against the separately acquired context rather than trusting a submitted build, environment, or profile. All 127 cases traverse this path; changed bindings, metadata, missing fields, and profile substitution are rejected. Retained documents and operation rows remain valid after the producing context and fixtures are released.
-
-The build dependencies and source acquisition are absent without the non-default `benchmark` feature. Ordinary configuration resolution neither reads build metadata nor acquires machine or environment information. The issued Run Plan binds this native build observation, and the common projection preserves applicable facts without upgrading unavailable attestations.
-
-## Native environment acquisition
-
-`benchmark::environment` acquires owner-local `EnvironmentInputs` before case collection. It retains the compiled library's controlled OS/architecture separately from the running kernel's view. The pinned safe `rustix::system::uname` interface is measurement-only on Linux/macOS. Only kernel family, machine architecture, and an entire bounded numeric release pass through controlled projections. Hostname, domain name, full kernel-build text, raw environment variables, unknown strings, and error details are neither serialized nor hashed. A custom or unsupported release remains unavailable rather than being truncated to a plausible prefix.
-
-Kernel release is not silently substituted for the OS version or complete kernel-build identity. Likewise, compiled target architecture and the kernel view do not attest the underlying physical host when translation or virtualization may be present. `std::thread::available_parallelism` is retained with its method as a positive exact _parallelism hint_, not a physical or available logical CPU-count attestation. Query failures and checked conversion failures have closed unavailable causes, not zero values.
-
-This acquisition path has no controlled Runner Class or qualification/preflight inputs. It can represent only `local-uncontrolled`; a CI environment label or a submitted document cannot promote it to controlled or qualified execution. It does not establish numeric-decision eligibility, infer two unavailable values are comparable, or prove that a changing host remained unchanged throughout a run.
-
-The context now owns the actual `MonotonicClock` used for all its ordinary collections. The environment uses the same existing `ClockObservation` type as operation descriptors; there is no duplicate clock schema or caller-selected replacement clock. Revalidation uses the context's acquired clock even if a submitted row and environment document agree with each other about a fabricated clock. Snapshot/checksum construction, platform queries, serialization, and validation remain outside component intervals.
-
-The common projection assembles the full 27-field 026 Environment Observation from checked native inputs and applicable Build, method and execution facts. Unknown applicable fields retain typed reasons. Only the two registered initial rules prove non-applicability; neither a native kernel view nor a parallelism hint is upgraded into a stronger hardware fact. Observed-only harness, projection and instrumentation entries refer to the executing implementation.
-
-The local tests cover controlled projection, release length/format limits, exact positive parallelism, content-free acquisition failures, runner non-promotion, actual-clock retention, missing/unknown fields, environment substitution, and all 127 context-bound native cases. Default library builds exclude these queries and the optional `rustix` system feature.
-
-## Owner-run assembly and record validation
-
-`benchmark::run` freezes the admitted context, all 127 fixture expectations and preparation results, sequential order, and required/unconditional membership before any capture. Each prepared run is consumed once. A benchmark-only OS random nonce distinguishes native invocations without using timestamps, process IDs, hostnames, or caller-selected identities. Stable native case bindings include the registry and complete fixture expectation but exclude the nonce, array position, clock, and build. These native bindings remain separate from the common Plan and Case identities described below.
-
-Native plan/result codecs are now `intlify-config-owner-run-plan/1` and `intlify-config-owner-run-result/1`. The native plan retains the already-issued common Plan reference and one fresh `intlify-config-owner-result-v1` identity reserved for its result. That identity is checked on result revalidation, separately from the native BLAKE3 content checksum. Neither the checksum nor the native run nonce is renamed into a common record ID.
-
-Ordinary collection visits every planned case, including after a preparation or collection failure. Expected semantic failures remain successful measured operations. Operational failures make the owner run incomplete; mismatched semantics, invalid observations, or fixture/harness failures make it invalid, with invalid taking precedence. Typed failure causes retain both mismatched observations or work vectors and all diagnostic progress/prefix fields. Failure stages, repetitions, prefixes, and mismatch claims are checked against the independently admitted sampling and fixture. No failure prefix becomes a measured row.
-
-The result retains its plan and complete acquired owner context once, plus ordered attempts. A checksum covers every retained raw field. Revalidation additionally uses the acquired run, prepared fixtures, and original result checksum: modifying a duration and recomputing its checksum cannot replace the actual observation. The closed decoder rejects unknown/missing/duplicate fields and bounds encoded input to 16 MiB before parsing. This is a private harness input limit, not a resolver policy or common artifact limit. Tests write and reread the record from temporary storage and verify that decoded results outlive the producing run.
-
-Successful owner-document validation can retain an incomplete or invalid benchmark outcome; it does not certify successful common evidence or numeric eligibility. The common pipeline consumes this checked input and projects only successful cases, retaining every negative evaluation and its diagnostic references. The assembler is feature-isolated and has no public constructor, runtime Profile output, or product command. Startup failures produce a typed error with no completed owner result.
-
-## Issued common Run Plan and Case identity
-
-`benchmark::shared` adopts the minimum [017 representation](../../design/017-intlify-shared-artifact-and-version-admission-design.md). Before fixture preparation or capture, the native assembler issues one immutable common Run Plan from the admitted profile/context and fixed registry. All 127 cases are required and unconditional, including any whose preparation later fails. Common record, run, and local runner-instance identities use separate registered domains and fresh OS-random values; the native assembler retains the Plan through collection.
-
-Case identities include the complete applicable 026 semantic dimensions and pinned native work/variant/descriptor fragments. They exclude observed samples, expected result checksums, build implementation revision, paths, branch, worker identity, and run/record IDs. Instance IDs change across invocations; semantic Case identities do not. No service profile, target, artifact or memory-domain applicability is invented for these six private component-duration boundaries.
-
-Shared integrity uses the exact length-framed, UTF-8-key-ordered SHA-256 function from 017 and excludes only the top-level envelope's integrity member. Decimal quantities cover the complete `u64` string domain with no JSON-number coercion. The encoder preflights depth and a private 32 MiB canonical-buffer bound; Plan decoding bounds input to 1 MiB. Encoding, randomness and digest work occur outside measured component intervals. Frozen byte vectors and independent Node-crypto hash vectors check framing without replacing native owner checksums.
-
-The checked-in [Run Plan schema](./schema/measurement-run-plan-v0.schema.json) and [Case identity-input schema](./schema/measurement-case-identity-v0.schema.json) are generated closed Draft 7 companions. Schema-only helpers are feature-gated and expose no Plan constructor or application API. Regeneration/freshness checks are developer commands, not benchmark execution:
-
-```sh
-rtk proxy cargo run -p intlify_config --features benchmark --example generate_measurement_schema -- plan --check
-rtk proxy cargo run -p intlify_config --features benchmark --example generate_measurement_schema -- case --check
-```
-
-Retained-issuer validation compares the whole decoded Plan with the independently issued original and rechecks integrity. Self-rehashing, replacing the build/profile/runner/case inventory, or dropping/reordering/duplicating entries cannot authorize another Plan for this run. The following finite resolver performs the remaining native-backed common checks; Plan validation alone is not evidence admission.
-
-## Common projection, report and standalone smoke
-
-`shared::pipeline` admits an explicit finite collection under the four exact 017 tuples. It rejects duplicate JSON members, unsupported tuples, malformed shapes, digest changes, duplicate/conflicting record identities, duplicate child identities, wrong nested references and changed run/Plan/case bindings. It performs no discovery or network access. Private reader capacities are 16 MiB per record, depth 64, 1 MiB per encoded atom, one million tokens, eight common records and 64 MiB total common input; these are not application Resource Limit Policy defaults.
-
-The projection preserves the complete owner result/schema/profile/checksum, applicable Build and 27-field Environment facts, case dimensions, complete work vectors, raw quantities, positive repetitions, semantic/execution identities and actual descriptors. Every planned case receives an evaluation. Missing/unsupported native input produces incomplete unavailable cases; malformed or inconsistently bound input produces invalid cases. Operational failures remain unavailable with typed diagnostic references; semantic mismatch is invalid. No failed prefix, fabricated zero, unproven non-applicability or withheld eligible evidence becomes a successful measurement. Valid negative evaluations remain resolvable records.
-
-The initial report has one `measurement-observation` section. Every row/sample resolves to its exact Evidence and Case Evaluation; all non-measured required cases remain in the missing-case inventory. Raw samples are not replaced by averages. Validation uses retained acquisition authority, not only a submitted checksum. This is the fixed initial profile, not a universal 026 consumer, remote trust service, baseline store or migration framework.
-
-Closed [Evidence](./schema/measurement-evidence-set-v0.schema.json), [Evaluation](./schema/measurement-run-evaluation-v0.schema.json) and [Report](./schema/measurement-structured-report-v0.schema.json) schemas have freshness and independent Draft 7 checks. The schema generator also accepts `evidence`, `evaluation`, or `report` with `--check`.
-
-Run the same entry as Linux CI from the repository root:
-
-```sh
-rtk proxy vp run bench:config:smoke
-# Equivalent direct entry:
-rtk proxy cargo bench -p intlify_config --bench profile_resolver --features benchmark -- --profile smoke --validate
-```
-
-The Linux/macOS harness creates a fresh temporary output directory and prints its location. It saves `run-plan.json`, `owner-result.json`, optional `measurement-evidence.json`, `run-evaluation.json` and `report.json`, rereads them with byte limits, and performs native-backed validation in the same process. `--output-dir NEW_DIRECTORY` selects an explicit new directory; existing directories/files are never overwritten. Files remain available after success or diagnostic failure. Preparation failure may leave an empty directory. Revalidation does not rerun timers or reconstruct capture authority from saved self-claims.
-
-Stdout JSON is presentation, not another common record. Smoke succeeds only when all 127 required cases complete and persisted records validate. Timing magnitude, including zero, remains observational; advisory/gating numeric decisions are forbidden. Unsupported clock acquisition is explicit failure. Ordinary `cargo test --all-targets` compiles the custom bench without silently executing the smoke profile; CI invokes it explicitly.
+The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. Locale normalization currently uses a finite test provider, not a production locale-data implementation. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
 
 ## Verification
 
-The [minimum vertical-slice fixture index](./fixtures/minimum/README.md) maps the raw-entry tests to their 015 rules and stopping points. Its test-only runner calls the ordinary strict materializer, structural analysis, complete model construction, exact selection, and private locale core; it never reconstructs a partial authoring root from valid fragments. Invalid raw input, invalid root/version/structure, and rejected selection stop before later stages. Locale failure retains its private exact reasons but no core.
+For contributors, run these commands from the repository root.
 
-The fixtures run without the `benchmark` feature and cover formatting/member/alias equivalence, semantic mutations, selected-profile isolation, scoped limit edges, retained output after failed calls and runner release, and explicitly caller-scheduled parallel invocations on native targets. No repository discovery, file writes, host locale, clock, network, random fixture input, or implicit thread pool enters this path. The harness has no public or serde surface and is absent from both ordinary and benchmark-only library builds.
-
-These tests verify the local minimum vertical slice separately from the benchmark/report path. Formal schema/freshness, common records, standalone smoke and CI wiring are implementation artifacts, not review/merge evidence or full Phase 2/3 completion. The fixture index is not the Phase 6 Suite Index, a new conformance manifest, or `profile_resolve_e2e` evidence.
-
-`src/model_tests.rs` records an explicit inventory of every fixed object's fields and checks positive, negative, omission, null, wrong-type, empty-collection, identity, and sibling-failure fixtures. It compares the internal evaluator, typed deserialization, and the independently compiled Draft 7 schema. The external schema oracle is a pinned dev dependency with HTTP/file retrieval, TLS, and IDNA data disabled; it is not part of the normal dependency graph.
-
-Relevant traceability:
-
-| 015 decision / section | Tests or implementation |
-| --- | --- |
-| 015-007, existing configuration reuse | `json`, `location`, `schema`; unchanged CLI config/schema tests |
-| 015-008, independent configuration version | `root_version_and_shape_are_closed` |
-| 015-009 / 015-038, complete closed field vocabulary | `field_inventory_matches_required_optional_and_wrong_type_behavior`, `fixed_objects_reject_unknown_members_at_every_level` |
-| Profile Scope and Identity | Distinct identity types; identity syntax and control-character fixtures |
-| Required/optional/null distinctions | `every_optional_member_rejects_null`, `all_policy_members_are_required_and_only_two_are_nullable` |
-| Coverage selector structure | `coverage_requires_a_mode_and_at_least_one_constrained_dimension` |
-| No partial authoring root | `an_invalid_sibling_never_constructs_a_partial_root` |
-| Semantic checks remain separate | `semantic_duplicates_and_references_are_not_silently_normalized` |
-| Strict file entry / Portable JSON Number | `portable_numbers_use_binary64_values_and_preserve_raw_tokens`, strict syntax / UTF-8 / Unicode / duplicate tests |
-| Portable Source Span byte coordinates | `source_map_retains_key_value_container_and_eof_positions`, malformed UTF-8 byte-span tests |
-| 015-128 / logical input accounting | Resource-bound parsing, complete aggregate / exact / first-over / ordering tests |
-| 026 storage ownership | Owned result isolation, 20,000-level arrays and 10,000-level objects including failure cleanup; no shared mutable workspace or cache |
-| Parser / materializer agreement | Finite generated corpus, Unicode escape lengths, and single-byte mutation tests against the independent JSON decoder |
-| Schema-guided fragment admission | `bad_sibling_does_not_erase_a_fully_admitted_declaration`, missing-field/source-span and type-prerequisite tests |
-| Structural work limit | `work_limit_uses_complete_exact_total_and_returns_no_evaluation_prefix`, order/repeated-invocation tests |
-| Generated schema source | All definitions compiled; unsupported keyword/dialect/pattern/reference, cycle and malformed-schema tests |
-| Normalized typed input | Complete owned model, negative zero / binary64 rounding, tuple-tail and content-free error tests in `materialize::typed` |
-| Outer version/profile admission | `structural::admission_tests`: absent/invalid/unsupported version, metadata isolation, exact/first-over count and decoded-ID bounds |
-| Complete root construction | Sealed proof and no-`Deserialize` assertion; independent typed siblings, aggregate `anyOf` proof, work-overrun suppression |
-| 015 external selector / provisional selection | `structural::selection::tests`: omission, exact match, original-map count, structural prerequisites, explicit bootstrap-bound binding |
-| 015-089 / 015-090 / provisional portion of 015-091 | Closed top-level selector types, exact UTF-8 limits, redacted unknown/invalid observations, no retained provisional Evidence |
-| 026 invocation isolation | Shared immutable schema/input; complete roots and selections survive producer release; failures do not contaminate repeated calls |
-| 026 exact numeric representation | `benchmark::quantity::tests`: JSON precision, decimal canonicality, positive repetitions, reversed clock, exact/first-over duration and accumulation overflow |
-| 026 clock and interval boundaries | `benchmark::clock::tests`, `benchmark::measure::tests`: acquired resolution, wide subtraction, first-over conversion, invocation/lifetime markers, panic and failed-clock paths |
-| 015 complete semantic observation | `benchmark::operation::tests`: actual six operations, full output mutation, member permutations, separate entry facts, content-free rejected selectors, iterative deep-document encoding |
-| 026 raw sample capture | `benchmark::sample::tests`: warmup exclusion, fixed repetitions, diagnostic-only failure prefixes, checked aggregation/capacity, raw ordering, exact run/case/sample binding |
-| 026 method and execution descriptors | `benchmark::descriptor::tests`: all descriptor leaves, missing/unknown fields, marker/overlap mutation, actual clock binding, independent reuse states, duration eligibility |
-| 026 Measurement Profile / capture binding | `benchmark::profile_tests`: fixed complete inventory, exact smoke sampling, every policy leaf and closed object, explicit numeric prohibition, all 127 native captures, independent profile/case/clock binding, and retained rows after profile/fixture release |
-| 026 build observations / disclosure | `benchmark::build::producer::tests`, `benchmark::build::tests`: every declared input, path/order/time independence, same-byte source/lock binding, source/depth/entry exact and first-over bounds, symlink rejection, controlled compiler/Cargo metadata, closed unavailable causes, and submitted-build mutation rejection |
-| Build/environment/profile-bound capture | `benchmark::context::tests`: all 127 native cases, context-owned clock, separately acquired context and per-row bindings, missing/unknown fields, metadata/profile substitution, fabricated environment-and-sample clock agreement, and retained operation/context ownership |
-| Native environment inputs / local Runner Context | `benchmark::environment::tests`: closed target/kernel identifiers, whole bounded releases, exact positive parallelism hint, content-free unavailable states, no runner promotion, actual acquired clock, owned snapshots, and metadata mutation; `shared::pipeline::tests` checks the complete common 27-field projection |
-| Connected owner observation | `benchmark::collect::tests`: native-clock capture for all six pairs, serialization and separate-input revalidation, cross-case/run rejection, no successful failure prefix |
-| Enclosing owner run / stored result | `benchmark::run::tests`: all 127 cases in one consumed run, fresh run/stable case bindings, file roundtrip and retained ownership, required-case completeness/order, metadata/sample mutation including self-rehashing, typed operational/integrity failure precedence, failure progress and diagnostic prefixes, closed decode and exact/first-over input bytes |
-| Shared Run Plan / canonical Case identity | `benchmark::shared::plan::tests`, `shared::encoding::tests`, `shared::identity::tests`: complete closed schema freshness, all 127 Case inputs, pre-capture issuance and retention, stable semantic IDs versus fresh role-specific instance IDs, independent framing/digest vectors, exact quantities, whole-record binding, self-rehashed mutation rejection and input limits |
-| Native-to-common admission / report | `shared::pipeline::tests`, `run::tests::common_projection_keeps_failed_cases_diagnostic_and_invalid_precedence`: real 127-case projection, schema oracle/freshness, negative inventories, raw preservation, self-rehashed mutation, duplicate/conflicting identities, exact nested references, unproven applicability and run binding |
-| Reason order / reader capacities | `shared::reason::tests`, `shared::decode::tests`: stage/code/typed numeric ordering, permutation/deduplication, exact/first-over capacities, duplicate JSON and scalar/number rejection |
-| Standalone facade / disk revalidation | `benchmark::facade::tests`, `benches/profile_resolver.rs`, `vp run bench:config:smoke`: completed bytes only, exact file inventory, persisted-record admission, no caller-defined timed operation or product state |
-| Active logical work vector | `benchmark::work::tests`: complete ordered vocabulary/units/stages, raw parsing versus complete counts, structural first-over totals, retained-record zeroes, private selector witnesses, tamper and per-repetition mismatch checks |
-| Finite case catalog and preparation | `benchmark::cases::tests`, `cases::locale_tests`, `cases::core_tests`: 127 unique ordered declarations, independent schema/locale/core checks, scaled/permuted inputs, 32 exact/first-over edges, exact failure kinds, undeclared-case rejection |
-| Fixed expected input/result/work | `benchmark::cases::registry::tests`: closed pinned inventory and nullable presence, actual context/result/work revalidation, changed-but-equivalent inputs, secret-safe selector matching, cached-summary and operation substitution |
-| Admitted fixture collection | `benchmark::collect::tests`: all 127 pinned cases through native collection/decode/revalidation; changed input context rejected even when result, logical work, run, and case labels coincide |
-| 026 run inventory relationships | `benchmark::inventory_tests`: required/optional unavailable kinds, missing/duplicate/unknown/reordered rows, exact run/plan/profile/subject/build/case bindings, scoped applicability proof, absent/stale/corrupt/ambiguous evidence, outcome precedence and canonical internal issue ordering |
-| Inventory / owner-collection integration | All 94 pinned native collections accounted for through non-serialized test views; explicit required unavailability is incomplete, a missing attempt is invalid, and diagnostic prefixes never enter successful-reference output |
-| Private locale provider boundary | `locale::tests`: exact binding components, raw/canonical byte bounds, declared aliases and invalid examples versus unsupported coverage, immutable shared output, source corrections, fixed points, byte ordering, and fresh/reused equivalence |
-| Locale / owner measurement integration | `benchmark::measure::tests`, `cases::locale_tests`, `work::tests`, `descriptor::tests`, `collect::tests`: exact ordinary-call interval, fixed semantic/correction observations, actual byte/retention work, provider/data/reuse binding, no invented output buffer, and failure paths that cannot produce successful samples; `shared::pipeline::tests` checks the same native observations through common records/projection/report |
-| Minimum source/requested/default core | `locale::core::tests`: complete-root/selection prerequisite, explicit defaults, canonical order, duplicate groups and every occurrence, independent failures, scoped exact/first-over bounds, preflight before provider work, semantic equivalence/mutation, owned results, reuse, and no serde artifact surface |
-| Minimum locale-core / owner measurement integration | `cases::core_tests`, `work::tests`, `descriptor::tests`, `operation::tests`, `collect::tests`, `cases::registry::tests`: independent complete outcomes, permutation/mutation and correction separation, eight exact work facts, prerequisite rejection before clocks, provider/subset/bound binding, and no successful unsupported samples; `shared::pipeline::tests` connects these cases to the same common observation path |
-
-From the repository root:
+Run the crate's tests, including its optional measurement support:
 
 ```sh
-rtk proxy cargo test -p intlify_config --all-targets
-rtk proxy cargo test -p intlify_config --all-targets --all-features
-rtk proxy cargo test -p intlify_config --doc
-rtk proxy cargo check -p intlify_config --lib --no-default-features
-rtk proxy cargo clippy -p intlify_config --all-targets --all-features -- -D warnings
-rtk proxy cargo test -p intlify_cli --test config --test schema
-rtk proxy vp run schema:cli:check
+cargo test -p intlify_config --all-targets --all-features
 ```
 
-## Minimum handoff and deferred scope
+Check that the generated project-profile JSON Schema is up to date:
 
-The local minimum covers complete Phase 1 configuration foundations, the finite/data-free portion of Phase 2 and the private source/requested/default-locale portion of Phase 3. All six active boundaries connect to the initial 026 observation path. Review/merge evidence remains separate from local tests and smoke results; no PR or merged milestone is implied.
+```sh
+cargo run -p intlify_config --example generate_config_schema -- --check
+```
 
-Follow-up work still owns production canonicalization data/adapters and full locale conformance; Policy/Target artifact resolution and trust; negotiation/fallback/coverage and target/group semantics; full Root Package/RCI/replay/Findings; public Profile and Runtime handoff; complete conformance suites, workflow/peak-memory cases, profiler/allocation observers, qualified runners, baselines and numeric budgets. None is simulated by this minimum core or its measurement facade. 016 can be designed independently but cannot consume this private core as a provisional public Profile.
+On Linux or macOS, run the measurement smoke check:
+
+```sh
+vp run bench:config:smoke
+```
+
+The smoke check exercises the implemented operations, saves measurement records to a new temporary directory, and validates the saved records. It prints the output location. It checks the measurement workflow, not whether the crate meets a performance budget. Measurement support is disabled in normal library builds.
+
+For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md).
+
+## Further reading
+
+- [Intlify overview](../../design/000-intlify-overview-design.md): the source-first localization concept and overall architecture.
+- [Project profile and locale policy design](../../design/015-intlify-project-profile-and-locale-policy-design.md): configuration semantics, the intended profile resolver, and implementation scope.
+- [Conformance and measurement design](../../design/026-intlify-conformance-and-measurement-design.md): shared correctness and performance-verification requirements.
+
+## License
+
+MIT
