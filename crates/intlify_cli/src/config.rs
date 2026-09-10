@@ -3,21 +3,19 @@
 
 //! Unified project-configuration discovery, decoding, and validation.
 //!
-//! This module owns project-root and config-path resolution, duplicate-aware
-//! JSON/JSONC decoding, cross-section validation order, and construction of the
-//! immutable loaded configuration. Command input discovery and execution occur
-//! only after this boundary succeeds.
+//! This module owns project-root and config-path resolution, JSONC adaptation,
+//! cross-section validation order, and construction of the immutable loaded
+//! configuration. Duplicate-aware JSON decoding is shared with `intlify_config`.
+//! Command input discovery and execution occur only after this boundary succeeds.
 
-use std::cell::Cell;
-use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
+use intlify_config::json::{decode_unique_json, JsonDecodeError, JsonDecodeErrorKind};
 use intlify_format::FormatMode;
 use intlify_resource::{ResolvedResources, ResourceConfigViolation, ResourcesConfig};
 use schemars::JsonSchema;
-use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -336,10 +334,12 @@ fn load_config_file(project_root: &Path, path: &Path) -> Result<LoadedConfigBody
     let source = fs::read_to_string(path).map_err(|error| read_error(&path_label, &error))?;
 
     match config_syntax(path) {
-        Some(ConfigSyntax::Json) => parse_json_config(&source, &source, &path_label),
+        Some(ConfigSyntax::Json) => parse_json_config(&source, &path_label),
         Some(ConfigSyntax::Jsonc) => {
             let normalized = normalize_jsonc(&source);
-            parse_json_config(&normalized, &source, &path_label)
+            // Normalization retains every UTF-8 byte offset and newline, so
+            // decoder positions still identify tokens in the original file.
+            parse_json_config(&normalized, &path_label)
         }
         None => Err(ConfigError::new(
             "config_extension_unsupported",
@@ -350,31 +350,9 @@ fn load_config_file(project_root: &Path, path: &Path) -> Result<LoadedConfigBody
     }
 }
 
-fn parse_json_config(
-    source: &str,
-    location_source: &str,
-    path_label: &str,
-) -> Result<LoadedConfigBody, ConfigError> {
-    debug_assert_eq!(source.len(), location_source.len());
-    let duplicate_found = Cell::new(false);
-    let mut deserializer = serde_json::Deserializer::from_str(source);
-    let parsed = UniqueJsonValueSeed {
-        duplicate_found: &duplicate_found,
-    }
-    .deserialize(&mut deserializer)
-    .and_then(|value| {
-        deserializer.end()?;
-        Ok(value)
-    });
-    let value = parsed.map_err(|error| {
-        config_parse_error(
-            source,
-            location_source,
-            path_label,
-            &error,
-            duplicate_found.get(),
-        )
-    })?;
+fn parse_json_config(source: &str, path_label: &str) -> Result<LoadedConfigBody, ConfigError> {
+    let value =
+        decode_unique_json(source).map_err(|error| config_parse_error(path_label, &error))?;
 
     let ValidatedConfigSections {
         resources,
@@ -403,122 +381,15 @@ fn parse_json_config(
     })
 }
 
-#[derive(Clone, Copy)]
-struct UniqueJsonValueSeed<'a> {
-    duplicate_found: &'a Cell<bool>,
-}
-
-struct UniqueJsonValueVisitor<'a> {
-    duplicate_found: &'a Cell<bool>,
-}
-
-impl<'de> DeserializeSeed<'de> for UniqueJsonValueSeed<'_> {
-    type Value = Value;
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_any(UniqueJsonValueVisitor {
-            duplicate_found: self.duplicate_found,
-        })
+fn config_parse_error(path_label: &str, error: &JsonDecodeError) -> ConfigError {
+    let position = error.position();
+    let mut details = json!({
+        "line": position.line,
+        "column": position.column
+    });
+    if error.kind() == JsonDecodeErrorKind::DuplicateObjectMember {
+        details["reason"] = json!("duplicate_object_member");
     }
-}
-
-impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
-    type Value = Value;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("any JSON value without duplicate object members")
-    }
-
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
-        Ok(Value::Bool(value))
-    }
-
-    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
-        Ok(Value::Number(value.into()))
-    }
-
-    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
-        Ok(Value::Number(value.into()))
-    }
-
-    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E> {
-        Ok(serde_json::Number::from_f64(value).map_or(Value::Null, Value::Number))
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Value::String(value.to_owned()))
-    }
-
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
-        Ok(Value::String(value))
-    }
-
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
-        Ok(Value::Null)
-    }
-
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
-        Ok(Value::Null)
-    }
-
-    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let mut values = Vec::new();
-        while let Some(value) = sequence.next_element_seed(UniqueJsonValueSeed {
-            duplicate_found: self.duplicate_found,
-        })? {
-            values.push(value);
-        }
-        Ok(Value::Array(values))
-    }
-
-    fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        let mut values = serde_json::Map::new();
-        while let Some(key) = object.next_key::<String>()? {
-            if values.contains_key(&key) {
-                self.duplicate_found.set(true);
-                return Err(de::Error::custom("duplicate object member"));
-            }
-            let value = object.next_value_seed(UniqueJsonValueSeed {
-                duplicate_found: self.duplicate_found,
-            })?;
-            values.insert(key, value);
-        }
-        Ok(Value::Object(values))
-    }
-}
-
-fn config_parse_error(
-    source: &str,
-    location_source: &str,
-    path_label: &str,
-    error: &serde_json::Error,
-    duplicate_found: bool,
-) -> ConfigError {
-    let details = if duplicate_found {
-        let (line, column) = duplicate_member_location(source, location_source, error);
-        json!({
-            "line": line,
-            "column": column,
-            "reason": "duplicate_object_member"
-        })
-    } else {
-        json!({
-            "line": error.line(),
-            "column": error.column().saturating_sub(1)
-        })
-    };
 
     ConfigError::new(
         "config_parse_failed",
@@ -526,71 +397,6 @@ fn config_parse_error(
         Some(path_label.to_owned()),
         Some(details),
     )
-}
-
-fn duplicate_member_location(
-    source: &str,
-    location_source: &str,
-    error: &serde_json::Error,
-) -> (usize, usize) {
-    let detected =
-        byte_offset_for_line_column(source, error.line(), error.column()).unwrap_or(source.len());
-    let opening = previous_unescaped_quote(source, detected)
-        .and_then(|closing| closing.checked_sub(1))
-        .and_then(|before_closing| previous_unescaped_quote(source, before_closing))
-        .unwrap_or(detected.min(location_source.len()));
-    line_and_byte_column(location_source, opening)
-}
-
-fn byte_offset_for_line_column(source: &str, line: usize, column: usize) -> Option<usize> {
-    if line == 0 {
-        return None;
-    }
-
-    let mut line_start = 0;
-    for _ in 1..line {
-        let newline = source.as_bytes()[line_start..]
-            .iter()
-            .position(|byte| *byte == b'\n')?;
-        line_start += newline + 1;
-    }
-    Some(
-        line_start
-            .saturating_add(column.saturating_sub(1))
-            .min(source.len()),
-    )
-}
-
-fn previous_unescaped_quote(source: &str, before_or_at: usize) -> Option<usize> {
-    let bytes = source.as_bytes();
-    let mut index = before_or_at.min(bytes.len().checked_sub(1)?);
-
-    loop {
-        if bytes[index] == b'"' {
-            let preceding_backslashes = bytes[..index]
-                .iter()
-                .rev()
-                .take_while(|byte| **byte == b'\\')
-                .count();
-            if preceding_backslashes % 2 == 0 {
-                return Some(index);
-            }
-        }
-        index = index.checked_sub(1)?;
-    }
-}
-
-fn line_and_byte_column(source: &str, byte_offset: usize) -> (usize, usize) {
-    let prefix = &source.as_bytes()[..byte_offset.min(source.len())];
-    let mut line = 1;
-    let mut line_start = 0;
-    for (index, byte) in prefix.iter().enumerate() {
-        if *byte == b'\n' {
-            line += 1;
-            line_start = index + 1;
-        }
-    }
-    (line, prefix.len() - line_start)
 }
 
 struct ValidatedConfigSections {

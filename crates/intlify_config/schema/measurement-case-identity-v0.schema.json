@@ -1,0 +1,816 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "Aggregation": {
+      "enum": ["batch_total"],
+      "type": "string"
+    },
+    "Boundary": {
+      "additionalProperties": false,
+      "properties": {
+        "cost": {
+          "type": "string"
+        },
+        "directChildren": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "directParents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedMarkers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "finalIncludedMarker": {
+          "type": "string"
+        },
+        "firstIncludedMarker": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedMarkers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "occurrencePolicy": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/definitions/Operation"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "operation",
+        "phase",
+        "cost",
+        "metric",
+        "occurrencePolicy",
+        "firstIncludedMarker",
+        "finalIncludedMarker",
+        "includedMarkers",
+        "excludedMarkers",
+        "directParents",
+        "directChildren"
+      ],
+      "type": "object"
+    },
+    "CaseProjection": {
+      "additionalProperties": false,
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these six internal duration boundaries and are absent, not guessed.",
+      "properties": {
+        "category": {
+          "$ref": "#/definitions/Category"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/Concurrency"
+        },
+        "executionModel": {
+          "$ref": "#/definitions/ExecutionModel"
+        },
+        "executionState": {
+          "$ref": "#/definitions/Execution"
+        },
+        "fixture": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "intervalBoundary": {
+          "$ref": "#/definitions/Boundary"
+        },
+        "measurementMethod": {
+          "$ref": "#/definitions/Method"
+        },
+        "measurementProfileRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "metric": {
+          "$ref": "#/definitions/Metric"
+        },
+        "operationClass": {
+          "$ref": "#/definitions/OperationClass"
+        },
+        "ownerBenchmarkProfileRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "ownerCost": {
+          "type": "string"
+        },
+        "ownerIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "ownerPhase": {
+          "type": "string"
+        },
+        "ownerResultSchemaRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "performanceSurface": {
+          "$ref": "#/definitions/Surface"
+        },
+        "sampleAggregation": {
+          "$ref": "#/definitions/Aggregation"
+        },
+        "scale": {
+          "$ref": "#/definitions/Scale"
+        },
+        "variant": {
+          "$ref": "#/definitions/Variant"
+        },
+        "verificationSubject": {
+          "$ref": "#/definitions/Subject"
+        },
+        "workload": {
+          "$ref": "#/definitions/LogicalWork"
+        }
+      },
+      "required": [
+        "ownerIdentity",
+        "ownerResultSchemaRevision",
+        "ownerBenchmarkProfileRevision",
+        "ownerPhase",
+        "ownerCost",
+        "category",
+        "operationClass",
+        "performanceSurface",
+        "intervalBoundary",
+        "fixture",
+        "variant",
+        "scale",
+        "verificationSubject",
+        "executionModel",
+        "executionState",
+        "concurrency",
+        "workload",
+        "metric",
+        "measurementMethod",
+        "sampleAggregation",
+        "measurementProfileRevision"
+      ],
+      "type": "object"
+    },
+    "Category": {
+      "enum": ["toolchain"],
+      "type": "string"
+    },
+    "Concurrency": {
+      "enum": ["sequential-cases-calling-thread-no-workers"],
+      "type": "string"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheState": {
+          "type": "string"
+        },
+        "engineState": {
+          "type": "string"
+        },
+        "initialPreparationState": {
+          "type": "string"
+        },
+        "managedHeapState": {
+          "type": "string"
+        },
+        "outputBufferState": {
+          "$ref": "#/definitions/OutputBuffer"
+        },
+        "processState": {
+          "type": "string"
+        },
+        "runtimeCompilationState": {
+          "type": "string"
+        },
+        "scratchReuseState": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "processState",
+        "engineState",
+        "initialPreparationState",
+        "cacheState",
+        "runtimeCompilationState",
+        "managedHeapState",
+        "scratchReuseState",
+        "outputBufferState"
+      ],
+      "type": "object"
+    },
+    "ExecutionModel": {
+      "enum": ["same-process-synchronous-ordinary-core"],
+      "type": "string"
+    },
+    "LimitEdge": {
+      "enum": ["exact", "first-over"],
+      "type": "string"
+    },
+    "LimitKind": {
+      "enum": [
+        "file-bytes",
+        "parser-tokens",
+        "nodes",
+        "depth",
+        "collection-entries",
+        "total-string-bytes",
+        "single-string-bytes",
+        "profiles",
+        "profile-id-bytes",
+        "structural-units",
+        "locale-raw-identifier-bytes",
+        "locale-canonical-identifier-bytes",
+        "core-active-occurrences",
+        "core-requested-cardinality",
+        "core-raw-identifier-bytes",
+        "core-canonical-identifier-bytes"
+      ],
+      "type": "string"
+    },
+    "LocaleCoreRecipe": {
+      "enum": [
+        "minimal",
+        "source-und",
+        "source-en",
+        "multi",
+        "reordered",
+        "aliased",
+        "changed-set",
+        "changed-default",
+        "changed-source",
+        "absent-source",
+        "exact-duplicate",
+        "alias-duplicate",
+        "multiple-duplicates",
+        "duplicate-heavy",
+        "invalid-source",
+        "invalid-requested",
+        "invalid-default",
+        "invalid-and-duplicate",
+        "default-not-member",
+        "unrelated-fields",
+        "other-profile",
+        "duplicate-reordered",
+        "invalid-reordered",
+        "expanding-alias",
+        "expanded-alias"
+      ],
+      "type": "string"
+    },
+    "LocaleRecipe": {
+      "enum": [
+        "language",
+        "region",
+        "casing",
+        "alias",
+        "canonical-alias",
+        "extension-ordering",
+        "canonical-extensions",
+        "expanding-alias",
+        "canonical-expanded-alias",
+        "invalid-legacy",
+        "invalid-validity",
+        "invalid-extension",
+        "invalid-private"
+      ],
+      "type": "string"
+    },
+    "LogicalWork": {
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "items": {
+            "$ref": "#/definitions/WorkFact"
+          },
+          "type": "array"
+        },
+        "operation": {
+          "$ref": "#/definitions/Operation"
+        },
+        "profileIdentity": {
+          "type": "string"
+        },
+        "profileRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["profileIdentity", "profileRevision", "operation", "facts"],
+      "type": "object"
+    },
+    "Method": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalUnit": {
+          "type": "string"
+        },
+        "clock": {
+          "type": "string"
+        },
+        "clockResolutionSource": {
+          "type": "string"
+        },
+        "concurrencyCoverage": {
+          "type": "string"
+        },
+        "durationConversion": {
+          "type": "string"
+        },
+        "estimatedOverheadSubtraction": {
+          "type": "boolean"
+        },
+        "eventTaxonomy": {
+          "type": "string"
+        },
+        "excludedDomain": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedInstrumentation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "numericDecisionEligibility": {
+          "type": "string"
+        },
+        "observationDomain": {
+          "type": "string"
+        },
+        "optimizationBarrier": {
+          "$ref": "#/definitions/OptimizationBarrier"
+        },
+        "overflowBehavior": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerRevision": {
+          "type": "string"
+        },
+        "repetitionAggregation": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "sampleAggregationKind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "metric",
+        "canonicalUnit",
+        "provider",
+        "providerRevision",
+        "clock",
+        "observationDomain",
+        "excludedDomain",
+        "eventTaxonomy",
+        "durationConversion",
+        "sampleAggregationKind",
+        "repetitionAggregation",
+        "concurrencyCoverage",
+        "overflowBehavior",
+        "numericDecisionEligibility",
+        "clockResolutionSource",
+        "includedInstrumentation",
+        "estimatedOverheadSubtraction",
+        "optimizationBarrier"
+      ],
+      "type": "object"
+    },
+    "Metric": {
+      "enum": ["wall_duration"],
+      "type": "string"
+    },
+    "Operation": {
+      "enum": [
+        "file-materialization",
+        "structural-analysis",
+        "authoring-construction",
+        "profile-selection",
+        "locale-canonicalization",
+        "locale-core-resolution"
+      ],
+      "type": "string"
+    },
+    "OperationClass": {
+      "enum": ["component"],
+      "type": "string"
+    },
+    "OptimizationBarrier": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "inputOpacity": {
+          "type": "string"
+        },
+        "inputPlacement": {
+          "type": "string"
+        },
+        "invocationPlacement": {
+          "type": "string"
+        },
+        "invocationPreservation": {
+          "type": "string"
+        },
+        "outputConsumption": {
+          "type": "string"
+        },
+        "outputLifetime": {
+          "type": "string"
+        },
+        "outputPlacement": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "semanticValidation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "applicability",
+        "inputOpacity",
+        "invocationPreservation",
+        "outputConsumption",
+        "outputLifetime",
+        "inputPlacement",
+        "invocationPlacement",
+        "outputPlacement",
+        "semanticValidation"
+      ],
+      "type": "object"
+    },
+    "OutputBuffer": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ownership": {
+              "type": "string"
+            },
+            "reuse": {
+              "type": "string"
+            },
+            "state": {
+              "const": "applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state", "ownership", "reuse"],
+          "type": "object"
+        }
+      ]
+    },
+    "Recipe": {
+      "oneOf": [
+        {
+          "enum": [
+            "minimal",
+            "reversed-members",
+            "padded-bytes",
+            "long-string",
+            "two-profiles",
+            "many-profiles",
+            "many-locale-occurrences",
+            "nested-array",
+            "many-values",
+            "portable-maximum",
+            "negative-zero",
+            "invalid-utf8",
+            "invalid-json",
+            "trailing-token",
+            "duplicate-key",
+            "escaped-duplicate-key",
+            "invalid-surrogate",
+            "non-portable-number",
+            "root-null",
+            "missing-version",
+            "wrong-version-type",
+            "unsupported-version",
+            "empty-profiles",
+            "unknown-member",
+            "missing-nullable-policy",
+            "null-source-default",
+            "invalid-sibling",
+            "invalid-resource-reference",
+            "dense-invalid"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "locale": {
+              "$ref": "#/definitions/LocaleRecipe"
+            }
+          },
+          "required": ["locale"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "locale-core": {
+              "$ref": "#/definitions/LocaleCoreRecipe"
+            }
+          },
+          "required": ["locale-core"],
+          "type": "object"
+        }
+      ]
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "Scale": {
+      "enum": ["fixed-owner-recipe"],
+      "type": "string"
+    },
+    "Selector": {
+      "enum": [
+        "absent",
+        "app",
+        "unknown",
+        "invalid-syntax",
+        "invalid-type",
+        "exact-byte-limit",
+        "first-over-byte-limit"
+      ],
+      "type": "string"
+    },
+    "Subject": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "kind": {
+          "$ref": "#/definitions/SubjectKind"
+        }
+      },
+      "required": ["kind", "identity"],
+      "type": "object"
+    },
+    "SubjectKind": {
+      "enum": ["toolchain-component"],
+      "type": "string"
+    },
+    "Surface": {
+      "enum": ["core"],
+      "type": "string"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "UnavailableWork": {
+      "enum": [
+        "raw-input-not-complete",
+        "profile-container-not-admitted",
+        "schema-prerequisite-unavailable",
+        "locale-not-canonicalized",
+        "locale-core-requested-not-resolved"
+      ],
+      "type": "string"
+    },
+    "Variant": {
+      "additionalProperties": false,
+      "description": "A typed native-owner fragment. Recipe/limit/selector tags retain their owner\nspelling and revision; they are not a new generic common selector language.",
+      "properties": {
+        "limit": {
+          "items": [
+            {
+              "$ref": "#/definitions/LimitKind"
+            },
+            {
+              "$ref": "#/definitions/LimitEdge"
+            }
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "type": ["array", "null"]
+        },
+        "recipe": {
+          "$ref": "#/definitions/Recipe"
+        },
+        "selector": {
+          "$ref": "#/definitions/Selector"
+        }
+      },
+      "required": ["recipe", "selector"],
+      "type": "object"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "WorkFact": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/WorkKind"
+        },
+        "observation": {
+          "$ref": "#/definitions/WorkValue"
+        },
+        "stage": {
+          "$ref": "#/definitions/WorkStage"
+        },
+        "unit": {
+          "$ref": "#/definitions/WorkUnit"
+        }
+      },
+      "required": ["kind", "unit", "stage", "observation"],
+      "type": "object"
+    },
+    "WorkKind": {
+      "enum": [
+        "raw-file-bytes",
+        "parser-tokens-visited",
+        "logical-value-nodes",
+        "maximum-value-depth",
+        "collection-entries",
+        "total-decoded-string-bytes",
+        "maximum-decoded-string-bytes",
+        "profile-declarations",
+        "maximum-declared-profile-id-bytes",
+        "structural-analysis-units",
+        "retained-admission-issues",
+        "retained-schema-fragments",
+        "retained-schema-issues-including-alternatives",
+        "selector-id-bytes",
+        "locale-occurrences",
+        "raw-locale-identifier-bytes",
+        "canonical-locale-identifier-bytes",
+        "retained-canonical-locale-values",
+        "locale-correction-suggestions",
+        "locale-core-occurrences",
+        "locale-core-raw-identifier-bytes",
+        "locale-core-canonical-requested-locales",
+        "locale-core-retained-values",
+        "locale-core-retained-value-bytes",
+        "locale-core-blocking-reasons",
+        "locale-core-related-duplicate-occurrences",
+        "locale-core-corrections"
+      ],
+      "type": "string"
+    },
+    "WorkStage": {
+      "enum": ["operation-result", "prepared-input", "not-applicable"],
+      "type": "string"
+    },
+    "WorkUnit": {
+      "enum": [
+        "octet",
+        "utf8-octet",
+        "parser-token",
+        "logical-value",
+        "value-level",
+        "collection-entry",
+        "profile-declaration",
+        "applicable-keyword-subject",
+        "retained-record",
+        "locale-occurrence",
+        "canonical-locale-value",
+        "correction-suggestion"
+      ],
+      "type": "string"
+    },
+    "WorkValue": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "exact",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/UInt64"
+            }
+          },
+          "required": ["state", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "at-least",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/UInt64"
+            }
+          },
+          "required": ["state", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/definitions/UnavailableWork"
+            },
+            "state": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": ["state", "reason"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state"],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "properties": {
+    "governingSpecification": {
+      "$ref": "#/definitions/VersionedIdentity"
+    },
+    "identitySchemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    },
+    "projection": {
+      "$ref": "#/definitions/CaseProjection"
+    }
+  },
+  "required": ["governingSpecification", "identitySchemaRevision", "projection"],
+  "title": "CaseIdentityInput",
+  "type": "object"
+}

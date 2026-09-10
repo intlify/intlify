@@ -109,6 +109,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run bench:messages:validate
 
+      - name: Validate minimum project-profile observation records
+        if: runner.os == 'Linux'
+        run: vp run bench:config:smoke
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

@@ -1,0 +1,3732 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "Acquisition": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unpaired",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "Aggregation": {
+      "enum": ["batch_total"],
+      "type": "string"
+    },
+    "Aggregation2": {
+      "enum": ["batch_total"],
+      "type": "string"
+    },
+    "Algorithm": {
+      "enum": ["blake3-256"],
+      "type": "string"
+    },
+    "Architecture": {
+      "enum": ["x86", "x86_64", "arm", "aarch64", "riscv32", "riscv64", "wasm32", "wasm64"],
+      "type": "string"
+    },
+    "Blake3": {
+      "enum": ["blake3-256"],
+      "type": "string"
+    },
+    "Boundary": {
+      "additionalProperties": false,
+      "properties": {
+        "cost": {
+          "type": "string"
+        },
+        "directChildren": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "directParents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedMarkers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "finalIncludedMarker": {
+          "type": "string"
+        },
+        "firstIncludedMarker": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedMarkers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "occurrencePolicy": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/definitions/Operation"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "operation",
+        "phase",
+        "cost",
+        "metric",
+        "occurrencePolicy",
+        "firstIncludedMarker",
+        "finalIncludedMarker",
+        "includedMarkers",
+        "excludedMarkers",
+        "directParents",
+        "directChildren"
+      ],
+      "type": "object"
+    },
+    "Build": {
+      "additionalProperties": false,
+      "properties": {
+        "buildConfiguration": {
+          "$ref": "#/definitions/Observation4"
+        },
+        "dependencyLock": {
+          "$ref": "#/definitions/Observation3"
+        },
+        "executable": {
+          "$ref": "#/definitions/Observation2"
+        },
+        "implementation": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "measurementProfile": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "physicalEngine": {
+          "$ref": "#/definitions/PhysicalEngine"
+        },
+        "sourceContent": {
+          "$ref": "#/definitions/Observation"
+        },
+        "sourceControlState": {
+          "$ref": "#/definitions/Observation5"
+        }
+      },
+      "required": [
+        "sourceContent",
+        "implementation",
+        "executable",
+        "dependencyLock",
+        "buildConfiguration",
+        "physicalEngine",
+        "sourceControlState",
+        "measurementProfile"
+      ],
+      "type": "object"
+    },
+    "BuildConfiguration": {
+      "additionalProperties": false,
+      "properties": {
+        "assertions": {
+          "type": "boolean"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/definitions/Token"
+          },
+          "type": "array"
+        },
+        "linkMode": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "optimization": {
+          "$ref": "#/definitions/Token"
+        },
+        "profile": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["profile", "optimization", "assertions", "linkMode", "features"],
+      "type": "object"
+    },
+    "BuildField": {
+      "enum": [
+        "source-content",
+        "implementation",
+        "executable",
+        "dependency-lock",
+        "build-configuration",
+        "physical-engine",
+        "source-control-state"
+      ],
+      "type": "string"
+    },
+    "BuildIdentity": {
+      "additionalProperties": false,
+      "description": "This is a content binding to the actual native Build Observation, not a\ncommon record ID, complete compiler attestation, or executable digest.",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/NativeAlgorithm"
+        },
+        "checksum": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "domain": {
+          "$ref": "#/definitions/NativeBuildDomain"
+        },
+        "framing": {
+          "$ref": "#/definitions/NativeFraming"
+        },
+        "ownerSchema": {
+          "$ref": "#/definitions/NativeBuildSchema"
+        }
+      },
+      "required": ["ownerSchema", "algorithm", "framing", "domain", "checksum"],
+      "type": "object"
+    },
+    "CaseEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "caseIdentity": {
+          "$ref": "#/definitions/CaseIdentity"
+        },
+        "identityProjection": {
+          "$ref": "#/definitions/CaseProjection"
+        },
+        "localRecordIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "observedDescriptors": {
+          "$ref": "#/definitions/Descriptors"
+        },
+        "ownerAttempt": {
+          "$ref": "#/definitions/Reference"
+        },
+        "samples": {
+          "items": {
+            "$ref": "#/definitions/Sample"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "samplingPolicy": {
+          "$ref": "#/definitions/SamplingPolicy"
+        }
+      },
+      "required": [
+        "localRecordIdentity",
+        "caseIdentity",
+        "identityProjection",
+        "ownerAttempt",
+        "observedDescriptors",
+        "samplingPolicy",
+        "samples"
+      ],
+      "type": "object"
+    },
+    "CaseIdentity": {
+      "pattern": "^mc0_[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "CaseProjection": {
+      "additionalProperties": false,
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these six internal duration boundaries and are absent, not guessed.",
+      "properties": {
+        "category": {
+          "$ref": "#/definitions/Category"
+        },
+        "concurrency": {
+          "$ref": "#/definitions/Concurrency2"
+        },
+        "executionModel": {
+          "$ref": "#/definitions/ExecutionModel"
+        },
+        "executionState": {
+          "$ref": "#/definitions/Execution"
+        },
+        "fixture": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "intervalBoundary": {
+          "$ref": "#/definitions/Boundary"
+        },
+        "measurementMethod": {
+          "$ref": "#/definitions/Method"
+        },
+        "measurementProfileRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "metric": {
+          "$ref": "#/definitions/Metric"
+        },
+        "operationClass": {
+          "$ref": "#/definitions/OperationClass"
+        },
+        "ownerBenchmarkProfileRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "ownerCost": {
+          "type": "string"
+        },
+        "ownerIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "ownerPhase": {
+          "type": "string"
+        },
+        "ownerResultSchemaRevision": {
+          "$ref": "#/definitions/Token"
+        },
+        "performanceSurface": {
+          "$ref": "#/definitions/Surface"
+        },
+        "sampleAggregation": {
+          "$ref": "#/definitions/Aggregation"
+        },
+        "scale": {
+          "$ref": "#/definitions/Scale"
+        },
+        "variant": {
+          "$ref": "#/definitions/Variant"
+        },
+        "verificationSubject": {
+          "$ref": "#/definitions/Subject"
+        },
+        "workload": {
+          "$ref": "#/definitions/LogicalWork"
+        }
+      },
+      "required": [
+        "ownerIdentity",
+        "ownerResultSchemaRevision",
+        "ownerBenchmarkProfileRevision",
+        "ownerPhase",
+        "ownerCost",
+        "category",
+        "operationClass",
+        "performanceSurface",
+        "intervalBoundary",
+        "fixture",
+        "variant",
+        "scale",
+        "verificationSubject",
+        "executionModel",
+        "executionState",
+        "concurrency",
+        "workload",
+        "metric",
+        "measurementMethod",
+        "sampleAggregation",
+        "measurementProfileRevision"
+      ],
+      "type": "object"
+    },
+    "Category": {
+      "enum": ["toolchain"],
+      "type": "string"
+    },
+    "ClockObservation": {
+      "additionalProperties": false,
+      "description": "An actual acquisition fact, not a guessed precision or part of semantic output.",
+      "properties": {
+        "clock": {
+          "type": "string"
+        },
+        "conversion": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerRevision": {
+          "type": "string"
+        },
+        "resolutionNanoseconds": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "resolutionSource": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "providerRevision",
+        "clock",
+        "resolutionNanoseconds",
+        "resolutionSource",
+        "conversion"
+      ],
+      "type": "object"
+    },
+    "Code": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "$ref": "#/definitions/CommonCode"
+            },
+            "kind": {
+              "const": "common",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "code"],
+          "type": "object"
+        }
+      ]
+    },
+    "CommonCode": {
+      "enum": [
+        "missing-evidence",
+        "missing-required-case",
+        "skipped-required-case",
+        "unsupported-measurement",
+        "failed-invocation",
+        "projection-ineligible",
+        "stale-evidence",
+        "insufficient-samples",
+        "schema-invalid",
+        "integrity-digest-mismatch",
+        "inconsistent-record",
+        "duplicate-case",
+        "unknown-case",
+        "invalid-state-combination",
+        "invalid-profile",
+        "ambiguous-binding",
+        "case-dimension-mismatch",
+        "environment-mismatch",
+        "method-mismatch",
+        "interval-mismatch",
+        "sampling-policy-mismatch",
+        "semantic-observation-mismatch"
+      ],
+      "type": "string"
+    },
+    "Concurrency": {
+      "additionalProperties": false,
+      "properties": {
+        "callingThreads": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "descriptor": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "externalActivity": {
+          "$ref": "#/definitions/ExternalActivity"
+        },
+        "internalWorkers": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "policy": {
+          "$ref": "#/definitions/ConcurrencyPolicy"
+        },
+        "processes": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "scope": {
+          "$ref": "#/definitions/ConcurrencyScope"
+        }
+      },
+      "required": [
+        "descriptor",
+        "scope",
+        "processes",
+        "callingThreads",
+        "internalWorkers",
+        "policy",
+        "externalActivity"
+      ],
+      "type": "object"
+    },
+    "Concurrency2": {
+      "enum": ["sequential-cases-calling-thread-no-workers"],
+      "type": "string"
+    },
+    "ConcurrencyPolicy": {
+      "enum": ["sequential-cases-synchronous-calling-thread-no-workers"],
+      "type": "string"
+    },
+    "ConcurrencyScope": {
+      "enum": ["one-owner-run-in-the-calling-process"],
+      "type": "string"
+    },
+    "ConditionalObservation": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/VersionedIdentity"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "applicabilityRule": {
+              "$ref": "#/definitions/VersionedIdentity"
+            },
+            "kind": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "applicabilityRule"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "ConditionalObservation2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Token"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "applicabilityRule": {
+              "$ref": "#/definitions/VersionedIdentity"
+            },
+            "kind": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "applicabilityRule"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "ConditionalObservation3": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/ClockObservation"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "applicabilityRule": {
+              "$ref": "#/definitions/VersionedIdentity"
+            },
+            "kind": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "applicabilityRule"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "ContentBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "declaredContentPin": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "required": ["identity", "revision", "declaredContentPin"],
+      "type": "object"
+    },
+    "CreationContext": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAtUnixNanoseconds": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": ["createdAtUnixNanoseconds"],
+      "type": "object"
+    },
+    "Datum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "os_family",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation6"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "os_version",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation7"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "kernel_build",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "cpu_architecture",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation8"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "target_triple",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation2"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "runner_context",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/RequiredObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "execution_kind",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation7"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "processor_class",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation7"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "logical_cpu_count",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation9"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "memory_capacity_class",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation7"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "power_thermal_policy",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "language_runtime",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "browser",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "virtual_machine",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "device",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "jit_gc_configuration",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "toolchain",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation10"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "build_configuration",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation4"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "instrumentation",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/RequiredObservation2"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "allocator",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "memory_observer",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "clock_or_sampler",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation3"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "concurrency",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/Observation11"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "container_emulator_simulator",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "locale_service",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/ConditionalObservation"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "harness",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/RequiredObservation3"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "const": "projection",
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/definitions/RequiredObservation3"
+            }
+          },
+          "required": ["field", "state"],
+          "type": "object"
+        }
+      ]
+    },
+    "Descriptors": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary": {
+          "$ref": "#/definitions/Boundary"
+        },
+        "clockObservation": {
+          "$ref": "#/definitions/ClockObservation"
+        },
+        "execution": {
+          "$ref": "#/definitions/Execution"
+        },
+        "localeCoreInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "localeInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "$ref": "#/definitions/Method"
+        }
+      },
+      "required": ["boundary", "method", "clockObservation", "execution"],
+      "type": "object"
+    },
+    "Detail": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cause": {
+              "$ref": "#/definitions/MissingObservation"
+            },
+            "kind": {
+              "const": "missing-observation",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "cause"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "missing-input",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unsupported-tuple",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "invalid-input",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "duplicate-input",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "binding-mismatch",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "inventory-mismatch",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "diagnostic": {
+              "$ref": "#/definitions/Reference"
+            },
+            "kind": {
+              "const": "invocation-failed",
+              "type": "string"
+            },
+            "subtype": {
+              "$ref": "#/definitions/InvocationFailure"
+            }
+          },
+          "required": ["kind", "subtype", "diagnostic"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "diagnostic": {
+              "$ref": "#/definitions/Reference"
+            },
+            "kind": {
+              "const": "invalid-owner-case",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "diagnostic"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "diagnostic": {
+              "$ref": "#/definitions/Reference"
+            },
+            "kind": {
+              "const": "semantic-mismatch",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "diagnostic"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "available": {
+              "$ref": "#/definitions/UInt64"
+            },
+            "kind": {
+              "const": "sample-count",
+              "type": "string"
+            },
+            "required": {
+              "$ref": "#/definitions/UInt64"
+            }
+          },
+          "required": ["kind", "required", "available"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "projection-mismatch",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "report-mismatch",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "DeterminismProof": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "not-required",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "Entry": {
+      "additionalProperties": false,
+      "properties": {
+        "localRecordIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "observation": {
+          "$ref": "#/definitions/Datum"
+        }
+      },
+      "required": ["localRecordIdentity", "observation"],
+      "type": "object"
+    },
+    "Envelope": {
+      "additionalProperties": false,
+      "properties": {
+        "creationContext": {
+          "$ref": "#/definitions/CreationContext"
+        },
+        "governingSpecification": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "integrityDigest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        },
+        "producingTool": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "recordIdentity": {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        "recordKind": {
+          "$ref": "#/definitions/EvidenceKind"
+        },
+        "recordSchemaRevision": {
+          "$ref": "#/definitions/RevisionZero"
+        }
+      },
+      "required": [
+        "recordKind",
+        "recordSchemaRevision",
+        "governingSpecification",
+        "recordIdentity",
+        "integrityDigest",
+        "producingTool"
+      ],
+      "type": "object"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldRegistry": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "fields": {
+          "additionalItems": false,
+          "items": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "os_family"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "os_version"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "kernel_build"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "cpu_architecture"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "target_triple"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "runner_context"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "execution_kind"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "processor_class"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "logical_cpu_count"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "memory_capacity_class"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "power_thermal_policy"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "language_runtime"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "browser"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "virtual_machine"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "device"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "jit_gc_configuration"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "toolchain"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "build_configuration"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "instrumentation"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "allocator"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "memory_observer"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "clock_or_sampler"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "concurrency"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "container_emulator_simulator"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "locale_service"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "harness"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Entry"
+                },
+                {
+                  "properties": {
+                    "observation": {
+                      "properties": {
+                        "field": {
+                          "const": "projection"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "maxItems": 27,
+          "minItems": 27,
+          "type": "array"
+        }
+      },
+      "required": ["fieldRegistry", "fields"],
+      "type": "object"
+    },
+    "EnvironmentField": {
+      "description": "Declaration order is the exact 026 environment registry order, not alphabetic.",
+      "enum": [
+        "os_family",
+        "os_version",
+        "kernel_build",
+        "cpu_architecture",
+        "target_triple",
+        "runner_context",
+        "execution_kind",
+        "processor_class",
+        "logical_cpu_count",
+        "memory_capacity_class",
+        "power_thermal_policy",
+        "language_runtime",
+        "browser",
+        "virtual_machine",
+        "device",
+        "jit_gc_configuration",
+        "toolchain",
+        "build_configuration",
+        "instrumentation",
+        "allocator",
+        "memory_observer",
+        "clock_or_sampler",
+        "concurrency",
+        "container_emulator_simulator",
+        "locale_service",
+        "harness",
+        "projection"
+      ],
+      "type": "string"
+    },
+    "EvidenceBody": {
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "$ref": "#/definitions/RunBinding"
+        },
+        "build": {
+          "$ref": "#/definitions/Build"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/definitions/CaseEvidence"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "environment": {
+          "$ref": "#/definitions/Environment"
+        },
+        "ownerResult": {
+          "$ref": "#/definitions/OwnerBinding"
+        },
+        "projection": {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      },
+      "required": ["binding", "projection", "ownerResult", "build", "environment", "cases"],
+      "type": "object"
+    },
+    "EvidenceKind": {
+      "enum": ["measurement-evidence-set"],
+      "type": "string"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheState": {
+          "type": "string"
+        },
+        "engineState": {
+          "type": "string"
+        },
+        "initialPreparationState": {
+          "type": "string"
+        },
+        "managedHeapState": {
+          "type": "string"
+        },
+        "outputBufferState": {
+          "$ref": "#/definitions/OutputBuffer"
+        },
+        "processState": {
+          "type": "string"
+        },
+        "runtimeCompilationState": {
+          "type": "string"
+        },
+        "scratchReuseState": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "processState",
+        "engineState",
+        "initialPreparationState",
+        "cacheState",
+        "runtimeCompilationState",
+        "managedHeapState",
+        "scratchReuseState",
+        "outputBufferState"
+      ],
+      "type": "object"
+    },
+    "ExecutionDomain": {
+      "enum": ["sample-execution"],
+      "type": "string"
+    },
+    "ExecutionIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/Algorithm"
+        },
+        "domain": {
+          "$ref": "#/definitions/ExecutionDomain"
+        },
+        "framing": {
+          "$ref": "#/definitions/Framing"
+        },
+        "ownerResult": {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        "value": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        }
+      },
+      "required": ["ownerResult", "algorithm", "framing", "domain", "value"],
+      "type": "object"
+    },
+    "ExecutionModel": {
+      "enum": ["same-process-synchronous-ordinary-core"],
+      "type": "string"
+    },
+    "ExternalActivity": {
+      "enum": ["uncontrolled"],
+      "type": "string"
+    },
+    "Framing": {
+      "enum": ["intlify-config-minimum-observation/0"],
+      "type": "string"
+    },
+    "Hex256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "InputFacts": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalValueStorage": {
+          "type": "string"
+        },
+        "dataset": {
+          "$ref": "#/definitions/ContentBinding"
+        },
+        "declaredTransportPin": {
+          "type": "string"
+        },
+        "fixtureContentsObservation": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "identifierByteLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "identifierByteUnit": {
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/definitions/VersionedPin"
+        },
+        "providerReuse": {
+          "type": "string"
+        },
+        "providerSchema": {
+          "$ref": "#/definitions/VersionedPin"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "specification": {
+          "$ref": "#/definitions/ContentBinding"
+        }
+      },
+      "required": [
+        "scope",
+        "specification",
+        "dataset",
+        "provider",
+        "providerSchema",
+        "declaredTransportPin",
+        "fixtureContentsObservation",
+        "identifierByteLimit",
+        "identifierByteUnit",
+        "providerReuse",
+        "canonicalValueStorage"
+      ],
+      "type": "object"
+    },
+    "InputFacts2": {
+      "additionalProperties": false,
+      "properties": {
+        "activeOccurrenceDomain": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "activeOccurrenceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "inputStorage": {
+          "type": "string"
+        },
+        "ordinaryOutput": {
+          "type": "string"
+        },
+        "requestedCardinalityDomain": {
+          "type": "string"
+        },
+        "requestedLocaleLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "selectedProfile": {
+          "type": "string"
+        },
+        "structuralPreparation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "selectedProfile",
+        "activeOccurrenceLimit",
+        "activeOccurrenceDomain",
+        "requestedLocaleLimit",
+        "requestedCardinalityDomain",
+        "inputStorage",
+        "structuralPreparation",
+        "ordinaryOutput"
+      ],
+      "type": "object"
+    },
+    "InstanceDomain": {
+      "enum": [
+        "intlify-verification-record-v0",
+        "intlify-measurement-run-v0",
+        "intlify-config-owner-result-v1",
+        "intlify-config-local-runner-instance-v0"
+      ],
+      "type": "string"
+    },
+    "Instrumentation": {
+      "additionalProperties": false,
+      "properties": {
+        "allocation": {
+          "$ref": "#/definitions/NotInstalled"
+        },
+        "descriptor": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "externalInstrumentation": {
+          "$ref": "#/definitions/Unattested"
+        },
+        "profiling": {
+          "$ref": "#/definitions/NotInstalled"
+        },
+        "timing": {
+          "$ref": "#/definitions/Timing"
+        },
+        "trace": {
+          "$ref": "#/definitions/NotInstalled"
+        }
+      },
+      "required": [
+        "descriptor",
+        "timing",
+        "allocation",
+        "trace",
+        "profiling",
+        "externalInstrumentation"
+      ],
+      "type": "object"
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "InvocationFailure": {
+      "enum": [
+        "measurement-overflow",
+        "counter-overflow",
+        "repetition-overflow",
+        "duration-conversion-overflow",
+        "clock-failure",
+        "invocation-panicked",
+        "prerequisite-unavailable",
+        "collector-allocation",
+        "output-failure",
+        "observation-panicked",
+        "work-observation-failure"
+      ],
+      "type": "string"
+    },
+    "LimitEdge": {
+      "enum": ["exact", "first-over"],
+      "type": "string"
+    },
+    "LimitKind": {
+      "enum": [
+        "file-bytes",
+        "parser-tokens",
+        "nodes",
+        "depth",
+        "collection-entries",
+        "total-string-bytes",
+        "single-string-bytes",
+        "profiles",
+        "profile-id-bytes",
+        "structural-units",
+        "locale-raw-identifier-bytes",
+        "locale-canonical-identifier-bytes",
+        "core-active-occurrences",
+        "core-requested-cardinality",
+        "core-raw-identifier-bytes",
+        "core-canonical-identifier-bytes"
+      ],
+      "type": "string"
+    },
+    "LocaleCoreRecipe": {
+      "enum": [
+        "minimal",
+        "source-und",
+        "source-en",
+        "multi",
+        "reordered",
+        "aliased",
+        "changed-set",
+        "changed-default",
+        "changed-source",
+        "absent-source",
+        "exact-duplicate",
+        "alias-duplicate",
+        "multiple-duplicates",
+        "duplicate-heavy",
+        "invalid-source",
+        "invalid-requested",
+        "invalid-default",
+        "invalid-and-duplicate",
+        "default-not-member",
+        "unrelated-fields",
+        "other-profile",
+        "duplicate-reordered",
+        "invalid-reordered",
+        "expanding-alias",
+        "expanded-alias"
+      ],
+      "type": "string"
+    },
+    "LocaleRecipe": {
+      "enum": [
+        "language",
+        "region",
+        "casing",
+        "alias",
+        "canonical-alias",
+        "extension-ordering",
+        "canonical-extensions",
+        "expanding-alias",
+        "canonical-expanded-alias",
+        "invalid-legacy",
+        "invalid-validity",
+        "invalid-extension",
+        "invalid-private"
+      ],
+      "type": "string"
+    },
+    "LockContent": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/Blake3"
+        },
+        "bytes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "digest": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "representation": {
+          "$ref": "#/definitions/LockRepresentation"
+        }
+      },
+      "required": ["algorithm", "representation", "digest", "bytes"],
+      "type": "object"
+    },
+    "LockRepresentation": {
+      "enum": ["complete-lock-file-octets"],
+      "type": "string"
+    },
+    "LogicalWork": {
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "items": {
+            "$ref": "#/definitions/WorkFact"
+          },
+          "type": "array"
+        },
+        "operation": {
+          "$ref": "#/definitions/Operation"
+        },
+        "profileIdentity": {
+          "type": "string"
+        },
+        "profileRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["profileIdentity", "profileRevision", "operation", "facts"],
+      "type": "object"
+    },
+    "Method": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalUnit": {
+          "type": "string"
+        },
+        "clock": {
+          "type": "string"
+        },
+        "clockResolutionSource": {
+          "type": "string"
+        },
+        "concurrencyCoverage": {
+          "type": "string"
+        },
+        "durationConversion": {
+          "type": "string"
+        },
+        "estimatedOverheadSubtraction": {
+          "type": "boolean"
+        },
+        "eventTaxonomy": {
+          "type": "string"
+        },
+        "excludedDomain": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedInstrumentation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "numericDecisionEligibility": {
+          "type": "string"
+        },
+        "observationDomain": {
+          "type": "string"
+        },
+        "optimizationBarrier": {
+          "$ref": "#/definitions/OptimizationBarrier"
+        },
+        "overflowBehavior": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerRevision": {
+          "type": "string"
+        },
+        "repetitionAggregation": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "sampleAggregationKind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "metric",
+        "canonicalUnit",
+        "provider",
+        "providerRevision",
+        "clock",
+        "observationDomain",
+        "excludedDomain",
+        "eventTaxonomy",
+        "durationConversion",
+        "sampleAggregationKind",
+        "repetitionAggregation",
+        "concurrencyCoverage",
+        "overflowBehavior",
+        "numericDecisionEligibility",
+        "clockResolutionSource",
+        "includedInstrumentation",
+        "estimatedOverheadSubtraction",
+        "optimizationBarrier"
+      ],
+      "type": "object"
+    },
+    "Metric": {
+      "enum": ["wall_duration"],
+      "type": "string"
+    },
+    "MissingObservation": {
+      "enum": [
+        "not-collected",
+        "native-acquisition-unavailable",
+        "effective-build-not-attested",
+        "executable-not-attested",
+        "kernel-release-is-not-build-identity",
+        "parallelism-hint-is-not-logical-cpu-count",
+        "finite-provider-has-no-locale-service-profile",
+        "source-control-state-not-attested"
+      ],
+      "type": "string"
+    },
+    "NativeAlgorithm": {
+      "enum": ["blake3"],
+      "type": "string"
+    },
+    "NativeBuildDomain": {
+      "enum": ["build-observation"],
+      "type": "string"
+    },
+    "NativeBuildSchema": {
+      "enum": ["intlify-config-build-observation/0"],
+      "type": "string"
+    },
+    "NativeFraming": {
+      "enum": ["intlify-config-minimum-observation/0"],
+      "type": "string"
+    },
+    "NativeObservationChecksum": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "NestedReference": {
+      "additionalProperties": false,
+      "properties": {
+        "localRecordIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "parentRecordIdentity": {
+          "$ref": "#/definitions/RecordIdentity"
+        }
+      },
+      "required": ["parentRecordIdentity", "localRecordIdentity"],
+      "type": "object"
+    },
+    "NoCalibration": {
+      "enum": ["none"],
+      "type": "string"
+    },
+    "NotInstalled": {
+      "enum": ["not-installed-by-this-harness"],
+      "type": "string"
+    },
+    "Observation": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/SourceContent"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation10": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Toolchain"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation11": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Concurrency"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation12": {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NativeObservationChecksum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shared": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        }
+      },
+      "required": ["shared"],
+      "type": "object"
+    },
+    "Observation2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/IntegrityDigest"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation3": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/LockContent"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation4": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/BuildConfiguration"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation5": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/SourceControlState"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation6": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/ReportedIdentifier"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation7": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/VersionedIdentity"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation8": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/ReportedIdentifier2"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Observation9": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/PositiveUInt64"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/definitions/Reason"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["kind", "reasons"],
+          "type": "object"
+        }
+      ]
+    },
+    "Operation": {
+      "enum": [
+        "file-materialization",
+        "structural-analysis",
+        "authoring-construction",
+        "profile-selection",
+        "locale-canonicalization",
+        "locale-core-resolution"
+      ],
+      "type": "string"
+    },
+    "OperationClass": {
+      "enum": ["component"],
+      "type": "string"
+    },
+    "OptimizationBarrier": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "inputOpacity": {
+          "type": "string"
+        },
+        "inputPlacement": {
+          "type": "string"
+        },
+        "invocationPlacement": {
+          "type": "string"
+        },
+        "invocationPreservation": {
+          "type": "string"
+        },
+        "outputConsumption": {
+          "type": "string"
+        },
+        "outputLifetime": {
+          "type": "string"
+        },
+        "outputPlacement": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "semanticValidation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "applicability",
+        "inputOpacity",
+        "invocationPreservation",
+        "outputConsumption",
+        "outputLifetime",
+        "inputPlacement",
+        "invocationPlacement",
+        "outputPlacement",
+        "semanticValidation"
+      ],
+      "type": "object"
+    },
+    "OutputBuffer": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ownership": {
+              "type": "string"
+            },
+            "reuse": {
+              "type": "string"
+            },
+            "state": {
+              "const": "applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state", "ownership", "reuse"],
+          "type": "object"
+        }
+      ]
+    },
+    "OwnerBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/Algorithm"
+        },
+        "benchmarkProfile": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "checksum": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "domain": {
+          "$ref": "#/definitions/OwnerDomain"
+        },
+        "framing": {
+          "$ref": "#/definitions/Framing"
+        },
+        "ownerIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "resultIdentity": {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        "resultSchema": {
+          "$ref": "#/definitions/OwnerCodec"
+        }
+      },
+      "required": [
+        "ownerIdentity",
+        "resultSchema",
+        "benchmarkProfile",
+        "resultIdentity",
+        "algorithm",
+        "framing",
+        "domain",
+        "checksum"
+      ],
+      "type": "object"
+    },
+    "OwnerCodec": {
+      "enum": ["intlify-config-owner-run-result/1"],
+      "type": "string"
+    },
+    "OwnerDomain": {
+      "enum": ["owner-run-result"],
+      "type": "string"
+    },
+    "PhysicalEngine": {
+      "enum": ["rust-native-component"],
+      "type": "string"
+    },
+    "PositiveUInt64": {
+      "pattern": "^(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "Reason": {
+      "additionalProperties": false,
+      "properties": {
+        "affected": {
+          "$ref": "#/definitions/Selector"
+        },
+        "code": {
+          "$ref": "#/definitions/Code"
+        },
+        "detail": {
+          "$ref": "#/definitions/Detail"
+        },
+        "related": {
+          "items": {
+            "$ref": "#/definitions/Reference"
+          },
+          "type": "array"
+        },
+        "stage": {
+          "$ref": "#/definitions/Stage"
+        }
+      },
+      "required": ["code", "stage", "affected", "related", "detail"],
+      "type": "object"
+    },
+    "Recipe": {
+      "oneOf": [
+        {
+          "enum": [
+            "minimal",
+            "reversed-members",
+            "padded-bytes",
+            "long-string",
+            "two-profiles",
+            "many-profiles",
+            "many-locale-occurrences",
+            "nested-array",
+            "many-values",
+            "portable-maximum",
+            "negative-zero",
+            "invalid-utf8",
+            "invalid-json",
+            "trailing-token",
+            "duplicate-key",
+            "escaped-duplicate-key",
+            "invalid-surrogate",
+            "non-portable-number",
+            "root-null",
+            "missing-version",
+            "wrong-version-type",
+            "unsupported-version",
+            "empty-profiles",
+            "unknown-member",
+            "missing-nullable-policy",
+            "null-source-default",
+            "invalid-sibling",
+            "invalid-resource-reference",
+            "dense-invalid"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "locale": {
+              "$ref": "#/definitions/LocaleRecipe"
+            }
+          },
+          "required": ["locale"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "locale-core": {
+              "$ref": "#/definitions/LocaleCoreRecipe"
+            }
+          },
+          "required": ["locale-core"],
+          "type": "object"
+        }
+      ]
+    },
+    "RecordIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/InstanceDomain"
+        },
+        "value": {
+          "$ref": "#/definitions/Hex256"
+        }
+      },
+      "required": ["domain", "value"],
+      "type": "object"
+    },
+    "Reference": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "top-level",
+              "type": "string"
+            },
+            "recordIdentity": {
+              "$ref": "#/definitions/RecordIdentity"
+            }
+          },
+          "required": ["kind", "recordIdentity"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "nested-record",
+              "type": "string"
+            },
+            "reference": {
+              "$ref": "#/definitions/NestedReference"
+            }
+          },
+          "required": ["kind", "reference"],
+          "type": "object"
+        }
+      ]
+    },
+    "ReportedIdentifier": {
+      "additionalProperties": false,
+      "description": "The acquisition method qualifies this identifier: neither uname's system\nfamily nor its machine view is a distribution/device/physical-host attestation.",
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/SystemFamily"
+        },
+        "method": {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      },
+      "required": ["identity", "method"],
+      "type": "object"
+    },
+    "ReportedIdentifier2": {
+      "additionalProperties": false,
+      "description": "The acquisition method qualifies this identifier: neither uname's system\nfamily nor its machine view is a distribution/device/physical-host attestation.",
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Architecture"
+        },
+        "method": {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      },
+      "required": ["identity", "method"],
+      "type": "object"
+    },
+    "RequiredObservation": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/RunnerContext"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        }
+      ]
+    },
+    "RequiredObservation2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Instrumentation"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        }
+      ]
+    },
+    "RequiredObservation3": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/VersionedIdentity"
+            }
+          },
+          "required": ["kind", "value"],
+          "type": "object"
+        }
+      ]
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "RunBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "buildIdentity": {
+          "$ref": "#/definitions/BuildIdentity"
+        },
+        "measurementProfile": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "measurementRun": {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        "measurementRunPlan": {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        "verificationSubject": {
+          "$ref": "#/definitions/Subject"
+        }
+      },
+      "required": [
+        "measurementRun",
+        "measurementRunPlan",
+        "measurementProfile",
+        "verificationSubject",
+        "buildIdentity"
+      ],
+      "type": "object"
+    },
+    "RunnerContext": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "local-uncontrolled",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "Sample": {
+      "additionalProperties": false,
+      "properties": {
+        "acquisition": {
+          "$ref": "#/definitions/Acquisition"
+        },
+        "aggregateQuantity": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "determinismProof": {
+          "$ref": "#/definitions/DeterminismProof"
+        },
+        "executionIdentity": {
+          "$ref": "#/definitions/ExecutionIdentity"
+        },
+        "localRecordIdentity": {
+          "$ref": "#/definitions/Token"
+        },
+        "ordinal": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "ownerSampleIdentity": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "repetitionCount": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "semanticObservation": {
+          "$ref": "#/definitions/SemanticObservation"
+        }
+      },
+      "required": [
+        "localRecordIdentity",
+        "ordinal",
+        "repetitionCount",
+        "aggregateQuantity",
+        "semanticObservation",
+        "executionIdentity",
+        "determinismProof",
+        "acquisition",
+        "ownerSampleIdentity"
+      ],
+      "type": "object"
+    },
+    "SamplingPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregation": {
+          "$ref": "#/definitions/Aggregation2"
+        },
+        "calibration": {
+          "$ref": "#/definitions/NoCalibration"
+        },
+        "measuredSamples": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "repetitionsPerSample": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "warmupCompleted": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "warmupRepetitions": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "warmupStrategy": {
+          "$ref": "#/definitions/WarmupStrategy"
+        }
+      },
+      "required": [
+        "warmupStrategy",
+        "warmupRepetitions",
+        "warmupCompleted",
+        "measuredSamples",
+        "repetitionsPerSample",
+        "aggregation",
+        "calibration"
+      ],
+      "type": "object"
+    },
+    "Scale": {
+      "enum": ["fixed-owner-recipe"],
+      "type": "string"
+    },
+    "Selector": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "record",
+              "type": "string"
+            },
+            "reference": {
+              "$ref": "#/definitions/Reference"
+            }
+          },
+          "required": ["kind", "reference"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "caseIdentity": {
+              "$ref": "#/definitions/CaseIdentity"
+            },
+            "kind": {
+              "const": "planned-case",
+              "type": "string"
+            },
+            "runPlan": {
+              "$ref": "#/definitions/RecordIdentity"
+            }
+          },
+          "required": ["kind", "runPlan", "caseIdentity"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "$ref": "#/definitions/EnvironmentField"
+            },
+            "kind": {
+              "const": "environment-field",
+              "type": "string"
+            },
+            "recordIdentity": {
+              "$ref": "#/definitions/RecordIdentity"
+            }
+          },
+          "required": ["kind", "recordIdentity", "field"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "$ref": "#/definitions/BuildField"
+            },
+            "kind": {
+              "const": "build-field",
+              "type": "string"
+            },
+            "recordIdentity": {
+              "$ref": "#/definitions/RecordIdentity"
+            }
+          },
+          "required": ["kind", "recordIdentity", "field"],
+          "type": "object"
+        }
+      ]
+    },
+    "Selector2": {
+      "enum": [
+        "absent",
+        "app",
+        "unknown",
+        "invalid-syntax",
+        "invalid-type",
+        "exact-byte-limit",
+        "first-over-byte-limit"
+      ],
+      "type": "string"
+    },
+    "SemanticDomain": {
+      "enum": ["observation"],
+      "type": "string"
+    },
+    "SemanticObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/Algorithm"
+        },
+        "completeObservation": {
+          "$ref": "#/definitions/Observation12"
+        },
+        "domain": {
+          "$ref": "#/definitions/SemanticDomain"
+        },
+        "framing": {
+          "$ref": "#/definitions/Framing"
+        },
+        "identity": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "ownerIdentity": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": [
+        "ownerIdentity",
+        "algorithm",
+        "framing",
+        "domain",
+        "identity",
+        "completeObservation"
+      ],
+      "type": "object"
+    },
+    "SourceContent": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/definitions/Blake3"
+        },
+        "bytes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "digest": {
+          "$ref": "#/definitions/NativeObservationChecksum"
+        },
+        "files": {
+          "$ref": "#/definitions/PositiveUInt64"
+        },
+        "framing": {
+          "$ref": "#/definitions/SourceFraming"
+        }
+      },
+      "required": ["algorithm", "framing", "digest", "files", "bytes"],
+      "type": "object"
+    },
+    "SourceControlState": {
+      "enum": ["clean", "dirty"],
+      "type": "string"
+    },
+    "SourceFraming": {
+      "enum": ["intlify-config-build-source/0"],
+      "type": "string"
+    },
+    "Stage": {
+      "enum": [
+        "input-admission",
+        "plan",
+        "binding",
+        "inventory",
+        "case-result",
+        "evidence",
+        "environment",
+        "reporting"
+      ],
+      "type": "string"
+    },
+    "Subject": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "kind": {
+          "$ref": "#/definitions/SubjectKind"
+        }
+      },
+      "required": ["kind", "identity"],
+      "type": "object"
+    },
+    "SubjectKind": {
+      "enum": ["toolchain-component"],
+      "type": "string"
+    },
+    "Surface": {
+      "enum": ["core"],
+      "type": "string"
+    },
+    "SystemFamily": {
+      "enum": ["linux", "darwin"],
+      "type": "string"
+    },
+    "Timing": {
+      "enum": ["compiled-and-enabled-posix-monotonic-invocation"],
+      "type": "string"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "Toolchain": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Token"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compiler": {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      },
+      "required": ["compiler", "backend"],
+      "type": "object"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "Unattested": {
+      "enum": ["not-attested"],
+      "type": "string"
+    },
+    "UnavailableWork": {
+      "enum": [
+        "raw-input-not-complete",
+        "profile-container-not-admitted",
+        "schema-prerequisite-unavailable",
+        "locale-not-canonicalized",
+        "locale-core-requested-not-resolved"
+      ],
+      "type": "string"
+    },
+    "Variant": {
+      "additionalProperties": false,
+      "description": "A typed native-owner fragment. Recipe/limit/selector tags retain their owner\nspelling and revision; they are not a new generic common selector language.",
+      "properties": {
+        "limit": {
+          "items": [
+            {
+              "$ref": "#/definitions/LimitKind"
+            },
+            {
+              "$ref": "#/definitions/LimitEdge"
+            }
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "type": ["array", "null"]
+        },
+        "recipe": {
+          "$ref": "#/definitions/Recipe"
+        },
+        "selector": {
+          "$ref": "#/definitions/Selector2"
+        }
+      },
+      "required": ["recipe", "selector"],
+      "type": "object"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "VersionedPin": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "WarmupStrategy": {
+      "enum": ["fixed-invocations-before-measured-samples-per-case"],
+      "type": "string"
+    },
+    "WorkFact": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/WorkKind"
+        },
+        "observation": {
+          "$ref": "#/definitions/WorkValue"
+        },
+        "stage": {
+          "$ref": "#/definitions/WorkStage"
+        },
+        "unit": {
+          "$ref": "#/definitions/WorkUnit"
+        }
+      },
+      "required": ["kind", "unit", "stage", "observation"],
+      "type": "object"
+    },
+    "WorkKind": {
+      "enum": [
+        "raw-file-bytes",
+        "parser-tokens-visited",
+        "logical-value-nodes",
+        "maximum-value-depth",
+        "collection-entries",
+        "total-decoded-string-bytes",
+        "maximum-decoded-string-bytes",
+        "profile-declarations",
+        "maximum-declared-profile-id-bytes",
+        "structural-analysis-units",
+        "retained-admission-issues",
+        "retained-schema-fragments",
+        "retained-schema-issues-including-alternatives",
+        "selector-id-bytes",
+        "locale-occurrences",
+        "raw-locale-identifier-bytes",
+        "canonical-locale-identifier-bytes",
+        "retained-canonical-locale-values",
+        "locale-correction-suggestions",
+        "locale-core-occurrences",
+        "locale-core-raw-identifier-bytes",
+        "locale-core-canonical-requested-locales",
+        "locale-core-retained-values",
+        "locale-core-retained-value-bytes",
+        "locale-core-blocking-reasons",
+        "locale-core-related-duplicate-occurrences",
+        "locale-core-corrections"
+      ],
+      "type": "string"
+    },
+    "WorkStage": {
+      "enum": ["operation-result", "prepared-input", "not-applicable"],
+      "type": "string"
+    },
+    "WorkUnit": {
+      "enum": [
+        "octet",
+        "utf8-octet",
+        "parser-token",
+        "logical-value",
+        "value-level",
+        "collection-entry",
+        "profile-declaration",
+        "applicable-keyword-subject",
+        "retained-record",
+        "locale-occurrence",
+        "canonical-locale-value",
+        "correction-suggestion"
+      ],
+      "type": "string"
+    },
+    "WorkValue": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "exact",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/UInt64"
+            }
+          },
+          "required": ["state", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "at-least",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/UInt64"
+            }
+          },
+          "required": ["state", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/definitions/UnavailableWork"
+            },
+            "state": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": ["state", "reason"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "not-applicable",
+              "type": "string"
+            }
+          },
+          "required": ["state"],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "properties": {
+    "body": {
+      "$ref": "#/definitions/EvidenceBody"
+    },
+    "envelope": {
+      "$ref": "#/definitions/Envelope"
+    }
+  },
+  "required": ["envelope", "body"],
+  "title": "Record",
+  "type": "object"
+}

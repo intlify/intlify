@@ -1,0 +1,48 @@
+# Minimum profile-resolution fixture index
+
+This is the implementation review index for the test-owned minimum 015 path. It does not admit a configuration schema, shared artifact, Profile, formal Resolver Outcome, or revision-`"0"` conformance suite.
+
+The tests are in [`src/minimum_tests.rs`](../../src/minimum_tests.rs); [`harness.rs`](../../src/minimum_tests/harness.rs) contains only test orchestration over the ordinary component calls. Inputs are constructed directly in [`profile_fixtures.rs`](../../src/profile_fixtures.rs) using the formal five-field 017 references; [`references.rs`](../../src/references.rs) and the checked-in [configuration schema](../../schema/project-profile-config-v0.schema.json) own their closed structural representation. No referenced body is acquired or admitted by these fixtures. Locale data comes from the finite [`FixtureProvider`](../../src/locale/fixtures.rs), with an explicit binding and no host fallback. `FixtureLimits::finite()` supplies test-owned input/structural/identifier/active-locale bounds; these are not product defaults or full Resource Limit Policy admission.
+
+## Scope and traceability
+
+The review labels below are local index labels, not common Case IDs. Expected values, exact failure kinds, locations, and related indices are asserted in the tests; no implementation output is regenerated and automatically accepted as an oracle. Input serialization and bounded permutations happen in memory.
+
+| Review label | Test in `minimum_tests` | 015 rule | Required observation |
+| --- | --- | --- | --- |
+| MIN-001 | `strict_bytes_reach_only_the_selected_private_locale_core` | [Input stages](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#input-stages); [source default](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#source-locale-defaults); [requested default](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#requested-locale-default-resolution) | Strict bytes reach complete configuration, exact selection, canonical requested set and explicit default; absent source stays absent; corrections remain separate |
+| MIN-002 | `invalid_raw_inputs_stop_before_structure_selection_and_locale_processing` | [Input stages](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#input-stages) | Invalid UTF-8/JSON, comments/trailing syntax, decoded duplicate member, non-scalar Unicode and non-portable number retain their exact materialization failure; no later stage is called |
+| MIN-003 | `root_and_version_failures_stop_before_model_construction` | [Configuration shape](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#version-0-project-profile-configuration-shape) | Wrong root, missing/wrong-type/unsupported version retain exact structural admission reasons; no complete model or later call exists |
+| MIN-004 | `incomplete_root_and_invalid_sibling_never_reach_selected_profile_resolution` | [Authoring model](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#intlifyconfig-and-json-schema) | Missing/null/empty required locale fields, invalid policy shape, unknown fields and invalid sibling prevent the whole root from being constructed, even with a valid selected declaration |
+| MIN-005 | `named_selection_is_exact_and_failures_never_start_locale_work` | [Profile scope](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#profile-scope-and-identity) | Single-profile omission works; multiple-profile omission and unknown/invalid IDs fail; explicit selection resolves that declaration rather than map order |
+| MIN-006 | `semantic_failures_preserve_the_exact_cause_without_a_partial_locale_core` | [Canonicalization](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#locale-identity-and-canonicalization); [requested set](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#requested-locale-set) | Invalid source/requested/default, alias duplicate and default-outside-set preserve exact causes; every duplicate index survives; unsupported fixture coverage is not mislabeled invalid |
+| MIN-007 | `file_spelling_and_authoring_permutations_preserve_core_meaning_not_corrections` | [Canonicalization](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#locale-identity-and-canonicalization); [performance observations](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#workloads-and-observations) | Whitespace, LF/CRLF, object order, set order and accepted aliases preserve core value; corrections are separate; source/default/set semantic mutations change core value |
+| MIN-008 | `resource_edges_stop_at_their_owning_stage_without_later_semantic_work` | [Resource limits](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#project-profile-resolution-resource-limits) | File-byte and active-occurrence exact/first-over edges and profile-count failure stop at their owning call and retain the actual bound witness; test-owned active counts do not claim the full 015 locale domain |
+| MIN-009 | `owned_results_survive_interleaved_failures_input_release_and_runner_release` | [Memory ownership](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#memory-ownership-and-reuse) | Raw, structural and locale failures do not contaminate another call; retained result and structural analysis remain valid after input/context release |
+| MIN-010 | `explicit_parallel_callers_keep_fixture_association_and_results_deterministic` | [Memory ownership](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#memory-ownership-and-reuse) | Native caller-created threads can share immutable schema/provider and keep input/result association; the core creates no scheduler or mutable shared workspace. This native scheduling test is not run on Wasm |
+| MIN-011 | `malformed_formal_references_and_legacy_test_tokens_stop_before_locale_work` | [Authoring model](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#intlifyconfig-and-json-schema); [017 references](../../../../design/017-intlify-shared-artifact-and-version-admission-design.md) | Legacy test token, null/scalar, missing revision, unknown kind, truncated digest and extra field stop before construction, selection and locale resolution; no synthetic fallback |
+
+The call trace is local test instrumentation, not Finding/Evidence output or a timer. Construction/selection errors that contradict an admitted test prerequisite fail the test rather than becoming fabricated semantic failures.
+
+## 026 verification and minimum handoff
+
+These fixtures apply [026 memory-lifetime and reuse requirements](../../../../design/026-intlify-conformance-and-measurement-design.md#memory-lifetime-classes) and normal-build isolation. Compile-fail documentation keeps the test runner inaccessible to consumers. Running the same matrix with and without `benchmark` verifies that benchmark code is not needed to resolve the minimum test input.
+
+Measurement verification remains separate; see the [crate's verification commands](../../README.md#verification) and the tests alongside the [measurement implementation](../../src/benchmark.rs). The vertical slice is not a complete workflow measurement and does not register `profile_resolve_e2e` or peak-memory cases.
+
+The local measurement path now provides complete applicable Build and ordered 27-field Environment observations, a pre-capture Run Plan, Evidence, full Run/Case Evaluations and a lossless observational Report. `shared::pipeline::tests` validates native-result projection, complete/negative inventories, schema freshness and an independent Draft 7 oracle, raw quantities, same-run/Plan/nested references, mutation, duplicate/conflicting identities, unsupported inputs and unproven non-applicability. No aggregate-only output or failed numeric prefix replaces retained samples.
+
+`vp run bench:config:smoke` captures all 127 cases across six active boundaries, writes completed records to a fresh directory, rereads them and performs native-backed admission in the same process. Linux CI invokes this same entry. The feature-gated facade returns completed bytes only; the vertical-slice runner, provider fixture and locale core are still not application APIs. Normal builds exclude benchmark collectors, dataset and optional timing/digest dependencies.
+
+The minimum fixtures above cover positive/negative/equivalence/ownership and exact stopping points; component tests cover operation-specific bounds and measurement verification. Local tests and implementation do not establish PR review/merge completion. Full Phase 2/3 semantics, production locale data/adapter, Policy/Target body admission, public Profile output, RCI/replay/Findings, workflow/peak-memory cases and the Phase 6 conformance suite remain outside this minimum. 016 can be designed independently but cannot consume this private result as a checked Profile.
+
+From the repository root:
+
+```sh
+cargo test -p intlify_config --lib minimum_tests
+cargo test -p intlify_config --lib --features benchmark minimum_tests
+cargo test -p intlify_config --doc
+cargo check -p intlify_config --lib --no-default-features
+cargo check -p intlify_config --lib --features benchmark
+vp run bench:config:smoke
+```

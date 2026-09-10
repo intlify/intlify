@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "0",
+  "profiles": {
+    "app": {
+      "projectId": "storefront",
+      "selectionScope": "storefront.development",
+      "requestedLocales": ["ja", "EN-us"],
+      "defaultRequestedLocale": "EN-us",
+      "policies": {
+        "resourceLimits": {
+          "kind": "resource-limit-policy",
+          "identity": "example-artifact",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "trust": {
+          "kind": "trust-policy",
+          "identity": "example-artifact",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "sourceAdmission": {
+          "kind": "source-admission-policy",
+          "identity": "example-artifact",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "approval": {
+          "kind": "approval-policy",
+          "identity": "example-artifact",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "selection": {
+          "kind": "selection-policy",
+          "identity": "example-artifact",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "providerRouting": null,
+        "glossarySet": null
+      },
+      "targetProfiles": {
+        "browser": {
+          "profile": {
+            "kind": "target-profile",
+            "identity": "example-artifact",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "requestedLocales": ["en-US", "ja"]
+        }
+      },
+      "deploymentGroups": {
+        "web": { "members": ["browser"] }
+      }
+    }
+  }
+}

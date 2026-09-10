@@ -1,0 +1,58 @@
+[package]
+name = "intlify_config"
+version = "0.14.0-alpha.12"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Display-only support for the resolve_config contributor example.
+dev-example = []
+# Measurement support is excluded from ordinary configuration consumers.
+benchmark = ["dep:blake3", "dep:getrandom", "dep:rustix", "dep:serde_json", "dep:sha2"]
+
+[dependencies]
+schemars = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+blake3 = { version = "=1.8.7", optional = true }
+# Shared verification-record framing, outside measured component intervals.
+sha2 = { version = "=0.10.9", default-features = false, optional = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# Reuse locked safe clock/system APIs only for measurement acquisition.
+rustix = { version = "=1.1.4", features = ["time", "system"], optional = true }
+# Fresh owner-run nonce; no timestamp, PID, hostname, or caller-supplied identity.
+getrandom = { version = "=0.4.3", optional = true }
+
+[build-dependencies]
+# Build-time observations are produced only for the benchmark feature.
+blake3 = { version = "=1.8.7", optional = true }
+serde_json = { version = "1.0.106", optional = true }
+
+[dev-dependencies]
+# Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
+# Reuse the version already locked for intlify_contract's schema tests.
+jsonschema = { version = "=0.52.1", default-features = false }
+tempfile = "3"
+
+[[example]]
+name = "generate_measurement_schema"
+required-features = ["benchmark"]
+
+[[example]]
+name = "resolve_config"
+path = "examples/resolve_config/main.rs"
+required-features = ["dev-example"]
+
+[[bench]]
+name = "profile_resolver"
+harness = false
+test = false
+required-features = ["benchmark"]
