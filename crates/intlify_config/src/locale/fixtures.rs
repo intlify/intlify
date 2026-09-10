@@ -1,8 +1,9 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite test-owned provider, absent from ordinary library builds. These
-//! symbolic pins exercise exact binding equality; they are NOT artifact digests,
+//! Finite test-owned provider, also used by the opt-in developer example and
+//! absent from ordinary library builds. These symbolic pins exercise exact
+//! binding equality; they are NOT artifact digests,
 //! an admitted 017 data representation, or a production canonicalization corpus.
 //! Every answer is declared below. Unlisted input is unsupported, not invalid.
 

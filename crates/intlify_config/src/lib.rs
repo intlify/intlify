@@ -49,6 +49,12 @@ pub mod json;
 pub mod location;
 pub mod schema;
 
+// An unstable, display-only bridge for the opt-in contributor example. No
+// private authoring/core types or production resolver API become public.
+#[cfg(feature = "dev-example")]
+#[doc(hidden)]
+pub use structural::example as example_support;
+
 /// Non-default developer measurements only; no configuration resolver or Profile API.
 #[cfg(feature = "benchmark")]
 pub use benchmark::facade as measurement;

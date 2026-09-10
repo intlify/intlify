@@ -12,6 +12,8 @@ workspace = true
 
 [features]
 default = []
+# Display-only support for the resolve_config contributor example.
+dev-example = []
 # Measurement support is excluded from ordinary configuration consumers.
 benchmark = ["dep:blake3", "dep:getrandom", "dep:rustix", "dep:serde_json", "dep:sha2"]
 
@@ -43,6 +45,11 @@ tempfile = "3"
 [[example]]
 name = "generate_measurement_schema"
 required-features = ["benchmark"]
+
+[[example]]
+name = "resolve_config"
+path = "examples/resolve_config/main.rs"
+required-features = ["dev-example"]
 
 [[bench]]
 name = "profile_resolver"

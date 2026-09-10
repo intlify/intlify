@@ -34,6 +34,19 @@ The current implementation includes:
 
 The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. Locale normalization currently uses a finite test provider, not a production locale-data implementation. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
 
+## Try it from the terminal
+
+Run the developer example with an editable sample configuration:
+
+```sh
+cargo run -p intlify_config --features dev-example --example resolve_config -- \
+  crates/intlify_config/examples/resolve_config/intlify.config.json
+```
+
+Run this from the repository root. The example prints normalized locales, suggested spelling corrections, or configuration errors without modifying the file. It is separate from the existing CLI and uses the finite test locale provider, not production locale data.
+
+See [the example guide](./examples/resolve_config/README.md) for changes to try, profile selection, JSON output, and limitations.
+
 ## Verification
 
 For contributors, run these commands from the repository root.

@@ -24,6 +24,9 @@ mod eval;
 mod program;
 pub(crate) mod selection;
 
+#[cfg(feature = "dev-example")]
+pub mod example;
+
 #[cfg(feature = "benchmark")]
 mod observation;
 
