@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 980" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" role="img" aria-labelledby="title desc">
   <title id="title">Source authoring and Intent identity</title>
-  <desc id="desc">Immutable source snapshots, checked project context, and an identity registry are explicit inputs to the proposed 016 authoring pipeline. Host discovery feeds shared MF2 and context analysis, then stable identity and finite reference resolution. A complete checked outcome supplies logical Intent, source, and reference facts to shared artifact encoding and downstream consumers. Any stage may instead produce blocking Findings and a proposed reconciliation plan. A separate authorized host operation may publish an accepted registry snapshot for the next invocation. Compilation never writes the registry, translates messages, or rewrites host code.</desc>
+  <desc id="desc">Immutable source snapshots, checked project context, and an identity registry are explicit inputs to the proposed 016 authoring pipeline. Host discovery feeds shared MF2 and context analysis, then stable identity and finite reference resolution. A complete checked outcome supplies logical Intent, source, and reference facts to shared artifact encoding and downstream consumers. Any stage may instead produce blocking diagnostics and a proposed reconciliation plan. A separate authorized host operation may publish an accepted registry snapshot for the next invocation. Compilation never writes the registry, translates messages, or rewrites host code.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill" />
@@ -103,7 +103,7 @@
   <g data-card="blocked-output">
     <rect x="830" y="605" width="400" height="170" rx="12" class="blocked" />
     <text x="850" y="638" font-size="18" font-weight="700" class="white">OUTPUT / blocked or update required</text>
-    <text x="850" y="671" class="soft-white">Findings from any stage</text>
+    <text x="850" y="671" class="soft-white">Diagnostics from any stage</text>
     <text x="850" y="697" class="soft-white">Inspection facts, not complete compiler input</text>
     <text x="850" y="723" class="soft-white">A proposed reconciliation plan, when applicable</text>
     <text x="850" y="753" font-size="12" class="soft-white">Ambiguity or limits never become successful absence</text>
