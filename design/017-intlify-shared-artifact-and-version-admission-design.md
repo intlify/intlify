@@ -4,18 +4,19 @@
 
 ## Purpose
 
-This design fixes the shared representations needed to implement the minimum scope of [015](./015-intlify-project-profile-and-locale-policy-design.md): complete configuration structure, an internal locale-canonicalization boundary, and the private source/requested/default-locale core. It also supplies the shared identity and integrity rules required by that implementation's initial [026](./026-intlify-conformance-and-measurement-design.md) measurement path.
+This design fixes the minimum shared representations needed by [015](./015-intlify-project-profile-and-locale-policy-design.md)'s configuration/locale foundation, its initial [026](./026-intlify-conformance-and-measurement-design.md) measurement path, and [016](./016-intlify-source-authoring-and-intent-identity-design.md)'s source-authoring and persistent-identity implementation.
 
-There are two immediate uses:
+There are three independently adopted uses:
 
 - **Configuration:** encode an exact Policy or Target Profile reference so `intlify_config` can generate and validate the complete `intlify.config.json` schema without test-only reference placeholders.
 - **Measurement:** retain an owner result, identify and validate common records, and follow exact references from a planned run through observations and evaluations to a structured report.
+- **Source authoring:** encode an owner-qualified Intent ID, a reproducible semantic revision, source/declaration/reference facts, and exact-base registry updates. This supplies 016's Phase 1–3 foundation and a minimal Intent/reference handoff, not the complete downstream artifact system.
 
-The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. Those decisions remain with the owning specifications.
+The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. The authoring path encodes 016's facts and identity decisions; it does not prove source approval, authorize registry publication, or establish executable target compatibility. Those decisions remain with the owning specifications.
 
-This revision specifies only this minimum shared subset. It does not complete every artifact family assigned to 017 by [000](./000-intlify-overview-design.md), nor does adopting it establish complete 015 Profile Specification revision-`"0"` support.
+This revision specifies only these explicitly scoped shared subsets. It does not complete every artifact family assigned to 017 by [000](./000-intlify-overview-design.md), nor does adopting it establish complete 015 Profile Specification revision-`"0"` support.
 
-The adoption scope is 015 Implementation Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice.
+The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice. The additive 016 scope has its own artifact-kind/schema tuples; it changes neither the existing configuration references nor the four measurement record schemas or their digests.
 
 ## Goals
 
@@ -24,12 +25,16 @@ The adoption scope is 015 Implementation Phase 1 plus only the finite, test-owne
 - Fix common verification envelopes, top-level and nested record references, exact quantities, and canonical digest framing for initial measurement records.
 - Keep record-instance identity, integrity, Measurement Case identity, semantic observations, and native owner-result provenance distinct.
 - Allow the initial 015 implementation to use these definitions without implementing Intent artifacts, a public checked-profile format, deployment artifacts, or a general migration system.
+- Fix only the authoring representations needed to implement and test 016's adopted rules without path/text-derived persistent IDs or implementation-defined revision hashes.
+- Retain exact source, input, base, decision, and result bindings while keeping decoding, semantic validation, and publication authorization separate.
 
 ## Non-Goals
 
 - Defining Policy bodies, Target Profile bodies, artifact acquisition, bootstrap trust, signatures, or authorization.
 - Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, Finding/Evidence model, or canonicalization-data artifacts.
-- Defining Intent identity, source or localized message artifacts, `LibraryManifest`, Store records, Release artifacts, target output, or Runtime ABI.
+- Redefining 016's recognition, semantic-revision, identity-continuity, or automatic-update rules.
+- Completing `SourceLocaleMessageArtifact`, localized message artifacts, `LibraryManifest`, Store records, Release artifacts, target output, or Runtime ABI.
+- Defining a general authoring-result/diagnostic protocol, project graph, module acquisition, host lowering, or registry update commands.
 - Replacing 026's measurement semantics, owner benchmark schemas, logical work, checksum algorithms, or component interval definitions.
 - Adding comparison, budget, runner-qualification, profiling, cross-target, or Release capabilities to the initial observational measurement scope.
 - Defining public crate/API names, schema distribution paths, registry services, binary transport, or migration commands.
@@ -39,8 +44,10 @@ The adoption scope is 015 Implementation Phase 1 plus only the finite, test-owne
 | Owner | Responsibility in this subset |
 | --- | --- |
 | 015 | Configuration members and presence, field-role expectations, structural versus semantic admission, selection, locale behavior, resource limits, and the active owner measurement boundaries |
-| 017 | Shared reference JSON, verification envelope and reference representation, identity domains, canonical framing, integrity coverage, and exact-version selection |
+| 016 | Source recognition and extraction, MF2/context projection meaning, parameter requirements, continuity/newness/absence checks, and valid identity decisions |
+| 017 | Shared reference JSON, verification and authoring representations, identity domains, canonical framing, integrity coverage, and exact-version selection |
 | 018 | Artifact authentication, provenance, trust, and authorized evidence use; an integrity digest never supplies these decisions |
+| 019 | Complete project queries, shared diagnostic reporting, dependency storage, and incremental orchestration; the minimum authoring inventory below is not a project graph |
 | 026 | Verification and measurement body semantics, common reasons, expected-input resolution, case dimensions, samples, environment, projection admission, and report meaning |
 | Owner measurement implementation | The closed native result schema, native identity/checksum, fixture expectations, Measurement Profile, and exact versioned projection into 026 |
 | 029 | Discovery, acquisition, publication, packaging, and user-facing workflow; none is performed by a shared decoder |
@@ -58,6 +65,8 @@ The implementation may colocate small reusable types with their first consumer. 
 | Semantic projection | The exact logical fields and ordering selected by the owning specification for equality or identity, excluding that owner's declared non-semantic metadata |
 | Native owner result | The complete result retained under its own schema, identity, validation rules, and checksum; it is not replaced by common evidence |
 | Admission registry | A finite implementation-supplied mapping of exact supported schema/specification tuples to local validators and codecs; it is not a network registry |
+| Owner-qualified Intent ID | The complete application/library owner and opaque owner-local value identifying one message lineage; distinct from artifact integrity and a target-local Message Handle |
+| Authoring artifact reference | Exact kind, schema, authoring specification, and complete-content digest for one immutable authoring artifact; not a configuration Policy reference or verification-record identity |
 
 ## Design Overview
 
@@ -66,8 +75,10 @@ The implementation may colocate small reusable types with their first consumer. 
 | Policy/Target reference in configuration | Closed reference decoding | 015 structural admission, followed later by exact artifact resolution and owner body checks |
 | Native benchmark result | Preserve its owner-qualified identity and native integrity information | Owner validation and the registered 026 Measurement Projection |
 | Common verification record | Decode, select the exact schema, verify integrity, and resolve typed references | 026 case, sample, run, projection, and report validation |
+| Declaration and reference facts | Encode the Intent projection, stable ID, and source/evaluation evidence | 016 semantic validation; later planning and lowering retain their own checks |
+| Registry snapshot and update plan | Bind exact base, inventory, decisions, and immutable result | 016 association checks, 018 authorization, and 029 atomic publication |
 
-017 does not add an executable compiler phase. The reference definitions are used by 015's Configuration Foundation, and measurement encoding is used alongside each active measured boundary.
+017 does not add an executable compiler phase. Its representations are adopted by the relevant 015/016 operations and by measurement alongside each active measured boundary.
 
 ## Shared JSON Primitives
 
@@ -160,6 +171,300 @@ The generated Draft 7 configuration schema must contain closed reusable definiti
 The reference representation used by configuration `schemaVersion: "0"` is fixed by that configuration schema's admitted authority. References do not add a second author-controlled `schemaVersion` or `$schema` member. The `$schema` editor hint never loads or selects an artifact validator.
 
 Structural success does not establish supported Policy/Target semantics, artifact availability, body integrity, trust, or a checked profile. The minimum private locale core can retain these structurally admitted references without resolving their bodies, but cannot expose that result as a complete `LocalizationProjectProfile`.
+
+## Minimum Intent Authoring Representation
+
+This additive subset encodes 016's logical rules. It is intentionally limited to declaration semantics, local finite references, source evidence, and persistent registry history. It does not complete 016 Phases 4–5, admit every host/import form, or mark 016 decisions still recorded as `Proposed` as accepted.
+
+The notation below defines closed JSON objects, not Rust structs or public authoring APIs. Every shown member is required unless marked `?`; arrays are present even when empty. `Text` is a Unicode-scalar string, `NonemptyText` excludes the empty string, and counts, indexes, and byte positions use the existing `UInt64` string representation. All sizes, recursion, collection counts, and reference-resolution work are subject to explicit caller-supplied finite limits. Unknown members/variants are not extension points.
+
+### Identity and artifact envelope
+
+```text
+OwnerIdentity = { kind: "application" | "library", identity: IdentityToken }
+MessageIntentId = { owner: OwnerIdentity, value: Opaque128 }
+Opaque128 = exactly 32 lowercase hexadecimal digits
+
+AuthoringArtifact<K, B> {
+  kind: K
+  schemaRevision: "0"
+  authoringSpecification: { identity: "intlify-design-016", revision: "0" }
+  body: B
+  integrityDigest: IntegrityDigest
+}
+
+AuthoringArtifactReference {
+  kind: registered authoring artifact kind
+  schemaRevision: RevisionToken
+  authoringSpecification: VersionedIdentity
+  integrityDigest: IntegrityDigest
+}
+```
+
+An application's owner identity is its checked 015 `projectId`, not its configuration-scoped Profile ID, package name, Selection Scope, or path. A library owner identity is supplied by its separately admitted library context. The same identity token under the two owner kinds denotes different owners; spelling is not proof of publisher identity or authorization.
+
+An update host obtains an owner-local ID once from 16 fresh bytes of operating-system cryptographic randomness, retains the lowercase hexadecimal value in the update plan, and rejects collisions against that owner's active and retired IDs. Failure to obtain randomness or a collision is an explicit allocation failure requiring a new candidate/plan; no timestamp, source hash, traversal-order, or unchecked fallback is permitted. Replaying a plan never generates the value again. These internal IDs need not be written by developers or used as generated target handles; display abbreviations do not change stored identity.
+
+Intent equality compares `(owner.kind, owner.identity, value)` completely. Canonical ordering uses those fields in that order, with unsigned UTF-8 byte comparison. `IntentRevision` uses the complete `SemanticDigest` spelling defined below, not this random-ID domain.
+
+The new kind/schema/specification tuples are exactly:
+
+| Kind | Closed body | Use |
+| --- | --- | --- |
+| `authoring-inventory` | `AuthoringInventory` | One finite source-analysis scope before persistent identity assignment |
+| `message-intent` | `MessageIntentBody` | One declaration's persistent identity, revision, and source facts |
+| `message-reference` | `MessageReferenceBody` | One use site's exact finite references and parameter-expression evidence |
+| `intent-registry` | `IntentRegistrySnapshot` | One immutable owner/scope registry state |
+| `intent-registry-update` | `IntentRegistryUpdate` | One fully specified candidate update against one exact base |
+
+All five initially use schema revision `"0"` and authoring specification `intlify-design-016` revision `"0"`, denoting the adopted 016 rule set. A kind selects the complete body schema; there is no arbitrary `B` at runtime. Existing readers without these tuples report unsupported input. Adding them does not extend a measurement-kind enum or reinterpret a verification record as an authoring artifact.
+
+Artifact integrity is `H("authoring-artifact-integrity", artifact-with-only-top-level-integrityDigest-omitted)`, using the existing framing below. The complete kind, schema, specification, and body are covered. Only that top-level member is excluded; a missing or `null` stored digest is invalid. An artifact reference compares all its fields and must resolve to exactly that admitted artifact. Reference ordering is kind, schema revision, authoring-specification identity/revision, then digest, using unsigned UTF-8 bytes. Equal digests do not merge distinct Intent IDs, and different source evidence may produce different artifact digests for the same Intent ID/revision. This digest is not the source/localized-message `ArtifactDigest` consumed by Store selection or Release binding in 000; that later artifact family remains deferred.
+
+### Semantic projection and IntentRevision
+
+```text
+IntentProjection {
+  mf2Specification: VersionedIdentity
+  message: MessageProjection
+  sourceLocale: NonemptyText
+  parameters: Text[]
+  usage?: { profile: VersionedIdentity, value: NonemptyText }
+  description?: NonemptyText
+}
+
+MessageProjection { declarations: Declaration[], body: MessageBody }
+Declaration =
+  { kind: "input", name: Text, function?: Function, attributes: Attribute[] }
+  | { kind: "local", name: Text, expression: Expression }
+MessageBody =
+  { kind: "pattern", parts: PatternPart[] }
+  | { kind: "match", selectors: Text[], variants: Variant[] }
+Variant { keys: VariantKey[], parts: PatternPart[] }
+VariantKey = { kind: "literal", value: Text } | { kind: "catch-all" }
+PatternPart =
+  { kind: "text", value: Text }
+  | Expression
+  | {
+      kind: "markup", form: "open" | "close" | "standalone",
+      name: Text, options: Option[], attributes: Attribute[]
+    }
+Expression { kind: "expression", operand?: Value, function?: Function, attributes: Attribute[] }
+Value = { kind: "literal", value: Text } | { kind: "variable", name: Text }
+Function { name: Text, options: Option[] }
+Option { name: Text, value: Value }
+Attribute { name: Text, value?: Text }
+```
+
+The local semantic-profile registry binds `mf2Specification` to the exact supported syntax and 001/002/012 parser-owned semantics. Its implementation and independent fixtures must be pinned before that tuple is admitted; a package version or successful JSON decode is not a substitute. The projection schema is `intlify-intent-projection` revision `"0"`. It encodes the adopted MF2 structures above without persisting parser node IDs, CST tables, host ASTs, or a second selector-validation implementation.
+
+Projection construction follows these rules:
+
+- Parse and validate through 012 first. Reconstruct the structured message from parser-owned facts and read-only CST views; invalid or unsupported syntax has no admitted projection. An expression must have an operand, a function, or both. Declaration bindings, selector annotation, variant arity/fallback, and option validity remain parser-owned checks.
+- Decode host escapes before MF2 parsing, then preserve actual MF2 text and literal values after MF2 escape decoding. Quoted/unquoted literals with equal decoded values have the same representation. Numeric-looking literals remain strings; there is no host number conversion, trimming, dedenting, whitespace compression, or Unicode normalization of literal content, including literal variant keys.
+- Names and identifiers use parser-owned semantic names, without syntactic sigils; name matching and resolution retain 002/012's rules. Do not substitute a normalized matching key for the original decoded text/literal value. In particular, a parser's normalized variant-comparison key is not the revision's literal payload.
+- Merge adjacent text parts and omit empty text parts. Simple versus quoted-pattern wrappers do not add a node. Preserve declaration, selector, variant, option, attribute, and pattern-part order; preserve local names, initializer structure, and references. Do not alpha-rename, expand expressions, reorder branches, or infer equal output for all inputs.
+- `parameters` is the duplicate-free, unsigned-UTF-8-byte-sorted set of external names required by 016's checked message analysis, not the host parameter object's values or order. The structured message retains the symbolic selector/function/options requirements; this subset does not encode a second runtime type system.
+- `sourceLocale` is the exact canonical locale already established by 016 using its admitted locale inputs. `usage`, when present, carries the exact bounded semantic-usage profile and its value; a coverage class or DOM tag cannot substitute for that profile. The initial optional semantic metadata is `description`; richer structured constraints require a new explicitly adopted projection revision, not an open metadata object.
+
+The exact revision calculation is:
+
+```text
+IntentRevision = H("intent-semantic-revision", {
+  projectionSpecification: { identity: "intlify-intent-projection", revision: "0" },
+  projection: IntentProjection
+})
+```
+
+The persistent Intent ID, host grammar/profile, source positions, original host spelling, reference count, `surfaceClass`, default-versus-explicit locale evidence, policies, glossary, target, Provider, and locale-data revisions are not additional revision fields. Their applicable evidence/dependencies remain separate. A change to the admitted MF2/projection specification is explicit, not an implementation silently changing an existing digest's meaning.
+
+Admission reconstructs this projection from retained MF2 source and the admitted 016 context, then compares both the complete projection and revision. It does not trust a caller's precomputed digest, external-name list, or `usage` claim. Equal revision digests with unequal available projections are a conflict, not deduplication. Literal whitespace, local renames, branch order, context changes, and host-only changes follow 016's independent equality/change vectors.
+
+### Source facts and bounded inventory
+
+```text
+ExactInputBinding { identity: IdentityToken, revision: RevisionToken, semanticDigest: SemanticDigest }
+ByteRange { start: UInt64, end: UInt64 }
+SourceSnapshot {
+  owner: OwnerIdentity, unit: IdentityToken, revision: RevisionToken,
+  grammar: VersionedIdentity, byteLength: UInt64, utf8Digest: IntegrityDigest
+}
+Occurrence {
+  source: SourceSnapshot, range: ByteRange,
+  role: "ui-literal" | "intent-literal" | "mf2-declaration"
+        | "reference" | "parameter-expression" | "exclusion"
+}
+AuthoringBasis {
+  authoringProfile: VersionedIdentity
+  contextKind: "application-profile" | "library-context" | "test-context"
+  context: ExactInputBinding
+  surfaceVocabulary: ExactInputBinding
+  localeCanonicalization: VersionedIdentity
+  localeData: { identity: IdentityToken, semanticDigest: SemanticDigest }
+  defaultSurfaceClass?: NonemptyText
+}
+DeclarationFacts {
+  occurrence: Occurrence
+  mf2Source: Text
+  projection: IntentProjection
+  sourceLocaleBasis: "explicit" | "context-default"
+  surfaceClass: NonemptyText
+  extractionMap: { extracted: ByteRange, source: ByteRange }[]
+}
+ParameterBinding { name: Text, expression: Occurrence }
+ReferenceFacts {
+  occurrence: Occurrence
+  declarations: Occurrence[]
+  parameters: ParameterBinding[]
+}
+AuthoringInventory {
+  owner: OwnerIdentity, scope: IdentityToken, basis: AuthoringBasis
+  completeness: "complete" | "partial"
+  units: { source: SourceSnapshot, outcome: "checked" | "blocked" | "failed" }[]
+  declarations: DeclarationFacts[]
+  references: ReferenceFacts[]
+  exclusions: { occurrence: Occurrence, reason: NonemptyText }[]
+}
+```
+
+`utf8Digest` is the complete lowercase `sha256:` digest of the exact source bytes, not `H` of reserialized text. Admission receives those already acquired immutable bytes and checks length, digest, owner, grammar, and revision association. A source unit token is a caller-supplied identity within the owner; it is not a file path or persistent Intent ID. Equal owner/unit/revision tuples with inconsistent bytes or grammar are conflicts. A move may change the unit token without changing an established Intent identity.
+
+Ranges are half-open UTF-8 byte ranges, bounded by the named source or extracted MF2 byte length and aligned to scalar boundaries wherever text is addressed. Empty insertion ranges and EOF are representable; actual declaration/reference ranges must identify the asserted syntax occurrence. Extraction segments are ordered by extracted start, non-overlapping, and cover the emitted MF2 bytes. Source ranges may repeat or cover several emitted bytes for escapes, and generated literal delimiters may use an explicit zero-width source position. A mapping never claims byte-for-byte correspondence merely from equal lengths.
+
+`AuthoringBasis` retains exact dependency pins, not full Profile, vocabulary, or locale-data bodies. For `application-profile`, `context.identity` is the checked `projectId`, `context.revision` is its governing 015 Profile Specification revision, and `context.semanticDigest` is the complete checked profile's semantic digest. The vocabulary uses its exact artifact identity/revision/digest; canonicalization uses its specification identity/revision and the separate dataset identity/digest as defined by 015. No extra dataset revision or canonicalization-specification digest is invented here. Library/test contexts use their explicitly pinned owning input identity/revision/digest and corresponding validators, not an application default.
+
+The caller supplies and validates the actual applicable inputs under 015/016 and checks each pin against those inputs. There is no new default Profile, configuration member, independent vocabulary resolver, or schema for the complete `LocalizationProjectProfile` here. `context-default` requires the corresponding present canonical default; a library never uses the consuming application's default. A `test-context` is admitted only by an explicitly test-only invocation and cannot satisfy production Profile or library admission. Changing that string does not turn a test input into checked production evidence.
+
+An inventory is the declared finite scope of one analysis, not a complete serialized authoring outcome or a 019 graph. A `complete` label is checked against the caller's expected scope and source membership; it does not prove completeness by itself. Every declaration, reference, exclusion, and parameter occurrence must resolve against its actual supplied snapshot and checked unit, with the corresponding role; declaration facts admit only the three declaration roles. Blocked/failed units prevent complete authoring success; detailed diagnostics remain 016/019-owned and cannot be reconstructed as empty success from this record. A registry-update inventory requires every submitted unit to be checked. A separate partial invocation may analyze a smaller declared scope, but a failed complete attempt cannot simply erase its failed units and retain the complete claim.
+
+Units are sorted by source-unit identity and contain at most one revision of each unit. Declaration/reference/exclusion arrays are sorted by occurrence: owner kind/identity, unit, revision, grammar identity/revision, source digest, numeric start/end, then role spelling. Duplicate or conflicting occurrences are rejected, not silently removed. All inventory sources belong to the declared owner. The first reference form names a nonempty finite set of declarations in this inventory, sorted by occurrence; cross-owner/library handoff requires a later explicit schema/profile extension. Parameter bindings preserve host property/evaluation order, have unique checked names, and retain source expressions rather than serialized runtime values.
+
+### Minimal Intent and reference artifacts
+
+```text
+MessageIntentBody {
+  intentId: MessageIntentId
+  intentRevision: SemanticDigest
+  inventory: AuthoringArtifactReference
+  declaration: Occurrence
+  registry: AuthoringArtifactReference
+  continuity?: { from: Occurrence, basis: ContinuationBasis }
+}
+MessageReferenceBody {
+  inventory: AuthoringArtifactReference
+  occurrence: Occurrence
+  targets: {
+    intentId: MessageIntentId, intentRevision: SemanticDigest,
+    intentArtifact: AuthoringArtifactReference
+  }[]
+}
+```
+
+The inventory reference must resolve to `authoring-inventory`. A message Intent's declaration selects exactly one `DeclarationFacts`; its ID must be active in the exact `intent-registry` reference, and its revision is computed from the current declaration's projection, not read from the registry. Without `continuity`, the declaration must exactly match that active association. With `continuity`, `from` must match it and the supplied basis must establish 016's one-to-one continuation to the current declaration. The same checks as update decisions apply, including competing claims across the current inventory. This permits read-only compilation to use checked continuity without secretly publishing a locator update; it cannot allocate or restore an ID absent from the active base.
+
+The projection, original extracted MF2, locale, class, input pins, and minimum source evidence are supplied through the retained inventory. These are exact logical source definitions, not a registry of translations. A consumer must retain or be explicitly supplied the referenced inventory and source/context inputs; an unavailable dependency is not a self-contained checked message. A context-only semantic change can change the Intent revision while leaving the registry association unchanged.
+
+A reference artifact selects one `ReferenceFacts` in that inventory. `targets` is the exact same finite declaration set after identity resolution, ordered by the complete Intent ID; each target resolves to a matching `message-intent` artifact, with no duplicate IDs or competing revisions for one ID. The referenced inventory retains parameter names, expressions, and evaluation order. Multiple uses of one declaration share its ID; equal text in separate declarations does not. This representation does not accept an unimplemented conditional form merely because its target array is finite; 016's applicable authoring rules and still-proposed choices remain explicit.
+
+These initial artifacts support a source-analysis/identity handoff, not final reachability, delivery placement, source approval, or generated execution. Source-locale MF2 can be read deterministically from the Intent's declaration facts without a Provider. Encoding a complete `SourceLocaleMessageArtifact` with its distinct content/artifact identities, execution requirements, and source-admission provenance is deferred to the adopting Phase 4–5 work; neither the inventory nor its digest substitutes for that artifact.
+
+### Registry snapshots and update plans
+
+```text
+RegistryEntry {
+  intentId: MessageIntentId
+  state: "active" | "retired"
+  declaration: Occurrence
+}
+IntentRegistrySnapshot {
+  owner: OwnerIdentity, scope: IdentityToken, registryIdentity: Opaque128
+  base?: AuthoringArtifactReference
+  update?: AuthoringArtifactReference
+  entries: RegistryEntry[]
+}
+IntentRegistryUpdate {
+  owner: OwnerIdentity
+  base: AuthoringArtifactReference
+  inventory: AuthoringArtifactReference
+  decisions: IdentityDecision[]
+  lineageLinks: {
+    kind: "copy" | "split" | "merge",
+    predecessors: MessageIntentId[], successors: MessageIntentId[]
+  }[]
+}
+IdentityDecision =
+  { kind: "continue", intentId: MessageIntentId, from: Occurrence, to: Occurrence, basis: ContinuationBasis }
+  | { kind: "allocate", intentId: MessageIntentId, to: Occurrence, basis: AllocationBasis }
+  | { kind: "retire", intentId: MessageIntentId, from: Occurrence, basis: { kind: "complete-absence" } }
+  | { kind: "restore", intentId: MessageIntentId, from: Occurrence, to: Occurrence, basis: ExplicitBasis }
+ExplicitBasis { kind: "explicit", reason: NonemptyText }
+ContinuationBasis =
+  { kind: "unchanged-snapshot" }
+  | { kind: "verified-edit", profile: VersionedIdentity, changes: SourceEdit[] }
+  | ExplicitBasis
+AllocationBasis = { kind: "confirmed-new" } | ExplicitBasis
+SourceEdit {
+  before?: SourceSnapshot, after?: SourceSnapshot,
+  replacements: { range: ByteRange, text: Text }[]
+}
+```
+
+The base reference always names `intent-registry`; the update's inventory names `authoring-inventory`. A non-genesis snapshot has both `base` and `update`, referring to the exact previous snapshot and `intent-registry-update`. All owners and the declared owning scope must agree. One authoritative registry chain covers the owner's retained ID domain; an analysis scope or a second file cannot create a separate collision domain for the same owner.
+
+A genesis snapshot omits both references and has empty `entries`. Its host-generated `registryIdentity` uses the same 16-byte random encoding in a separate registry identity role and remains unchanged throughout that chain. A new root requires a separately authorized initialization operation; a missing/corrupt registry never authorizes it. Recovery reuses the admitted retained identity and history, not a newly initialized chain presented as continuation. Neither a syntactically valid root nor a digest proves that a registry is current.
+
+Entries are sorted by complete Intent ID and retain retired entries with their last declaration association. The registry records identity history, not the authority for a current semantic revision; retained inventories and Intent artifacts preserve the corresponding historical message facts. There is exactly one entry for each ID, all IDs belong to the registry owner, and active entries cannot assign two IDs to the same exact declaration. Decisions are sorted by Intent ID and contain at most one action per ID. Every `to` selects a checked declaration in the current inventory, with at most one assigned identity; every `from` must exactly match the named base entry. New IDs cannot collide with either state in the base.
+
+The entry transition is closed:
+
+| Action | Required base state | Result |
+| --- | --- | --- |
+| `continue` | Active entry with the same ID and exact `from` | Active entry at `to`; the ID is unchanged |
+| `allocate` | No active or retired entry for this ID | New active entry at `to` |
+| `retire` | Active entry with exact `from`, proven absent under 016's complete-owning-inventory rules | Retired entry retaining its last declaration association; no history deletion |
+| `restore` | Retired entry with exact `from` and an explicit restoration decision | The same historical ID becomes active at `to` |
+
+Unchanged base entries are copied exactly. Every current declaration in the admitted inventory must either retain an exact active association or be covered by one checked `continue`, `allocate`, or `restore` action. An uncovered new/changed association or unresolved identity choice prevents an applicable update, not just the affected entry. Partial inventories may update proven covered associations but cannot authorize retirement or discard unseen entries. Failed units cannot be used as evidence of newness, continuity, or absence.
+
+For `unchanged-snapshot`, `from` and `to` must be exactly equal and name the actual unchanged snapshot. For `verified-edit`, the declared profile selects a supported 016 continuity verifier, not arbitrary executable code. Every `SourceEdit` has at least one of `before`/`after`; those references resolve to the exact old/current bytes. Replacement ranges use the original `before` coordinates, are ordered and non-overlapping, and replay in that order without offset reinterpretation. Two zero-width insertions at the same position are combined before recording. Replaying them must produce the exact `after` bytes; an absent `before` denotes an empty starting buffer, and an absent `after` requires an empty result and absence from the current complete membership where removal is claimed. Units cannot occur twice on either side of the change list.
+
+The change list is ordered by the before/after source tuples, absence before presence. A source tuple compares owner kind/identity, unit, revision, grammar identity/revision, digest, and numeric byte length. It must cover the affected source snapshots and agree with the decision's declaration pair. Replaying an edit proves byte correspondence only: the 016 verifier must additionally establish its accepted one-to-one declaration continuation and reject competing claims/copies. A supplied mapping, successful diff replay, or `verified-edit` label alone is not proof. An unsupported verifier/profile or insufficient history blocks automatic continuation; the host may obtain an explicit decision without weakening any base/source checks.
+
+Similarly, `confirmed-new` requires the independent 016 newness check; inability to find a continuation is not that check. `complete-absence` requires a successfully analyzed complete owning inventory and resolved identity choices. `explicit` records the requested historical choice and explanation, not actor authorization. The host must have the applicable explicit decision bound to this exact base, inventory, and action, and later publication must be authorized for the complete plan. An automatic-development setting is never inferred from these wire labels.
+
+Lineage links retain copy/split/merge intent without assigning identity or approval. Their nonempty predecessor/successor sets are sorted by complete ID, and links are sorted by kind and those sets. IDs must resolve in the base and resulting snapshot respectively; duplicate links are invalid. A copy has one predecessor and one distinct newly allocated successor, a split one predecessor and at least two distinct successors, and a merge at least two distinct predecessors and one successor. Any continuing predecessor is still subject to the same one-action/one-current-declaration rules. Links neither authorize retirement/restoration nor transfer translation approval.
+
+### Non-circular history and publication
+
+Construct and validate artifacts in this order:
+
+1. Retain the current inventory and exact base registry. The inventory contains no assigned IDs or reference to a future registry.
+2. Fix all decisions, including host-supplied new ID values, and encode the update plan. The plan references the base and inventory, not its future result.
+3. Apply that complete plan deterministically, create a new registry snapshot referencing the base and plan, and compute its integrity digest. It retains the same owner, scope, and registry identity. If both decisions and lineage links are empty, do not publish a new registry; reuse the existing snapshot. Refreshing semantic revisions or source-analysis evidence alone does not require an identity update.
+4. The host may publish only if the exact base is still current. The current-base check and replacement form one atomic operation under 029 and the applicable 018 authorization. A stale base requires revalidation/replanning; no partial publication or last-writer-wins merge is permitted.
+5. Subsequent read-only compilation consumes the accepted immutable snapshot and emits Intent/reference artifacts. Retained result references do not mutate the plan or create a plan/result digest cycle.
+
+A reader replays a retained update from its admitted base and inventory and compares the complete resulting snapshot, not just its digest. Base snapshots used as trusted starting points still require the applicable admission; an untrusted self-consistent chain does not establish authorization or currentness. History traversal is explicit and bounded. Required source snapshots, context inputs, or bases that are unavailable prevent that replay; an old locator or matching message text is not recovery evidence.
+
+### Authoring admission and fixtures
+
+The authoring reader first performs bounded strict decoding, selects the exact kind/schema/specification, validates the entire closed body, and verifies integrity. It then resolves the required finite artifact/source/input collection and performs 016's semantic, source-association, completeness, and registry-transition checks for the requested operation. Repeated artifact submissions are duplicate input; conflicting content under an equal reference is an identity conflict. Repeated references to one retained artifact are valid and do not require duplicate stored artifacts. It fetches no file, schema, registry, plugin, or network resource. A digest pin or `contextKind` cannot replace a missing checked input. Source/edit text, descriptions, and explicit-decision reasons remain untrusted potentially sensitive content, not executable instructions or default telemetry/profiler labels.
+
+Structural/integrity admission, checked authoring facts for a declared scope, and authorization to publish are separate results. Unsupported versions/verifiers, invalid fields, missing inputs, inconsistent references/projections, identity conflicts, and exceeded limits remain distinct typed failures; 016/019 own their diagnostic projection. There is no new general diagnostic envelope here. In particular, a valid partial inventory is not a complete build input, and a plan with unresolved choices is not a publishable `intent-registry-update`.
+
+The adopting implementation must materialize closed Draft 7 schemas for the five registered kinds, the standalone projection, and their referenced value types, together with independent fixtures. File paths and public package names remain implementation/029 choices. Required fixture groups are:
+
+| Area | Required independent expectations |
+| --- | --- |
+| IDs and domains | Exact 128-bit spelling, owner-kind separation, same local value under different owners, active/retired collision, allocation failure, stable replay, and registry ID distinct from Intent ID |
+| Projection | Literal/host escape equivalence, exact spaces/newlines and canonically equivalent but byte-distinct literal Unicode, names versus literal matching keys, local declarations, branch/order changes, function/options/attributes/markup, external-name requirements, and 016's context-versus-policy/class distinctions |
+| Revision and integrity | Frozen canonical preimages and full SHA-256 answers from an independent implementation; domain separation; source/evidence changes affecting artifact integrity without changing semantic revision; equal digest claims with unequal available content |
+| Source and scope | UTF-8/UTF-16 conversion, CRLF, multibyte/EOF/zero-width mapping, forged ranges/digests/roles, duplicate units/occurrences, missing snapshots, partial membership, failed units, and test inputs rejected by production admission |
+| Intent/reference handoff | Shared declaration versus equal text, exact target ID/revision/artifact matching, finite-set equality, parameter evaluation order, unavailable inventory/context, and no automatic promotion to source approval, reachability, or execution conformance |
+| Registry | Genesis versus recovery, explicit edit/move and verified edit replay, rejected ambiguous/unverifiable continuity, newness versus uncertainty, copy/split/merge/restore, complete-only retirement, tombstone retention, stale bases, and non-circular exact update replay |
+| Storage and failure | Exact/first-over bounds, indexed lookup, failure/cancellation followed by workspace reuse, no borrowed resettable storage in retained artifacts, deterministic ordering, and no mutation from ordinary compilation |
+
+Schema round trips alone do not prove these semantics. JSON examples with invented digest pins may test shape only; integrity/replay fixtures must use actual retained inputs and independently computed expectations. Source/revision comparison fixtures must not use a formatter's output or parser debug dump as the expected canonical representation.
 
 ## Verification Record Representation
 
@@ -328,7 +633,7 @@ These orders refine 026's stage/code/affected/related/detail priority; counts co
 
 ### Scope of canonical encoding
 
-Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this common-record encoding.
+Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this encoding. The existing verification-record domains and the explicitly added authoring domains use the same unchanged value framing.
 
 This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's existing Resolver Construction Identity, Snapshot, disclosure, and ResourceBoundValue framing are unchanged. A Policy/Target `semanticDigest` is an opaque exact pin at this minimum boundary; computing it from a body remains deferred with that body's schema and semantic projection.
 
@@ -388,12 +693,16 @@ This minimum registers these uses:
 | --- | --- |
 | `verification-record-integrity` | The complete `{ envelope, body }` record with only `envelope.integrityDigest` omitted |
 | `measurement-case-identity` | `{ governingSpecification, identitySchemaRevision, projection }`, where the specification is `intlify-design-026` / `"0"`, identity-schema revision is `"0"`, and `projection` contains exactly the 026 Measurement Case semantic dimensions |
+| `authoring-artifact-integrity` | The complete `AuthoringArtifact` with only its top-level `integrityDigest` omitted; no nested member is excluded |
+| `intent-semantic-revision` | `{ projectionSpecification, projection }` with exactly the projection specification and `IntentProjection` defined in Minimum Intent Authoring Representation |
 
 A Measurement Case identity is presented as `mc0_` followed by the 64 lowercase hexadecimal digits of the second digest. Its projection is a closed type fixed by the adopted measurement schema. It excludes sample values, creation time, record/run instance identities, branch/path/worker identities, and the implementation revision being compared. Expected semantic observations and native owner case bindings are retained separately rather than substituted for that projection.
 
-This subset introduces no universal semantic-result digest. Owner semantic observations keep their registered algorithm, framing, and value, and 026 determines which logical fields establish semantic equality. A common integrity digest must never be reused as semantic-result identity merely because both happen to be hashes.
+These uses introduce no universal semantic-result digest. Owner semantic observations keep their registered algorithm, framing, and value, and 026 determines which logical fields establish semantic equality. The Intent revision domain is limited to the specified 016 projection. A common integrity digest must never be reused as semantic-result identity merely because both happen to be hashes.
 
 ### Self-exclusion and complete integrity
+
+The following self-exclusion rule is unchanged for verification records. Authoring artifacts use the separately specified top-level exclusion and digest domain above.
 
 To produce a common record, establish the final identity and all stored fields, remove the single integrity member from an encoding view, compute `H`, and insert the resulting digest. On admission, validate the complete stored schema, build the same one-member-excluded view, recompute, and compare all digest bits.
 
@@ -414,6 +723,8 @@ The following version domains remain independent even when their initial value i
 | Common `recordKind` + `recordSchemaRevision` | Physical envelope/body schema and codec |
 | `governingSpecification.identity` + `.revision` | 026 semantics for the common record |
 | Native owner schema/profile and Measurement Projection revisions | The exact source result and its lossless common mapping |
+| Authoring `kind` + `schemaRevision` + `authoringSpecification` | One complete registered authoring body/codec and the adopted 016 rules; independent of measurement-kind support |
+| Intent projection and MF2 specification revisions | The exact semantic projection and parser-owned meaning used to compute an Intent revision |
 | Package/tool version | Producer implementation identity, not schema compatibility |
 
 The initial common-record vocabulary contains exactly the four kind/schema/specification tuples listed above. A reader admits only the tuples for which it implements the complete registered schema and validator; an unimplemented tuple remains unsupported even if its envelope is recognized. Unknown kinds or revisions are unsupported, never interpreted as the newest known revision, accepted by dropping fields, or repaired by filling defaults. A syntactically valid reference to a future Policy revision may remain structurally representable; that does not authorize later artifact resolution to accept unsupported semantics.
@@ -441,6 +752,9 @@ The [026 Performance Implementation Architecture](./026-intlify-conformance-and-
 - Establish canonical object/member order without depending on randomized map iteration. Do not add global interning, caches, arenas, custom hash tables, SIMD, or unsafe code merely to implement this encoding.
 - Generate record identities, encode/projection/report records, and verify digests outside 015's existing measured intervals. This work does not change the semantic operation or its checksum.
 - Keep measurement collectors, random-ID production, fixtures, and report code out of the ordinary `intlify_config` dependency path. Configuration reference types must not depend on the benchmark stack.
+- Authoring/registry codecs reuse the small framing primitives without depending on measurement collectors or `intlify_config`'s benchmark implementation. New Intent/registry random values are supplied by the authorized host outside read-only authoring operations.
+- Build bounded indexes for artifact references, source snapshots, occurrences, and registry IDs once per admitted collection. Decode/parse a shared source or projection once where its exact inputs permit reuse; do not resolve every reference by scanning all artifacts or repeatedly walk the entire ancestry for each declaration.
+- Preserve identity distinctions while sharing immutable source/projection storage. Measure projection/revision encoding, artifact integrity, and registry replay separately from file acquisition/publication, under the applicable 016/026 operation definitions. No new numeric performance threshold is introduced here.
 
 Decoded retained records own their required content or share an explicit immutable owner. No retained reference may borrow resettable scratch, a temporary serializer buffer, a file mapping whose lifetime has ended, or the next invocation's workspace.
 
@@ -475,25 +789,44 @@ This document introduces no new implementation Phase or separate prerequisite to
 
 The reference-schema definition and record framing remove those specific design dependencies. They do not by themselves finish schema generation, owner projection, harness/CI integration, or any 015 Phase. Complete checked-profile artifacts, Policy/Target body admission, and full revision-`"0"` resolver conformance remain outside the minimum implementation claim.
 
+## Adoption in the 016 Implementation
+
+The authoring additions are adopted within 016's existing phases, not a new 017 implementation sequence or a requirement to finish the wider artifact system first.
+
+| Adopting work | Minimum use of this design | Remaining prerequisites |
+| --- | --- | --- |
+| Phase 1 — Shared authoring semantics | Implement the closed projection and revision encoder with independent equality/change vectors and pinned parser semantics | Explicit finite test-owned context may be used under 016; richer constraints and portable execution semantics are not inferred |
+| Phase 2 — Initial JS/TS Producer | Implement source snapshots, ranges/maps, declaration/reference facts, inventory completeness, and input binding checks | 016 owns recognition/profile decisions and the actual host/parser checks; serializable facts are not proof of generated host behavior |
+| Phase 3 — Persistent identity and reconciliation | Adopt owner/local IDs, the registry/update schemas, exact replay and collision rules, and minimal Intent/reference artifacts against accepted associations | Production use requires the necessary checked 015 inputs, actual supported continuity verifiers, applicable 018 authorization, and 029 host exact-base/atomic publication; test doubles do not satisfy these |
+| Phase 4–5 — Broader handoff and integration | Reuse the established identity/revision/source basis, extending only the missing artifact families with their own exact schema revisions | Cross-owner/library references, 019 graph/diagnostic handoff, complete source-locale artifacts, 020 planning, and 023/024/028 execution/lowering remain separately adopted work |
+
+Thus the minimum lets an implementation parse source, construct reproducible message facts, exercise persistent identity history, and exchange the initial local artifacts without inventing its own ID or revision format. It does not declare all of Phase 3 complete merely because codecs exist. Existing configuration and measurement implementations need not adopt these new kinds until they consume authoring artifacts.
+
 ## Decision Log
 
 | ID | Decision | Rationale |
 | --- | --- | --- |
-| 017-001 | Limit this revision's detailed scope to the 015 configuration-reference and initial measurement dependencies | Enables the minimum implementation without designing unrelated shared artifact families |
+| 017-001 | Initially limit detailed scope to the 015 configuration-reference and initial measurement dependencies; add the independently adopted 016 subset below | Preserves the existing minimum's formats and implementation scope while allowing the next consumer's necessary representations |
 | 017-002 | Encode each configuration reference as one closed five-field exact tuple | Preserves 015's identity and presence semantics without embedding bodies or acquisition behavior |
 | 017-003 | Keep record instance, run, case, integrity, and native owner semantic observations separate | Prevents measurement metadata or a locally computed checksum from becoming another kind of authority |
 | 017-004 | Use typed length-framed canonical values, full domain-separated SHA-256, and exactly one self-excluded integrity member | Makes record integrity deterministic without self-reference or serializer-dependent JSON text |
 | 017-005 | Admit only explicitly registered versions and retain owner schemas/algorithms | Avoids silent migration and allows existing owner results to remain independently verifiable |
+| 017-006 | Encode owner-qualified Intent IDs with 16 host-generated random bytes and retain retired IDs; keep artifact integrity and semantic revision in separate domains | Avoids source-derived identity, owner collisions, implicit ID reuse, and random work inside deterministic compilation |
+| 017-007 | Use one closed, parser-backed message projection and full domain-separated SHA-256 for IntentRevision | Makes 016's equality/change rules reproducible without hashing raw host text, formatter output, runtime values, or policy inputs |
+| 017-008 | Add only finite authoring inventories, minimal Intent/reference artifacts, registry snapshots, and update plans under new explicit tuples | Enables the initial authoring/identity implementation without completing Profile, source-locale Release, library, or runtime schemas |
+| 017-009 | Bind registry history through inventory → update → result references, preserving exact-base atomic publication and explicit genesis/recovery separation | Avoids self-referential digests, partial updates, stale-base overwrite, and history reset disguised as initialization |
+| 017-010 | Keep semantic revisions derived from current declaration facts, not registry state; permit read-only use of checked continuity evidence | Separates message changes from identity bookkeeping and avoids requiring registry writes for context-only semantic changes |
+| 017-011 | Require complete kind-specific schema and semantic validation with explicit actual inputs; treat basis labels, digest pins, and test contexts as insufficient for production admission | Preserves 015/016/018/019/029 ownership instead of turning successful decoding into a complete or authorized result |
 
 ## Deferred Follow-Up Notes
 
-These subjects remain assigned to 017 but are not prerequisites for the scoped configuration and observational measurement path:
+These subjects remain assigned to 017 but are not prerequisites for the scoped configuration, observational measurement, or initial local authoring/identity paths:
 
-- complete source-first message, reference, candidate, dependency, library, Store, Release, and target artifact schemas;
+- complete source-locale/localized message, cross-owner/library reference, candidate, dependency, library, Store, Release, and target artifact schemas beyond the initial authoring subset;
 - full Profile, construction-authority, Snapshot, canonicalization-data, binding, and Finding/Evidence representations;
 - Policy/Target body schemas, semantic digest projections, and their trust/admission integration;
 - measurement capabilities not adopted by the minimum, including comparison/budget, qualification, profiling, campaigns, and cross-platform reports;
-- general semantic-result identity, alternate physical encodings, transport containers, registry distribution, and cross-version migrations.
+- extended semantic-context/constraint projections, general semantic-result identity, alternate physical encodings, transport containers, registry distribution/compaction, and cross-version migrations.
 
 Any future extension must state its owning semantics and schema-version impact. These notes do not authorize an open extension map or an unsupported success path in the current subset.
 
@@ -503,6 +836,7 @@ Any future extension must state its owning semantics and schema-version impact. 
 | --- | --- |
 | [000 — Intlify overview](./000-intlify-overview-design.md) | Assigns 017's wider artifact and version-admission responsibilities; only the minimum subset is specified here |
 | [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, and resolver semantics implemented using these encodings |
+| [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns recognition, message/revision meaning, source facts, continuity, and registry-transition validity; this document fixes the minimum shared representations without completing its later integrations |
 | [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication; digest and schema success supply neither |
 | [026 — Conformance and measurement](./026-intlify-conformance-and-measurement-design.md) | Owns the adopted records' semantic fields, projections, admission outcomes, and performance/storage requirements |
 | [029 — Product workflow and packaging](./029-intlify-product-workflow-and-packaging-design.md) | Owns public workflow, artifact/schema acquisition, publication, and packaging |
