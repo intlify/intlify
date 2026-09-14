@@ -363,7 +363,7 @@ Parameter-expression source text, variable renames in surrounding host code, and
 
 ## Static References and Finite Selection
 
-The first finite-selection form is a conditional expression whose alternatives are admitted immutable message declarations:
+The accepted first conditional-selection design uses a conditional expression whose alternatives are admitted immutable message declarations. Its implementation is deferred beyond the [first Phase 1–2 minimum](#first-minimum-implementation-phases-12); accepting the design does not admit this form into that initial implementation:
 
 ```js
 const loading = mf2`Loading`
@@ -371,7 +371,9 @@ const done = mf2`Done`
 intent(pending ? loading : done)
 ```
 
-Both declarations remain possible references even when a compiler cannot predict `pending`. The condition remains runtime code. An implementation may add finite arrays, maps, enums, switches, aliases, and module edges only under explicit bounded profile rules; user-provided labels claiming completeness are not proof.
+When this form is adopted, both declarations remain possible references even when a compiler cannot predict `pending`. The condition remains runtime code. An implementation may add finite arrays, maps, enums, switches, aliases, and module edges only under explicit bounded profile rules; user-provided labels claiming completeness are not proof.
+
+The first Phase 1–2 minimum accepts static inline message source and direct references to one local immutable `mf2` declaration. It reports conditional declaration selection as `authoring-form-unsupported`, without evaluating the condition or choosing one alternative. This restriction concerns host-side declaration selection, not MF2 match syntax or the host control flow that the accepted DOM receiver analysis must account for.
 
 The initial rule for one shared parameter object requires compatible external-name and symbolic-requirement shapes across every alternative. Otherwise authors put separate `intent()` calls in the branches. Richer discriminated bindings require a later explicit extension, not an unbounded runtime source path.
 
@@ -561,7 +563,7 @@ If a valid recovery cannot be established, emit diagnostics and stop registry up
 - A split or merge requires an explicit plan. At most one current declaration may continue one prior identity; all other new declarations require fresh IDs. Lineage links are audit facts, not approval transfer.
 - Restoring a retired identity requires an explicit, exact restore decision. Newly allocated IDs cannot collide with or recycle tombstones.
 - A currently unreferenced but still declared message retains its identity. 020 may omit it from a particular build without instructing 016 to retire it.
-- Retirement changes future authoring inventory; it does not delete immutable Store or Release history. Historical execution and rollback continue to use their pinned artifacts.
+- Retirement requires declaration absence established by a successfully analyzed complete owning inventory with no unresolved identity associations. Partial views and failed analysis do not authorize it. Retirement changes registry state while keeping the ID reserved; it does not delete immutable Store or Release history. Historical execution and rollback continue to use their pinned artifacts.
 - Source-controlled registry conflicts cannot be resolved by unioning duplicate entries or choosing the newest timestamp. The same association and plan checks apply after branch merges.
 
 ## Source Evidence and Consumer Handoff
@@ -661,6 +663,8 @@ File discovery/I/O, registry publication, package resolution, and host/native tr
 
 Required workloads include no candidates, many short UI literals, repeated equal text with distinct IDs, complex MF2, sparse/dense parameter maps, many references to one declaration, long alias chains, large finite selections, ambiguous copies, complete versus partial inventories, invalid source, and exact/first-over limits. Repeated workspace use must agree with fresh execution after success, failure, and cancellation.
 
+Workloads and operation intervals are adopted with the capability they exercise. The first Phase 1–2 minimum covers message/context analysis, source discovery, and pre-identity fact/result construction. It tests equal text at distinct declarations without claiming persistent IDs, and conditional declaration selection as an unsupported input rather than a successful selection benchmark. Identity reconciliation, registry publication, and generated execution remain outside this initial delivery; their absence is explicit, not zero-cost or passing evidence.
+
 The initial gate checks semantic observations, required-case coverage, record integrity, and fresh/reused equivalence. Physical time/allocation observations do not become numeric pass/fail thresholds without 026's applicable method, comparison, and budget requirements. Optional profiling is feature-isolated and uses controlled labels; profiler observations are not substituted for primary benchmark samples.
 
 ## Conformance and Fixtures
@@ -705,8 +709,8 @@ These are proposed implementation-readiness gates, not PR boundaries or a claim 
 
 | Phase | Scope | Completion condition |
 | --- | --- | --- |
-| 1 — Shared authoring semantics | Literal/MF2 extraction distinction, parser handoff, parameter requirements, source-locale/context/class inputs, and semantic revision projection | Language-neutral logical fixtures pass, unsupported inputs stay explicit, and 015 fixture projections cannot be mistaken for complete production Profiles |
-| 2 — Initial JavaScript/TypeScript Producer | Exact bindings, explicit forms, accepted metadata/exclusion syntax, bounded DOM recognition, source maps, and local finite references | Recognition and diagnostic fixtures pass; each source is parsed under an explicit profile; no duplicate extraction or host-code execution occurs |
+| 1 — Shared authoring semantics | Literal/MF2 extraction distinction, parser handoff, parameter requirements, source-locale/context/class inputs, and semantic revision projection | Language-neutral logical fixtures pass, unsupported inputs stay explicit, 015 fixture projections cannot be mistaken for complete production Profiles, and the applicable minimum verification/measurement gate below passes |
+| 2 — Initial JavaScript/TypeScript Producer | Exact bindings, explicit forms, accepted metadata/exclusion syntax, bounded DOM recognition, source maps, and direct local declaration references in the first minimum | Recognition and diagnostic fixtures pass; each source is parsed under an explicit profile; no duplicate extraction or host-code execution occurs; conditional selection remains unsupported; the applicable minimum verification/measurement gate below passes |
 | 3 — Persistent identity and reconciliation | Registry admission, stable association rules, replayable allocation inputs, conflict/restore/retirement handling, and read-only compile operation | The adopted 017 minimum identity/registry representations and admission checks are implemented; independent history fixtures pass; production publication adopts the applicable 018 authorization slice and 029 host adapter exact-base/atomicity checks |
 | 4 — Shared consumer handoff | Versioned Intent/source/reference artifacts, admitted module/library references, graph dependency/diagnostic projection, and broader bounded selection | Adopted 017/019 interfaces validate complete versus partial outcomes; consumers cannot infer source approval, final reachability, or target validity from authoring success |
 | 5 — Integration and conformance closure | 020/024/028 source-first integration, evaluated host behavior, adopted-case inventory, and performance baseline evidence | One supported Web path proves source → stable Intent → checked reference → preserved host execution, with complete conformance and measurement records for the claimed subset |
@@ -719,9 +723,26 @@ Neither these fixture inputs nor PR #205's minimum configuration/locale-core res
 
 Before production use of persistent IDs or shared artifacts, implement and adopt the necessary checked 015 inputs and 017 representation/admission specifications for that supported subset. Phase 3 additionally requires actual supported continuity verifiers and, for production publication, the applicable 018 authorization and 029 host exact-base/atomicity checks. Valid encodings or test doubles do not satisfy these requirements. This does not require every feature of 015 or 017 to be finished. Phase 4–5 claims additionally require the adopted cross-owner/library and complete source-locale artifact extensions, 019 graph/diagnostic interfaces, and applicable 020/023/024/028 integration. End-to-end localization is not established by a checked Producer result alone.
 
-Choices still recorded as `Proposed`, including 016-010 and 016-011, require separate resolution before claiming those choices as accepted behavior. The 017 representation addition does not change their decision states or admit unsupported authoring forms.
+Decisions 016-010 and 016-011 are accepted logical rules. Conditional declaration selection remains follow-up implementation work, and retirement/history handling remains Phase 3 work. Neither acceptance nor 017's representable target arrays expands the first Phase 1–2 profile or the separately adopted 020/028 integration scope.
 
 The existing `intlify_producer_js` offers reusable host parsing, bounded static analysis, source grouping, and scheduling/cache foundations, but its current configured-callee/key-reference model is not the source-first Intent specification. Reuse code selectively without making that format authoritative. The PR #183 implementation remains behavioral evidence, not a migration protocol or stable public API.
+
+### First minimum implementation: Phases 1–2
+
+The first deliverable uses an explicitly test-only context and implements the accepted shared semantics plus the initial JS/TS Producer. It produces source/declaration/reference facts, exclusions, diagnostics, semantic projections, and revisions under the applicable 017 representations. It does not allocate or manage persistent IDs, substitute fixture IDs for that capability, or claim the complete identity-resolved authoring result required by later consumers.
+
+The test host explicitly supplies the application owner and context identity, the optional canonical source-locale default, the exact surface-class vocabulary and optional scope default, supported locale-canonicalization/data bindings, immutable source membership, grammar/recognition profiles, and finite limits. These inputs retain their actual values and applicable validators; they are not arbitrary digest labels or unconditional-success adapters. Missing defaults are tested under the existing declaration-level precedence rules, and missing required information remains an error rather than an inferred default.
+
+Test-only describes input establishment, not a replacement for implementation. Source recognition, MF2 parsing/semantic validation, parameter checks, metadata/context resolution, and 017 projection/revision generation execute the real operations. Complete production `LocalizationProjectProfile` construction from configuration and persistent registry management are not part of this delivery. A test context cannot be relabeled as a production Profile, and an identity-dependent operation cannot succeed without its required registry evidence.
+
+Apply the following minimum verification/measurement gate with the phase that introduces each operation:
+
+- Implement and validate the required 017 representation subset and use independent expected facts, projections, revisions, and failure outcomes. Keep broader fixture families tied to their separately adopted capabilities.
+- Verify positive, negative, exact-limit, and first-over cases; fresh/reused equivalence; and workspace recovery after success, failure, and cancellation. Parse reuse must preserve complete input associations, and returned immutable results must not borrow resettable workspace storage.
+- Pin the applicable cases, Method Descriptors, operation intervals, memory/allocation domains, and semantic observations in the implementation plan. Retain descriptive timing, work-count, and applicable memory/allocation baselines through the required 026 evidence checks. Missing or unsupported required observations cannot become zero values or successful completion.
+- Require correctness, required-case coverage, evidence integrity, and complete mandatory records for completion. Do not introduce numerical speed/allocation pass/fail thresholds without the applicable 026 comparison and budget specifications. Custom arenas, SIMD, and unsafe optimizations are not prerequisites and require their separate evidence when adopted. Optional profiling uses a non-default build feature and does not replace primary measurements.
+
+Implement or reuse only the shared 026 capabilities required by these operations; this does not create a separate prerequisite to implement all of 026. Acceptance of this minimum fixes the first delivery scope, not a claim that Phases 3–5, conditional selection, production configuration integration, or multilingual execution are complete.
 
 ## Decision Log
 
@@ -738,8 +759,8 @@ The existing `intlify_producer_js` offers reusable host parsing, bounded static 
 | 016-007 | Resolve source locale and surface assignment from explicit source/checked inputs, never ambient locale or inferred vocabulary | Inherited | Respects 015's defaults, absence, and vocabulary ownership |
 | 016-008 | Separate declaration identity from references, semantic revisions, and target-local handles | Inherited | Preserves history without developer-maintained translation keys |
 | 016-009 | Make compilation read-only and registry updates exact-base, explicit, and atomic | Accepted | Makes identity changes reviewable and prevents nondeterministic build mutations |
-| 016-010 | Use conservative finite references and require compatible parameter requirements in the first selection form | Proposed | Gives planning a complete finite set while keeping evaluation-order obligations explicit |
-| 016-011 | Require complete-inventory absence for retirement and never transfer approval through lineage links | Proposed | Refines the inherited retirement/history rules without inferring deletion from partial or unreachable source |
+| 016-010 | Accept statically enumerable conditional declaration selection with compatible parameter requirements, but defer its implementation beyond the first Phase 1–2 minimum | Accepted | Retains every possible declaration without evaluating the host condition; the first minimum diagnoses this form as unsupported and supports static inline source/direct local references |
+| 016-011 | Require complete-inventory absence and resolved identity associations for retirement, retain reserved IDs/history, and never transfer approval through lineage links | Accepted | Aligns the general Phase 3 retirement rule with 016-030; partial/failed analysis or unreferenced declarations cannot establish retirement, and lineage is not approval |
 | 016-012 | Activate owner measurement, storage-lifetime rules, and optional profiling isolation with implementation phases | Inherited | Applies 026 without creating a separate performance implementation phase |
 | 016-013 | Name the explicit exclusion marker `noIntent()` | Accepted | Pairs with `intent()` and expresses deliberate exclusion from Message Intent generation, not merely an absent declaration |
 | 016-014 | Use Diagnostic for structured error, warning, and informational records | Accepted | Uses one term for parser and authoring reports while preserving component-owned codes and the shared reporting responsibility |
@@ -768,6 +789,8 @@ The existing `intlify_producer_js` offers reusable host parsing, bounded static 
 | 016-037 | Receive caller-supplied finite source inventories, snapshots, and owner scope with explicit complete/partial coverage; do not discover the repository in the Producer | Accepted | Makes result scope explicit and prevents missing/failed units or partial views from satisfying a complete build or authorizing retirement |
 | 016-038 | Resolve supported module references from caller-supplied verifiable target information and retain declaration-owned identity, revision, locale, and metadata | Accepted | Shares declarations across uses without consumer-side redefinition and rejects missing, revision-inconsistent, or unbounded targets without claiming all import forms |
 | 016-039 | Allow explicit test-only minimal profile inputs in Phases 1–2; require the adopted checked 015 inputs and 017 representation/admission subset before production use | Accepted | Enables bounded implementation work without promoting private/test inputs to a complete Profile or requiring unrelated upstream features |
+| 016-040 | Deliver the first Phase 1–2 minimum with explicitly supplied test-context inputs and actual source/MF2/parameter/projection validation; exclude production Profile construction and persistent ID management | Accepted | Selects a concrete initial scope under 016-039 without hidden defaults, fake validation, or claims of identity-resolved production authoring |
+| 016-041 | Adopt applicable 026 storage, correctness, equivalence, and validated descriptive measurement requirements with Phase 1–2 | Accepted | Makes mandatory evidence part of completion without inventing numeric performance budgets, requiring premature low-level optimization, or waiting for all shared measurement capabilities |
 
 ## Resolved Questions
 
@@ -775,10 +798,11 @@ Q1 is resolved by decisions 016-002, 016-013, 016-015, and 016-016; Q2 by decisi
 
 Q6 is resolved by decisions 016-028–016-031; Q7 by decisions 016-032–016-036; Q8 by decisions 016-037–016-039. The originally listed Q1–Q8 items are therefore resolved at the logical-rule level owned by 016.
 
-The associated minimum representation dependency is also resolved by [017's Minimum Intent Authoring Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-intent-authoring-representation): it fixes the owner-qualified ID, semantic projection/revision encoding, source/declaration/reference facts, registry snapshots, and update decisions/history. These are specified formats, not implementation or production-admission claims. The remaining implementation, adoption, and decision-state conditions are tracked in [Implementation Phasing](#implementation-phasing); broader extensions remain in [Deferred Follow-Up Notes](#deferred-follow-up-notes).
+The associated minimum representation dependency is also resolved by [017's Minimum Intent Authoring Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-intent-authoring-representation): it fixes the owner-qualified ID, semantic projection/revision encoding, source/declaration/reference facts, registry snapshots, and update decisions/history. These are specified formats, not implementation or production-admission claims. The implementation-readiness review additionally accepts 016-010/016-011 and fixes the first delivery and 026 adoption under 016-040/016-041. Remaining implementation, scope, and adoption conditions are tracked in [Implementation Phasing](#implementation-phasing); broader extensions remain in [Deferred Follow-Up Notes](#deferred-follow-up-notes).
 
 ## Deferred Follow-Up Notes
 
+- Implement accepted conditional declaration selection under 016-010 after the first Phase 1–2 minimum, with its actual bounded recognition, compatible-parameter checks, complete alternative retention, and applicable consumer integration. Design acceptance alone does not enable it in an existing Producer, planner, or Web profile.
 - Vue/template, JSX/TSX UI, mobile, and native authoring profiles should refine the same declaration, exclusion, context, and identity semantics in their owning integration documents.
 - Rich structured semantic context, more ergonomic source annotations, message specialization, parameter-object inference, and finite container selection need separate versioned profile extensions.
 - Registry file distribution, source-control merge tooling, automated update triggers, migration/recovery UX, and public authoring package layout belong to 029, constrained by the reconciliation rules here.
