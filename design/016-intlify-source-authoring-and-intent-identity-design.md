@@ -68,7 +68,7 @@ The design separates language-neutral meaning and identity rules from a first Ja
 
 These are ownership relationships, not a requirement to finish every downstream design before discussing 016. The shared meaning can be designed now. An implementation needs the exact upstream specifications for the subset it claims to support; test-owned inputs may exercise a smaller slice but cannot masquerade as complete checked project or artifact inputs.
 
-In particular, PR #205 supplies 015's minimum configuration/canonicalization/locale-core path and 017's initial configuration-reference and measurement subset. It does not supply a complete `LocalizationProjectProfile`, Intent artifact schema, production registry, or production locale-data implementation. Those gaps remain explicit adoption prerequisites rather than being filled with hidden Producer defaults.
+In particular, PR #205 supplies 015's minimum configuration/canonicalization/locale-core path and 017's initial configuration-reference and measurement subset. It does not supply a complete `LocalizationProjectProfile`, Intent artifact schema, production registry, or production locale-data implementation. 017 now separately defines the [minimum authoring representations](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-intent-authoring-representation) needed for the initial Intent/identity implementation. These definitions resolve the representation-design dependency, not the remaining implementation and production-admission requirements; a Producer must not fill those gaps with hidden defaults.
 
 ## Inherited Decisions from 000
 
@@ -434,7 +434,7 @@ The accepted persistent identity is logically the complete pair `(owner identity
 
 Identity equality compares both parts. Equal owner-local ID values under different owners identify different Intents; comparing only the local value must not merge application and library identities. Within one owner, new allocations must reject collisions with both active and retired IDs. A retired ID remains reserved and cannot be assigned to a new message lineage. The separate explicit-restoration rules below concern restoring the same historical identity, not reusing its ID for a different lineage.
 
-The owner-local value is opaque: its spelling does not describe the source message or its file position, and it is not derived from those values. UUID selection, length, byte/string representation, and serialization belong to 017, subject to these uniqueness rules. 016 fixes the logical identity scope without selecting those formats.
+The owner-local value is opaque: its spelling does not describe the source message or its file position, and it is not derived from those values. The minimum owner/ID format, allocation encoding, and serialization are defined in [017's Identity and artifact envelope](./017-intlify-shared-artifact-and-version-admission-design.md#identity-and-artifact-envelope), subject to these uniqueness rules. 016 owns the logical identity scope; implementations use the shared format rather than choosing a separate one.
 
 ### Semantic projection and revision changes
 
@@ -454,7 +454,7 @@ The initial comparison is conservative about MF2 structure. Adding/removing bran
 
 Canonical source locale, description, and semantic UI usage changes affect revision. Switching between explicit and inherited locale evidence with the same canonical locale does not. Coverage-facing `surfaceClass`, requested locales, policies, glossaries, targets, and Provider revisions remain separate dependencies; unchanged Intent revision does not waive any downstream revalidation or localization work required by changes to those inputs.
 
-017 must freeze the exact canonical representation, digest domain, and revision encoding before persisted production revisions are implemented. 016 supplies the semantic inclusion/exclusion rules and independent equivalence vectors. It does not reuse a fast in-process hash or PR #183's truncated path/source payload as a persistent ID.
+017 defines the minimum canonical projection, digest domain, and revision encoding in [Semantic projection and IntentRevision](./017-intlify-shared-artifact-and-version-admission-design.md#semantic-projection-and-intentrevision). 016 supplies the semantic inclusion/exclusion rules and independent equivalence vectors; richer structured context or constraints require an explicitly versioned extension beyond that minimum. Implementations must use the adopted shared encoding, not a fast in-process hash, and must not reuse PR #183's truncated path/source payload as a persistent ID.
 
 | Change, with an established identity continuation | Persistent ID | Semantic revision | Other affected facts |
 | --- | --- | --- | --- |
@@ -477,7 +477,7 @@ Equal revision labels in a lineage must identify equal projections. Full source/
 
 The registry retains owner-qualified IDs, declaration lineage associations, active/retired state, and an exact snapshot/update ancestry. Locator and continuity evidence are indexes into source history, not the definition of identity. The registry contains no translations, approval decisions, requested-locale catalogs, runtime handles, or Provider credentials.
 
-The logical ID uniqueness rules are defined above. Exact owner/ID representations, allocation and serialization formats, integrity rules, and schema evolution are 017 work. A product may use a file such as `intent.lock`, but that filename and the update commands remain 029 decisions.
+The logical ID uniqueness rules are defined above. The minimum owner/ID, allocation, serialization, and integrity rules follow 017's authoring representations, including [Registry snapshots and update plans](./017-intlify-shared-artifact-and-version-admission-design.md#registry-snapshots-and-update-plans); schema evolution remains owned there. A product may use a file such as `intent.lock`, but that filename and the update commands remain 029 decisions.
 
 ### Read-only compilation
 
@@ -511,7 +511,7 @@ Registry updates are explicit operations separate from ordinary read-only compil
 - the accepted identity decisions and their required evidence; and
 - the resulting immutable registry snapshot.
 
-This records which registry was changed, on which source and decision basis, and into which result. Update ancestry identifies the exact accepted base, not a timestamp, a similarity match, or an unversioned reference to the latest state. These are logical relationships; 017 chooses their concrete representation and integrity encoding, while 029 owns persistence and update UX.
+This records which registry was changed, on which source and decision basis, and into which result. Update ancestry identifies the exact accepted base, not a timestamp, a similarity match, or an unversioned reference to the latest state. 017's [Non-circular history and publication](./017-intlify-shared-artifact-and-version-admission-design.md#non-circular-history-and-publication) defines the minimum representation and integrity linkage for these logical relationships; 029 owns persistence and update UX.
 
 The authorized host may publish the complete accepted result only if its exact base is still the current registry snapshot. Checking that condition and publishing the whole update must form one atomic operation: an intervening update must not be overwritten, and no partially applied associations may become current. All required identity decisions must be resolved before publication.
 
@@ -580,7 +580,7 @@ The checked result supplies the logical fields needed by:
 | Project graph and diagnostics | Input dependencies, source evidence, explicit exclusions, completeness, typed authoring failures | Query storage, client protocols, or a second common diagnostic format |
 | Later source-lowering plan | Host occurrence and evaluation-order facts associated with checked references | Generated accessor name, compact handle, runtime ABI, or host rewrite |
 
-Source-locale message derivation requires no Provider and does not place a translated candidate payload into the Store. Its envelope/digests and source-admission dependencies must use the later 017/018 definitions. Governance and linking still verify the applicable source evidence before use in a Release.
+017's [Minimal Intent and reference artifacts](./017-intlify-shared-artifact-and-version-admission-design.md#minimal-intent-and-reference-artifacts) cover the initial local source-analysis/identity handoff and retain the facts from which source-locale MF2 can be derived without a Provider. This does not place a translated candidate payload into the Store or supply a complete `SourceLocaleMessageArtifact`. That complete artifact's envelope/digests and source-admission dependencies remain later 017/018 work for the adopting Phase 4–5 integration. Governance and linking still verify the applicable source evidence before use in a Release.
 
 ## Diagnostics and Failure Model
 
@@ -707,15 +707,19 @@ These are proposed implementation-readiness gates, not PR boundaries or a claim 
 | --- | --- | --- |
 | 1 — Shared authoring semantics | Literal/MF2 extraction distinction, parser handoff, parameter requirements, source-locale/context/class inputs, and semantic revision projection | Language-neutral logical fixtures pass, unsupported inputs stay explicit, and 015 fixture projections cannot be mistaken for complete production Profiles |
 | 2 — Initial JavaScript/TypeScript Producer | Exact bindings, explicit forms, accepted metadata/exclusion syntax, bounded DOM recognition, source maps, and local finite references | Recognition and diagnostic fixtures pass; each source is parsed under an explicit profile; no duplicate extraction or host-code execution occurs |
-| 3 — Persistent identity and reconciliation | Registry admission, stable association rules, replayable allocation inputs, conflict/restore/retirement handling, and read-only compile operation | Necessary 017 representation/identity decisions are fixed; independent history fixtures pass; production publication adopts the applicable 018 authorization slice and host adapter exact-base/atomicity checks |
+| 3 — Persistent identity and reconciliation | Registry admission, stable association rules, replayable allocation inputs, conflict/restore/retirement handling, and read-only compile operation | The adopted 017 minimum identity/registry representations and admission checks are implemented; independent history fixtures pass; production publication adopts the applicable 018 authorization slice and 029 host adapter exact-base/atomicity checks |
 | 4 — Shared consumer handoff | Versioned Intent/source/reference artifacts, admitted module/library references, graph dependency/diagnostic projection, and broader bounded selection | Adopted 017/019 interfaces validate complete versus partial outcomes; consumers cannot infer source approval, final reachability, or target validity from authoring success |
 | 5 — Integration and conformance closure | 020/024/028 source-first integration, evaluated host behavior, adopted-case inventory, and performance baseline evidence | One supported Web path proves source → stable Intent → checked reference → preserved host execution, with complete conformance and measurement records for the claimed subset |
 
-The accepted startup rule permits Phases 1 and 2 to use finite, explicitly test-owned project/registry inputs while shared encodings are being completed. Minimal profile inputs state the information needed by 016, including owning context, optional default source locale, exact surface-class vocabulary, and the applicable supplied canonicalization binding. Missing information must not be filled with hidden defaults.
+017's [Adoption in the 016 Implementation](./017-intlify-shared-artifact-and-version-admission-design.md#adoption-in-the-016-implementation) defines the minimum representations used by Phases 1–3: the semantic projection/revision encoding, finite source/declaration/reference facts, owner-qualified IDs, registry snapshots/update plans, and minimal local Intent/reference artifacts. Their design is no longer a pending 017 prerequisite. Each adopting phase must implement and validate the applicable subset, including independent projection/history fixtures for the adopted parser/profile revision; specifying the formats does not complete a phase.
+
+The accepted startup rule still permits Phases 1 and 2 to use finite, explicitly test-owned project/registry inputs without waiting for full production context and workflow integration. These inputs exercise the applicable shared representations, not private replacement ID or revision formats. Minimal profile inputs state the information needed by 016, including owning context, optional default source locale, exact surface-class vocabulary, and the applicable supplied canonicalization binding. Missing information must not be filled with hidden defaults.
 
 Neither these fixture inputs nor PR #205's minimum configuration/locale-core results constitute a complete production `LocalizationProjectProfile`. They may exercise the declared subset, but that experiment is not persistent-identity support or full authoring conformance.
 
-Before production use of persistent IDs or shared artifacts, adopt the necessary checked 015 inputs and 017 representation/admission specifications for that supported subset. This does not require every feature of 015 or 017 to be finished. Production identity claims still require Phase 3 and its other admission/publication checks; end-to-end localization claims require the corresponding downstream adoption, not merely a checked Producer result.
+Before production use of persistent IDs or shared artifacts, implement and adopt the necessary checked 015 inputs and 017 representation/admission specifications for that supported subset. Phase 3 additionally requires actual supported continuity verifiers and, for production publication, the applicable 018 authorization and 029 host exact-base/atomicity checks. Valid encodings or test doubles do not satisfy these requirements. This does not require every feature of 015 or 017 to be finished. Phase 4–5 claims additionally require the adopted cross-owner/library and complete source-locale artifact extensions, 019 graph/diagnostic interfaces, and applicable 020/023/024/028 integration. End-to-end localization is not established by a checked Producer result alone.
+
+Choices still recorded as `Proposed`, including 016-010 and 016-011, require separate resolution before claiming those choices as accepted behavior. The 017 representation addition does not change their decision states or admit unsupported authoring forms.
 
 The existing `intlify_producer_js` offers reusable host parsing, bounded static analysis, source grouping, and scheduling/cache foundations, but its current configured-callee/key-reference model is not the source-first Intent specification. Reuse code selectively without making that format authoritative. The PR #183 implementation remains behavioral evidence, not a migration protocol or stable public API.
 
@@ -765,20 +769,20 @@ The existing `intlify_producer_js` offers reusable host parsing, bounded static 
 | 016-038 | Resolve supported module references from caller-supplied verifiable target information and retain declaration-owned identity, revision, locale, and metadata | Accepted | Shares declarations across uses without consumer-side redefinition and rejects missing, revision-inconsistent, or unbounded targets without claiming all import forms |
 | 016-039 | Allow explicit test-only minimal profile inputs in Phases 1–2; require the adopted checked 015 inputs and 017 representation/admission subset before production use | Accepted | Enables bounded implementation work without promoting private/test inputs to a complete Profile or requiring unrelated upstream features |
 
-## Open Questions
+## Resolved Questions
 
-Q1 is resolved by decisions 016-002, 016-013, 016-015, and 016-016; Q2 by decision 016-005; Q3 by decisions 016-017–016-020; Q4 by decisions 016-003 and 016-021–016-025. Q5's 016-owned identity and update-history rules, including the division of responsibilities, are resolved by decisions 016-009, 016-026, and 016-027. Concrete ID, registry, and decision encodings remain a required 017 extension before Phase 3; resolving the logical rules here does not define those formats.
+Q1 is resolved by decisions 016-002, 016-013, 016-015, and 016-016; Q2 by decision 016-005; Q3 by decisions 016-017–016-020; Q4 by decisions 016-003 and 016-021–016-025. Q5's 016-owned identity and update-history rules, including the division of responsibilities, are resolved by decisions 016-009, 016-026, and 016-027.
 
-Q6 is resolved by decisions 016-028–016-031; Q7 by decisions 016-032–016-036; Q8 by decisions 016-037–016-039. The originally listed Q1–Q8 items are therefore resolved at the logical-rule level owned by 016. The revision comparison rules and fixture requirements above supply the equality/change expectations; the implementation must provide independent fixtures for the adopted parser/profile revision.
+Q6 is resolved by decisions 016-028–016-031; Q7 by decisions 016-032–016-036; Q8 by decisions 016-037–016-039. The originally listed Q1–Q8 items are therefore resolved at the logical-rule level owned by 016.
 
-These agreements do not mark other choices still recorded as `Proposed` as accepted, define 017's wire formats, or turn test inputs into production admission. The remaining representation, workflow, and integration prerequisites stay with their owning documents and the implementation-readiness gates above.
+The associated minimum representation dependency is also resolved by [017's Minimum Intent Authoring Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-intent-authoring-representation): it fixes the owner-qualified ID, semantic projection/revision encoding, source/declaration/reference facts, registry snapshots, and update decisions/history. These are specified formats, not implementation or production-admission claims. The remaining implementation, adoption, and decision-state conditions are tracked in [Implementation Phasing](#implementation-phasing); broader extensions remain in [Deferred Follow-Up Notes](#deferred-follow-up-notes).
 
 ## Deferred Follow-Up Notes
 
 - Vue/template, JSX/TSX UI, mobile, and native authoring profiles should refine the same declaration, exclusion, context, and identity semantics in their owning integration documents.
 - Rich structured semantic context, more ergonomic source annotations, message specialization, parameter-object inference, and finite container selection need separate versioned profile extensions.
 - Registry file distribution, source-control merge tooling, automated update triggers, migration/recovery UX, and public authoring package layout belong to 029, constrained by the reconciliation rules here.
-- 017 must expand beyond its current 015/measurement subset to encode persisted Intent identity, source/reference artifacts, and registry/evidence representations. This draft does not silently extend that subset.
+- 017 already defines the minimum local authoring/identity representations. Complete source-locale/localized message artifacts, cross-owner/library reference and distribution formats, richer semantic-context/constraint projections, and other downstream artifact families remain versioned extensions for the work that adopts them. These extensions are not prerequisites for the bounded Phase 1–3 representation subset.
 - 018/019/020/023/024 remain owners of trust, graph/query, final planning, portable execution, and target/source lowering respectively. Their unfinished details are not redefined here.
 - Broad similarity matching, cross-language refactoring inference, cryptographic source attestation, and long-history registry compaction are not prerequisites for the first bounded Producer experiment.
 
@@ -790,7 +794,7 @@ These agreements do not mark other choices still recorded as `Proposed` as accep
 | [001 — Toolchain foundation](./001-ox-mf2-toolchain-foundation.md), [012 — Parser semantic validation](./012-ox-mf2-parser-semantic-validation-design.md) | Shared source, syntax, and semantic facts reused by all authoring forms |
 | [014 — Message linker](./014-ox-mf2-message-linker-design.md) | Existing reference-extraction and host-grouping implementation evidence; its key-oriented artifact semantics do not define this source-first interface |
 | [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Source defaults, canonicalization and surface-vocabulary handoff; a partial test core is not a checked production Profile |
-| [017 — Shared artifacts and version admission](./017-intlify-shared-artifact-and-version-admission-design.md) | Required later representation of the semantic and identity rules defined here |
+| [017 — Shared artifacts and version admission](./017-intlify-shared-artifact-and-version-admission-design.md) | Defines the minimum shared representations for Phases 1–3 and local Intent/reference handoff; broader downstream artifact families remain separately adopted extensions |
 | [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md), [019 — Project graph and queries](./019-intlify-project-graph-query-and-incremental-design.md) | Trust admission, authoring inventory/identity queries, common diagnostics, and incremental scheduling |
 | [020 — Requirement planning and linking](./020-intlify-requirement-planning-and-linking-design.md) | Consumes checked finite references and Intent source facts; owns final requirement and reachability decisions |
 | [023 — Localization execution](./023-intlify-localization-execution-specification-design.md), [024 — Target Profile and export](./024-intlify-target-profile-and-export-design.md) | Portable parameter/function meaning, target admission, and host-lowering obligations |
