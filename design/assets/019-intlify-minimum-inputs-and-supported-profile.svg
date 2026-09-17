@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16" role="img" aria-labelledby="title desc">
+  <title id="title">Minimum inputs for the local-authoring profile</title>
+  <desc id="desc">Already acquired, bounded scope and source inputs, checked context and identity inputs, and actual owner results with admission evidence feed the 019 capture. A pinned local profile and explicit invocation limits determine which operations and adapters are supported. Successful capture retains an immutable checked or inspection-only snapshot for read-only queries. A separately retained previous snapshot is optional and is used only for change analysis. Test contexts do not become production Profiles, and queries do not acquire inputs, publish state, or grant access.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-fill" />
+    </marker>
+    <style>
+      .canvas { fill: #ffffff; }
+      .title { fill: #111827; }
+      .muted { fill: #475569; }
+      .input { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.5; }
+      .step { fill: #1d4ed8; }
+      .output { fill: #0f766e; }
+      .optional { fill: #fffbeb; stroke: #b45309; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .white { fill: #ffffff; }
+      .soft-white { fill: #f1f5f9; }
+      .connector, .arrow { fill: none; stroke: #64748b; stroke-width: 2.2; }
+      .arrow { marker-end: url(#arrow); }
+      .optional-arrow { stroke-dasharray: 6 4; }
+      .arrow-fill, .join { fill: #64748b; }
+      @media (prefers-color-scheme: dark) {
+        .canvas { fill: #020617; }
+        .title { fill: #f8fafc; }
+        .muted { fill: #cbd5e1; }
+        .input { fill: #1e293b; stroke: #64748b; }
+        .optional { fill: #30200b; stroke: #fbbf24; }
+        .connector, .arrow { stroke: #cbd5e1; }
+        .arrow-fill, .join { fill: #cbd5e1; }
+      }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" class="canvas" />
+  <text x="640" y="42" text-anchor="middle" font-size="25" font-weight="700" class="title">Minimum inputs for the local-authoring profile</text>
+  <text x="640" y="74" text-anchor="middle" class="muted">One finite application · already acquired, bounded values · no hidden I/O</text>
+
+  <g data-card="source-inputs">
+    <rect x="40" y="110" width="360" height="144" rx="12" class="input" />
+    <text x="60" y="141" font-size="18" font-weight="700" class="title">Scope and exact source inputs</text>
+    <text x="60" y="174" class="muted">Owner · complete / partial membership</text>
+    <text x="60" y="202" class="muted">Source snapshots + bytes</text>
+    <text x="60" y="230" class="muted">Grammar / Producer / bindings</text>
+  </g>
+  <g data-card="context-inputs">
+    <rect x="460" y="110" width="360" height="144" rx="12" class="input" />
+    <text x="480" y="141" font-size="18" font-weight="700" class="title">Context and identity inputs</text>
+    <text x="480" y="174" class="muted">Checked 015 context + required evidence</text>
+    <text x="480" y="202" class="muted">OR explicit 016 / 017 test context</text>
+    <text x="480" y="230" font-size="15" class="muted">Registry base + history when IDs requested</text>
+  </g>
+  <g data-card="owner-inputs">
+    <rect x="880" y="110" width="360" height="144" rx="12" class="input" />
+    <text x="900" y="141" font-size="18" font-weight="700" class="title">Owner results and admission</text>
+    <text x="900" y="174" class="muted">Actual 016 outcomes + diagnostics</text>
+    <text x="900" y="202" class="muted">017 artifacts + source / input evidence</text>
+    <text x="900" y="230" class="muted">018 / 029 verification / disclosure</text>
+  </g>
+  <path d="M 220 254 V 282 H 1060 V 254 M 640 254 V 282" class="connector" />
+  <circle cx="640" cy="282" r="4" class="join" />
+  <path d="M 640 282 V 314" class="arrow" />
+
+  <g data-card="supported-profile">
+    <rect x="40" y="314" width="360" height="140" rx="12" class="input" />
+    <text x="60" y="345" font-size="18" font-weight="700" class="title">Supported local profile</text>
+    <text x="60" y="378" class="muted">019 operation / query revisions</text>
+    <text x="60" y="406" class="muted">Pinned owner / projection adapters</text>
+    <text x="60" y="434" class="muted">Closed shapes + independent fixtures</text>
+  </g>
+  <g data-card="capture">
+    <rect x="460" y="314" width="360" height="140" rx="12" class="step" />
+    <text x="480" y="345" font-size="18" font-weight="700" class="white">019 / check and retain</text>
+    <text x="480" y="378" class="soft-white">Exact associations + owner adapters</text>
+    <text x="480" y="406" class="soft-white">Explicit missing / blocked input state</text>
+    <text x="480" y="434" class="soft-white">No executable selectors or plugins</text>
+  </g>
+  <g data-card="invocation-inputs">
+    <rect x="880" y="314" width="360" height="140" rx="12" class="input" />
+    <text x="900" y="345" font-size="18" font-weight="700" class="title">Invocation and capacity inputs</text>
+    <text x="900" y="378" class="muted">Exact query / profile selection</text>
+    <text x="900" y="406" class="muted">Graph / traversal / output limits</text>
+    <text x="900" y="434" class="muted">Scratch + optional cache bounds</text>
+  </g>
+  <path d="M 400 384 H 460" class="arrow" />
+  <path d="M 880 384 H 820" class="arrow" />
+  <path d="M 640 454 V 510" class="arrow" />
+
+  <g data-card="previous-snapshot">
+    <rect x="40" y="510" width="360" height="110" rx="12" class="optional" />
+    <text x="60" y="541" font-size="18" font-weight="700" class="title">Previous snapshot / optional</text>
+    <text x="60" y="574" class="muted">Separately identified immutable view</text>
+    <text x="60" y="602" class="muted">Used only for change analysis</text>
+  </g>
+  <g data-card="snapshot">
+    <rect x="460" y="510" width="360" height="110" rx="12" class="output" />
+    <text x="480" y="541" font-size="18" font-weight="700" class="white">Immutable graph snapshot</text>
+    <text x="480" y="574" class="soft-white">Inputs, results, relations, and scope</text>
+    <text x="480" y="602" class="soft-white">Checked or inspection-only</text>
+  </g>
+  <g data-card="queries">
+    <rect x="880" y="510" width="360" height="110" rx="12" class="input" />
+    <text x="900" y="541" font-size="18" font-weight="700" class="title">Read-only queries</text>
+    <text x="900" y="574" class="muted">Facts · diagnostics · scoped handoff</text>
+    <text x="900" y="602" class="muted">Change explanation when comparable</text>
+  </g>
+  <path d="M 820 565 H 880" class="arrow" />
+  <path d="M 220 620 V 660 H 1060 V 620" class="arrow optional-arrow" />
+  <text x="640" y="647" text-anchor="middle" font-size="14" class="muted">Change analysis only</text>
+
+  <text x="640" y="707" text-anchor="middle" font-size="15" class="muted">A test context is not a production Profile. Unsupported or missing required inputs cannot establish a complete checked handoff.</text>
+  <text x="640" y="735" text-anchor="middle" font-size="15" class="muted">Queries do not acquire files, publish state, or grant access; no publication handle or caller-asserted grant is an input.</text>
+</svg>

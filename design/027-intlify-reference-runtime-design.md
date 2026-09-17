@@ -6,7 +6,7 @@ This document defines the high-level architecture of one reference physical Runt
 
 Documents 023–026 are the normative authorities for shared behavior. This document owns only the reference physical split among the Runtime Engine, locale-bound Localizer, artifact loader and caches, MF2 Runtime Core integration, and host bindings. If a reference implementation choice here conflicts with an admitted shared specification, the shared specification prevails.
 
-Runtime implementation has not started. This document fixes the initial reference-component boundaries, build/runtime separation, context ownership, caching direction, and implementation milestones. It does not freeze a public Rust, JavaScript, C, Swift, Kotlin, or other language API; a compiled Locale Capsule wire format; a runtime IR; exact portable-value wire encodings; or the complete diagnostic and resource-limit specifications.
+Runtime implementation has not started. This document fixes the initial reference-component boundaries, build/runtime separation, context ownership, caching direction, and implementation milestones. It does not freeze a public Rust, JavaScript, C, Swift, Kotlin, or other language API; a compiled Locale Capsule wire format; a runtime IR; exact portable-value wire encodings; or the complete diagnostic and resource-limit specifications. The [Minimum Web Runtime Adapter](#minimum-web-runtime-adapter) section fixes the first implementation subset: the Runtime-backed path for 028 under the 023 minimum text-interpolation profile, 024's binding tables and locale payloads, and 025's execution admission.
 
 The current `dev.intlify/esm-module` format `0.1` from [014](./014-ox-mf2-message-linker-design.md) is a possible implementation bridge for the first reference Runtime. Nothing in this document changes that ABI or infers formatter behavior from it. It is not the normative source-first Runtime artifact, and its continued public compatibility depends on the explicit decision in [036](./036-intlify-resource-migration-and-compatibility-design.md). A future compiled representation requires a new artifact kind or a coordinated format-version decision owned by 024.
 
@@ -238,7 +238,7 @@ The Localization Runtime is the reference application-facing physical service ab
 
 - runtime-backed execution compatibility admission for one deployment-selected Release Snapshot, Runtime Manifest, and matching artifacts;
 - exact locale binding;
-- Locale Capsule or current ESM locale-module loading;
+- 024 locale-payload loading and, optionally, Locale Capsule or current ESM locale-module loading;
 - delivery-unit registration and availability;
 - Message Handle lookup within compatible admitted artifacts;
 - runtime capability preflight;
@@ -432,9 +432,9 @@ The Runtime does not choose the active Release, verify mutable deployment state,
 
 The current `dev.intlify/esm-module` format `0.1` contains parser-validated exact MF2 records already selected by the linker. Its loader map provides exact requested-locale module loading. It contains no formatter or prepared representation.
 
-The first reference Runtime Adapter may consume this existing ABI and prepare each message once when admitting or first using an immutable module. This provides a short end-to-end implementation path and completes the already generated `MessageRuntime<Result>` injection boundary without making ESM `0.1` the target source-first artifact specification.
+An optional bridge adapter may consume this existing ABI and prepare each message once when admitting or first using an immutable module. This provides a short end-to-end implementation path and completes the already generated `MessageRuntime<Result>` injection boundary without making ESM `0.1` the target source-first artifact specification.
 
-Runtime parsing or preparation of `0.1` is an adapter behavior. It does not retroactively make the ESM module a compiled Runtime Capsule.
+Runtime parsing or preparation of `0.1` is an adapter behavior. It does not retroactively make the ESM module a compiled Runtime Capsule. It is not the artifact consumed by the 028 minimum path, which uses 024's `locale-payload` records through the [Minimum Web Runtime Adapter](#minimum-web-runtime-adapter).
 
 ### Future compiled Locale Capsule consumption
 
@@ -477,6 +477,58 @@ Generated code uses checked opaque Message Handles rather than arbitrary user-au
 The persistent compiler-owned `MessageIntentId` and generated runtime handle are separate identities. 024 owns the exact handle shape and compatibility rules. The reference Runtime may consume an artifact-local compact index paired with an artifact identity; an ahead-of-time target may instead erase the handle into a generated resource identifier. Runtime admission must reject accidental resolution against an unrelated release, project, capsule version, scope, or delivery unit.
 
 External serialization of deferred message references requires its own versioned identity and argument specification. It is not implied by an in-process generated handle.
+
+## Minimum Web Runtime Adapter
+
+This section fixes the first reference implementation subset: the Runtime-backed execution path that [028](./028-intlify-javascript-web-vertical-slice-design.md#execution-pair-and-locale-lifecycle) runs against [024](./024-intlify-target-profile-and-export-design.md#runtime-backed-message-data)'s locale payloads under [023](./023-intlify-localization-execution-specification-design.md)'s minimum text-interpolation profile and [025](./025-intlify-release-assembly-and-deployment-design.md#execution-admission)'s execution admission. It is a physical realization of those specifications, not a second definition of them. The ahead-of-time path is generated by 024 and shares only the argument, limit, and result helpers permitted there.
+
+### Scope and inputs
+
+The adapter consumes, per application instance and member target:
+
+- the deployment-selected Release, the member `target-descriptor`, and the execution-admission evidence produced by the 025 host;
+- the verified bytes of the member's `binding-table` and one `locale-payload` per supported requested locale, decoded with the 017 reader under explicit limits;
+- the Target Profile body's `execution`, `mf2Specification`, `adapter`, `locale`, and `limits` pins; and
+- the pinned `ox_mf2_parser` semantic revision and the finite call limits.
+
+It has no loader for source, registry, Store, Provider, destination, or network resources, and it does not consume ESM `0.1` modules on this path. Locale services are explicitly absent; there is no function registry, negotiation, fallback, or parts output in this subset.
+
+### Admission and preparation
+
+1. Verify the admission evidence, then check that every payload and the binding table name the same Release-bound target, profile, unit, binding specification, execution profile, and MF2 specification as the descriptor. A mismatch in any pin is a setup failure before decoding records.
+2. Decode each payload under the 017 canonical JSON rules and the profile's limits. Check that `records` are dense by entry, that entries equal the binding table's message slots, and that each record's Intent ID, revision, artifact reference, and definition locale equal the binding table's selection for that locale and slot.
+3. Parse each record's exact `mf2Source` with the shared parser, construct and validate its semantic model under 012, and reject any node outside 023's allowlist with a capability failure. Recompute the content digest and the canonical parameter set and compare them with the record and the binding table; supplied counts and names are never trusted.
+4. Prepare one immutable Prepared Message per record: ordered decoded literal runs with adjacent runs merged and empty runs omitted, variable occurrences resolved to dense parameter slots, the required name set, the definition locale, the supplied direction, and the precomputed logical work and fixed output contribution.
+5. Freeze a ready binding for the locale only after every record succeeds; a failed record discards the whole locale. Freeze the application's binding only after every supported locale is ready, since the minimum profile is eager.
+
+Preparation runs once per admitted payload. Repeated formatting never reparses `mf2Source`, rebuilds name maps, or reloads bytes.
+
+### Ready binding, handles, and Localizer
+
+A ready binding owns the prepared messages of all supported locales, the binding table's message and use slots, and private handle tokens created for this Release, target, unit, and table. The host obtains a Localizer for one requested locale from that binding; the Localizer is immutable and holds no global state. Two Localizers for `en` and `ja` coexist, and interleaving calls on them changes neither.
+
+A handle is an in-process token that the binding maps to one message slot; it cannot be constructed from an integer, an Intent ID, a filename, or a property on a caller-supplied object. The formatting entry checks that the handle belongs to its binding, that the use slot exists and refers to that message slot, and that the Localizer's locale has a prepared message for the slot. Any mismatch, including a handle from another Release or binding with identical bytes, is a typed setup failure.
+
+### Formatting call
+
+The generated call supplies a handle, a use slot, and optionally the evaluated parameter object. The adapter reads only the object's own data entries, in this order:
+
+1. Map the object to the required name set: missing, unexpected, duplicate, and noncanonical names fail with 023's deterministic category order; a missing object is the empty set only for a parameterless message.
+2. Admit each value as a primitive JavaScript string using trusted intrinsics captured at adapter construction; scan UTF-16 for unpaired surrogates and reject them; compute each distinct value's UTF-8 length once and check per-value and aggregate limits.
+3. Charge the logical work and the exact expanded UTF-8 output size from the prepared message and admitted values, including six bytes per interpolation, and compare with the current call limits before constructing text.
+4. Append literal runs and, for each variable occurrence, U+2068, the admitted value, and U+2069 into a pre-sized buffer, then return one primitive string.
+
+A failure returns no partial string and assigns nothing; it surfaces as a typed exception carrying stage, reason, safe subjects, and the 019 projection, without parameter values or host exception text. Host exceptions raised while evaluating the parameter object propagate unchanged and never reach the adapter.
+
+### Caches, lifetimes, and measurement
+
+Prepared messages and ready bindings are immutable and keyed by the exact payload artifact reference, binding table reference, Release identity, execution profile, and parser revision; nothing is shared across different Releases by content equality. Call scratch is per invocation and reset on success, failure, and cancellation; returned strings never borrow it. Eviction of a prepared cache delays readiness outside formatting and never changes text, failure category, or limits.
+
+The adapter reports 023's semantic admission/preparation, argument admission, and evaluation observations, and 026's `release_admission`, `localizer`, and `binding` initialization components separately from engine construction and from the host's file verification. It supplies the Runtime-backed side of 028's Logical Render Equivalence relation with exact text, bidi controls, failure observations, and logical work.
+
+### Completion
+
+The adapter is complete for the minimum when it admits 028's two locale payloads from verified bytes, renders the six selected definitions with `Ada` and `Kai` through both Localizers, rejects tampered, foreign-Release, and unsupported-profile inputs before formatting, preserves once-only host parameter evaluation, and passes the applicable 023 and 026 cases with independent expectations. It does not claim parts, functions, selectors, negotiation, Locale Capsules, ESM `0.1`, native bindings, or SSR.
 
 ## Formatting Output
 
@@ -617,15 +669,14 @@ packages/
 - Establish deterministic evaluation, bidi, fallback-value, and resource-limit evidence through 026.
 - Keep catalog lookup, locale loading, and framework behavior outside the crate.
 
-### R1: Provisional current ESM Runtime Adapter
+### R1: Minimum Web Runtime Adapter
 
-- If selected for the I1 implementation bridge, consume `dev.intlify/esm-module` and loader-map format `0.1` without changing their ABI.
-- Implement exact runtime-backed execution admission for the deployment-selected Release and its modules, plus requested-locale binding.
-- Implement deterministic lookup negotiation over a versioned Locale Negotiation Profile while allowing direct supported-locale selection.
-- Implement the generated TypeScript `MessageRuntime<Result>` interface.
-- Prepare each immutable MF2 source at most once per compatible cache identity.
-- Provide an explicit application-scoped and request-scoped Localizer path.
-- Verify concurrent SSR requests with different locales and no global locale mutation.
+- Implement the [Minimum Web Runtime Adapter](#minimum-web-runtime-adapter) for 028: admission-evidence checks, `binding-table` and `locale-payload` decoding, shared-parser preparation, eager ready bindings, locale-bound Localizers, private handles, and the synchronous formatting entry under 023's text-interpolation profile.
+- Reject mixed-Release, mismatched-pin, tampered, and unsupported-feature inputs before formatting, and expose typed failures with the 019 projection.
+- Provide the Runtime-backed side of the 026 Logical Render Equivalence relation and the initialization, preparation, and formatting observations.
+- Provide an explicit application-scoped and request-scoped Localizer path, and verify concurrent SSR requests with different locales and no global locale mutation.
+- Optionally, without blocking R1, implement deterministic lookup negotiation over an admitted Locale Negotiation Profile; 028 selects the supported locale directly.
+- Optionally, without blocking R1, consume `dev.intlify/esm-module` and loader-map format `0.1` through a separate bridge adapter that prepares each immutable module once and implements the generated `MessageRuntime<Result>` interface; that bridge is not the 028 path.
 
 ### R2: Compiled Locale Capsule
 
@@ -656,6 +707,7 @@ packages/
 026 owns the normative conformance fixture and measurement model. The reference Runtime contributes implementation evidence and must eventually cover:
 
 - simple text and interpolation;
+- the Minimum Web Runtime Adapter cases: admission from verified bytes, mixed-Release and mismatched-pin rejection, eager readiness for `en` and `ja`, once-only argument admission with surrogate and limit checks, exact FSI/PDI text, typed failures, and the Runtime-backed side of the 026 Logical Render Equivalence relation;
 - portable text, boolean, integer, decimal, instant, local-date, and local-date-time argument admission;
 - declarations, selectors, exact and fallback variants;
 - built-in number/string and promoted function sets;
@@ -686,8 +738,8 @@ The following work is deferred to its owning design rather than being silently d
 - 018: runtime trust roots, integrity proofs, resource-limit authority, and security evidence;
 - 019: common Finding codes, retained dependency evidence, and query projection;
 - 023: exact portable value ranges, structured parts, function semantics, Locale Service behavior, formatting outcomes, diagnostics, and extension policy;
-- 024: Runtime Manifest, Locale Capsule, Message Handle, generated-code ABI, deferred-reference serialization, and FFI-facing artifact formats;
-- 025: Release wire format, `ReleasePublicationRecord`, publication, deployment activation, and execution-admission coordination;
+- 024: Runtime Manifest, Locale Capsule, generated-code ABI, deferred-reference serialization, and FFI-facing artifact formats beyond the minimum binding table and locale payload consumed here;
+- 025: production publication, deployment activation, withdrawal, and rollback beyond the minimum local admission evidence consumed here;
 - 026: conformance fixture protocol and cross-target measurement categories;
 - 030: framework context, Suspense, hydration, locale transitions, and rich-markup projection;
 - 035: `no_std`, `alloc`, embedded targets, native binding integration, and thread-affinity evidence;
