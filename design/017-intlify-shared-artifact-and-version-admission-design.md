@@ -6,17 +6,18 @@
 
 This design fixes the minimum shared representations needed by [015](./015-intlify-project-profile-and-locale-policy-design.md)'s configuration/locale foundation, its initial [026](./026-intlify-conformance-and-measurement-design.md) measurement path, and [016](./016-intlify-source-authoring-and-intent-identity-design.md)'s source-authoring and persistent-identity implementation.
 
-There are three independently adopted uses:
+There are four independently adopted uses:
 
 - **Configuration:** encode an exact Policy or Target Profile reference so `intlify_config` can generate and validate the complete `intlify.config.json` schema without test-only reference placeholders.
 - **Measurement:** retain an owner result, identify and validate common records, and follow exact references from a planned run through observations and evaluations to a structured report.
 - **Source authoring:** encode an owner-qualified Intent ID, a reproducible semantic revision, source/declaration/reference facts, and exact-base registry updates. This supplies 016's Phase 1–3 foundation and a minimal Intent/reference handoff, not the complete downstream artifact system.
+- **Web localization:** encode the message, policy, supply, governance, planning, target, and Release artifacts that [020](./020-intlify-requirement-planning-and-linking-design.md) through [025](./025-intlify-release-assembly-and-deployment-design.md) require for 016 Phase 4–5 and the [028](./028-intlify-javascript-web-vertical-slice-design.md) Web integration. This supplies their minimum shared representations, not their semantics, authority, or host workflows.
 
-The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. The authoring path encodes 016's facts and identity decisions; it does not prove source approval, authorize registry publication, or establish executable target compatibility. Those decisions remain with the owning specifications.
+The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. The authoring path encodes 016's facts and identity decisions; it does not prove source approval, authorize registry publication, or establish executable target compatibility. Those decisions remain with the owning specifications. The Web localization path encodes what those owners decided; it does not select, approve, publish, activate, or execute anything.
 
 This revision specifies only these explicitly scoped shared subsets. It does not complete every artifact family assigned to 017 by [000](./000-intlify-overview-design.md), nor does adopting it establish complete 015 Profile Specification revision-`"0"` support.
 
-The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice. The additive 016 scope has its own artifact-kind/schema tuples; it changes neither the existing configuration references nor the four measurement record schemas or their digests.
+The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice. The additive 016 scope has its own artifact-kind/schema tuples; it changes neither the existing configuration references nor the four measurement record schemas or their digests. The additive Web localization scope below likewise adds tuples without changing existing ones. It adds semantic body admission for four Policy kinds and the Target Profile kind, which the existing structural configuration admission never performed.
 
 ## Goals
 
@@ -27,13 +28,15 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 - Allow the initial 015 implementation to use these definitions without implementing Intent artifacts, a public checked-profile format, deployment artifacts, or a general migration system.
 - Fix only the authoring representations needed to implement and test 016's adopted rules without path/text-derived persistent IDs or implementation-defined revision hashes.
 - Retain exact source, input, base, decision, and result bindings while keeping decoding, semantic validation, and publication authorization separate.
+- Fix the minimum message, policy, supply, governance, planning, target, and Release representations required by 020–025 for 028, with exact identities, canonical orders, and non-circular references.
+- Keep message content identity, complete artifact identity, file-byte integrity, and record instance identity distinct.
 
 ## Non-Goals
 
-- Defining Policy bodies, Target Profile bodies, artifact acquisition, bootstrap trust, signatures, or authorization.
+- Defining Trust Policy, Resource Limit Policy, or Glossary Set bodies, artifact acquisition, bootstrap trust, signatures, or authorization.
 - Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, Finding/Evidence model, or canonicalization-data artifacts.
 - Redefining 016's recognition, semantic-revision, identity-continuity, or automatic-update rules.
-- Completing `SourceLocaleMessageArtifact`, localized message artifacts, `LibraryManifest`, Store records, Release artifacts, target output, or Runtime ABI.
+- Completing `LibraryManifest`, cross-owner references, Locale Capsules, Runtime Manifests, multi-unit or hydration-coupled target output, remote publication records, or Runtime ABI.
 - Defining a general authoring-result/diagnostic protocol, project graph, module acquisition, host lowering, or registry update commands.
 - Replacing 026's measurement semantics, owner benchmark schemas, logical work, checksum algorithms, or component interval definitions.
 - Adding comparison, budget, runner-qualification, profiling, cross-target, or Release capabilities to the initial observational measurement scope.
@@ -48,6 +51,8 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 | 017 | Shared reference JSON, verification and authoring representations, identity domains, canonical framing, integrity coverage, and exact-version selection |
 | 018 | Artifact authentication, provenance, trust, and authorized evidence use; an integrity digest never supplies these decisions |
 | 019 | Complete project queries, shared diagnostic reporting, dependency storage, and incremental orchestration; the minimum authoring inventory below is not a project graph |
+| 020/021/022 | Planning, Store/governance, and supply semantics; 017 encodes their minimum records without deciding demand, eligibility, or selection |
+| 023/024/025 | Execution profile, target capability/output, and Release/publication semantics; 017 encodes their minimum bodies, descriptors, payloads, and records |
 | 026 | Verification and measurement body semantics, common reasons, expected-input resolution, case dimensions, samples, environment, projection admission, and report meaning |
 | Owner measurement implementation | The closed native result schema, native identity/checksum, fixture expectations, Measurement Profile, and exact versioned projection into 026 |
 | 029 | Discovery, acquisition, publication, packaging, and user-facing workflow; none is performed by a shared decoder |
@@ -67,6 +72,10 @@ The implementation may colocate small reusable types with their first consumer. 
 | Admission registry | A finite implementation-supplied mapping of exact supported schema/specification tuples to local validators and codecs; it is not a network registry |
 | Owner-qualified Intent ID | The complete application/library owner and opaque owner-local value identifying one message lineage; distinct from artifact integrity and a target-local Message Handle |
 | Authoring artifact reference | Exact kind, schema, authoring specification, and complete-content digest for one immutable authoring artifact; not a configuration Policy reference or verification-record identity |
+| Localization artifact reference | Exact kind, schema revision, governing specification, and complete-content integrity digest for one immutable Web localization artifact; not an authoring artifact reference or a configuration Policy reference |
+| `ContentDigest` / `ArtifactDigest` | Identity of one message's canonical content projection versus the integrity identity of its complete immutable artifact envelope; neither is an Intent revision |
+| Logical address | Deployment-relative safe path of one generated file inside a target output set or destination; it locates bytes and carries no semantic identity |
+| File digest | Domain-less SHA-256 of exact file bytes; distinct from canonical record integrity |
 
 ## Design Overview
 
@@ -77,6 +86,8 @@ The implementation may colocate small reusable types with their first consumer. 
 | Common verification record | Decode, select the exact schema, verify integrity, and resolve typed references | 026 case, sample, run, projection, and report validation |
 | Declaration and reference facts | Encode the Intent projection, stable ID, and source/evaluation evidence | 016 semantic validation; later planning and lowering retain their own checks |
 | Registry snapshot and update plan | Bind exact base, inventory, decisions, and immutable result | 016 association checks, 018 authorization, and 029 atomic publication |
+| Message, plan, Store, and supply records | Encode exact message content and artifacts, plans, Store membership and transitions, and acquisition provenance | 020/021/022 admission, eligibility, selection, and publication |
+| Target and Release records | Encode Target Profile bodies, binding tables, locale payloads, output descriptors, Release snapshots, publication records, and admission evidence | 024 generation and validation, 025 publication/activation, 027 execution admission |
 
 017 does not add an executable compiler phase. Its representations are adopted by the relevant 015/016 operations and by measurement alongside each active measured boundary.
 
@@ -170,11 +181,11 @@ The generated Draft 7 configuration schema must contain closed reusable definiti
 
 The reference representation used by configuration `schemaVersion: "0"` is fixed by that configuration schema's admitted authority. References do not add a second author-controlled `schemaVersion` or `$schema` member. The `$schema` editor hint never loads or selects an artifact validator.
 
-Structural success does not establish supported Policy/Target semantics, artifact availability, body integrity, trust, or a checked profile. The minimum private locale core can retain these structurally admitted references without resolving their bodies, but cannot expose that result as a complete `LocalizationProjectProfile`.
+Structural success does not establish supported Policy/Target semantics, artifact availability, body integrity, trust, or a checked profile. The minimum private locale core can retain these structurally admitted references without resolving their bodies, but cannot expose that result as a complete `LocalizationProjectProfile`. The [Minimum Web Localization Representation](#minimum-web-localization-representation) below adds body schemas and semantic-digest computation for the four Policy kinds and the Target Profile kind that 028 consumes; structural admission of the reference itself is unchanged.
 
 ## Minimum Intent Authoring Representation
 
-This additive subset encodes 016's logical rules. It is intentionally limited to declaration semantics, local finite references, source evidence, and persistent registry history. It does not complete 016 Phases 4–5, admit every host/import form, or mark 016 decisions still recorded as `Proposed` as accepted.
+This additive subset encodes 016's logical rules. It is intentionally limited to declaration semantics, local finite references, source evidence, and persistent registry history. It does not by itself complete 016 Phases 4–5, whose representations are added under [Minimum Web Localization Representation](#minimum-web-localization-representation), or admit every host/import form.
 
 The notation below defines closed JSON objects, not Rust structs or public authoring APIs. Every shown member is required unless marked `?`; arrays are present even when empty. `Text` is a Unicode-scalar string, `NonemptyText` excludes the empty string, and counts, indexes, and byte positions use the existing `UInt64` string representation. All sizes, recursion, collection counts, and reference-resolution work are subject to explicit caller-supplied finite limits. Unknown members/variants are not extension points.
 
@@ -219,7 +230,7 @@ The new kind/schema/specification tuples are exactly:
 
 All five initially use schema revision `"0"` and authoring specification `intlify-design-016` revision `"0"`, denoting the adopted 016 rule set. A kind selects the complete body schema; there is no arbitrary `B` at runtime. Existing readers without these tuples report unsupported input. Adding them does not extend a measurement-kind enum or reinterpret a verification record as an authoring artifact.
 
-Artifact integrity is `H("authoring-artifact-integrity", artifact-with-only-top-level-integrityDigest-omitted)`, using the existing framing below. The complete kind, schema, specification, and body are covered. Only that top-level member is excluded; a missing or `null` stored digest is invalid. An artifact reference compares all its fields and must resolve to exactly that admitted artifact. Reference ordering is kind, schema revision, authoring-specification identity/revision, then digest, using unsigned UTF-8 bytes. Equal digests do not merge distinct Intent IDs, and different source evidence may produce different artifact digests for the same Intent ID/revision. This digest is not the source/localized-message `ArtifactDigest` consumed by Store selection or Release binding in 000; that later artifact family remains deferred.
+Artifact integrity is `H("authoring-artifact-integrity", artifact-with-only-top-level-integrityDigest-omitted)`, using the existing framing below. The complete kind, schema, specification, and body are covered. Only that top-level member is excluded; a missing or `null` stored digest is invalid. An artifact reference compares all its fields and must resolve to exactly that admitted artifact. Reference ordering is kind, schema revision, authoring-specification identity/revision, then digest, using unsigned UTF-8 bytes. Equal digests do not merge distinct Intent IDs, and different source evidence may produce different artifact digests for the same Intent ID/revision. This digest is not the source/localized-message `ArtifactDigest` consumed by Store selection or Release binding in 000; that family is defined under [Message content and message artifacts](#message-content-and-message-artifacts).
 
 ### Semantic projection and IntentRevision
 
@@ -364,9 +375,9 @@ The inventory reference must resolve to `authoring-inventory`. A message Intent'
 
 The projection, original extracted MF2, locale, class, input pins, and minimum source evidence are supplied through the retained inventory. These are exact logical source definitions, not a registry of translations. A consumer must retain or be explicitly supplied the referenced inventory and source/context inputs; an unavailable dependency is not a self-contained checked message. A context-only semantic change can change the Intent revision while leaving the registry association unchanged.
 
-A reference artifact selects one `ReferenceFacts` in that inventory. `targets` is the exact same finite declaration set after identity resolution, ordered by the complete Intent ID; each target resolves to a matching `message-intent` artifact, with no duplicate IDs or competing revisions for one ID. The referenced inventory retains parameter names, expressions, and evaluation order. Multiple uses of one declaration share its ID; equal text in separate declarations does not. This representation does not accept an unimplemented conditional form merely because its target array is finite; 016's applicable authoring rules and still-proposed choices remain explicit.
+A reference artifact selects one `ReferenceFacts` in that inventory. `targets` is the exact same finite declaration set after identity resolution, ordered by the complete Intent ID; each target resolves to a matching `message-intent` artifact, with no duplicate IDs or competing revisions for one ID. The referenced inventory retains parameter names, expressions, and evaluation order. Multiple uses of one declaration share its ID; equal text in separate declarations does not. This representation does not accept an unimplemented conditional form merely because its target array is finite; 016's applicable authoring rules and deferred forms remain explicit.
 
-These initial artifacts support a source-analysis/identity handoff, not final reachability, delivery placement, source approval, or generated execution. Source-locale MF2 can be read deterministically from the Intent's declaration facts without a Provider. Encoding a complete `SourceLocaleMessageArtifact` with its distinct content/artifact identities, execution requirements, and source-admission provenance is deferred to the adopting Phase 4–5 work; neither the inventory nor its digest substitutes for that artifact.
+These initial artifacts support a source-analysis/identity handoff, not final reachability, delivery placement, source approval, or generated execution. Source-locale MF2 can be read deterministically from the Intent's declaration facts without a Provider. A complete source-locale message artifact with its distinct content/artifact identities, execution facts, and derivation references is defined under [Message content and message artifacts](#message-content-and-message-artifacts); neither the inventory nor its digest substitutes for that artifact.
 
 ### Registry snapshots and update plans
 
@@ -465,6 +476,502 @@ The adopting implementation must materialize closed Draft 7 schemas for the five
 | Storage and failure | Exact/first-over bounds, indexed lookup, failure/cancellation followed by workspace reuse, no borrowed resettable storage in retained artifacts, deterministic ordering, and no mutation from ordinary compilation |
 
 Schema round trips alone do not prove these semantics. JSON examples with invented digest pins may test shape only; integrity/replay fixtures must use actual retained inputs and independently computed expectations. Source/revision comparison fixtures must not use a formatter's output or parser debug dump as the expected canonical representation.
+
+## Minimum Web Localization Representation
+
+This additive subset encodes the artifacts that [020](./020-intlify-requirement-planning-and-linking-design.md) through [025](./025-intlify-release-assembly-and-deployment-design.md) require for 016 Phase 4–5 and the [028](./028-intlify-javascript-web-vertical-slice-design.md) Web integration. It is limited to one local application, one Selection Scope and Store lineage, direct-required coverage, hydration-free Web targets, and the 023 minimum text-interpolation profile. It does not encode cross-owner or library references, Locale Capsules, Runtime Manifests, multi-unit delivery, hydration relations, remote publication, or portable diagnostics.
+
+The notation follows the authoring subset: closed JSON objects, required members unless marked `?`, arrays present even when empty, `Text`/`NonemptyText`, and `UInt64` strings for every quantity. All collections are subject to explicit caller-supplied finite limits. `MessageIntentId`, `Occurrence`, `AuthoringArtifactReference`, `ExactInputBinding`, `OwnerIdentity`, and `Opaque128` are the authoring definitions above; `RecordIdentity` is defined under Record and run identities. Unknown members and variants are not extension points.
+
+### Envelope and references
+
+```text
+LocalizationArtifact<K, B> {
+  kind: K
+  schemaRevision: "0"
+  specification: VersionedIdentity
+  body: B
+  integrityDigest: IntegrityDigest
+}
+LocalizationArtifactReference {
+  kind: registered localization artifact kind
+  schemaRevision: RevisionToken
+  specification: VersionedIdentity
+  integrityDigest: IntegrityDigest
+}
+SelectionScopeBinding { identity: IdentityToken, profile: ExactInputBinding }
+Actor { principal: IdentityToken, authorityState: RevisionToken }
+```
+
+Integrity is `H("localization-artifact-integrity", artifact-with-only-top-level-integrityDigest-omitted)`. A reference compares all four members and resolves to exactly one admitted artifact; references order by kind, schema revision, specification identity/revision, then digest. Reference arrays are sorted in that order and duplicate-free unless a body specifies another canonical order.
+
+`specification` names the governing design and revision for the body's semantics. `SelectionScopeBinding` carries the checked 015 `selectionScope` together with the exact profile binding that established it; the profile binding is its version. `Actor` retains only the safe principal and authority-state identifiers that 018 permits in retained records; it is never a credential, permit, or confirmation.
+
+The registered kinds are:
+
+| Kind | Governing specification | Closed body |
+| --- | --- | --- |
+| `source-locale-message` | `intlify-design-020` `"0"` | `SourceLocaleMessageBody` |
+| `localized-message` | `intlify-design-021` `"0"` | `LocalizedMessageBody` |
+| `approval-policy`, `selection-policy` | `intlify-design-021` `"0"` | `PolicyArtifactBody` |
+| `source-admission-policy` | `intlify-design-018` `"0"` | `PolicyArtifactBody` |
+| `provider-routing-policy` | `intlify-design-022` `"0"` | `PolicyArtifactBody` |
+| `target-profile` | `intlify-design-024` `"0"` | `TargetProfileArtifactBody` |
+| `acquisition-record` | `intlify-design-022` `"0"` | `AcquisitionRecordBody` |
+| `validation-evidence`, `approval-record`, `rejection-record`, `selection-decision`, `revocation-record` | `intlify-design-021` `"0"` | Governance bodies below |
+| `store-snapshot`, `store-transition` | `intlify-design-021` `"0"` | `StoreSnapshotBody`, `StoreTransitionBody` |
+| `delivery-unit-graph` | `intlify-design-015` `"0"` | `DeliveryUnitGraphBody` |
+| `requirement-plan`, `bundle-plan` | `intlify-design-020` `"0"` | `RequirementPlanBody`, `BundlePlanBody` |
+| `binding-table`, `locale-payload`, `target-descriptor` | `intlify-design-024` `"0"` | Target bodies below |
+| `release-snapshot`, `release-publication-record`, `execution-admission-evidence` | `intlify-design-025` `"0"` | Release bodies below |
+
+Every kind initially uses schema revision `"0"`. A kind selects one complete body schema; a reader without that schema reports unsupported input. Adding these kinds does not extend the authoring or measurement families, and an authoring artifact never becomes a localization artifact by relabeling its `kind`.
+
+### Message content and message artifacts
+
+```text
+MessageContent {
+  mf2Specification: VersionedIdentity
+  mf2Source: Text
+  message: MessageProjection
+  parameters: Text[]
+}
+ExecutionFacts {
+  features: ("declarations" | "selectors" | "functions" | "literal-expressions"
+             | "options" | "attributes" | "markup")[]
+}
+SourceLocaleMessageBody {
+  intentId: MessageIntentId
+  intentRevision: SemanticDigest
+  definitionLocale: NonemptyText
+  content: MessageContent
+  contentDigest: SemanticDigest
+  execution: ExecutionFacts
+  derivation: {
+    intent: AuthoringArtifactReference
+    inventory: AuthoringArtifactReference
+    compiler: VersionedIdentity
+  }
+}
+LocalizedMessageBody {
+  intentId: MessageIntentId
+  intentRevision: SemanticDigest
+  definitionLocale: NonemptyText
+  content: MessageContent
+  contentDigest: SemanticDigest
+  execution: ExecutionFacts
+  source: LocalizationArtifactReference
+  provenance: LocalizationArtifactReference
+}
+```
+
+`ContentDigest` is `H("message-content-digest", { contentSpecification: { identity: "intlify-message-content", revision: "0" }, mf2Specification, message, parameters })`. It covers the parser-backed `MessageProjection` reconstructed from `mf2Source` under 012 and the sorted duplicate-free external names, not the source spelling, locale, Intent, usage, or description. Two candidates with different `mf2Source` spelling but equal projections share a `ContentDigest`; the exact `mf2Source` is nevertheless retained because execution artifacts ship it.
+
+`ArtifactDigest` is the artifact's `integrityDigest`. A `MessageArtifactReference` is a `LocalizationArtifactReference` whose kind is `source-locale-message` or `localized-message`; Store selection, Bundle Plans, and Releases name this reference. Equal `ContentDigest` values under different Intent revisions, definition locales, sources, or provenance yield different artifacts and transfer no approval.
+
+`execution.features` is the sorted duplicate-free set of MF2 features present in the projection beyond decoded literal text and unannotated external variables. An empty set is the 023 minimum text-interpolation profile. Admission reparses `mf2Source`, reconstructs the projection, recomputes `contentDigest` and `execution`, and rejects mismatches; it never trusts the stored values.
+
+A source artifact's `definitionLocale` equals the canonical source locale retained in its derivation inventory, and its projection must equal the `message` of the referenced `message-intent` projection under the same `mf2Specification`. A localized artifact's `definitionLocale` differs from its source's locale, its `source` resolves to the source artifact for the same complete Intent ID and revision, and its `provenance` resolves to an `acquisition-record` whose request names that source and revision. The initial 021 validator additionally requires equal `parameters` and an empty `execution.features` on both sides.
+
+### Policy and Target Profile bodies
+
+```text
+PolicyArtifactBody<C> { identity: IdentityToken, revision: RevisionToken, content: C }
+ApprovalPolicyContent { localizedApproval: "required" | "not-required" }
+SelectionPolicyContent { mode: "explicit" }
+SourceAdmissionPolicyContent { sourceApproval: "required" | "authenticated-sufficient" }
+ProviderRoutingPolicyContent {
+  adapter: VersionedIdentity
+  configuration: { identity: IdentityToken, semanticDigest: SemanticDigest }
+}
+TargetProfileArtifactBody {
+  identity: IdentityToken
+  revision: RevisionToken
+  content: {
+    host: { kind: "javascript-esm-dom-text", grammar: VersionedIdentity, moduleProfile: VersionedIdentity }
+    mode: "runtime-backed" | "aot"
+    adapter: VersionedIdentity
+    execution: { specification: VersionedIdentity, profile: VersionedIdentity }
+    mf2Specification: VersionedIdentity
+    codecs: {
+      bindingTable: VersionedIdentity, localePayload: VersionedIdentity,
+      descriptor: VersionedIdentity, sourceMap: VersionedIdentity
+    }
+    locale: {
+      selection: "direct-only"
+      services: "absent"
+      directions: { locale: NonemptyText, direction: "LTR" | "RTL" | "unknown" }[]
+    }
+    delivery: { unit: "main", loading: "eager" }
+    limits: {
+      maxMessages: PositiveUInt64, maxUses: PositiveUInt64, maxLocales: PositiveUInt64,
+      maxFiles: PositiveUInt64, maxFileBytes: PositiveUInt64, maxOutputBytes: PositiveUInt64,
+      maxParameterBytes: PositiveUInt64, maxTextBytes: PositiveUInt64
+    }
+  }
+}
+```
+
+A configuration `PolicyReference` or `TargetProfileReference` resolves to one of these artifacts when the kinds are equal, `identity` and `revision` equal the body's, `specificationRevision` equals the artifact's `specification.revision`, and `semanticDigest` equals `H("policy-semantic-digest", { kind, specificationRevision, content })` or `H("target-profile-semantic-digest", { kind: "target-profile", specificationRevision, content })`. The semantic digest excludes `identity` and `revision`, so it pins content rather than naming. Resolution is a 015 semantic step; the existing structural admission of the reference is unchanged.
+
+The four Policy contents carry only the closed minimum behavior that 021, 018, and 022 define; they add no expression language. `resource-limit-policy`, `trust-policy`, and `glossary-set` bodies remain undefined by this subset: their references stay structurally admitted pins, the 018 authority context and 015 bounds supply the corresponding constraints, and 028 requires `glossarySet` to be `null`.
+
+The Target Profile content pins the dimensions that 024 fixes for the minimum Web text profile. `execution.specification` is `intlify-design-023` `"0"` and `execution.profile` is `intlify-text-interpolation-minimum` `"0"` in this revision; `codecs.sourceMap` is `ecma-426-source-map` `"3"`. `directions` is sorted by locale, duplicate-free, and must cover every requested locale of each 015 target entry that references the profile; direction is a message-context input, not a text-based inference. Supported requested locales, effective defaults, and group membership remain 015 target-entry facts and are not repeated in the body.
+
+### Supply records
+
+```text
+AcquisitionRecordBody {
+  attempt: RecordIdentity
+  correlation: UInt64
+  owner: OwnerIdentity
+  selectionScope: SelectionScopeBinding
+  plan: LocalizationArtifactReference
+  storeBase: LocalizationArtifactReference
+  routing: PolicyReference
+  request: {
+    intentId: MessageIntentId
+    intentRevision: SemanticDigest
+    sourceLocale: NonemptyText
+    requestedLocale: NonemptyText
+    source: LocalizationArtifactReference
+    context: { description?: NonemptyText }
+    responseProfile: VersionedIdentity
+  }
+  reasons: ("missing" | "stale" | "refresh")[]
+  outcome:
+    { kind: "candidate", mf2Source: Text, responseDigest: FileDigest }
+    | { kind: "failure", reason: NonemptyText }
+}
+```
+
+`attempt` uses domain `intlify-acquisition-attempt-v0` with the 32-byte random rule; `correlation` is the request ordinal within that attempt, so `(attempt, correlation)` is unique and a response from another attempt cannot satisfy a request. `plan` names the `requirement-plan`, `storeBase` the pinned `store-snapshot`, and `routing` the `provider-routing-policy` reference actually used. `request.context` carries only the disclosed description; occurrences, placements, parameter values, and Store history are never members. `reasons` is sorted and duplicate-free. `responseDigest` is the file digest of the exact response bytes observed. A record never references the localized artifact or snapshot produced from it.
+
+### Governance records and Store snapshots
+
+```text
+ReviewKey { selectionScope: SelectionScopeBinding, subject: LocalizationArtifactReference, policy: PolicyReference }
+SelectionKey {
+  selectionScope: SelectionScopeBinding
+  intentId: MessageIntentId
+  intentRevision: SemanticDigest
+  definitionLocale: NonemptyText
+}
+PriorHead = { kind: "absent" } | { kind: "record", reference: LocalizationArtifactReference }
+ValidationEvidenceBody {
+  subject: LocalizationArtifactReference
+  source: LocalizationArtifactReference
+  provenance: LocalizationArtifactReference
+  validator: VersionedIdentity
+  mf2Specification: VersionedIdentity
+  checks: { name: Text, outcome: "passed" }[]
+}
+ReviewRecordBody {
+  key: ReviewKey
+  expectedPrior: PriorHead
+  support?: LocalizationArtifactReference
+  actor: Actor
+  reason?: NonemptyText
+}
+SelectionDecisionBody {
+  key: SelectionKey
+  selected: LocalizationArtifactReference
+  expectedPrior: PriorHead
+  policies: { approval: PolicyReference, selection: PolicyReference }
+  support: {
+    validation: LocalizationArtifactReference
+    review?: LocalizationArtifactReference
+    provenance: LocalizationArtifactReference
+  }
+  actor: Actor
+}
+RevocationRecordBody {
+  selectionScope: SelectionScopeBinding
+  target: LocalizationArtifactReference
+  actor: Actor
+  reason: NonemptyText
+}
+StoreSnapshotBody {
+  owner: OwnerIdentity
+  selectionScope: SelectionScopeBinding
+  storeIdentity: Opaque128
+  parent?: LocalizationArtifactReference
+  transition?: LocalizationArtifactReference
+  artifacts: LocalizationArtifactReference[]
+  evidence: LocalizationArtifactReference[]
+  reviewHeads: { key: ReviewKey, head: LocalizationArtifactReference }[]
+  selectionHeads: { key: SelectionKey, head: LocalizationArtifactReference }[]
+}
+StoreTransitionBody {
+  base: LocalizationArtifactReference
+  class: "candidate-publication" | "review" | "selection" | "revocation"
+  additions: LocalizationArtifactReference[]
+  expectedHeads: (
+    { kind: "review", key: ReviewKey, prior: PriorHead }
+    | { kind: "selection", key: SelectionKey, prior: PriorHead }
+  )[]
+  invalidations: { key: SelectionKey, head: LocalizationArtifactReference, cause: LocalizationArtifactReference }[]
+}
+```
+
+`ReviewKey.subject` may name a `source-locale-message` or `localized-message`; `ReviewKey.policy` names the `approval-policy` reference. A review record's kind carries its verdict: `approval-record` or `rejection-record`. `support` is required for a localized subject and names its `validation-evidence`; a source subject has none. `ValidationEvidenceBody.checks` uses the closed check names registered by the 021 validator profile, and only complete `passed` evidence is admitted; a failed check produces diagnostics, not a record.
+
+A `selection-decision` selects a `localized-message` only. Its `support.validation` names evidence for exactly that artifact, `support.provenance` equals the artifact's own provenance, and `support.review` is required when the approval policy content is `required` and must be an `approval-record` for the same subject and policy. `RevocationRecordBody.target` names a message artifact or one of the evidence kinds; revoking a revocation is invalid.
+
+A genesis `store-snapshot` omits `parent` and `transition`, has empty membership and heads, and fixes `storeIdentity` from 16 fresh random bytes in the Store lineage role; every later snapshot in the lineage repeats it. A non-genesis snapshot names its exact parent and the `store-transition` applied to it. `artifacts` contains localized artifacts only; source artifacts are referenced by evidence but never members. `artifacts` and `evidence` are sorted reference arrays; head arrays are sorted by key. Membership is append-only: every parent member and head record remains reachable, and heads change only through the transition's `expectedHeads` and `invalidations`.
+
+A reader replays the transition over the parent and compares the complete resulting snapshot: additions become members, each `expectedHeads` entry matches the parent head exactly, review and selection heads move to the added record for their key, and every `invalidations` entry removes a selection head whose `cause` is an added rejection or revocation record or a superseding review that its support relied on. A revoked artifact or evidence record stays in membership. Head arrays are derived state and cannot introduce a head that no transition established. Store publication provenance is host-private under 029's persistence rules and is not a shared kind.
+
+### Planning and topology records
+
+```text
+DeliveryUnitGraphBody {
+  specification: VersionedIdentity
+  identity: IdentityToken
+  revision: RevisionToken
+  targets: IdentityToken[]
+  units: { id: IdentityToken[] }[]
+  edges: { from: UInt64, to: UInt64 }[]
+  bindings: { reference: AuthoringArtifactReference, unit: UInt64 }[]
+}
+TargetEntry {
+  targetId: IdentityToken
+  profile: TargetProfileReference
+  requestedLocales: NonemptyText[]
+  effectiveDefault: NonemptyText
+}
+RequirementKey { intentId: MessageIntentId, intentRevision: SemanticDigest, requestedLocale: NonemptyText }
+RequirementPlanBody {
+  owner: OwnerIdentity
+  profile: ExactInputBinding
+  selectionScope: SelectionScopeBinding
+  group: IdentityToken
+  targets: TargetEntry[]
+  source: {
+    inventory: AuthoringArtifactReference
+    intents: AuthoringArtifactReference[]
+    references: AuthoringArtifactReference[]
+  }
+  topology: LocalizationArtifactReference[]
+  requirements: {
+    key: RequirementKey
+    sourceLocale: NonemptyText
+    sourceEqual: boolean
+    surfaceClass: NonemptyText
+    coverage: "direct-required"
+    sourceBasis: { intent: AuthoringArtifactReference, compiler: VersionedIdentity }
+    applicability: { reference: AuthoringArtifactReference, targetId: IdentityToken, unit: IdentityToken[] }[]
+  }[]
+  operation: VersionedIdentity
+}
+SelectionSupport =
+  { kind: "source", admission: { kind: "authenticated" } | { kind: "approved", record: LocalizationArtifactReference } }
+  | {
+      kind: "localized"
+      decision: LocalizationArtifactReference
+      validation: LocalizationArtifactReference
+      review?: LocalizationArtifactReference
+    }
+BundlePlanBody {
+  plan: LocalizationArtifactReference
+  store: LocalizationArtifactReference
+  policies: { sourceAdmission: PolicyReference, approval: PolicyReference, selection: PolicyReference }
+  selections: {
+    key: RequirementKey
+    definitionLocale: NonemptyText
+    artifact: LocalizationArtifactReference
+    support: SelectionSupport
+  }[]
+  placements: { key: RequirementKey, targetId: IdentityToken, unit: IdentityToken[] }[]
+  operation: VersionedIdentity
+}
+```
+
+The graph body encodes the 015 Delivery Unit Graph artifact for revision `"0"`; its `specification` is `intlify-delivery-graph` `"0"`, and its 015 semantic digest is the artifact integrity digest because the body has no non-semantic members. `units` are sorted by their token sequences, `edges` and `bindings` refer to unit ordinals, and the minimum admits exactly one unit `["main"]` with no edges. `targets` is the sorted applicability set that 020 checks as an exact partition of the selected group.
+
+`RequirementPlanBody` is Store-independent: it names no Store snapshot, selection, or approval. `targets` is sorted by Target ID, `topology` by reference order, and `requirements` by key, where keys order by complete Intent ID, revision, then requested locale by unsigned UTF-8 bytes. `applicability` is sorted by reference, Target ID, then unit and is never empty. `sourceEqual` is true exactly when `key.requestedLocale` equals `sourceLocale`. `operation` names the 020 planning operation revision.
+
+`BundlePlanBody` names its exact `requirement-plan` and pinned `store-snapshot`. `selections` contains one entry per plan requirement in the same order; `definitionLocale` equals `key.requestedLocale` in the direct-only profile. A `source` selection names a `source-locale-message` and records how source admission was satisfied; a `localized` selection names a `localized-message` that is the `selected` artifact of the referenced `selection-decision`, which must be the selection head for that key in the pinned snapshot. `placements` is sorted by key, Target ID, then unit, and equals the plan's applicability projected onto targets and units. A plan with a missing, blocked, or ineligible requirement is not encoded as a `bundle-plan`.
+
+### Target output representations
+
+```text
+LogicalAddress = segments joined by "/", each matching ^[a-z0-9][a-z0-9._-]{0,254}$ and not "." or "..",
+                 at most 64 segments and 4096 bytes, with no leading "/" and no empty segment
+FileDigest = "sha256:" followed by 64 lowercase hexadecimal digits of SHA-256 over the exact file bytes
+FileRole = "application" | "binding" | "locale-payload" | "message-functions"
+         | "formatting-dependency" | "loader" | "source-map" | "evidence"
+BindingTableBody {
+  targetId: IdentityToken
+  profile: TargetProfileReference
+  unit: IdentityToken[]
+  basis: { bundle: LocalizationArtifactReference, specification: VersionedIdentity }
+  messages: { slot: UInt64, intentId: MessageIntentId, intentRevision: SemanticDigest, parameters: Text[] }[]
+  uses: {
+    slot: UInt64
+    message: UInt64
+    reference: AuthoringArtifactReference
+    occurrence: Occurrence
+    parameterOrder: Text[]
+  }[]
+  selections: {
+    locale: NonemptyText
+    message: UInt64
+    artifact: LocalizationArtifactReference
+    definitionLocale: NonemptyText
+    entry: UInt64
+  }[]
+}
+LocalePayloadBody {
+  targetId: IdentityToken
+  profile: TargetProfileReference
+  unit: IdentityToken[]
+  requestedLocale: NonemptyText
+  bindingTable: LocalizationArtifactReference
+  execution: { specification: VersionedIdentity, profile: VersionedIdentity }
+  mf2Specification: VersionedIdentity
+  services: "absent"
+  records: {
+    entry: UInt64
+    message: UInt64
+    intentId: MessageIntentId
+    intentRevision: SemanticDigest
+    artifact: LocalizationArtifactReference
+    definitionLocale: NonemptyText
+    direction: "LTR" | "RTL" | "unknown"
+    mf2Source: Text
+    contentDigest: SemanticDigest
+    parameters: Text[]
+  }[]
+}
+TargetDescriptorBody {
+  targetId: IdentityToken
+  profile: TargetProfileReference
+  mode: "runtime-backed" | "aot"
+  adapter: VersionedIdentity
+  basis: {
+    bundle: LocalizationArtifactReference
+    bindingTable: LocalizationArtifactReference
+    emitter: VersionedIdentity
+  }
+  locales: NonemptyText[]
+  files: {
+    address: LogicalAddress
+    role: FileRole
+    format: VersionedIdentity
+    mediaType: Text
+    byteLength: UInt64
+    digest: FileDigest
+    locale?: NonemptyText
+    execution: boolean
+  }[]
+  dependencies: { from: LogicalAddress, to: LogicalAddress }[]
+  evidence: LocalizationArtifactReference[]
+}
+```
+
+Message slots are dense zero-based ordinals assigned by complete Intent ID then revision; use slots by reference then occurrence; `parameters` are canonical sorted names while `parameterOrder` retains the host property order for that use. `selections` is sorted by locale then message slot and covers every supported locale × message slot exactly once; `entry` is the ordinal of the matching `locale-payload` record. `messages` and `uses` may be empty only together.
+
+A `locale-payload` is the runtime-backed data for one requested locale and unit. Its `records` are sorted by `entry`, which equals the message slot in this revision, and each retains the exact selected `mf2Source`, its `contentDigest`, and the direction supplied for its definition locale. The payload file's bytes are the canonical JSON text of the complete artifact, so its `FileDigest` and `integrityDigest` are both checkable. An AOT target retains the same artifact as verification-only evidence for its generated functions and does not ship it as execution data.
+
+Canonical JSON text revision `"0"` is UTF-8 without a byte-order mark, object members in ascending unsigned UTF-8 key order, no whitespace outside strings, every quantity as its `UInt64` string, arrays in canonical order, and string escapes limited to `\"`, `\\`, and lowercase `\uXXXX` for U+0000–U+001F; all other scalars are literal, and the text ends without a line terminator. It is the file codec for JSON artifacts written into output sets and destinations; canonical value framing remains the digest preimage for records.
+
+A `target-descriptor` freezes one complete output set. `files` is sorted by address with unique addresses; `execution` marks files in the eager execution closure, and `dependencies` is a sorted acyclic relation over listed addresses whose endpoints are all execution files. Every role required by 024 for the mode is present, every `locale` in `locales` has its payload or function file, and `evidence` names the `binding-table` and every `locale-payload` artifact. The descriptor references no Release, destination, or publication record. File digests are domain-less byte digests and are never compared with record integrity digests.
+
+### Release representations
+
+```text
+ReleaseSnapshotBody {
+  basis: {
+    owner: OwnerIdentity
+    profile: ExactInputBinding
+    selectionScope: SelectionScopeBinding
+    group: IdentityToken
+    requirementPlan: LocalizationArtifactReference
+    bundle: LocalizationArtifactReference
+    store: LocalizationArtifactReference
+    sources: LocalizationArtifactReference[]
+    specifications: { mf2: VersionedIdentity, execution: VersionedIdentity, assembly: VersionedIdentity }
+    assembler: VersionedIdentity
+  }
+  members: {
+    targetId: IdentityToken
+    profile: TargetProfileReference
+    mode: "runtime-backed" | "aot"
+    adapter: VersionedIdentity
+    descriptor: LocalizationArtifactReference
+    bindingTable: LocalizationArtifactReference
+    payloads: { locale: NonemptyText, address: LogicalAddress, digest: FileDigest }[]
+  }[]
+  selections: {
+    key: RequirementKey
+    definitionLocale: NonemptyText
+    artifact: LocalizationArtifactReference
+    support: SelectionSupport
+  }[]
+  hydrationRelations: { server: IdentityToken, client: IdentityToken }[]
+}
+ReleasePublicationRecordBody {
+  record: RecordIdentity
+  release: LocalizationArtifactReference
+  destination: IdentityToken
+  view: { store: LocalizationArtifactReference, storeIdentity: Opaque128, evaluation: VersionedIdentity }
+  policy: VersionedIdentity
+  publisher: Actor
+  evidence: { targetId: IdentityToken, validator: VersionedIdentity, outcome: "valid" }[]
+  repository: { manifest: LogicalAddress, digest: FileDigest }
+}
+ExecutionAdmissionEvidenceBody {
+  destination: IdentityToken
+  publication: LocalizationArtifactReference
+  release: LocalizationArtifactReference
+  targetId: IdentityToken
+  mode: "runtime-backed" | "aot"
+  descriptor: LocalizationArtifactReference
+  verified: { address: LogicalAddress, digest: FileDigest }[]
+  verifier: VersionedIdentity
+  outcome: "admitted"
+}
+```
+
+The Release identity is the `release-snapshot` artifact's `integrityDigest`. `members` are sorted by Target ID and cover the selected group exactly; `selections` equals the Bundle Plan's selections; `hydrationRelations` must be empty in this revision. The body contains no destination, view, publisher, timestamp, or publication reference. The manifest exposed at a destination is the canonical JSON text of the complete `release-snapshot` artifact, and `repository.digest` is its file digest.
+
+`record` uses domain `intlify-release-publication-v0` with the 32-byte random rule; a publication is an event, while assembly is a function of its inputs. `view.store` names the `store-snapshot` actually evaluated and `view.evaluation` the 021 evaluation profile. `evidence` lists the 024 set validation results the policy required. `ExecutionAdmissionEvidenceBody` is an in-process checked value in the minimum; its encoding exists for fixtures and retained evidence, not for transport of authority.
+
+### Non-circular construction and file staging
+
+Construct and validate in this order, so that no artifact references one produced after it:
+
+1. `source-locale-message` artifacts from admitted `message-intent` artifacts and their inventory.
+2. `delivery-unit-graph` and `requirement-plan` from the source handoff, profile, and group; no Store input.
+3. `acquisition-record` from the plan, the pinned Store base, the routing policy, and the observed response.
+4. `localized-message` from the source artifact and its acquisition record, then `validation-evidence`, review records, and `selection-decision` records in that order.
+5. `store-transition` from its base and additions, then the resulting `store-snapshot`.
+6. `bundle-plan` from the plan, the pinned snapshot, and the admitted artifacts and evidence.
+7. `binding-table`, then `locale-payload` artifacts, then generated files, then the `target-descriptor` over the final bytes.
+8. `release-snapshot` over the member descriptors, then `release-publication-record`, then `execution-admission-evidence`.
+
+Files in an output set or destination are addressed by `LogicalAddress` and identified by `FileDigest` plus byte length; records are identified by integrity digest over canonical value framing. A JSON artifact written as a file has both identities, and admission may check either against the same bytes. Neither identity is a semantic message identity, and none is authorization.
+
+### Web localization admission and fixtures
+
+The reader follows the common order: bounded strict decoding, exact kind/schema/specification selection, complete closed-body validation, integrity verification, then resolution of the finite artifact collection and the owner's semantic checks. It fetches no file, Store, Provider, or network resource; a caller supplies every referenced artifact and file. Unsupported kinds, mismatched digests, unresolvable references, conflicting content under one reference, and exceeded limits are distinct typed failures; 019 owns their diagnostic projection.
+
+The adopting implementation materializes closed Draft 7 schemas for every kind above and their shared value types, together with independent fixtures:
+
+| Area | Required independent expectations |
+| --- | --- |
+| Envelope and references | Frozen integrity preimages, one excluded member, kind/schema/specification selection, reference equality and order, conflicting content under one digest |
+| Message artifacts | Equal projection with different spelling shares a content digest; changed parameters, locale, revision, source, or provenance change the artifact; reparsed projection and feature mismatch rejected; localized locale equal to source locale rejected |
+| Policy and Target bodies | Semantic digest excludes identity/revision; reference resolution for every defined kind; undefined kinds remain pins; direction coverage and unsupported host/mode/profile values rejected |
+| Supply | Attempt/correlation uniqueness, disclosed context limited to description, response digest of exact bytes, failure outcomes, and no forward reference to artifacts or snapshots |
+| Governance and Store | Genesis and lineage identity, append-only membership, expected-head mismatch, derived heads versus transition, invalidation causes, revocation retention, source subjects without membership, and forged head arrays rejected |
+| Planning | Store-independent plan identity, canonical requirement and applicability order, one-unit graph partition, source-equal flag, bundle selections and placements matching the plan, and head mismatch with the pinned snapshot rejected |
+| Target outputs | Slot assignment order, selection coverage, payload record and entry correspondence, canonical JSON file bytes with matching file and record digests, descriptor roles, dependencies, and unique addresses |
+| Release | Deterministic Release identity, empty hydration relations, member coverage, publication record identity and view, manifest file digest, and admission evidence bound to verified bytes |
+| Non-circularity | Every reference points to an earlier construction step; a forward or self reference fails at decoding |
+
+Schema round trips and encoder-generated expectations do not satisfy these fixtures. Digest, file-byte, and canonical-JSON expectations come from an independent implementation.
 
 ## Verification Record Representation
 
@@ -635,7 +1142,7 @@ These orders refine 026's stage/code/affected/related/detail priority; counts co
 
 Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this encoding. The existing verification-record domains and the explicitly added authoring domains use the same unchanged value framing.
 
-This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's existing Resolver Construction Identity, Snapshot, disclosure, and ResourceBoundValue framing are unchanged. A Policy/Target `semanticDigest` is an opaque exact pin at this minimum boundary; computing it from a body remains deferred with that body's schema and semantic projection.
+This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's existing Resolver Construction Identity, Snapshot, disclosure, and ResourceBoundValue framing are unchanged. A Policy/Target `semanticDigest` is computed from the body only for the four Policy kinds and the Target Profile kind defined under Minimum Web Localization Representation; for the remaining kinds it stays an opaque exact pin whose computation is deferred with that body's schema and semantic projection.
 
 ### Value framing revision `"0"`
 
@@ -695,6 +1202,10 @@ This minimum registers these uses:
 | `measurement-case-identity` | `{ governingSpecification, identitySchemaRevision, projection }`, where the specification is `intlify-design-026` / `"0"`, identity-schema revision is `"0"`, and `projection` contains exactly the 026 Measurement Case semantic dimensions |
 | `authoring-artifact-integrity` | The complete `AuthoringArtifact` with only its top-level `integrityDigest` omitted; no nested member is excluded |
 | `intent-semantic-revision` | `{ projectionSpecification, projection }` with exactly the projection specification and `IntentProjection` defined in Minimum Intent Authoring Representation |
+| `localization-artifact-integrity` | The complete `LocalizationArtifact` with only its top-level `integrityDigest` omitted; the message `ArtifactDigest` and the Release identity are instances of this digest |
+| `message-content-digest` | `{ contentSpecification, mf2Specification, message, parameters }` with exactly the content specification and `MessageContent` projection defined in Minimum Web Localization Representation |
+| `policy-semantic-digest` | `{ kind, specificationRevision, content }` for the four Policy kinds whose bodies are defined there |
+| `target-profile-semantic-digest` | `{ kind, specificationRevision, content }` for the Target Profile body defined there |
 
 A Measurement Case identity is presented as `mc0_` followed by the 64 lowercase hexadecimal digits of the second digest. Its projection is a closed type fixed by the adopted measurement schema. It excludes sample values, creation time, record/run instance identities, branch/path/worker identities, and the implementation revision being compared. Expected semantic observations and native owner case bindings are retained separately rather than substituted for that projection.
 
@@ -724,6 +1235,8 @@ The following version domains remain independent even when their initial value i
 | `governingSpecification.identity` + `.revision` | 026 semantics for the common record |
 | Native owner schema/profile and Measurement Projection revisions | The exact source result and its lossless common mapping |
 | Authoring `kind` + `schemaRevision` + `authoringSpecification` | One complete registered authoring body/codec and the adopted 016 rules; independent of measurement-kind support |
+| Localization `kind` + `schemaRevision` + `specification` | One complete registered Web localization body/codec and its governing 020–025 semantics; independent of authoring and measurement support |
+| Policy/Target Profile body schema + `specificationRevision` | The closed body admitted for one configuration reference kind and the semantic digest it pins |
 | Intent projection and MF2 specification revisions | The exact semantic projection and parser-owned meaning used to compute an Intent revision |
 | Package/tool version | Producer implementation identity, not schema compatibility |
 
@@ -755,6 +1268,8 @@ The [026 Performance Implementation Architecture](./026-intlify-conformance-and-
 - Authoring/registry codecs reuse the small framing primitives without depending on measurement collectors or `intlify_config`'s benchmark implementation. New Intent/registry random values are supplied by the authorized host outside read-only authoring operations.
 - Build bounded indexes for artifact references, source snapshots, occurrences, and registry IDs once per admitted collection. Decode/parse a shared source or projection once where its exact inputs permit reuse; do not resolve every reference by scanning all artifacts or repeatedly walk the entire ancestry for each declaration.
 - Preserve identity distinctions while sharing immutable source/projection storage. Measure projection/revision encoding, artifact integrity, and registry replay separately from file acquisition/publication, under the applicable 016/026 operation definitions. No new numeric performance threshold is introduced here.
+- Decode locale payloads, descriptors, and Store snapshots under explicit byte, count, and depth limits before indexing; hash file bytes in bounded streams and never load a complete output set into one buffer to compute a Release identity.
+- Index Store membership, heads, and revocations once per admitted snapshot; resolve plan, binding, and Release references through those indexes rather than by rescanning artifact collections.
 
 Decoded retained records own their required content or share an explicit immutable owner. No retained reference may borrow resettable scratch, a temporary serializer buffer, a file mapping whose lifetime has ended, or the next invocation's workspace.
 
@@ -775,7 +1290,7 @@ Implementations must materialize machine-readable schemas and fixtures for the a
 | Owner provenance | Native checksum algorithm/framing and complete result retained unchanged; unsupported/lossy owner projection rejected; a rehashed altered result still fails against independent owner/fixture inputs |
 | Integrated measurement | Planned run to retained owner result to common evidence/evaluation to structured report and revalidation, including measured, incomplete, invalid, missing, unsupported, and partial-observation cases required by 026 |
 
-Byte-framing tests must not compute their expected bytes with the same encoder under test. The same rule applies to digest and schema expectations. Owner-only round trips and envelope-only validation are not substitutes for the integrated 026 path.
+Byte-framing tests must not compute their expected bytes with the same encoder under test. The same rule applies to digest and schema expectations. Owner-only round trips and envelope-only validation are not substitutes for the integrated 026 path. The Web localization families add the fixture groups listed under [Web localization admission and fixtures](#web-localization-admission-and-fixtures).
 
 ## Adoption in the 015 Minimum Implementation
 
@@ -798,9 +1313,23 @@ The authoring additions are adopted within 016's existing phases, not a new 017 
 | Phase 1 — Shared authoring semantics | Implement the closed projection and revision encoder with independent equality/change vectors and pinned parser semantics | Explicit finite test-owned context may be used under 016; richer constraints and portable execution semantics are not inferred |
 | Phase 2 — Initial JS/TS Producer | Implement source snapshots, ranges/maps, declaration/reference facts, inventory completeness, and input binding checks | 016 owns recognition/profile decisions and the actual host/parser checks; serializable facts are not proof of generated host behavior |
 | Phase 3 — Persistent identity and reconciliation | Adopt owner/local IDs, the registry/update schemas, exact replay and collision rules, and minimal Intent/reference artifacts against accepted associations | Production use requires the necessary checked 015 inputs, actual supported continuity verifiers, applicable 018 authorization, and 029 host exact-base/atomic publication; test doubles do not satisfy these |
-| Phase 4–5 — Broader handoff and integration | Reuse the established identity/revision/source basis, extending only the missing artifact families with their own exact schema revisions | Cross-owner/library references, 019 graph/diagnostic handoff, complete source-locale artifacts, 020 planning, and 023/024/028 execution/lowering remain separately adopted work |
+| Phase 4–5 — Broader handoff and integration | Adopt the Web localization representations for source-locale artifacts, plans, Store/supply records, target outputs, and Releases | Cross-owner/library references, portable 019 diagnostics, and the 020–025 owner implementations remain separately adopted work |
 
 Thus the minimum lets an implementation parse source, construct reproducible message facts, exercise persistent identity history, and exchange the initial local artifacts without inventing its own ID or revision format. It does not declare all of Phase 3 complete merely because codecs exist. Existing configuration and measurement implementations need not adopt these new kinds until they consume authoring artifacts.
+
+## Adoption in the 028 Web Integration
+
+The Web localization representations are adopted by the 020–025 implementations that 028 integrates, within 016 Phases 4–5, not as a separate 017 sequence.
+
+| Adopting work | Minimum use of this design | Remaining prerequisites |
+| --- | --- | --- |
+| 020 planning and linking | `source-locale-message`, `delivery-unit-graph`, `requirement-plan`, and `bundle-plan` | Actual 019 handoff, host applicability evidence, and 021 reads; plan identities are inputs to 025 |
+| 021 Store and governance | `localized-message`, `validation-evidence`, review, selection, and revocation records, `store-snapshot`, `store-transition`, and the approval/selection policy bodies | 018 governance powers and confirmations, the 021 validator profile, and a 029-style local publication adapter |
+| 022 supply | `acquisition-record` and the provider-routing policy body | 018 disclosure and Provider powers and the registered fixture adapter |
+| 023/024 execution and export | The Target Profile body, `binding-table`, `locale-payload`, `target-descriptor`, canonical JSON text, logical addresses, and file digests | 024 capability admission, lowering, emission, and the ECMA-426 map codec |
+| 025 Release | `release-snapshot`, `release-publication-record`, and `execution-admission-evidence` | 018 publication/activation powers, the local destination and deployment adapters, and 027 admission |
+
+Existing configuration, measurement, and authoring implementations need not adopt these kinds until they consume them. Encoding an artifact establishes its representation and integrity only; demand, eligibility, selection, publication, activation, and execution admission remain owner decisions.
 
 ## Decision Log
 
@@ -817,14 +1346,21 @@ Thus the minimum lets an implementation parse source, construct reproducible mes
 | 017-009 | Bind registry history through inventory → update → result references, preserving exact-base atomic publication and explicit genesis/recovery separation | Avoids self-referential digests, partial updates, stale-base overwrite, and history reset disguised as initialization |
 | 017-010 | Keep semantic revisions derived from current declaration facts, not registry state; permit read-only use of checked continuity evidence | Separates message changes from identity bookkeeping and avoids requiring registry writes for context-only semantic changes |
 | 017-011 | Require complete kind-specific schema and semantic validation with explicit actual inputs; treat basis labels, digest pins, and test contexts as insufficient for production admission | Preserves 015/016/018/019/029 ownership instead of turning successful decoding into a complete or authorized result |
+| 017-012 | Add one additive Web localization artifact family with its own envelope, integrity domain, and closed kind registry | Gives 020–025 exact shared representations without extending authoring or measurement tuples |
+| 017-013 | Derive `ContentDigest` from the parser-backed content projection and use the complete envelope integrity as `ArtifactDigest` | Separates comparison of message content from identity of a specific immutable artifact and its provenance |
+| 017-014 | Define closed bodies and semantic digests for four Policy kinds and the Target Profile kind; leave trust, resource-limit, and glossary bodies as pins | Makes 028's references resolvable without designing a policy language or expanding 015 |
+| 017-015 | Encode Store history as append-only membership with replayable transitions and derived heads | Preserves 021's immutability, expected-head, and invalidation rules without a mutable catalog |
+| 017-016 | Keep plans, binding tables, payloads, descriptors, and Releases as references to immutable artifacts and files, with domain-less file digests and a canonical JSON file codec | Lets output sets and destinations verify exact bytes while records keep framed canonical integrity |
+| 017-017 | Use fresh random instance identities only for acquisition attempts, Store lineage, and publication records | Distinguishes events and lineages from deterministic content identities |
+| 017-018 | Fix an acyclic construction order from source artifacts through admission evidence | Prevents self-referential digests and forward references across the Web path |
 
 ## Deferred Follow-Up Notes
 
 These subjects remain assigned to 017 but are not prerequisites for the scoped configuration, observational measurement, or initial local authoring/identity paths:
 
-- complete source-locale/localized message, cross-owner/library reference, candidate, dependency, library, Store, Release, and target artifact schemas beyond the initial authoring subset;
+- cross-owner/library reference, candidate ranking, dependency, library, Locale Capsule, Runtime Manifest, multi-unit, hydration-coupled, and remote publication schemas beyond the Web localization minimum;
 - full Profile, construction-authority, Snapshot, canonicalization-data, binding, and Finding/Evidence representations;
-- Policy/Target body schemas, semantic digest projections, and their trust/admission integration;
+- Trust Policy, Resource Limit Policy, and Glossary Set bodies, their semantic digest projections, and their trust/admission integration;
 - measurement capabilities not adopted by the minimum, including comparison/budget, qualification, profiling, campaigns, and cross-platform reports;
 - extended semantic-context/constraint projections, general semantic-result identity, alternate physical encodings, transport containers, registry distribution/compaction, and cross-version migrations.
 
@@ -838,5 +1374,11 @@ Any future extension must state its owning semantics and schema-version impact. 
 | [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, and resolver semantics implemented using these encodings |
 | [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns recognition, message/revision meaning, source facts, continuity, and registry-transition validity; this document fixes the minimum shared representations without completing its later integrations |
 | [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication; digest and schema success supply neither |
+| [020 — Requirement planning and linking](./020-intlify-requirement-planning-and-linking-design.md) | Owns demand, reachability, and selection semantics for the plan and bundle records encoded here |
+| [021 — Translation Store and governance](./021-intlify-translation-store-and-governance-design.md) | Owns candidate validity, governance, and Store transition semantics for the message, evidence, and snapshot records encoded here |
+| [022 — Provider and localization sync](./022-intlify-provider-and-localization-sync-design.md) | Owns work derivation, request/response, and provenance semantics for the acquisition record and routing body encoded here |
+| [023 — Localization execution](./023-intlify-localization-execution-specification-design.md), [024 — Target Profile and export](./024-intlify-target-profile-and-export-design.md) | Own execution profile, target capability, and output semantics for the Target Profile body, binding table, payload, and descriptor encoded here |
+| [025 — Release Assembly and deployment](./025-intlify-release-assembly-and-deployment-design.md) | Owns Release, publication, activation, and execution-admission semantics for the snapshot, record, and evidence encoded here |
 | [026 — Conformance and measurement](./026-intlify-conformance-and-measurement-design.md) | Owns the adopted records' semantic fields, projections, admission outcomes, and performance/storage requirements |
+| [028 — JavaScript/Web vertical slice](./028-intlify-javascript-web-vertical-slice-design.md) | Consumes these representations through its harness; fixture labels never become identities |
 | [029 — Product workflow and packaging](./029-intlify-product-workflow-and-packaging-design.md) | Owns public workflow, artifact/schema acquisition, publication, and packaging |
