@@ -12,7 +12,7 @@ For example, an application starts with one explicitly initialized empty registr
 | 018 | Are the inputs, actor, explicit choices, and requested publication permitted? |
 | 029, this subset | How does the local host acquire those inputs and safely make the authorized result current? |
 
-The initial deliverable is an internal local-host integration with a bounded filesystem persistence profile and real failure tests. It is not a public CLI or the complete product packaging design. [000](./000-intlify-overview-design.md#detailed-design-traceability)'s wider 029 productization work remains downstream of 028; these earlier host obligations are adopted by 016 Phase 3 and later reused by the Web integration.
+The initial deliverable is an internal local-host integration with a bounded filesystem persistence profile and real failure tests. It is not a public CLI or the complete product packaging design. The same protocol is reused, under [Store lineage and Release destination adapters](#store-lineage-and-release-destination-adapters), for the local Translation Store and Release destination that 028 needs. [000](./000-intlify-overview-design.md#detailed-design-traceability)'s wider 029 productization work remains downstream of 028; these earlier host obligations are adopted by 016 Phase 3 and later reused by the Web integration.
 
 ## Goals
 
@@ -23,12 +23,13 @@ The initial deliverable is an internal local-host integration with a bounded fil
 - Persist the registry, required replay inputs, and publication provenance consistently without rewriting source files or managing translation catalogs.
 - Distinguish a proved uncommitted failure, a completed publication, and an indeterminate outcome after interrupted I/O.
 - Reuse existing acquisition/storage foundations selectively and apply 026 without requiring a database, service daemon, or general workflow engine.
+- Reuse the same generation, pointer, and outcome protocol for the local Store lineage and Release destination adapters that 021 and 025 require, without redefining their semantics.
 
 ## Non-Goals
 
 - Public command spellings, package/import names, install flows, repository-wide discovery, monorepo selection UX, bundler plugins, watch scheduling, or CI/release automation.
 - Completing 015 policy bodies, 017's later artifact families, or the authentication/signature profiles deferred by 018.
-- Translation synchronization, governance, Store or Release publication, generated-code execution, or claiming the complete 028 scenario.
+- Translation synchronization, governance decisions, Release assembly, generated-code execution, or claiming the complete 028 scenario; the Store and destination adapters below reuse this host's persistence protocol without redefining 021 or 025 semantics.
 - Cross-owner/library operations, remote storage, network filesystems, distributed writers, or cross-process transfer of live authorization capabilities.
 - Restoring missing registry history from Git/backups, selecting a rollback, migrating stores, compacting history, or garbage-collecting retained inputs. Resolving the outcome of this host's interrupted transaction is a different, supported operation.
 - Promoting source-controlled copies, PR #183 IDs, or existing resource-output manifests into the source-first registry specification.
@@ -42,6 +43,7 @@ The initial deliverable is an internal local-host integration with a bounded fil
 | 017 | Shared source/inventory/Intent/registry bodies, identities, integrity, and exact replay |
 | 018 | Authority establishment and grant semantics, input-origin admission, confirmations, permits, and required publication provenance |
 | 019 | Later discovery/query/scheduling and common diagnostic projections; no general graph service is required here |
+| 021/025 | Store transition and Release publication/activation semantics; 029 supplies only their local persistence and conditional commit through the adapters below |
 | 026 | Applicable conformance, storage/performance architecture, measurement, and profiling isolation |
 | 028 | The later bounded Web integration, not a prerequisite for the local identity host |
 | 029 | Explicit input selection, local caller/destination binding, operation orchestration, private persistence records, conditional publication, and outcome reporting |
@@ -123,6 +125,9 @@ An explicit historical read can use a separately admitted pinned anchor without 
 | Prepare update | Analyze captured inputs, run supported continuity checks, obtain fixed host allocation candidates, and construct the complete 017 plan/result | An immutable prepared update or unresolved decisions; not a publication permit |
 | Confirm identity choice | Present the exact base, inventory/context, action, occurrences/IDs, and reason through the trusted host interface | 018 confirmation for that exact choice from a principal with `resolve-identity` |
 | Publish update | Obtain `update-registry` authorization and conditionally install the complete prepared result | Published, unchanged, conflict/denied/blocked, or operational outcome |
+| Publish Store transition | Obtain `publish-store`, or `initialize-store` for genesis, and conditionally install one checked 021 transition and its resulting snapshot | Published, unchanged, conflict/denied/blocked, or operational outcome for that lineage |
+| Publish Release | Obtain `publish-release` and conditionally install one 025 Release with its record at the destination | Published, unchanged, conflict/denied/blocked, or operational outcome for that destination |
+| Activate Release | Obtain `activate-release` and switch the activation reference under the expected-current condition | Activated or conflict/denied/blocked; the published Release set is unchanged |
 | Enable/end development updates | Explicitly establish or end a scoped local session under 018 | Eligibility to submit the narrowly allowed update class, not permission for ordinary compilation to write |
 | Inspect/resolve transaction outcome | Examine the named local operation and its retained state under fresh authorized host access | Proof of committed/uncommitted state or indeterminate/blocked; never a fresh publication of the request |
 
@@ -201,6 +206,24 @@ The generation protocol also protects explicit trusted enrollment/authority-mana
 
 The host may precompute/encode outside the lock, but publication must keep the final guards through the pointer switch and its durability decision. A cancellation before the switch stops that write. Once replacement has been attempted, cancellation cannot justify discarding transaction state or promising that nothing was published; the host completes bounded outcome handling or reports indeterminate state.
 
+### Store lineage and Release destination adapters
+
+028 needs two more protected destinations in the same host domain: the owner's Translation Store lineage that [021](./021-intlify-translation-store-and-governance-design.md#exact-base-atomic-publication) publishes, and the Release destination that [025](./025-intlify-release-assembly-and-deployment-design.md#release-publication) publishes to and its deployment host activates. Both reuse this host's owner binding, stable lock, immutable payload storage, Host Generations, one current pointer per destination, pending transactions, and the eight-step protocol above. 021 and 025 own what a transition means; this host owns only how it becomes current.
+
+| Destination | Generation carries | Exact-base condition | Powers at the commit point |
+| --- | --- | --- | --- |
+| Store lineage | The current `store-snapshot` reference, the applied `store-transition`, the retained member and evidence payloads, and Store publication provenance | The prepared transition's `base` equals the current snapshot; genesis expects the explicit uninitialized binding created for `initialize-store` | `publish-store` for a transition and `initialize-store` for genesis; decision powers never substitute |
+| Release destination | The set of published Release identities with their immutable member files, the canonical manifest bytes, and each `release-publication-record` | The Release identity is absent, or present with equal bytes and a valid record, which yields `unchanged` | `publish-release` scoped to this destination |
+| Activation reference | The activation generation naming one published Release and its record at this destination | The caller's expected activation reference equals the current one | `activate-release`; publication never advances this pointer |
+
+A Store transaction stages every added artifact and evidence payload, verifies each against its 017 integrity digest, and switches the pointer to a generation that names the resulting snapshot. Readers pin one generation and its snapshot exactly as the registry read path does, and a pending marker blocks a current-state read until it is resolved. Candidate publication, review, selection, and revocation stay separate transaction classes, and an empty transition reuses the current generation without a new publication.
+
+A Release publication stages the member files at their descriptor addresses under an immutable namespace keyed by the Release identity, verifies every file digest and byte length after writing, flushes them, and only then installs the pending marker and switches the pointer to a generation that lists the new Release and its record. The manifest bytes are the canonical JSON text of the `release-snapshot`, and the manifest and record become visible in that one switch. Distinct Releases occupy distinct namespaces, so publishing one never touches another. The serving adapter reads only from this namespace under the host root, which is how it satisfies 018's origin admission profile.
+
+Activation is a separate generation kind for the deployment host. It verifies the record for this destination as 025 requires, then switches the activation pointer under the expected-current condition. This host never removes a published Release from the destination, and the previously active generation remains readable. Outcome resolution for all three destinations follows the table below without modification: a pending marker with the pointer at the expected generation is `not-published`, a pointer at the candidate generation is `published` once durability is proved, and anything else is indeterminate or blocked.
+
+These adapters add no authority. Store, publication, and activation provenance are host-private records like registry provenance and retain only the safe identifiers that 017 records carry. Remote Stores, shared destinations, CDN upload, withdrawal, rollback, and garbage collection remain deferred with their owners.
+
 ## Interrupted Transactions and Outcomes
 
 Outcome resolution is explicit host work under the existing binding and storage lock. Read-only compilation reports the need for it but never repairs control files. Resolving a transaction checks the stored marker, exact generation references, required payloads, and trusted provenance; it never imports a backup, regenerates IDs, or replays a permit as a new publication.
@@ -263,6 +286,7 @@ The implementing slice pins finite workloads, method boundaries, environment/sto
 | Persistence | Independent decoding of complete generation/provenance/payload associations; same reference with changed bytes, missing required bodies, unsupported layout/capabilities, and incorrect private/shared identity reuse fail |
 | Interrupted writes | Inject faults/cancellation before and after every creation, payload/generation sync, marker install/sync, pointer replacement/sync, and cleanup; verify old, new, or explicitly indeterminate state without a valid-looking partial result |
 | Outcome resolution | Old/candidate pointer cases, enrollment-only expected absence versus lost current state, malformed marker, lost acknowledgement, later supersession, restart with fresh authority, and repeated resolution after another failure; no replayed publication or invented rollback |
+| Store and Release destinations | Store genesis and exact-base transitions with pending-state reads blocked; Release staging with digest verification, unchanged republish, distinct namespaces, and manifest/record visibility in one switch; activation conflicts with the previous generation preserved; the same fault-injection and outcome cases for each destination |
 | Limits and reuse | Exact/first-over capacities, retained-history exhaustion, repeated hostile inputs, workspace reuse after every outcome, and bounded safe diagnostics |
 
 The minimum local host is complete only when actual 016/017 validators and 018 evaluators run through the real selected storage adapter, all required cases for the adopted subset pass, and scoped 026 records retain independently expected outcomes. An in-memory adapter proves only its own model. At least one admitted local disk profile needs reopen/restart and concurrent-process lock tests plus deterministic fault injection; tests must not infer durable success from a mock rename or a returned `true`.
@@ -276,7 +300,7 @@ Completion remains narrower than full 016 support: any unadopted semantic choice
 | Phases 1–2 | Explicit finite acquisition and read-only test host | No checked production Profile, durable identity, or Web execution claim |
 | Phase 3, pure core | Actual authority/confirmation orchestration and replayable allocation inputs against fixed test state | Requires 016/017 semantics and 018 evaluation; no disk durability claim from an in-memory store |
 | Phase 3, local persistence | Owner binding, empty genesis, conditional updates, safe storage, provenance, and interrupted-outcome resolution defined here | Requires actual applicable 015 inputs/policies and the implemented/tested 017/018/029 subset; pending policy/bootstrap formats remain explicit prerequisites |
-| Phase 4–5 / 028 | Reuse the established registry host and separation of read, prepare, authorize, publish, and inspect | Broader library, sync/governance, build/Release, and execution workflows are separately adopted, not authorized by registry powers |
+| Phase 4–5 / 028 | Reuse the registry host's separation of read, prepare, authorize, publish, and inspect, and the Store lineage and Release destination adapters above for 021 transitions and 025 publication/activation | Sync/governance decisions, build/Release assembly, and execution remain their owners' work; registry powers authorize none of them, and the adapters require 018's Web extension powers |
 
 An implementation plan should deliver private codecs/fixtures, acquisition and read-only integration, authorization/confirmation wiring, conditional persistence, and fault/performance coverage in dependency order. It must name any required upstream input/representation additions before the operations that consume them, without requiring the whole later product design to be finished.
 
@@ -293,13 +317,14 @@ An implementation plan should deliver private codecs/fixtures, acquisition and r
 | 029-007 | Reject unsupported storage capabilities and keep read-only paths non-repairing | Avoids weaker cross-platform fallbacks and hidden writes during compilation |
 | 029-008 | Keep control codecs private and adopt actual 017/018 values | Reuses shared identity rules without inventing portable authorization or promoting resource-output formats |
 | 029-009 | Require real persistence, failure, and scoped 026 evidence | File output or mock success alone cannot establish safe persistent identity |
+| 029-010 | Reuse the generation, pointer, and outcome protocol for the local Store lineage and Release destination instead of designing separate storage models | One tested persistence protocol serves registry, Store, and Release without new authority or semantics |
 
 ## Deferred Follow-Up Notes
 
 - Public commands, authoring package names, configuration discovery, monorepo/worktree enrollment UX, installation, watch/dev scheduling, CI, packaging, and release sequencing.
 - Complete 015 policy/bootstrap input adoption, shared portable provenance formats, remote/cross-process authorization, alternative storage backends, and wider platform durability profiles.
 - Authenticated import of registry history, recovery/rollback selection, source-control merges, destination migration, history compaction, retention policy, and garbage collection. Transaction outcome resolution above does not implement these.
-- 028's translation supply/governance, build/export, Release assembly/publication, browser execution, and later TMS integrations under their owning specifications.
+- 028's translation supply/governance decisions, build/export, Release assembly, browser execution, and later TMS integrations under their owning specifications; the local Store and Release destination adapters above cover only their persistence.
 - General graph/query/inspect/audit services and stable public reporting; broader product workflow must preserve the established owner inputs, failure states, and least-authority separation.
 
 ## Relationship to Other Documents and Existing Foundations
@@ -308,4 +333,5 @@ An implementation plan should deliver private codecs/fixtures, acquisition and r
 - [015](./015-intlify-project-profile-and-locale-policy-design.md#consumer-input-boundaries) supplies checked context/bindings, while [016](./016-intlify-source-authoring-and-intent-identity-design.md#identity-registry-and-reconciliation) owns source and identity validity.
 - [017](./017-intlify-shared-artifact-and-version-admission-design.md#non-circular-history-and-publication) supplies exact non-circular registry history; [018](./018-intlify-security-trust-and-provenance-design.md#publication-handoff-to-029) supplies final authorization and provenance obligations.
 - [026](./026-intlify-conformance-and-measurement-design.md#performance-implementation-architecture) supplies reusable performance/verification requirements; [028](./028-intlify-javascript-web-vertical-slice-design.md#adoption-with-016) later consumes this host without implying that all public workflows are finished.
+- [021 — Exact-base atomic publication](./021-intlify-translation-store-and-governance-design.md#exact-base-atomic-publication) and [025 — Release publication](./025-intlify-release-assembly-and-deployment-design.md#release-publication) supply the transition and publication semantics that the Store and Release destination adapters persist; [018 — Minimum Web Localization Extension](./018-intlify-security-trust-and-provenance-design.md#minimum-web-localization-extension) supplies their powers.
 - Existing [CLI registration storage](../crates/intlify_cli/src/messages/registration/transaction.rs) provides reusable no-follow directory access, stable locking, flush/capability checks, and fault-injection foundations. Its resource-output tree replacement, journal, manifest, and rollback semantics are not Intent-registry formats or authorization. Reuse helpers only after the generation/currentness protocol above is independently tested; no automatic migration is defined.
