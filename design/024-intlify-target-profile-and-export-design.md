@@ -58,7 +58,7 @@ This is the initial application-only export slice for 016 Phase 5, not the compl
 | 027 | Reference MF2 preparation/evaluation, immutable Localizers, loaders/readiness, caches, and internal physical representation |
 | 028/029 | Actual host rewriting/execution, trusted local acquisition/staging, browser tests, and later product packaging |
 
-The tables below fix closed logical contents and owner obligations. They do not extend 017's existing authoring envelope or register new kinds in an unrelated reader. Shared wire schemas, digest domains, and exact version tuples must be adopted in 017 before those serialized artifacts are exchanged. 024 owns their target-specific meaning; a codec registration must not invent different lowering or execution semantics.
+The tables below fix closed logical contents and owner obligations. They do not extend 017's existing authoring envelope or register new kinds in an unrelated reader. Shared wire schemas, digest domains, and exact version tuples are adopted in 017's [Minimum Web Localization Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-web-localization-representation) as the Target Profile body, `binding-table`, `locale-payload`, and `target-descriptor` kinds; serialized artifacts use those kinds. 024 owns their target-specific meaning; a codec registration must not invent different lowering or execution semantics.
 
 ## Minimum Web Target Profiles
 
@@ -438,10 +438,10 @@ These are adoption dependencies, not a claim that their implementations or the b
 
 ### Required follow-up for minimum Web execution
 
-- 017: encode the actual complete source/localized-message and plan inputs, Target Profile bodies, binding/use/selection tables, locale payload metadata, output descriptors, and required references/digest domains. Register exact closed tuples and validators; do not reuse an authoring integrity digest as a selected ArtifactDigest or extend ESM `0.1` implicitly.
-- 018/025/029: define the minimum trusted local generated-code acquisition/staging/serving and execution-admission profile, including protection against verification/use substitution. Existing source/registry authorization does not supply these powers.
-- 025: define the smallest complete group Release over both target output sets, independent publication/activation evidence, and exact mixed-output/handle rejection. This is the next owner specification.
-- 027: adopt the MF2-data preparation adapter, ready locale-bound Localizer, private handle/value/result projection, cache/lifetime behavior, and synchronous 023 formatting for the chosen Web implementation.
+- 017: the source/localized-message and plan inputs, Target Profile bodies, binding/use/selection tables, locale payload metadata, output descriptors, and required references/digest domains are now encoded under its Minimum Web Localization Representation; the adopting implementation registers the validators and fixtures. Do not reuse an authoring integrity digest as a selected ArtifactDigest or extend ESM `0.1` implicitly.
+- 018/025/029: the minimum trusted local generated-code staging, serving, and execution-admission profile, including protection against verification/use substitution, is now defined by 025's execution admission and 018's code-origin admission profile; 029 must implement the adapters. Existing source/registry authorization does not supply these powers.
+- 025: the smallest complete group Release over both target output sets, independent publication/activation evidence, and exact mixed-output/handle rejection are now defined; implementing them remains 025 work.
+- 027: the MF2-data preparation adapter, ready locale-bound Localizer, private handle/value/result projection, cache/lifetime behavior, and synchronous 023 formatting are now defined by its Minimum Web Runtime Adapter; implementing them remains 027 work.
 - 028/029: wire the actual lowerer, loader, generated factory, explicit locale construction, and both browser paths; retain required maps, trust checks, and complete scoped 026 evidence.
 
 ### Broader extensions

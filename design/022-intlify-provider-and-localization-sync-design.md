@@ -317,10 +317,10 @@ This document does not claim those formats, hosts, or consumers are already impl
 
 ### Required follow-up for minimum Web execution
 
-- 017: adopt exact request/response/acquisition-provenance and Provider Routing representations alongside the source/localized, validation, requirement, Store, and transition representations required by 020/021. Define closed decoding, canonical ordering, identity projections, and non-circular references before shared persistence/interchange.
-- 018: adopt source-use/disclosure, Provider invocation, Store read/candidate-publication, and provenance/retention rules with an actual trusted-local-host mode. Existing source/registry grants do not authorize these operations by implication.
+- 017: the `acquisition-record` and `provider-routing-policy` representations, together with the source/localized, validation, requirement, Store, and transition representations required by 020/021, are now defined under its Minimum Web Localization Representation with closed decoding, canonical ordering, identity projections, and non-circular references; the adopting implementation must materialize them before shared persistence/interchange.
+- 018: the `disclose-source`, `invoke-provider`, `read-store`, and `stage-candidates` powers, the Provider-visible projection, and the provenance/retention rules are now defined under its Minimum Web Localization Extension in the same trusted-local-host mode; existing source/registry grants do not authorize these operations by implication.
 - 021/028/029: implement real validation, candidate transactions, protected local publication/outcome resolution, the deterministic registered Provider, and their integration/failure tests. Separate governance still needs its own actual 021/018 checks.
-- 023/024/025/027: define the minimum message/value behavior, target code generation/admission, Release/publication, and execution path required by 028. 023 is the next execution-side specification after this supply subset.
+- 023/024/025/027: the minimum message/value behavior, target code generation/admission, Release/publication, and the Runtime-backed execution path required by 028 are now defined; their implementations remain separate work.
 
 ### Broader extensions
 

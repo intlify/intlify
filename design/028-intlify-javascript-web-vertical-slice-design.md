@@ -24,7 +24,7 @@ The initial scenario is one application-owned JavaScript module, standard DOM `t
 - Defining public commands, package/import names, repository discovery, bundler plugins, watch mode, or installation workflows owned by 029.
 - Designing all of 017–025, or treating a test fixture as permission to bypass their applicable semantic, integrity, or authorization checks.
 - Completing TypeScript-specific syntax, JSX/TSX, Vue, SSR/hydration, workers, mobile, native, or source-first library distribution.
-- Supporting conditional/container message selection, arbitrary module graphs, or other choices still recorded as `Proposed` in 016.
+- Supporting conditional/container message selection, arbitrary module graphs, or other forms that 016 defers beyond its first Phase 1–2 minimum.
 - Supporting numeric/date formatting, plurals, selectors, custom functions, rich markup/parts, or the full MF2 execution capability set in the initial output profile.
 - Providing automatic locale negotiation, runtime message fallback, reactive DOM updates, or production deployment.
 - Building an external AI/TMS integration or requiring network credentials; fixture localization is test supply, not a product catalog workflow.
@@ -40,7 +40,7 @@ The following table is the minimum dependency checklist, not a requirement to fi
 | --- | --- | --- |
 | [015](./015-intlify-project-profile-and-locale-policy-design.md) | Checked application ownership, exact source/requested locales, supplied vocabulary and defaults, finite applicable policy/target/canonicalization inputs | Supply the actual inputs and verify that every component uses the same admitted scope; do not promote PR #205's partial core to a complete Profile |
 | [016](./016-intlify-source-authoring-and-intent-identity-design.md) | Accepted recognition, MF2/context analysis, source mappings, ID continuity, read-only compilation, and complete/partial results | Exercise the selected forms and preserve their source/evaluation evidence through lowering |
-| [017](./017-intlify-shared-artifact-and-version-admission-design.md) | Existing minimum authoring/registry representations; necessary source/localized message, plan, Store, target, Release, and verification-record extensions | Retain exact references and supplied bodies; do not reuse an authoring inventory digest as a complete source-message or Release artifact |
+| [017](./017-intlify-shared-artifact-and-version-admission-design.md) | Existing authoring/registry representations, the Web localization representations for source/localized messages, plans, Store, supply, target outputs, and Releases, and the verification records | Retain exact references and supplied bodies; do not reuse an authoring inventory digest as a complete source-message or Release artifact |
 | [018](./018-intlify-security-trust-and-provenance-design.md) | Local source/artifact admission and separate registry, candidate, governance, and Release-publication powers | Supply isolated test principals and verify denial as well as success; no unconditional `trusted: true` adapter |
 | [019](./019-intlify-project-graph-query-and-incremental-design.md) | Finite application dependency/diagnostic handoff with complete versus partial scope and exact input invalidation | Supply one complete local graph and project component diagnostics; no repository query service is needed |
 | [020](./020-intlify-requirement-planning-and-linking-design.md) | Complete requirements for the selected group, source fulfillment, direct localized selection, final reference and delivery linking | Run planning before sync and recompute it during build; do not turn Provider results directly into a bundle |
@@ -52,7 +52,7 @@ The following table is the minimum dependency checklist, not a requirement to fi
 | [027](./027-intlify-reference-runtime-design.md) | A reference evaluator, artifact admission/readiness, locale-bound Localizer, and immutable preparation/cache behavior for the selected capability | Instantiate and exercise the real reference execution path; leave its internal IR and component split with 027 |
 | [029](./029-intlify-product-workflow-and-packaging-design.md) | Host obligations for explicit operations and exact-base atomic registry publication | Exercise those obligations through a local test host without fixing public commands or packaging |
 
-017 now provides the Phase 1–3 authoring representation foundation. It does not yet provide all later artifact families in this table. 027 provides the reference architecture, not an implemented formatter or a frozen Web ABI. These are explicit adoption prerequisites, not reasons to postpone 016's bounded Phase 1–2 implementation.
+017 now provides the Phase 1–3 authoring representations and, under its [Minimum Web Localization Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-web-localization-representation), the message, plan, Store, supply, target, and Release families in this table; portable diagnostics and library references remain deferred. 018 provides the Web extension powers, and 027 provides the [Minimum Web Runtime Adapter](./027-intlify-reference-runtime-design.md#minimum-web-runtime-adapter) as a design, not an implemented formatter or a frozen Web ABI. These are explicit adoption prerequisites, not reasons to postpone 016's bounded Phase 1–2 implementation.
 
 ## Terminology
 
@@ -187,7 +187,7 @@ The two paths consume the same selected source/localized Message Artifacts, revi
 | Runtime-backed | 027's real preparation/evaluation path for the admitted literal/string subset, with exact 024/025 artifact admission and an explicitly locale-bound Localizer | Asynchronous readiness followed by synchronous formatting; reusable immutable prepared state; no ambient locale |
 | Ahead-of-time | 024-generated literal/string-parameter execution code derived from the same validated messages and admitted 023 semantics | Equivalent observable results without invoking the Runtime MF2 evaluator; not a wrapper around the first path or a list of hard-coded expected DOM values |
 
-Both paths must use the shared MF2 analysis; neither may replace it with a regex placeholder parser. Generated JavaScript quotes and escapes candidate literals as data under the target specification and never evaluates candidate-supplied code. Full Locale Capsule design is not required if 024 explicitly adopts a smaller compatible Web representation. The existing data-only ESM `0.1` format is only a possible explicitly admitted bridge, not an implicitly extended source-first format or a formatter.
+Both paths must use the shared MF2 analysis; neither may replace it with a regex placeholder parser. Generated JavaScript quotes and escapes candidate literals as data under the target specification and never evaluates candidate-supplied code. Full Locale Capsule design is not required: 024 adopts the smaller `locale-payload` representation for the Runtime-backed path, and 027's Minimum Web Runtime Adapter consumes it. The existing data-only ESM `0.1` format is not on this path; it remains only a possible separately admitted bridge, not an implicitly extended source-first format or a formatter.
 
 The test host directly selects `en` or `ja`, prepares the required eager artifacts, then invokes the generated render entry. Selecting another locale creates a new bound context; re-rendering is an explicit application/test-host action. No reactive locale-switch API is specified here.
 
@@ -213,7 +213,7 @@ At least two bound contexts remain usable concurrently: interleaving `en`, `ja`,
 | Incompatible output set | Wrong locale, target, schema/specification, Message Handle, integrity, or Release association is rejected before successful rendering |
 | Missing runtime data | No source fallback, alternate-locale search, or Provider call; retain a typed integration failure |
 
-The initial history scenarios do not adopt 016-010's proposed conditional selection or finalize 016-011's proposed retirement/approval-lineage policy. Tests must preserve already accepted complete-inventory and no-implicit-reset constraints. Broader copy/split/merge/retirement coverage remains with the adopting 016 implementation and later integration cases.
+The initial history scenarios do not implement 016-010's conditional selection, which 016 defers beyond its first Phase 1–2 minimum, and exercise 016-011's retirement/approval-lineage rules only through the accepted complete-inventory and no-implicit-reset constraints. Broader copy/split/merge/retirement coverage remains with the adopting 016 implementation and later integration cases.
 
 ## Performance and Measurement
 
@@ -275,7 +275,7 @@ An implementation plan may deliver these pieces in smaller commits. It must list
 
 ## Decision Log
 
-These decisions define this initial integration scope; they do not change upstream `Proposed` decisions or claim that missing owner specifications have been completed.
+These decisions define this initial integration scope; they do not change upstream decisions or claim that missing owner implementations have been completed.
 
 | ID | Decision | Rationale |
 | --- | --- | --- |

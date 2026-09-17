@@ -55,7 +55,7 @@ The initial scope is one local application, one selected Deployment Compatibilit
 | 027 | Runtime-backed execution admission consuming the deployment-selected Release and admission evidence as inputs |
 | 028/029 | Trusted local destination, deployment host, serving adapter, browser execution, storage protocol, and later product workflow |
 
-The tables below fix logical contents and owner obligations. Shared wire schemas, digest domains, and exact version tuples must be adopted in 017 before serialized Releases or records are exchanged. 018 must extend its closed grant table before a publication or activation is authorized in production; 025 names the powers, not their authentication.
+The tables below fix logical contents and owner obligations. Shared wire schemas, digest domains, and exact version tuples are adopted in 017's [Minimum Web Localization Representation](./017-intlify-shared-artifact-and-version-admission-design.md#minimum-web-localization-representation) as the `release-snapshot`, `release-publication-record`, and `execution-admission-evidence` kinds. 018's [Minimum Web Localization Extension](./018-intlify-security-trust-and-provenance-design.md#minimum-web-localization-extension) defines the `publish-release` and `activate-release` powers; 025 names the powers, not their authentication.
 
 ## Terminology
 
@@ -149,14 +149,14 @@ The snapshot is a localization release manifest. It is not the application's dep
 
 ### Authority and policy
 
-Publication requires a host-established publisher principal holding a publication power scoped to the exact destination, plus authorized read access to obtain the revocation view. This power is a new 018 grant; the existing source/registry grants, Store publication authority, and the build actor's role do not imply it. Publication holds repository authority only and receives no Provider, TMS, governance, or deployment credential.
+Publication requires a host-established publisher principal holding a publication power scoped to the exact destination, plus authorized read access to obtain the revocation view. This power is 018's `publish-release` grant; the existing source/registry grants, Store publication authority, and the build actor's role do not imply it. Publication holds repository authority only and receives no Provider, TMS, governance, or deployment credential.
 
 The publication policy is an explicit input naming the destination, the required evidence set, and the view requirement. The minimum local policy requires the 024 set validation results for every member and the 021 recheck below; it requires no 026 Budget Evaluation or equivalence record. A production policy may require the Release evidence described by [026](./026-intlify-conformance-and-measurement-design.md#release-evidence). An absent or unsupported policy blocks publication; there is no permissive default.
 
 ### Publication admission
 
 1. Admit the complete snapshot, all member bytes, and the publication inputs under finite limits. Recompute the Release identity from the supplied snapshot and compare; a caller-supplied identity is not trusted.
-2. Obtain the latest obtainable authorized revocation view. In the local profile this is the current Store snapshot of the build's lineage, read under 021's rules; it must be the pinned snapshot or a descendant of it. An unavailable, unreadable, or foreign-lineage view blocks publication, and the pinned build snapshot is not a substitute view.
+2. Obtain the latest obtainable authorized revocation view. In the local profile this is the current Store snapshot of the build's lineage, read under 021's rules and 018's `read-store` power; it must be the pinned snapshot or a descendant of it. An unavailable, unreadable, or foreign-lineage view blocks publication, and the pinned build snapshot is not a substitute view.
 3. Re-evaluate every retained selection against that exact view. A localized selection blocks publication when its artifact is revoked or rejected, or when its supporting validation, approval, or selection evidence is revoked. A source selection blocks publication when its source-admission evidence is revoked. A failure identifies the exact requirement, artifact, revocation or rejection record, and view identity. Supersession by a newer positive review or selection is recorded as an observation and does not block this minimum.
 4. Verify the policy's required evidence set against the actual retained results; a missing or stale item blocks publication.
 5. Stage every member's inventoried bytes into the destination's immutable namespace for this Release identity, verify the written bytes against their integrity references, and flush them. Existing unequal content under the same address is a conflict, not an overwrite.
@@ -190,7 +190,7 @@ The local destination adapter must provide the guarantees that [029](./029-intli
 
 Activation is an explicit host deployment operation, not a consequence of publication. The 028 test deployment host performs it; production deployment systems remain outside Intlify.
 
-Before activating, the host verifies the proposed `ReleasePublicationRecord` for its own destination: the record's integrity, that its destination identity equals the host's destination, that the exposed manifest bytes match the record's repository identity, that the manifest decodes to the snapshot whose identity the record names, and that the record's policy and actor provenance satisfy the applicable 018 rules. It then switches the activation reference under an expected-current condition: the caller names the activation reference it observed, and the switch fails as a conflict if another activation intervened. Activation requires an activation power distinct from the publication power.
+Before activating, the host verifies the proposed `ReleasePublicationRecord` for its own destination: the record's integrity, that its destination identity equals the host's destination, that the exposed manifest bytes match the record's repository identity, that the manifest decodes to the snapshot whose identity the record names, and that the record's policy and actor provenance satisfy the applicable 018 rules. It then switches the activation reference under an expected-current condition: the caller names the activation reference it observed, and the switch fails as a conflict if another activation intervened. Activation requires 018's `activate-release` power, distinct from the publication power.
 
 A missing, malformed, foreign-destination, or unverifiable record blocks activation. The host does not activate from a manifest without its record, from a staged namespace without visibility, or from a mutable `latest` pointer. Activation neither rechecks the revocation view nor requires a fresh publication. A revocation after publication is handled by a replacement Release, which is a new assembly and publication, not by editing the active one.
 
@@ -325,10 +325,10 @@ These are adoption dependencies, not claims that their implementations are finis
 
 ### Required follow-up for minimum Web execution
 
-- 017: encode the Release snapshot, publication record, and execution-admission evidence with exact kind/schema tuples, record identity domains, and the Release identity digest domain; register the member descriptor reference form together with 024's descriptor.
-- 018: add scoped publication and activation powers, publisher and activator provenance, publication permits bound to the exact snapshot and destination, and the local code-origin admission profile applied before importing generated modules.
-- 021: supply the authorized revocation-view read for a named lineage and the exact evaluation basis recorded here.
-- 027: consume the deployment-selected Release and admission evidence in runtime-backed admission; reject mixed-Release inputs by identity.
+- 017: the Release snapshot, publication record, and execution-admission evidence are now encoded under its Minimum Web Localization Representation with exact kind/schema tuples, the `intlify-release-publication-v0` identity domain, and the Release identity as the snapshot's integrity digest; the adopting implementation registers the validators and fixtures.
+- 018: the `publish-release` and `activate-release` powers, publisher and activator provenance, permits bound to the exact snapshot and destination, and the local code-origin admission profile are now defined under its Minimum Web Localization Extension; the adopting implementation must evaluate them against real host state.
+- 021: the revocation-view read is supplied by its publication read handoff under 018's `read-store` power; the exact evaluation-basis identifier recorded here remains to be registered by the adopting implementation.
+- 027: consuming the deployment-selected Release and admission evidence and rejecting mixed-Release inputs by identity are now defined by its Minimum Web Runtime Adapter; implementing them remains 027 work.
 - 028/029: implement the local destination adapter, serving adapter, deployment host, and their fault, reopen, and concurrency tests; retain scoped 026 records.
 
 ### Broader extensions

@@ -122,7 +122,7 @@ One view contains at most one current source revision per unit and one admitted 
 
 ### Two relations, not one reachability graph
 
-Reference relations retain all checked use sites and declarations in the declared inventory, including unreferenced live declarations. A use points to exactly the targets admitted by 016/017. The first profile does not accept a still-proposed conditional form merely because it fits into an array. A missing target is a blocked/invalid association, not an empty target set or a new declaration.
+Reference relations retain all checked use sites and declarations in the declared inventory, including unreferenced live declarations. A use points to exactly the targets admitted by 016/017. The first profile does not accept a conditional form that 016 defers beyond its first minimum merely because it fits into an array. A missing target is a blocked/invalid association, not an empty target set or a new declaration.
 
 Computation dependencies point from a product to what it consumed. Each use retains the dependency role, exact input/product facet, its value stamp, and the defining owner operation/profile. Initial roles cover source bytes/grammar, recognition bindings, message semantics, context/default/vocabulary/locale data, registry/continuity, inventory membership, reference/evaluation evidence, and diagnostic projection. Optional absence is a recorded value, never an omitted dependency.
 
@@ -227,7 +227,7 @@ Source evidence uses 016/017's ranges, exact bytes, and mapping rules. A host pr
 
 For an input rejected before safe identity/source admission, use its bounded invocation-local input slot and the owning safe cause. Do not copy its submitted actor name, path, source content, or a digest of unsafe content into a public diagnostic identity. Native retained handles remain non-serializable; an export adapter must separately define admitted references and disclosure.
 
-The initial 019-owned codes are `graph-input-invalid`, `graph-input-unavailable`, `graph-profile-unsupported`, `graph-dependency-invalid`, `graph-handoff-incomplete`, `graph-query-invalid`, `graph-resource-limit`, `graph-cancelled`, and `graph-invariant-failure`. They classify 019 operations, not MF2, resolver, security, or linker errors. Adopted owner adapters pin the actual supported component codes/stages and typed details; an unsupported projection reports that limitation instead of dropping its owner's failure. This does not accept 016 semantic decisions still marked `Proposed`.
+The initial 019-owned codes are `graph-input-invalid`, `graph-input-unavailable`, `graph-profile-unsupported`, `graph-dependency-invalid`, `graph-handoff-incomplete`, `graph-query-invalid`, `graph-resource-limit`, `graph-cancelled`, and `graph-invariant-failure`. They classify 019 operations, not MF2, resolver, security, or linker errors. Adopted owner adapters pin the actual supported component codes/stages and typed details; an unsupported projection reports that limitation instead of dropping its owner's failure. This does not enable 016 forms deferred beyond the first implementation.
 
 ### Ordering, duplication, and failure meaning
 
@@ -299,7 +299,7 @@ At least one real local authoring path must exercise admission, checked and bloc
 | --- | --- | --- |
 | 016 Phases 1–2 | Optional finite fact/diagnostic inspection using explicitly test-owned context | 019 need not delay the shared semantics or Producer implementation; no durable identity or production Profile claim |
 | 016 Phase 3 | Query accepted source/registry associations and explain why reanalysis/reconciliation is required | Actual 015/017/018 inputs and 029 publication remain their own prerequisites; a graph query cannot accept an update |
-| 016 Phase 4, local subset | Complete source/Intent/reference handoff and common Diagnostic projection defined here | Cross-owner/library forms, complete source-locale artifact extensions, and other unadopted Phase 4 features remain separate |
+| 016 Phase 4, local subset | Complete source/Intent/reference handoff and common Diagnostic projection defined here | Cross-owner/library forms and other unadopted Phase 4 features remain separate; 017's `source-locale-message` supplies the complete source-locale artifact |
 | 016 Phase 5 / 028 | Supply and compare the exact local graph used by planning/build; preserve diagnostics and dependency evidence | Requires actual 020 and later supply/execution/export/Release consumers and their necessary 017/018 extensions |
 
 The implementing plan can deliver admitted retained records/indexes, complete/partial query and diagnostic behavior, local handoff, and then bounded change analysis/cache equivalence. Freeze each adopted owner adapter and required fixture before its consumer. This is dependency guidance, not a new project-wide phase numbering or a requirement to finish the broad repository service first.

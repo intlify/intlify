@@ -337,10 +337,10 @@ This is a minimum owner specification, not an implementation-completion claim. E
 
 ### Required follow-up for minimum Web execution
 
-- 017/024: adopt the exact execution-capability/context/parameter and selected-message target representations, logical result/diagnostic projections, identity, and version checks used here. Do not reinterpret current authoring or data-only ESM records as complete execution artifacts.
-- 018/024/025: instantiate the applicable artifact/value trust, resource limits, output-set/Release/handle compatibility, and execution-admission inputs. Formatting receives checked immutable evidence, never supply or publication credentials.
-- 024: define the smallest Runtime-backed and AOT Web outputs, generated call/binding rules, primitive-string conversion and surrogate rejection, safe literal emission, once-only host evaluation, and output-set admission. This is the next target-side specification.
-- 027: define and implement actual preparation/evaluation, loader/readiness and locale-bound entry points, cache keys, output/workspace lifetime, and typed failure projection for this profile.
+- 017/024: the execution profile pins, message direction context, parameter facts, and selected-message target representations are now defined by 024's Target Profile body and 017's `locale-payload` and `binding-table` kinds; logical result/diagnostic projections remain in-process under 019. Do not reinterpret current authoring or data-only ESM records as complete execution artifacts.
+- 018/024/025: output-set/Release/handle compatibility and execution-admission inputs are now defined by 024, 025, and 018's code-origin admission profile; the adopting implementation instantiates them with the applicable artifact/value trust and resource limits. Formatting receives checked immutable evidence, never supply or publication credentials.
+- 024: the smallest Runtime-backed and AOT Web outputs, generated call/binding rules, primitive-string conversion and surrogate rejection, safe literal emission, once-only host evaluation, and output-set admission are now defined; implementing them remains target-side work.
+- 027: preparation/evaluation, readiness and locale-bound entry points, cache keys, output/workspace lifetime, and typed failure projection for this profile are now defined by its Minimum Web Runtime Adapter; implementing them remains 027 work.
 - 028/029: integrate actual selected definitions, explicit direction inputs, exact bidi-aware oracles, local Release admission, and the two real browser paths; retain complete applicable 026 evidence.
 
 ### Broader extensions

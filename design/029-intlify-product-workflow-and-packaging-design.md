@@ -152,7 +152,7 @@ An explicit identity confirmation precedes final plan acceptance where needed. T
 
 Manual updates may accept verified continuations, independently confirmed new declarations, and complete-absence retirement. Explicit-basis actions and restoration require their own authorized confirmations. Development mode accepts only 018's eligible automatic cases in an explicitly enabled live session; ambiguous history, restoration, initialization, and recovery remain separate explicit work. It introduces no watcher, scheduling policy, or persistent auto-enable setting.
 
-A partial but fully checked inventory may update proven covered associations while retaining unseen entries; it cannot retire them. Failed units, unknown continuity verifiers, unavailable exact history, unsupported semantic choices, or any required unresolved decision prevent a publishable result. 016 decisions still marked `Proposed` are not accepted by this host design.
+A partial but fully checked inventory may update proven covered associations while retaining unseen entries; it cannot retire them. Failed units, unknown continuity verifiers, unavailable exact history, unsupported semantic choices, or any required unresolved decision prevent a publishable result. 016 forms deferred beyond the first implementation are not enabled by this host design.
 
 An empty decision/link plan reuses the current snapshot without a new registry publication. Context-only revision changes and new analysis evidence do not require registry mutation. If the observed base or authority changes before an unchanged result is returned, report that staleness rather than claiming the originally observed state is still current.
 
