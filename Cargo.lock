@@ -531,6 +531,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_authoring"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "intlify_shared_json",
+ "ox_mf2_parser",
+ "schemars",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "intlify_cli"
 version = "0.14.0-alpha.12"
 dependencies = [
