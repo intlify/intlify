@@ -28,7 +28,7 @@ serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
-jsonschema = { version = "=0.52.1", default-features = false }
+jsonschema = { version = "=0.56.0", default-features = false }
 
 # The resolution fixtures need an authoring context, and the only context this
 # phase admits is the non-default test one. Declaring the requirement keeps the
