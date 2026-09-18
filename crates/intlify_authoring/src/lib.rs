@@ -22,7 +22,19 @@
 //!
 //! No file, network, registry, or plugin is retrieved, no host code is
 //! evaluated, and no mutable global state is held.
+//!
+//! The only authoring context this phase admits is explicitly test-owned, and
+//! it is absent from an ordinary build:
+//! ```compile_fail
+//! use intlify_authoring::test_context::TestContext;
+//! ```
+//! A caller that supplies its own context still cannot claim a production kind,
+//! because production admission needs checked 015 inputs and the 017/018 work
+//! that later phases own. That rejection is asserted in
+//! `tests/declaration_resolution.rs`.
 
+mod context;
+mod declaration;
 mod diagnostic;
 mod limits;
 mod message;
@@ -36,6 +48,16 @@ mod workspace;
 // caller does not need a direct dependency on the shared crate to use them.
 pub use intlify_shared_json::token::{IntegrityDigest, Token, VersionedIdentity};
 
+#[cfg(feature = "test-context")]
+pub use context::test_context;
+pub use context::{
+    AuthoringBasis, AuthoringContext, CanonicalLocale, ContextKind, LocaleData, LocaleFailure,
+    SurfaceVocabulary,
+};
+pub use declaration::{
+    resolve_declarations, AuthoringFailure, AuthoringResult, DeclarationFacts, DeclarationInput,
+    DeclarationMetadata, Outcome, ParameterBinding, SourceLocaleBasis,
+};
 pub use diagnostic::{Diagnostic, DiagnosticOrigin, ReasonFamily, Severity, Stage};
 pub use limits::{AuthoringLimits, LimitKind, LimitsError};
 pub use message::{
