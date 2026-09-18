@@ -185,8 +185,37 @@ impl<'de> Visitor<'de> for UniqueJsonValueVisitor<'_> {
             })?;
             values.insert(key, value);
         }
-        Ok(Value::Object(values))
+        Ok(restore_arbitrary_precision(values))
     }
+}
+
+/// The private key `serde_json` uses to deliver a number through `visit_map`.
+const ARBITRARY_PRECISION_TOKEN: &str = "$serde_json::private::Number";
+
+/// Rebuild the number that `serde_json` delivered as a single-entry map.
+///
+/// With the `arbitrary_precision` feature, a number the parser cannot hand to
+/// `visit_u64`, `visit_i64`, or `visit_f64` losslessly arrives at
+/// `deserialize_any` as a one-entry map under a private key. That covers every
+/// non-integer, not only extreme magnitudes. A visitor that stores the entry
+/// verbatim returns an object where the document had a number, which both
+/// misreports the shape to a typed reader and hides the value from a canonical
+/// encoder that must reject JSON numbers outright.
+///
+/// The key is an implementation detail of `serde_json` rather than public API,
+/// so it is matched defensively: the entry becomes a number only when it is the
+/// map's sole member and its value is a string that parses as a JSON number. A
+/// document that genuinely carries that key with any other content keeps its
+/// object shape.
+fn restore_arbitrary_precision(values: serde_json::Map<String, Value>) -> Value {
+    if values.len() == 1 {
+        if let Some(Value::String(text)) = values.get(ARBITRARY_PRECISION_TOKEN) {
+            if let Ok(number) = serde_json::from_str::<serde_json::Number>(text) {
+                return Value::Number(number);
+            }
+        }
+    }
+    Value::Object(values)
 }
 
 #[cfg(test)]
@@ -224,6 +253,49 @@ mod tests {
                 SourcePosition { line, column },
                 "{source}"
             );
+        }
+    }
+
+    #[test]
+    fn every_number_keeps_its_number_shape_including_arbitrary_precision() {
+        // Integers reach visit_u64 / visit_i64 directly. Everything else is
+        // delivered as a private single-entry map and must be rebuilt.
+        for text in [
+            "0",
+            "-1",
+            "9007199254740993",
+            "1.5",
+            "-0.0",
+            "1e308",
+            "1e999",
+            "-1e999",
+            "1.7976931348623159e308",
+        ] {
+            let value = decode_unique_json(text).unwrap();
+            assert!(value.is_number(), "{text} decoded as {value:?}");
+            assert_eq!(
+                serde_json::to_string(&value).unwrap(),
+                text.replace('e', "e+")
+            );
+        }
+        // The same holds nested, where a typed reader would see the shape.
+        let nested = decode_unique_json(r#"{"a":[1.5,{"b":1e999}]}"#).unwrap();
+        assert!(nested["a"][0].is_number());
+        assert!(nested["a"][1]["b"].is_number());
+    }
+
+    #[test]
+    fn a_document_that_really_carries_the_private_key_keeps_its_object_shape() {
+        // The key is a serde_json implementation detail, not public API, so a
+        // document using it for anything but a number must not be reinterpreted.
+        for source in [
+            r#"{"$serde_json::private::Number":"hello"}"#,
+            r#"{"$serde_json::private::Number":null}"#,
+            r#"{"$serde_json::private::Number":"1","other":true}"#,
+            r#"{"$serde_json::private::Number":"1e999suffix"}"#,
+        ] {
+            let value = decode_unique_json(source).unwrap();
+            assert!(value.is_object(), "{source} decoded as {value:?}");
         }
     }
 

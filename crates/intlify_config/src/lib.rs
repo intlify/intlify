@@ -45,8 +45,11 @@
 //! let fabricated = intlify_config::measurement::CompletedObservation {};
 //! ```
 
-pub mod json;
-pub mod location;
+// Duplicate-aware decoding and byte-based source positions are shared 017
+// reading utilities. They keep their existing public paths here so the CLI
+// compatibility surface is unchanged.
+pub use intlify_shared_json::{json, location};
+
 pub mod schema;
 
 // An unstable, display-only bridge for the opt-in contributor example. No

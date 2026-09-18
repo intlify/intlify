@@ -11,7 +11,7 @@ use serde_json::Value;
 use super::{evaluate, owner::OwnerInput, Artifacts};
 use crate::benchmark::run::RecordedRun;
 use crate::benchmark::shared::identity::{
-    InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
+    self, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
 };
 use crate::benchmark::shared::measurement::{
     native_attempt_reference, CaseEvidence, CaseResult, Evaluation, Evidence, EvidenceBody,
@@ -210,7 +210,7 @@ impl Catalog {
                     .cloned()
                     .ok_or(decode::DecodeFailure::Shape)?,
             )?;
-            if revision != Token::literal("0") || governing != VersionedIdentity::specification() {
+            if revision != Token::literal("0") || governing != identity::specification() {
                 return Err(decode::DecodeFailure::Unsupported.into());
             }
             let document = match kind {

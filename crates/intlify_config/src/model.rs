@@ -15,17 +15,11 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 pub(crate) const CONFIGURATION_SCHEMA_VERSION: &str = "0";
-pub(crate) const ID_PATTERN: &str = "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$";
 
-pub(crate) fn valid_identity(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    let endpoint = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit();
-    bytes.first().is_some_and(|byte| endpoint(*byte))
-        && bytes.last().is_some_and(|byte| endpoint(*byte))
-        && bytes
-            .iter()
-            .all(|byte| endpoint(*byte) || matches!(byte, b'.' | b'_' | b'-'))
-}
+// 015 configuration identities use 017's exact token grammar. Reusing the
+// shared definition keeps the two from drifting apart; it does not make these
+// semantic identity domains interchangeable with a shared artifact token.
+pub(crate) use intlify_shared_json::token::{valid_identity, ID_PATTERN};
 
 macro_rules! identity_type {
     ($name:ident) => {
