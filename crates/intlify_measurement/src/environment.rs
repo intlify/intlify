@@ -306,9 +306,15 @@ impl JsonSchema for Environment {
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         let entry = generator.subschema_for::<Entry>();
         let registry = generator.subschema_for::<VersionedIdentity>();
-        let fields = Field::ALL.map(|field| serde_json::json!({
-            "allOf": [entry, {"properties": {"observation": {"properties": {"field": {"const": field.name()}}}}}]
-        }));
+        // Both the field and its local identifier are fixed per position.
+        // Leaving the identifier open would let a document pass validation and
+        // then fail admission, which reconstructs the exact inventory.
+        let fields = Field::ALL.map(|field| {
+            serde_json::json!({"allOf": [entry, {"properties": {
+                "localRecordIdentity": {"const": local_identity(field)},
+                "observation": {"properties": {"field": {"const": field.name()}}}
+            }}]})
+        });
         schemars::json_schema!({
             "type": "object", "additionalProperties": false,
             "required": ["fieldRegistry", "fields"],
@@ -319,6 +325,29 @@ impl JsonSchema for Environment {
             }
         })
     }
+}
+
+/// The local identifier 026 gives one field inside its inventory.
+fn local_identity(field: Field) -> String {
+    format!("environment-field-{}", field.name())
+}
+
+/// Return whether reasons are canonical and belong to this exact field.
+///
+/// A reason that is well formed but selects another field, or another record,
+/// explains nothing about the field it was filed under. Shape alone is
+/// therefore not enough to call an absence explained.
+fn bound_reasons(reasons: &[Reason], parent: &RecordIdentity, field: Field) -> bool {
+    valid_reasons(reasons)
+        && reasons.iter().all(|reason| {
+            matches!(
+                reason.affected(),
+                Selector::EnvironmentField {
+                    record_identity,
+                    field: selected,
+                } if record_identity == parent && *selected == field
+            )
+        })
 }
 
 /// Build the reasons one absent field carries.
@@ -341,6 +370,8 @@ pub fn missing(parent: &RecordIdentity, field: Field, cause: Missing) -> Vec<Rea
 pub enum InventoryFailure {
     /// An observation was supplied for the wrong field, or out of order.
     FieldOrder,
+    /// An absent field's reasons do not belong to that field and record.
+    ReasonBinding,
     /// A local identifier could not be rendered.
     Identity(IdentityFailure),
 }
@@ -355,14 +386,22 @@ impl Environment {
     ///
     /// The observations arrive in that exact order and are checked against it,
     /// so an owner cannot report one field's state under another field's name.
-    pub fn new(observations: [Datum; 27]) -> Result<Self, InventoryFailure> {
+    pub fn new(
+        parent: &RecordIdentity,
+        observations: [Datum; 27],
+    ) -> Result<Self, InventoryFailure> {
         let mut fields = Vec::with_capacity(observations.len());
         for (observation, field) in observations.into_iter().zip(Field::ALL) {
             if observation.field() != field {
                 return Err(InventoryFailure::FieldOrder);
             }
+            if let Some(reasons) = observation.reasons() {
+                if !bound_reasons(reasons, parent, field) {
+                    return Err(InventoryFailure::ReasonBinding);
+                }
+            }
             fields.push(Entry {
-                local_record_identity: Token::new(&format!("environment-field-{}", field.name()))?,
+                local_record_identity: Token::new(&local_identity(field))?,
                 observation,
             });
         }
@@ -377,13 +416,18 @@ impl Environment {
         self.fields.iter().map(|field| &field.local_record_identity)
     }
 
-    /// Return whether every unavailable field carries canonical valid reasons.
+    /// Return whether every unavailable field explains its own absence.
+    ///
+    /// A submitted inventory is checked here, so the reasons must be canonical
+    /// and must select the field and record they were filed under.
     #[must_use]
-    pub fn reasons_are_valid(&self) -> bool {
-        self.fields
-            .iter()
-            .filter_map(|entry| entry.observation.reasons())
-            .all(valid_reasons)
+    pub fn reasons_are_valid(&self, parent: &RecordIdentity) -> bool {
+        self.fields.iter().all(|entry| {
+            entry
+                .observation
+                .reasons()
+                .is_none_or(|reasons| bound_reasons(reasons, parent, entry.observation.field()))
+        })
     }
 }
 
@@ -466,8 +510,8 @@ mod tests {
     #[test]
     fn the_inventory_keeps_every_registered_field_in_its_registered_order() {
         let parent = parent();
-        let environment = Environment::new(complete(&parent)).unwrap();
-        assert!(environment.reasons_are_valid());
+        let environment = Environment::new(&parent, complete(&parent)).unwrap();
+        assert!(environment.reasons_are_valid(&parent));
         let value = serde_json::to_value(&environment).unwrap();
         let fields = value["fields"].as_array().unwrap();
         assert_eq!(fields.len(), 27);
@@ -481,12 +525,41 @@ mod tests {
     }
 
     #[test]
+    fn the_generated_schema_pins_each_position_the_way_admission_does() {
+        // Admission reconstructs the exact inventory and compares it, so a
+        // schema that leaves a position's identifier open would admit records
+        // that cannot survive admission.
+        let parent = parent();
+        let schema = crate::schema::draft7_schema::<Environment>().unwrap();
+        let validator = jsonschema::draft7::new(&schema).unwrap();
+        let environment = Environment::new(&parent, complete(&parent)).unwrap();
+        let value = serde_json::to_value(&environment).unwrap();
+        assert!(
+            validator.is_valid(&value),
+            "{:?}",
+            validator.iter_errors(&value).collect::<Vec<_>>()
+        );
+
+        let mut renamed = value.clone();
+        renamed["fields"][1]["localRecordIdentity"] =
+            serde_json::json!("environment-field-renamed");
+        assert!(!validator.is_valid(&renamed));
+
+        // Another registered field's identifier is not a free spelling either:
+        // each position carries exactly its own.
+        let mut borrowed = value;
+        borrowed["fields"][1]["localRecordIdentity"] =
+            serde_json::json!("environment-field-kernel_build");
+        assert!(!validator.is_valid(&borrowed));
+    }
+
+    #[test]
     fn an_observation_reported_under_another_field_is_rejected() {
         let parent = parent();
         let mut swapped = complete(&parent);
         swapped.swap(1, 2);
         assert_eq!(
-            Environment::new(swapped).map(|_| ()),
+            Environment::new(&parent, swapped).map(|_| ()),
             Err(InventoryFailure::FieldOrder)
         );
     }
@@ -499,7 +572,45 @@ mod tests {
         fields[1] = Datum::OsVersion(Observation::Unavailable {
             reasons: Vec::new(),
         });
-        let environment = Environment::new(fields).unwrap();
-        assert!(!environment.reasons_are_valid());
+        assert_eq!(
+            Environment::new(&parent, fields).map(|_| ()),
+            Err(InventoryFailure::ReasonBinding)
+        );
+    }
+
+    #[test]
+    fn a_reason_must_explain_the_field_and_record_it_was_filed_under() {
+        let parent = parent();
+
+        // Well formed, but about another field: it explains nothing about the
+        // field whose absence it was filed under.
+        let mut wrong_field = complete(&parent);
+        wrong_field[1] = Datum::OsVersion(Observation::Unavailable {
+            reasons: missing(&parent, Field::KernelBuild, Missing::NotCollected),
+        });
+        assert_eq!(
+            Environment::new(&parent, wrong_field).map(|_| ()),
+            Err(InventoryFailure::ReasonBinding)
+        );
+
+        // Well formed and about the right field, but about another record.
+        let other = RecordIdentity::fresh(CommonDomain::Record).unwrap();
+        let mut wrong_record = complete(&parent);
+        wrong_record[1] = Datum::OsVersion(Observation::Unavailable {
+            reasons: missing(&other, Field::OsVersion, Missing::NotCollected),
+        });
+        assert_eq!(
+            Environment::new(&parent, wrong_record).map(|_| ()),
+            Err(InventoryFailure::ReasonBinding)
+        );
+
+        // A submitted inventory is checked the same way, so a decoded document
+        // cannot carry a binding that construction would have refused.
+        let environment = Environment::new(&parent, complete(&parent)).unwrap();
+        assert!(environment.reasons_are_valid(&parent));
+        assert!(
+            !environment.reasons_are_valid(&other),
+            "the reasons belong to the record they name"
+        );
     }
 }

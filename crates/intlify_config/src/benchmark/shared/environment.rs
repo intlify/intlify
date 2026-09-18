@@ -99,119 +99,129 @@ pub(super) fn project(
             }
         };
     }
-    Environment::new([
-        Datum::OsFamily(family.map_or_else(
-            || unavailable!(OsFamily, NativeAcquisitionUnavailable),
-            |identity| Observation::Observed {
-                value: ReportedIdentifier {
-                    identity,
-                    method: uname_method(),
+    Environment::new(
+        parent,
+        [
+            Datum::OsFamily(family.map_or_else(
+                || unavailable!(OsFamily, NativeAcquisitionUnavailable),
+                |identity| Observation::Observed {
+                    value: ReportedIdentifier {
+                        identity,
+                        method: uname_method(),
+                    },
                 },
-            },
-        )),
-        Datum::OsVersion(unavailable!(OsVersion, NotCollected)),
-        Datum::KernelBuild(conditional_unavailable!(
-            KernelBuild,
-            KernelReleaseIsNotBuildIdentity
-        )),
-        Datum::CpuArchitecture(architecture.map_or_else(
-            || unavailable!(CpuArchitecture, NativeAcquisitionUnavailable),
-            |identity| Observation::Observed {
-                value: ReportedIdentifier {
-                    identity,
-                    method: uname_method(),
+            )),
+            Datum::OsVersion(unavailable!(OsVersion, NotCollected)),
+            Datum::KernelBuild(conditional_unavailable!(
+                KernelBuild,
+                KernelReleaseIsNotBuildIdentity
+            )),
+            Datum::CpuArchitecture(architecture.map_or_else(
+                || unavailable!(CpuArchitecture, NativeAcquisitionUnavailable),
+                |identity| Observation::Observed {
+                    value: ReportedIdentifier {
+                        identity,
+                        method: uname_method(),
+                    },
                 },
-            },
-        )),
-        Datum::TargetTriple(match &build.cargo_inputs.target {
-            Acquisition::Observed { value } => ConditionalObservation::Observed {
-                value: Token::new(value)?,
-            },
-            Acquisition::Unavailable { .. } => {
-                conditional_unavailable!(TargetTriple, NativeAcquisitionUnavailable)
-            }
-        }),
-        Datum::RunnerContext(RequiredObservation::Observed {
-            value: RunnerContext::LocalUncontrolled {},
-        }),
-        Datum::ExecutionKind(unavailable!(ExecutionKind, NotCollected)),
-        Datum::ProcessorClass(unavailable!(ProcessorClass, NotCollected)),
-        Datum::LogicalCpuCount(unavailable!(
-            LogicalCpuCount,
-            ParallelismHintIsNotLogicalCpuCount
-        )),
-        Datum::MemoryCapacityClass(unavailable!(MemoryCapacityClass, NotCollected)),
-        Datum::PowerThermalPolicy(conditional_unavailable!(PowerThermalPolicy, NotCollected)),
-        Datum::LanguageRuntime(ConditionalObservation::NotApplicable {
-            applicability_rule: native_rule(),
-        }),
-        Datum::Browser(ConditionalObservation::NotApplicable {
-            applicability_rule: native_rule(),
-        }),
-        Datum::VirtualMachine(ConditionalObservation::NotApplicable {
-            applicability_rule: native_rule(),
-        }),
-        Datum::Device(conditional_unavailable!(Device, NotCollected)),
-        Datum::JitGcConfiguration(ConditionalObservation::NotApplicable {
-            applicability_rule: native_rule(),
-        }),
-        Datum::Toolchain(toolchain(build)?.map_or_else(
-            || unavailable!(Toolchain, NativeAcquisitionUnavailable),
-            |value| Observation::Observed { value },
-        )),
-        Datum::BuildConfiguration(unavailable!(BuildConfiguration, EffectiveBuildNotAttested)),
-        Datum::Instrumentation(RequiredObservation::Observed {
-            value: Instrumentation {
-                descriptor: VersionedIdentity::new(
-                    "intlify-config-owner-run-instrumentation",
-                    "0",
-                )?,
-                timing: Token::literal("compiled-and-enabled-posix-monotonic-invocation"),
-                allocation: Token::literal("not-installed-by-this-harness"),
-                trace: Token::literal("not-installed-by-this-harness"),
-                profiling: Token::literal("not-installed-by-this-harness"),
-                external: Token::literal("not-attested"),
-            },
-        }),
-        Datum::Allocator(conditional_unavailable!(Allocator, NotCollected)),
-        Datum::MemoryObserver(ConditionalObservation::NotApplicable {
-            applicability_rule: duration_rule,
-        }),
-        Datum::ClockOrSampler(ConditionalObservation::Observed {
-            value: native_context.clock.clone(),
-        }),
-        Datum::Concurrency(Observation::Observed {
-            value: Concurrency {
-                descriptor: VersionedIdentity::new("intlify-config-owner-run-concurrency", "0")?,
-                scope: Token::literal("one-owner-run-in-the-calling-process"),
-                processes: Repetitions::new(1).expect("one process"),
-                calling_threads: Repetitions::new(1).expect("one calling thread"),
-                internal_workers: Quantity::new(0),
-                policy: Token::literal("sequential-cases-synchronous-calling-thread-no-workers"),
-                external_activity: Token::literal("uncontrolled"),
-            },
-        }),
-        Datum::ContainerEmulatorSimulator(conditional_unavailable!(
-            ContainerEmulatorSimulator,
-            NotCollected
-        )),
-        Datum::LocaleService(conditional_unavailable!(
-            LocaleService,
-            FiniteProviderHasNoLocaleServiceProfile
-        )),
-        Datum::Harness(RequiredObservation::Observed {
-            value: harness_identity(),
-        }),
-        Datum::Projection(RequiredObservation::Observed {
-            value: projection_identity(),
-        }),
-    ])
+            )),
+            Datum::TargetTriple(match &build.cargo_inputs.target {
+                Acquisition::Observed { value } => ConditionalObservation::Observed {
+                    value: Token::new(value)?,
+                },
+                Acquisition::Unavailable { .. } => {
+                    conditional_unavailable!(TargetTriple, NativeAcquisitionUnavailable)
+                }
+            }),
+            Datum::RunnerContext(RequiredObservation::Observed {
+                value: RunnerContext::LocalUncontrolled {},
+            }),
+            Datum::ExecutionKind(unavailable!(ExecutionKind, NotCollected)),
+            Datum::ProcessorClass(unavailable!(ProcessorClass, NotCollected)),
+            Datum::LogicalCpuCount(unavailable!(
+                LogicalCpuCount,
+                ParallelismHintIsNotLogicalCpuCount
+            )),
+            Datum::MemoryCapacityClass(unavailable!(MemoryCapacityClass, NotCollected)),
+            Datum::PowerThermalPolicy(conditional_unavailable!(PowerThermalPolicy, NotCollected)),
+            Datum::LanguageRuntime(ConditionalObservation::NotApplicable {
+                applicability_rule: native_rule(),
+            }),
+            Datum::Browser(ConditionalObservation::NotApplicable {
+                applicability_rule: native_rule(),
+            }),
+            Datum::VirtualMachine(ConditionalObservation::NotApplicable {
+                applicability_rule: native_rule(),
+            }),
+            Datum::Device(conditional_unavailable!(Device, NotCollected)),
+            Datum::JitGcConfiguration(ConditionalObservation::NotApplicable {
+                applicability_rule: native_rule(),
+            }),
+            Datum::Toolchain(toolchain(build)?.map_or_else(
+                || unavailable!(Toolchain, NativeAcquisitionUnavailable),
+                |value| Observation::Observed { value },
+            )),
+            Datum::BuildConfiguration(unavailable!(BuildConfiguration, EffectiveBuildNotAttested)),
+            Datum::Instrumentation(RequiredObservation::Observed {
+                value: Instrumentation {
+                    descriptor: VersionedIdentity::new(
+                        "intlify-config-owner-run-instrumentation",
+                        "0",
+                    )?,
+                    timing: Token::literal("compiled-and-enabled-posix-monotonic-invocation"),
+                    allocation: Token::literal("not-installed-by-this-harness"),
+                    trace: Token::literal("not-installed-by-this-harness"),
+                    profiling: Token::literal("not-installed-by-this-harness"),
+                    external: Token::literal("not-attested"),
+                },
+            }),
+            Datum::Allocator(conditional_unavailable!(Allocator, NotCollected)),
+            Datum::MemoryObserver(ConditionalObservation::NotApplicable {
+                applicability_rule: duration_rule,
+            }),
+            Datum::ClockOrSampler(ConditionalObservation::Observed {
+                value: native_context.clock.clone(),
+            }),
+            Datum::Concurrency(Observation::Observed {
+                value: Concurrency {
+                    descriptor: VersionedIdentity::new(
+                        "intlify-config-owner-run-concurrency",
+                        "0",
+                    )?,
+                    scope: Token::literal("one-owner-run-in-the-calling-process"),
+                    processes: Repetitions::new(1).expect("one process"),
+                    calling_threads: Repetitions::new(1).expect("one calling thread"),
+                    internal_workers: Quantity::new(0),
+                    policy: Token::literal(
+                        "sequential-cases-synchronous-calling-thread-no-workers",
+                    ),
+                    external_activity: Token::literal("uncontrolled"),
+                },
+            }),
+            Datum::ContainerEmulatorSimulator(conditional_unavailable!(
+                ContainerEmulatorSimulator,
+                NotCollected
+            )),
+            Datum::LocaleService(conditional_unavailable!(
+                LocaleService,
+                FiniteProviderHasNoLocaleServiceProfile
+            )),
+            Datum::Harness(RequiredObservation::Observed {
+                value: harness_identity(),
+            }),
+            Datum::Projection(RequiredObservation::Observed {
+                value: projection_identity(),
+            }),
+        ],
+    )
     .map_err(|failure| match failure {
         intlify_measurement::environment::InventoryFailure::Identity(failure) => failure,
-        // The inventory above is a literal in 026's registered order, so a
-        // field-order failure would be a defect in this module, not an input.
-        intlify_measurement::environment::InventoryFailure::FieldOrder => {
-            unreachable!("registered field order")
+        // The inventory above is a literal in 026's registered order, and each
+        // absent field's reasons are built from that same field and parent, so
+        // either failure would be a defect in this module rather than an input.
+        intlify_measurement::environment::InventoryFailure::FieldOrder
+        | intlify_measurement::environment::InventoryFailure::ReasonBinding => {
+            unreachable!("registered field order and reason binding")
         }
     })
 }
@@ -226,5 +236,5 @@ pub(super) fn validate(
     parent: &RecordIdentity,
 ) -> bool {
     project(source, parent).is_ok_and(|expected| expected == *environment)
-        && environment.reasons_are_valid()
+        && environment.reasons_are_valid(parent)
 }

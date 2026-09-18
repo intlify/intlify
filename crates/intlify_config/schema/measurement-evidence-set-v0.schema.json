@@ -1332,6 +1332,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-os_family"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1350,6 +1353,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-os_version"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1368,6 +1374,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-kernel_build"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1386,6 +1395,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-cpu_architecture"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1404,6 +1416,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-target_triple"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1422,6 +1437,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-runner_context"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1440,6 +1458,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-execution_kind"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1458,6 +1479,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-processor_class"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1476,6 +1500,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-logical_cpu_count"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1494,6 +1521,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-memory_capacity_class"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1512,6 +1542,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-power_thermal_policy"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1530,6 +1563,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-language_runtime"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1548,6 +1584,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-browser"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1566,6 +1605,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-virtual_machine"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1584,6 +1626,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-device"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1602,6 +1647,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-jit_gc_configuration"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1620,6 +1668,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-toolchain"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1638,6 +1689,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-build_configuration"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1656,6 +1710,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-instrumentation"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1674,6 +1731,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-allocator"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1692,6 +1752,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-memory_observer"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1710,6 +1773,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-clock_or_sampler"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1728,6 +1794,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-concurrency"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1746,6 +1815,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-container_emulator_simulator"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1764,6 +1836,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-locale_service"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1782,6 +1857,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-harness"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1800,6 +1878,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-projection"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -2934,6 +3015,9 @@
       "type": "object"
     },
     "OwnerDomain": {
+      "not": {
+        "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"]
+      },
       "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
       "type": "string"
     },

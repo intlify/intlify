@@ -143,16 +143,56 @@ fn valid_owner_domain(value: &str) -> bool {
     valid_identity(value) && value != COMMON_RECORD && value != COMMON_RUN
 }
 
-// The pattern is the exact token grammar. Excluding the two common spellings
-// is a decode rule rather than a pattern, because a schema pattern must stay
-// inside the regular subset every admitting implementation can compile, and a
-// document that names a common domain decodes as the common identity anyway.
-intlify_shared_json::shared_string_type!(
-    pub OwnerDomain,
-    valid_owner_domain,
-    intlify_shared_json::token::ID_PATTERN,
-    "invalid owner instance domain"
-);
+/// One instance domain an owner registers.
+///
+/// This is written out rather than produced by the shared string macro because
+/// its schema must exclude the two common spellings as well as match the token
+/// grammar. A lookahead pattern would not do: it is outside the regular subset
+/// an admitting implementation can be relied on to compile. An exclusion is a
+/// schema constraint every Draft 7 validator supports, so the generated schema
+/// admits exactly what the decoder below admits.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(transparent)]
+pub struct OwnerDomain(String);
+
+impl<'de> Deserialize<'de> for OwnerDomain {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = String::deserialize(deserializer)?;
+        if valid_owner_domain(&value) {
+            Ok(Self(value))
+        } else {
+            Err(serde::de::Error::custom("invalid owner instance domain"))
+        }
+    }
+}
+
+impl schemars::JsonSchema for OwnerDomain {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "OwnerDomain".into()
+    }
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "pattern": intlify_shared_json::token::ID_PATTERN,
+            "not": {"enum": [COMMON_RECORD, COMMON_RUN]}
+        })
+    }
+}
+
+impl OwnerDomain {
+    /// Retain one already validated spelling.
+    pub fn from_validated(value: &str) -> Result<Self, IdentityFailure> {
+        valid_owner_domain(value)
+            .then(|| Self(value.to_owned()))
+            .ok_or(IdentityFailure::InvalidToken)
+    }
+
+    /// Borrow the exact retained spelling.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// One fresh instance identity in a domain this crate registers.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
@@ -421,6 +461,30 @@ mod tests {
         let mut unknown = json!({"domain": "intlify-measurement-run-v0", "value": "0".repeat(64)});
         unknown["extra"] = json!(true);
         assert!(serde_json::from_value::<AnyIdentity>(unknown).is_err());
+    }
+
+    #[test]
+    fn the_generated_schema_admits_exactly_what_the_decoder_admits() {
+        // A document that validates and then fails to decode is a schema that
+        // describes a different type than the one it was generated from.
+        let schema = crate::schema::draft7_schema::<OwnerRecordIdentity>().unwrap();
+        let validator = jsonschema::draft7::new(&schema).unwrap();
+        for (domain, admitted) in [
+            ("intlify-config-owner-result-v1", true),
+            ("intlify-authoring-owner-result-v1", true),
+            ("intlify-verification-record-v0", false),
+            ("intlify-measurement-run-v0", false),
+            ("Owner-Domain", false),
+            ("-leading", false),
+        ] {
+            let value = json!({"domain": domain, "value": "0".repeat(64)});
+            assert_eq!(validator.is_valid(&value), admitted, "schema: {domain}");
+            assert_eq!(
+                serde_json::from_value::<OwnerRecordIdentity>(value).is_ok(),
+                admitted,
+                "decoder: {domain}"
+            );
+        }
     }
 
     #[test]
