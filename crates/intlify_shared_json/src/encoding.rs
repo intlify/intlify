@@ -389,6 +389,27 @@ mod tests {
     }
 
     #[test]
+    fn a_decoded_number_is_rejected_whatever_shape_serde_delivered_it_in() {
+        // A number that arrives through serde_json's private single-entry map
+        // must still reach this encoder as a number. If the decoder stored it
+        // verbatim, the document would encode as an ordinary object and a
+        // digest would be produced over a value this encoding forbids.
+        for source in ["0", "-1", "1.5", "1e999", r#"{"total":1.5}"#, "[1e999]"] {
+            let value = crate::json::decode_unique_json(source).unwrap();
+            assert_eq!(
+                encode(&value),
+                Err(EncodingFailure::Number),
+                "{source} encoded instead of being rejected"
+            );
+        }
+        // A document that really uses the private key is an object, and an
+        // object of strings is encodable.
+        let literal =
+            crate::json::decode_unique_json(r#"{"$serde_json::private::Number":"hello"}"#).unwrap();
+        assert!(encode(&literal).is_ok());
+    }
+
+    #[test]
     fn registered_domains_use_the_exact_token_grammar() {
         assert_eq!(
             Domain::literal("intent-semantic-revision").name(),
