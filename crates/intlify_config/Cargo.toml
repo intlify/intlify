@@ -47,7 +47,7 @@ serde_json = { version = "1.0.106", optional = true }
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
 # Reuse the version already locked for intlify_contract's schema tests.
-jsonschema = { version = "=0.52.1", default-features = false }
+jsonschema = { version = "=0.56.0", default-features = false }
 tempfile = "3"
 
 [[example]]

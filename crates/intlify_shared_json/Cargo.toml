@@ -26,4 +26,4 @@ sha2 = { version = "=0.10.9", default-features = false, optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
-jsonschema = { version = "=0.52.1", default-features = false }
+jsonschema = { version = "=0.56.0", default-features = false }
