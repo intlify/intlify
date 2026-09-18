@@ -90,6 +90,15 @@ fn resolve(
     resolve_declarations(context, inputs, &limits(), &mut workspace)
 }
 
+fn resolve_within(
+    context: &dyn AuthoringContext,
+    inputs: &[DeclarationInput<'_>],
+    limits: &AuthoringLimits,
+) -> Result<intlify_authoring::AuthoringResult, AuthoringFailure> {
+    let mut workspace = AnalysisWorkspace::new();
+    resolve_declarations(context, inputs, limits, &mut workspace)
+}
+
 fn reasons(result: &intlify_authoring::AuthoringResult) -> Vec<&str> {
     result
         .diagnostics()
@@ -449,4 +458,80 @@ fn relabelling_a_test_context_as_production_does_not_admit_it() {
             ContextKind::ApplicationProfile
         ))
     );
+}
+
+#[test]
+fn source_owned_by_another_owner_is_outside_this_invocation() {
+    // The invocation resolves one owner's declarations. Source belonging to a
+    // different owner is not merely unusual: admitting it would attribute the
+    // message to the wrong application, which no later stage can detect.
+    let context = context();
+    let other = SourceSnapshot::new(
+        OwnerIdentity::new(OwnerKind::Library, "storefront").expect("checked project id"),
+        "checkout",
+        "1",
+        VersionedIdentity::literal("intlify-fixture-grammar", "0"),
+        4096,
+        &format!("sha256:{}", "0".repeat(64)),
+    )
+    .expect("checked snapshot");
+    let input = DeclarationInput {
+        occurrence: Occurrence::new(
+            other,
+            ByteRange::new(0, 8).unwrap(),
+            OccurrenceRole::UiLiteral,
+        )
+        .expect("range inside the snapshot"),
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+
+    let result = resolve(&context, &[input]).unwrap();
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    assert!(result.checked().is_none());
+    assert!(result.inspection_facts().is_empty());
+    assert_eq!(
+        reasons(&result),
+        [ReasonFamily::AuthoringInputInvalid.as_str()]
+    );
+
+    // The owner-local identity alone is equal here, so the rejection is the
+    // complete owner pair rather than the identity token.
+    let same_owner = declaration(MessageInput::Literal("Pay now"));
+    assert_eq!(
+        resolve(&context, &[same_owner]).unwrap().outcome(),
+        Outcome::Checked
+    );
+}
+
+#[test]
+fn the_diagnostics_budget_bounds_what_is_collected_not_only_what_is_returned() {
+    // One declaration reports a diagnostic per unusable parameter, so a caller
+    // supplying many would otherwise fill an unbounded vector before the limit
+    // was consulted. The failure must arrive from a bounded collector.
+    let context = context();
+    let parameters = (0..64)
+        .map(|index| ParameterBinding::new(&format!("extra{index}"), occurrence()))
+        .collect::<Vec<_>>();
+    let input = DeclarationInput {
+        parameters: &parameters,
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+    let mut limits = limits();
+    limits.diagnostics = 4;
+    let limits = limits.validate().expect("satisfiable bounds");
+
+    assert_eq!(
+        resolve_within(&context, &[input], &limits).unwrap_err(),
+        AuthoringFailure::Limit(intlify_authoring::LimitKind::Diagnostics)
+    );
+
+    // Below the budget the same shape still reports every diagnostic.
+    let few = parameters[..2].to_vec();
+    let input = DeclarationInput {
+        parameters: &few,
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+    let result = resolve_within(&context, &[input], &limits).unwrap();
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    assert_eq!(result.diagnostics().len(), 2);
 }

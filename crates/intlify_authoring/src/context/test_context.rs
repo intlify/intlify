@@ -13,7 +13,9 @@
 //! recognition, MF2 parsing, parameter checks, context resolution, and the
 //! projection all execute the real operations against these values.
 
-use intlify_shared_json::token::VersionedIdentity;
+use intlify_shared_json::encoding::{hash, Domain};
+use intlify_shared_json::token::{IntegrityDigest, VersionedIdentity};
+use serde_json::{json, Value};
 
 use super::{
     AuthoringBasis, AuthoringContext, CanonicalLocale, ContextKind, LocaleData, LocaleFailure,
@@ -50,6 +52,21 @@ impl LocaleRule {
             canonical: None,
         }
     }
+}
+
+/// Serialize one fixture input so it can be pinned.
+fn serialized(value: &impl serde::Serialize) -> Result<Value, PrimitiveError> {
+    serde_json::to_value(value).map_err(|_| PrimitiveError::InvalidToken)
+}
+
+/// Pin one fixture input by digesting its complete content.
+///
+/// The value carries no JSON numbers, because 017's canonical encoding has no
+/// number form; counts and flags are spelled as text or booleans.
+fn pin(domain: &'static str, value: &Value) -> Result<String, PrimitiveError> {
+    hash(Domain::literal(domain), value)
+        .map(|bytes| IntegrityDigest::from_hash(bytes).as_str().to_owned())
+        .map_err(|_| PrimitiveError::InvalidToken)
 }
 
 /// A finite, explicitly declared authoring context for tests.
@@ -136,19 +153,49 @@ impl TestContextBuilder {
 
     /// Build the context, pinning it as a test context.
     pub fn build(self) -> Result<TestContext, PrimitiveError> {
-        let digest = format!("sha256:{}", "0".repeat(64));
         let default_surface_class = self
             .default_surface_class
             .as_deref()
             .map(NonemptyText::from_validated)
             .transpose()?;
+        // The pins are digests of this fixture's own inputs. A constant pin
+        // would say nothing about which inputs were used, and two fixtures
+        // with different owners, vocabularies, or rules would carry identical
+        // basis evidence.
+        let context_pin = pin(
+            "intlify-authoring-test-context-input",
+            &json!({
+                "owner": serialized(&self.owner)?,
+                "defaultSourceLocale": self.default_source_locale,
+                "defaultSurfaceClass": self.default_surface_class,
+                "usageProfile": serialized(&self.usage_profile)?,
+            }),
+        )?;
+        let vocabulary_pin = pin(
+            "intlify-authoring-test-vocabulary-input",
+            &json!({"members": self.vocabulary.members()}),
+        )?;
+        let locale_pin = pin(
+            "intlify-authoring-test-locale-input",
+            &json!({
+                "available": self.available,
+                "rules": self
+                    .rules
+                    .iter()
+                    .map(|rule| json!({"input": rule.input, "canonical": rule.canonical}))
+                    .collect::<Vec<_>>(),
+            }),
+        )?;
         let basis = AuthoringBasis::new(
             VersionedIdentity::literal("intlify-authoring-phase1-test", "0"),
             ContextKind::TestContext,
-            ExactInputBinding::new("intlify-authoring-test-context", "0", &digest)?,
-            ExactInputBinding::new("intlify-authoring-test-vocabulary", "0", &digest)?,
+            ExactInputBinding::new("intlify-authoring-test-context", "0", &context_pin)?,
+            ExactInputBinding::new("intlify-authoring-test-vocabulary", "0", &vocabulary_pin)?,
+            // The canonicalization is the same finite rule interpreter in every
+            // fixture; what differs between them is the rule data, which the
+            // locale-data pin above carries.
             VersionedIdentity::literal("intlify-authoring-test-canonicalization", "0"),
-            LocaleData::new("intlify-authoring-test-locale-data", &digest)?,
+            LocaleData::new("intlify-authoring-test-locale-data", &locale_pin)?,
             default_surface_class,
         );
         Ok(TestContext {
@@ -260,6 +307,65 @@ mod tests {
         assert!(context.surface_vocabulary().admits("checkout"));
         assert_eq!(context.basis().default_surface_class(), None);
         assert!(context.usage_profile().is_none());
+    }
+
+    #[test]
+    fn distinct_fixture_inputs_produce_distinct_basis_evidence() {
+        // A basis records which inputs were used. A pin that is the same for
+        // every fixture records nothing, so two contexts that differ in any
+        // admitted input must not carry identical evidence.
+        let base = context();
+        assert_eq!(base.basis(), context().basis(), "the same inputs pin alike");
+
+        let other_owner = TestContext::builder(
+            OwnerIdentity::new(OwnerKind::Library, "storefront").unwrap(),
+            SurfaceVocabulary::new(["checkout"]).unwrap(),
+        )
+        .default_source_locale("en")
+        .rule(LocaleRule::canonical("EN-us", "en-US"))
+        .rule(LocaleRule::canonical("en-US", "en-US"))
+        .rule(LocaleRule::invalid("en_US"))
+        .build()
+        .unwrap();
+        assert_ne!(base.basis(), other_owner.basis(), "owner");
+
+        let other_vocabulary = TestContext::builder(
+            OwnerIdentity::new(OwnerKind::Application, "storefront").unwrap(),
+            SurfaceVocabulary::new(["checkout", "nav"]).unwrap(),
+        )
+        .default_source_locale("en")
+        .rule(LocaleRule::canonical("EN-us", "en-US"))
+        .rule(LocaleRule::canonical("en-US", "en-US"))
+        .rule(LocaleRule::invalid("en_US"))
+        .build()
+        .unwrap();
+        assert_ne!(base.basis(), other_vocabulary.basis(), "vocabulary");
+
+        let other_rules = TestContext::builder(
+            OwnerIdentity::new(OwnerKind::Application, "storefront").unwrap(),
+            SurfaceVocabulary::new(["checkout"]).unwrap(),
+        )
+        .default_source_locale("en")
+        .rule(LocaleRule::canonical("EN-us", "en-US"))
+        .rule(LocaleRule::canonical("en-US", "en-US"))
+        // The same identifier, now declared valid instead of malformed.
+        .rule(LocaleRule::canonical("en_US", "en-US"))
+        .build()
+        .unwrap();
+        assert_ne!(base.basis(), other_rules.basis(), "locale rules");
+
+        let offline = TestContext::builder(
+            OwnerIdentity::new(OwnerKind::Application, "storefront").unwrap(),
+            SurfaceVocabulary::new(["checkout"]).unwrap(),
+        )
+        .default_source_locale("en")
+        .rule(LocaleRule::canonical("EN-us", "en-US"))
+        .rule(LocaleRule::canonical("en-US", "en-US"))
+        .rule(LocaleRule::invalid("en_US"))
+        .unavailable()
+        .build()
+        .unwrap();
+        assert_ne!(base.basis(), offline.basis(), "provider availability");
     }
 
     #[test]

@@ -24,10 +24,15 @@
 //! evaluated, and no mutable global state is held.
 //!
 //! The only authoring context this phase admits is explicitly test-owned, and
-//! it is absent from an ordinary build:
-//! ```compile_fail
-//! use intlify_authoring::test_context::TestContext;
-//! ```
+//! it is absent from an ordinary build. The example below is compiled only in
+//! that build, because an ordinary build is the one whose reachability it
+//! describes; with the feature enabled the import is supposed to resolve.
+#![cfg_attr(
+    not(feature = "test-context"),
+    doc = "```compile_fail",
+    doc = "use intlify_authoring::test_context::TestContext;",
+    doc = "```"
+)]
 //! A caller that supplies its own context still cannot claim a production kind,
 //! because production admission needs checked 015 inputs and the 017/018 work
 //! that later phases own. That rejection is asserted in

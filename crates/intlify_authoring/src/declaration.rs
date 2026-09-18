@@ -233,6 +233,55 @@ impl From<MessageFailure> for AuthoringFailure {
     }
 }
 
+/// A bounded collector for the diagnostics one invocation reports.
+///
+/// The budget is enforced as each diagnostic is added rather than after the
+/// fact. One declaration can report a diagnostic per supplied parameter, so a
+/// caller that supplies many would otherwise buy an unbounded vector before
+/// the limit is ever consulted.
+struct DiagnosticSink {
+    reported: Vec<Diagnostic>,
+    budget: u64,
+    exhausted: bool,
+}
+
+impl DiagnosticSink {
+    const fn new(budget: u64) -> Self {
+        Self {
+            reported: Vec::new(),
+            budget,
+            exhausted: false,
+        }
+    }
+
+    /// Report one diagnostic, or record that the budget is exhausted.
+    ///
+    /// Nothing is appended past the budget, so the failure below is reported
+    /// from a bounded collector rather than from an oversized one.
+    fn push(&mut self, diagnostic: Diagnostic) {
+        if self.reported.len() as u64 >= self.budget {
+            self.exhausted = true;
+            return;
+        }
+        self.reported.push(diagnostic);
+    }
+
+    fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        for diagnostic in diagnostics {
+            self.push(diagnostic);
+        }
+    }
+
+    const fn exhausted(&self) -> bool {
+        self.exhausted
+    }
+
+    fn into_reported(mut self) -> Vec<Diagnostic> {
+        self.reported.sort_by(Diagnostic::reporting_cmp);
+        self.reported
+    }
+}
+
 /// Resolve a finite set of declarations against a checked context.
 ///
 /// Every declaration is analyzed, so one blocked declaration does not suppress
@@ -260,7 +309,7 @@ pub fn resolve_declarations(
     reject_duplicate_occurrences(inputs)?;
 
     let mut declarations = Vec::new();
-    let mut diagnostics = Vec::new();
+    let mut diagnostics = DiagnosticSink::new(limits.diagnostics);
     let mut blocked = false;
 
     for input in inputs {
@@ -268,13 +317,12 @@ pub fn resolve_declarations(
             Some(facts) => declarations.push(facts),
             None => blocked = true,
         }
+        if diagnostics.exhausted() {
+            return Err(AuthoringFailure::Limit(LimitKind::Diagnostics));
+        }
     }
 
     declarations.sort_by(|left, right| left.occurrence.canonical_cmp(&right.occurrence));
-    diagnostics.sort_by(Diagnostic::reporting_cmp);
-    if diagnostics.len() as u64 > limits.diagnostics {
-        return Err(AuthoringFailure::Limit(LimitKind::Diagnostics));
-    }
 
     Ok(AuthoringResult {
         outcome: if blocked {
@@ -283,7 +331,7 @@ pub fn resolve_declarations(
             Outcome::Checked
         },
         declarations: declarations.into_boxed_slice(),
-        diagnostics: diagnostics.into_boxed_slice(),
+        diagnostics: diagnostics.into_reported().into_boxed_slice(),
     })
 }
 
@@ -304,9 +352,21 @@ fn resolve_one(
     input: &DeclarationInput<'_>,
     limits: &AuthoringLimits,
     workspace: &mut AnalysisWorkspace,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> Result<Option<DeclarationFacts>, AuthoringFailure> {
     if !input.occurrence.role().is_declaration() {
+        diagnostics.push(authoring(
+            Stage::ResultConstruction,
+            ReasonFamily::AuthoringInputInvalid,
+            input,
+        ));
+        return Ok(None);
+    }
+    // One invocation resolves one owner's declarations. Source that belongs to
+    // another owner is outside this scope, and admitting it would attribute
+    // the message to the wrong application or library. This is checked before
+    // any analysis, because out-of-scope input is not work to be done.
+    if input.occurrence.source().owner() != context.owner() {
         diagnostics.push(authoring(
             Stage::ResultConstruction,
             ReasonFamily::AuthoringInputInvalid,
@@ -364,7 +424,7 @@ type ResolvedLocale = Option<(crate::context::CanonicalLocale, SourceLocaleBasis
 fn resolve_locale(
     context: &dyn AuthoringContext,
     input: &DeclarationInput<'_>,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> Result<ResolvedLocale, AuthoringFailure> {
     if let Some(authored) = input.metadata.source_locale {
         return match context.canonicalize(authored) {
@@ -397,7 +457,7 @@ fn resolve_locale(
 fn resolve_surface_class(
     context: &dyn AuthoringContext,
     input: &DeclarationInput<'_>,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> Option<String> {
     // An explicit assignment wins; only its absence lets the default apply.
     let candidate = input
@@ -421,7 +481,7 @@ fn resolve_usage(
     context: &dyn AuthoringContext,
     input: &DeclarationInput<'_>,
     limits: &AuthoringLimits,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> Result<Option<Usage>, ()> {
     let Some(value) = input.usage else {
         return Ok(None);
@@ -453,7 +513,7 @@ fn resolve_usage(
 fn resolve_description(
     input: &DeclarationInput<'_>,
     limits: &AuthoringLimits,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> Result<Option<String>, ()> {
     let Some(description) = input.metadata.description else {
         // There is no shared description default: absence stays absence.
@@ -484,7 +544,7 @@ fn admitted_text(value: &str, limits: &AuthoringLimits) -> Result<NonemptyText, 
 fn match_parameters(
     input: &DeclarationInput<'_>,
     required: &[String],
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut DiagnosticSink,
 ) -> bool {
     let mut matched = true;
     let mut seen: Vec<&str> = Vec::new();
@@ -534,4 +594,60 @@ fn authoring(stage: Stage, family: ReasonFamily, input: &DeclarationInput<'_>) -
         Severity::Error,
         input.occurrence.clone(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::primitives::{ByteRange, OccurrenceRole, OwnerIdentity, OwnerKind, SourceSnapshot};
+    use intlify_shared_json::token::VersionedIdentity;
+
+    fn diagnostic() -> Diagnostic {
+        let source = SourceSnapshot::new(
+            OwnerIdentity::new(OwnerKind::Application, "storefront").unwrap(),
+            "checkout",
+            "1",
+            VersionedIdentity::literal("intlify-fixture-grammar", "0"),
+            4096,
+            &format!("sha256:{}", "0".repeat(64)),
+        )
+        .unwrap();
+        Diagnostic::new(
+            Stage::ContextResolution,
+            DiagnosticOrigin::Authoring(ReasonFamily::AuthoringParameterMismatch),
+            Severity::Error,
+            Occurrence::new(
+                source,
+                ByteRange::new(0, 8).unwrap(),
+                OccurrenceRole::UiLiteral,
+            )
+            .unwrap(),
+        )
+    }
+
+    #[test]
+    fn the_sink_never_grows_past_its_budget_however_many_arrive() {
+        let mut sink = DiagnosticSink::new(3);
+        for _ in 0..1_000 {
+            sink.push(diagnostic());
+        }
+        // The point of the budget is the memory, not only the failure: a
+        // thousand arrivals leave three retained diagnostics behind.
+        assert!(sink.exhausted());
+        assert_eq!(sink.into_reported().len(), 3);
+    }
+
+    #[test]
+    fn a_sink_inside_its_budget_reports_everything_and_is_not_exhausted() {
+        let mut sink = DiagnosticSink::new(3);
+        sink.extend([diagnostic(), diagnostic()]);
+        assert!(!sink.exhausted());
+        assert_eq!(sink.into_reported().len(), 2);
+
+        // The boundary is exact: filling the budget is not exceeding it.
+        let mut exact = DiagnosticSink::new(2);
+        exact.extend([diagnostic(), diagnostic()]);
+        assert!(!exact.exhausted());
+        assert_eq!(exact.into_reported().len(), 2);
+    }
 }
