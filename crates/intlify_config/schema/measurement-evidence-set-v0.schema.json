@@ -41,6 +41,7 @@
       "description": "Either instance identity, as a reference target carries them equally.\n\nThe two are still separate types: a common record's own identity is never\nan owner instance, and reading one out of a reference does not make it one."
     },
     "Architecture": {
+      "description": "The processor architectures this inventory admits.",
       "enum": ["x86", "x86_64", "arm", "aarch64", "riscv32", "riscv64", "wasm32", "wasm64"],
       "type": "string"
     },
@@ -162,6 +163,7 @@
     },
     "BuildConfiguration": {
       "additionalProperties": false,
+      "description": "The effective build settings a measured artifact was produced under.",
       "properties": {
         "assertions": {
           "type": "boolean"
@@ -364,7 +366,7 @@
     },
     "ClockObservation": {
       "additionalProperties": false,
-      "description": "An actual acquisition fact, not a guessed precision or part of semantic output.",
+      "description": "An actual clock acquisition fact, not a guessed precision or a semantic output.",
       "properties": {
         "clock": {
           "type": "string"
@@ -448,6 +450,7 @@
     },
     "Concurrency": {
       "additionalProperties": false,
+      "description": "How much concurrency a run actually used, and under which policy.",
       "properties": {
         "callingThreads": {
           "$ref": "#/definitions/PositiveUInt64"
@@ -456,19 +459,19 @@
           "$ref": "#/definitions/VersionedIdentity"
         },
         "externalActivity": {
-          "$ref": "#/definitions/ExternalActivity"
+          "$ref": "#/definitions/Token"
         },
         "internalWorkers": {
           "$ref": "#/definitions/UInt64"
         },
         "policy": {
-          "$ref": "#/definitions/ConcurrencyPolicy"
+          "$ref": "#/definitions/Token"
         },
         "processes": {
           "$ref": "#/definitions/PositiveUInt64"
         },
         "scope": {
-          "$ref": "#/definitions/ConcurrencyScope"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -486,15 +489,8 @@
       "enum": ["sequential-cases-calling-thread-no-workers"],
       "type": "string"
     },
-    "ConcurrencyPolicy": {
-      "enum": ["sequential-cases-synchronous-calling-thread-no-workers"],
-      "type": "string"
-    },
-    "ConcurrencyScope": {
-      "enum": ["one-owner-run-in-the-calling-process"],
-      "type": "string"
-    },
     "ConditionalObservation": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -545,6 +541,7 @@
       ]
     },
     "ConditionalObservation2": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -595,6 +592,7 @@
       ]
     },
     "ConditionalObservation3": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1964,10 +1962,6 @@
       "enum": ["same-process-synchronous-ordinary-core"],
       "type": "string"
     },
-    "ExternalActivity": {
-      "enum": ["uncontrolled"],
-      "type": "string"
-    },
     "Framing": {
       "enum": ["intlify-config-minimum-observation/0"],
       "type": "string"
@@ -2079,24 +2073,25 @@
     },
     "Instrumentation": {
       "additionalProperties": false,
+      "description": "What a harness installed while measuring, and what it did not.",
       "properties": {
         "allocation": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         },
         "descriptor": {
           "$ref": "#/definitions/VersionedIdentity"
         },
         "externalInstrumentation": {
-          "$ref": "#/definitions/Unattested"
+          "$ref": "#/definitions/Token"
         },
         "profiling": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         },
         "timing": {
-          "$ref": "#/definitions/Timing"
+          "$ref": "#/definitions/Token"
         },
         "trace": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -2395,11 +2390,8 @@
       "enum": ["none"],
       "type": "string"
     },
-    "NotInstalled": {
-      "enum": ["not-installed-by-this-harness"],
-      "type": "string"
-    },
     "Observation": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2436,6 +2428,7 @@
       ]
     },
     "Observation10": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2472,6 +2465,7 @@
       ]
     },
     "Observation11": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2528,6 +2522,7 @@
       "type": "object"
     },
     "Observation2": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2564,6 +2559,7 @@
       ]
     },
     "Observation3": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2600,6 +2596,7 @@
       ]
     },
     "Observation4": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2636,6 +2633,7 @@
       ]
     },
     "Observation5": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2672,6 +2670,7 @@
       ]
     },
     "Observation6": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2708,6 +2707,7 @@
       ]
     },
     "Observation7": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2744,6 +2744,7 @@
       ]
     },
     "Observation8": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2780,6 +2781,7 @@
       ]
     },
     "Observation9": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3148,6 +3150,7 @@
       "type": "object"
     },
     "RequiredObservation": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3166,6 +3169,7 @@
       ]
     },
     "RequiredObservation2": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3184,6 +3188,7 @@
       ]
     },
     "RequiredObservation3": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3234,6 +3239,7 @@
       "type": "object"
     },
     "RunnerContext": {
+      "description": "Where a run executed. An uncontrolled local machine is not a qualified runner.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3516,11 +3522,8 @@
       "type": "string"
     },
     "SystemFamily": {
+      "description": "The system families this inventory admits.",
       "enum": ["linux", "darwin"],
-      "type": "string"
-    },
-    "Timing": {
-      "enum": ["compiled-and-enabled-posix-monotonic-invocation"],
       "type": "string"
     },
     "Token": {
@@ -3529,6 +3532,7 @@
     },
     "Toolchain": {
       "additionalProperties": false,
+      "description": "The compiler and backend a measured build was produced with.",
       "properties": {
         "backend": {
           "$ref": "#/definitions/VersionedIdentity"
@@ -3552,10 +3556,6 @@
     },
     "UInt64": {
       "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
-      "type": "string"
-    },
-    "Unattested": {
-      "enum": ["not-attested"],
       "type": "string"
     },
     "UnavailableWork": {

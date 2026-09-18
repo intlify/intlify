@@ -20,6 +20,7 @@
 
 pub mod decode;
 pub mod encoding;
+pub mod environment;
 pub mod identity;
 pub mod reason;
 pub mod record;

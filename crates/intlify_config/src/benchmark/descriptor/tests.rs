@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 
 use crate::benchmark::operation::tests::operations;
 
+use super::super::quantity::Quantity;
 use super::*;
 
 fn prepared(operation: Operation) -> Prepared {

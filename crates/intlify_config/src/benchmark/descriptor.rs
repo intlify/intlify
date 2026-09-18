@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use super::clock::ClockDescription;
 use super::locale::InputFacts;
 use super::operation::{Operation, Prepared};
-use super::quantity::Quantity;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -153,28 +152,18 @@ impl Method {
     }
 }
 
-/// An actual acquisition fact, not a guessed precision or part of semantic output.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct ClockObservation {
-    pub(super) provider: String,
-    pub(super) provider_revision: String,
-    pub(super) clock: String,
-    pub(super) resolution_nanoseconds: Quantity,
-    pub(super) resolution_source: String,
-    pub(super) conversion: String,
-}
+// The clock observation is one of 026's environment fields, so its shape is
+// the common one. What this owner supplies is the acquired values.
+pub(super) use intlify_measurement::environment::ClockObservation;
 
-impl From<ClockDescription> for ClockObservation {
-    fn from(value: ClockDescription) -> Self {
-        Self {
-            provider: value.provider.into(),
-            provider_revision: value.provider_revision.into(),
-            clock: value.clock.into(),
-            resolution_nanoseconds: value.resolution_nanoseconds,
-            resolution_source: value.resolution_source.into(),
-            conversion: value.conversion.into(),
-        }
+pub(super) fn clock_observation(value: ClockDescription) -> ClockObservation {
+    ClockObservation {
+        provider: value.provider.into(),
+        provider_revision: value.provider_revision.into(),
+        clock: value.clock.into(),
+        resolution_nanoseconds: value.resolution_nanoseconds,
+        resolution_source: value.resolution_source.into(),
+        conversion: value.conversion.into(),
     }
 }
 
@@ -261,7 +250,7 @@ impl Descriptors {
         Self {
             boundary: Boundary::for_operation(operation),
             method: Method::monotonic_invocation(),
-            clock_observation: clock.into(),
+            clock_observation: clock_observation(clock),
             execution: Execution::prepared_core(operation),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
@@ -289,7 +278,7 @@ impl Descriptors {
         if self.method != method {
             issues.push(DescriptorIssue::MethodMismatch);
         }
-        if self.clock_observation != ClockObservation::from(acquisition) {
+        if self.clock_observation != clock_observation(acquisition) {
             issues.push(DescriptorIssue::ClockBindingMismatch);
         }
         let clock = &self.clock_observation;

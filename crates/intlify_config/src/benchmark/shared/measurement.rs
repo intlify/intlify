@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::build::Build;
-use super::environment::{projection_identity, Environment};
+use super::environment::{self, projection_identity, Environment};
 use super::identity::{
     CaseIdentity, IdentityFailure, OwnerRecordIdentity, RecordIdentity, Token, VersionedIdentity,
 };
@@ -513,7 +513,7 @@ impl EvidenceBody {
             projection: projection_identity(),
             owner_result: OwnerBinding::from_owner(source.document())?,
             build: Build::project(source, parent)?,
-            environment: Environment::project(source, parent)?,
+            environment: environment::project(source, parent)?,
             cases,
         })
     }
