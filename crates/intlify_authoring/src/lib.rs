@@ -27,6 +27,8 @@ mod diagnostic;
 mod limits;
 mod message;
 mod primitives;
+mod projection;
+pub mod schema;
 mod specification;
 mod workspace;
 
@@ -44,5 +46,13 @@ pub use primitives::{
     OwnerKind, PrimitiveError, SemanticDigest, SourceSnapshot,
 };
 pub use primitives::{Occurrence, OccurrenceRole};
+pub use projection::{
+    intent_projection, intent_revision, projection_specification, revision_preimage, Attribute,
+    CatchAllKey, CatchAllTag, Declaration, Expression, ExpressionTag, Function, InputDeclaration,
+    InputTag, IntentProjection, LiteralKey, LiteralTag, LiteralValue, LocalDeclaration, LocalTag,
+    MarkupForm, MarkupPart, MarkupTag, MatchBody, MatchTag, MessageBody, MessageProjection, Opt,
+    PatternBody, PatternPart, PatternTag, RevisionFailure, TextPart, TextTag, Usage, Value,
+    VariableTag, VariableValue, Variant, VariantKey, PROJECTION_IDENTITY, PROJECTION_REVISION,
+};
 pub use specification::{mf2_specification, MF2_SEMANTICS_IDENTITY, MF2_SEMANTICS_REVISION};
 pub use workspace::AnalysisWorkspace;

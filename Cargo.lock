@@ -535,10 +535,12 @@ name = "intlify_authoring"
 version = "0.14.0-alpha.12"
 dependencies = [
  "intlify_shared_json",
+ "jsonschema",
  "ox_mf2_parser",
  "schemars",
  "serde",
  "serde_json",
+ "unicode-normalization",
 ]
 
 [[package]]

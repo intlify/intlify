@@ -1,0 +1,497 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "Attribute": {
+      "additionalProperties": false,
+      "description": "One attribute, in its source order within the owning production.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["name"],
+      "type": "object"
+    },
+    "CatchAllKey": {
+      "additionalProperties": false,
+      "description": "The catch-all key.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatchAllTag"
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "CatchAllTag": {
+      "description": "Discriminator of a catch-all key.",
+      "enum": ["catch-all"],
+      "type": "string"
+    },
+    "Declaration": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/InputDeclaration"
+        },
+        {
+          "$ref": "#/definitions/LocalDeclaration"
+        }
+      ],
+      "description": "One declaration, in source order."
+    },
+    "Expression": {
+      "additionalProperties": false,
+      "description": "One expression: an operand, a function, or both.\n\nAn expression with neither is not representable, matching the MF2 grammar.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/definitions/Attribute"
+          },
+          "type": "array"
+        },
+        "function": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Function"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/ExpressionTag"
+        },
+        "operand": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["kind", "attributes"],
+      "type": "object"
+    },
+    "ExpressionTag": {
+      "description": "Discriminator of an expression.",
+      "enum": ["expression"],
+      "type": "string"
+    },
+    "Function": {
+      "additionalProperties": false,
+      "description": "One function reference and its options.\n\nThe options are symbolic requirements. This projection encodes no second\nruntime type system and asserts nothing about what the function computes.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/definitions/Opt"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["name", "options"],
+      "type": "object"
+    },
+    "InputDeclaration": {
+      "additionalProperties": false,
+      "description": "One `.input` declaration.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/definitions/Attribute"
+          },
+          "type": "array"
+        },
+        "function": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Function"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/InputTag"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "name", "attributes"],
+      "type": "object"
+    },
+    "InputTag": {
+      "description": "Discriminator of an input declaration.",
+      "enum": ["input"],
+      "type": "string"
+    },
+    "LiteralKey": {
+      "additionalProperties": false,
+      "description": "One matcher variant key.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/LiteralTag"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "value"],
+      "type": "object"
+    },
+    "LiteralTag": {
+      "description": "Discriminator of a literal value.",
+      "enum": ["literal"],
+      "type": "string"
+    },
+    "LiteralValue": {
+      "additionalProperties": false,
+      "description": "One literal value, after MF2 escape decoding.\n\nQuoted and unquoted spellings with equal decoded values are the same value.\nA numeric-looking literal stays a string: there is no host number\nconversion, trimming, whitespace compression, or Unicode normalization of\nliteral content anywhere in this projection.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/LiteralTag"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "value"],
+      "type": "object"
+    },
+    "LocalDeclaration": {
+      "additionalProperties": false,
+      "description": "One `.local` declaration.",
+      "properties": {
+        "expression": {
+          "$ref": "#/definitions/Expression"
+        },
+        "kind": {
+          "$ref": "#/definitions/LocalTag"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "name", "expression"],
+      "type": "object"
+    },
+    "LocalTag": {
+      "description": "Discriminator of a local declaration.",
+      "enum": ["local"],
+      "type": "string"
+    },
+    "MarkupForm": {
+      "description": "Which side of a markup pair a part represents.",
+      "enum": ["open", "close", "standalone"],
+      "type": "string"
+    },
+    "MarkupPart": {
+      "additionalProperties": false,
+      "description": "One markup part.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/definitions/Attribute"
+          },
+          "type": "array"
+        },
+        "form": {
+          "$ref": "#/definitions/MarkupForm"
+        },
+        "kind": {
+          "$ref": "#/definitions/MarkupTag"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/definitions/Opt"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["kind", "form", "name", "options", "attributes"],
+      "type": "object"
+    },
+    "MarkupTag": {
+      "description": "Discriminator of a markup part.",
+      "enum": ["markup"],
+      "type": "string"
+    },
+    "MatchBody": {
+      "additionalProperties": false,
+      "description": "A message that selects among variants.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/MatchTag"
+        },
+        "selectors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "variants": {
+          "items": {
+            "$ref": "#/definitions/Variant"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["kind", "selectors", "variants"],
+      "type": "object"
+    },
+    "MatchTag": {
+      "description": "Discriminator of a matcher body.",
+      "enum": ["match"],
+      "type": "string"
+    },
+    "MessageBody": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PatternBody"
+        },
+        {
+          "$ref": "#/definitions/MatchBody"
+        }
+      ],
+      "description": "The body of a message.\n\nA simple message and a quoted pattern with equal content produce the same\nbody: the wrapper is syntax, not structure."
+    },
+    "MessageProjection": {
+      "additionalProperties": false,
+      "description": "The structured message.",
+      "properties": {
+        "body": {
+          "$ref": "#/definitions/MessageBody"
+        },
+        "declarations": {
+          "items": {
+            "$ref": "#/definitions/Declaration"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["declarations", "body"],
+      "type": "object"
+    },
+    "NonemptyText": {
+      "pattern": "^[\\s\\S]+$",
+      "type": "string"
+    },
+    "Opt": {
+      "additionalProperties": false,
+      "description": "One function option, in its source order within the owning function.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/Value"
+        }
+      },
+      "required": ["name", "value"],
+      "type": "object"
+    },
+    "PatternBody": {
+      "additionalProperties": false,
+      "description": "A message with one pattern.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PatternTag"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/definitions/PatternPart"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["kind", "parts"],
+      "type": "object"
+    },
+    "PatternPart": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TextPart"
+        },
+        {
+          "$ref": "#/definitions/Expression"
+        },
+        {
+          "$ref": "#/definitions/MarkupPart"
+        }
+      ],
+      "description": "One element of a pattern, in source order."
+    },
+    "PatternTag": {
+      "description": "Discriminator of a pattern body.",
+      "enum": ["pattern"],
+      "type": "string"
+    },
+    "TextPart": {
+      "additionalProperties": false,
+      "description": "One run of literal text.\n\nAdjacent runs are merged and empty runs are omitted, so a text part always\ncarries content and two equal messages cannot differ by how the parser\nhappened to split their text.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/TextTag"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "value"],
+      "type": "object"
+    },
+    "TextTag": {
+      "description": "Discriminator of a literal text run.",
+      "enum": ["text"],
+      "type": "string"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "Usage": {
+      "additionalProperties": false,
+      "description": "The bounded semantic usage a declaration was proven to have.",
+      "properties": {
+        "profile": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "value": {
+          "$ref": "#/definitions/NonemptyText"
+        }
+      },
+      "required": ["profile", "value"],
+      "type": "object"
+    },
+    "Value": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LiteralValue"
+        },
+        {
+          "$ref": "#/definitions/VariableValue"
+        }
+      ],
+      "description": "An operand or option value."
+    },
+    "VariableTag": {
+      "description": "Discriminator of a variable reference.",
+      "enum": ["variable"],
+      "type": "string"
+    },
+    "VariableValue": {
+      "additionalProperties": false,
+      "description": "One variable reference, by its parser-owned semantic name without a sigil.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/VariableTag"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["kind", "name"],
+      "type": "object"
+    },
+    "Variant": {
+      "additionalProperties": false,
+      "description": "One matcher variant, in source order.",
+      "properties": {
+        "keys": {
+          "items": {
+            "$ref": "#/definitions/VariantKey"
+          },
+          "type": "array"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/definitions/PatternPart"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["keys", "parts"],
+      "type": "object"
+    },
+    "VariantKey": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LiteralKey"
+        },
+        {
+          "$ref": "#/definitions/CatchAllKey"
+        }
+      ],
+      "description": "One variant key.\n\nA literal key carries its decoded value, never the parser's normalized\ncomparison key: two keys the parser matches identically can still be\ndifferent message content."
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    }
+  },
+  "description": "The complete localization-relevant projection of one declaration.\n\nEqual projections mean equal localization semantics. Host source\ncoordinates, quote spelling, non-semantic trivia, reference counts, and\nparameter-expression implementation are deliberately absent, so formatting\nthat leaves both the parsed structure and literal content unchanged cannot\nchange a revision.",
+  "properties": {
+    "description": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/NonemptyText"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "message": {
+      "$ref": "#/definitions/MessageProjection"
+    },
+    "mf2Specification": {
+      "$ref": "#/definitions/VersionedIdentity"
+    },
+    "parameters": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "sourceLocale": {
+      "$ref": "#/definitions/NonemptyText"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Usage"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": ["mf2Specification", "message", "sourceLocale", "parameters"],
+  "title": "IntentProjection",
+  "type": "object"
+}

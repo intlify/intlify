@@ -16,6 +16,8 @@ use super::literal::{self, ExtractionSegment, LiteralFailure};
 use crate::diagnostic::{Diagnostic, DiagnosticOrigin, Severity, Stage};
 use crate::limits::{AuthoringLimits, LimitKind};
 use crate::primitives::{ByteRange, Occurrence};
+use crate::projection::build::{Builder, ProjectionFailure};
+use crate::projection::MessageProjection;
 use crate::workspace::AnalysisWorkspace;
 
 /// One already host-decoded message, in the form its authoring site used.
@@ -51,6 +53,18 @@ pub enum MessageFailure {
     LiteralRoundTrip,
 }
 
+impl From<ProjectionFailure> for MessageFailure {
+    fn from(failure: ProjectionFailure) -> Self {
+        match failure {
+            ProjectionFailure::Limit(kind) => Self::Limit(kind),
+            // The parse was diagnostic-free and semantically valid, so a shape
+            // the projection walker cannot read is a parser change or a defect
+            // here, never an authoring mistake the caller could fix.
+            ProjectionFailure::UnsupportedStructure => Self::ParserInvariant,
+        }
+    }
+}
+
 impl From<LiteralFailure> for MessageFailure {
     fn from(failure: LiteralFailure) -> Self {
         match failure {
@@ -70,6 +84,7 @@ impl From<LiteralFailure> for MessageFailure {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageFacts {
     parameters: Box<[String]>,
+    message: MessageProjection,
 }
 
 impl MessageFacts {
@@ -81,6 +96,16 @@ impl MessageFacts {
     #[must_use]
     pub fn parameters(&self) -> &[String] {
         &self.parameters
+    }
+
+    /// Borrow the structured message this projection is computed from.
+    ///
+    /// This is the message half of an Intent projection. Combining it with the
+    /// resolved source locale, usage, and description produces the complete
+    /// projection a revision is taken over.
+    #[must_use]
+    pub const fn message(&self) -> &MessageProjection {
+        &self.message
     }
 }
 
@@ -223,9 +248,14 @@ pub fn analyze_message(
 
     collect_external_parameters(&model, limits, workspace)?;
     let parameters: Box<[String]> = workspace.names.drain(..).collect();
+    let view = ox_mf2_parser::CstView::new(parsed.sources(), result.source, &result.cst);
+    let message = Builder::new(view, limits).message()?;
     Ok(finish(
         mf2_source,
-        Some(MessageFacts { parameters }),
+        Some(MessageFacts {
+            parameters,
+            message,
+        }),
         workspace,
     ))
 }
