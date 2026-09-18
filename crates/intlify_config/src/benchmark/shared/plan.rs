@@ -22,7 +22,7 @@ pub(in crate::benchmark) use intlify_measurement::plan::{
 use crate::benchmark::cases::registry::Registry;
 use crate::benchmark::cases::{LimitEdge, LimitKind, Recipe, Selector};
 use crate::benchmark::context::CaptureContext;
-use crate::benchmark::descriptor::{Boundary, Execution, Method};
+use crate::benchmark::descriptor::{prepared_core, Boundary, Execution, Method};
 
 use super::identity::{
     CaseIdentity, NativeChecksum, OwnerLabel, OwnerRecordIdentity, Token, VersionedIdentity,
@@ -154,7 +154,7 @@ impl CaseProjection {
                     scale: Scale::Value,
                     verification_subject: subject(),
                     execution_model: ExecutionModel::Value,
-                    execution_state: Execution::prepared_core(operation),
+                    execution_state: prepared_core(operation),
                     concurrency: Concurrency::Value,
                     workload: expected.work().clone(),
                     metric: Metric::Value,

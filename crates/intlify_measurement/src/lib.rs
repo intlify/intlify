@@ -22,6 +22,7 @@ pub mod build;
 pub mod decode;
 pub mod encoding;
 pub mod environment;
+pub mod execution;
 pub mod identity;
 pub mod plan;
 pub mod reason;

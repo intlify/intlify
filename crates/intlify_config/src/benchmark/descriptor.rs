@@ -167,53 +167,32 @@ pub(super) fn clock_observation(value: ClockDescription) -> ClockObservation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[expect(
-    clippy::struct_field_names,
-    reason = "mirror 026's independent execution-state fields"
-)]
-pub(super) struct Execution {
-    process_state: String,
-    engine_state: String,
-    initial_preparation_state: String,
-    cache_state: String,
-    runtime_compilation_state: String,
-    managed_heap_state: String,
-    scratch_reuse_state: String,
-    output_buffer_state: OutputBuffer,
-}
+// The execution state is one of 026's common record shapes. What this owner
+// supplies is which states its prepared core actually ran in.
+pub(super) use intlify_measurement::execution::{Execution, OutputBuffer};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
-enum OutputBuffer {
-    NotApplicable {},
-    Applicable { ownership: String, reuse: String },
-}
-
-impl Execution {
-    pub(super) fn prepared_core(operation: Operation) -> Self {
-        let locale = operation == Operation::LocaleCanonicalization;
-        Self {
-            // The harness invokes prepared calls in its existing process. Its
-            // compiled core and immutable preparation are retained, not rebuilt
-            // between samples. None of these fields claims a warm lookup cache.
-            process_state: "reused-process".into(),
-            engine_state: "reused".into(),
-            initial_preparation_state: "resident".into(),
-            cache_state: "disabled".into(),
-            runtime_compilation_state: "ahead-of-time".into(),
-            managed_heap_state: "not-applicable".into(),
-            scratch_reuse_state: if locale { "not-applicable" } else { "fresh" }.into(),
-            output_buffer_state: if locale {
-                OutputBuffer::NotApplicable {}
-            } else {
-                OutputBuffer::Applicable {
-                    ownership: "caller-owned".into(),
-                    reuse: "fresh".into(),
-                }
-            },
-        }
+/// The execution state this owner's prepared core actually runs in.
+pub(super) fn prepared_core(operation: Operation) -> Execution {
+    let locale = operation == Operation::LocaleCanonicalization;
+    Execution {
+        // The harness invokes prepared calls in its existing process. Its
+        // compiled core and immutable preparation are retained, not rebuilt
+        // between samples. None of these fields claims a warm lookup cache.
+        process_state: "reused-process".into(),
+        engine_state: "reused".into(),
+        initial_preparation_state: "resident".into(),
+        cache_state: "disabled".into(),
+        runtime_compilation_state: "ahead-of-time".into(),
+        managed_heap_state: "not-applicable".into(),
+        scratch_reuse_state: if locale { "not-applicable" } else { "fresh" }.into(),
+        output_buffer_state: if locale {
+            OutputBuffer::NotApplicable {}
+        } else {
+            OutputBuffer::Applicable {
+                ownership: "caller-owned".into(),
+                reuse: "fresh".into(),
+            }
+        },
     }
 }
 
@@ -251,7 +230,7 @@ impl Descriptors {
             boundary: Boundary::for_operation(operation),
             method: Method::monotonic_invocation(),
             clock_observation: clock_observation(clock),
-            execution: Execution::prepared_core(operation),
+            execution: prepared_core(operation),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
                 Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
@@ -291,7 +270,7 @@ impl Descriptors {
         {
             issues.push(DescriptorIssue::InvalidClockObservation);
         }
-        if self.execution != Execution::prepared_core(operation) {
+        if self.execution != prepared_core(operation) {
             issues.push(DescriptorIssue::ExecutionMismatch);
         }
         let expected_locale = match prepared {

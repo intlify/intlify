@@ -1891,6 +1891,7 @@
     },
     "Execution": {
       "additionalProperties": false,
+      "description": "The complete execution state of one measured case.",
       "properties": {
         "cacheState": {
           "type": "string"
@@ -2867,6 +2868,7 @@
       "type": "object"
     },
     "OutputBuffer": {
+      "description": "Whether a measured operation writes into a caller-owned output buffer.",
       "oneOf": [
         {
           "additionalProperties": false,
