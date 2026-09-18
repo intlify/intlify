@@ -50,10 +50,13 @@ intlify_shared_json::shared_string_type!(
     "invalid 128-bit opaque value"
 );
 
+// A JSON Schema pattern is an ECMA-262 regular expression, which has no inline
+// dot-all flag, so the character class spells out "any scalar, newline
+// included" rather than relying on one.
 intlify_shared_json::shared_string_type!(
     pub NonemptyText,
     str_is_nonempty,
-    "^(?s).+$",
+    "^[\\s\\S]+$",
     "value must be a nonempty string"
 );
 

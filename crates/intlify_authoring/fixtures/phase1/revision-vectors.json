@@ -1,0 +1,451 @@
+{
+  "note": "Each vector is the exact digest preimage and the revision taken over it. An independent implementation reframes the preimage and re-hashes it, so a disagreement identifies whether the framing or the hash is wrong.",
+  "domain": "intent-semantic-revision",
+  "projectionSpecification": {
+    "identity": "intlify-intent-projection",
+    "revision": "0"
+  },
+  "vectors": [
+    {
+      "id": "plain-literal",
+      "mf2Source": "{{Pay now}}",
+      "equalTo": ["equivalent-quoted-pattern"],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "Pay now"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:2b84c47ff7a203571d235c12606002999866b55e20b085d05b042cb07d1c7342"
+    },
+    {
+      "id": "equivalent-quoted-pattern",
+      "mf2Source": "{{Pay now}}",
+      "equalTo": ["plain-literal"],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "Pay now"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:2b84c47ff7a203571d235c12606002999866b55e20b085d05b042cb07d1c7342"
+    },
+    {
+      "id": "trailing-space-differs",
+      "mf2Source": "{{Pay now }}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "Pay now "
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:5f7ff1ed7dc4de9b7df19f06d35b6169a12b478e8793522ec6adb18dda311529"
+    },
+    {
+      "id": "decomposed-literal-stays-distinct",
+      "mf2Source": "{{café}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "café"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:b16f7cc141fa3fdf8bc2041f5e3ac4e90e531298d0c4dc7f0be851e2b07797d2"
+    },
+    {
+      "id": "precomposed-literal",
+      "mf2Source": "{{café}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "café"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:9b379ee1b43bd7d4c6fc70be0fcfeb1a1c9f45f9e76f5426fa7f83a18429baf1"
+    },
+    {
+      "id": "variable-and-function",
+      "mf2Source": "{$amount :number style=percent}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "expression",
+                  "operand": {
+                    "kind": "variable",
+                    "name": "amount"
+                  },
+                  "function": {
+                    "name": "number",
+                    "options": [
+                      {
+                        "name": "style",
+                        "value": {
+                          "kind": "literal",
+                          "value": "percent"
+                        }
+                      }
+                    ]
+                  },
+                  "attributes": []
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": ["amount"]
+        }
+      },
+      "revision": "sha256:d9795b8a03fd93f3c12e79566805742187fff6d19120e26b6c8d8ca3b57b42b5"
+    },
+    {
+      "id": "matcher",
+      "mf2Source": ".input {$count :number}\n.match $count\none {{one}}\n* {{many}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [
+              {
+                "kind": "input",
+                "name": "count",
+                "function": {
+                  "name": "number",
+                  "options": []
+                },
+                "attributes": []
+              }
+            ],
+            "body": {
+              "kind": "match",
+              "selectors": ["count"],
+              "variants": [
+                {
+                  "keys": [
+                    {
+                      "kind": "literal",
+                      "value": "one"
+                    }
+                  ],
+                  "parts": [
+                    {
+                      "kind": "text",
+                      "value": "one"
+                    }
+                  ]
+                },
+                {
+                  "keys": [
+                    {
+                      "kind": "catch-all"
+                    }
+                  ],
+                  "parts": [
+                    {
+                      "kind": "text",
+                      "value": "many"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": ["count"]
+        }
+      },
+      "revision": "sha256:3169e850a5bc21f32c25eb8dad314b483078abaeda884c2a27da59ee18389372"
+    },
+    {
+      "id": "local-declaration",
+      "mf2Source": ".local $greeting = {|hello|}\n{{{$greeting}}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [
+              {
+                "kind": "local",
+                "name": "greeting",
+                "expression": {
+                  "kind": "expression",
+                  "operand": {
+                    "kind": "literal",
+                    "value": "hello"
+                  },
+                  "attributes": []
+                }
+              }
+            ],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "expression",
+                  "operand": {
+                    "kind": "variable",
+                    "name": "greeting"
+                  },
+                  "attributes": []
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:2e5368feac4e34fba860389003c9330a867c4bf7477bfc658efd739be63028a6"
+    },
+    {
+      "id": "markup",
+      "mf2Source": "{#b}bold{/b}{#img /}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "markup",
+                  "form": "open",
+                  "name": "b",
+                  "options": [],
+                  "attributes": []
+                },
+                {
+                  "kind": "text",
+                  "value": "bold"
+                },
+                {
+                  "kind": "markup",
+                  "form": "close",
+                  "name": "b",
+                  "options": [],
+                  "attributes": []
+                },
+                {
+                  "kind": "markup",
+                  "form": "standalone",
+                  "name": "img",
+                  "options": [],
+                  "attributes": []
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:48c0d36d646eedbfcfde157bc450ccc23baffe60c76c6784cb8a5705903cf62f"
+    },
+    {
+      "id": "other-locale",
+      "mf2Source": "{{Pay now}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "Pay now"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "ja",
+          "parameters": []
+        }
+      },
+      "revision": "sha256:f87197223a7aebd4047e4fce1a72ad74422b9bdfdab6cf87bed588728d6b6568"
+    },
+    {
+      "id": "with-description",
+      "mf2Source": "{{Pay now}}",
+      "equalTo": [],
+      "preimage": {
+        "projectionSpecification": {
+          "identity": "intlify-intent-projection",
+          "revision": "0"
+        },
+        "projection": {
+          "mf2Specification": {
+            "identity": "intlify-mf2-semantics",
+            "revision": "0"
+          },
+          "message": {
+            "declarations": [],
+            "body": {
+              "kind": "pattern",
+              "parts": [
+                {
+                  "kind": "text",
+                  "value": "Pay now"
+                }
+              ]
+            }
+          },
+          "sourceLocale": "en",
+          "parameters": [],
+          "description": "Primary payment action"
+        }
+      },
+      "revision": "sha256:9244a080b93c7003a316b272f32e6c41f24c2dd2c7a3dc01154c144fb2192235"
+    }
+  ]
+}
