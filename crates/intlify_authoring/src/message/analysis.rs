@@ -407,6 +407,28 @@ mod tests {
     }
 
     #[test]
+    fn the_quoted_pattern_covers_strings_a_simple_message_would_special_case() {
+        // A leading period starts a declaration, so displayed text beginning
+        // with one cannot be emitted as a bare simple message.
+        let as_simple = analyze(MessageInput::Mf2(".input looks like a keyword")).unwrap();
+        assert!(as_simple.is_blocked());
+
+        // The same text as displayed content encodes and is understood.
+        let displayed = analyze(MessageInput::Literal(".input looks like a keyword")).unwrap();
+        assert!(displayed.facts().is_some());
+        assert_eq!(displayed.mf2_source(), "{{.input looks like a keyword}}");
+
+        // An empty simple message is valid MF2, because the grammar makes the
+        // whole production optional. The encoder still uses the quoted form so
+        // that one encoding covers every displayed string.
+        assert!(analyze(MessageInput::Mf2("")).unwrap().facts().is_some());
+        assert_eq!(
+            analyze(MessageInput::Literal("")).unwrap().mf2_source(),
+            "{{}}"
+        );
+    }
+
+    #[test]
     fn identical_cooked_content_analyses_identically_across_authoring_forms() {
         let literal = analyze(MessageInput::Literal("Pay now")).unwrap();
         let authored = analyze(MessageInput::Mf2("{{Pay now}}")).unwrap();
@@ -432,6 +454,34 @@ mod tests {
             codes.iter().all(|code| !code.starts_with("authoring-")),
             "parser codes must not be relabelled into an authoring family: {codes:?}"
         );
+    }
+
+    #[test]
+    fn a_reported_range_addresses_real_bytes_and_resolves_through_the_segments() {
+        let analysis = analyze(MessageInput::Mf2("Hello {$name")).unwrap();
+        let reported = analysis
+            .diagnostics()
+            .iter()
+            .find_map(Diagnostic::message_range)
+            .expect("a syntax diagnostic carries the range it concerns");
+
+        // The range addresses the analyzed MF2 bytes, on scalar boundaries.
+        let source = analysis.mf2_source();
+        assert!(reported.end() <= source.len() as u64);
+        assert!(source.is_char_boundary(reported.start() as usize));
+        assert!(source.is_char_boundary(reported.end() as usize));
+
+        // A caller resolves it back to the supplied text through the segments,
+        // which is the reason the range is exposed at all.
+        let containing = analysis
+            .extraction_map()
+            .iter()
+            .find(|segment| {
+                segment.extracted().start() <= reported.start()
+                    && reported.start() < segment.extracted().end()
+            })
+            .expect("every emitted byte is covered by a segment");
+        assert!(containing.source().end() >= containing.source().start());
     }
 
     #[test]

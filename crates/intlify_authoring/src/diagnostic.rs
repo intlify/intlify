@@ -219,6 +219,22 @@ impl Diagnostic {
         &self.occurrence
     }
 
+    /// Return the range inside the emitted MF2 message this concerns.
+    ///
+    /// The range addresses the analyzed MF2 bytes, not the host source. A
+    /// caller maps it back through the analysis's extraction segments; it must
+    /// not be treated as an offset into the occurrence's own source unit.
+    #[must_use]
+    pub const fn message_range(&self) -> Option<ByteRange> {
+        self.message_range
+    }
+
+    /// Borrow the related occurrences, in the same admitted source domain.
+    #[must_use]
+    pub fn related(&self) -> &[Occurrence] {
+        &self.related
+    }
+
     /// Return the exhausted bound, when this is a resource-limit reason.
     #[must_use]
     pub const fn limit(&self) -> Option<LimitKind> {
@@ -377,6 +393,32 @@ mod tests {
                 ("context-resolution", "authoring-source-locale-missing", 0),
             ]
         );
+    }
+
+    #[test]
+    fn retained_evidence_is_readable_by_a_caller() {
+        let subject = occurrence(0, 4, OccurrenceRole::UiLiteral);
+        let sibling = occurrence(10, 14, OccurrenceRole::Reference);
+        let plain = Diagnostic::new(
+            Stage::MessageAnalysis,
+            DiagnosticOrigin::Mf2Syntax("unclosed-expression"),
+            Severity::Error,
+            subject.clone(),
+        );
+        assert_eq!(plain.message_range(), None);
+        assert!(plain.related().is_empty());
+
+        let range = ByteRange::new(6, 12).unwrap();
+        let detailed = Diagnostic::new(
+            Stage::ContextResolution,
+            DiagnosticOrigin::Authoring(ReasonFamily::AuthoringParameterMismatch),
+            Severity::Error,
+            subject,
+        )
+        .with_message_range(range)
+        .with_related(vec![sibling.clone()]);
+        assert_eq!(detailed.message_range(), Some(range));
+        assert_eq!(detailed.related(), [sibling]);
     }
 
     #[test]
