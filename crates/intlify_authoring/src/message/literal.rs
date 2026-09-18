@@ -4,10 +4,17 @@
 //! Encoding displayed text as a literal MF2 message, with its source mapping.
 //!
 //! The encoder emits a quoted pattern, `{{` … `}}`, rather than a simple
-//! message. A simple message cannot begin with whitespace or `.`, and it cannot
-//! be empty, so a simple-message encoder would have to special-case exactly the
-//! displayed strings that applications use most. The quoted pattern encodes
-//! every displayed string uniformly and round-trips byte for byte.
+//! message. The MF2 grammar starts a simple message with `simple-start-char`,
+//! which excludes whitespace and `.`, so displayed text that begins with either
+//! would need a special case in a simple-message encoder. A leading `.` starts a
+//! declaration and the parser rejects it today; a leading space is accepted only
+//! because stricter mode detection has not landed yet, and the encoder must not
+//! depend on that leniency. The quoted pattern encodes every displayed string
+//! uniformly and round-trips byte for byte.
+//!
+//! An empty simple message is valid, since the grammar makes the whole
+//! production optional. It gains nothing here: the quoted form already covers
+//! it, and one encoding for every string is what keeps this reversible.
 //!
 //! Only `\`, `{`, and `}` are escaped. `|` is an ordinary pattern text
 //! character and is deliberately left alone, so escaping it would change the
