@@ -50,6 +50,59 @@ impl CaseIdentity {
     }
 }
 
+fn valid_label(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let boundary = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit();
+    !bytes.is_empty()
+        && boundary(bytes[0])
+        && boundary(bytes[bytes.len() - 1])
+        && bytes
+            .iter()
+            .all(|byte| boundary(*byte) || matches!(byte, b'.' | b'_' | b'-' | b'/'))
+}
+
+// An owner spells a versioned codec, framing, or digest domain with a `/`, so
+// these are not IdentityTokens. This crate retains the owner's exact spelling
+// and never normalizes it into the token grammar.
+intlify_shared_json::shared_string_type!(
+    pub OwnerLabel,
+    valid_label,
+    "^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$",
+    "invalid owner label"
+);
+
+impl OwnerLabel {
+    /// Retain one label the owner registers as a literal.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the literal is outside the label grammar. A registered label
+    /// is an implementation constant, so an invalid one is a defect.
+    #[must_use]
+    pub fn literal(value: &'static str) -> Self {
+        Self::from_validated(value).expect("registered owner label")
+    }
+}
+
+intlify_shared_json::shared_string_type!(
+    pub NativeChecksum,
+    valid_hex256,
+    "^[0-9a-f]{64}$",
+    "invalid native observation checksum"
+);
+
+impl NativeChecksum {
+    /// Present an owner's complete 256-bit checksum.
+    ///
+    /// The algorithm and framing belong to the owner and are recorded beside
+    /// this value. This type carries the result, and never implies that two
+    /// equal values were produced under the same framing.
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self::from_validated(&hex(bytes)).expect("rendered native checksum")
+    }
+}
+
 /// The two instance domains 026 itself registers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum CommonDomain {
@@ -264,6 +317,30 @@ mod tests {
         for value in [json!(0), json!(null), json!({}), json!([])] {
             assert!(serde_json::from_value::<CaseIdentity>(value).is_err());
         }
+    }
+
+    #[test]
+    fn an_owner_label_keeps_a_versioned_codec_spelling_that_a_token_would_reject() {
+        for label in [
+            "intlify-config-owner-run-result/1",
+            "intlify-config-minimum-observation/0",
+            "blake3-256",
+            "owner-run-result",
+        ] {
+            assert_eq!(OwnerLabel::literal(label).as_str(), label);
+        }
+        // A label is still closed: it is not free text that happens to contain
+        // a slash. Only the boundaries and the character set are constrained.
+        for invalid in ["", "/leading", "trailing/", "Upper/0", "has space", "a b"] {
+            assert_eq!(
+                OwnerLabel::from_validated(invalid),
+                Err(IdentityFailure::InvalidToken),
+                "{invalid} was admitted as an owner label"
+            );
+        }
+        // The token grammar would reject the very spelling owners register, so
+        // the two types are not interchangeable in either direction.
+        assert!(Token::new("intlify-config-owner-run-result/1").is_err());
     }
 
     #[test]

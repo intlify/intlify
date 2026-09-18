@@ -10,7 +10,8 @@
 
 pub(in crate::benchmark) use intlify_measurement::identity::{
     specification, AnyIdentity, CaseIdentity, CommonDomain as InstanceDomain, IdentityFailure,
-    IntegrityDigest, OwnerRecordIdentity, RecordIdentity, Token, VersionedIdentity,
+    IntegrityDigest, NativeChecksum, OwnerLabel, OwnerRecordIdentity, RecordIdentity, Token,
+    VersionedIdentity,
 };
 
 /// Native schema v1 explicitly gives one fresh immutable ID to the one-shot

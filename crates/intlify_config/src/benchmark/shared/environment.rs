@@ -10,12 +10,10 @@
 
 use intlify_measurement::environment::{
     missing, Architecture, Concurrency, ConditionalObservation, Datum, Instrumentation,
-    ReportedIdentifier, RequiredObservation, RunnerContext, SystemFamily,
+    Observation, ReportedIdentifier, RequiredObservation, RunnerContext, SystemFamily,
 };
 
-pub(super) use intlify_measurement::environment::{
-    BuildConfiguration, Environment, Observation, Toolchain,
-};
+pub(super) use intlify_measurement::environment::{Environment, Toolchain};
 
 use super::identity::{IdentityFailure, RecordIdentity, Token, VersionedIdentity};
 use super::reason::{EnvironmentField as Field, MissingObservation as Missing};

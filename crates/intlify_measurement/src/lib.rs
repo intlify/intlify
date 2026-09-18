@@ -18,6 +18,7 @@
 //! projection eligibility remain separate checks, and a failed or absent case
 //! stays in the record rather than being removed from it.
 
+pub mod build;
 pub mod decode;
 pub mod encoding;
 pub mod environment;

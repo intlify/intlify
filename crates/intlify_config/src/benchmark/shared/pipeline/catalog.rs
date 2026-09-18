@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use super::{evaluate, owner::OwnerInput, Artifacts};
 use crate::benchmark::run::RecordedRun;
+use crate::benchmark::shared::build;
 use crate::benchmark::shared::environment;
 use crate::benchmark::shared::identity::{
     self, AnyIdentity, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
@@ -449,7 +450,7 @@ pub(in crate::benchmark) fn validate_records(
                     .map_err(|_| ValidationFailure::Evidence)?;
             if expected.cases.is_empty()
                 || evidence.body != expected
-                || !evidence.body.build.validate(&source, evidence.identity())
+                || !build::validate(&evidence.body.build, &source, evidence.identity())
                 || !environment::validate(&evidence.body.environment, &source, evidence.identity())
             {
                 return Err(ValidationFailure::Evidence);

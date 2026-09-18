@@ -45,10 +45,6 @@
       "enum": ["x86", "x86_64", "arm", "aarch64", "riscv32", "riscv64", "wasm32", "wasm64"],
       "type": "string"
     },
-    "Blake3": {
-      "enum": ["blake3-256"],
-      "type": "string"
-    },
     "Boundary": {
       "additionalProperties": false,
       "properties": {
@@ -123,6 +119,7 @@
     },
     "Build": {
       "additionalProperties": false,
+      "description": "The complete applicable Build facts one Evidence Set carries.",
       "properties": {
         "buildConfiguration": {
           "$ref": "#/definitions/Observation4"
@@ -140,7 +137,7 @@
           "$ref": "#/definitions/VersionedIdentity"
         },
         "physicalEngine": {
-          "$ref": "#/definitions/PhysicalEngine"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "sourceContent": {
           "$ref": "#/definitions/Observation"
@@ -2200,26 +2197,23 @@
     },
     "LockContent": {
       "additionalProperties": false,
+      "description": "One complete observation of the dependency lock a subject resolved against.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Blake3"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "bytes": {
           "$ref": "#/definitions/UInt64"
         },
         "digest": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "representation": {
-          "$ref": "#/definitions/LockRepresentation"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["algorithm", "representation", "digest", "bytes"],
       "type": "object"
-    },
-    "LockRepresentation": {
-      "enum": ["complete-lock-file-octets"],
-      "type": "string"
     },
     "LogicalWork": {
       "additionalProperties": false,
@@ -2362,6 +2356,10 @@
     },
     "NativeBuildSchema": {
       "enum": ["intlify-config-build-observation/0"],
+      "type": "string"
+    },
+    "NativeChecksum": {
+      "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
     "NativeFraming": {
@@ -2968,6 +2966,10 @@
       "enum": ["owner-run-result"],
       "type": "string"
     },
+    "OwnerLabel": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$",
+      "type": "string"
+    },
     "OwnerRecordIdentity": {
       "additionalProperties": false,
       "description": "One fresh instance identity in a domain an owner registers.\n\nThe domain is the owner's, so this crate checks its grammar and its\nseparation from the common domains, never its meaning.",
@@ -2981,10 +2983,6 @@
       },
       "required": ["domain", "value"],
       "type": "object"
-    },
-    "PhysicalEngine": {
-      "enum": ["rust-native-component"],
-      "type": "string"
     },
     "PositiveUInt64": {
       "pattern": "^(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
@@ -3458,32 +3456,30 @@
     },
     "SourceContent": {
       "additionalProperties": false,
+      "description": "One complete observation of the source a subject was built from.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Blake3"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "bytes": {
           "$ref": "#/definitions/UInt64"
         },
         "digest": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "files": {
           "$ref": "#/definitions/PositiveUInt64"
         },
         "framing": {
-          "$ref": "#/definitions/SourceFraming"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["algorithm", "framing", "digest", "files", "bytes"],
       "type": "object"
     },
     "SourceControlState": {
+      "description": "Whether a working tree matched its recorded source control state.",
       "enum": ["clean", "dirty"],
-      "type": "string"
-    },
-    "SourceFraming": {
-      "enum": ["intlify-config-build-source/0"],
       "type": "string"
     },
     "Stage": {
