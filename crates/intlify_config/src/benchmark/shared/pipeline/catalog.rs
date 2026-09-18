@@ -11,7 +11,8 @@ use serde_json::Value;
 use super::{evaluate, owner::OwnerInput, Artifacts};
 use crate::benchmark::run::RecordedRun;
 use crate::benchmark::shared::identity::{
-    self, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
+    self, AnyIdentity, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
+    OWNER_RESULT_DOMAIN,
 };
 use crate::benchmark::shared::measurement::{
     native_attempt_reference, CaseEvidence, CaseResult, Evaluation, Evidence, EvidenceBody,
@@ -258,9 +259,18 @@ impl Catalog {
         Ok(Self { documents })
     }
 
-    fn record(&self, id: &RecordIdentity) -> Result<&Document, ValidationFailure> {
+    fn common(&self, id: &RecordIdentity) -> Result<&Document, ValidationFailure> {
         self.documents
             .get(id)
+            .ok_or(ValidationFailure::MissingRecord)
+    }
+
+    fn record(&self, id: &AnyIdentity) -> Result<&Document, ValidationFailure> {
+        // Only a common record can be resolved in this catalog. An owner
+        // instance is a valid reference target but is not one of these
+        // documents, so it is resolved against the admitted owner input.
+        id.as_common()
+            .and_then(|identity| self.documents.get(identity))
             .ok_or(ValidationFailure::MissingRecord)
     }
     fn resolve(&self, reference: &Reference) -> Result<&Document, ValidationFailure> {
@@ -285,15 +295,18 @@ impl Catalog {
             Reference::TopLevel { record_identity } => record_identity,
             Reference::NestedRecord { reference } => &reference.parent_record_identity,
         };
-        if parent.domain() != InstanceDomain::NativeOwnerResult {
+        let Some(owner_instance) = parent
+            .as_owner()
+            .filter(|identity| identity.domain() == OWNER_RESULT_DOMAIN)
+        else {
             return self.resolve(reference).map(|_| ());
-        }
+        };
         let source = owner
             .checked
             .as_ref()
             .ok_or(ValidationFailure::Reference)?
             .document();
-        if parent != &source.result().record_identity {
+        if owner_instance != &source.result().record_identity {
             return Err(ValidationFailure::Reference);
         }
         match reference {
@@ -352,13 +365,13 @@ pub(in crate::benchmark) fn validate_records(
         return Err(ValidationFailure::Capacity);
     }
     let catalog = Catalog::read(common_inputs)?;
-    let Document::Plan(plan) = catalog.record(run.plan_record().identity())? else {
+    let Document::Plan(plan) = catalog.common(run.plan_record().identity())? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
     if **plan != *run.plan_record() {
         return Err(ValidationFailure::Plan);
     }
-    let Document::Report(report) = catalog.record(report_identity)? else {
+    let Document::Report(report) = catalog.common(report_identity)? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
     let [Section::MeasurementObservation {

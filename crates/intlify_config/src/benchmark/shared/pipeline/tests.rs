@@ -223,12 +223,14 @@ fn withholding_eligible_evidence_cannot_manufacture_projection_ineligibility() {
     let evaluation = Evaluation::seal(
         EvaluationKind::Value,
         RecordIdentity::fresh(InstanceDomain::Record).unwrap(),
+        &producing_tool(),
         evaluate::evaluate(&run, &owner, None).unwrap(),
     )
     .unwrap();
     let report = Report::seal(
         ReportKind::Value,
         RecordIdentity::fresh(InstanceDomain::Record).unwrap(),
+        &producing_tool(),
         evaluate::report(&evaluation, None).unwrap(),
     )
     .unwrap();

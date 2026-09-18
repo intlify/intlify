@@ -574,6 +574,7 @@ version = "0.14.0-alpha.12"
 dependencies = [
  "blake3",
  "getrandom 0.4.3",
+ "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
  "rustix",
@@ -638,6 +639,18 @@ name = "intlify_linker"
 version = "0.14.0-alpha.11"
 dependencies = [
  "intlify_contract",
+]
+
+[[package]]
+name = "intlify_measurement"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "getrandom 0.4.3",
+ "intlify_shared_json",
+ "jsonschema",
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

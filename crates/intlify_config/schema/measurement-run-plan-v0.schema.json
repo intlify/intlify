@@ -31,7 +31,7 @@
           ]
         },
         "runnerInstanceIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "verificationSubject": {
           "$ref": "#/definitions/Subject"
@@ -72,6 +72,11 @@
     },
     "CaseIdentity": {
       "pattern": "^mc0_[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "CommonDomain": {
+      "description": "The two instance domains 026 itself registers.",
+      "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"],
       "type": "string"
     },
     "CreationContext": {
@@ -123,15 +128,6 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
-    "InstanceDomain": {
-      "enum": [
-        "intlify-verification-record-v0",
-        "intlify-measurement-run-v0",
-        "intlify-config-owner-result-v1",
-        "intlify-config-local-runner-instance-v0"
-      ],
-      "type": "string"
-    },
     "IntegrityDigest": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "type": "string"
@@ -172,11 +168,30 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
-    "RecordIdentity": {
+    "OwnerDomain": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "OwnerRecordIdentity": {
       "additionalProperties": false,
+      "description": "One fresh instance identity in a domain an owner registers.\n\nThe domain is the owner's, so this crate checks its grammar and its\nseparation from the common domains, never its meaning.",
       "properties": {
         "domain": {
-          "$ref": "#/definitions/InstanceDomain"
+          "$ref": "#/definitions/OwnerDomain"
+        },
+        "value": {
+          "$ref": "#/definitions/Hex256"
+        }
+      },
+      "required": ["domain", "value"],
+      "type": "object"
+    },
+    "RecordIdentity": {
+      "additionalProperties": false,
+      "description": "One fresh instance identity in a domain this crate registers.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/CommonDomain"
         },
         "value": {
           "$ref": "#/definitions/Hex256"
@@ -194,6 +209,7 @@
       "type": "string"
     },
     "RunPlanKind": {
+      "description": "The Measurement Run Plan record kind.",
       "enum": ["measurement-run-plan"],
       "type": "string"
     },
@@ -236,6 +252,7 @@
       "type": "object"
     }
   },
+  "description": "One complete common record: a closed envelope and its typed body.",
   "properties": {
     "body": {
       "$ref": "#/definitions/Body"

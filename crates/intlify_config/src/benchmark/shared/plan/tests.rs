@@ -1,8 +1,20 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+use super::super::identity::IntegrityDigest;
 use super::*;
 use serde_json::{json, Value};
+
+/// Recompute a submitted document's own integrity digest after changing it.
+///
+/// The change is applied to the serialized document rather than through the
+/// record type, because that is what a submitter can actually do: a rehashed
+/// document is self-consistent, and admission must still reject it.
+fn rehashed(mut value: Value) -> Vec<u8> {
+    let digest = IntegrityDigest::from_hash(encoding::record_hash(&value).unwrap());
+    value["envelope"]["integrityDigest"] = serde_json::to_value(digest).unwrap();
+    serde_json::to_vec(&value).unwrap()
+}
 
 fn issue() -> IssuedRunPlan {
     let registry = Registry::load().unwrap();
@@ -75,17 +87,14 @@ fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case
         first.record.body.runner_instance_identity,
         second.record.body.runner_instance_identity
     );
-    assert_eq!(
-        first.record.envelope.record_identity.domain(),
-        InstanceDomain::Record
-    );
+    assert_eq!(first.record.identity().domain(), InstanceDomain::Record);
     assert_eq!(
         first.record.body.measurement_run.domain(),
         InstanceDomain::Run
     );
     assert_eq!(
         first.record.body.runner_instance_identity.domain(),
-        InstanceDomain::LocalRunnerInstance
+        LOCAL_RUNNER_DOMAIN
     );
     assert_eq!(first.record.body.planned_runner_class, None);
     let bytes = first.encode().unwrap();
@@ -167,17 +176,18 @@ fn self_rehashed_changes_do_not_replace_the_plan_issued_for_the_acquired_context
     ] {
         let mut value = original.clone();
         *value.pointer_mut(pointer).unwrap() = replacement;
-        let mut changed: RunPlanRecord = serde_json::from_value(value).unwrap();
-        changed.envelope.integrity_digest = changed.digest().unwrap();
+        // The changed document still decodes as a Run Plan, so the rejection
+        // below is admission's, not the decoder's.
+        assert!(serde_json::from_value::<RunPlanRecord>(value.clone()).is_ok());
         assert_eq!(
-            issued.decode_checked(&serde_json::to_vec(&changed).unwrap()),
+            issued.decode_checked(&rehashed(value)),
             Err(PlanFailure::InvalidRecord),
             "{pointer}"
         );
     }
     for action in 0..3 {
-        let mut changed = issued.record.clone();
-        let inventory = &mut changed.body.case_inventory;
+        let mut changed = original.clone();
+        let inventory = changed["body"]["caseInventory"].as_array_mut().unwrap();
         match action {
             0 => {
                 inventory.pop();
@@ -185,10 +195,7 @@ fn self_rehashed_changes_do_not_replace_the_plan_issued_for_the_acquired_context
             1 => inventory[1] = inventory[0].clone(),
             _ => inventory.swap(0, 1),
         }
-        changed.envelope.integrity_digest = changed.digest().unwrap();
-        assert!(issued
-            .decode_checked(&serde_json::to_vec(&changed).unwrap())
-            .is_err());
+        assert!(issued.decode_checked(&rehashed(changed)).is_err());
     }
 }
 

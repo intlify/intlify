@@ -9,7 +9,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use super::build::Build;
 use super::environment::{projection_identity, Environment};
-use super::identity::{CaseIdentity, IdentityFailure, RecordIdentity, Token, VersionedIdentity};
+use super::identity::{
+    CaseIdentity, IdentityFailure, OwnerRecordIdentity, RecordIdentity, Token, VersionedIdentity,
+};
 use super::plan::{BuildIdentity, CaseProjection, InventoryEntry, RunPlanRecord, Subject};
 use super::reason::{Reason, Selector};
 use super::record::{EvaluationKind, EvidenceKind, Record, Reference, ReportKind};
@@ -87,7 +89,7 @@ pub(super) struct OwnerBinding {
     owner_identity: Token,
     result_schema: OwnerCodec,
     benchmark_profile: VersionedIdentity,
-    pub(super) result_identity: RecordIdentity,
+    pub(super) result_identity: OwnerRecordIdentity,
     algorithm: Algorithm,
     framing: Framing,
     domain: OwnerDomain,
@@ -136,7 +138,7 @@ impl From<Observation> for SemanticObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ExecutionIdentity {
-    owner_result: RecordIdentity,
+    owner_result: OwnerRecordIdentity,
     algorithm: Algorithm,
     framing: Framing,
     domain: ExecutionDomain,
@@ -289,12 +291,12 @@ pub(super) type Evidence = Record<EvidenceKind, EvidenceBody>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ExpectedOwner {
-    pub(super) record_identity: RecordIdentity,
+    pub(super) record_identity: OwnerRecordIdentity,
     result_schema: OwnerCodec,
     benchmark_profile: VersionedIdentity,
 }
 impl ExpectedOwner {
-    pub(super) fn from_plan(plan: &RunPlanRecord, native_identity: &RecordIdentity) -> Self {
+    pub(super) fn from_plan(plan: &RunPlanRecord, native_identity: &OwnerRecordIdentity) -> Self {
         Self {
             record_identity: native_identity.clone(),
             result_schema: OwnerCodec::Value,

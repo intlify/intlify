@@ -2,7 +2,19 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "AnyIdentity": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        {
+          "$ref": "#/definitions/OwnerRecordIdentity"
+        }
+      ],
+      "description": "Either instance identity, as a reference target carries them equally.\n\nThe two are still separate types: a common record's own identity is never\nan owner instance, and reading one out of a reference does not make it one."
+    },
     "BuildField": {
+      "description": "The complete applicable Build fields one record reports on.",
       "enum": [
         "source-content",
         "implementation",
@@ -153,6 +165,7 @@
       ]
     },
     "CommonCode": {
+      "description": "The registered common cause codes.",
       "enum": [
         "missing-evidence",
         "missing-required-case",
@@ -179,6 +192,11 @@
       ],
       "type": "string"
     },
+    "CommonDomain": {
+      "description": "The two instance domains 026 itself registers.",
+      "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"],
+      "type": "string"
+    },
     "CreationContext": {
       "additionalProperties": false,
       "properties": {
@@ -190,6 +208,7 @@
       "type": "object"
     },
     "Detail": {
+      "description": "The typed payload of a reason.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -460,6 +479,7 @@
       "type": "object"
     },
     "EvaluationKind": {
+      "description": "The Measurement Run Evaluation record kind.",
       "enum": ["measurement-run-evaluation"],
       "type": "string"
     },
@@ -470,7 +490,7 @@
           "$ref": "#/definitions/VersionedIdentity"
         },
         "recordIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "resultSchema": {
           "$ref": "#/definitions/OwnerCodec"
@@ -559,15 +579,6 @@
         }
       ]
     },
-    "InstanceDomain": {
-      "enum": [
-        "intlify-verification-record-v0",
-        "intlify-measurement-run-v0",
-        "intlify-config-owner-result-v1",
-        "intlify-config-local-runner-instance-v0"
-      ],
-      "type": "string"
-    },
     "IntegrityDigest": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "type": "string"
@@ -589,6 +600,7 @@
       "type": "object"
     },
     "InvocationFailure": {
+      "description": "How exactly a measured invocation failed.",
       "enum": [
         "measurement-overflow",
         "counter-overflow",
@@ -605,6 +617,7 @@
       "type": "string"
     },
     "MissingObservation": {
+      "description": "Why an observation is absent. Absence is never reported as a value.",
       "enum": [
         "not-collected",
         "native-acquisition-unavailable",
@@ -639,12 +652,13 @@
     },
     "NestedReference": {
       "additionalProperties": false,
+      "description": "One local record inside a named parent record.",
       "properties": {
         "localRecordIdentity": {
           "$ref": "#/definitions/Token"
         },
         "parentRecordIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/AnyIdentity"
         }
       },
       "required": ["parentRecordIdentity", "localRecordIdentity"],
@@ -658,8 +672,27 @@
       "enum": ["intlify-config-owner-run-result/1"],
       "type": "string"
     },
+    "OwnerDomain": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "OwnerRecordIdentity": {
+      "additionalProperties": false,
+      "description": "One fresh instance identity in a domain an owner registers.\n\nThe domain is the owner's, so this crate checks its grammar and its\nseparation from the common domains, never its meaning.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/OwnerDomain"
+        },
+        "value": {
+          "$ref": "#/definitions/Hex256"
+        }
+      },
+      "required": ["domain", "value"],
+      "type": "object"
+    },
     "Reason": {
       "additionalProperties": false,
+      "description": "One complete reason: code, stage, what it affects, and its typed payload.",
       "properties": {
         "affected": {
           "$ref": "#/definitions/Selector"
@@ -685,9 +718,10 @@
     },
     "RecordIdentity": {
       "additionalProperties": false,
+      "description": "One fresh instance identity in a domain this crate registers.",
       "properties": {
         "domain": {
-          "$ref": "#/definitions/InstanceDomain"
+          "$ref": "#/definitions/CommonDomain"
         },
         "value": {
           "$ref": "#/definitions/Hex256"
@@ -697,6 +731,7 @@
       "type": "object"
     },
     "Reference": {
+      "description": "One reference to a complete record or to a local record inside one.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -706,7 +741,7 @@
               "type": "string"
             },
             "recordIdentity": {
-              "$ref": "#/definitions/RecordIdentity"
+              "$ref": "#/definitions/AnyIdentity"
             }
           },
           "required": ["kind", "recordIdentity"],
@@ -765,6 +800,7 @@
       "type": "object"
     },
     "Selector": {
+      "description": "What exactly a reason is about.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -834,6 +870,7 @@
       ]
     },
     "Stage": {
+      "description": "The stage of the pipeline a reason was raised in.",
       "enum": [
         "input-admission",
         "plan",
@@ -889,6 +926,7 @@
       "type": "object"
     }
   },
+  "description": "One complete common record: a closed envelope and its typed body.",
   "properties": {
     "body": {
       "$ref": "#/definitions/EvaluationBody"

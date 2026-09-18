@@ -7,26 +7,26 @@
 //! Evaluation must later resolve this exact Plan, not manufacture another one.
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::benchmark::cases::registry::Registry;
 use crate::benchmark::cases::{LimitEdge, LimitKind, Recipe, Selector};
 use crate::benchmark::context::CaptureContext;
 use crate::benchmark::descriptor::{Boundary, Execution, Method};
 use crate::benchmark::observation::Digest as NativeDigest;
-use crate::benchmark::quantity::Quantity;
 use crate::benchmark::work::LogicalWork;
 
 use super::encoding::{self, Domain, EncodingFailure};
 use super::identity::{
-    CaseIdentity, IdentityFailure, InstanceDomain, IntegrityDigest, RecordIdentity, Token,
-    VersionedIdentity,
+    CaseIdentity, IdentityFailure, InstanceDomain, OwnerRecordIdentity, RecordIdentity, Token,
+    VersionedIdentity, LOCAL_RUNNER_DOMAIN,
 };
+use super::record::{producing_tool, Record, RunPlanKind};
 
 const MAX_PLAN_BYTES: usize = 1024 * 1024;
 
 pub(in crate::benchmark) fn record_schema() -> Result<serde_json::Value, serde_json::Error> {
-    crate::schema::draft7_schema::<RunPlanRecord>()
+    intlify_measurement::schema::draft7_record_schema::<RunPlanRecord>("RunPlanRecord")
 }
 
 pub(in crate::benchmark) fn case_schema() -> Result<serde_json::Value, serde_json::Error> {
@@ -43,7 +43,6 @@ macro_rules! literal_type {
     };
 }
 
-literal_type!(RunPlanKind, "measurement-run-plan");
 literal_type!(RevisionZero, "0");
 literal_type!(Required, "required");
 literal_type!(SubjectKind, "toolchain-component");
@@ -215,52 +214,11 @@ pub(in crate::benchmark) struct Body {
     pub(super) case_inventory: Vec<InventoryEntry>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) planned_runner_class: Option<Token>,
-    pub(super) runner_instance_identity: RecordIdentity,
+    pub(super) runner_instance_identity: OwnerRecordIdentity,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CreationContext {
-    created_at_unix_nanoseconds: Quantity,
-}
-
-fn present<'de, D: Deserializer<'de>>(decoder: D) -> Result<Option<CreationContext>, D::Error> {
-    CreationContext::deserialize(decoder).map(Some)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Envelope {
-    record_kind: RunPlanKind,
-    record_schema_revision: RevisionZero,
-    governing_specification: VersionedIdentity,
-    record_identity: RecordIdentity,
-    integrity_digest: IntegrityDigest,
-    producing_tool: VersionedIdentity,
-    #[serde(
-        default,
-        deserialize_with = "present",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[schemars(with = "CreationContext")]
-    creation_context: Option<CreationContext>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(in crate::benchmark) struct RunPlanRecord {
-    envelope: Envelope,
-    pub(super) body: Body,
-}
-
-impl RunPlanRecord {
-    fn digest(&self) -> Result<IntegrityDigest, PlanFailure> {
-        Ok(IntegrityDigest::from_hash(encoding::record_hash(self)?))
-    }
-    pub(in crate::benchmark) fn identity(&self) -> &RecordIdentity {
-        &self.envelope.record_identity
-    }
-}
+/// The Run Plan is one common record; its envelope is not a second one.
+pub(in crate::benchmark) type RunPlanRecord = Record<RunPlanKind, Body>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::benchmark) enum PlanFailure {
@@ -309,38 +267,27 @@ impl IssuedRunPlan {
                 requirement: Required::Value,
             });
         }
-        let mut record = RunPlanRecord {
-            envelope: Envelope {
-                record_kind: RunPlanKind::Value,
-                record_schema_revision: RevisionZero::Value,
-                governing_specification: super::identity::specification(),
-                record_identity: RecordIdentity::fresh(InstanceDomain::Record)?,
-                integrity_digest: IntegrityDigest::from_hash([0; 32]),
-                producing_tool: VersionedIdentity::new(
-                    "intlify-config-minimum-measurement",
-                    env!("CARGO_PKG_VERSION"),
-                )?,
-                creation_context: None,
+        let body = Body {
+            measurement_run: RecordIdentity::fresh(InstanceDomain::Run)?,
+            measurement_profile: VersionedIdentity::new(profile_identity, profile_revision)?,
+            verification_subject: Subject::minimum(),
+            build_identity: BuildIdentity {
+                owner_schema: NativeBuildSchema::Value,
+                algorithm: NativeAlgorithm::Value,
+                framing: NativeFraming::Value,
+                domain: NativeBuildDomain::Value,
+                checksum: context.build_checksum(),
             },
-            body: Body {
-                measurement_run: RecordIdentity::fresh(InstanceDomain::Run)?,
-                measurement_profile: VersionedIdentity::new(profile_identity, profile_revision)?,
-                verification_subject: Subject::minimum(),
-                build_identity: BuildIdentity {
-                    owner_schema: NativeBuildSchema::Value,
-                    algorithm: NativeAlgorithm::Value,
-                    framing: NativeFraming::Value,
-                    domain: NativeBuildDomain::Value,
-                    checksum: context.build_checksum(),
-                },
-                case_inventory,
-                planned_runner_class: None,
-                runner_instance_identity: RecordIdentity::fresh(
-                    InstanceDomain::LocalRunnerInstance,
-                )?,
-            },
+            case_inventory,
+            planned_runner_class: None,
+            runner_instance_identity: OwnerRecordIdentity::fresh(LOCAL_RUNNER_DOMAIN)?,
         };
-        record.envelope.integrity_digest = record.digest()?;
+        let record = RunPlanRecord::seal(
+            RunPlanKind::Value,
+            RecordIdentity::fresh(InstanceDomain::Record)?,
+            &producing_tool(),
+            body,
+        )?;
         Ok(Self {
             record,
             projections,
@@ -371,7 +318,7 @@ impl IssuedRunPlan {
             serde_json::from_slice(bytes).map_err(|_| PlanFailure::InvalidRecord)?;
         // Equality binds all body fields, order, local IDs, domains, tool and
         // schema/specification revisions, creation context, and instance IDs.
-        if record != self.record || record.digest()? != record.envelope.integrity_digest {
+        if record != self.record || !record.verify_integrity()? {
             return Err(PlanFailure::InvalidRecord);
         }
         Ok(record)

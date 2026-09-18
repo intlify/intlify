@@ -25,7 +25,7 @@ use super::observation::{Digest, Frame};
 use super::profile::ProfileCollectionFailure;
 use super::quantity::Quantity;
 use super::sample::{CaptureBinding, CaptureFailureCause};
-use super::shared::identity::{InstanceDomain, RecordIdentity};
+use super::shared::identity::{OwnerRecordIdentity, RecordIdentity, OWNER_RESULT_DOMAIN};
 use super::shared::plan::{IssuedRunPlan, PlanFailure, RunPlanRecord};
 use super::work::WorkFailure;
 
@@ -59,7 +59,7 @@ enum Preparation {
 struct OwnerPlan {
     codec: String,
     run: Digest,
-    result_identity: RecordIdentity,
+    result_identity: OwnerRecordIdentity,
     common_run_plan: RecordIdentity,
     context: Digest,
     preparation: Preparation,
@@ -101,7 +101,7 @@ pub(super) struct CaseAttempt {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct OwnerResult {
     pub(super) codec: String,
-    pub(super) record_identity: RecordIdentity,
+    pub(super) record_identity: OwnerRecordIdentity,
     plan: OwnerPlan,
     pub(super) context: ContextObservation,
     pub(super) attempts: Vec<CaseAttempt>,
@@ -238,7 +238,7 @@ impl PreparedRun {
         let run = fresh_run(context_binding)?;
         let common_plan =
             IssuedRunPlan::issue(&registry, &context).map_err(RunFailure::SharedPlan)?;
-        let result_identity = RecordIdentity::fresh(InstanceDomain::NativeOwnerResult)
+        let result_identity = OwnerRecordIdentity::fresh(OWNER_RESULT_DOMAIN)
             .map_err(|_| RunFailure::EntropyUnavailable)?;
         let count = registry.expectations().len();
         u64::try_from(count).map_err(|_| RunFailure::Addressability)?;
@@ -347,7 +347,7 @@ impl PreparedRun {
 }
 
 impl RecordedRun {
-    pub(super) fn expected_owner_identity(&self) -> &RecordIdentity {
+    pub(super) fn expected_owner_identity(&self) -> &OwnerRecordIdentity {
         &self.inputs.plan.result_identity
     }
 
