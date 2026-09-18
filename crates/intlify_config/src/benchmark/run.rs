@@ -26,7 +26,7 @@ use super::profile::ProfileCollectionFailure;
 use super::quantity::Quantity;
 use super::sample::{CaptureBinding, CaptureFailureCause};
 use super::shared::identity::{OwnerRecordIdentity, RecordIdentity, OWNER_RESULT_DOMAIN};
-use super::shared::plan::{IssuedRunPlan, PlanFailure, RunPlanRecord};
+use super::shared::plan::{self, IssuedRunPlan, PlanFailure, RunPlanRecord};
 use super::work::WorkFailure;
 
 const PLAN_CODEC: &str = "intlify-config-owner-run-plan/1";
@@ -236,8 +236,7 @@ impl PreparedRun {
         let context = CaptureContext::acquire(&registry).map_err(RunFailure::Context)?;
         let context_binding = checksum("owner-run-context", &context.observation())?;
         let run = fresh_run(context_binding)?;
-        let common_plan =
-            IssuedRunPlan::issue(&registry, &context).map_err(RunFailure::SharedPlan)?;
+        let common_plan = plan::issue(&registry, &context).map_err(RunFailure::SharedPlan)?;
         let result_identity = OwnerRecordIdentity::fresh(OWNER_RESULT_DOMAIN)
             .map_err(|_| RunFailure::EntropyUnavailable)?;
         let count = registry.expectations().len();

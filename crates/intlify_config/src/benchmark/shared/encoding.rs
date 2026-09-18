@@ -6,6 +6,4 @@
 //! Framing, the digest function, the registered domains, and the verification
 //! record's single-member self-exclusion belong to `intlify_measurement`.
 
-pub(in crate::benchmark) use intlify_measurement::encoding::{
-    hash, record_hash, Domain, EncodingFailure,
-};
+pub(in crate::benchmark) use intlify_measurement::encoding::{record_hash, EncodingFailure};

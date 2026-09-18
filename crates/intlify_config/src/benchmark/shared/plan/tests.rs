@@ -1,7 +1,10 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use super::super::identity::IntegrityDigest;
+use intlify_measurement::plan::{case_identity_input, MAX_PLAN_BYTES};
+
+use super::super::encoding;
+use super::super::identity::{InstanceDomain, IntegrityDigest};
 use super::*;
 use serde_json::{json, Value};
 
@@ -19,7 +22,7 @@ fn rehashed(mut value: Value) -> Vec<u8> {
 fn issue() -> IssuedRunPlan {
     let registry = Registry::load().unwrap();
     let context = CaptureContext::acquire(&registry).unwrap();
-    IssuedRunPlan::issue(&registry, &context).unwrap()
+    super::issue(&registry, &context).unwrap()
 }
 
 #[test]
@@ -48,12 +51,7 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
         plan_validator.iter_errors(&value).collect::<Vec<_>>()
     );
     for projection in plan.projections() {
-        let value = serde_json::to_value(CaseIdentityInput {
-            governing_specification: super::super::identity::specification(),
-            identity_schema_revision: RevisionZero::Value,
-            projection,
-        })
-        .unwrap();
+        let value = case_identity_input(projection).unwrap();
         assert!(case_validator.is_valid(&value));
     }
     let mut null_context = value.clone();
@@ -72,42 +70,42 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.record.body.case_inventory.len(), 127);
+    assert_eq!(first.document().body.case_inventory.len(), 127);
     assert_eq!(
-        first.record.body.case_inventory,
-        second.record.body.case_inventory
+        first.document().body.case_inventory,
+        second.document().body.case_inventory
     );
-    assert_eq!(first.projections, second.projections);
-    assert_ne!(first.record.identity(), second.record.identity());
+    assert_eq!(first.projections(), second.projections());
+    assert_ne!(first.document().identity(), second.document().identity());
     assert_ne!(
-        first.record.body.measurement_run,
-        second.record.body.measurement_run
+        first.document().body.measurement_run,
+        second.document().body.measurement_run
     );
     assert_ne!(
-        first.record.body.runner_instance_identity,
-        second.record.body.runner_instance_identity
+        first.document().body.runner_instance_identity,
+        second.document().body.runner_instance_identity
     );
-    assert_eq!(first.record.identity().domain(), InstanceDomain::Record);
+    assert_eq!(first.document().identity().domain(), InstanceDomain::Record);
     assert_eq!(
-        first.record.body.measurement_run.domain(),
+        first.document().body.measurement_run.domain(),
         InstanceDomain::Run
     );
     assert_eq!(
-        first.record.body.runner_instance_identity.domain(),
+        first.document().body.runner_instance_identity.domain(),
         LOCAL_RUNNER_DOMAIN
     );
-    assert_eq!(first.record.body.planned_runner_class, None);
+    assert_eq!(first.document().body.planned_runner_class, None);
     let bytes = first.encode().unwrap();
-    assert_eq!(first.decode_checked(&bytes).unwrap(), first.record);
+    assert_eq!(&first.decode_checked(&bytes).unwrap(), first.document());
     assert!(second.decode_checked(&bytes).is_err());
     let mut cases = std::collections::BTreeSet::new();
     let mut locals = std::collections::BTreeSet::new();
     for (entry, projection) in first
-        .record
+        .document()
         .body
         .case_inventory
         .iter()
-        .zip(&first.projections)
+        .zip(first.projections())
     {
         assert_eq!(entry.case_identity, projection.identity().unwrap());
         assert!(cases.insert(entry.case_identity.clone()));
@@ -249,7 +247,7 @@ fn malformed_missing_extra_or_duplicate_fields_and_size_overruns_are_rejected() 
 #[test]
 fn case_identity_preserves_canonical_object_order_and_rejects_unlisted_dimensions() {
     let issued = issue();
-    let projection = &issued.projections[0];
+    let projection = &issued.projections()[0];
     let original = serde_json::to_value(projection).unwrap();
     let mut reversed = original.clone();
     let map = reversed.as_object_mut().unwrap();

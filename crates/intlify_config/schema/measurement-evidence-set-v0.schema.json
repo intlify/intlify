@@ -199,22 +199,22 @@
     },
     "BuildIdentity": {
       "additionalProperties": false,
-      "description": "This is a content binding to the actual native Build Observation, not a\ncommon record ID, complete compiler attestation, or executable digest.",
+      "description": "A content binding to an owner's actual Build Observation.\n\nIt is not a common record identity, a compiler attestation, or an\nexecutable digest, so the framing that produced the checksum travels with it.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/NativeAlgorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "checksum": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "domain": {
-          "$ref": "#/definitions/NativeBuildDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/NativeFraming"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerSchema": {
-          "$ref": "#/definitions/NativeBuildSchema"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["ownerSchema", "algorithm", "framing", "domain", "checksum"],
@@ -2346,24 +2346,8 @@
       ],
       "type": "string"
     },
-    "NativeAlgorithm": {
-      "enum": ["blake3"],
-      "type": "string"
-    },
-    "NativeBuildDomain": {
-      "enum": ["build-observation"],
-      "type": "string"
-    },
-    "NativeBuildSchema": {
-      "enum": ["intlify-config-build-observation/0"],
-      "type": "string"
-    },
     "NativeChecksum": {
       "pattern": "^[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "NativeFraming": {
-      "enum": ["intlify-config-minimum-observation/0"],
       "type": "string"
     },
     "NativeObservationChecksum": {
@@ -3498,6 +3482,7 @@
     },
     "Subject": {
       "additionalProperties": false,
+      "description": "What exactly was measured.",
       "properties": {
         "identity": {
           "$ref": "#/definitions/Token"
@@ -3510,6 +3495,7 @@
       "type": "object"
     },
     "SubjectKind": {
+      "description": "A subject that is one component of a toolchain.",
       "enum": ["toolchain-component"],
       "type": "string"
     },
