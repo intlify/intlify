@@ -104,7 +104,7 @@
     },
     {
       "id": "decomposed-literal-stays-distinct",
-      "mf2Source": "{{café}}",
+      "mf2Source": "{{é}}",
       "equalTo": [],
       "preimage": {
         "projectionSpecification": {
@@ -123,7 +123,7 @@
               "parts": [
                 {
                   "kind": "text",
-                  "value": "café"
+                  "value": "é"
                 }
               ]
             }
@@ -132,11 +132,11 @@
           "parameters": []
         }
       },
-      "revision": "sha256:b16f7cc141fa3fdf8bc2041f5e3ac4e90e531298d0c4dc7f0be851e2b07797d2"
+      "revision": "sha256:6a800b7f8420b7960f01560bb48711bc468e0e9fa7b3da322de2945b14d64b7d"
     },
     {
       "id": "precomposed-literal",
-      "mf2Source": "{{café}}",
+      "mf2Source": "{{é}}",
       "equalTo": [],
       "preimage": {
         "projectionSpecification": {
@@ -155,7 +155,7 @@
               "parts": [
                 {
                   "kind": "text",
-                  "value": "café"
+                  "value": "é"
                 }
               ]
             }
@@ -164,7 +164,7 @@
           "parameters": []
         }
       },
-      "revision": "sha256:9b379ee1b43bd7d4c6fc70be0fcfeb1a1c9f45f9e76f5426fa7f83a18429baf1"
+      "revision": "sha256:5148de2c8f3d30edc679592afcbbd6086c578d37f52ced8c2cc30bacfce46550"
     },
     {
       "id": "variable-and-function",

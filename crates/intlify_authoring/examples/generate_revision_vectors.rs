@@ -58,7 +58,7 @@ const CASES: &[Case] = &[
     Case {
         id: "decomposed-literal-stays-distinct",
         literal: true,
-        source: "cafe\u{301}",
+        source: "e\u{301}",
         locale: "en",
         description: None,
         equal_to: &[],
@@ -66,7 +66,7 @@ const CASES: &[Case] = &[
     Case {
         id: "precomposed-literal",
         literal: true,
-        source: "caf\u{e9}",
+        source: "\u{e9}",
         locale: "en",
         description: None,
         equal_to: &[],

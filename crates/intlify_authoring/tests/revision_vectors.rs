@@ -99,9 +99,12 @@ fn literal_content_is_compared_exactly() {
     assert_ne!(literal("one\ntwo"), literal("one two"));
     assert_ne!(literal("a  b"), literal("a b"));
     // Canonically equivalent but byte-distinct Unicode stays distinct: the
-    // projection must not normalize literal content.
-    assert_ne!(literal("caf\u{e9}"), literal("cafe\u{301}"));
-    assert_eq!(literal("caf\u{e9}"), literal("caf\u{e9}"));
+    // projection must not normalize literal content. U+00E9 is the precomposed
+    // form and U+0065 U+0301 is its decomposed equivalent.
+    let precomposed = "\u{e9}";
+    let decomposed = "e\u{301}";
+    assert_ne!(literal(precomposed), literal(decomposed));
+    assert_eq!(literal(precomposed), literal(precomposed));
 }
 
 #[test]

@@ -593,8 +593,8 @@ mod tests {
     fn cooked_names_agree_with_the_parser_for_every_declaration() {
         for source in [
             ".local $plain = {|x|}\n{{{$plain}}}",
-            ".input {$caf\u{e9}}\n{{{$caf\u{e9}}}}",
-            ".input {$cafe\u{301}}\n{{{$cafe\u{301}}}}",
+            ".input {$a\u{e9}}\n{{{$a\u{e9}}}}",
+            ".input {$ae\u{301}}\n{{{$ae\u{301}}}}",
             ".local $\u{2066}isolated\u{2069} = {|x|}\n{{ok}}",
             ".input {$a}\n.local $b = {$a}\n{{{$b}}}",
         ] {
@@ -649,10 +649,10 @@ mod tests {
     fn literal_content_is_never_normalized_the_way_a_name_is() {
         // The same decomposed sequence is one value as a literal and another
         // as a name, which is exactly the distinction 017 requires.
-        let decomposed = "cafe\u{301}";
+        let decomposed = "ae\u{301}";
         assert_ne!(cook_name(decomposed), decomposed);
 
-        let parsed = parse_message("{|cafe\u{301}| :string}").unwrap();
+        let parsed = parse_message("{|ae\u{301}| :string}").unwrap();
         let result = parsed.result();
         assert!(result.diagnostics.is_empty());
         let view = CstView::new(parsed.sources(), result.source, &result.cst);
