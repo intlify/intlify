@@ -41,7 +41,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
@@ -84,7 +84,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
           targets: wasm32-unknown-unknown
 
       - name: Install dependencies
@@ -142,7 +142,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -186,7 +186,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
           targets: wasm32-unknown-unknown
 
       - name: Install dependencies
@@ -222,7 +222,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
           targets: wasm32-unknown-unknown
 
       - name: Install dependencies
@@ -263,7 +263,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
-          toolchain: '1.98.0'
+          toolchain: '1.98.1'
           targets: wasm32-unknown-unknown
 
       - name: Install dependencies
