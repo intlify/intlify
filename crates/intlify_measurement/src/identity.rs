@@ -233,17 +233,16 @@ impl PartialOrd for AnyIdentity {
     }
 }
 
+/// Draw one fresh instance value from the operating system.
+///
+/// Nothing derives the value from a timestamp, a process identifier, a host
+/// name, or anything a caller supplied: an instance identity must not be
+/// predictable or reconstructible from the record it appears in. Entropy can
+/// still be unavailable, and that is a failure rather than a weaker value.
 fn fresh_value() -> Result<Hex256, IdentityFailure> {
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    {
-        let mut bytes = [0; 32];
-        getrandom::fill(&mut bytes).map_err(|_| IdentityFailure::EntropyUnavailable)?;
-        Ok(Hex256::from_hash(bytes))
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    {
-        Err(IdentityFailure::EntropyUnavailable)
-    }
+    let mut bytes = [0; 32];
+    getrandom::fill(&mut bytes).map_err(|_| IdentityFailure::EntropyUnavailable)?;
+    Ok(Hex256::from_hash(bytes))
 }
 
 impl RecordIdentity {
