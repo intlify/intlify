@@ -37,7 +37,7 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
     );
     for projection in plan.projections() {
         let value = serde_json::to_value(CaseIdentityInput {
-            governing_specification: VersionedIdentity::specification(),
+            governing_specification: super::super::identity::specification(),
             identity_schema_revision: RevisionZero::Value,
             projection,
         })

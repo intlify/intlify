@@ -561,12 +561,12 @@ version = "0.14.0-alpha.12"
 dependencies = [
  "blake3",
  "getrandom 0.4.3",
+ "intlify_shared_json",
  "jsonschema",
  "rustix",
  "schemars",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
 ]
 
@@ -648,6 +648,17 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "intlify_shared_json"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "jsonschema",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

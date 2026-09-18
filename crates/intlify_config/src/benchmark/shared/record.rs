@@ -78,7 +78,7 @@ impl<K: Serialize, B: Serialize> Record<K, B> {
             envelope: Envelope {
                 record_kind: kind,
                 record_schema_revision: RevisionZero::Value,
-                governing_specification: VersionedIdentity::specification(),
+                governing_specification: super::identity::specification(),
                 record_identity: identity,
                 integrity_digest: IntegrityDigest::from_hash([0; 32]),
                 producing_tool: VersionedIdentity::new(
@@ -102,7 +102,7 @@ impl<K: Serialize, B: Serialize> Record<K, B> {
     pub(super) fn verify_integrity(&self) -> Result<bool, EncodingFailure> {
         Ok(
             self.envelope.record_identity.domain() == InstanceDomain::Record
-                && self.envelope.governing_specification == VersionedIdentity::specification()
+                && self.envelope.governing_specification == super::identity::specification()
                 && self.envelope.integrity_digest
                     == IntegrityDigest::from_hash(encoding::record_hash(self)?),
         )

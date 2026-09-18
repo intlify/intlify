@@ -1,106 +1,41 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Closed 017 token, instance, digest, and Case-ID representations. An instance
-//! ID is neither a semantic checksum nor an assertion about a trusted runner.
+//! The identity domains this owner registers, over 017's shared primitives.
+//!
+//! Token, 256-bit value, digest, and versioned-identity spellings belong to
+//! `intlify_shared_json`. Registered instance domains, the Measurement Case
+//! presentation, and the governing specification are 026 decisions and stay
+//! here. An instance ID is neither a semantic checksum nor an assertion about
+//! a trusted runner.
 
-use std::borrow::Cow;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use schemars::{JsonSchema, Schema, SchemaGenerator};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use intlify_shared_json::token::hex;
+pub(in crate::benchmark) use intlify_shared_json::token::{
+    valid_hex256, Hex256, IdentityFailure, IntegrityDigest, Token, VersionedIdentity,
+};
 
-use crate::model::{valid_identity, ID_PATTERN};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::benchmark) enum IdentityFailure {
-    InvalidToken,
-    EntropyUnavailable,
+/// The 026 specification that governs every common record this owner produces.
+pub(in crate::benchmark) fn specification() -> VersionedIdentity {
+    VersionedIdentity::literal("intlify-design-026", "0")
 }
 
-fn hex64(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+fn valid_case(value: &str) -> bool {
+    value.strip_prefix("mc0_").is_some_and(valid_hex256)
 }
 
-fn digest(value: &str) -> bool {
-    value.strip_prefix("sha256:").is_some_and(hex64)
-}
-fn case(value: &str) -> bool {
-    value.strip_prefix("mc0_").is_some_and(hex64)
-}
-
-macro_rules! string_type {
-    ($name:ident, $check:ident, $pattern:expr, $label:literal) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-        #[serde(transparent)]
-        pub(in crate::benchmark) struct $name(String);
-
-        impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let value = String::deserialize(deserializer)?;
-                if $check(&value) { Ok(Self(value)) } else { Err(de::Error::custom($label)) }
-            }
-        }
-        impl JsonSchema for $name {
-            fn schema_name() -> Cow<'static, str> { stringify!($name).into() }
-            fn json_schema(_: &mut SchemaGenerator) -> Schema {
-                schemars::json_schema!({"type": "string", "pattern": $pattern})
-            }
-        }
-    };
-}
-
-string_type!(
-    Token,
-    valid_identity,
-    ID_PATTERN,
-    "invalid exact identity token"
-);
-string_type!(Hex256, hex64, "^[0-9a-f]{64}$", "invalid 256-bit value");
-string_type!(
-    IntegrityDigest,
-    digest,
-    "^sha256:[0-9a-f]{64}$",
-    "invalid shared SHA-256 digest"
-);
-string_type!(
-    CaseIdentity,
-    case,
+intlify_shared_json::shared_string_type!(
+    pub(in crate::benchmark) CaseIdentity,
+    valid_case,
     "^mc0_[0-9a-f]{64}$",
     "invalid Measurement Case identity"
 );
 
-impl Token {
-    pub(in crate::benchmark) fn new(value: &str) -> Result<Self, IdentityFailure> {
-        valid_identity(value)
-            .then(|| Self(value.into()))
-            .ok_or(IdentityFailure::InvalidToken)
-    }
-    pub(in crate::benchmark) fn literal(value: &'static str) -> Self {
-        Self::new(value).expect("registered literal token")
-    }
-}
-
-fn hex(bytes: [u8; 32]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut text = String::with_capacity(64);
-    for byte in bytes {
-        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
-        text.push(char::from(DIGITS[usize::from(byte & 15)]));
-    }
-    text
-}
-
-impl IntegrityDigest {
-    pub(in crate::benchmark) fn from_hash(bytes: [u8; 32]) -> Self {
-        Self(format!("sha256:{}", hex(bytes)))
-    }
-}
 impl CaseIdentity {
     pub(in crate::benchmark) fn from_hash(bytes: [u8; 32]) -> Self {
-        Self(format!("mc0_{}", hex(bytes)))
+        Self::from_validated(&format!("mc0_{}", hex(bytes))).expect("rendered case identity")
     }
 }
 
@@ -155,7 +90,7 @@ impl RecordIdentity {
             getrandom::fill(&mut bytes).map_err(|_| IdentityFailure::EntropyUnavailable)?;
             Ok(Self {
                 domain,
-                value: Hex256(hex(bytes)),
+                value: Hex256::from_hash(bytes),
             })
         }
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -169,66 +104,41 @@ impl RecordIdentity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(in crate::benchmark) struct VersionedIdentity {
-    identity: Token,
-    revision: Token,
-}
-
-impl VersionedIdentity {
-    pub(in crate::benchmark) fn new(
-        identity: &str,
-        revision: &str,
-    ) -> Result<Self, IdentityFailure> {
-        Ok(Self {
-            identity: Token::new(identity)?,
-            revision: Token::new(revision)?,
-        })
-    }
-    pub(in crate::benchmark) fn specification() -> Self {
-        Self::new("intlify-design-026", "0").expect("registered specification")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
 
     #[test]
-    fn token_digest_and_case_encodings_are_closed_and_do_not_coerce_values() {
-        for text in ["0", "intlify-design-026", "0.14.0-alpha.12", "a_b.c"] {
-            assert!(serde_json::from_value::<Token>(json!(text)).is_ok());
-        }
-        for text in ["", "Upper", "a-", "-a", "a/b", "é", "a\n"] {
-            assert!(serde_json::from_value::<Token>(json!(text)).is_err());
-        }
-        let digest = IntegrityDigest::from_hash([0xab; 32]);
+    fn case_identity_is_closed_and_distinct_from_a_shared_digest() {
         let case = CaseIdentity::from_hash([0xab; 32]);
-        assert_eq!(
-            serde_json::to_value(&digest).unwrap(),
-            json!(format!("sha256:{}", "ab".repeat(32)))
-        );
         assert_eq!(
             serde_json::to_value(&case).unwrap(),
             json!(format!("mc0_{}", "ab".repeat(32)))
         );
-        for text in [
-            "ab".repeat(32),
-            format!("sha256:{}", "AB".repeat(32)),
-            format!("sha256:{}", "a".repeat(63)),
-            format!("sha256:{}", "g".repeat(64)),
-        ] {
-            assert!(serde_json::from_value::<IntegrityDigest>(json!(text)).is_err());
-        }
+        let digest = IntegrityDigest::from_hash([0xab; 32]);
         assert!(
             serde_json::from_value::<CaseIdentity>(serde_json::to_value(digest).unwrap()).is_err()
         );
-        for value in [json!(0), json!(null), json!({}), json!([])] {
-            assert!(serde_json::from_value::<Token>(value.clone()).is_err());
-            assert!(serde_json::from_value::<IntegrityDigest>(value).is_err());
+        for text in [
+            "ab".repeat(32),
+            format!("mc0_{}", "AB".repeat(32)),
+            format!("mc0_{}", "a".repeat(63)),
+            format!("mc0_{}", "g".repeat(64)),
+        ] {
+            assert!(serde_json::from_value::<CaseIdentity>(json!(text)).is_err());
         }
+        for value in [json!(0), json!(null), json!({}), json!([])] {
+            assert!(serde_json::from_value::<CaseIdentity>(value).is_err());
+        }
+    }
+
+    #[test]
+    fn the_governing_specification_is_the_exact_registered_pair() {
+        assert_eq!(
+            serde_json::to_value(specification()).unwrap(),
+            json!({"identity": "intlify-design-026", "revision": "0"})
+        );
     }
 
     #[test]

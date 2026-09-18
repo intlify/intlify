@@ -261,7 +261,7 @@ pub(super) fn report(
         }
     }
     Ok(ReportBody {
-        report_specification: super::super::identity::VersionedIdentity::specification(),
+        report_specification: super::super::identity::specification(),
         sections: vec![Section::MeasurementObservation {
             local_record_identity: Token::literal("measurement-observation-section-0"),
             run_evaluation: Reference::top(evaluation.identity()),

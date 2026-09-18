@@ -173,7 +173,7 @@ impl CaseProjection {
 
     pub(in crate::benchmark) fn identity(&self) -> Result<CaseIdentity, PlanFailure> {
         let value = serde_json::to_value(CaseIdentityInput {
-            governing_specification: VersionedIdentity::specification(),
+            governing_specification: super::identity::specification(),
             identity_schema_revision: RevisionZero::Value,
             projection: self,
         })
@@ -313,7 +313,7 @@ impl IssuedRunPlan {
             envelope: Envelope {
                 record_kind: RunPlanKind::Value,
                 record_schema_revision: RevisionZero::Value,
-                governing_specification: VersionedIdentity::specification(),
+                governing_specification: super::identity::specification(),
                 record_identity: RecordIdentity::fresh(InstanceDomain::Record)?,
                 integrity_digest: IntegrityDigest::from_hash([0; 32]),
                 producing_tool: VersionedIdentity::new(
