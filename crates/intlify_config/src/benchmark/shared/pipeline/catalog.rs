@@ -17,8 +17,7 @@ use crate::benchmark::shared::identity::{
     OWNER_RESULT_DOMAIN,
 };
 use crate::benchmark::shared::measurement::{
-    native_attempt_reference, CaseEvidence, CaseResult, Evaluation, Evidence, EvidenceBody,
-    InputState, Outcome, Report, Section,
+    self, CaseResult, Evaluation, Evidence, InputState, Outcome, Report, Section,
 };
 use crate::benchmark::shared::plan::RunPlanRecord;
 use crate::benchmark::shared::reason::valid_reasons;
@@ -315,7 +314,8 @@ impl Catalog {
             Reference::TopLevel { .. } => Ok(()),
             Reference::NestedRecord { .. }
                 if source.result().attempts.iter().any(|attempt| {
-                    native_attempt_reference(source, attempt.ordinal).as_ref() == Ok(reference)
+                    measurement::attempt_reference(source, attempt.ordinal).as_ref()
+                        == Ok(reference)
                 }) =>
             {
                 Ok(())
@@ -403,7 +403,12 @@ pub(in crate::benchmark) fn validate_records(
                     .zip(&plan.body.case_inventory)
                     .zip(run.common_plan().projections())
                     .map(|((attempt, planned), projection)| {
-                        CaseEvidence::project(&source, attempt, &planned.case_identity, projection)
+                        measurement::project_case(
+                            &source,
+                            attempt,
+                            &planned.case_identity,
+                            projection,
+                        )
                     })
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|_| ValidationFailure::Evidence)?
@@ -414,7 +419,7 @@ pub(in crate::benchmark) fn validate_records(
                 // record is minted. A producer cannot declare eligible measured
                 // cases projection-ineligible simply by withholding evidence.
                 if !cases.is_empty()
-                    && EvidenceBody::from_source(&source, plan, plan.identity(), cases).is_ok()
+                    && measurement::evidence_body(&source, plan, plan.identity(), cases).is_ok()
                 {
                     return Err(ValidationFailure::MissingRecord);
                 }
@@ -439,14 +444,14 @@ pub(in crate::benchmark) fn validate_records(
                 .zip(run.common_plan().projections())
             {
                 if let Some(case) =
-                    CaseEvidence::project(&source, attempt, &planned.case_identity, projection)
+                    measurement::project_case(&source, attempt, &planned.case_identity, projection)
                         .map_err(|_| ValidationFailure::Evidence)?
                 {
                     expected_cases.push(case);
                 }
             }
             let expected =
-                EvidenceBody::from_source(&source, plan, evidence.identity(), expected_cases)
+                measurement::evidence_body(&source, plan, evidence.identity(), expected_cases)
                     .map_err(|_| ValidationFailure::Evidence)?;
             if expected.cases.is_empty()
                 || evidence.body != expected

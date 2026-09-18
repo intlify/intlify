@@ -24,6 +24,7 @@ pub mod encoding;
 pub mod environment;
 pub mod execution;
 pub mod identity;
+pub mod measurement;
 pub mod plan;
 pub mod reason;
 pub mod record;

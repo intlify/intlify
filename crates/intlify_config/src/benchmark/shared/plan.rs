@@ -16,7 +16,7 @@ use intlify_measurement::plan::{self, CaseProjection as CommonProjection, Issuan
 pub(super) use intlify_measurement::plan::{BuildIdentity, Subject};
 
 pub(in crate::benchmark) use intlify_measurement::plan::{
-    case_identity, InventoryEntry, PlanFailure, RunPlanRecord,
+    case_identity, PlanFailure, RunPlanRecord,
 };
 
 use crate::benchmark::cases::registry::Registry;

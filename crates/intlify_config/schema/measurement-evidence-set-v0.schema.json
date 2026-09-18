@@ -22,11 +22,8 @@
       "type": "string"
     },
     "Aggregation2": {
+      "description": "Samples aggregate as a batch total.",
       "enum": ["batch_total"],
-      "type": "string"
-    },
-    "Algorithm": {
-      "enum": ["blake3-256"],
       "type": "string"
     },
     "AnyIdentity": {
@@ -222,6 +219,7 @@
     },
     "CaseEvidence": {
       "additionalProperties": false,
+      "description": "One measured case as the common Evidence Set carries it.",
       "properties": {
         "caseIdentity": {
           "$ref": "#/definitions/CaseIdentity"
@@ -1857,6 +1855,7 @@
     },
     "EvidenceBody": {
       "additionalProperties": false,
+      "description": "The complete Evidence Set body.",
       "properties": {
         "binding": {
           "$ref": "#/definitions/RunBinding"
@@ -1930,27 +1929,23 @@
       ],
       "type": "object"
     },
-    "ExecutionDomain": {
-      "enum": ["sample-execution"],
-      "type": "string"
-    },
     "ExecutionIdentity": {
       "additionalProperties": false,
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "domain": {
-          "$ref": "#/definitions/ExecutionDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerResult": {
           "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "value": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         }
       },
       "required": ["ownerResult", "algorithm", "framing", "domain", "value"],
@@ -1958,10 +1953,6 @@
     },
     "ExecutionModel": {
       "enum": ["same-process-synchronous-ordinary-core"],
-      "type": "string"
-    },
-    "Framing": {
-      "enum": ["intlify-config-minimum-observation/0"],
       "type": "string"
     },
     "Hex256": {
@@ -2370,6 +2361,7 @@
       "type": "object"
     },
     "NoCalibration": {
+      "description": "No calibration was applied.",
       "enum": ["none"],
       "type": "string"
     },
@@ -2902,21 +2894,22 @@
     },
     "OwnerBinding": {
       "additionalProperties": false,
+      "description": "The owner result one Evidence Set was projected from.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "benchmarkProfile": {
           "$ref": "#/definitions/VersionedIdentity"
         },
         "checksum": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "domain": {
-          "$ref": "#/definitions/OwnerDomain2"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerIdentity": {
           "$ref": "#/definitions/Token"
@@ -2925,7 +2918,7 @@
           "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "resultSchema": {
-          "$ref": "#/definitions/OwnerCodec"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": [
@@ -2940,16 +2933,8 @@
       ],
       "type": "object"
     },
-    "OwnerCodec": {
-      "enum": ["intlify-config-owner-run-result/1"],
-      "type": "string"
-    },
     "OwnerDomain": {
       "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
-      "type": "string"
-    },
-    "OwnerDomain2": {
-      "enum": ["owner-run-result"],
       "type": "string"
     },
     "OwnerLabel": {
@@ -3196,6 +3181,7 @@
     },
     "RunBinding": {
       "additionalProperties": false,
+      "description": "The exact run this record belongs to.",
       "properties": {
         "buildIdentity": {
           "$ref": "#/definitions/BuildIdentity"
@@ -3240,6 +3226,7 @@
     },
     "Sample": {
       "additionalProperties": false,
+      "description": "One sample as the common Evidence Set carries it.",
       "properties": {
         "acquisition": {
           "$ref": "#/definitions/Acquisition"
@@ -3260,7 +3247,7 @@
           "$ref": "#/definitions/UInt64"
         },
         "ownerSampleIdentity": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "repetitionCount": {
           "$ref": "#/definitions/PositiveUInt64"
@@ -3284,6 +3271,7 @@
     },
     "SamplingPolicy": {
       "additionalProperties": false,
+      "description": "The sampling policy a measured case was captured under.",
       "properties": {
         "aggregation": {
           "$ref": "#/definitions/Aggregation2"
@@ -3304,7 +3292,7 @@
           "$ref": "#/definitions/UInt64"
         },
         "warmupStrategy": {
-          "$ref": "#/definitions/WarmupStrategy"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -3404,27 +3392,23 @@
       ],
       "type": "string"
     },
-    "SemanticDomain": {
-      "enum": ["observation"],
-      "type": "string"
-    },
     "SemanticObservation": {
       "additionalProperties": false,
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "completeObservation": {
           "$ref": "#/definitions/Observation12"
         },
         "domain": {
-          "$ref": "#/definitions/SemanticDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "identity": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "ownerIdentity": {
           "$ref": "#/definitions/Token"
@@ -3605,10 +3589,6 @@
       "required": ["identity", "revision"],
       "type": "object"
     },
-    "WarmupStrategy": {
-      "enum": ["fixed-invocations-before-measured-samples-per-case"],
-      "type": "string"
-    },
     "WorkFact": {
       "additionalProperties": false,
       "properties": {
@@ -3749,6 +3729,6 @@
     }
   },
   "required": ["envelope", "body"],
-  "title": "Record",
+  "title": "Evidence",
   "type": "object"
 }

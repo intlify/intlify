@@ -10,7 +10,7 @@
 use intlify_measurement::identity::VersionedIdentity;
 
 pub(in crate::benchmark) use intlify_measurement::record::Reference;
-pub(super) use intlify_measurement::record::{EvaluationKind, EvidenceKind, Record, ReportKind};
+pub(super) use intlify_measurement::record::{EvaluationKind, EvidenceKind, ReportKind};
 
 /// The exact tool that produced this owner's common records.
 pub(super) fn producing_tool() -> VersionedIdentity {

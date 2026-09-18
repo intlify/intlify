@@ -51,6 +51,7 @@
     },
     "CaseEvaluation": {
       "additionalProperties": false,
+      "description": "One planned case's evaluation.",
       "properties": {
         "caseIdentity": {
           "$ref": "#/definitions/CaseIdentity"
@@ -70,6 +71,7 @@
       "type": "string"
     },
     "CaseResult": {
+      "description": "What became of one planned case.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -446,6 +448,7 @@
     },
     "EvaluationBody": {
       "additionalProperties": false,
+      "description": "The complete Run Evaluation body.",
       "properties": {
         "binding": {
           "$ref": "#/definitions/RunBinding"
@@ -485,6 +488,7 @@
     },
     "ExpectedOwner": {
       "additionalProperties": false,
+      "description": "The owner result a Run Evaluation expected to resolve.",
       "properties": {
         "benchmarkProfile": {
           "$ref": "#/definitions/VersionedIdentity"
@@ -493,7 +497,7 @@
           "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "resultSchema": {
-          "$ref": "#/definitions/OwnerCodec"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["recordIdentity", "resultSchema", "benchmarkProfile"],
@@ -505,6 +509,7 @@
     },
     "InputResolution": {
       "additionalProperties": false,
+      "description": "The owner result this evaluation expected, and what it got.",
       "properties": {
         "expected": {
           "$ref": "#/definitions/ExpectedOwner"
@@ -517,6 +522,7 @@
       "type": "object"
     },
     "InputState": {
+      "description": "Whether the owner result resolved, and if not, exactly why.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -650,11 +656,8 @@
       "type": "object"
     },
     "Outcome": {
+      "description": "Whether a run produced a complete result for its planned inventory.",
       "enum": ["complete", "incomplete", "invalid"],
-      "type": "string"
-    },
-    "OwnerCodec": {
-      "enum": ["intlify-config-owner-run-result/1"],
       "type": "string"
     },
     "OwnerDomain": {
@@ -763,6 +766,7 @@
     },
     "RunBinding": {
       "additionalProperties": false,
+      "description": "The exact run this record belongs to.",
       "properties": {
         "buildIdentity": {
           "$ref": "#/definitions/BuildIdentity"
@@ -901,6 +905,7 @@
       "type": "string"
     },
     "UnavailableKind": {
+      "description": "Why a planned case produced no measurement.\n\nThe kinds are separate because they call for different responses, and none\nof them is a measured result.",
       "enum": ["missing", "skipped", "unsupported", "failed", "projection-ineligible", "stale"],
       "type": "string"
     },
@@ -928,6 +933,6 @@
     }
   },
   "required": ["envelope", "body"],
-  "title": "Record",
+  "title": "Evaluation",
   "type": "object"
 }

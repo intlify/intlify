@@ -6,9 +6,7 @@
 
 use crate::benchmark::run::{CheckedOwnerRecord, OwnerRecord, RecordedRun, RunIssue};
 use crate::benchmark::shared::decode;
-use crate::benchmark::shared::measurement::{
-    ExpectedOwner, InputResolution, InputState, UnavailableKind,
-};
+use crate::benchmark::shared::measurement::{self, InputResolution, InputState, UnavailableKind};
 use crate::benchmark::shared::reason::{CommonCode, Detail, Reason, Selector, Stage};
 use crate::benchmark::shared::record::Reference;
 
@@ -21,7 +19,8 @@ pub(super) struct OwnerInput {
 
 impl OwnerInput {
     pub(super) fn resolve(run: &RecordedRun, inputs: &[&[u8]]) -> Self {
-        let expected = ExpectedOwner::from_plan(run.plan_record(), run.expected_owner_identity());
+        let expected =
+            measurement::expected_from_plan(run.plan_record(), run.expected_owner_identity());
         let selector = || Selector::Record {
             reference: Reference::top(&expected.record_identity),
         };

@@ -3,6 +3,7 @@
   "additionalProperties": false,
   "definitions": {
     "Aggregation": {
+      "description": "Samples aggregate as a batch total.",
       "enum": ["batch_total"],
       "type": "string"
     },
@@ -35,6 +36,7 @@
       "type": "string"
     },
     "CaseResult": {
+      "description": "What became of one planned case.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -112,6 +114,7 @@
       ]
     },
     "Category": {
+      "description": "The measured category.",
       "enum": ["toolchain"],
       "type": "string"
     },
@@ -480,11 +483,13 @@
       "type": "string"
     },
     "Metric": {
+      "description": "The measured metric.",
       "enum": ["wall_duration"],
       "type": "string"
     },
     "MissingCase": {
       "additionalProperties": false,
+      "description": "One planned case that produced no row, retained rather than dropped.",
       "properties": {
         "caseIdentity": {
           "$ref": "#/definitions/CaseIdentity"
@@ -534,14 +539,17 @@
       "type": "object"
     },
     "ObservationalOnly": {
+      "description": "This profile permits no numeric decision.",
       "enum": ["observational-only-no-numeric-decisions"],
       "type": "string"
     },
     "OperationClass": {
+      "description": "The measured operation class.",
       "enum": ["component"],
       "type": "string"
     },
     "Outcome": {
+      "description": "Whether a run produced a complete result for its planned inventory.",
       "enum": ["complete", "incomplete", "invalid"],
       "type": "string"
     },
@@ -675,6 +683,7 @@
     },
     "ReportBody": {
       "additionalProperties": false,
+      "description": "The complete structured report body.",
       "properties": {
         "reportSpecification": {
           "$ref": "#/definitions/VersionedIdentity"
@@ -696,6 +705,7 @@
     },
     "ReportSample": {
       "additionalProperties": false,
+      "description": "One raw sample, as a report row presents it.",
       "properties": {
         "aggregateQuantity": {
           "$ref": "#/definitions/UInt64"
@@ -723,6 +733,7 @@
       "type": "object"
     },
     "Requirement": {
+      "description": "A case the inventory cannot omit.",
       "enum": ["required"],
       "type": "string"
     },
@@ -732,6 +743,7 @@
     },
     "Row": {
       "additionalProperties": false,
+      "description": "One measured case, as a report row presents it.",
       "properties": {
         "caseEvaluation": {
           "$ref": "#/definitions/Reference"
@@ -798,6 +810,7 @@
       "type": "object"
     },
     "Section": {
+      "description": "One report section.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -947,6 +960,7 @@
       "type": "string"
     },
     "Surface": {
+      "description": "The measured performance surface.",
       "enum": ["core"],
       "type": "string"
     },
@@ -955,6 +969,7 @@
       "type": "string"
     },
     "Truncation": {
+      "description": "Whether a report presents everything it evaluated.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -974,10 +989,12 @@
       "type": "string"
     },
     "UnavailableKind": {
+      "description": "Why a planned case produced no measurement.\n\nThe kinds are separate because they call for different responses, and none\nof them is a measured result.",
       "enum": ["missing", "skipped", "unsupported", "failed", "projection-ineligible", "stale"],
       "type": "string"
     },
     "Unit": {
+      "description": "The canonical unit of the metric.",
       "enum": ["nanosecond"],
       "type": "string"
     },
@@ -1005,6 +1022,6 @@
     }
   },
   "required": ["envelope", "body"],
-  "title": "Record",
+  "title": "Report",
   "type": "object"
 }

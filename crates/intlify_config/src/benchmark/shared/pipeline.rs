@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use super::encoding::EncodingFailure;
 use super::identity::{IdentityFailure, InstanceDomain, RecordIdentity};
-use super::measurement::{CaseEvidence, Evaluation, Evidence, EvidenceBody, Report};
+use super::measurement::{self, Evaluation, Evidence, Report};
 use super::record::{producing_tool, EvaluationKind, EvidenceKind, ReportKind};
 use crate::benchmark::run::{RecordedRun, RunFailure};
 
@@ -96,7 +96,7 @@ pub(in crate::benchmark) fn produce_with_owner(
                 return Err(Failure::Plan);
             }
             if let Some(case) =
-                CaseEvidence::project(&source, attempt, &planned.case_identity, projection)?
+                measurement::project_case(&source, attempt, &planned.case_identity, projection)?
             {
                 cases.push(case);
             }
@@ -105,7 +105,7 @@ pub(in crate::benchmark) fn produce_with_owner(
             None
         } else {
             let identity = RecordIdentity::fresh(InstanceDomain::Record)?;
-            match EvidenceBody::from_source(&source, plan, &identity, cases) {
+            match measurement::evidence_body(&source, plan, &identity, cases) {
                 Ok(body) => Some(Evidence::seal(
                     EvidenceKind::Value,
                     identity,
