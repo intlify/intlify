@@ -10,12 +10,14 @@ use serde_json::Value;
 
 use super::{evaluate, owner::OwnerInput, Artifacts};
 use crate::benchmark::run::RecordedRun;
+use crate::benchmark::shared::build;
+use crate::benchmark::shared::environment;
 use crate::benchmark::shared::identity::{
-    self, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
+    self, AnyIdentity, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
+    OWNER_RESULT_DOMAIN,
 };
 use crate::benchmark::shared::measurement::{
-    native_attempt_reference, CaseEvidence, CaseResult, Evaluation, Evidence, EvidenceBody,
-    InputState, Outcome, Report, Section,
+    self, CaseResult, Evaluation, Evidence, InputState, Outcome, Report, Section,
 };
 use crate::benchmark::shared::plan::RunPlanRecord;
 use crate::benchmark::shared::reason::valid_reasons;
@@ -258,9 +260,18 @@ impl Catalog {
         Ok(Self { documents })
     }
 
-    fn record(&self, id: &RecordIdentity) -> Result<&Document, ValidationFailure> {
+    fn common(&self, id: &RecordIdentity) -> Result<&Document, ValidationFailure> {
         self.documents
             .get(id)
+            .ok_or(ValidationFailure::MissingRecord)
+    }
+
+    fn record(&self, id: &AnyIdentity) -> Result<&Document, ValidationFailure> {
+        // Only a common record can be resolved in this catalog. An owner
+        // instance is a valid reference target but is not one of these
+        // documents, so it is resolved against the admitted owner input.
+        id.as_common()
+            .and_then(|identity| self.documents.get(identity))
             .ok_or(ValidationFailure::MissingRecord)
     }
     fn resolve(&self, reference: &Reference) -> Result<&Document, ValidationFailure> {
@@ -285,22 +296,26 @@ impl Catalog {
             Reference::TopLevel { record_identity } => record_identity,
             Reference::NestedRecord { reference } => &reference.parent_record_identity,
         };
-        if parent.domain() != InstanceDomain::NativeOwnerResult {
+        let Some(owner_instance) = parent
+            .as_owner()
+            .filter(|identity| identity.domain() == OWNER_RESULT_DOMAIN)
+        else {
             return self.resolve(reference).map(|_| ());
-        }
+        };
         let source = owner
             .checked
             .as_ref()
             .ok_or(ValidationFailure::Reference)?
             .document();
-        if parent != &source.result().record_identity {
+        if owner_instance != &source.result().record_identity {
             return Err(ValidationFailure::Reference);
         }
         match reference {
             Reference::TopLevel { .. } => Ok(()),
             Reference::NestedRecord { .. }
                 if source.result().attempts.iter().any(|attempt| {
-                    native_attempt_reference(source, attempt.ordinal).as_ref() == Ok(reference)
+                    measurement::attempt_reference(source, attempt.ordinal).as_ref()
+                        == Ok(reference)
                 }) =>
             {
                 Ok(())
@@ -352,13 +367,13 @@ pub(in crate::benchmark) fn validate_records(
         return Err(ValidationFailure::Capacity);
     }
     let catalog = Catalog::read(common_inputs)?;
-    let Document::Plan(plan) = catalog.record(run.plan_record().identity())? else {
+    let Document::Plan(plan) = catalog.common(run.plan_record().identity())? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
     if **plan != *run.plan_record() {
         return Err(ValidationFailure::Plan);
     }
-    let Document::Report(report) = catalog.record(report_identity)? else {
+    let Document::Report(report) = catalog.common(report_identity)? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
     let [Section::MeasurementObservation {
@@ -388,7 +403,12 @@ pub(in crate::benchmark) fn validate_records(
                     .zip(&plan.body.case_inventory)
                     .zip(run.common_plan().projections())
                     .map(|((attempt, planned), projection)| {
-                        CaseEvidence::project(&source, attempt, &planned.case_identity, projection)
+                        measurement::project_case(
+                            &source,
+                            attempt,
+                            &planned.case_identity,
+                            projection,
+                        )
                     })
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|_| ValidationFailure::Evidence)?
@@ -399,7 +419,7 @@ pub(in crate::benchmark) fn validate_records(
                 // record is minted. A producer cannot declare eligible measured
                 // cases projection-ineligible simply by withholding evidence.
                 if !cases.is_empty()
-                    && EvidenceBody::from_source(&source, plan, plan.identity(), cases).is_ok()
+                    && measurement::evidence_body(&source, plan, plan.identity(), cases).is_ok()
                 {
                     return Err(ValidationFailure::MissingRecord);
                 }
@@ -424,22 +444,19 @@ pub(in crate::benchmark) fn validate_records(
                 .zip(run.common_plan().projections())
             {
                 if let Some(case) =
-                    CaseEvidence::project(&source, attempt, &planned.case_identity, projection)
+                    measurement::project_case(&source, attempt, &planned.case_identity, projection)
                         .map_err(|_| ValidationFailure::Evidence)?
                 {
                     expected_cases.push(case);
                 }
             }
             let expected =
-                EvidenceBody::from_source(&source, plan, evidence.identity(), expected_cases)
+                measurement::evidence_body(&source, plan, evidence.identity(), expected_cases)
                     .map_err(|_| ValidationFailure::Evidence)?;
             if expected.cases.is_empty()
                 || evidence.body != expected
-                || !evidence.body.build.validate(&source, evidence.identity())
-                || !evidence
-                    .body
-                    .environment
-                    .validate(&source, evidence.identity())
+                || !build::validate(&evidence.body.build, &source, evidence.identity())
+                || !environment::validate(&evidence.body.environment, &source, evidence.identity())
             {
                 return Err(ValidationFailure::Evidence);
             }

@@ -22,19 +22,24 @@
       "type": "string"
     },
     "Aggregation2": {
+      "description": "Samples aggregate as a batch total.",
       "enum": ["batch_total"],
       "type": "string"
     },
-    "Algorithm": {
-      "enum": ["blake3-256"],
-      "type": "string"
+    "AnyIdentity": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        {
+          "$ref": "#/definitions/OwnerRecordIdentity"
+        }
+      ],
+      "description": "Either instance identity, as a reference target carries them equally.\n\nThe two are still separate types: a common record's own identity is never\nan owner instance, and reading one out of a reference does not make it one."
     },
     "Architecture": {
+      "description": "The processor architectures this inventory admits.",
       "enum": ["x86", "x86_64", "arm", "aarch64", "riscv32", "riscv64", "wasm32", "wasm64"],
-      "type": "string"
-    },
-    "Blake3": {
-      "enum": ["blake3-256"],
       "type": "string"
     },
     "Boundary": {
@@ -111,6 +116,7 @@
     },
     "Build": {
       "additionalProperties": false,
+      "description": "The complete applicable Build facts one Evidence Set carries.",
       "properties": {
         "buildConfiguration": {
           "$ref": "#/definitions/Observation4"
@@ -128,7 +134,7 @@
           "$ref": "#/definitions/VersionedIdentity"
         },
         "physicalEngine": {
-          "$ref": "#/definitions/PhysicalEngine"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "sourceContent": {
           "$ref": "#/definitions/Observation"
@@ -151,6 +157,7 @@
     },
     "BuildConfiguration": {
       "additionalProperties": false,
+      "description": "The effective build settings a measured artifact was produced under.",
       "properties": {
         "assertions": {
           "type": "boolean"
@@ -175,6 +182,7 @@
       "type": "object"
     },
     "BuildField": {
+      "description": "The complete applicable Build fields one record reports on.",
       "enum": [
         "source-content",
         "implementation",
@@ -188,22 +196,22 @@
     },
     "BuildIdentity": {
       "additionalProperties": false,
-      "description": "This is a content binding to the actual native Build Observation, not a\ncommon record ID, complete compiler attestation, or executable digest.",
+      "description": "A content binding to an owner's actual Build Observation.\n\nIt is not a common record identity, a compiler attestation, or an\nexecutable digest, so the framing that produced the checksum travels with it.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/NativeAlgorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "checksum": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "domain": {
-          "$ref": "#/definitions/NativeBuildDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/NativeFraming"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerSchema": {
-          "$ref": "#/definitions/NativeBuildSchema"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["ownerSchema", "algorithm", "framing", "domain", "checksum"],
@@ -211,6 +219,7 @@
     },
     "CaseEvidence": {
       "additionalProperties": false,
+      "description": "One measured case as the common Evidence Set carries it.",
       "properties": {
         "caseIdentity": {
           "$ref": "#/definitions/CaseIdentity"
@@ -352,7 +361,7 @@
     },
     "ClockObservation": {
       "additionalProperties": false,
-      "description": "An actual acquisition fact, not a guessed precision or part of semantic output.",
+      "description": "An actual clock acquisition fact, not a guessed precision or a semantic output.",
       "properties": {
         "clock": {
           "type": "string"
@@ -402,6 +411,7 @@
       ]
     },
     "CommonCode": {
+      "description": "The registered common cause codes.",
       "enum": [
         "missing-evidence",
         "missing-required-case",
@@ -428,8 +438,14 @@
       ],
       "type": "string"
     },
+    "CommonDomain": {
+      "description": "The two instance domains 026 itself registers.",
+      "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"],
+      "type": "string"
+    },
     "Concurrency": {
       "additionalProperties": false,
+      "description": "How much concurrency a run actually used, and under which policy.",
       "properties": {
         "callingThreads": {
           "$ref": "#/definitions/PositiveUInt64"
@@ -438,19 +454,19 @@
           "$ref": "#/definitions/VersionedIdentity"
         },
         "externalActivity": {
-          "$ref": "#/definitions/ExternalActivity"
+          "$ref": "#/definitions/Token"
         },
         "internalWorkers": {
           "$ref": "#/definitions/UInt64"
         },
         "policy": {
-          "$ref": "#/definitions/ConcurrencyPolicy"
+          "$ref": "#/definitions/Token"
         },
         "processes": {
           "$ref": "#/definitions/PositiveUInt64"
         },
         "scope": {
-          "$ref": "#/definitions/ConcurrencyScope"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -468,15 +484,8 @@
       "enum": ["sequential-cases-calling-thread-no-workers"],
       "type": "string"
     },
-    "ConcurrencyPolicy": {
-      "enum": ["sequential-cases-synchronous-calling-thread-no-workers"],
-      "type": "string"
-    },
-    "ConcurrencyScope": {
-      "enum": ["one-owner-run-in-the-calling-process"],
-      "type": "string"
-    },
     "ConditionalObservation": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -527,6 +536,7 @@
       ]
     },
     "ConditionalObservation2": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -577,6 +587,7 @@
       ]
     },
     "ConditionalObservation3": {
+      "description": "One observation that can also be inapplicable under a registered rule.\n\nInapplicable is not a third spelling of absent: it names the rule that makes\nthe field meaningless for this subject.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1074,6 +1085,7 @@
       "type": "object"
     },
     "Detail": {
+      "description": "The typed payload of a reason.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1320,6 +1332,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-os_family"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1338,6 +1353,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-os_version"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1356,6 +1374,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-kernel_build"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1374,6 +1395,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-cpu_architecture"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1392,6 +1416,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-target_triple"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1410,6 +1437,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-runner_context"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1428,6 +1458,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-execution_kind"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1446,6 +1479,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-processor_class"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1464,6 +1500,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-logical_cpu_count"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1482,6 +1521,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-memory_capacity_class"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1500,6 +1542,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-power_thermal_policy"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1518,6 +1563,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-language_runtime"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1536,6 +1584,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-browser"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1554,6 +1605,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-virtual_machine"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1572,6 +1626,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-device"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1590,6 +1647,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-jit_gc_configuration"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1608,6 +1668,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-toolchain"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1626,6 +1689,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-build_configuration"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1644,6 +1710,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-instrumentation"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1662,6 +1731,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-allocator"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1680,6 +1752,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-memory_observer"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1698,6 +1773,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-clock_or_sampler"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1716,6 +1794,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-concurrency"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1734,6 +1815,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-container_emulator_simulator"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1752,6 +1836,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-locale_service"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1770,6 +1857,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-harness"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1788,6 +1878,9 @@
                 },
                 {
                   "properties": {
+                    "localRecordIdentity": {
+                      "const": "environment-field-projection"
+                    },
                     "observation": {
                       "properties": {
                         "field": {
@@ -1843,6 +1936,7 @@
     },
     "EvidenceBody": {
       "additionalProperties": false,
+      "description": "The complete Evidence Set body.",
       "properties": {
         "binding": {
           "$ref": "#/definitions/RunBinding"
@@ -1871,11 +1965,13 @@
       "type": "object"
     },
     "EvidenceKind": {
+      "description": "The Measurement Evidence Set record kind.",
       "enum": ["measurement-evidence-set"],
       "type": "string"
     },
     "Execution": {
       "additionalProperties": false,
+      "description": "The complete execution state of one measured case.",
       "properties": {
         "cacheState": {
           "type": "string"
@@ -1914,27 +2010,23 @@
       ],
       "type": "object"
     },
-    "ExecutionDomain": {
-      "enum": ["sample-execution"],
-      "type": "string"
-    },
     "ExecutionIdentity": {
       "additionalProperties": false,
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "domain": {
-          "$ref": "#/definitions/ExecutionDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerResult": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "value": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         }
       },
       "required": ["ownerResult", "algorithm", "framing", "domain", "value"],
@@ -1942,14 +2034,6 @@
     },
     "ExecutionModel": {
       "enum": ["same-process-synchronous-ordinary-core"],
-      "type": "string"
-    },
-    "ExternalActivity": {
-      "enum": ["uncontrolled"],
-      "type": "string"
-    },
-    "Framing": {
-      "enum": ["intlify-config-minimum-observation/0"],
       "type": "string"
     },
     "Hex256": {
@@ -2057,35 +2141,27 @@
       ],
       "type": "object"
     },
-    "InstanceDomain": {
-      "enum": [
-        "intlify-verification-record-v0",
-        "intlify-measurement-run-v0",
-        "intlify-config-owner-result-v1",
-        "intlify-config-local-runner-instance-v0"
-      ],
-      "type": "string"
-    },
     "Instrumentation": {
       "additionalProperties": false,
+      "description": "What a harness installed while measuring, and what it did not.",
       "properties": {
         "allocation": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         },
         "descriptor": {
           "$ref": "#/definitions/VersionedIdentity"
         },
         "externalInstrumentation": {
-          "$ref": "#/definitions/Unattested"
+          "$ref": "#/definitions/Token"
         },
         "profiling": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         },
         "timing": {
-          "$ref": "#/definitions/Timing"
+          "$ref": "#/definitions/Token"
         },
         "trace": {
-          "$ref": "#/definitions/NotInstalled"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -2103,6 +2179,7 @@
       "type": "string"
     },
     "InvocationFailure": {
+      "description": "How exactly a measured invocation failed.",
       "enum": [
         "measurement-overflow",
         "counter-overflow",
@@ -2193,26 +2270,23 @@
     },
     "LockContent": {
       "additionalProperties": false,
+      "description": "One complete observation of the dependency lock a subject resolved against.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Blake3"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "bytes": {
           "$ref": "#/definitions/UInt64"
         },
         "digest": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "representation": {
-          "$ref": "#/definitions/LockRepresentation"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["algorithm", "representation", "digest", "bytes"],
       "type": "object"
-    },
-    "LockRepresentation": {
-      "enum": ["complete-lock-file-octets"],
-      "type": "string"
     },
     "LogicalWork": {
       "additionalProperties": false,
@@ -2332,6 +2406,7 @@
       "type": "string"
     },
     "MissingObservation": {
+      "description": "Why an observation is absent. Absence is never reported as a value.",
       "enum": [
         "not-collected",
         "native-acquisition-unavailable",
@@ -2344,20 +2419,8 @@
       ],
       "type": "string"
     },
-    "NativeAlgorithm": {
-      "enum": ["blake3"],
-      "type": "string"
-    },
-    "NativeBuildDomain": {
-      "enum": ["build-observation"],
-      "type": "string"
-    },
-    "NativeBuildSchema": {
-      "enum": ["intlify-config-build-observation/0"],
-      "type": "string"
-    },
-    "NativeFraming": {
-      "enum": ["intlify-config-minimum-observation/0"],
+    "NativeChecksum": {
+      "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
     "NativeObservationChecksum": {
@@ -2366,26 +2429,25 @@
     },
     "NestedReference": {
       "additionalProperties": false,
+      "description": "One local record inside a named parent record.",
       "properties": {
         "localRecordIdentity": {
           "$ref": "#/definitions/Token"
         },
         "parentRecordIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/AnyIdentity"
         }
       },
       "required": ["parentRecordIdentity", "localRecordIdentity"],
       "type": "object"
     },
     "NoCalibration": {
+      "description": "No calibration was applied.",
       "enum": ["none"],
       "type": "string"
     },
-    "NotInstalled": {
-      "enum": ["not-installed-by-this-harness"],
-      "type": "string"
-    },
     "Observation": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2422,6 +2484,7 @@
       ]
     },
     "Observation10": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2458,6 +2521,7 @@
       ]
     },
     "Observation11": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2514,6 +2578,7 @@
       "type": "object"
     },
     "Observation2": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2550,6 +2615,7 @@
       ]
     },
     "Observation3": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2586,6 +2652,7 @@
       ]
     },
     "Observation4": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2622,6 +2689,7 @@
       ]
     },
     "Observation5": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2658,6 +2726,7 @@
       ]
     },
     "Observation6": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2694,6 +2763,7 @@
       ]
     },
     "Observation7": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2730,6 +2800,7 @@
       ]
     },
     "Observation8": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2766,6 +2837,7 @@
       ]
     },
     "Observation9": {
+      "description": "One observation that is either present or unavailable with its reasons.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2869,6 +2941,7 @@
       "type": "object"
     },
     "OutputBuffer": {
+      "description": "Whether a measured operation writes into a caller-owned output buffer.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2902,30 +2975,31 @@
     },
     "OwnerBinding": {
       "additionalProperties": false,
+      "description": "The owner result one Evidence Set was projected from.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "benchmarkProfile": {
           "$ref": "#/definitions/VersionedIdentity"
         },
         "checksum": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "domain": {
-          "$ref": "#/definitions/OwnerDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "ownerIdentity": {
           "$ref": "#/definitions/Token"
         },
         "resultIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/OwnerRecordIdentity"
         },
         "resultSchema": {
-          "$ref": "#/definitions/OwnerCodec"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": [
@@ -2940,17 +3014,30 @@
       ],
       "type": "object"
     },
-    "OwnerCodec": {
-      "enum": ["intlify-config-owner-run-result/1"],
-      "type": "string"
-    },
     "OwnerDomain": {
-      "enum": ["owner-run-result"],
+      "not": {
+        "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"]
+      },
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
       "type": "string"
     },
-    "PhysicalEngine": {
-      "enum": ["rust-native-component"],
+    "OwnerLabel": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$",
       "type": "string"
+    },
+    "OwnerRecordIdentity": {
+      "additionalProperties": false,
+      "description": "One fresh instance identity in a domain an owner registers.\n\nThe domain is the owner's, so this crate checks its grammar and its\nseparation from the common domains, never its meaning.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/OwnerDomain"
+        },
+        "value": {
+          "$ref": "#/definitions/Hex256"
+        }
+      },
+      "required": ["domain", "value"],
+      "type": "object"
     },
     "PositiveUInt64": {
       "pattern": "^(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
@@ -2958,6 +3045,7 @@
     },
     "Reason": {
       "additionalProperties": false,
+      "description": "One complete reason: code, stage, what it affects, and its typed payload.",
       "properties": {
         "affected": {
           "$ref": "#/definitions/Selector"
@@ -3041,9 +3129,10 @@
     },
     "RecordIdentity": {
       "additionalProperties": false,
+      "description": "One fresh instance identity in a domain this crate registers.",
       "properties": {
         "domain": {
-          "$ref": "#/definitions/InstanceDomain"
+          "$ref": "#/definitions/CommonDomain"
         },
         "value": {
           "$ref": "#/definitions/Hex256"
@@ -3053,6 +3142,7 @@
       "type": "object"
     },
     "Reference": {
+      "description": "One reference to a complete record or to a local record inside one.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3062,7 +3152,7 @@
               "type": "string"
             },
             "recordIdentity": {
-              "$ref": "#/definitions/RecordIdentity"
+              "$ref": "#/definitions/AnyIdentity"
             }
           },
           "required": ["kind", "recordIdentity"],
@@ -3113,6 +3203,7 @@
       "type": "object"
     },
     "RequiredObservation": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3131,6 +3222,7 @@
       ]
     },
     "RequiredObservation2": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3149,6 +3241,7 @@
       ]
     },
     "RequiredObservation3": {
+      "description": "One observation a record cannot omit, so it has no unavailable state.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3172,6 +3265,7 @@
     },
     "RunBinding": {
       "additionalProperties": false,
+      "description": "The exact run this record belongs to.",
       "properties": {
         "buildIdentity": {
           "$ref": "#/definitions/BuildIdentity"
@@ -3199,6 +3293,7 @@
       "type": "object"
     },
     "RunnerContext": {
+      "description": "Where a run executed. An uncontrolled local machine is not a qualified runner.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3215,6 +3310,7 @@
     },
     "Sample": {
       "additionalProperties": false,
+      "description": "One sample as the common Evidence Set carries it.",
       "properties": {
         "acquisition": {
           "$ref": "#/definitions/Acquisition"
@@ -3235,7 +3331,7 @@
           "$ref": "#/definitions/UInt64"
         },
         "ownerSampleIdentity": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "repetitionCount": {
           "$ref": "#/definitions/PositiveUInt64"
@@ -3259,6 +3355,7 @@
     },
     "SamplingPolicy": {
       "additionalProperties": false,
+      "description": "The sampling policy a measured case was captured under.",
       "properties": {
         "aggregation": {
           "$ref": "#/definitions/Aggregation2"
@@ -3279,7 +3376,7 @@
           "$ref": "#/definitions/UInt64"
         },
         "warmupStrategy": {
-          "$ref": "#/definitions/WarmupStrategy"
+          "$ref": "#/definitions/Token"
         }
       },
       "required": [
@@ -3298,6 +3395,7 @@
       "type": "string"
     },
     "Selector": {
+      "description": "What exactly a reason is about.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3378,27 +3476,23 @@
       ],
       "type": "string"
     },
-    "SemanticDomain": {
-      "enum": ["observation"],
-      "type": "string"
-    },
     "SemanticObservation": {
       "additionalProperties": false,
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Algorithm"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "completeObservation": {
           "$ref": "#/definitions/Observation12"
         },
         "domain": {
-          "$ref": "#/definitions/SemanticDomain"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "framing": {
-          "$ref": "#/definitions/Framing"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "identity": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "ownerIdentity": {
           "$ref": "#/definitions/Token"
@@ -3416,35 +3510,34 @@
     },
     "SourceContent": {
       "additionalProperties": false,
+      "description": "One complete observation of the source a subject was built from.",
       "properties": {
         "algorithm": {
-          "$ref": "#/definitions/Blake3"
+          "$ref": "#/definitions/OwnerLabel"
         },
         "bytes": {
           "$ref": "#/definitions/UInt64"
         },
         "digest": {
-          "$ref": "#/definitions/NativeObservationChecksum"
+          "$ref": "#/definitions/NativeChecksum"
         },
         "files": {
           "$ref": "#/definitions/PositiveUInt64"
         },
         "framing": {
-          "$ref": "#/definitions/SourceFraming"
+          "$ref": "#/definitions/OwnerLabel"
         }
       },
       "required": ["algorithm", "framing", "digest", "files", "bytes"],
       "type": "object"
     },
     "SourceControlState": {
+      "description": "Whether a working tree matched its recorded source control state.",
       "enum": ["clean", "dirty"],
       "type": "string"
     },
-    "SourceFraming": {
-      "enum": ["intlify-config-build-source/0"],
-      "type": "string"
-    },
     "Stage": {
+      "description": "The stage of the pipeline a reason was raised in.",
       "enum": [
         "input-admission",
         "plan",
@@ -3459,6 +3552,7 @@
     },
     "Subject": {
       "additionalProperties": false,
+      "description": "What exactly was measured.",
       "properties": {
         "identity": {
           "$ref": "#/definitions/Token"
@@ -3471,6 +3565,7 @@
       "type": "object"
     },
     "SubjectKind": {
+      "description": "A subject that is one component of a toolchain.",
       "enum": ["toolchain-component"],
       "type": "string"
     },
@@ -3479,11 +3574,8 @@
       "type": "string"
     },
     "SystemFamily": {
+      "description": "The system families this inventory admits.",
       "enum": ["linux", "darwin"],
-      "type": "string"
-    },
-    "Timing": {
-      "enum": ["compiled-and-enabled-posix-monotonic-invocation"],
       "type": "string"
     },
     "Token": {
@@ -3492,6 +3584,7 @@
     },
     "Toolchain": {
       "additionalProperties": false,
+      "description": "The compiler and backend a measured build was produced with.",
       "properties": {
         "backend": {
           "$ref": "#/definitions/VersionedIdentity"
@@ -3515,10 +3608,6 @@
     },
     "UInt64": {
       "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
-      "type": "string"
-    },
-    "Unattested": {
-      "enum": ["not-attested"],
       "type": "string"
     },
     "UnavailableWork": {
@@ -3583,10 +3672,6 @@
       },
       "required": ["identity", "revision"],
       "type": "object"
-    },
-    "WarmupStrategy": {
-      "enum": ["fixed-invocations-before-measured-samples-per-case"],
-      "type": "string"
     },
     "WorkFact": {
       "additionalProperties": false,
@@ -3718,6 +3803,7 @@
       ]
     }
   },
+  "description": "One complete common record: a closed envelope and its typed body.",
   "properties": {
     "body": {
       "$ref": "#/definitions/EvidenceBody"
@@ -3727,6 +3813,6 @@
     }
   },
   "required": ["envelope", "body"],
-  "title": "Record",
+  "title": "Evidence",
   "type": "object"
 }

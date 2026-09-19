@@ -9,10 +9,10 @@ use crate::benchmark::run::{attempt_outcome, AttemptResult, OwnerOutcome, Record
 use crate::benchmark::sample::CaptureFailureCause;
 use crate::benchmark::shared::identity::{IdentityFailure, Token};
 use crate::benchmark::shared::measurement::{
-    native_attempt_reference, Aggregation, CaseEvaluation, CaseResult, Category, Evaluation,
-    EvaluationBody, Evidence, InputState, Metric, MissingCase, ObservationalOnly, OperationClass,
-    Outcome, ReportBody, ReportSample, Requirement, Row, RunBinding, Section, Surface, Truncation,
-    UnavailableKind, Unit,
+    self, Aggregation, CaseEvaluation, CaseResult, Category, Evaluation, EvaluationBody, Evidence,
+    InputState, Metric, MissingCase, ObservationalOnly, OperationClass, Outcome, ReportBody,
+    ReportSample, Requirement, Row, RunBinding, Section, Surface, Truncation, UnavailableKind,
+    Unit,
 };
 use crate::benchmark::shared::reason::{
     ordered, CommonCode as C, Detail, InvocationFailure as Invocation, Reason, Stage,
@@ -68,7 +68,7 @@ pub(super) fn evaluate(
         let result = if let Some(source) = &owner.checked {
             // Native admission has already checked exact inventory/order/binding.
             let attempt = &source.document().result().attempts[index];
-            let diagnostic = native_attempt_reference(source.document(), attempt.ordinal)?;
+            let diagnostic = measurement::attempt_reference(source.document(), attempt.ordinal)?;
             match &attempt.result {
                 AttemptResult::Measured(_) => {
                     if let Some((evidence, case)) = evidence.and_then(|record| {

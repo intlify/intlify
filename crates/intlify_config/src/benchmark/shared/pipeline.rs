@@ -8,8 +8,8 @@ use serde::Serialize;
 
 use super::encoding::EncodingFailure;
 use super::identity::{IdentityFailure, InstanceDomain, RecordIdentity};
-use super::measurement::{CaseEvidence, Evaluation, Evidence, EvidenceBody, Report};
-use super::record::{EvaluationKind, EvidenceKind, ReportKind};
+use super::measurement::{self, Evaluation, Evidence, Report};
+use super::record::{producing_tool, EvaluationKind, EvidenceKind, ReportKind};
 use crate::benchmark::run::{RecordedRun, RunFailure};
 
 mod catalog;
@@ -96,7 +96,7 @@ pub(in crate::benchmark) fn produce_with_owner(
                 return Err(Failure::Plan);
             }
             if let Some(case) =
-                CaseEvidence::project(&source, attempt, &planned.case_identity, projection)?
+                measurement::project_case(&source, attempt, &planned.case_identity, projection)?
             {
                 cases.push(case);
             }
@@ -105,8 +105,13 @@ pub(in crate::benchmark) fn produce_with_owner(
             None
         } else {
             let identity = RecordIdentity::fresh(InstanceDomain::Record)?;
-            match EvidenceBody::from_source(&source, plan, &identity, cases) {
-                Ok(body) => Some(Evidence::seal(EvidenceKind::Value, identity, body)?),
+            match measurement::evidence_body(&source, plan, &identity, cases) {
+                Ok(body) => Some(Evidence::seal(
+                    EvidenceKind::Value,
+                    identity,
+                    &producing_tool(),
+                    body,
+                )?),
                 // A valid native observation whose identifiers cannot be mapped
                 // losslessly is projection-ineligible, not a fabricated value.
                 Err(IdentityFailure::InvalidToken) => None,
@@ -119,11 +124,13 @@ pub(in crate::benchmark) fn produce_with_owner(
     let evaluation = Evaluation::seal(
         EvaluationKind::Value,
         RecordIdentity::fresh(InstanceDomain::Record)?,
+        &producing_tool(),
         evaluate::evaluate(run, &owner, evidence.as_ref())?,
     )?;
     let report = Report::seal(
         ReportKind::Value,
         RecordIdentity::fresh(InstanceDomain::Record)?,
+        &producing_tool(),
         evaluate::report(&evaluation, evidence.as_ref())?,
     )?;
     let artifacts = Artifacts {

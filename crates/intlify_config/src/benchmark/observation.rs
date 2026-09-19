@@ -21,6 +21,17 @@ use crate::materialize::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Digest([u8; 32]);
 
+impl Digest {
+    /// Borrow the complete 256-bit result.
+    ///
+    /// The framing that produced it is recorded beside every use, so these
+    /// bytes never travel as a checksum without the owner label that explains
+    /// how they were computed.
+    pub(crate) const fn bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
 impl schemars::JsonSchema for Digest {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         "NativeObservationChecksum".into()

@@ -3,10 +3,23 @@
   "additionalProperties": false,
   "definitions": {
     "Aggregation": {
+      "description": "Samples aggregate as a batch total.",
       "enum": ["batch_total"],
       "type": "string"
     },
+    "AnyIdentity": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RecordIdentity"
+        },
+        {
+          "$ref": "#/definitions/OwnerRecordIdentity"
+        }
+      ],
+      "description": "Either instance identity, as a reference target carries them equally.\n\nThe two are still separate types: a common record's own identity is never\nan owner instance, and reading one out of a reference does not make it one."
+    },
     "BuildField": {
+      "description": "The complete applicable Build fields one record reports on.",
       "enum": [
         "source-content",
         "implementation",
@@ -23,6 +36,7 @@
       "type": "string"
     },
     "CaseResult": {
+      "description": "What became of one planned case.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -100,6 +114,7 @@
       ]
     },
     "Category": {
+      "description": "The measured category.",
       "enum": ["toolchain"],
       "type": "string"
     },
@@ -122,6 +137,7 @@
       ]
     },
     "CommonCode": {
+      "description": "The registered common cause codes.",
       "enum": [
         "missing-evidence",
         "missing-required-case",
@@ -148,6 +164,11 @@
       ],
       "type": "string"
     },
+    "CommonDomain": {
+      "description": "The two instance domains 026 itself registers.",
+      "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"],
+      "type": "string"
+    },
     "CreationContext": {
       "additionalProperties": false,
       "properties": {
@@ -159,6 +180,7 @@
       "type": "object"
     },
     "Detail": {
+      "description": "The typed payload of a reason.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -396,6 +418,7 @@
     },
     "Execution": {
       "additionalProperties": false,
+      "description": "The complete execution state of one measured case.",
       "properties": {
         "cacheState": {
           "type": "string"
@@ -438,20 +461,12 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
-    "InstanceDomain": {
-      "enum": [
-        "intlify-verification-record-v0",
-        "intlify-measurement-run-v0",
-        "intlify-config-owner-result-v1",
-        "intlify-config-local-runner-instance-v0"
-      ],
-      "type": "string"
-    },
     "IntegrityDigest": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "type": "string"
     },
     "InvocationFailure": {
+      "description": "How exactly a measured invocation failed.",
       "enum": [
         "measurement-overflow",
         "counter-overflow",
@@ -468,11 +483,13 @@
       "type": "string"
     },
     "Metric": {
+      "description": "The measured metric.",
       "enum": ["wall_duration"],
       "type": "string"
     },
     "MissingCase": {
       "additionalProperties": false,
+      "description": "One planned case that produced no row, retained rather than dropped.",
       "properties": {
         "caseIdentity": {
           "$ref": "#/definitions/CaseIdentity"
@@ -494,6 +511,7 @@
       "type": "object"
     },
     "MissingObservation": {
+      "description": "Why an observation is absent. Absence is never reported as a value.",
       "enum": [
         "not-collected",
         "native-acquisition-unavailable",
@@ -508,30 +526,35 @@
     },
     "NestedReference": {
       "additionalProperties": false,
+      "description": "One local record inside a named parent record.",
       "properties": {
         "localRecordIdentity": {
           "$ref": "#/definitions/Token"
         },
         "parentRecordIdentity": {
-          "$ref": "#/definitions/RecordIdentity"
+          "$ref": "#/definitions/AnyIdentity"
         }
       },
       "required": ["parentRecordIdentity", "localRecordIdentity"],
       "type": "object"
     },
     "ObservationalOnly": {
+      "description": "This profile permits no numeric decision.",
       "enum": ["observational-only-no-numeric-decisions"],
       "type": "string"
     },
     "OperationClass": {
+      "description": "The measured operation class.",
       "enum": ["component"],
       "type": "string"
     },
     "Outcome": {
+      "description": "Whether a run produced a complete result for its planned inventory.",
       "enum": ["complete", "incomplete", "invalid"],
       "type": "string"
     },
     "OutputBuffer": {
+      "description": "Whether a measured operation writes into a caller-owned output buffer.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -563,12 +586,34 @@
         }
       ]
     },
+    "OwnerDomain": {
+      "not": {
+        "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"]
+      },
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "OwnerRecordIdentity": {
+      "additionalProperties": false,
+      "description": "One fresh instance identity in a domain an owner registers.\n\nThe domain is the owner's, so this crate checks its grammar and its\nseparation from the common domains, never its meaning.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/OwnerDomain"
+        },
+        "value": {
+          "$ref": "#/definitions/Hex256"
+        }
+      },
+      "required": ["domain", "value"],
+      "type": "object"
+    },
     "PositiveUInt64": {
       "pattern": "^(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
       "type": "string"
     },
     "Reason": {
       "additionalProperties": false,
+      "description": "One complete reason: code, stage, what it affects, and its typed payload.",
       "properties": {
         "affected": {
           "$ref": "#/definitions/Selector"
@@ -594,9 +639,10 @@
     },
     "RecordIdentity": {
       "additionalProperties": false,
+      "description": "One fresh instance identity in a domain this crate registers.",
       "properties": {
         "domain": {
-          "$ref": "#/definitions/InstanceDomain"
+          "$ref": "#/definitions/CommonDomain"
         },
         "value": {
           "$ref": "#/definitions/Hex256"
@@ -606,6 +652,7 @@
       "type": "object"
     },
     "Reference": {
+      "description": "One reference to a complete record or to a local record inside one.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -615,7 +662,7 @@
               "type": "string"
             },
             "recordIdentity": {
-              "$ref": "#/definitions/RecordIdentity"
+              "$ref": "#/definitions/AnyIdentity"
             }
           },
           "required": ["kind", "recordIdentity"],
@@ -639,6 +686,7 @@
     },
     "ReportBody": {
       "additionalProperties": false,
+      "description": "The complete structured report body.",
       "properties": {
         "reportSpecification": {
           "$ref": "#/definitions/VersionedIdentity"
@@ -654,11 +702,13 @@
       "type": "object"
     },
     "ReportKind": {
+      "description": "The structured report record kind.",
       "enum": ["structured-report"],
       "type": "string"
     },
     "ReportSample": {
       "additionalProperties": false,
+      "description": "One raw sample, as a report row presents it.",
       "properties": {
         "aggregateQuantity": {
           "$ref": "#/definitions/UInt64"
@@ -686,6 +736,7 @@
       "type": "object"
     },
     "Requirement": {
+      "description": "A case the inventory cannot omit.",
       "enum": ["required"],
       "type": "string"
     },
@@ -695,6 +746,7 @@
     },
     "Row": {
       "additionalProperties": false,
+      "description": "One measured case, as a report row presents it.",
       "properties": {
         "caseEvaluation": {
           "$ref": "#/definitions/Reference"
@@ -761,6 +813,7 @@
       "type": "object"
     },
     "Section": {
+      "description": "One report section.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -826,6 +879,7 @@
       ]
     },
     "Selector": {
+      "description": "What exactly a reason is about.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -895,6 +949,7 @@
       ]
     },
     "Stage": {
+      "description": "The stage of the pipeline a reason was raised in.",
       "enum": [
         "input-admission",
         "plan",
@@ -908,6 +963,7 @@
       "type": "string"
     },
     "Surface": {
+      "description": "The measured performance surface.",
       "enum": ["core"],
       "type": "string"
     },
@@ -916,6 +972,7 @@
       "type": "string"
     },
     "Truncation": {
+      "description": "Whether a report presents everything it evaluated.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -935,10 +992,12 @@
       "type": "string"
     },
     "UnavailableKind": {
+      "description": "Why a planned case produced no measurement.\n\nThe kinds are separate because they call for different responses, and none\nof them is a measured result.",
       "enum": ["missing", "skipped", "unsupported", "failed", "projection-ineligible", "stale"],
       "type": "string"
     },
     "Unit": {
+      "description": "The canonical unit of the metric.",
       "enum": ["nanosecond"],
       "type": "string"
     },
@@ -956,6 +1015,7 @@
       "type": "object"
     }
   },
+  "description": "One complete common record: a closed envelope and its typed body.",
   "properties": {
     "body": {
       "$ref": "#/definitions/ReportBody"
@@ -965,6 +1025,6 @@
     }
   },
   "required": ["envelope", "body"],
-  "title": "Record",
+  "title": "Report",
   "type": "object"
 }

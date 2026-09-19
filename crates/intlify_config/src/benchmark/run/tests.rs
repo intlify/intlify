@@ -133,7 +133,7 @@ fn self_rehashed_metadata_samples_and_status_do_not_replace_acquired_observation
     let raw = serde_json::to_value(&recorded.record).unwrap();
     for (pointer, replacement) in [
         ("/result/recordIdentity/value", json!("0".repeat(64))),
-        ("/result/recordIdentity/domain", json!("intlify-measurement-run-v0")),
+        ("/result/recordIdentity/domain", json!("intlify-config-owner-result-v2")),
         ("/result/plan/resultIdentity/value", json!("0".repeat(64))),
         ("/result/plan/commonRunPlan/value", json!("0".repeat(64))),
         ("/result/context/environment/clock/resolutionNanoseconds", json!("0")),
@@ -149,6 +149,11 @@ fn self_rehashed_metadata_samples_and_status_do_not_replace_acquired_observation
         assert!(recorded.validate(&changed).contains(&RunIssue::RecordedObservation));
         assert!(recorded.decode_checked(&serde_json::to_vec(&changed).unwrap()).is_err());
     }
+    // A common instance domain is not an owner domain at all. Relabelling the
+    // owner result with one is rejected while reading, before any validation.
+    let mut relabelled = raw;
+    relabelled["result"]["recordIdentity"]["domain"] = json!("intlify-measurement-run-v0");
+    assert!(serde_json::from_value::<OwnerRecord>(relabelled).is_err());
 }
 
 #[test]

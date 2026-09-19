@@ -1,13 +1,28 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
+use intlify_measurement::plan::{case_identity_input, MAX_PLAN_BYTES};
+
+use super::super::encoding;
+use super::super::identity::{InstanceDomain, IntegrityDigest};
 use super::*;
 use serde_json::{json, Value};
+
+/// Recompute a submitted document's own integrity digest after changing it.
+///
+/// The change is applied to the serialized document rather than through the
+/// record type, because that is what a submitter can actually do: a rehashed
+/// document is self-consistent, and admission must still reject it.
+fn rehashed(mut value: Value) -> Vec<u8> {
+    let digest = IntegrityDigest::from_hash(encoding::record_hash(&value).unwrap());
+    value["envelope"]["integrityDigest"] = serde_json::to_value(digest).unwrap();
+    serde_json::to_vec(&value).unwrap()
+}
 
 fn issue() -> IssuedRunPlan {
     let registry = Registry::load().unwrap();
     let context = CaptureContext::acquire(&registry).unwrap();
-    IssuedRunPlan::issue(&registry, &context).unwrap()
+    super::issue(&registry, &context).unwrap()
 }
 
 #[test]
@@ -36,12 +51,7 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
         plan_validator.iter_errors(&value).collect::<Vec<_>>()
     );
     for projection in plan.projections() {
-        let value = serde_json::to_value(CaseIdentityInput {
-            governing_specification: super::super::identity::specification(),
-            identity_schema_revision: RevisionZero::Value,
-            projection,
-        })
-        .unwrap();
+        let value = case_identity_input(projection).unwrap();
         assert!(case_validator.is_valid(&value));
     }
     let mut null_context = value.clone();
@@ -60,45 +70,42 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.record.body.case_inventory.len(), 127);
+    assert_eq!(first.document().body.case_inventory.len(), 127);
     assert_eq!(
-        first.record.body.case_inventory,
-        second.record.body.case_inventory
+        first.document().body.case_inventory,
+        second.document().body.case_inventory
     );
-    assert_eq!(first.projections, second.projections);
-    assert_ne!(first.record.identity(), second.record.identity());
+    assert_eq!(first.projections(), second.projections());
+    assert_ne!(first.document().identity(), second.document().identity());
     assert_ne!(
-        first.record.body.measurement_run,
-        second.record.body.measurement_run
+        first.document().body.measurement_run,
+        second.document().body.measurement_run
     );
     assert_ne!(
-        first.record.body.runner_instance_identity,
-        second.record.body.runner_instance_identity
+        first.document().body.runner_instance_identity,
+        second.document().body.runner_instance_identity
     );
+    assert_eq!(first.document().identity().domain(), InstanceDomain::Record);
     assert_eq!(
-        first.record.envelope.record_identity.domain(),
-        InstanceDomain::Record
-    );
-    assert_eq!(
-        first.record.body.measurement_run.domain(),
+        first.document().body.measurement_run.domain(),
         InstanceDomain::Run
     );
     assert_eq!(
-        first.record.body.runner_instance_identity.domain(),
-        InstanceDomain::LocalRunnerInstance
+        first.document().body.runner_instance_identity.domain(),
+        LOCAL_RUNNER_DOMAIN
     );
-    assert_eq!(first.record.body.planned_runner_class, None);
+    assert_eq!(first.document().body.planned_runner_class, None);
     let bytes = first.encode().unwrap();
-    assert_eq!(first.decode_checked(&bytes).unwrap(), first.record);
+    assert_eq!(&first.decode_checked(&bytes).unwrap(), first.document());
     assert!(second.decode_checked(&bytes).is_err());
     let mut cases = std::collections::BTreeSet::new();
     let mut locals = std::collections::BTreeSet::new();
     for (entry, projection) in first
-        .record
+        .document()
         .body
         .case_inventory
         .iter()
-        .zip(&first.projections)
+        .zip(first.projections())
     {
         assert_eq!(entry.case_identity, projection.identity().unwrap());
         assert!(cases.insert(entry.case_identity.clone()));
@@ -167,17 +174,18 @@ fn self_rehashed_changes_do_not_replace_the_plan_issued_for_the_acquired_context
     ] {
         let mut value = original.clone();
         *value.pointer_mut(pointer).unwrap() = replacement;
-        let mut changed: RunPlanRecord = serde_json::from_value(value).unwrap();
-        changed.envelope.integrity_digest = changed.digest().unwrap();
+        // The changed document still decodes as a Run Plan, so the rejection
+        // below is admission's, not the decoder's.
+        assert!(serde_json::from_value::<RunPlanRecord>(value.clone()).is_ok());
         assert_eq!(
-            issued.decode_checked(&serde_json::to_vec(&changed).unwrap()),
+            issued.decode_checked(&rehashed(value)),
             Err(PlanFailure::InvalidRecord),
             "{pointer}"
         );
     }
     for action in 0..3 {
-        let mut changed = issued.record.clone();
-        let inventory = &mut changed.body.case_inventory;
+        let mut changed = original.clone();
+        let inventory = changed["body"]["caseInventory"].as_array_mut().unwrap();
         match action {
             0 => {
                 inventory.pop();
@@ -185,10 +193,7 @@ fn self_rehashed_changes_do_not_replace_the_plan_issued_for_the_acquired_context
             1 => inventory[1] = inventory[0].clone(),
             _ => inventory.swap(0, 1),
         }
-        changed.envelope.integrity_digest = changed.digest().unwrap();
-        assert!(issued
-            .decode_checked(&serde_json::to_vec(&changed).unwrap())
-            .is_err());
+        assert!(issued.decode_checked(&rehashed(changed)).is_err());
     }
 }
 
@@ -242,7 +247,7 @@ fn malformed_missing_extra_or_duplicate_fields_and_size_overruns_are_rejected() 
 #[test]
 fn case_identity_preserves_canonical_object_order_and_rejects_unlisted_dimensions() {
     let issued = issue();
-    let projection = &issued.projections[0];
+    let projection = &issued.projections()[0];
     let original = serde_json::to_value(projection).unwrap();
     let mut reversed = original.clone();
     let map = reversed.as_object_mut().unwrap();

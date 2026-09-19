@@ -139,7 +139,7 @@ impl MeasurementProfile {
                 .into_iter()
                 .map(|operation| OperationState {
                     operation,
-                    execution: Execution::prepared_core(operation),
+                    execution: crate::benchmark::descriptor::prepared_core(operation),
                 })
                 .collect(),
             ordering: "fixture-registry-order-no-interleaving".into(),
