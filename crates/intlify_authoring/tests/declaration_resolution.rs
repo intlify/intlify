@@ -584,27 +584,34 @@ fn a_metadata_value_past_its_bound_blocks_rather_than_being_truncated() {
     limits.metadata_value_bytes = 8;
     let limits = limits.validate().expect("satisfiable bounds");
 
-    let within = DeclarationInput {
+    let described = |description: &'static str| DeclarationInput {
         metadata: DeclarationMetadata {
-            description: Some("exact8b"),
+            description: Some(description),
             surface_class: Some("checkout"),
             ..DeclarationMetadata::default()
         },
         ..declaration(MessageInput::Literal("Pay now"))
     };
-    let result = resolve_within(&context, &[within], &limits).unwrap();
+
+    // The bound is the last accepted length, not the first rejected one, so
+    // the two witnesses either side of it are what fixes where it sits.
+    let exact = "exactly8";
+    assert_eq!(exact.len() as u64, limits.metadata_value_bytes);
+    let result = resolve_within(&context, &[described(exact)], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Checked);
 
-    let beyond = DeclarationInput {
-        metadata: DeclarationMetadata {
-            description: Some("this description does not fit"),
-            surface_class: Some("checkout"),
-            ..DeclarationMetadata::default()
-        },
-        ..declaration(MessageInput::Literal("Pay now"))
-    };
-    let result = resolve_within(&context, &[beyond], &limits).unwrap();
+    let first_over = "exactly89";
+    assert_eq!(first_over.len() as u64, limits.metadata_value_bytes + 1);
+    let result = resolve_within(&context, &[described(first_over)], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
     assert!(result.checked().is_none());
     assert!(reasons(&result).contains(&ReasonFamily::AuthoringMetadataInvalid.as_str()));
+
+    // The bound counts bytes, not characters: one multi-byte scalar can put a
+    // shorter-looking description past it.
+    let multibyte = "日本語";
+    assert_eq!(multibyte.chars().count(), 3);
+    assert_eq!(multibyte.len() as u64, limits.metadata_value_bytes + 1);
+    let result = resolve_within(&context, &[described(multibyte)], &limits).unwrap();
+    assert_eq!(result.outcome(), Outcome::Blocked);
 }
