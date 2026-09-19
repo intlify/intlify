@@ -39,7 +39,7 @@
 //! `tests/declaration_resolution.rs`.
 
 #[cfg(feature = "benchmark")]
-mod benchmark;
+pub mod benchmark;
 mod context;
 mod declaration;
 mod diagnostic;

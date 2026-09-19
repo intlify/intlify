@@ -14,6 +14,7 @@
 
 use intlify_measurement::acquisition::{measure, Clock, MeasurementFailure};
 use intlify_shared_json::quantity::{Quantity, Repetitions};
+use serde::{Deserialize, Serialize};
 
 use super::cases::{PreparationFailure, Prepared};
 use super::observation::{Digest, Frame, Observation};
@@ -28,7 +29,8 @@ pub(super) struct Sampling {
 }
 
 /// The binding one case's samples are local to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Binding {
     pub(super) run: Digest,
     pub(super) case: Digest,
@@ -45,7 +47,8 @@ impl Binding {
 }
 
 /// One captured sample of one case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CapturedSample {
     pub(super) local_identity: Digest,
     pub(super) ordinal: Quantity,
@@ -56,7 +59,8 @@ pub(super) struct CapturedSample {
 }
 
 /// The complete capture of one case.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Capture {
     pub(super) warmup_completed: Quantity,
     pub(super) samples: Vec<CapturedSample>,
@@ -64,7 +68,13 @@ pub(super) struct Capture {
 }
 
 /// Why a case produced no complete capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum CaptureFailure {
     /// The fixture could not be prepared.
     Preparation(PreparationFailure),
@@ -80,14 +90,11 @@ fn capture_with<I: Copy, O>(
     clock: &impl Clock,
     sampling: Sampling,
     binding: Binding,
+    expected: &Observed,
     input: I,
     invoke: fn(I) -> O,
     observe: fn(&O, I) -> Observed,
 ) -> Result<Capture, CaptureFailure> {
-    // The expectation is independently established: this invocation is not
-    // measured and not sampled, so a wrong result cannot be explained by it.
-    let expected = observe(&invoke(input), input);
-
     let mut warmup_completed = 0_u64;
     for _ in 0..sampling.warmup.get() {
         let measured = measure(clock, input, invoke).map_err(CaptureFailure::Measurement)?;
@@ -121,7 +128,7 @@ fn capture_with<I: Copy, O>(
     Ok(Capture {
         warmup_completed: Quantity::new(warmup_completed),
         samples,
-        work: expected.work,
+        work: expected.work.clone(),
     })
 }
 
@@ -141,6 +148,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (text, &prepared.limits, &prepared.segments),
                 operation::invoke_encode,
                 operation::observe_encode,
@@ -154,6 +162,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (
                     source,
                     &prepared.occurrence,
@@ -170,6 +179,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (&prepared.context, &declaration, &prepared.limits),
                 operation::invoke_context,
                 operation::observe_context,
@@ -185,6 +195,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (&declaration, analysis, facts),
                 operation::invoke_facts,
                 operation::observe_facts,
@@ -198,7 +209,7 @@ mod tests {
     use super::capture as capture_case;
     use super::*;
     use crate::benchmark::cases::{prepare, FIXTURES};
-    use intlify_measurement::acquisition::MonotonicClock;
+    use intlify_measurement::acquisition::{MonotonicClock, Tick};
 
     fn binding() -> Binding {
         let mut frame = Frame::new("test-binding");
@@ -242,6 +253,57 @@ mod tests {
             );
             assert_eq!(again.work, capture.work);
         }
+    }
+
+    /// A clock whose readings the test writes in advance.
+    ///
+    /// The real provider cannot be made to report an interval near the top of
+    /// the quantity domain, and that is exactly the case that must not become
+    /// a saturated or wrapped sample.
+    struct ScriptedClock(std::cell::RefCell<std::collections::VecDeque<Tick>>);
+
+    impl ScriptedClock {
+        fn spans(nanoseconds: u64, reads: usize) -> Self {
+            let seconds = i64::try_from(nanoseconds / 1_000_000_000).unwrap();
+            let rest = i64::try_from(nanoseconds % 1_000_000_000).unwrap();
+            let mut ticks = std::collections::VecDeque::new();
+            for _ in 0..reads {
+                ticks.push_back(Tick::new(0, 0).unwrap());
+                ticks.push_back(Tick::new(seconds, rest).unwrap());
+            }
+            Self(std::cell::RefCell::new(ticks))
+        }
+    }
+
+    impl Clock for ScriptedClock {
+        fn read(&self) -> Result<Tick, intlify_measurement::acquisition::ClockFailure> {
+            Ok(self.0.borrow_mut().pop_front().expect("scripted read"))
+        }
+    }
+
+    #[test]
+    fn a_repetition_sum_past_the_quantity_domain_fails_the_case() {
+        // Two repetitions, each just over half the domain. The sum does not
+        // fit, and the case must fail rather than saturate or wrap.
+        let prepared = prepare(FIXTURES[0]).unwrap();
+        let sampling = Sampling {
+            warmup: Quantity::new(0),
+            samples: Repetitions::new(1).unwrap(),
+            repetitions: Repetitions::new(2).unwrap(),
+        };
+        let clock = ScriptedClock::spans(u64::MAX / 2 + 2, 2);
+        assert_eq!(
+            capture_case(&clock, &prepared, sampling, binding()),
+            Err(CaptureFailure::Overflow)
+        );
+
+        // The same two repetitions inside the domain are captured exactly.
+        let clock = ScriptedClock::spans(u64::MAX / 2 - 2, 2);
+        let capture = capture_case(&clock, &prepared, sampling, binding()).unwrap();
+        assert_eq!(
+            capture.samples[0].aggregate_nanoseconds,
+            Quantity::new((u64::MAX / 2 - 2) * 2)
+        );
     }
 
     #[test]

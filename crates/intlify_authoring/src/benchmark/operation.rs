@@ -24,7 +24,9 @@ use crate::primitives::Occurrence;
 use crate::workspace::AnalysisWorkspace;
 
 /// The six-way vocabulary 016 gives this crate's measured operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Operation {
     LiteralEncode,
@@ -38,6 +40,7 @@ impl Operation {
     ///
     /// Source discovery and identity reconciliation are later phases. A case
     /// here never reports their work as zero; it states what it covers.
+    #[cfg(test)]
     pub(super) const ALL: [Self; 4] = [
         Self::LiteralEncode,
         Self::Mf2ParseAndSemanticFacts,
@@ -106,9 +109,15 @@ impl LogicalWork {
 }
 
 /// What one measured invocation produced, observed after the interval closed.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Observed {
     pub(super) observation: Observation,
     pub(super) work: LogicalWork,
+    /// Whether the operation produced its complete result.
+    ///
+    /// A fixture declares which path it expects, and this is what that
+    /// declaration is checked against.
+    pub(super) complete: bool,
 }
 
 // --- literal encoding ------------------------------------------------------
@@ -138,6 +147,7 @@ pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> O
                 positions: None,
             },
             work: LogicalWork::new([("input_bytes", text.len() as u64), ("emitted_bytes", 0)]),
+            complete: false,
         };
     };
     semantic.uint(1);
@@ -159,6 +169,7 @@ pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> O
             ("emitted_bytes", encoded.len() as u64),
             ("extraction_segments", segments.len() as u64),
         ]),
+        complete: true,
     }
 }
 
@@ -182,6 +193,13 @@ pub(super) fn invoke_mf2(input: Mf2Input<'_>) -> Option<MessageAnalysis> {
     .ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> Observed {
     let mut semantic = Frame::new("mf2-semantics");
     let mut positions = Frame::new("mf2-semantics-positions");
@@ -193,6 +211,7 @@ pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> 
                 positions: None,
             },
             work: LogicalWork::new([("operational_failure", 1)]),
+            complete: false,
         };
     };
     semantic.uint(1);
@@ -225,6 +244,9 @@ pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> 
             ("external_parameters", parameters),
             ("diagnostics", analysis.diagnostics().len() as u64),
         ]),
+        // Returning an analysis is not producing facts: a message the parser
+        // reported on was understood well enough to be rejected, not to be used.
+        complete: analysis.facts().is_some(),
     }
 }
 
@@ -241,6 +263,13 @@ pub(super) fn invoke_context(input: ContextInput<'_>) -> Option<Result<ContextFa
     measured::context_facts(context, declaration, limits).ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_context(
     output: &Option<Result<ContextFacts, usize>>,
     _: ContextInput<'_>,
@@ -255,6 +284,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("operational_failure", 1)]),
+                complete: false,
             }
         }
         Some(Err(reported)) => {
@@ -266,6 +296,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("diagnostics", *reported as u64)]),
+                complete: false,
             }
         }
         Some(Ok(facts)) => {
@@ -284,6 +315,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("resolved_facts", 4), ("diagnostics", 0)]),
+                complete: true,
             }
         }
     }
@@ -312,6 +344,13 @@ pub(super) fn invoke_facts(input: FactsInput<'_>) -> FactsOutput {
     measured::declaration_facts(declaration, analysis, context).ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed {
     let mut semantic = Frame::new("declaration-facts");
     match output {
@@ -323,6 +362,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     positions: None,
                 },
                 work: LogicalWork::new([("operational_failure", 1)]),
+                complete: false,
             }
         }
         Some(Err(reported)) => {
@@ -334,6 +374,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     positions: None,
                 },
                 work: LogicalWork::new([("diagnostics", *reported as u64)]),
+                complete: false,
             }
         }
         Some(Ok((facts, revision))) => {
@@ -360,6 +401,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     ("mf2_bytes", facts.mf2_source().len() as u64),
                     ("extraction_segments", facts.extraction_map().len() as u64),
                 ]),
+                complete: true,
             }
         }
     }
