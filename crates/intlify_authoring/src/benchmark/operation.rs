@@ -327,6 +327,7 @@ pub(super) type FactsInput<'a> = (
     &'a DeclarationInput<'a>,
     &'a MessageAnalysis,
     &'a ContextFacts,
+    &'a AuthoringLimits,
 );
 
 pub(super) type FactsOutput = Option<
@@ -340,8 +341,8 @@ pub(super) type FactsOutput = Option<
 >;
 
 pub(super) fn invoke_facts(input: FactsInput<'_>) -> FactsOutput {
-    let (declaration, analysis, context) = input;
-    measured::declaration_facts(declaration, analysis, context).ok()
+    let (declaration, analysis, context, limits) = input;
+    measured::declaration_facts(declaration, analysis, context, limits).ok()
 }
 
 // The capture measures an operation through `fn(I) -> O` and observes it

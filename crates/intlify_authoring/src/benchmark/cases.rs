@@ -305,13 +305,16 @@ impl Prepared {
                 Input::Literal(text) => MessageInput::Literal(text),
                 Input::Mf2(text) => MessageInput::Mf2(text),
             },
+            // The fixtures are their own source, so there is no host decoding
+            // to compose and the extraction map is already final.
+            input_map: None,
             metadata: DeclarationMetadata {
                 source_locale: self.fixture.source_locale,
                 surface_class: self.fixture.surface_class,
                 description: Some("a fixed smoke fixture"),
             },
             usage: None,
-            parameters: &self.parameters,
+            parameters: Some(&self.parameters),
         }
     }
 }
@@ -409,7 +412,7 @@ fn observe_once(prepared: &Prepared) -> Observed {
                 unreachable!("a facts fixture establishes its prior stages")
             };
             let declaration = prepared.declaration();
-            let input = (&declaration, analysis, facts);
+            let input = (&declaration, analysis, facts, &prepared.limits);
             operation::observe_facts(&operation::invoke_facts(input), input)
         }
     }

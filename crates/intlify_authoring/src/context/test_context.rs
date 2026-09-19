@@ -85,6 +85,7 @@ pub struct TestContext {
 #[derive(Debug, Clone)]
 pub struct TestContextBuilder {
     owner: OwnerIdentity,
+    authoring_profile: VersionedIdentity,
     default_source_locale: Option<String>,
     vocabulary: SurfaceVocabulary,
     default_surface_class: Option<String>,
@@ -99,6 +100,10 @@ impl TestContext {
     pub fn builder(owner: OwnerIdentity, vocabulary: SurfaceVocabulary) -> TestContextBuilder {
         TestContextBuilder {
             owner,
+            // The language-neutral pin. A host profile replaces it, because
+            // the profile is what says which syntax was recognized, and this
+            // crate recognizes none.
+            authoring_profile: VersionedIdentity::literal("intlify-authoring-phase1-test", "0"),
             default_source_locale: None,
             vocabulary,
             default_surface_class: None,
@@ -110,6 +115,17 @@ impl TestContext {
 }
 
 impl TestContextBuilder {
+    /// Pin the authoring profile this context is analyzed under.
+    ///
+    /// A host Producer supplies its own, because the profile names the rules
+    /// that recognized the syntax. Leaving the default in place would let a
+    /// host's facts claim they came from a language-neutral analysis.
+    #[must_use]
+    pub fn authoring_profile(mut self, profile: VersionedIdentity) -> Self {
+        self.authoring_profile = profile;
+        self
+    }
+
     /// Supply the canonical default source locale.
     ///
     /// The value is taken as already canonical, matching 015, where the default
@@ -187,7 +203,7 @@ impl TestContextBuilder {
             }),
         )?;
         let basis = AuthoringBasis::new(
-            VersionedIdentity::literal("intlify-authoring-phase1-test", "0"),
+            self.authoring_profile,
             ContextKind::TestContext,
             ExactInputBinding::new("intlify-authoring-test-context", "0", &context_pin)?,
             ExactInputBinding::new("intlify-authoring-test-vocabulary", "0", &vocabulary_pin)?,

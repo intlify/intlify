@@ -12,8 +12,10 @@
 //! never turns a blocked result into a checked one, and any truncation is
 //! explicit.
 
+use intlify_shared_json::token::{valid_identity, IdentityFailure};
+
 use crate::limits::LimitKind;
-use crate::primitives::{ByteRange, Occurrence};
+use crate::primitives::{ByteRange, Occurrence, SourceSnapshot};
 
 /// Reason families owned by design 016.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -139,44 +141,293 @@ impl DiagnosticOrigin {
     }
 }
 
+/// Which cause inside a reason family one record reports.
+///
+/// A reason family says what kind of mistake this is and what a reader should
+/// do about it, and that is the part other components consume. Several
+/// distinct causes share one family, so a test asserting only the family also
+/// passes when a different cause fires. The detail exists so a fixture can
+/// name the cause it actually means.
+///
+/// This is not a stable public code registry. Spellings are chosen by the
+/// component that reports them and change with its implementation; nothing
+/// outside this workspace should branch on one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Detail(&'static str);
+
+impl Detail {
+    /// Validate and retain one detail spelling.
+    pub fn new(value: &'static str) -> Result<Self, IdentityFailure> {
+        valid_identity(value)
+            .then_some(Self(value))
+            .ok_or(IdentityFailure::InvalidToken)
+    }
+
+    /// Retain one detail that the reporting component writes as a literal.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the literal is outside the exact token grammar. Details are
+    /// implementation constants, so an invalid one is a defect.
+    #[must_use]
+    pub fn literal(value: &'static str) -> Self {
+        Self::new(value).expect("registered literal diagnostic detail")
+    }
+
+    /// Borrow the exact retained spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+/// The details this crate reports.
+///
+/// They are gathered here so one reader can see every cause this component
+/// distinguishes, rather than finding them spread across reporting sites.
+pub mod detail {
+    use super::Detail;
+
+    /// The message requires a parameter the use site did not supply.
+    #[must_use]
+    pub fn parameter_missing() -> Detail {
+        Detail::literal("parameter-missing")
+    }
+
+    /// The use site supplied a name the message does not require.
+    #[must_use]
+    pub fn parameter_extra() -> Detail {
+        Detail::literal("parameter-extra")
+    }
+
+    /// The use site supplied one name more than once.
+    #[must_use]
+    pub fn parameter_duplicate() -> Detail {
+        Detail::literal("parameter-duplicate")
+    }
+
+    /// Displayed text contains a scalar MF2 pattern text cannot carry.
+    #[must_use]
+    pub fn unrepresentable_scalar() -> Detail {
+        Detail::literal("unrepresentable-scalar")
+    }
+
+    /// No source-locale basis exists for this declaration.
+    #[must_use]
+    pub fn source_locale_absent() -> Detail {
+        Detail::literal("source-locale-absent")
+    }
+
+    /// The authored locale failed the admitted canonicalization rules.
+    #[must_use]
+    pub fn source_locale_rejected() -> Detail {
+        Detail::literal("source-locale-rejected")
+    }
+
+    /// Neither an explicit class nor an invocation default was present.
+    #[must_use]
+    pub fn surface_class_absent() -> Detail {
+        Detail::literal("surface-class-absent")
+    }
+
+    /// The applicable class is not a member of the pinned vocabulary.
+    #[must_use]
+    pub fn surface_class_unknown() -> Detail {
+        Detail::literal("surface-class-unknown")
+    }
+
+    /// A metadata value is empty or exceeds its bound.
+    #[must_use]
+    pub fn metadata_value_invalid() -> Detail {
+        Detail::literal("metadata-value-invalid")
+    }
+
+    /// Semantic usage was supplied without a registered profile.
+    #[must_use]
+    pub fn usage_profile_unregistered() -> Detail {
+        Detail::literal("usage-profile-unregistered")
+    }
+
+    /// The occurrence does not carry a declaration role.
+    #[must_use]
+    pub fn occurrence_role_invalid() -> Detail {
+        Detail::literal("occurrence-role-invalid")
+    }
+
+    /// The occurrence belongs to an owner outside this invocation.
+    #[must_use]
+    pub fn occurrence_owner_foreign() -> Detail {
+        Detail::literal("occurrence-owner-foreign")
+    }
+}
+
+/// Which coordinate space a message range is expressed in.
+///
+/// A range inside a message can name the MF2 the parser saw or the text the
+/// host decoded, and the two differ wherever encoding inserted or removed
+/// bytes. Carrying the space with the range is what lets a reader pick the
+/// right map instead of guessing which one the producer meant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageRange {
+    /// A range in the emitted MF2; map it back through the extraction map.
+    Emitted(ByteRange),
+    /// A range in the supplied text; map it through the host's input map.
+    Supplied(ByteRange),
+}
+
+impl MessageRange {
+    /// Return the addressed range, whichever space it names.
+    #[must_use]
+    pub const fn range(self) -> ByteRange {
+        match self {
+            Self::Emitted(range) | Self::Supplied(range) => range,
+        }
+    }
+}
+
+/// Where one record points.
+///
+/// Many authoring mistakes are not at a classified occurrence: an annotation
+/// the compiler read and rejected, an import that bound an authoring intrinsic
+/// in an unsupported way, or a unit whose bytes could not be parsed at all.
+/// Giving those an inventory role would put syntax that produced no
+/// declaration into the same vocabulary as syntax that did, and that
+/// vocabulary is what an inventory admits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Location {
+    /// One classified occurrence, in an inventory-admissible role.
+    Occurrence(Occurrence),
+    /// A region of one unit that carries no inventory role.
+    Region {
+        /// The unit the region belongs to.
+        source: SourceSnapshot,
+        /// The addressed half-open range.
+        range: ByteRange,
+    },
+    /// One whole source unit, when no range inside it is meaningful.
+    Unit(SourceSnapshot),
+}
+
+impl From<Occurrence> for Location {
+    fn from(occurrence: Occurrence) -> Self {
+        Self::Occurrence(occurrence)
+    }
+}
+
+impl Location {
+    /// Borrow the unit this record points into.
+    #[must_use]
+    pub const fn source(&self) -> &SourceSnapshot {
+        match self {
+            Self::Occurrence(occurrence) => occurrence.source(),
+            Self::Region { source, .. } | Self::Unit(source) => source,
+        }
+    }
+
+    /// Return the addressed range, when the record names one.
+    #[must_use]
+    pub const fn range(&self) -> Option<ByteRange> {
+        match self {
+            Self::Occurrence(occurrence) => Some(occurrence.range()),
+            Self::Region { range, .. } => Some(*range),
+            Self::Unit(_) => None,
+        }
+    }
+
+    /// Borrow the classified occurrence, when the record points at one.
+    #[must_use]
+    pub const fn occurrence(&self) -> Option<&Occurrence> {
+        match self {
+            Self::Occurrence(occurrence) => Some(occurrence),
+            Self::Region { .. } | Self::Unit(_) => None,
+        }
+    }
+
+    // A whole-unit record sorts before every position inside that unit, which
+    // is also how it reads: the unit could not be understood, so the positions
+    // that follow are what was understood in spite of that.
+    const fn rank(&self) -> u8 {
+        match self {
+            Self::Unit(_) => 0,
+            Self::Region { .. } => 1,
+            Self::Occurrence(_) => 2,
+        }
+    }
+
+    const fn role_spelling(&self) -> &'static str {
+        match self {
+            Self::Occurrence(occurrence) => occurrence.role().as_str(),
+            Self::Region { .. } | Self::Unit(_) => "",
+        }
+    }
+
+    /// Compare two locations in 016's canonical reporting order.
+    #[must_use]
+    pub fn canonical_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let span = |location: &Self| location.range().map_or((0, 0), |r| (r.start(), r.end()));
+        let (left_start, left_end) = span(self);
+        let (right_start, right_end) = span(other);
+        self.source()
+            .canonical_cmp(other.source())
+            .then_with(|| left_start.cmp(&right_start))
+            .then_with(|| left_end.cmp(&right_end))
+            .then_with(|| self.rank().cmp(&other.rank()))
+            .then_with(|| {
+                self.role_spelling()
+                    .as_bytes()
+                    .cmp(other.role_spelling().as_bytes())
+            })
+    }
+}
+
 /// One structured authoring record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     stage: Stage,
     origin: DiagnosticOrigin,
+    detail: Option<Detail>,
     severity: Severity,
-    occurrence: Occurrence,
-    message_range: Option<ByteRange>,
+    location: Location,
+    message_range: Option<MessageRange>,
     limit: Option<LimitKind>,
     related: Box<[Occurrence]>,
 }
 
 impl Diagnostic {
-    /// Record one diagnostic against a declaration occurrence.
+    /// Record one diagnostic at one location.
     #[must_use]
     pub fn new(
         stage: Stage,
         origin: DiagnosticOrigin,
         severity: Severity,
-        occurrence: Occurrence,
+        location: impl Into<Location>,
     ) -> Self {
         Self {
             stage,
             origin,
+            detail: None,
             severity,
-            occurrence,
+            location: location.into(),
             message_range: None,
             limit: None,
             related: Box::new([]),
         }
     }
 
-    /// Attach the range inside the extracted MF2 message that this concerns.
-    ///
-    /// This addresses the emitted MF2 bytes, not the host source. Callers map
-    /// it back through the extraction segments.
+    /// Name the cause within the reason family.
     #[must_use]
-    pub fn with_message_range(mut self, range: ByteRange) -> Self {
+    pub const fn with_detail(mut self, detail: Detail) -> Self {
+        self.detail = Some(detail);
+        self
+    }
+
+    /// Attach the range inside the message that this record concerns.
+    ///
+    /// The range carries the space it is expressed in, because a reader has to
+    /// choose between the extraction map and the host's input map to resolve
+    /// it back to source.
+    #[must_use]
+    pub const fn with_message_range(mut self, range: MessageRange) -> Self {
         self.message_range = Some(range);
         self
     }
@@ -193,6 +444,12 @@ impl Diagnostic {
     pub fn with_related(mut self, related: impl Into<Box<[Occurrence]>>) -> Self {
         self.related = related.into();
         self
+    }
+
+    /// Return the cause within the reason family, when one was named.
+    #[must_use]
+    pub const fn detail(&self) -> Option<Detail> {
+        self.detail
     }
 
     /// Return the producing stage.
@@ -213,19 +470,29 @@ impl Diagnostic {
         self.severity
     }
 
-    /// Borrow the reported occurrence.
+    /// Borrow where this record points.
     #[must_use]
-    pub const fn occurrence(&self) -> &Occurrence {
-        &self.occurrence
+    pub const fn location(&self) -> &Location {
+        &self.location
     }
 
-    /// Return the range inside the emitted MF2 message this concerns.
+    /// Borrow the reported occurrence, when this record points at one.
     ///
-    /// The range addresses the analyzed MF2 bytes, not the host source. A
-    /// caller maps it back through the analysis's extraction segments; it must
-    /// not be treated as an offset into the occurrence's own source unit.
+    /// A record about an annotation, an import, or a whole unit has no
+    /// classified occurrence, so this returns `None` rather than inventing an
+    /// inventory role for syntax that produced no declaration.
     #[must_use]
-    pub const fn message_range(&self) -> Option<ByteRange> {
+    pub const fn occurrence(&self) -> Option<&Occurrence> {
+        self.location.occurrence()
+    }
+
+    /// Return the range inside the message this record concerns.
+    ///
+    /// The range names its own coordinate space. It is never an offset into
+    /// the location's source unit: resolving it needs the extraction map, the
+    /// host's input map, or both.
+    #[must_use]
+    pub const fn message_range(&self) -> Option<MessageRange> {
         self.message_range
     }
 
@@ -250,19 +517,24 @@ impl Diagnostic {
     /// Compare two records in 016's deterministic reporting order.
     ///
     /// The order is stage, admitted source-unit identity and range, component
-    /// reason, then a stable related-occurrence discriminator. It never depends
-    /// on worker scheduling or hash-map iteration.
+    /// reason and its detail, then a stable related-occurrence discriminator.
+    /// It never depends on worker scheduling or hash-map iteration.
     #[must_use]
     pub fn reporting_cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.stage
             .cmp(&other.stage)
-            .then_with(|| self.occurrence.canonical_cmp(&other.occurrence))
+            .then_with(|| self.location.canonical_cmp(&other.location))
             .then_with(|| self.origin.rank().cmp(&other.origin.rank()))
             .then_with(|| {
                 self.origin
                     .code()
                     .as_bytes()
                     .cmp(other.origin.code().as_bytes())
+            })
+            .then_with(|| {
+                self.detail
+                    .map(Detail::as_str)
+                    .cmp(&other.detail.map(Detail::as_str))
             })
             .then_with(|| self.message_range.cmp(&other.message_range))
             .then_with(|| self.severity.cmp(&other.severity))
@@ -380,7 +652,11 @@ mod tests {
                 (
                     record.stage().as_str(),
                     record.origin().code(),
-                    record.occurrence().range().start(),
+                    record
+                        .location()
+                        .range()
+                        .expect("every record here names a range")
+                        .start(),
                 )
             })
             .collect();
@@ -408,6 +684,9 @@ mod tests {
         assert_eq!(plain.message_range(), None);
         assert!(plain.related().is_empty());
 
+        assert_eq!(plain.detail(), None);
+        assert_eq!(plain.occurrence(), Some(&subject));
+
         let range = ByteRange::new(6, 12).unwrap();
         let detailed = Diagnostic::new(
             Stage::ContextResolution,
@@ -415,10 +694,55 @@ mod tests {
             Severity::Error,
             subject,
         )
-        .with_message_range(range)
+        .with_detail(detail::parameter_extra())
+        .with_message_range(MessageRange::Emitted(range))
         .with_related(vec![sibling.clone()]);
-        assert_eq!(detailed.message_range(), Some(range));
+        assert_eq!(detailed.message_range(), Some(MessageRange::Emitted(range)));
+        assert_eq!(
+            detailed.detail().map(Detail::as_str),
+            Some("parameter-extra")
+        );
         assert_eq!(detailed.related(), [sibling]);
+    }
+
+    #[test]
+    fn a_location_without_an_inventory_role_is_still_reportable_and_ordered() {
+        let classified = occurrence(4, 8, OccurrenceRole::UiLiteral);
+        let source = classified.source().clone();
+        let annotation = Location::Region {
+            source: source.clone(),
+            range: ByteRange::new(4, 8).unwrap(),
+        };
+        let whole = Location::Unit(source);
+
+        // A region and a unit carry no classified occurrence, so a consumer
+        // reading one cannot mistake the syntax for a declaration.
+        assert_eq!(annotation.occurrence(), None);
+        assert_eq!(whole.occurrence(), None);
+        assert_eq!(whole.range(), None);
+        assert_eq!(annotation.range(), Some(ByteRange::new(4, 8).unwrap()));
+
+        // The unit sorts before every position inside it: what could not be
+        // read at all comes before what was read in spite of it.
+        let mut locations = [
+            Location::Occurrence(classified),
+            annotation.clone(),
+            whole.clone(),
+        ];
+        locations.sort_by(Location::canonical_cmp);
+        assert_eq!(locations[0], whole);
+        assert_eq!(locations[1], annotation);
+    }
+
+    #[test]
+    fn a_detail_uses_the_exact_token_grammar() {
+        assert_eq!(
+            Detail::literal("parameter-missing").as_str(),
+            "parameter-missing"
+        );
+        for invalid in ["", "Parameter-Missing", "parameter missing", "-a", "a-"] {
+            assert_eq!(Detail::new(invalid), Err(IdentityFailure::InvalidToken));
+        }
     }
 
     #[test]

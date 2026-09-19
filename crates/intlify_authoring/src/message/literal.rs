@@ -41,6 +41,11 @@ pub struct ExtractionSegment {
 }
 
 impl ExtractionSegment {
+    /// Retain one correspondence between emitted and source bytes.
+    pub(crate) const fn new(extracted: ByteRange, source: ByteRange) -> Self {
+        Self { extracted, source }
+    }
+
     /// Return the covered range of emitted MF2 bytes.
     #[must_use]
     pub const fn extracted(self) -> ByteRange {
