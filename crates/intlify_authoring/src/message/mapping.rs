@@ -27,6 +27,24 @@ use crate::primitives::{ByteRange, Occurrence};
 ///
 /// The input side is a range in the text the host handed to this crate; the
 /// source side is a range in the host's own source unit.
+///
+/// # What a run asserts
+///
+/// A run whose two sides have the same length asserts a positional
+/// correspondence: decoded byte `k` of this run is source byte `k` of it.
+/// Composition relies on that and cuts such a run at any offset, so a host
+/// that cannot assert it must split the run instead. Carriage return becoming
+/// a line feed is still positional, because one byte answers for one byte; an
+/// escape is not, because several source bytes produced one decoded byte.
+///
+/// A run whose sides differ in length asserts only that the whole decoded run
+/// came from the whole source run. It is never subdivided, so an offset inside
+/// it resolves to the run as a whole.
+///
+/// Decoded-side boundaries must fall between Unicode scalars of the supplied
+/// text. A boundary inside one would be carried into the emitted map, where a
+/// consumer slicing the analyzed MF2 at that offset panics;
+/// [`compose_extraction_map`] refuses such a map rather than propagating it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InputSegment {
     input: ByteRange,
@@ -35,6 +53,11 @@ pub struct InputSegment {
 
 impl InputSegment {
     /// Retain one correspondence the host establishes.
+    ///
+    /// The host is asserting what its own decoding did. See
+    /// [What a run asserts](Self#what-a-run-asserts) for what the two lengths
+    /// mean, because equal lengths are read as a positional claim rather than
+    /// as a coincidence.
     #[must_use]
     pub const fn new(input: ByteRange, source: ByteRange) -> Self {
         Self { input, source }
