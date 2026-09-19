@@ -18,6 +18,8 @@
 //! projection eligibility remain separate checks, and a failed or absent case
 //! stays in the record rather than being removed from it.
 
+#[cfg(feature = "acquisition")]
+pub mod acquisition;
 pub mod build;
 pub mod decode;
 pub mod encoding;

@@ -156,17 +156,6 @@ impl Method {
 // the common one. What this owner supplies is the acquired values.
 pub(super) use intlify_measurement::environment::ClockObservation;
 
-pub(super) fn clock_observation(value: ClockDescription) -> ClockObservation {
-    ClockObservation {
-        provider: value.provider.into(),
-        provider_revision: value.provider_revision.into(),
-        clock: value.clock.into(),
-        resolution_nanoseconds: value.resolution_nanoseconds,
-        resolution_source: value.resolution_source.into(),
-        conversion: value.conversion.into(),
-    }
-}
-
 // The execution state is one of 026's common record shapes. What this owner
 // supplies is which states its prepared core actually ran in.
 pub(super) use intlify_measurement::execution::{Execution, OutputBuffer};
@@ -229,7 +218,7 @@ impl Descriptors {
         Self {
             boundary: Boundary::for_operation(operation),
             method: Method::monotonic_invocation(),
-            clock_observation: clock_observation(clock),
+            clock_observation: clock.observation(),
             execution: prepared_core(operation),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
@@ -257,7 +246,7 @@ impl Descriptors {
         if self.method != method {
             issues.push(DescriptorIssue::MethodMismatch);
         }
-        if self.clock_observation != clock_observation(acquisition) {
+        if self.clock_observation != acquisition.observation() {
             issues.push(DescriptorIssue::ClockBindingMismatch);
         }
         let clock = &self.clock_observation;

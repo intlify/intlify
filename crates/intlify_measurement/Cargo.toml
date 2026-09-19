@@ -10,6 +10,12 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+default = []
+# Reading a clock is not part of reading a record, so ordinary consumers of
+# these records never pull in a system time API.
+acquisition = ["dep:rustix"]
+
 [dependencies]
 # 017 token grammars, exact quantities, canonical framing, domain-separated
 # digests, and bounded strict reading. The digest feature is required here
@@ -23,6 +29,10 @@ serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve
 # clock and system views that are POSIX-only stay with the owner that acquires
 # them.
 getrandom = { version = "=0.4.3" }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# Locked safe clock APIs, for duration acquisition only.
+rustix = { version = "=1.1.4", features = ["time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
