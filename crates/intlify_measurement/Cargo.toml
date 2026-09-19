@@ -36,4 +36,6 @@ rustix = { version = "=1.1.4", features = ["time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
-jsonschema = { version = "=0.52.1", default-features = false }
+# Exactly the version every other crate's schema tests use: two oracles would
+# be two answers about whether a generated schema admits a record.
+jsonschema = { version = "=0.56.0", default-features = false }
