@@ -80,14 +80,11 @@ fn capture_with<I: Copy, O>(
     clock: &impl Clock,
     sampling: Sampling,
     binding: Binding,
+    expected: &Observed,
     input: I,
     invoke: fn(I) -> O,
     observe: fn(&O, I) -> Observed,
 ) -> Result<Capture, CaptureFailure> {
-    // The expectation is independently established: this invocation is not
-    // measured and not sampled, so a wrong result cannot be explained by it.
-    let expected = observe(&invoke(input), input);
-
     let mut warmup_completed = 0_u64;
     for _ in 0..sampling.warmup.get() {
         let measured = measure(clock, input, invoke).map_err(CaptureFailure::Measurement)?;
@@ -121,7 +118,7 @@ fn capture_with<I: Copy, O>(
     Ok(Capture {
         warmup_completed: Quantity::new(warmup_completed),
         samples,
-        work: expected.work,
+        work: expected.work.clone(),
     })
 }
 
@@ -141,6 +138,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (text, &prepared.limits, &prepared.segments),
                 operation::invoke_encode,
                 operation::observe_encode,
@@ -154,6 +152,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (
                     source,
                     &prepared.occurrence,
@@ -170,6 +169,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (&prepared.context, &declaration, &prepared.limits),
                 operation::invoke_context,
                 operation::observe_context,
@@ -185,6 +185,7 @@ pub(super) fn capture(
                 clock,
                 sampling,
                 binding,
+                prepared.expected(),
                 (&declaration, analysis, facts),
                 operation::invoke_facts,
                 operation::observe_facts,

@@ -22,7 +22,7 @@ use crate::primitives::{
 use crate::workspace::AnalysisWorkspace;
 use intlify_shared_json::token::VersionedIdentity;
 
-use super::operation::Operation;
+use super::operation::{Observed, Operation};
 
 /// What one fixture supplies to its operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,9 +279,21 @@ pub(super) struct Prepared {
     pub(super) analysis: Option<MessageAnalysis>,
     /// The context facts a facts case starts from, likewise established first.
     pub(super) context_facts: Option<ContextFacts>,
+    /// What this case is expected to produce, established outside measurement.
+    expected: Option<Observed>,
 }
 
 impl Prepared {
+    /// Borrow what this case is expected to produce.
+    ///
+    /// Every measured invocation is compared against this, so it is
+    /// established by one unmeasured invocation rather than by a sample.
+    pub(super) fn expected(&self) -> &Observed {
+        self.expected
+            .as_ref()
+            .expect("preparation establishes the expectation")
+    }
+
     /// Build one declaration input over this case's owned fixture values.
     pub(super) fn declaration(&self) -> DeclarationInput<'_> {
         DeclarationInput {
@@ -321,6 +333,7 @@ pub(super) fn prepare(fixture: Fixture) -> Result<Prepared, PreparationFailure> 
         context,
         analysis: None,
         context_facts: None,
+        expected: None,
     };
     if fixture.operation == Operation::DeclarationFacts {
         // The facts boundary starts from an admitted message and admitted
@@ -340,57 +353,61 @@ pub(super) fn prepare(fixture: Fixture) -> Result<Prepared, PreparationFailure> 
         prepared.analysis = Some(analysis);
         prepared.context_facts = Some(facts);
     }
+    // The expectation is established here, by one invocation that is not
+    // measured and never becomes a sample.
+    prepared.expected = Some(observe_once(&prepared));
     Ok(prepared)
 }
 
-/// Run one prepared case once, outside measurement, and report its path.
-///
-/// This is the same invocation the harness uses to establish its expectation,
-/// so a fixture cannot declare one path and measure another.
+/// Report which path a prepared case takes, from its established expectation.
 pub(super) fn path_of(prepared: &Prepared) -> Expected {
+    if prepared.expected().complete {
+        Expected::Complete
+    } else {
+        Expected::Blocked
+    }
+}
+
+/// Invoke one prepared case once, outside measurement, and observe it.
+///
+/// This is the same pair of functions the capture below measures, so the
+/// expectation cannot describe a different operation than the samples do.
+fn observe_once(prepared: &Prepared) -> Observed {
     use super::operation;
-    let complete = match prepared.fixture.operation {
+    match prepared.fixture.operation {
         Operation::LiteralEncode => {
             let Input::Literal(text) = prepared.fixture.input else {
-                return Expected::Blocked;
+                unreachable!("a literal-encode fixture carries literal text")
             };
-            operation::invoke_encode((text, &prepared.limits, &prepared.segments)).is_ok()
+            let input = (text, &prepared.limits, &prepared.segments);
+            operation::observe_encode(&operation::invoke_encode(input), input)
         }
         Operation::Mf2ParseAndSemanticFacts => {
             let Input::Mf2(source) = prepared.fixture.input else {
-                return Expected::Blocked;
+                unreachable!("an MF2 fixture carries MF2 source")
             };
-            operation::invoke_mf2((
+            let input = (
                 source,
                 &prepared.occurrence,
                 &prepared.limits,
                 &prepared.workspace,
-            ))
-            .is_some_and(|analysis| analysis.facts().is_some())
+            );
+            operation::observe_mf2(&operation::invoke_mf2(input), input)
         }
         Operation::SourceLocaleAndSurfaceClass => {
             let declaration = prepared.declaration();
-            matches!(
-                operation::invoke_context((&prepared.context, &declaration, &prepared.limits)),
-                Some(Ok(_))
-            )
+            let input = (&prepared.context, &declaration, &prepared.limits);
+            operation::observe_context(&operation::invoke_context(input), input)
         }
         Operation::DeclarationFacts => {
             let (Some(analysis), Some(facts)) = (&prepared.analysis, &prepared.context_facts)
             else {
-                return Expected::Blocked;
+                unreachable!("a facts fixture establishes its prior stages")
             };
             let declaration = prepared.declaration();
-            matches!(
-                operation::invoke_facts((&declaration, analysis, facts)),
-                Some(Ok(_))
-            )
+            let input = (&declaration, analysis, facts);
+            operation::observe_facts(&operation::invoke_facts(input), input)
         }
-    };
-    if complete {
-        Expected::Complete
-    } else {
-        Expected::Blocked
     }
 }
 
