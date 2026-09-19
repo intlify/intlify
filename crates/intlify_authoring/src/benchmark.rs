@@ -14,6 +14,7 @@
 
 mod capture;
 mod cases;
+mod context;
 mod descriptor;
 mod observation;
 mod operation;
