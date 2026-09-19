@@ -38,7 +38,10 @@ pub(super) enum Input {
 /// A fixture states its expected result, so a change that silently moves it
 /// onto another path — a fast failure instead of the work it claims to
 /// measure — fails a test rather than producing plausible samples.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub(super) enum Expected {
     /// The operation produces its complete result.
     Complete,

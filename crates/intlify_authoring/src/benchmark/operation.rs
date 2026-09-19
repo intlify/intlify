@@ -24,7 +24,9 @@ use crate::primitives::Occurrence;
 use crate::workspace::AnalysisWorkspace;
 
 /// The six-way vocabulary 016 gives this crate's measured operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Operation {
     LiteralEncode,
