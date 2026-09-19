@@ -454,9 +454,15 @@ mod tests {
             digest_bytes(&encode(&json!("abc")).unwrap())
         );
 
-        // Bytes that are not valid UTF-8 still have a digest; whether a unit is
-        // text is a separate question from which bytes it is.
-        assert_eq!(digest_bytes(&[0xff, 0xfe]).len(), 32);
+        // Bytes that are not valid UTF-8 still have a digest, and it is the
+        // digest of those bytes. Asserting only that some answer comes back
+        // would hold for an implementation that gave every such input the same
+        // one, and a snapshot check would then accept any byte string of the
+        // right length.
+        assert_eq!(
+            hex(&digest_bytes(&[0xff, 0xfe])),
+            "b3d510ef04275ca8e698e5b3cbb0ece3949ef9252f0cdc839e9ee347409a2209"
+        );
     }
 
     #[test]
