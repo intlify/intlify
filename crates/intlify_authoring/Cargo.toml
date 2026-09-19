@@ -15,8 +15,20 @@ default = []
 # Explicitly test-owned authoring context. Ordinary builds cannot construct one,
 # so a test input can never be presented as checked production evidence.
 test-context = []
+# Observational measurement, excluded from ordinary authoring consumers.
+#
+# It enables `test-context` because the only context this phase admits is the
+# explicitly test-owned one. What is measured is the real operation; what is
+# test-owned is where its inputs came from, and the owner record says so.
+benchmark = ["dep:blake3", "dep:getrandom", "dep:intlify_measurement", "test-context"]
 
 [dependencies]
+# The owner-neutral 026 records and the shared duration acquisition. Ordinary
+# authoring consumers never build it.
+intlify_measurement = { path = "../intlify_measurement", features = [
+  "acquisition"
+], optional = true }
+blake3 = { version = "=1.8.7", optional = true }
 # Shared 017 primitives, canonical framing, and the domain-separated digest.
 intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
 ox_mf2_parser = { path = "../ox_mf2_parser" }
@@ -25,6 +37,10 @@ unicode-normalization = "0.1.24"
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# Fresh owner-run nonce; no timestamp, PID, hostname, or caller-supplied value.
+getrandom = { version = "=0.4.3", optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.

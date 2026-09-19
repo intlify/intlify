@@ -651,3 +651,103 @@ mod tests {
         assert_eq!(exact.into_reported().len(), 2);
     }
 }
+
+/// The seams the observational harness measures at.
+///
+/// These exist only under the non-default `benchmark` feature and add no
+/// behaviour: each one composes the same private helpers `resolve_one` uses, so
+/// what is measured is the ordinary operation rather than a copy of it.
+#[cfg(feature = "benchmark")]
+pub(crate) mod measured {
+    use super::{
+        intent_projection, match_parameters, resolve_description, resolve_locale,
+        resolve_surface_class, resolve_usage, AuthoringContext, AuthoringFailure, AuthoringLimits,
+        DeclarationFacts, DeclarationInput, DiagnosticSink, SourceLocaleBasis, Usage,
+    };
+    use crate::context::CanonicalLocale;
+    use crate::message::MessageAnalysis;
+    use crate::projection::intent_revision;
+    use intlify_shared_json::token::IntegrityDigest;
+
+    /// Everything the context contributes to one declaration.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct ContextFacts {
+        pub(crate) locale: CanonicalLocale,
+        pub(crate) basis: SourceLocaleBasis,
+        pub(crate) surface_class: String,
+        pub(crate) usage: Option<Usage>,
+        pub(crate) description: Option<String>,
+    }
+
+    /// Resolve the context-owned facts, or report that the declaration is blocked.
+    ///
+    /// The diagnostic count is returned rather than the diagnostics themselves:
+    /// the harness observes that the same fixture produced the same number of
+    /// the same kind, not the reporting text.
+    pub(crate) fn context_facts(
+        context: &dyn AuthoringContext,
+        input: &DeclarationInput<'_>,
+        limits: &AuthoringLimits,
+    ) -> Result<Result<ContextFacts, usize>, AuthoringFailure> {
+        let mut diagnostics = DiagnosticSink::new(limits.diagnostics);
+        let locale = resolve_locale(context, input, &mut diagnostics)?;
+        let class = resolve_surface_class(context, input, &mut diagnostics);
+        let usage = resolve_usage(context, input, limits, &mut diagnostics);
+        let description = resolve_description(input, limits, &mut diagnostics);
+        let reported = diagnostics.into_reported().len();
+        let (Some((locale, basis)), Some(surface_class), Ok(usage), Ok(description)) =
+            (locale, class, usage, description)
+        else {
+            return Ok(Err(reported));
+        };
+        Ok(Ok(ContextFacts {
+            locale,
+            basis,
+            surface_class,
+            usage,
+            description,
+        }))
+    }
+
+    /// Assemble the immutable facts of one declaration whose inputs are admitted.
+    ///
+    /// The revision is taken here because it is what an authoring result is
+    /// for: a consumer that holds the facts without it cannot yet say whether
+    /// a translation stays valid. It is the same public function the ordinary
+    /// path calls, not a second implementation.
+    pub(crate) fn declaration_facts(
+        input: &DeclarationInput<'_>,
+        analysis: &MessageAnalysis,
+        context: &ContextFacts,
+    ) -> Result<Result<(DeclarationFacts, IntegrityDigest), usize>, AuthoringFailure> {
+        let mut diagnostics = DiagnosticSink::new(u64::MAX);
+        let Some(message) = analysis.facts() else {
+            return Ok(Err(0));
+        };
+        if !match_parameters(input, message.parameters(), &mut diagnostics) {
+            return Ok(Err(diagnostics.into_reported().len()));
+        }
+        let projection = intent_projection(
+            message.message().clone(),
+            message.parameters().to_vec().into_boxed_slice(),
+            context.locale.as_str(),
+            context.usage.clone(),
+            context.description.as_deref(),
+        )
+        .map_err(AuthoringFailure::ContextInvalid)?;
+        let revision = intent_revision(&projection).map_err(|_| {
+            AuthoringFailure::ContextInvalid(crate::primitives::PrimitiveError::InvalidToken)
+        })?;
+        Ok(Ok((
+            DeclarationFacts {
+                occurrence: input.occurrence.clone(),
+                mf2_source: analysis.mf2_source().to_owned(),
+                projection,
+                source_locale_basis: context.basis,
+                surface_class: context.surface_class.clone(),
+                extraction_map: analysis.extraction_map().to_vec().into_boxed_slice(),
+            },
+            revision,
+        )))
+    }
+}
