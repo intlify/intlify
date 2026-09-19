@@ -6,36 +6,60 @@
     {
       "id": "literal-plain-text",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "Pay now" },
+      "input": {
+        "kind": "literal",
+        "text": "Pay now"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{Pay now}}",
         "parameters": [],
         "segments": [
-          { "extracted": ["0", "2"], "source": ["0", "0"] },
-          { "extracted": ["2", "9"], "source": ["0", "7"] },
-          { "extracted": ["9", "11"], "source": ["7", "7"] }
+          {
+            "extracted": ["0", "2"],
+            "source": ["0", "0"]
+          },
+          {
+            "extracted": ["2", "9"],
+            "source": ["0", "7"]
+          },
+          {
+            "extracted": ["9", "11"],
+            "source": ["7", "7"]
+          }
         ]
       }
     },
     {
       "id": "literal-empty-text",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "" },
+      "input": {
+        "kind": "literal",
+        "text": ""
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{}}",
         "parameters": [],
         "segments": [
-          { "extracted": ["0", "2"], "source": ["0", "0"] },
-          { "extracted": ["2", "4"], "source": ["0", "0"] }
+          {
+            "extracted": ["0", "2"],
+            "source": ["0", "0"]
+          },
+          {
+            "extracted": ["2", "4"],
+            "source": ["0", "0"]
+          }
         ]
       }
     },
     {
       "id": "literal-braces-are-not-interpolation",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "Total: {amount}" },
+      "input": {
+        "kind": "literal",
+        "text": "Total: {amount}"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{Total: \\{amount\\}}}",
@@ -45,7 +69,10 @@
     {
       "id": "literal-backslash",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "a\\b" },
+      "input": {
+        "kind": "literal",
+        "text": "a\\b"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{a\\\\b}}",
@@ -55,7 +82,10 @@
     {
       "id": "literal-pipe-stays-unescaped",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "a|b" },
+      "input": {
+        "kind": "literal",
+        "text": "a|b"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{a|b}}",
@@ -65,7 +95,10 @@
     {
       "id": "literal-leading-whitespace-is-preserved",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "  indented" },
+      "input": {
+        "kind": "literal",
+        "text": "  indented"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{  indented}}",
@@ -73,9 +106,25 @@
       }
     },
     {
+      "id": "literal-trailing-whitespace-is-preserved",
+      "family": "extraction",
+      "input": {
+        "kind": "literal",
+        "text": "trailing   "
+      },
+      "expect": {
+        "outcome": "understood",
+        "mf2Source": "{{trailing   }}",
+        "parameters": []
+      }
+    },
+    {
       "id": "literal-leading-period-is-not-a-declaration",
       "family": "extraction",
-      "input": { "kind": "literal", "text": ".input looks like a keyword" },
+      "input": {
+        "kind": "literal",
+        "text": ".input looks like a keyword"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{.input looks like a keyword}}",
@@ -85,7 +134,10 @@
     {
       "id": "literal-newline-is-preserved-without-trimming",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "line one\nline two\n" },
+      "input": {
+        "kind": "literal",
+        "text": "line one\nline two\n"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{line one\nline two\n}}",
@@ -95,7 +147,10 @@
     {
       "id": "literal-crlf-is-preserved",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "first\r\nsecond" },
+      "input": {
+        "kind": "literal",
+        "text": "first\r\nsecond"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{first\r\nsecond}}",
@@ -105,35 +160,64 @@
     {
       "id": "literal-multibyte-maps-on-scalar-boundaries",
       "family": "extraction",
-      "input": { "kind": "literal", "text": "日{本" },
+      "input": {
+        "kind": "literal",
+        "text": "日{本"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{日\\{本}}",
         "parameters": [],
         "segments": [
-          { "extracted": ["0", "2"], "source": ["0", "0"] },
-          { "extracted": ["2", "5"], "source": ["0", "3"] },
-          { "extracted": ["5", "7"], "source": ["3", "4"] },
-          { "extracted": ["7", "10"], "source": ["4", "7"] },
-          { "extracted": ["10", "12"], "source": ["7", "7"] }
+          {
+            "extracted": ["0", "2"],
+            "source": ["0", "0"]
+          },
+          {
+            "extracted": ["2", "5"],
+            "source": ["0", "3"]
+          },
+          {
+            "extracted": ["5", "7"],
+            "source": ["3", "4"]
+          },
+          {
+            "extracted": ["7", "10"],
+            "source": ["4", "7"]
+          },
+          {
+            "extracted": ["10", "12"],
+            "source": ["7", "7"]
+          }
         ]
       }
     },
     {
       "id": "authored-mf2-is-its-own-extracted-form",
       "family": "extraction",
-      "input": { "kind": "mf2", "text": "Hello {$name}!" },
+      "input": {
+        "kind": "mf2",
+        "text": "Hello {$name}!"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "Hello {$name}!",
         "parameters": ["name"],
-        "segments": [{ "extracted": ["0", "14"], "source": ["0", "14"] }]
+        "segments": [
+          {
+            "extracted": ["0", "14"],
+            "source": ["0", "14"]
+          }
+        ]
       }
     },
     {
       "id": "equal-cooked-content-analyses-identically",
       "family": "parser-ownership",
-      "input": { "kind": "mf2", "text": "{{Pay now}}" },
+      "input": {
+        "kind": "mf2",
+        "text": "{{Pay now}}"
+      },
       "expect": {
         "outcome": "understood",
         "mf2Source": "{{Pay now}}",
@@ -179,7 +263,10 @@
     {
       "id": "parameter-names-are-sorted-by-unsigned-utf8-bytes",
       "family": "parameters",
-      "input": { "kind": "mf2", "text": "{$zulu} {$alpha} {$Mike}" },
+      "input": {
+        "kind": "mf2",
+        "text": "{$zulu} {$alpha} {$Mike}"
+      },
       "expect": {
         "outcome": "understood",
         "parameters": ["Mike", "alpha", "zulu"]
@@ -188,7 +275,10 @@
     {
       "id": "repeated-uses-collapse-to-one-requirement",
       "family": "parameters",
-      "input": { "kind": "mf2", "text": "{$name} and {$name} again" },
+      "input": {
+        "kind": "mf2",
+        "text": "{$name} and {$name} again"
+      },
       "expect": {
         "outcome": "understood",
         "parameters": ["name"]
@@ -197,7 +287,10 @@
     {
       "id": "syntax-failure-suppresses-dependent-work",
       "family": "parser-ownership",
-      "input": { "kind": "mf2", "text": "Hello {$name" },
+      "input": {
+        "kind": "mf2",
+        "text": "Hello {$name"
+      },
       "expect": {
         "outcome": "blocked",
         "mf2Source": "Hello {$name",
@@ -207,7 +300,10 @@
     {
       "id": "semantic-failure-keeps-its-parser-owned-code",
       "family": "parser-ownership",
-      "input": { "kind": "mf2", "text": ".input {$a}\n.input {$a}\n{{text}}" },
+      "input": {
+        "kind": "mf2",
+        "text": ".input {$a}\n.input {$a}\n{{text}}"
+      },
       "expect": {
         "outcome": "blocked",
         "diagnosticCodes": ["duplicate-declaration"]
@@ -229,7 +325,10 @@
       "id": "unrepresentable-scalar-is-an-operational-failure",
       "family": "extraction",
       "note": "The text is given as code points because JSON cannot carry a raw NUL and escaping it here would hide the very byte under test.",
-      "input": { "kind": "literal", "textCodepoints": ["97", "0", "98"] },
+      "input": {
+        "kind": "literal",
+        "textCodepoints": ["97", "0", "98"]
+      },
       "expect": {
         "outcome": "failed",
         "failure": "unrepresentable-scalar",
