@@ -209,7 +209,7 @@ mod tests {
     use super::capture as capture_case;
     use super::*;
     use crate::benchmark::cases::{prepare, FIXTURES};
-    use intlify_measurement::acquisition::MonotonicClock;
+    use intlify_measurement::acquisition::{MonotonicClock, Tick};
 
     fn binding() -> Binding {
         let mut frame = Frame::new("test-binding");
@@ -253,6 +253,57 @@ mod tests {
             );
             assert_eq!(again.work, capture.work);
         }
+    }
+
+    /// A clock whose readings the test writes in advance.
+    ///
+    /// The real provider cannot be made to report an interval near the top of
+    /// the quantity domain, and that is exactly the case that must not become
+    /// a saturated or wrapped sample.
+    struct ScriptedClock(std::cell::RefCell<std::collections::VecDeque<Tick>>);
+
+    impl ScriptedClock {
+        fn spans(nanoseconds: u64, reads: usize) -> Self {
+            let seconds = i64::try_from(nanoseconds / 1_000_000_000).unwrap();
+            let rest = i64::try_from(nanoseconds % 1_000_000_000).unwrap();
+            let mut ticks = std::collections::VecDeque::new();
+            for _ in 0..reads {
+                ticks.push_back(Tick::new(0, 0).unwrap());
+                ticks.push_back(Tick::new(seconds, rest).unwrap());
+            }
+            Self(std::cell::RefCell::new(ticks))
+        }
+    }
+
+    impl Clock for ScriptedClock {
+        fn read(&self) -> Result<Tick, intlify_measurement::acquisition::ClockFailure> {
+            Ok(self.0.borrow_mut().pop_front().expect("scripted read"))
+        }
+    }
+
+    #[test]
+    fn a_repetition_sum_past_the_quantity_domain_fails_the_case() {
+        // Two repetitions, each just over half the domain. The sum does not
+        // fit, and the case must fail rather than saturate or wrap.
+        let prepared = prepare(FIXTURES[0]).unwrap();
+        let sampling = Sampling {
+            warmup: Quantity::new(0),
+            samples: Repetitions::new(1).unwrap(),
+            repetitions: Repetitions::new(2).unwrap(),
+        };
+        let clock = ScriptedClock::spans(u64::MAX / 2 + 2, 2);
+        assert_eq!(
+            capture_case(&clock, &prepared, sampling, binding()),
+            Err(CaptureFailure::Overflow)
+        );
+
+        // The same two repetitions inside the domain are captured exactly.
+        let clock = ScriptedClock::spans(u64::MAX / 2 - 2, 2);
+        let capture = capture_case(&clock, &prepared, sampling, binding()).unwrap();
+        assert_eq!(
+            capture.samples[0].aggregate_nanoseconds,
+            Quantity::new((u64::MAX / 2 - 2) * 2)
+        );
     }
 
     #[test]

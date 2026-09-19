@@ -178,6 +178,64 @@ mod tests {
         }
     }
 
+    /// The common records this observation wrote, without the owner document.
+    fn common(observation: &Observation) -> Vec<&[u8]> {
+        observation
+            .records()
+            .into_iter()
+            .filter(|(name, _)| *name != OWNER_RESULT)
+            .map(|(_, bytes)| bytes)
+            .collect()
+    }
+
+    #[test]
+    fn two_owner_documents_for_one_run_are_an_ambiguous_binding() {
+        // Two documents for one run is not twice the evidence. Neither one is
+        // selected, and the records that claim one resolved are refused.
+        let observation = observe_smoke().unwrap();
+        let owner = observation.owner.as_slice();
+        assert!(pipeline::validate_records(
+            &observation.run,
+            &[owner, owner],
+            &common(&observation),
+            &observation.artifacts.report_identity,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn a_document_from_another_run_does_not_bind_to_this_one() {
+        // Both runs measured the same fixtures and agree on every case
+        // identity. What they do not share is which run was captured, and
+        // that is what admission checks.
+        let first = observe_smoke().unwrap();
+        let second = observe_smoke().unwrap();
+        assert_eq!(
+            first.run.plan_record().body.case_inventory,
+            second.run.plan_record().body.case_inventory,
+            "the two runs plan the same cases"
+        );
+        assert!(pipeline::validate_records(
+            &first.run,
+            &[second.owner.as_slice()],
+            &common(&first),
+            &first.artifacts.report_identity,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn no_owner_document_at_all_is_not_a_complete_run() {
+        let observation = observe_smoke().unwrap();
+        assert!(pipeline::validate_records(
+            &observation.run,
+            &[],
+            &common(&observation),
+            &observation.artifacts.report_identity,
+        )
+        .is_err());
+    }
+
     #[test]
     fn a_rehashed_change_to_a_saved_record_is_not_admitted() {
         let observation = observe_smoke().unwrap();
