@@ -24,11 +24,14 @@ A host Producer is responsible for everything language-specific, and supplies th
 
 - the already decoded message text, as displayed text or as authored MF2;
 - an `Occurrence` locating the declaration inside a `SourceSnapshot`;
+- where that decoded text came from, as an `InputSegment` map, when the host decoded anything;
 - the metadata values it recognised — source locale, surface class, description;
-- the parameter names supplied at the use site, in the host's evaluation order;
+- the parameter names supplied at the use site, in the host's evaluation order, or nothing at all when a declaration has no use site yet;
 - an `AuthoringContext` giving the checked inputs: the owner, the default source locale, the exact surface-class vocabulary, and a locale canonicalisation.
 
 `resolve_declarations` then returns one `AuthoringResult` for the batch.
+
+Two of those are worth stating as facts rather than as fields. Supplying an input map is what moves the returned extraction map into host coordinates; omitting it leaves the map in the coordinates of the supplied text, which is a different fact and not a missing one. Supplying no parameters at all says the declaration has no use site in this batch, which is what a reusable declaration looks like before anything references it; supplying an empty list says a use site supplied nothing, and a message that requires a name then reports it missing.
 
 ## What this crate never does
 
@@ -39,6 +42,7 @@ These are guarantees, not current limitations:
 - It never invents a surface class from a file path, a component name, or a DOM tag. Membership in the vocabulary is exact.
 - It never normalises literal content. The parser normalises a cooked literal so that matching works, but a revision has to carry the actual content, or two variant keys the parser matches identically would merge into one revision.
 - It never evaluates or serialises a use-site expression. Only its position is retained.
+- It never claims a byte-for-byte correspondence it was not given. Composing two maps slices only where a run asserts a positional correspondence, so an escape resolves to the character it escaped and never to the whole literal around it.
 
 ## Outcomes
 
@@ -70,16 +74,18 @@ The fixture matrix in [`fixtures/phase1/README.md`](fixtures/phase1/README.md) m
 
 A host Producer is the next phase's work. The entry points it will use already exist and are not expected to change shape:
 
-- `resolve_declarations(context, inputs, limits, workspace)` for a batch;
+- `resolve_declarations(context, inputs, limits, workspace)` for a batch, or `resolve_declarations_with_cancellation` when the caller owns a probe;
 - `AuthoringResult`'s accessors for facts and diagnostics;
+- `compare_parameters` for a reference, whose declaration was analysed separately;
+- `compose_extraction_map` to carry the extraction map back through the host's own decoding;
+- `SourceSnapshot::verify` to turn supplied bytes into evidence before addressing ranges in them;
 - `AuthoringLimits` for the bounds, and `AnalysisWorkspace` for scratch reuse across declarations.
 
 What Phase 2 has to add on top:
 
 - **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers.
-- **`inputMap` composition** — the mapping from host source to the decoded text, composed with the extraction map this crate returns.
+- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules.
 - **Usage profile registration** — semantic usage is admitted only under a registered profile, and Phase 1 admits none from production.
 - **References and inventory** — enumerating reference sites and assembling the authoring inventory.
-- **Cancellation** — there is no cancellation probe in this phase's entry point.
 
 Phase 3 adds identity: allocating a `MessageIntentId`, the registry artifacts and their codecs, and reconciling declaration history. Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.

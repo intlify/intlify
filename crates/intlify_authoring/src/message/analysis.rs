@@ -13,7 +13,7 @@ use ox_mf2_parser::{
 };
 
 use super::literal::{self, ExtractionSegment, LiteralFailure};
-use crate::diagnostic::{Diagnostic, DiagnosticOrigin, Severity, Stage};
+use crate::diagnostic::{Diagnostic, DiagnosticOrigin, MessageRange, Severity, Stage};
 use crate::limits::{AuthoringLimits, LimitKind};
 use crate::primitives::{ByteRange, Occurrence};
 use crate::projection::build::{Builder, ProjectionFailure};
@@ -31,6 +31,16 @@ pub enum MessageInput<'a> {
     Literal(&'a str),
     /// Explicitly authored MF2 source.
     Mf2(&'a str),
+}
+
+impl<'a> MessageInput<'a> {
+    /// Borrow the supplied text, whichever form it was authored in.
+    #[must_use]
+    pub const fn text(self) -> &'a str {
+        match self {
+            Self::Literal(text) | Self::Mf2(text) => text,
+        }
+    }
 }
 
 /// Complete failure of a message analysis.
@@ -294,7 +304,7 @@ fn push_parser_diagnostic(
     };
     let mut record = Diagnostic::new(Stage::MessageAnalysis, origin, severity, occurrence.clone());
     if let Ok(range) = ByteRange::new(u64::from(span.start), u64::from(span.end)) {
-        record = record.with_message_range(range);
+        record = record.with_message_range(MessageRange::Emitted(range));
     }
     workspace.diagnostics.push(record);
     Ok(())
@@ -497,6 +507,7 @@ mod tests {
 
         // The range addresses the analyzed MF2 bytes, on scalar boundaries.
         let source = analysis.mf2_source();
+        let reported = reported.range();
         assert!(reported.end() <= source.len() as u64);
         assert!(source.is_char_boundary(reported.start() as usize));
         assert!(source.is_char_boundary(reported.end() as usize));

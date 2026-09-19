@@ -59,7 +59,11 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | Zero-width segments for the generated `{{` and `}}` | `displayed_text_round_trips_byte_for_byte` |
 | Non-overlapping, ordered, complete coverage | `displayed_text_round_trips_byte_for_byte`, `multibyte_scalars_keep_byte_ranges_on_scalar_boundaries`, `authored_mf2_maps_to_itself_so_the_segments_cover_the_emitted_message` |
 | A reported range resolves back through the map | `a_reported_range_addresses_real_bytes_and_resolves_through_the_segments` |
-| `inputMap` composition | **Deferred to Phase 2.** The host supplies the map from its own source to the decoded text; this crate has no host syntax. |
+| Composition with a host's own map | `a_verbatim_run_slices_and_the_generated_delimiters_become_insertion_points`, `a_host_escape_keeps_its_own_span_and_splits_the_run_around_it`, `an_mf2_escape_inside_a_verbatim_run_resolves_to_the_character_it_escaped`, `multibyte_text_composes_on_scalar_boundaries`, `a_crlf_the_host_normalized_answers_for_both_of_its_bytes`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `empty_text_still_has_a_position_in_source`, `a_declaration_ending_at_the_unit_boundary_composes`, `authored_mf2_composes_through_its_identity_segment` |
+| A map that does not describe the text | `a_map_that_does_not_describe_the_text_is_refused_for_the_reason_it_fails`, `a_host_map_that_does_not_describe_the_text_fails_the_invocation` |
+| Omitting a map is not supplying a broken one | `a_host_map_moves_the_extraction_map_into_source_and_omitting_one_does_not` |
+| The composed map is bounded | `the_composed_map_is_bounded_by_the_invocation` |
+| Supplying the map | **Deferred to Phase 2.** A host reads its own escapes; this crate composes whatever map the host establishes. |
 
 ### Parser ownership
 
@@ -168,7 +172,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | Clearing leaves no semantic state and keeps capacity | `clearing_retains_capacity_and_leaves_no_semantic_state` |
 | Returned values borrow nothing from the scratch | `retained_evidence_is_readable_by_a_caller`; the encoder's contract is stated on `literal::encode` |
 | Bounds that no invocation could satisfy are rejected | `bounds_that_no_invocation_could_satisfy_are_rejected` |
-| Cancellation | **Deferred to Phase 2.** There is no cancellation probe in this phase's entry point. |
+| Cancellation yields no partial scope | `a_cancelled_invocation_returns_no_facts_at_all` |
 
 ### Measurement
 
@@ -190,7 +194,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 
 These are named so that their absence is a decision rather than an oversight.
 
-- **Host language analysis** — source discovery, annotation syntax, intrinsic bindings and `inputMap` composition belong to Phase 2. This crate takes already decoded text and occurrence evidence.
+- **Host language analysis** — source discovery, annotation syntax, intrinsic bindings, and reading a host's own escapes belong to Phase 2. This crate takes already decoded text and occurrence evidence, and composes the map a host establishes rather than establishing one.
 - **Identity** — allocating a `MessageIntentId`, reading or publishing a registry, and reconciling declaration history are Phase 3. A checked result here is authoring evidence, not an identity-resolved result.
 - **Artifact codecs** — `message-intent`, `message-reference`, `intent-registry` and their schemas are Phase 3.
 - **Production canonicalisation** — the provider behind `AuthoringContext` is a finite declared rule table. The production one is 015's Phase 2, and the trait duplicated here is unified at that integration.

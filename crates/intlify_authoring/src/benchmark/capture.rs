@@ -196,7 +196,7 @@ pub(super) fn capture(
                 sampling,
                 binding,
                 prepared.expected(),
-                (&declaration, analysis, facts),
+                (&declaration, analysis, facts, &prepared.limits),
                 operation::invoke_facts,
                 operation::observe_facts,
             )

@@ -4,11 +4,14 @@
 //! 017 authoring value types: owner-qualified identity, exact input pins,
 //! source snapshots, and occurrence evidence.
 //!
-//! These types validate structure only. A well-formed occurrence is not proof
-//! that the named bytes exist, that the digest matches them, or that the caller
-//! is authorized to analyze them. Checking evidence against an actual immutable
-//! snapshot belongs to the Producer that supplies the bytes.
+//! Construction validates structure only. A well-formed occurrence is not
+//! proof that the named bytes exist, that the digest matches them, or that the
+//! caller is authorized to analyze them. Acquiring the bytes stays with the
+//! Producer; what this module adds is the one check that turns supplied bytes
+//! into evidence, [`SourceSnapshot::verify`], so that every host performs it
+//! the same way instead of each deciding what "the right bytes" means.
 
+use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::{IdentityFailure, IntegrityDigest, Token, VersionedIdentity};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -225,6 +228,14 @@ impl ByteRange {
         Ok(Self { start, end })
     }
 
+    /// Retain a range whose endpoints the caller already ordered.
+    ///
+    /// Used where both endpoints come from one forward scan, so a reversed
+    /// range would be a defect here rather than an input to validate.
+    pub(crate) const fn assume(start: u64, end: u64) -> Self {
+        Self { start, end }
+    }
+
     /// Return the inclusive start offset.
     #[must_use]
     pub const fn start(self) -> u64 {
@@ -358,11 +369,84 @@ impl SourceSnapshot {
         &self.unit
     }
 
+    /// Borrow the owner-local source revision token.
+    #[must_use]
+    pub const fn revision(&self) -> &Token {
+        &self.revision
+    }
+
+    /// Borrow the pinned host grammar this snapshot was read under.
+    #[must_use]
+    pub const fn grammar(&self) -> &VersionedIdentity {
+        &self.grammar
+    }
+
     /// Return the exact source byte length.
     #[must_use]
     pub const fn byte_length(&self) -> u64 {
         self.byte_length
     }
+
+    /// Borrow the complete digest of the exact source bytes.
+    #[must_use]
+    pub const fn utf8_digest(&self) -> &IntegrityDigest {
+        &self.utf8_digest
+    }
+
+    /// Compare two snapshots in 017's canonical order.
+    ///
+    /// The order is owner kind and identity, unit, revision, grammar, then
+    /// source digest. The declared byte length is deliberately absent: two
+    /// snapshots agreeing on all of the above while disagreeing on length are
+    /// a conflict to reject, not two neighbours to order.
+    #[must_use]
+    pub fn canonical_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.owner
+            .cmp(&other.owner)
+            .then_with(|| self.unit.cmp(&other.unit))
+            .then_with(|| self.revision.cmp(&other.revision))
+            .then_with(|| self.grammar.cmp(&other.grammar))
+            .then_with(|| self.utf8_digest.cmp(&other.utf8_digest))
+    }
+
+    /// Check supplied bytes against this snapshot and return them as text.
+    ///
+    /// Verification and decoding are one step so that a caller cannot address
+    /// a range in text it never checked. An arbitrary supplied locator is not
+    /// proof of origin, and neither is an arbitrary supplied byte string.
+    ///
+    /// The three failures are separated because they say different things
+    /// about who is wrong. A length or digest mismatch means the caller
+    /// attached the wrong bytes to this snapshot. Bytes that hash correctly
+    /// but are not UTF-8 mean the snapshot itself names a unit that is not
+    /// text, which no range in this design can address.
+    pub fn verify<'bytes>(&self, bytes: &'bytes [u8]) -> Result<&'bytes str, SnapshotMismatch> {
+        if bytes.len() as u64 != self.byte_length {
+            return Err(SnapshotMismatch::ByteLength);
+        }
+        // The digest is taken over the bytes themselves, so it is checked
+        // before the encoding question and stays reproducible from a file.
+        let digest = IntegrityDigest::from_hash(digest_bytes(bytes));
+        if digest != self.utf8_digest {
+            return Err(SnapshotMismatch::Utf8Digest);
+        }
+        std::str::from_utf8(bytes).map_err(|_| SnapshotMismatch::Encoding)
+    }
+}
+
+/// Why supplied bytes are not the ones a snapshot names.
+///
+/// This is an inconsistent snapshot attachment rather than an authoring
+/// mistake: no edit to the source could fix it, so it is never reported as a
+/// diagnostic an author is asked to act on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotMismatch {
+    /// The bytes are not the length the snapshot declares.
+    ByteLength,
+    /// The bytes do not hash to the digest the snapshot declares.
+    Utf8Digest,
+    /// The bytes match the snapshot but are not valid UTF-8.
+    Encoding,
 }
 
 // Where a declaration, reference, parameter expression, or exclusion appears in
@@ -418,12 +502,7 @@ impl Occurrence {
     #[must_use]
     pub fn canonical_cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.source
-            .owner
-            .cmp(&other.source.owner)
-            .then_with(|| self.source.unit.cmp(&other.source.unit))
-            .then_with(|| self.source.revision.cmp(&other.source.revision))
-            .then_with(|| self.source.grammar.cmp(&other.source.grammar))
-            .then_with(|| self.source.utf8_digest.cmp(&other.source.utf8_digest))
+            .canonical_cmp(&other.source)
             .then_with(|| self.range.start.cmp(&other.range.start))
             .then_with(|| self.range.end.cmp(&other.range.end))
             .then_with(|| {
@@ -454,6 +533,63 @@ mod tests {
             &format!("sha256:{}", "0".repeat(64)),
         )
         .unwrap()
+    }
+
+    /// Build a snapshot that actually names `bytes`.
+    fn snapshot_of(bytes: &[u8]) -> SourceSnapshot {
+        let digest = IntegrityDigest::from_hash(digest_bytes(bytes));
+        SourceSnapshot::new(
+            owner(),
+            "checkout",
+            "1",
+            VersionedIdentity::literal("intlify-js-grammar", "0"),
+            bytes.len() as u64,
+            digest.as_str(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn verification_accepts_only_the_exact_bytes_and_separates_why_it_refused() {
+        let source = "const a = 'Pay now'\n";
+        let snapshot = snapshot_of(source.as_bytes());
+        assert_eq!(snapshot.verify(source.as_bytes()), Ok(source));
+
+        // A different unit of the same length hashes differently, so equal
+        // length is never accepted as evidence on its own.
+        let mut altered = source.as_bytes().to_vec();
+        altered[12] = b'X';
+        assert_eq!(altered.len(), source.len());
+        assert_eq!(snapshot.verify(&altered), Err(SnapshotMismatch::Utf8Digest));
+
+        assert_eq!(
+            snapshot.verify(b"short"),
+            Err(SnapshotMismatch::ByteLength),
+            "length is checked before the digest, so the cheap answer comes first"
+        );
+
+        // Bytes that are exactly what the snapshot names but are not text: the
+        // attachment is right and the unit is wrong, which is the other party.
+        let binary = [0xff_u8, 0xfe, 0x00, 0x01];
+        assert_eq!(
+            snapshot_of(&binary).verify(&binary),
+            Err(SnapshotMismatch::Encoding)
+        );
+    }
+
+    #[test]
+    fn a_snapshot_reports_every_pin_a_consumer_has_to_check() {
+        let snapshot = snapshot_of(b"x");
+        assert_eq!(snapshot.unit().as_str(), "checkout");
+        assert_eq!(snapshot.revision().as_str(), "1");
+        assert_eq!(snapshot.grammar().identity().as_str(), "intlify-js-grammar");
+        assert_eq!(snapshot.grammar().revision().as_str(), "0");
+        assert_eq!(snapshot.byte_length(), 1);
+        assert_eq!(
+            snapshot.utf8_digest().as_str(),
+            IntegrityDigest::from_hash(digest_bytes(b"x")).as_str()
+        );
+        assert_eq!(snapshot.owner(), &owner());
     }
 
     #[test]

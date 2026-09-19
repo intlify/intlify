@@ -200,6 +200,25 @@ pub fn hash(domain: Domain, value: &Value) -> Result<[u8; 32], EncodingFailure> 
     Ok(hasher.finalize().into())
 }
 
+/// Digest exact bytes with SHA-256, outside the canonical value framing.
+///
+/// Design 017 defines a source unit's `utf8Digest` over the actual source
+/// bytes rather than over `H` of a reserialized string, and the two are
+/// deliberately different values. `H` frames its input and separates it by
+/// domain, so it answers which admitted value this is; this answers whether
+/// these are the exact bytes a snapshot names. Routing a snapshot digest
+/// through `H` would make it depend on JSON string escaping, and no host could
+/// reproduce it from a file it read.
+///
+/// There is no domain here for the same reason: the input is not a value in
+/// the shared encoding, so there is nothing for a domain to separate it from.
+#[must_use]
+pub fn digest_bytes(bytes: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
 /// Compute `H(D, V)` over a value with exactly one member removed.
 ///
 /// `path` names the object members to descend, ending with the member to
@@ -407,6 +426,37 @@ mod tests {
         let literal =
             crate::json::decode_unique_json(r#"{"$serde_json::private::Number":"hello"}"#).unwrap();
         assert!(encode(&literal).is_ok());
+    }
+
+    #[test]
+    fn a_byte_digest_is_plain_sha256_and_not_the_framed_value_digest() {
+        // Published SHA-256 answers, so this fixes the function rather than
+        // recording whatever this crate currently computes.
+        assert_eq!(
+            hex(&digest_bytes(b"")),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            hex(&digest_bytes(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+
+        // A snapshot digest must stay reproducible from the bytes on disk, so
+        // it must not pick up the shared framing or a domain separator.
+        let framed = hash(
+            Domain::literal("verification-record-integrity"),
+            &json!("abc"),
+        )
+        .unwrap();
+        assert_ne!(digest_bytes(b"abc"), framed);
+        assert_ne!(
+            digest_bytes(b"abc"),
+            digest_bytes(&encode(&json!("abc")).unwrap())
+        );
+
+        // Bytes that are not valid UTF-8 still have a digest; whether a unit is
+        // text is a separate question from which bytes it is.
+        assert_eq!(digest_bytes(&[0xff, 0xfe]).len(), 32);
     }
 
     #[test]

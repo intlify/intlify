@@ -11,10 +11,12 @@
 
 use intlify_authoring::test_context::{LocaleRule, TestContext};
 use intlify_authoring::{
-    intent_revision, resolve_declarations, AnalysisWorkspace, AuthoringContext, AuthoringFailure,
-    AuthoringLimits, ByteRange, ContextKind, DeclarationInput, DeclarationMetadata, MessageInput,
-    Occurrence, OccurrenceRole, Outcome, OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily,
-    SourceLocaleBasis, SourceSnapshot, SurfaceVocabulary, VersionedIdentity,
+    compare_parameters, intent_revision, resolve_declarations,
+    resolve_declarations_with_cancellation, AnalysisWorkspace, AuthoringContext, AuthoringFailure,
+    AuthoringLimits, ByteRange, ContextKind, DeclarationInput, DeclarationMetadata, Detail,
+    InputSegment, MappingError, MessageInput, MessageRange, Occurrence, OccurrenceRole, Outcome,
+    OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily, SourceLocaleBasis, SourceSnapshot,
+    SurfaceVocabulary, VersionedIdentity,
 };
 
 fn limits() -> AuthoringLimits {
@@ -76,9 +78,10 @@ fn declaration(message: MessageInput<'_>) -> DeclarationInput<'_> {
     DeclarationInput {
         occurrence: occurrence(),
         message,
+        input_map: None,
         metadata: DeclarationMetadata::default(),
         usage: None,
-        parameters: &[],
+        parameters: Some(&[]),
     }
 }
 
@@ -104,6 +107,15 @@ fn reasons(result: &intlify_authoring::AuthoringResult) -> Vec<&str> {
         .diagnostics()
         .iter()
         .map(|record| record.origin().code())
+        .collect()
+}
+
+/// The causes reported, which is what separates two records of one family.
+fn details(result: &intlify_authoring::AuthoringResult) -> Vec<&str> {
+    result
+        .diagnostics()
+        .iter()
+        .map(|record| record.detail().map_or("", Detail::as_str))
         .collect()
 }
 
@@ -234,7 +246,7 @@ fn parameter_mismatches_are_reported_and_a_match_is_accepted() {
 
     let matched = [ParameterBinding::new("name", expression.clone())];
     let mut input = declaration(MessageInput::Mf2("Hello {$name}"));
-    input.parameters = &matched;
+    input.parameters = Some(&matched);
     assert_eq!(
         resolve(&context, &[input]).unwrap().outcome(),
         Outcome::Checked
@@ -252,7 +264,7 @@ fn parameter_mismatches_are_reported_and_a_match_is_accepted() {
         ParameterBinding::new("other", expression.clone()),
     ];
     let mut input = declaration(MessageInput::Mf2("Hello {$name}"));
-    input.parameters = &extra;
+    input.parameters = Some(&extra);
     let result = resolve(&context, &[input]).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
 
@@ -262,7 +274,7 @@ fn parameter_mismatches_are_reported_and_a_match_is_accepted() {
         ParameterBinding::new("name", expression),
     ];
     let mut input = declaration(MessageInput::Mf2("Hello {$name}"));
-    input.parameters = &duplicated;
+    input.parameters = Some(&duplicated);
     let result = resolve(&context, &[input]).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
 }
@@ -513,7 +525,7 @@ fn the_diagnostics_budget_bounds_what_is_collected_not_only_what_is_returned() {
         .map(|index| ParameterBinding::new(&format!("extra{index}"), occurrence()))
         .collect::<Vec<_>>();
     let input = DeclarationInput {
-        parameters: &parameters,
+        parameters: Some(&parameters),
         ..declaration(MessageInput::Literal("Pay now"))
     };
     let mut limits = limits();
@@ -528,7 +540,7 @@ fn the_diagnostics_budget_bounds_what_is_collected_not_only_what_is_returned() {
     // Below the budget the same shape still reports every diagnostic.
     let few = parameters[..2].to_vec();
     let input = DeclarationInput {
-        parameters: &few,
+        parameters: Some(&few),
         ..declaration(MessageInput::Literal("Pay now"))
     };
     let result = resolve_within(&context, &[input], &limits).unwrap();
@@ -614,4 +626,184 @@ fn a_metadata_value_past_its_bound_blocks_rather_than_being_truncated() {
     assert_eq!(multibyte.len() as u64, limits.metadata_value_bytes + 1);
     let result = resolve_within(&context, &[described(multibyte)], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
+}
+
+#[test]
+fn a_host_map_moves_the_extraction_map_into_source_and_omitting_one_does_not() {
+    // `'a{b'` sitting at bytes 0..=7 of the unit, its content at [1, 4).
+    let map = [InputSegment::new(
+        ByteRange::new(0, 3).unwrap(),
+        ByteRange::new(1, 4).unwrap(),
+    )];
+    let mut input = declaration(MessageInput::Literal("a{b"));
+    input.input_map = Some(&map);
+    let result = resolve(&context(), &[input]).expect("a complete invocation");
+    let facts = result.checked().expect("a checked result");
+    let composed: Vec<(u64, u64)> = facts[0]
+        .extraction_map()
+        .iter()
+        .map(|piece| (piece.source().start(), piece.source().end()))
+        .collect();
+    assert_eq!(
+        composed,
+        [(1, 1), (1, 2), (2, 3), (3, 4), (4, 4)],
+        "the escaped brace resolves to the one source byte it escaped"
+    );
+
+    // Without a map the same analysis reports the only coordinates it has.
+    let plain = resolve(&context(), &[declaration(MessageInput::Literal("a{b"))])
+        .expect("a complete invocation");
+    let decoded: Vec<(u64, u64)> = plain.checked().expect("a checked result")[0]
+        .extraction_map()
+        .iter()
+        .map(|piece| (piece.source().start(), piece.source().end()))
+        .collect();
+    assert_eq!(decoded, [(0, 0), (0, 1), (1, 2), (2, 3), (3, 3)]);
+}
+
+#[test]
+fn a_host_map_that_does_not_describe_the_text_fails_the_invocation() {
+    // No edit to the analyzed source could fix this, so it is not reported to
+    // an author as something to correct.
+    let map = [InputSegment::new(
+        ByteRange::new(0, 2).unwrap(),
+        ByteRange::new(1, 3).unwrap(),
+    )];
+    let mut input = declaration(MessageInput::Literal("abc"));
+    input.input_map = Some(&map);
+    assert_eq!(
+        resolve(&context(), &[input]),
+        Err(AuthoringFailure::InputMap(MappingError::Coverage))
+    );
+}
+
+#[test]
+fn a_declaration_without_a_use_site_does_not_owe_parameters() {
+    // A reusable declaration is written before anything references it. Reading
+    // that absence as an empty parameter object would block every message with
+    // a parameter at the moment it is declared.
+    let mut standalone = declaration(MessageInput::Mf2("Hello {$name}!"));
+    standalone.parameters = None;
+    let result = resolve(&context(), &[standalone]).expect("a complete invocation");
+    assert_eq!(result.outcome(), Outcome::Checked);
+    assert!(result.diagnostics().is_empty());
+
+    // A use site that supplied nothing is a different fact and still reports.
+    let mut supplied = declaration(MessageInput::Mf2("Hello {$name}!"));
+    supplied.parameters = Some(&[]);
+    let blocked = resolve(&context(), &[supplied]).expect("a complete invocation");
+    assert_eq!(blocked.outcome(), Outcome::Blocked);
+    assert_eq!(details(&blocked), ["parameter-missing"]);
+}
+
+#[test]
+fn a_parameter_mismatch_names_which_of_the_three_it_is() {
+    let expression = occurrence_at(16, OccurrenceRole::ParameterExpression);
+    let supplied = [
+        ParameterBinding::new("name", expression.clone()),
+        ParameterBinding::new("name", expression.clone()),
+        ParameterBinding::new("count", expression.clone()),
+    ];
+    let required = ["name".to_owned(), "total".to_owned()];
+    let reported = compare_parameters(&required, &supplied, &expression);
+    let causes: Vec<&str> = reported
+        .iter()
+        .map(|record| record.detail().map_or("", Detail::as_str))
+        .collect();
+    assert_eq!(
+        causes,
+        [
+            "parameter-duplicate",
+            "parameter-extra",
+            "parameter-missing"
+        ],
+        "three mistakes with three different fixes stay three records"
+    );
+
+    // A reference reports at the reference, not at the declaration it shares
+    // with every other use of the same message.
+    for record in &reported {
+        assert_eq!(record.occurrence(), Some(&expression));
+    }
+    assert!(reported
+        .iter()
+        .all(|record| record.origin().code() == "authoring-parameter-mismatch"));
+}
+
+#[test]
+fn displayed_text_no_message_can_carry_is_reported_where_an_author_can_fix_it() {
+    // The encoder alone cannot know whether a caller has source to point at,
+    // so it reports the position; a caller that does turns it into a record.
+    let result = resolve(&context(), &[declaration(MessageInput::Literal("a\u{0}b"))])
+        .expect("an invocation that ran");
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    assert_eq!(reasons(&result), ["authoring-form-unsupported"]);
+    assert_eq!(details(&result), ["unrepresentable-scalar"]);
+    assert_eq!(
+        result.diagnostics()[0].message_range(),
+        Some(MessageRange::Supplied(ByteRange::new(1, 2).unwrap())),
+        "the position names the one character to remove, in the text supplied"
+    );
+    assert!(
+        result.checked().is_none(),
+        "a blocked declaration is not a checked scope"
+    );
+}
+
+#[test]
+fn a_cancelled_invocation_returns_no_facts_at_all() {
+    let inputs = [
+        declaration(MessageInput::Literal("first")),
+        declaration(MessageInput::Literal("second")),
+    ];
+    // Distinct positions, so the two would otherwise both resolve.
+    let mut inputs = inputs.to_vec();
+    inputs[1].occurrence = occurrence_at(16, OccurrenceRole::UiLiteral);
+
+    let mut workspace = AnalysisWorkspace::new();
+    let cancelled = std::cell::Cell::new(false);
+    let probe = || {
+        let asked = cancelled.get();
+        cancelled.set(true);
+        asked
+    };
+    assert_eq!(
+        resolve_declarations_with_cancellation(
+            &context(),
+            &inputs,
+            &limits(),
+            &mut workspace,
+            &probe
+        ),
+        Err(AuthoringFailure::Cancelled),
+        "stopping yields no partial scope, so nothing can be read as an absence"
+    );
+
+    // The same workspace serves a later run as a fresh one would.
+    let again = resolve_declarations(&context(), &inputs, &limits(), &mut workspace)
+        .expect("a complete invocation");
+    assert_eq!(again.checked().expect("a checked result").len(), 2);
+}
+
+#[test]
+fn a_host_profile_replaces_the_language_neutral_pin() {
+    let neutral = context();
+    assert_eq!(
+        neutral.basis().authoring_profile().identity().as_str(),
+        "intlify-authoring-phase1-test"
+    );
+
+    // A Producer's facts have to say which rules recognized the syntax, or a
+    // host result would claim it came from an analysis that reads no host.
+    let hosted = TestContext::builder(owner(), SurfaceVocabulary::new(["checkout"]).unwrap())
+        .authoring_profile(VersionedIdentity::literal("intlify-js-dom-authoring", "0"))
+        .default_source_locale("en")
+        .default_surface_class("checkout")
+        .build()
+        .expect("checked test context");
+    assert_eq!(
+        hosted.basis().authoring_profile().identity().as_str(),
+        "intlify-js-dom-authoring"
+    );
+    assert_eq!(hosted.basis().context_kind(), ContextKind::TestContext);
 }
