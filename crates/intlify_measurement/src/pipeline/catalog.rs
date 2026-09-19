@@ -1,35 +1,40 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Bounded finite record resolution and native-backed semantic admission.
-//! Valid negative evaluations resolve as records, never as measured evidence.
+//! Bounded resolution of finished records, and owner-backed admission.
+//!
+//! Everything here works on the produced bytes. A record that decodes and
+//! verifies its own integrity has proved only that it is self-consistent: it
+//! still has to resolve the exact Plan, the exact inventory, and the exact
+//! owner document this run was issued for. A valid negative evaluation
+//! resolves as a record, never as measured evidence.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use super::{evaluate, owner::OwnerInput, Artifacts};
-use crate::benchmark::run::RecordedRun;
-use crate::benchmark::shared::build;
-use crate::benchmark::shared::environment;
-use crate::benchmark::shared::identity::{
-    self, AnyIdentity, InstanceDomain, IntegrityDigest, RecordIdentity, Token, VersionedIdentity,
-    OWNER_RESULT_DOMAIN,
+use crate::decode::{self, DecodeFailure};
+use crate::encoding;
+use crate::identity::{
+    self, AnyIdentity, CaseIdentity, CommonDomain, IntegrityDigest, RecordIdentity, Token,
+    VersionedIdentity,
 };
-use crate::benchmark::shared::measurement::{
-    self, CaseResult, Evaluation, Evidence, InputState, Outcome, Report, Section,
-};
-use crate::benchmark::shared::plan::RunPlanRecord;
-use crate::benchmark::shared::reason::valid_reasons;
-use crate::benchmark::shared::record::Reference;
-use crate::benchmark::shared::{decode, encoding};
+use crate::measurement::{CaseResult, Evaluation, Evidence, InputState, Outcome, Report, Section};
+use crate::owner::OwnerRun;
+use crate::plan::RunPlanRecord;
+use crate::reason::valid_reasons;
+use crate::record::Reference;
+
+use super::{evaluate, resolve, Artifacts, Resolved};
 
 const MAX_RECORDS: usize = 8;
 const MAX_TOTAL_BYTES: usize = 64 * 1024 * 1024;
+const MAX_OWNER_BYTES: usize = 16 * 1024 * 1024;
 
+/// Why a set of produced records was not admitted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::benchmark) enum ValidationFailure {
-    Decode(decode::DecodeFailure),
+pub enum ValidationFailure {
+    Decode(DecodeFailure),
     Capacity,
     DuplicateRecord,
     IdentityConflict,
@@ -43,19 +48,26 @@ pub(in crate::benchmark) enum ValidationFailure {
     Report,
     Reference,
 }
-impl From<decode::DecodeFailure> for ValidationFailure {
-    fn from(error: decode::DecodeFailure) -> Self {
+impl From<DecodeFailure> for ValidationFailure {
+    fn from(error: DecodeFailure) -> Self {
         Self::Decode(error)
     }
 }
 
-enum Document {
+type OwnerEvidence<O> = Evidence<
+    <O as OwnerRun>::Projection,
+    <O as OwnerRun>::Descriptors,
+    <O as OwnerRun>::Observation,
+>;
+
+enum Document<O: OwnerRun> {
     Plan(Box<RunPlanRecord>),
-    Evidence(Box<Evidence>),
+    Evidence(Box<OwnerEvidence<O>>),
     Evaluation(Box<Evaluation>),
     Report(Box<Report>),
 }
-impl Document {
+
+impl<O: OwnerRun> Document<O> {
     fn identity(&self) -> &RecordIdentity {
         match self {
             Self::Plan(v) => v.identity(),
@@ -64,6 +76,7 @@ impl Document {
             Self::Report(v) => v.identity(),
         }
     }
+
     fn locals(&self) -> Vec<&Token> {
         match self {
             Self::Plan(value) => value
@@ -125,10 +138,9 @@ impl Document {
                 .collect(),
         }
     }
+
     fn unique_cases(&self) -> bool {
-        fn unique<'a>(
-            values: impl Iterator<Item = &'a crate::benchmark::shared::identity::CaseIdentity>,
-        ) -> bool {
+        fn unique<'a>(values: impl Iterator<Item = &'a CaseIdentity>) -> bool {
             let mut seen = BTreeSet::new();
             values.into_iter().all(|id| seen.insert(id))
         }
@@ -170,10 +182,11 @@ impl Document {
     }
 }
 
-struct Catalog {
-    documents: BTreeMap<RecordIdentity, Document>,
+struct Catalog<O: OwnerRun> {
+    documents: BTreeMap<RecordIdentity, Document<O>>,
 }
-impl Catalog {
+
+impl<O: OwnerRun> Catalog<O> {
     fn read(inputs: &[&[u8]]) -> Result<Self, ValidationFailure> {
         if inputs.len() > MAX_RECORDS {
             return Err(ValidationFailure::Capacity);
@@ -195,25 +208,25 @@ impl Catalog {
             let envelope = value
                 .get("envelope")
                 .and_then(Value::as_object)
-                .ok_or(decode::DecodeFailure::Shape)?;
+                .ok_or(DecodeFailure::Shape)?;
             let kind = envelope
                 .get("recordKind")
                 .and_then(Value::as_str)
-                .ok_or(decode::DecodeFailure::Shape)?;
+                .ok_or(DecodeFailure::Shape)?;
             let revision: Token = decode::typed(
                 envelope
                     .get("recordSchemaRevision")
                     .cloned()
-                    .ok_or(decode::DecodeFailure::Shape)?,
+                    .ok_or(DecodeFailure::Shape)?,
             )?;
             let governing: VersionedIdentity = decode::typed(
                 envelope
                     .get("governingSpecification")
                     .cloned()
-                    .ok_or(decode::DecodeFailure::Shape)?,
+                    .ok_or(DecodeFailure::Shape)?,
             )?;
             if revision != Token::literal("0") || governing != identity::specification() {
-                return Err(decode::DecodeFailure::Unsupported.into());
+                return Err(DecodeFailure::Unsupported.into());
             }
             let document = match kind {
                 "measurement-run-plan" => Document::Plan(Box::new(decode::typed(value.clone())?)),
@@ -224,20 +237,20 @@ impl Catalog {
                     Document::Evaluation(Box::new(decode::typed(value.clone())?))
                 }
                 "structured-report" => Document::Report(Box::new(decode::typed(value.clone())?)),
-                _ => return Err(decode::DecodeFailure::Unsupported.into()),
+                _ => return Err(DecodeFailure::Unsupported.into()),
             };
-            if document.identity().domain() != InstanceDomain::Record {
-                return Err(decode::DecodeFailure::Shape.into());
+            if document.identity().domain() != CommonDomain::Record {
+                return Err(DecodeFailure::Shape.into());
             }
             let submitted: IntegrityDigest = decode::typed(
                 envelope
                     .get("integrityDigest")
                     .cloned()
-                    .ok_or(decode::DecodeFailure::Shape)?,
+                    .ok_or(DecodeFailure::Shape)?,
             )?;
-            let digest = encoding::record_hash(&value).map_err(|_| decode::DecodeFailure::Shape)?;
+            let digest = encoding::record_hash(&value).map_err(|_| DecodeFailure::Shape)?;
             if submitted != IntegrityDigest::from_hash(digest) {
-                return Err(decode::DecodeFailure::Integrity.into());
+                return Err(DecodeFailure::Integrity.into());
             }
             let identity = document.identity().clone();
             if let Some(previous) = canonical_values.get(&identity) {
@@ -260,13 +273,13 @@ impl Catalog {
         Ok(Self { documents })
     }
 
-    fn common(&self, id: &RecordIdentity) -> Result<&Document, ValidationFailure> {
+    fn common(&self, id: &RecordIdentity) -> Result<&Document<O>, ValidationFailure> {
         self.documents
             .get(id)
             .ok_or(ValidationFailure::MissingRecord)
     }
 
-    fn record(&self, id: &AnyIdentity) -> Result<&Document, ValidationFailure> {
+    fn record(&self, id: &AnyIdentity) -> Result<&Document<O>, ValidationFailure> {
         // Only a common record can be resolved in this catalog. An owner
         // instance is a valid reference target but is not one of these
         // documents, so it is resolved against the admitted owner input.
@@ -274,7 +287,8 @@ impl Catalog {
             .and_then(|identity| self.documents.get(identity))
             .ok_or(ValidationFailure::MissingRecord)
     }
-    fn resolve(&self, reference: &Reference) -> Result<&Document, ValidationFailure> {
+
+    fn resolve(&self, reference: &Reference) -> Result<&Document<O>, ValidationFailure> {
         match reference {
             Reference::TopLevel { record_identity } => self.record(record_identity),
             Reference::NestedRecord { reference } => {
@@ -289,54 +303,59 @@ impl Catalog {
 
     fn resolve_supported(
         &self,
-        owner: &OwnerInput,
+        run: &O,
+        resolved: &Resolved<O>,
         reference: &Reference,
     ) -> Result<(), ValidationFailure> {
         let parent = match reference {
             Reference::TopLevel { record_identity } => record_identity,
             Reference::NestedRecord { reference } => &reference.parent_record_identity,
         };
-        let Some(owner_instance) = parent
-            .as_owner()
-            .filter(|identity| identity.domain() == OWNER_RESULT_DOMAIN)
-        else {
+        let Some(owner_instance) = parent.as_owner() else {
             return self.resolve(reference).map(|_| ());
         };
-        let source = owner
-            .checked
+        let admitted = resolved
+            .admitted
             .as_ref()
-            .ok_or(ValidationFailure::Reference)?
-            .document();
-        if owner_instance != &source.result().record_identity {
+            .ok_or(ValidationFailure::Reference)?;
+        if owner_instance != run.result_identity(admitted) {
             return Err(ValidationFailure::Reference);
         }
         match reference {
             Reference::TopLevel { .. } => Ok(()),
-            Reference::NestedRecord { .. }
-                if source.result().attempts.iter().any(|attempt| {
-                    measurement::attempt_reference(source, attempt.ordinal).as_ref()
-                        == Ok(reference)
-                }) =>
-            {
-                Ok(())
+            Reference::NestedRecord { .. } => {
+                let count = run.outcomes(admitted).len();
+                let matches = (0..count).any(|index| {
+                    let ordinal = intlify_shared_json::quantity::Quantity::new(
+                        u64::try_from(index).expect("pre-admitted case count"),
+                    );
+                    run.attempt_reference(admitted, ordinal).as_ref() == Ok(reference)
+                });
+                if matches {
+                    Ok(())
+                } else {
+                    Err(ValidationFailure::Reference)
+                }
             }
-            Reference::NestedRecord { .. } => Err(ValidationFailure::Reference),
         }
     }
 }
 
-/// A successful admission may describe an incomplete/invalid measurement run.
-/// Counts are diagnostic; this initial profile has no numeric-decision facility.
+/// A successful admission may describe an incomplete or invalid run.
+///
+/// The counts are diagnostic. This profile has no numeric-decision facility,
+/// so nothing downstream may compare them against a threshold.
 #[derive(Debug, PartialEq, Eq)]
-pub(in crate::benchmark) struct Validation {
-    pub(in crate::benchmark) outcome: Outcome,
-    pub(in crate::benchmark) planned_cases: usize,
-    pub(in crate::benchmark) measured_cases: usize,
-    pub(in crate::benchmark) non_measured_cases: usize,
+pub struct Validation {
+    pub outcome: Outcome,
+    pub planned_cases: usize,
+    pub measured_cases: usize,
+    pub non_measured_cases: usize,
 }
 
-pub(in crate::benchmark) fn validate(
-    run: &RecordedRun,
+/// Admit the records one run just produced.
+pub fn validate<O: OwnerRun>(
+    run: &O,
     artifacts: &Artifacts,
 ) -> Result<Validation, ValidationFailure> {
     let mut records = vec![artifacts.run_plan.as_slice()];
@@ -353,24 +372,25 @@ pub(in crate::benchmark) fn validate(
     validate_records(run, &owner_inputs, &records, &artifacts.report_identity)
 }
 
-pub(in crate::benchmark) fn validate_records(
-    run: &RecordedRun,
-    native_inputs: &[&[u8]],
+/// Admit a set of submitted records against the run that issued their Plan.
+pub fn validate_records<O: OwnerRun>(
+    run: &O,
+    owner_inputs: &[&[u8]],
     common_inputs: &[&[u8]],
     report_identity: &RecordIdentity,
 ) -> Result<Validation, ValidationFailure> {
-    if native_inputs.len() > MAX_RECORDS
-        || native_inputs
+    if owner_inputs.len() > MAX_RECORDS
+        || owner_inputs
             .iter()
-            .any(|input| input.len() > 16 * 1024 * 1024)
+            .any(|input| input.len() > MAX_OWNER_BYTES)
     {
         return Err(ValidationFailure::Capacity);
     }
-    let catalog = Catalog::read(common_inputs)?;
-    let Document::Plan(plan) = catalog.common(run.plan_record().identity())? else {
+    let catalog = Catalog::<O>::read(common_inputs)?;
+    let Document::Plan(plan) = catalog.common(run.plan().identity())? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
-    if **plan != *run.plan_record() {
+    if **plan != *run.plan() {
         return Err(ValidationFailure::Plan);
     }
     let Document::Report(report) = catalog.common(report_identity)? else {
@@ -390,36 +410,17 @@ pub(in crate::benchmark) fn validate_records(
     let Document::Evaluation(evaluation) = catalog.resolve(run_evaluation)? else {
         return Err(ValidationFailure::WrongRecordKind);
     };
-    let owner = OwnerInput::resolve(run, native_inputs);
-    let evidence: Option<&Evidence> = match evidence_sets.as_slice() {
+    let resolved = resolve::resolve(run, owner_inputs);
+    let evidence: Option<&OwnerEvidence<O>> = match evidence_sets.as_slice() {
         [] => {
-            if let Some(checked) = &owner.checked {
-                let source = checked.projection_source();
-                let cases = source
-                    .document()
-                    .result()
-                    .attempts
-                    .iter()
-                    .zip(&plan.body.case_inventory)
-                    .zip(run.common_plan().projections())
-                    .map(|((attempt, planned), projection)| {
-                        measurement::project_case(
-                            &source,
-                            attempt,
-                            &planned.case_identity,
-                            projection,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()
+            if let Some(admitted) = &resolved.admitted {
+                // The parent here only tests lossless projection; no record is
+                // minted. A producer cannot declare eligible measured cases
+                // projection-ineligible simply by withholding the evidence.
+                if run
+                    .evidence(admitted, plan.identity())
                     .map_err(|_| ValidationFailure::Evidence)?
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>();
-                // The parent here is only used to test lossless projection; no
-                // record is minted. A producer cannot declare eligible measured
-                // cases projection-ineligible simply by withholding evidence.
-                if !cases.is_empty()
-                    && measurement::evidence_body(&source, plan, plan.identity(), cases).is_ok()
+                    .is_some()
                 {
                     return Err(ValidationFailure::MissingRecord);
                 }
@@ -430,34 +431,14 @@ pub(in crate::benchmark) fn validate_records(
             let Document::Evidence(evidence) = catalog.resolve(reference)? else {
                 return Err(ValidationFailure::WrongRecordKind);
             };
-            let Some(checked) = &owner.checked else {
+            let Some(admitted) = &resolved.admitted else {
                 return Err(ValidationFailure::Evidence);
             };
-            let source = checked.projection_source();
-            let mut expected_cases = Vec::new();
-            for ((attempt, planned), projection) in source
-                .document()
-                .result()
-                .attempts
-                .iter()
-                .zip(&plan.body.case_inventory)
-                .zip(run.common_plan().projections())
-            {
-                if let Some(case) =
-                    measurement::project_case(&source, attempt, &planned.case_identity, projection)
-                        .map_err(|_| ValidationFailure::Evidence)?
-                {
-                    expected_cases.push(case);
-                }
-            }
-            let expected =
-                measurement::evidence_body(&source, plan, evidence.identity(), expected_cases)
-                    .map_err(|_| ValidationFailure::Evidence)?;
-            if expected.cases.is_empty()
-                || evidence.body != expected
-                || !build::validate(&evidence.body.build, &source, evidence.identity())
-                || !environment::validate(&evidence.body.environment, &source, evidence.identity())
-            {
+            let expected = run
+                .evidence(admitted, evidence.identity())
+                .map_err(|_| ValidationFailure::Evidence)?
+                .ok_or(ValidationFailure::Evidence)?;
+            if evidence.body != expected {
                 return Err(ValidationFailure::Evidence);
             }
             Some(evidence)
@@ -465,7 +446,7 @@ pub(in crate::benchmark) fn validate_records(
         _ => return Err(ValidationFailure::Reference),
     };
     let expected =
-        evaluate::evaluate(run, &owner, evidence).map_err(|_| ValidationFailure::Evaluation)?;
+        evaluate::evaluate(run, &resolved, evidence).map_err(|_| ValidationFailure::Evaluation)?;
     if evaluation.body != expected {
         return Err(ValidationFailure::Evaluation);
     }
@@ -473,11 +454,11 @@ pub(in crate::benchmark) fn validate_records(
         return Err(ValidationFailure::Evaluation);
     }
     if let InputState::Resolved { reference } = &evaluation.body.owner_result_input.result {
-        catalog.resolve_supported(&owner, reference)?;
+        catalog.resolve_supported(run, &resolved, reference)?;
     }
     for reason in &evaluation.body.reasons {
         for reference in reason.references() {
-            catalog.resolve_supported(&owner, reference)?;
+            catalog.resolve_supported(run, &resolved, reference)?;
         }
     }
     for case in &evaluation.body.cases {
@@ -492,17 +473,17 @@ pub(in crate::benchmark) fn validate_records(
         } = &case.result
         {
             for reference in diagnostic_partial_observations {
-                catalog.resolve_supported(&owner, reference)?;
+                catalog.resolve_supported(run, &resolved, reference)?;
             }
         }
     }
     if let Some(evidence) = evidence {
         for case in &evidence.body.cases {
-            catalog.resolve_supported(&owner, &case.owner_attempt)?;
+            catalog.resolve_supported(run, &resolved, &case.owner_attempt)?;
         }
     }
     let expected_report =
-        evaluate::report(evaluation, evidence).map_err(|_| ValidationFailure::Report)?;
+        evaluate::report::<O>(evaluation, evidence).map_err(|_| ValidationFailure::Report)?;
     if report.body != expected_report {
         return Err(ValidationFailure::Report);
     }

@@ -25,6 +25,8 @@ pub mod environment;
 pub mod execution;
 pub mod identity;
 pub mod measurement;
+pub mod owner;
+pub mod pipeline;
 pub mod plan;
 pub mod reason;
 pub mod record;

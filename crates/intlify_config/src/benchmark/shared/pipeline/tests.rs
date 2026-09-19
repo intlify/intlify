@@ -3,13 +3,13 @@
 
 use serde_json::{json, Value};
 
-use super::catalog::{validate_records, ValidationFailure as V};
-use super::owner::OwnerInput;
 use super::*;
 use crate::benchmark::run::PreparedRun;
-use crate::benchmark::shared::identity::IntegrityDigest;
+use crate::benchmark::shared::encoding;
 use crate::benchmark::shared::measurement::Outcome;
-use crate::benchmark::shared::{decode, encoding};
+use intlify_measurement::decode;
+use intlify_measurement::identity::IntegrityDigest;
+use intlify_measurement::pipeline::ValidationFailure as V;
 
 fn capture() -> RecordedRun {
     PreparedRun::acquire().unwrap().collect().unwrap()
@@ -216,28 +216,26 @@ fn self_rehashed_common_content_never_replaces_the_independently_acquired_owner_
 
 #[test]
 fn withholding_eligible_evidence_cannot_manufacture_projection_ineligibility() {
+    // A producer submits a report that claims no evidence set exists, and
+    // withholds the evidence record, while the owner document still resolves
+    // and its cases are still projection-eligible. Admission rebuilds the
+    // projection from the owner document, finds it eligible, and refuses.
     let run = capture();
     let mut artifacts = produce(&run).unwrap();
-    let native = run.encode().unwrap();
-    let owner = OwnerInput::resolve(&run, &[&native]);
-    let evaluation = Evaluation::seal(
-        EvaluationKind::Value,
-        RecordIdentity::fresh(InstanceDomain::Record).unwrap(),
-        &producing_tool(),
-        evaluate::evaluate(&run, &owner, None).unwrap(),
-    )
-    .unwrap();
-    let report = Report::seal(
-        ReportKind::Value,
-        RecordIdentity::fresh(InstanceDomain::Record).unwrap(),
-        &producing_tool(),
-        evaluate::report(&evaluation, None).unwrap(),
-    )
-    .unwrap();
+    assert!(artifacts.evidence.is_some());
+
+    let mut report = value(&artifacts.report);
+    assert_eq!(
+        report["body"]["sections"][0]["evidenceSets"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    report["body"]["sections"][0]["evidenceSets"] = json!([]);
+    artifacts.report = reseal(&mut report);
     artifacts.evidence = None;
-    artifacts.evaluation = encode(&evaluation).unwrap();
-    artifacts.report = encode(&report).unwrap();
-    artifacts.report_identity = report.identity().clone();
+
     assert_eq!(validate(&run, &artifacts).unwrap_err(), V::MissingRecord);
 }
 

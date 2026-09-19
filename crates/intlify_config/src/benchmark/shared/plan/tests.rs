@@ -4,8 +4,8 @@
 use intlify_measurement::plan::{case_identity_input, MAX_PLAN_BYTES};
 
 use super::super::encoding;
-use super::super::identity::{InstanceDomain, IntegrityDigest};
 use super::*;
+use intlify_measurement::identity::{CommonDomain as InstanceDomain, IntegrityDigest};
 use serde_json::{json, Value};
 
 /// Recompute a submitted document's own integrity digest after changing it.

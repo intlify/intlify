@@ -5,7 +5,6 @@
 //! checksums keep their own algorithm and framing; this is not their codec.
 
 pub(super) mod build;
-pub(super) mod decode;
 pub(super) mod encoding;
 pub(super) mod environment;
 pub(super) mod identity;
