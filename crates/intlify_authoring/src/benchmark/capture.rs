@@ -14,6 +14,7 @@
 
 use intlify_measurement::acquisition::{measure, Clock, MeasurementFailure};
 use intlify_shared_json::quantity::{Quantity, Repetitions};
+use serde::{Deserialize, Serialize};
 
 use super::cases::{PreparationFailure, Prepared};
 use super::observation::{Digest, Frame, Observation};
@@ -28,7 +29,8 @@ pub(super) struct Sampling {
 }
 
 /// The binding one case's samples are local to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Binding {
     pub(super) run: Digest,
     pub(super) case: Digest,
@@ -45,7 +47,8 @@ impl Binding {
 }
 
 /// One captured sample of one case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CapturedSample {
     pub(super) local_identity: Digest,
     pub(super) ordinal: Quantity,
@@ -56,7 +59,8 @@ pub(super) struct CapturedSample {
 }
 
 /// The complete capture of one case.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Capture {
     pub(super) warmup_completed: Quantity,
     pub(super) samples: Vec<CapturedSample>,
@@ -64,7 +68,13 @@ pub(super) struct Capture {
 }
 
 /// Why a case produced no complete capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "detail",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
 pub(super) enum CaptureFailure {
     /// The fixture could not be prepared.
     Preparation(PreparationFailure),

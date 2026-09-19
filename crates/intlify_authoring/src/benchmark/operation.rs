@@ -40,6 +40,7 @@ impl Operation {
     ///
     /// Source discovery and identity reconciliation are later phases. A case
     /// here never reports their work as zero; it states what it covers.
+    #[cfg(test)]
     pub(super) const ALL: [Self; 4] = [
         Self::LiteralEncode,
         Self::Mf2ParseAndSemanticFacts,
@@ -192,6 +193,13 @@ pub(super) fn invoke_mf2(input: Mf2Input<'_>) -> Option<MessageAnalysis> {
     .ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> Observed {
     let mut semantic = Frame::new("mf2-semantics");
     let mut positions = Frame::new("mf2-semantics-positions");
@@ -255,6 +263,13 @@ pub(super) fn invoke_context(input: ContextInput<'_>) -> Option<Result<ContextFa
     measured::context_facts(context, declaration, limits).ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_context(
     output: &Option<Result<ContextFacts, usize>>,
     _: ContextInput<'_>,
@@ -329,6 +344,13 @@ pub(super) fn invoke_facts(input: FactsInput<'_>) -> FactsOutput {
     measured::declaration_facts(declaration, analysis, context).ok()
 }
 
+// The capture measures an operation through `fn(I) -> O` and observes it
+// through `fn(&O, I)`, so the observer takes whatever the operation returned.
+// An `Option<&T>` here would not be that type.
+#[allow(
+    clippy::ref_option,
+    reason = "the capture contract fixes this signature"
+)]
 pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed {
     let mut semantic = Frame::new("declaration-facts");
     match output {

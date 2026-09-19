@@ -12,6 +12,9 @@
 //! any of them for measurement, and nothing it observes is derived from a
 //! duration.
 
+pub mod facade;
+
+mod adapter;
 mod capture;
 mod cases;
 mod context;
@@ -19,3 +22,4 @@ mod descriptor;
 mod observation;
 mod operation;
 mod projection;
+mod run;
