@@ -11,9 +11,9 @@
 
 use intlify_authoring::test_context::{LocaleRule, TestContext};
 use intlify_authoring::{
-    resolve_declarations, AnalysisWorkspace, AuthoringContext, AuthoringFailure, AuthoringLimits,
-    ByteRange, ContextKind, DeclarationInput, DeclarationMetadata, MessageInput, Occurrence,
-    OccurrenceRole, Outcome, OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily,
+    intent_revision, resolve_declarations, AnalysisWorkspace, AuthoringContext, AuthoringFailure,
+    AuthoringLimits, ByteRange, ContextKind, DeclarationInput, DeclarationMetadata, MessageInput,
+    Occurrence, OccurrenceRole, Outcome, OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily,
     SourceLocaleBasis, SourceSnapshot, SurfaceVocabulary, VersionedIdentity,
 };
 
@@ -534,4 +534,77 @@ fn the_diagnostics_budget_bounds_what_is_collected_not_only_what_is_returned() {
     let result = resolve_within(&context, &[input], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
     assert_eq!(result.diagnostics().len(), 2);
+}
+
+#[test]
+fn the_same_canonical_locale_reached_two_ways_has_one_revision() {
+    // 016 keeps which basis established the locale as evidence, not as
+    // meaning. A message whose source locale is the same either way must not
+    // get two revisions because of how the locale was reached, or every
+    // translation would be revisited when a default is introduced.
+    let context = TestContext::builder(owner(), SurfaceVocabulary::new(["checkout"]).unwrap())
+        .default_source_locale("en-US")
+        .default_surface_class("checkout")
+        .rule(LocaleRule::canonical("EN-us", "en-US"))
+        .build()
+        .expect("checked test context");
+
+    let inherited = declaration(MessageInput::Literal("Pay now"));
+    let explicit = DeclarationInput {
+        metadata: DeclarationMetadata {
+            source_locale: Some("EN-us"),
+            ..DeclarationMetadata::default()
+        },
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+
+    let first = resolve(&context, &[inherited]).unwrap();
+    let second = resolve(&context, &[explicit]).unwrap();
+    let inherited = &first.checked().unwrap()[0];
+    let explicit = &second.checked().unwrap()[0];
+
+    assert_eq!(
+        inherited.source_locale_basis(),
+        SourceLocaleBasis::ContextDefault
+    );
+    assert_eq!(explicit.source_locale_basis(), SourceLocaleBasis::Explicit);
+    assert_eq!(
+        intent_revision(inherited.projection()).unwrap(),
+        intent_revision(explicit.projection()).unwrap(),
+        "the basis is evidence, not meaning"
+    );
+}
+
+#[test]
+fn a_metadata_value_past_its_bound_blocks_rather_than_being_truncated() {
+    // A description that does not fit is not a shorter description. Silently
+    // trimming one would change what a translator is told about the message.
+    let context = context();
+    let mut limits = limits();
+    limits.metadata_value_bytes = 8;
+    let limits = limits.validate().expect("satisfiable bounds");
+
+    let within = DeclarationInput {
+        metadata: DeclarationMetadata {
+            description: Some("exact8b"),
+            surface_class: Some("checkout"),
+            ..DeclarationMetadata::default()
+        },
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+    let result = resolve_within(&context, &[within], &limits).unwrap();
+    assert_eq!(result.outcome(), Outcome::Checked);
+
+    let beyond = DeclarationInput {
+        metadata: DeclarationMetadata {
+            description: Some("this description does not fit"),
+            surface_class: Some("checkout"),
+            ..DeclarationMetadata::default()
+        },
+        ..declaration(MessageInput::Literal("Pay now"))
+    };
+    let result = resolve_within(&context, &[beyond], &limits).unwrap();
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    assert!(result.checked().is_none());
+    assert!(reasons(&result).contains(&ReasonFamily::AuthoringMetadataInvalid.as_str()));
 }

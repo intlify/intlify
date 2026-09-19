@@ -672,6 +672,44 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_text_runs_merge_and_empty_runs_are_omitted() {
+        // The parser reports an escape as its own node, so one authored run of
+        // text can arrive as several. A projection that kept them separate
+        // would give two revisions to one message depending on where an escape
+        // happened to fall.
+        let parsed = parse_message("{{a\\{b\\}c}}").unwrap();
+        let result = parsed.result();
+        assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+        let view = CstView::new(parsed.sources(), result.source, &result.cst);
+        let limits = crate::limits::tests::generous();
+        let message = Builder::new(view, &limits).message().unwrap();
+        let MessageBody::Pattern(body) = &message.body else {
+            panic!("expected a pattern body");
+        };
+        assert_eq!(body.parts.len(), 1, "{:?}", body.parts);
+        let PatternPart::Text(text) = &body.parts[0] else {
+            panic!("expected one merged text run");
+        };
+        assert_eq!(text.value, "a{b}c");
+
+        // Two adjacent placeholders have no text between them, and an empty
+        // run is omitted rather than recorded as empty text.
+        let parsed = parse_message("{{{$a}{$b}}}").unwrap();
+        let result = parsed.result();
+        assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+        let view = CstView::new(parsed.sources(), result.source, &result.cst);
+        let message = Builder::new(view, &limits).message().unwrap();
+        let MessageBody::Pattern(body) = &message.body else {
+            panic!("expected a pattern body");
+        };
+        assert_eq!(body.parts.len(), 2, "{:?}", body.parts);
+        assert!(body
+            .parts
+            .iter()
+            .all(|part| matches!(part, PatternPart::Expression(_))));
+    }
+
+    #[test]
     fn a_namespaced_identifier_keeps_its_separator() {
         let parsed = parse_message("{$a :ns:fn}").unwrap();
         let result = parsed.result();
