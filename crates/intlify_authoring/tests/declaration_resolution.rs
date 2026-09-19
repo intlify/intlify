@@ -678,6 +678,53 @@ fn a_host_map_that_does_not_describe_the_text_fails_the_invocation() {
 }
 
 #[test]
+fn a_bound_exhausted_while_composing_reports_as_the_bound_it_is() {
+    // Composing splits one emitted run at each host boundary, so this map needs
+    // five segments where the encoder alone needed three. The bound must arrive
+    // as that bound: a host matching on the failure to name which limit it hit
+    // would otherwise have to know whether it happened to supply a map.
+    let map = [
+        InputSegment::new(ByteRange::new(0, 1).unwrap(), ByteRange::new(1, 2).unwrap()),
+        InputSegment::new(ByteRange::new(1, 2).unwrap(), ByteRange::new(2, 3).unwrap()),
+        InputSegment::new(ByteRange::new(2, 3).unwrap(), ByteRange::new(3, 4).unwrap()),
+    ];
+    let mut input = declaration(MessageInput::Literal("abc"));
+    input.input_map = Some(&map);
+    let mut limits = limits();
+    limits.extraction_segments = 4;
+    let limits = limits.validate().expect("satisfiable bounds");
+    assert_eq!(
+        resolve_within(&context(), &[input], &limits).unwrap_err(),
+        AuthoringFailure::Limit(intlify_authoring::LimitKind::ExtractionSegments)
+    );
+}
+
+#[test]
+fn the_three_parameter_causes_report_in_one_fixed_order() {
+    // All three share a stage, a location and a reason family, so the cause is
+    // what orders them. Pinning it keeps a later rename from silently
+    // reshuffling a report.
+    let expression = occurrence_at(16, OccurrenceRole::ParameterExpression);
+    let supplied = [
+        ParameterBinding::new("other", expression.clone()),
+        ParameterBinding::new("other", expression),
+    ];
+    let mut input = declaration(MessageInput::Mf2("Hello {$name}!"));
+    input.parameters = Some(&supplied);
+
+    let result = resolve(&context(), &[input]).expect("a complete invocation");
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    assert_eq!(
+        details(&result),
+        [
+            "parameter-duplicate",
+            "parameter-extra",
+            "parameter-missing"
+        ]
+    );
+}
+
+#[test]
 fn a_declaration_without_a_use_site_does_not_owe_parameters() {
     // A reusable declaration is written before anything references it. Reading
     // that absence as an empty parameter object would block every message with
@@ -705,7 +752,14 @@ fn a_parameter_mismatch_names_which_of_the_three_it_is() {
         ParameterBinding::new("count", expression.clone()),
     ];
     let required = ["name".to_owned(), "total".to_owned()];
-    let reported = compare_parameters(&required, &supplied, &expression);
+    let mut reported = Vec::new();
+    let matched = compare_parameters(&required, &supplied, &expression, &mut |record| {
+        reported.push(record);
+    });
+    assert!(
+        !matched,
+        "the use site does not match what the message requires"
+    );
     let causes: Vec<&str> = reported
         .iter()
         .map(|record| record.detail().map_or("", Detail::as_str))

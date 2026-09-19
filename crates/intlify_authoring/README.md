@@ -76,7 +76,7 @@ A host Producer is the next phase's work. The entry points it will use already e
 
 - `resolve_declarations(context, inputs, limits, workspace)` for a batch, or `resolve_declarations_with_cancellation` when the caller owns a probe;
 - `AuthoringResult`'s accessors for facts and diagnostics;
-- `compare_parameters` for a reference, whose declaration was analysed separately;
+- `compare_parameters` for a reference, whose declaration was analysed separately, reporting into the caller's own bounded collector;
 - `compose_extraction_map` to carry the extraction map back through the host's own decoding;
 - `SourceSnapshot::verify` to turn supplied bytes into evidence before addressing ranges in them;
 - `AuthoringLimits` for the bounds, and `AnalysisWorkspace` for scratch reuse across declarations.

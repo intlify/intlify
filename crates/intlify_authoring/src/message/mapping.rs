@@ -89,8 +89,12 @@ impl InputSegment {
 
 /// Why an input map cannot be composed.
 ///
-/// These are host-integration failures rather than authoring mistakes: no edit
-/// to the analyzed source could fix a map that does not describe it.
+/// Every variant but [`MappingError::Limit`] is a host-integration failure
+/// rather than an authoring mistake: no edit to the analyzed source could fix
+/// a map that does not describe it. A limit is different in kind, because the
+/// map may describe the text exactly and still need more segments than the
+/// caller allowed. That is the caller's own policy answering back, so it
+/// leaves this crate as the named bound it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MappingError {
     /// The map has no segments.
@@ -103,6 +107,8 @@ pub enum MappingError {
     Discontinuous,
     /// The segments do not cover the supplied text exactly.
     Coverage,
+    /// A boundary falls inside a Unicode scalar of the supplied text.
+    ScalarBoundary,
     /// A source range falls outside the occurrence it claims to come from.
     SourceOutsideOccurrence,
     /// An extraction segment addresses text the input map does not describe.
@@ -125,17 +131,17 @@ pub enum MappingError {
 pub fn compose_extraction_map(
     extraction: &[ExtractionSegment],
     input_map: &[InputSegment],
-    text_len: u64,
+    text: &str,
     occurrence: &Occurrence,
     limits: &AuthoringLimits,
 ) -> Result<Vec<ExtractionSegment>, MappingError> {
-    validate(input_map, text_len, occurrence)?;
+    validate(input_map, text, occurrence)?;
 
     let mut composed: Vec<ExtractionSegment> = Vec::new();
     for segment in extraction {
         let decoded = segment.source();
         if decoded.is_empty() {
-            let position = zero_width(input_map, decoded.start(), text_len)?;
+            let position = zero_width(input_map, decoded.start(), text.len() as u64)?;
             push(
                 &mut composed,
                 limits,
@@ -145,8 +151,13 @@ pub fn compose_extraction_map(
             continue;
         }
 
-        let overlapped = overlapping(input_map, decoded);
-        if overlapped.is_empty() {
+        // A run that produced no decoded byte is not the origin of any byte in
+        // a nonempty range, so the empties are dropped here rather than at the
+        // edges of the window: one can also sit strictly inside the range,
+        // between two runs that did produce bytes.
+        let window = overlapping(input_map, decoded);
+        let contributing = || window.iter().filter(|run| !run.input.is_empty());
+        if contributing().next().is_none() {
             return Err(MappingError::Uncovered);
         }
 
@@ -154,7 +165,7 @@ pub fn compose_extraction_map(
         // same positional assertion as a host run, so it can be cut where the
         // host's own runs change. An escape cannot: its emitted bytes have no
         // individual sources, so it stays one segment over the whole span.
-        let spans = overlapped.iter().map(|run| {
+        let spans = contributing().map(|run| {
             let low = run.input.start().max(decoded.start());
             let high = run.input.end().min(decoded.end());
             (low, high, run.span(low, high))
@@ -192,9 +203,18 @@ pub fn compose_extraction_map(
 }
 
 /// Check that an input map describes exactly the supplied text.
+///
+/// The decoded side is checked against the text itself, not only against its
+/// length. A boundary inside a Unicode scalar would be sliced by the composer
+/// and would put mid-scalar offsets into the emitted map, and a consumer
+/// slicing the analyzed MF2 at one of those offsets panics.
+///
+/// The source side cannot be checked here and is not meant to be: this crate
+/// never holds the host's bytes. [`crate::SourceSnapshot::verify`] is the seam
+/// where a caller that does hold them establishes that much.
 fn validate(
     input_map: &[InputSegment],
-    text_len: u64,
+    text: &str,
     occurrence: &Occurrence,
 ) -> Result<(), MappingError> {
     let Some(first) = input_map.first() else {
@@ -208,6 +228,14 @@ fn validate(
         if segment.input.start() != covered {
             return Err(MappingError::Discontinuous);
         }
+        if segment.input.end() > text.len() as u64 {
+            return Err(MappingError::Coverage);
+        }
+        if !text.is_char_boundary(segment.input.start() as usize)
+            || !text.is_char_boundary(segment.input.end() as usize)
+        {
+            return Err(MappingError::ScalarBoundary);
+        }
         covered = segment.input.end();
         // The decoded text comes from inside the declaration's own syntax, so
         // a source range outside it is describing something else.
@@ -217,7 +245,7 @@ fn validate(
             return Err(MappingError::SourceOutsideOccurrence);
         }
     }
-    if covered != text_len {
+    if covered != text.len() as u64 {
         return Err(MappingError::Coverage);
     }
     Ok(())
@@ -240,7 +268,16 @@ fn zero_width(
     }
     // A run that begins here is the more precise answer than one that merely
     // ends here: text the host dropped, such as a line continuation, sits
-    // between them and is not part of the decoded content.
+    // between them and is not part of the decoded content. Where a dropped run
+    // and a content run both begin here, the same reasoning picks the content
+    // run; otherwise an insertion point at the start of a message would
+    // resolve to syntax the host had already discarded.
+    if let Some(run) = input_map
+        .iter()
+        .find(|run| run.input.start() == position && !run.input.is_empty())
+    {
+        return Ok(run.source.start());
+    }
     if let Some(run) = input_map.iter().find(|run| run.input.start() == position) {
         return Ok(run.source.start());
     }
@@ -253,27 +290,18 @@ fn zero_width(
     Err(MappingError::Uncovered)
 }
 
-/// Return the runs that actually produced the bytes of `decoded`.
+/// Return the contiguous window of runs that overlaps `decoded`.
 ///
-/// Zero-width runs are excluded: they produced no decoded byte, so they are
-/// not the origin of any byte in a nonempty range.
+/// The window may contain runs that produced no decoded byte, including ones
+/// strictly inside the range. Dropping those is the caller's job, because the
+/// window has to stay a slice to be returned by reference.
 fn overlapping(input_map: &[InputSegment], decoded: ByteRange) -> &[InputSegment] {
-    // Ends are non-decreasing across a contiguous map, so the first run that
-    // can contribute is the first whose end passes the start of the range.
+    // Both predicates are monotone across a contiguous map, because starts and
+    // ends are each non-decreasing; that is what makes a binary search valid.
     let first = input_map.partition_point(|run| run.input.end() <= decoded.start());
     let rest = &input_map[first..];
     let count = rest.partition_point(|run| run.input.start() < decoded.end());
-    let window = &rest[..count];
-    // Zero-width runs can sit at either end of the window, so the empties are
-    // trimmed from both sides rather than searched for a single boundary.
-    let Some(lead) = window.iter().position(|run| !run.input.is_empty()) else {
-        return &[];
-    };
-    let trail = window
-        .iter()
-        .rposition(|run| !run.input.is_empty())
-        .unwrap_or(lead);
-    &window[lead..=trail]
+    &rest[..count]
 }
 
 fn push(
@@ -338,7 +366,7 @@ mod tests {
         let composed = compose_extraction_map(
             &extraction,
             input_map,
-            text.len() as u64,
+            text,
             &occurrence(at.0, at.1),
             &generous(),
         )
@@ -493,14 +521,9 @@ mod tests {
             segment((6, 7), (17, 19)),
             segment((7, 14), (19, 26)),
         ];
-        let composed = compose_extraction_map(
-            &extraction,
-            &map,
-            source.len() as u64,
-            &occurrence(10, 27),
-            &generous(),
-        )
-        .unwrap();
+        let composed =
+            compose_extraction_map(&extraction, &map, source, &occurrence(10, 27), &generous())
+                .unwrap();
         extraction.clear();
         assert_eq!(
             composed.len(),
@@ -513,11 +536,79 @@ mod tests {
     }
 
     #[test]
+    fn dropped_text_in_the_middle_of_a_run_contributes_no_segment_of_its_own() {
+        // A line continuation between two content runs produces no decoded
+        // byte. Keeping it would spend a segment on a range that addresses no
+        // emitted byte, and would put two segments at one extracted offset —
+        // a shape nothing else in this crate produces.
+        let map = [
+            segment((0, 2), (11, 13)),
+            segment((2, 2), (13, 15)),
+            segment((2, 4), (15, 17)),
+        ];
+        let composed = compose("abcd", &map, (10, 18));
+        assert_eq!(
+            composed,
+            [
+                (0, 2, 11, 11),
+                (2, 4, 11, 13),
+                (4, 6, 15, 17),
+                (6, 8, 17, 17)
+            ]
+        );
+        assert!(
+            composed.iter().all(|piece| piece.0 < piece.1),
+            "no segment addresses an empty run of emitted bytes"
+        );
+    }
+
+    #[test]
+    fn dropped_text_before_the_content_is_not_where_the_content_begins() {
+        // A line continuation immediately after the opening quote drops source
+        // bytes that precede every decoded byte. The opening delimiter marks
+        // where content begins, so it must skip them, exactly as the closing
+        // delimiter skips a trailing continuation.
+        let map = [segment((0, 0), (11, 13)), segment((0, 3), (13, 16))];
+        let composed = compose("abc", &map, (10, 17));
+        assert_eq!(composed, [(0, 2, 13, 13), (2, 5, 13, 16), (5, 7, 16, 16)]);
+    }
+
+    #[test]
+    fn a_boundary_inside_a_scalar_is_refused_rather_than_sliced() {
+        // A host escape scanner that mistracks a boundary would otherwise have
+        // its error carried into the emitted map, where a consumer slicing the
+        // analyzed MF2 at that offset panics.
+        let text = "日";
+        assert_eq!(text.len(), 3);
+        let mut extraction = Vec::new();
+        literal::encode(text, &generous(), &mut extraction).unwrap();
+        assert_eq!(
+            compose_extraction_map(
+                &extraction,
+                &[segment((0, 1), (11, 12)), segment((1, 3), (12, 14))],
+                text,
+                &occurrence(10, 15),
+                &generous(),
+            ),
+            Err(MappingError::ScalarBoundary)
+        );
+        // The same text split only on its real boundary composes.
+        assert!(compose_extraction_map(
+            &extraction,
+            &[segment((0, 3), (11, 14))],
+            text,
+            &occurrence(10, 15),
+            &generous(),
+        )
+        .is_ok());
+    }
+
+    #[test]
     fn a_map_that_does_not_describe_the_text_is_refused_for_the_reason_it_fails() {
         let mut extraction = Vec::new();
         literal::encode("abc", &generous(), &mut extraction).unwrap();
         let check = |map: &[InputSegment]| {
-            compose_extraction_map(&extraction, map, 3, &occurrence(10, 16), &generous())
+            compose_extraction_map(&extraction, map, "abc", &occurrence(10, 16), &generous())
                 .unwrap_err()
         };
 
@@ -561,7 +652,7 @@ mod tests {
 
         let mut limits = generous();
         limits.extraction_segments = 5;
-        let exact = compose_extraction_map(&extraction, &map, 3, &occurrence(10, 15), &limits);
+        let exact = compose_extraction_map(&extraction, &map, "abc", &occurrence(10, 15), &limits);
         assert_eq!(
             exact.map(|composed| composed.len()),
             Ok(5),
@@ -570,7 +661,7 @@ mod tests {
 
         limits.extraction_segments = 4;
         assert_eq!(
-            compose_extraction_map(&extraction, &map, 3, &occurrence(10, 15), &limits),
+            compose_extraction_map(&extraction, &map, "abc", &occurrence(10, 15), &limits),
             Err(MappingError::Limit(LimitKind::ExtractionSegments)),
             "one segment short of what this map needs is a refusal, not a shorter map"
         );

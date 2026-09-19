@@ -244,6 +244,9 @@ pub enum AuthoringFailure {
     /// Two declarations claim the same occurrence.
     DuplicateOccurrence,
     /// A supplied input map does not describe the supplied text.
+    ///
+    /// Exhausting a bound while composing is reported as [`Self::Limit`]
+    /// instead, because that map does describe the text.
     InputMap(MappingError),
     /// The caller's probe asked this invocation to stop.
     ///
@@ -467,10 +470,16 @@ fn resolve_one(
         return Ok(None);
     };
     if let Some(supplied) = input.parameters {
-        let mismatches = compare_parameters(facts.parameters(), supplied, &input.occurrence);
-        if !mismatches.is_empty() {
+        let matched = compare_parameters(
+            facts.parameters(),
+            supplied,
+            &input.occurrence,
+            &mut |record| {
+                diagnostics.push(record);
+            },
+        );
+        if !matched {
             blocked = true;
-            diagnostics.extend(mismatches);
         }
     }
 
@@ -517,12 +526,18 @@ fn extraction_map(
     compose_extraction_map(
         analysis.extraction_map(),
         map,
-        input.message.text().len() as u64,
+        input.message.text(),
         &input.occurrence,
         limits,
     )
     .map(Vec::into_boxed_slice)
-    .map_err(AuthoringFailure::InputMap)
+    // A named bound reports as that bound whichever path exhausted it. A host
+    // matching on the failure to name which limit it hit would otherwise have
+    // to know whether it happened to supply a map.
+    .map_err(|failure| match failure {
+        MappingError::Limit(kind) => AuthoringFailure::Limit(kind),
+        other => AuthoringFailure::InputMap(other),
+    })
 }
 
 /// Report displayed text that MF2 pattern text cannot carry.
@@ -700,14 +715,19 @@ fn admitted_text(value: &str, limits: &AuthoringLimits) -> Result<NonemptyText, 
 /// a reference reports at the reference rather than at the declaration it
 /// shares with every other use.
 ///
-/// The returned records are unordered; a caller merges them into its own
-/// report and sorts once.
-#[must_use]
+/// Records go to `report` one at a time rather than into a returned list, so a
+/// caller's own bound decides how many are retained. One use site can supply
+/// any number of parameters, and materialising a record for each one before
+/// any budget is consulted is the allocation a bounded collector exists to
+/// prevent. For the same reason the return value says whether the use site
+/// matched: a caller whose sink stopped accepting records cannot learn that by
+/// counting what it received.
 pub fn compare_parameters(
     required: &[String],
     supplied: &[ParameterBinding],
     occurrence: &Occurrence,
-) -> Vec<Diagnostic> {
+    report: &mut impl FnMut(Diagnostic),
+) -> bool {
     let mismatch = |detail: Detail| {
         Diagnostic::new(
             Stage::ContextResolution,
@@ -718,11 +738,12 @@ pub fn compare_parameters(
         .with_detail(detail)
     };
 
-    let mut reported = Vec::new();
+    let mut matched = true;
     let mut seen: Vec<&str> = Vec::new();
     for binding in supplied {
         if seen.contains(&binding.name()) {
-            reported.push(
+            matched = false;
+            report(
                 mismatch(detail::parameter_duplicate())
                     .with_related(vec![binding.expression().clone()]),
             );
@@ -730,7 +751,8 @@ pub fn compare_parameters(
         }
         seen.push(binding.name());
         if !required.iter().any(|name| name == binding.name()) {
-            reported.push(
+            matched = false;
+            report(
                 mismatch(detail::parameter_extra())
                     .with_related(vec![binding.expression().clone()]),
             );
@@ -738,10 +760,11 @@ pub fn compare_parameters(
     }
     for name in required {
         if !seen.contains(&name.as_str()) {
-            reported.push(mismatch(detail::parameter_missing()));
+            matched = false;
+            report(mismatch(detail::parameter_missing()));
         }
     }
-    reported
+    matched
 }
 
 fn authoring(stage: Stage, family: ReasonFamily, input: &DeclarationInput<'_>) -> Diagnostic {
@@ -790,6 +813,35 @@ mod tests {
         }
         // The point of the budget is the memory, not only the failure: a
         // thousand arrivals leave three retained diagnostics behind.
+        assert!(sink.exhausted());
+        assert_eq!(sink.into_reported().len(), 3);
+    }
+
+    #[test]
+    fn a_mismatch_is_answered_by_the_return_value_not_by_what_survived_the_bound() {
+        // Records arrive at the caller's sink one at a time, so a bound can
+        // drop most of them. Whether the use site matched therefore cannot be
+        // read from how many records the caller kept, which is why it is the
+        // return value. That the sink is also what limits peak allocation is
+        // structural and not observable from here; the assertion below pins
+        // the part that is.
+        let occurrence = diagnostic()
+            .occurrence()
+            .expect("a classified site")
+            .clone();
+        let supplied: Vec<ParameterBinding> = (0..1_000)
+            .map(|index| ParameterBinding::new(&format!("extra{index}"), occurrence.clone()))
+            .collect();
+
+        let mut sink = DiagnosticSink::new(3);
+        let matched = compare_parameters(&[], &supplied, &occurrence, &mut |record| {
+            sink.push(record);
+        });
+
+        assert!(
+            !matched,
+            "a thousand unusable names is a mismatch even when three were kept"
+        );
         assert!(sink.exhausted());
         assert_eq!(sink.into_reported().len(), 3);
     }
@@ -882,9 +934,17 @@ pub(crate) mod measured {
             return Ok(Err(0));
         };
         if let Some(supplied) = input.parameters {
-            let mismatches = compare_parameters(message.parameters(), supplied, &input.occurrence);
-            if !mismatches.is_empty() {
-                return Ok(Err(mismatches.len()));
+            let mut reported = 0_usize;
+            let matched = compare_parameters(
+                message.parameters(),
+                supplied,
+                &input.occurrence,
+                &mut |_| {
+                    reported += 1;
+                },
+            );
+            if !matched {
+                return Ok(Err(reported));
             }
         }
         let projection = intent_projection(
