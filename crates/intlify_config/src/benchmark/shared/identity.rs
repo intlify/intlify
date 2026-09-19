@@ -9,9 +9,8 @@
 //! visibility used inside the measurement implementation.
 
 pub(in crate::benchmark) use intlify_measurement::identity::{
-    specification, AnyIdentity, CaseIdentity, CommonDomain as InstanceDomain, IdentityFailure,
-    IntegrityDigest, NativeChecksum, OwnerLabel, OwnerRecordIdentity, RecordIdentity, Token,
-    VersionedIdentity,
+    CaseIdentity, IdentityFailure, NativeChecksum, OwnerLabel, OwnerRecordIdentity, RecordIdentity,
+    Token, VersionedIdentity,
 };
 
 /// Native schema v1 explicitly gives one fresh immutable ID to the one-shot

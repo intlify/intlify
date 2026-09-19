@@ -648,6 +648,7 @@ dependencies = [
  "getrandom 0.4.3",
  "intlify_shared_json",
  "jsonschema",
+ "rustix",
  "schemars",
  "serde",
  "serde_json",

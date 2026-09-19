@@ -248,7 +248,7 @@ impl ObservedEnvironment {
             kernel_view: acquire_kernel(),
             available_parallelism_hint: parallelism_hint(parallelism),
             runner: RunnerContext::LocalUncontrolled,
-            clock: crate::benchmark::descriptor::clock_observation(clock.description()),
+            clock: clock.description().observation(),
         };
         let checksum = checksum(&document)?;
         Ok(Self { document, checksum })

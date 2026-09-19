@@ -1,88 +1,177 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! One observational projection from an already executed owner run. It never
-//! recaptures a duration or makes its submitted records the input authority.
+//! This owner's adapter onto the common observational pipeline.
+//!
+//! The pipeline itself belongs to `intlify_measurement`. What this module
+//! answers is what only this owner can: whether a submitted document is the
+//! one this run issued, how each planned case turned out, and what the
+//! measured cases project to.
 
-use serde::Serialize;
+use intlify_measurement::owner::{
+    CaseOutcome, ObservedDescriptors, OwnerFailure, OwnerRun, Rejection,
+};
 
-use super::encoding::EncodingFailure;
-use super::identity::{IdentityFailure, InstanceDomain, RecordIdentity};
-use super::measurement::{self, Evaluation, Evidence, Report};
-use super::record::{producing_tool, EvaluationKind, EvidenceKind, ReportKind};
-use crate::benchmark::run::{RecordedRun, RunFailure};
+pub(in crate::benchmark) use intlify_measurement::pipeline::{
+    produce, validate_records, Artifacts,
+};
 
-mod catalog;
-mod evaluate;
-mod owner;
+// Submitting owner documents other than this run's own, and admitting produced
+// artifacts directly, are how the negative fixtures below reach the pipeline.
+#[cfg(test)]
+pub(in crate::benchmark) use intlify_measurement::pipeline::{produce_with_owner, validate};
 
-pub(in crate::benchmark) use catalog::{validate, validate_records, ValidationFailure};
+use super::identity::{OwnerRecordIdentity, RecordIdentity, VersionedIdentity};
+use super::measurement::{self, EvidenceBody, ExpectedOwner};
+use super::plan::{CaseProjection, RunPlanRecord};
+use super::record::producing_tool;
+use crate::benchmark::clock::ClockFailure;
+use crate::benchmark::collect::CollectionFailure;
+use crate::benchmark::descriptor::Descriptors;
+use crate::benchmark::measure::MeasurementFailure;
+use crate::benchmark::observation::Observation;
+use crate::benchmark::profile::ProfileCollectionFailure;
+use crate::benchmark::quantity::Quantity;
+use crate::benchmark::run::{
+    attempt_outcome, AttemptResult, CheckedOwnerRecord, OwnerOutcome, OwnerRecord, RecordedRun,
+    RunIssue,
+};
+use crate::benchmark::sample::CaptureFailureCause;
+use crate::benchmark::work::WorkFailure;
+use intlify_measurement::reason::InvocationFailure as Invocation;
+use intlify_measurement::record::Reference;
 
-#[derive(Debug)]
-pub(in crate::benchmark) enum Failure {
-    OwnerEncoding(RunFailure),
-    Identity(IdentityFailure),
-    Encoding(EncodingFailure),
-    Json,
-    Plan,
-    Capacity,
-    Admission(ValidationFailure),
-}
-impl From<IdentityFailure> for Failure {
-    fn from(value: IdentityFailure) -> Self {
-        Self::Identity(value)
+const RESULT_CODEC: &str = "intlify-config-owner-run-result/1";
+
+impl ObservedDescriptors for Descriptors {
+    fn execution(&self) -> &intlify_measurement::execution::Execution {
+        &self.execution
     }
 }
-impl From<EncodingFailure> for Failure {
-    fn from(value: EncodingFailure) -> Self {
-        Self::Encoding(value)
+
+fn failed_invocation(cause: &CaptureFailureCause) -> Invocation {
+    match cause {
+        CaptureFailureCause::Measurement(MeasurementFailure::Clock(
+            ClockFailure::DurationConversionOverflow,
+        )) => Invocation::DurationConversionOverflow,
+        CaptureFailureCause::Measurement(MeasurementFailure::Clock(_)) => Invocation::ClockFailure,
+        CaptureFailureCause::Measurement(MeasurementFailure::InvocationPanicked) => {
+            Invocation::InvocationPanicked
+        }
+        CaptureFailureCause::MeasurementOverflow => Invocation::MeasurementOverflow,
+        CaptureFailureCause::LogicalWorkObservation(WorkFailure::UnrepresentableCounter) => {
+            Invocation::CounterOverflow
+        }
+        CaptureFailureCause::CollectorAllocation => Invocation::CollectorAllocation,
+        CaptureFailureCause::ObservationPanicked => Invocation::ObservationPanicked,
+        CaptureFailureCause::PrerequisiteUnavailable
+        | CaptureFailureCause::Measurement(MeasurementFailure::PrerequisiteUnavailable) => {
+            Invocation::PrerequisiteUnavailable
+        }
+        CaptureFailureCause::Output(_) => Invocation::OutputFailure,
+        CaptureFailureCause::LogicalWorkObservation(_)
+        | CaptureFailureCause::LogicalWorkMismatch(_)
+        | CaptureFailureCause::SemanticObservationMismatch(_) => Invocation::WorkObservationFailure,
     }
 }
 
-/// Completed record bytes only. No Profile, locale core, partially filled
-/// record, or caller-controlled measured callback crosses this boundary.
-#[derive(Clone)]
-pub(in crate::benchmark) struct Artifacts {
-    pub(in crate::benchmark) report_identity: RecordIdentity,
-    pub(in crate::benchmark) run_plan: Vec<u8>,
-    pub(in crate::benchmark) owner_result: Vec<Vec<u8>>,
-    pub(in crate::benchmark) evidence: Option<Vec<u8>>,
-    pub(in crate::benchmark) evaluation: Vec<u8>,
-    pub(in crate::benchmark) report: Vec<u8>,
-}
+impl OwnerRun for RecordedRun {
+    type Projection = CaseProjection;
+    type Descriptors = Descriptors;
+    type Observation = Observation;
+    type Admitted = CheckedOwnerRecord;
 
-fn encode(record: &impl Serialize) -> Result<Vec<u8>, Failure> {
-    let bytes = serde_json::to_vec(record).map_err(|_| Failure::Json)?;
-    if bytes.len() > 16 * 1024 * 1024 {
-        return Err(Failure::Capacity);
+    fn plan(&self) -> &RunPlanRecord {
+        self.plan_record()
     }
-    Ok(bytes)
-}
 
-pub(in crate::benchmark) fn produce(run: &RecordedRun) -> Result<Artifacts, Failure> {
-    let native = run.encode().map_err(Failure::OwnerEncoding)?;
-    produce_with_owner(run, &[&native])
-}
+    fn projections(&self) -> &[CaseProjection] {
+        self.common_plan().projections()
+    }
 
-pub(in crate::benchmark) fn produce_with_owner(
-    run: &RecordedRun,
-    native_inputs: &[&[u8]],
-) -> Result<Artifacts, Failure> {
-    if native_inputs.len() > 8
-        || native_inputs
+    fn expected(&self) -> ExpectedOwner {
+        measurement::expected_from_plan(self.plan_record(), self.expected_owner_identity())
+    }
+
+    fn producing_tool(&self) -> VersionedIdentity {
+        producing_tool()
+    }
+
+    fn encode(&self) -> Result<Vec<u8>, OwnerFailure> {
+        Self::encode(self).map_err(|_| OwnerFailure)
+    }
+
+    fn admit(&self, bytes: &[u8]) -> Result<CheckedOwnerRecord, Rejection> {
+        let Ok(value) = intlify_measurement::decode::value(bytes, false) else {
+            return Err(Rejection::Unreadable);
+        };
+        // The exact tuple is selected before the body is strictly typed, so a
+        // future owner schema is unsupported rather than declared corrupt.
+        match value
+            .pointer("/result/codec")
+            .and_then(serde_json::Value::as_str)
+        {
+            Some(RESULT_CODEC) => {}
+            Some(_) => return Err(Rejection::UnsupportedCodec),
+            None => return Err(Rejection::Unreadable),
+        }
+        let Ok(document) = intlify_measurement::decode::typed::<OwnerRecord>(value) else {
+            return Err(Rejection::Unreadable);
+        };
+        let submitted = document.result().record_identity.clone();
+        if document.result().record_identity != *self.expected_owner_identity()
+            || document.plan_reference() != self.plan_record().identity()
+        {
+            return Err(Rejection::Binding(Some(submitted)));
+        }
+        match self.admit_owned(document) {
+            Ok(checked) => Ok(checked),
+            Err(issues) if issues.contains(&RunIssue::Integrity) => {
+                Err(Rejection::Integrity(submitted))
+            }
+            Err(_) => Err(Rejection::Binding(Some(submitted))),
+        }
+    }
+
+    fn result_identity<'a>(&self, admitted: &'a CheckedOwnerRecord) -> &'a OwnerRecordIdentity {
+        &admitted.document().result().record_identity
+    }
+
+    fn outcomes(&self, admitted: &CheckedOwnerRecord) -> Vec<CaseOutcome> {
+        admitted
+            .document()
+            .result()
+            .attempts
             .iter()
-            .any(|input| input.len() > 16 * 1024 * 1024)
-    {
-        return Err(Failure::Capacity);
+            .map(|attempt| match &attempt.result {
+                AttemptResult::Measured(_) => CaseOutcome::Measured,
+                AttemptResult::CollectionFailed(ProfileCollectionFailure::Collection(
+                    CollectionFailure::Capture(failure),
+                )) if attempt_outcome(attempt) == OwnerOutcome::Incomplete => {
+                    CaseOutcome::Failed(failed_invocation(&failure.cause))
+                }
+                AttemptResult::CollectionFailed(ProfileCollectionFailure::Collection(
+                    CollectionFailure::Capture(failure),
+                )) if matches!(
+                    failure.cause,
+                    CaptureFailureCause::SemanticObservationMismatch(_)
+                        | CaptureFailureCause::LogicalWorkMismatch(_)
+                ) =>
+                {
+                    CaseOutcome::SemanticMismatch
+                }
+                _ => CaseOutcome::Invalid,
+            })
+            .collect()
     }
-    let plan = run.plan_record();
-    let projections = run.common_plan().projections();
-    if projections.len() != plan.body.case_inventory.len() {
-        return Err(Failure::Plan);
-    }
-    let owner = owner::OwnerInput::resolve(run, native_inputs);
-    let evidence: Option<Evidence> = if let Some(checked) = &owner.checked {
-        let source = checked.projection_source();
+
+    fn evidence(
+        &self,
+        admitted: &CheckedOwnerRecord,
+        parent: &RecordIdentity,
+    ) -> Result<Option<EvidenceBody>, OwnerFailure> {
+        let source = admitted.projection_source();
+        let plan = self.plan_record();
         let mut cases = Vec::new();
         for ((attempt, planned), projection) in source
             .document()
@@ -90,59 +179,34 @@ pub(in crate::benchmark) fn produce_with_owner(
             .attempts
             .iter()
             .zip(&plan.body.case_inventory)
-            .zip(projections)
+            .zip(self.common_plan().projections())
         {
-            if projection.identity().map_err(|_| Failure::Plan)? != planned.case_identity {
-                return Err(Failure::Plan);
-            }
             if let Some(case) =
-                measurement::project_case(&source, attempt, &planned.case_identity, projection)?
+                measurement::project_case(&source, attempt, &planned.case_identity, projection)
+                    .map_err(|_| OwnerFailure)?
             {
                 cases.push(case);
             }
         }
         if cases.is_empty() {
-            None
-        } else {
-            let identity = RecordIdentity::fresh(InstanceDomain::Record)?;
-            match measurement::evidence_body(&source, plan, &identity, cases) {
-                Ok(body) => Some(Evidence::seal(
-                    EvidenceKind::Value,
-                    identity,
-                    &producing_tool(),
-                    body,
-                )?),
-                // A valid native observation whose identifiers cannot be mapped
-                // losslessly is projection-ineligible, not a fabricated value.
-                Err(IdentityFailure::InvalidToken) => None,
-                Err(error) => return Err(error.into()),
-            }
+            return Ok(None);
         }
-    } else {
-        None
-    };
-    let evaluation = Evaluation::seal(
-        EvaluationKind::Value,
-        RecordIdentity::fresh(InstanceDomain::Record)?,
-        &producing_tool(),
-        evaluate::evaluate(run, &owner, evidence.as_ref())?,
-    )?;
-    let report = Report::seal(
-        ReportKind::Value,
-        RecordIdentity::fresh(InstanceDomain::Record)?,
-        &producing_tool(),
-        evaluate::report(&evaluation, evidence.as_ref())?,
-    )?;
-    let artifacts = Artifacts {
-        report_identity: report.identity().clone(),
-        run_plan: run.common_plan().encode().map_err(|_| Failure::Plan)?,
-        owner_result: native_inputs.iter().map(|input| input.to_vec()).collect(),
-        evidence: evidence.as_ref().map(encode).transpose()?,
-        evaluation: encode(&evaluation)?,
-        report: encode(&report)?,
-    };
-    validate(run, &artifacts).map_err(Failure::Admission)?;
-    Ok(artifacts)
+        match measurement::evidence_body(&source, plan, parent, cases) {
+            Ok(body) => Ok(Some(body)),
+            // A valid observation whose identifiers cannot be mapped losslessly
+            // is projection-ineligible, not a fabricated value.
+            Err(intlify_measurement::identity::IdentityFailure::InvalidToken) => Ok(None),
+            Err(_) => Err(OwnerFailure),
+        }
+    }
+
+    fn attempt_reference(
+        &self,
+        admitted: &CheckedOwnerRecord,
+        ordinal: Quantity,
+    ) -> Result<Reference, OwnerFailure> {
+        measurement::attempt_reference(admitted.document(), ordinal).map_err(|_| OwnerFailure)
+    }
 }
 
 #[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
