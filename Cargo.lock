@@ -534,6 +534,9 @@ dependencies = [
 name = "intlify_authoring"
 version = "0.14.0-alpha.12"
 dependencies = [
+ "blake3",
+ "getrandom 0.4.3",
+ "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
  "ox_mf2_parser",
