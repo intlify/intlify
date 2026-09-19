@@ -113,6 +113,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run bench:config:smoke
 
+      - name: Validate authoring semantics observation records
+        if: runner.os == 'Linux'
+        run: vp run bench:authoring:smoke
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

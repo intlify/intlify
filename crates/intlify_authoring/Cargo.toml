@@ -45,6 +45,7 @@ getrandom = { version = "=0.4.3", optional = true }
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
 jsonschema = { version = "=0.56.0", default-features = false }
+tempfile = "3"
 
 # The resolution fixtures need an authoring context, and the only context this
 # phase admits is the non-default test one. Declaring the requirement keeps the
@@ -52,3 +53,9 @@ jsonschema = { version = "=0.56.0", default-features = false }
 [[test]]
 name = "declaration_resolution"
 required-features = ["test-context"]
+
+[[bench]]
+name = "authoring_semantics"
+harness = false
+test = false
+required-features = ["benchmark"]
