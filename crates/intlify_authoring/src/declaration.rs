@@ -13,11 +13,18 @@
 //! locale, `und`, or a language inferred from the text, because a wrong source
 //! locale silently mistranslates rather than failing.
 
+use std::collections::BTreeSet;
+
 use crate::context::{AuthoringContext, ContextKind, LocaleFailure};
-use crate::diagnostic::{Diagnostic, DiagnosticOrigin, ReasonFamily, Severity, Stage};
+use crate::diagnostic::{
+    detail, Detail, Diagnostic, DiagnosticOrigin, MessageRange, ReasonFamily, Severity, Stage,
+};
 use crate::limits::{AuthoringLimits, LimitKind};
-use crate::message::{analyze_message, ExtractionSegment, MessageFailure, MessageInput};
-use crate::primitives::{NonemptyText, Occurrence, PrimitiveError};
+use crate::message::{
+    analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
+    MappingError, MessageFailure, MessageInput,
+};
+use crate::primitives::{ByteRange, NonemptyText, Occurrence, PrimitiveError};
 use crate::projection::{intent_projection, IntentProjection, Usage};
 use crate::workspace::AnalysisWorkspace;
 
@@ -96,12 +103,25 @@ pub struct DeclarationInput<'a> {
     pub occurrence: Occurrence,
     /// The already host-decoded message.
     pub message: MessageInput<'a>,
+    /// Where the decoded message text came from in host source.
+    ///
+    /// Supplying it moves the returned extraction map into host coordinates.
+    /// Omitting it leaves that map in the coordinates of the supplied text,
+    /// which is a different fact rather than a missing one: a caller that
+    /// decoded nothing has nothing to compose.
+    pub input_map: Option<&'a [InputSegment]>,
     /// The metadata values the host recognized.
     pub metadata: DeclarationMetadata<'a>,
     /// A proven semantic usage, admitted only under the context's profile.
     pub usage: Option<&'a str>,
     /// The parameters supplied at the use site, in host evaluation order.
-    pub parameters: &'a [ParameterBinding],
+    ///
+    /// `None` says this declaration has no use site in this invocation, which
+    /// is what a reusable declaration looks like before anything references
+    /// it. An empty slice says a use site supplied nothing, so a message that
+    /// requires a name reports it missing. Collapsing the two would make every
+    /// standalone declaration of a message with parameters fail.
+    pub parameters: Option<&'a [ParameterBinding]>,
 }
 
 /// The checked facts for one declaration.
@@ -146,7 +166,10 @@ impl DeclarationFacts {
         &self.surface_class
     }
 
-    /// Return the mapping from emitted MF2 bytes back to the supplied text.
+    /// Return the mapping from emitted MF2 bytes back to their origin.
+    ///
+    /// The source side is in host coordinates when the caller supplied an
+    /// input map, and in the coordinates of the supplied text otherwise.
     #[must_use]
     pub fn extraction_map(&self) -> &[ExtractionSegment] {
         &self.extraction_map
@@ -222,6 +245,16 @@ pub enum AuthoringFailure {
     ProductionContextUnsupported(ContextKind),
     /// Two declarations claim the same occurrence.
     DuplicateOccurrence,
+    /// A supplied input map does not describe the supplied text.
+    ///
+    /// Exhausting a bound while composing is reported as [`Self::Limit`]
+    /// instead, because that map does describe the text.
+    InputMap(MappingError),
+    /// The caller's probe asked this invocation to stop.
+    ///
+    /// Cancellation is a control-flow result, never evidence. A cancelled
+    /// invocation establishes nothing about the declarations it did reach.
+    Cancelled,
 }
 
 impl From<MessageFailure> for AuthoringFailure {
@@ -293,6 +326,26 @@ pub fn resolve_declarations(
     limits: &AuthoringLimits,
     workspace: &mut AnalysisWorkspace,
 ) -> Result<AuthoringResult, AuthoringFailure> {
+    resolve_declarations_with_cancellation(context, inputs, limits, workspace, &|| false)
+}
+
+/// Resolve declarations under a caller-owned cancellation probe.
+///
+/// The probe is consulted at declaration boundaries, so it must be cheap,
+/// usable under the caller's own execution model, and free of assumptions
+/// about how many times it is called. Cancelling yields no partial result: a
+/// caller that stops the work learns nothing about the source, which is what
+/// keeps a cancelled run from being read as an absence of declarations.
+pub fn resolve_declarations_with_cancellation<C>(
+    context: &dyn AuthoringContext,
+    inputs: &[DeclarationInput<'_>],
+    limits: &AuthoringLimits,
+    workspace: &mut AnalysisWorkspace,
+    cancelled: &C,
+) -> Result<AuthoringResult, AuthoringFailure>
+where
+    C: Fn() -> bool + ?Sized,
+{
     // Production admission needs the checked 015 inputs and the 017/018
     // representation and authority work that later phases own. Accepting the
     // label here would let a fixture be read later as production evidence.
@@ -313,6 +366,9 @@ pub fn resolve_declarations(
     let mut blocked = false;
 
     for input in inputs {
+        if cancelled() {
+            return Err(AuthoringFailure::Cancelled);
+        }
         match resolve_one(context, input, limits, workspace, &mut diagnostics)? {
             Some(facts) => declarations.push(facts),
             None => blocked = true,
@@ -335,13 +391,21 @@ pub fn resolve_declarations(
     })
 }
 
+/// Reject two declarations that claim one position in one snapshot.
+///
+/// Comparison uses the canonical order, which covers every part of an
+/// occurrence except the declared byte length. Two occurrences that agree on
+/// everything else while disagreeing on the length of their unit are also
+/// rejected here, because that pair is a contradiction about the source rather
+/// than two positions to keep apart.
 fn reject_duplicate_occurrences(inputs: &[DeclarationInput<'_>]) -> Result<(), AuthoringFailure> {
-    for (index, input) in inputs.iter().enumerate() {
-        for other in &inputs[index + 1..] {
-            if input.occurrence == other.occurrence {
-                return Err(AuthoringFailure::DuplicateOccurrence);
-            }
-        }
+    let mut order: Vec<&Occurrence> = inputs.iter().map(|input| &input.occurrence).collect();
+    order.sort_by(|left, right| left.canonical_cmp(right));
+    if order
+        .windows(2)
+        .any(|pair| pair[0].canonical_cmp(pair[1]) == std::cmp::Ordering::Equal)
+    {
+        return Err(AuthoringFailure::DuplicateOccurrence);
     }
     Ok(())
 }
@@ -355,11 +419,14 @@ fn resolve_one(
     diagnostics: &mut DiagnosticSink,
 ) -> Result<Option<DeclarationFacts>, AuthoringFailure> {
     if !input.occurrence.role().is_declaration() {
-        diagnostics.push(authoring(
-            Stage::ResultConstruction,
-            ReasonFamily::AuthoringInputInvalid,
-            input,
-        ));
+        diagnostics.push(
+            authoring(
+                Stage::ResultConstruction,
+                ReasonFamily::AuthoringInputInvalid,
+                input,
+            )
+            .with_detail(detail::occurrence_role_invalid()),
+        );
         return Ok(None);
     }
     // One invocation resolves one owner's declarations. Source that belongs to
@@ -367,15 +434,43 @@ fn resolve_one(
     // the message to the wrong application or library. This is checked before
     // any analysis, because out-of-scope input is not work to be done.
     if input.occurrence.source().owner() != context.owner() {
-        diagnostics.push(authoring(
-            Stage::ResultConstruction,
-            ReasonFamily::AuthoringInputInvalid,
-            input,
-        ));
+        diagnostics.push(
+            authoring(
+                Stage::ResultConstruction,
+                ReasonFamily::AuthoringInputInvalid,
+                input,
+            )
+            .with_detail(detail::occurrence_owner_foreign()),
+        );
         return Ok(None);
     }
 
-    let analysis = analyze_message(input.message, &input.occurrence, limits, workspace)?;
+    // A map that does not describe the text is the host's mistake whatever the
+    // author wrote, so it is checked before anything that could block this
+    // declaration first. Checking it only on the way out would report a host
+    // integration bug for a clean declaration and stay silent for a blocked
+    // one, which is the opposite of how the two kinds of failure are meant to
+    // separate.
+    if let Some(map) = input.input_map {
+        validate_input_map(map, input.message.text(), &input.occurrence)
+            .map_err(input_map_failure)?;
+    }
+
+    let analysis = match analyze_message(input.message, &input.occurrence, limits, workspace) {
+        Ok(analysis) => analysis,
+        Err(MessageFailure::UnrepresentableScalar { offset }) => {
+            // The text came from source an author can edit, so this is a
+            // reportable authoring form rather than a failed invocation. The
+            // encoder alone cannot know that, which is why it reports the
+            // position and leaves the decision to the caller that has one.
+            diagnostics.push(
+                unrepresentable(input, offset)
+                    .ok_or(MessageFailure::UnrepresentableScalar { offset })?,
+            );
+            return Ok(None);
+        }
+        Err(other) => return Err(other.into()),
+    };
     let mut blocked = analysis.is_blocked();
     diagnostics.extend(analysis.diagnostics().iter().cloned());
 
@@ -387,8 +482,18 @@ fn resolve_one(
     let Some(facts) = analysis.facts() else {
         return Ok(None);
     };
-    if !match_parameters(input, facts.parameters(), diagnostics) {
-        blocked = true;
+    if let Some(supplied) = input.parameters {
+        let matched = compare_parameters(
+            facts.parameters(),
+            supplied,
+            &input.occurrence,
+            &mut |record| {
+                diagnostics.push(record);
+            },
+        );
+        if !matched {
+            blocked = true;
+        }
     }
 
     let (Some((locale, basis)), Some(class), Ok(usage), Ok(description)) =
@@ -415,8 +520,62 @@ fn resolve_one(
         projection,
         source_locale_basis: basis,
         surface_class: class,
-        extraction_map: analysis.extraction_map().to_vec().into_boxed_slice(),
+        extraction_map: extraction_map(input, &analysis, limits)?,
     }))
+}
+
+/// Return the map from emitted MF2 bytes to wherever the caller can point.
+///
+/// Without a host map the extraction map is already final, because the
+/// supplied text is as far back as this crate can see.
+fn extraction_map(
+    input: &DeclarationInput<'_>,
+    analysis: &crate::message::MessageAnalysis,
+    limits: &AuthoringLimits,
+) -> Result<Box<[ExtractionSegment]>, AuthoringFailure> {
+    let Some(map) = input.input_map else {
+        return Ok(analysis.extraction_map().to_vec().into_boxed_slice());
+    };
+    compose_extraction_map(
+        analysis.extraction_map(),
+        map,
+        input.message.text(),
+        &input.occurrence,
+        limits,
+    )
+    .map(Vec::into_boxed_slice)
+    .map_err(input_map_failure)
+}
+
+/// Report a composition failure as the kind of failure it actually is.
+///
+/// A named bound reports as that bound whichever path exhausted it. A host
+/// matching on the failure to name which limit it hit would otherwise have to
+/// know whether it happened to supply a map.
+const fn input_map_failure(failure: MappingError) -> AuthoringFailure {
+    match failure {
+        MappingError::Limit(kind) => AuthoringFailure::Limit(kind),
+        other => AuthoringFailure::InputMap(other),
+    }
+}
+
+/// Report displayed text that MF2 pattern text cannot carry.
+///
+/// Returns `None` only if the reported position cannot be expressed as a
+/// range, which would mean the encoder and this crate disagree about the text.
+fn unrepresentable(input: &DeclarationInput<'_>, offset: u64) -> Option<Diagnostic> {
+    // U+0000 is the one scalar the encoder rejects, and it is one byte, so the
+    // reported position names exactly the character an author has to remove.
+    let range = ByteRange::new(offset, offset + 1).ok()?;
+    Some(
+        authoring(
+            Stage::MessageAnalysis,
+            ReasonFamily::AuthoringFormUnsupported,
+            input,
+        )
+        .with_detail(detail::unrepresentable_scalar())
+        .with_message_range(MessageRange::Supplied(range)),
+    )
 }
 
 type ResolvedLocale = Option<(crate::context::CanonicalLocale, SourceLocaleBasis)>;
@@ -434,11 +593,14 @@ fn resolve_locale(
                 Err(AuthoringFailure::LocaleProviderUnavailable)
             }
             Err(LocaleFailure::InvalidIdentifier | LocaleFailure::UnsupportedInput) => {
-                diagnostics.push(authoring(
-                    Stage::ContextResolution,
-                    ReasonFamily::AuthoringSourceLocaleInvalid,
-                    input,
-                ));
+                diagnostics.push(
+                    authoring(
+                        Stage::ContextResolution,
+                        ReasonFamily::AuthoringSourceLocaleInvalid,
+                        input,
+                    )
+                    .with_detail(detail::source_locale_rejected()),
+                );
                 Ok(None)
             }
         };
@@ -446,11 +608,14 @@ fn resolve_locale(
     if let Some(default) = context.default_source_locale() {
         return Ok(Some((default.clone(), SourceLocaleBasis::ContextDefault)));
     }
-    diagnostics.push(authoring(
-        Stage::ContextResolution,
-        ReasonFamily::AuthoringSourceLocaleMissing,
-        input,
-    ));
+    diagnostics.push(
+        authoring(
+            Stage::ContextResolution,
+            ReasonFamily::AuthoringSourceLocaleMissing,
+            input,
+        )
+        .with_detail(detail::source_locale_absent()),
+    );
     Ok(None)
 }
 
@@ -466,12 +631,22 @@ fn resolve_surface_class(
         .or_else(|| context.basis().default_surface_class());
     match candidate {
         Some(class) if context.surface_vocabulary().admits(class) => Some(class.to_owned()),
-        _ => {
-            diagnostics.push(authoring(
-                Stage::ContextResolution,
-                ReasonFamily::AuthoringSurfaceClassInvalid,
-                input,
-            ));
+        candidate => {
+            // Absent and unknown are different mistakes with different fixes:
+            // one needs an assignment, the other needs the right vocabulary.
+            let detail = if candidate.is_some() {
+                detail::surface_class_unknown()
+            } else {
+                detail::surface_class_absent()
+            };
+            diagnostics.push(
+                authoring(
+                    Stage::ContextResolution,
+                    ReasonFamily::AuthoringSurfaceClassInvalid,
+                    input,
+                )
+                .with_detail(detail),
+            );
             None
         }
     }
@@ -489,19 +664,25 @@ fn resolve_usage(
     let Some(profile) = context.usage_profile() else {
         // Usage is only meaningful under a registered profile. A coverage class
         // or a DOM tag cannot substitute for one.
-        diagnostics.push(authoring(
-            Stage::ContextResolution,
-            ReasonFamily::AuthoringMetadataInvalid,
-            input,
-        ));
+        diagnostics.push(
+            authoring(
+                Stage::ContextResolution,
+                ReasonFamily::AuthoringMetadataInvalid,
+                input,
+            )
+            .with_detail(detail::usage_profile_unregistered()),
+        );
         return Err(());
     };
     let Ok(value) = admitted_text(value, limits) else {
-        diagnostics.push(authoring(
-            Stage::ContextResolution,
-            ReasonFamily::AuthoringMetadataInvalid,
-            input,
-        ));
+        diagnostics.push(
+            authoring(
+                Stage::ContextResolution,
+                ReasonFamily::AuthoringMetadataInvalid,
+                input,
+            )
+            .with_detail(detail::metadata_value_invalid()),
+        );
         return Err(());
     };
     Ok(Some(Usage {
@@ -522,11 +703,14 @@ fn resolve_description(
     if admitted_text(description, limits).is_ok() {
         return Ok(Some(description.to_owned()));
     }
-    diagnostics.push(authoring(
-        Stage::ContextResolution,
-        ReasonFamily::AuthoringMetadataInvalid,
-        input,
-    ));
+    diagnostics.push(
+        authoring(
+            Stage::ContextResolution,
+            ReasonFamily::AuthoringMetadataInvalid,
+            input,
+        )
+        .with_detail(detail::metadata_value_invalid()),
+    );
     Err(())
 }
 
@@ -537,51 +721,71 @@ fn admitted_text(value: &str, limits: &AuthoringLimits) -> Result<NonemptyText, 
     NonemptyText::from_validated(value).map_err(|_| ())
 }
 
-/// Compare the host's parameters with what the message requires.
+/// Compare what a message requires with what one use site supplies.
 ///
-/// Missing, extra, and duplicate names are separate diagnostics because they
-/// have different fixes. Returning false blocks the declaration.
-fn match_parameters(
-    input: &DeclarationInput<'_>,
+/// A Producer calls this for a reference, whose declaration was analyzed
+/// separately and may be in another statement or another function. The use
+/// site attached to a declaration goes through the same comparison, so one
+/// message cannot acquire different parameter rules according to which syntax
+/// carried it.
+///
+/// Missing, extra, and duplicate names are separate records because they have
+/// different fixes. `occurrence` is the site that supplied the parameters, so
+/// a reference reports at the reference rather than at the declaration it
+/// shares with every other use.
+///
+/// Records go to `report` one at a time rather than into a returned list, so a
+/// caller's own bound decides how many are retained. One use site can supply
+/// any number of parameters, and materialising a record for each one before
+/// any budget is consulted is the allocation a bounded collector exists to
+/// prevent. For the same reason the return value says whether the use site
+/// matched: a caller whose sink stopped accepting records cannot learn that by
+/// counting what it received.
+pub fn compare_parameters(
     required: &[String],
-    diagnostics: &mut DiagnosticSink,
+    supplied: &[ParameterBinding],
+    occurrence: &Occurrence,
+    report: &mut impl FnMut(Diagnostic),
 ) -> bool {
+    let mismatch = |detail: Detail| {
+        Diagnostic::new(
+            Stage::ContextResolution,
+            DiagnosticOrigin::Authoring(ReasonFamily::AuthoringParameterMismatch),
+            Severity::Error,
+            occurrence.clone(),
+        )
+        .with_detail(detail)
+    };
+
+    // Nothing bounds how many parameters a use site supplies, so membership is
+    // answered by ordered sets rather than by scanning a list for each name.
+    // The records still come out in the order a reader expects: supplied
+    // problems in host evaluation order, then missing names in the order the
+    // message requires them.
+    let wanted: BTreeSet<&str> = required.iter().map(String::as_str).collect();
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
     let mut matched = true;
-    let mut seen: Vec<&str> = Vec::new();
-    for binding in input.parameters {
-        if seen.contains(&binding.name()) {
-            diagnostics.push(
-                authoring(
-                    Stage::ContextResolution,
-                    ReasonFamily::AuthoringParameterMismatch,
-                    input,
-                )
-                .with_related(vec![binding.expression().clone()]),
-            );
+    for binding in supplied {
+        if !seen.insert(binding.name()) {
             matched = false;
-            continue;
-        }
-        seen.push(binding.name());
-        if !required.iter().any(|name| name == binding.name()) {
-            diagnostics.push(
-                authoring(
-                    Stage::ContextResolution,
-                    ReasonFamily::AuthoringParameterMismatch,
-                    input,
-                )
-                .with_related(vec![binding.expression().clone()]),
+            report(
+                mismatch(detail::parameter_duplicate())
+                    .with_parameter(binding.name())
+                    .with_related(vec![binding.expression().clone()]),
             );
+        } else if !wanted.contains(binding.name()) {
             matched = false;
+            report(
+                mismatch(detail::parameter_extra())
+                    .with_parameter(binding.name())
+                    .with_related(vec![binding.expression().clone()]),
+            );
         }
     }
     for name in required {
-        if !seen.contains(&name.as_str()) {
-            diagnostics.push(authoring(
-                Stage::ContextResolution,
-                ReasonFamily::AuthoringParameterMismatch,
-                input,
-            ));
+        if !seen.contains(name.as_str()) {
             matched = false;
+            report(mismatch(detail::parameter_missing()).with_parameter(name));
         }
     }
     matched
@@ -638,6 +842,35 @@ mod tests {
     }
 
     #[test]
+    fn a_mismatch_is_answered_by_the_return_value_not_by_what_survived_the_bound() {
+        // Records arrive at the caller's sink one at a time, so a bound can
+        // drop most of them. Whether the use site matched therefore cannot be
+        // read from how many records the caller kept, which is why it is the
+        // return value. That the sink is also what limits peak allocation is
+        // structural and not observable from here; the assertion below pins
+        // the part that is.
+        let occurrence = diagnostic()
+            .occurrence()
+            .expect("a classified site")
+            .clone();
+        let supplied: Vec<ParameterBinding> = (0..1_000)
+            .map(|index| ParameterBinding::new(&format!("extra{index}"), occurrence.clone()))
+            .collect();
+
+        let mut sink = DiagnosticSink::new(3);
+        let matched = compare_parameters(&[], &supplied, &occurrence, &mut |record| {
+            sink.push(record);
+        });
+
+        assert!(
+            !matched,
+            "a thousand unusable names is a mismatch even when three were kept"
+        );
+        assert!(sink.exhausted());
+        assert_eq!(sink.into_reported().len(), 3);
+    }
+
+    #[test]
     fn a_sink_inside_its_budget_reports_everything_and_is_not_exhausted() {
         let mut sink = DiagnosticSink::new(3);
         sink.extend([diagnostic(), diagnostic()]);
@@ -660,7 +893,7 @@ mod tests {
 #[cfg(feature = "benchmark")]
 pub(crate) mod measured {
     use super::{
-        intent_projection, match_parameters, resolve_description, resolve_locale,
+        compare_parameters, extraction_map, intent_projection, resolve_description, resolve_locale,
         resolve_surface_class, resolve_usage, AuthoringContext, AuthoringFailure, AuthoringLimits,
         DeclarationFacts, DeclarationInput, DiagnosticSink, SourceLocaleBasis, Usage,
     };
@@ -719,13 +952,24 @@ pub(crate) mod measured {
         input: &DeclarationInput<'_>,
         analysis: &MessageAnalysis,
         context: &ContextFacts,
+        limits: &AuthoringLimits,
     ) -> Result<Result<(DeclarationFacts, IntegrityDigest), usize>, AuthoringFailure> {
-        let mut diagnostics = DiagnosticSink::new(u64::MAX);
         let Some(message) = analysis.facts() else {
             return Ok(Err(0));
         };
-        if !match_parameters(input, message.parameters(), &mut diagnostics) {
-            return Ok(Err(diagnostics.into_reported().len()));
+        if let Some(supplied) = input.parameters {
+            let mut reported = 0_usize;
+            let matched = compare_parameters(
+                message.parameters(),
+                supplied,
+                &input.occurrence,
+                &mut |_| {
+                    reported += 1;
+                },
+            );
+            if !matched {
+                return Ok(Err(reported));
+            }
         }
         let projection = intent_projection(
             message.message().clone(),
@@ -745,7 +989,7 @@ pub(crate) mod measured {
                 projection,
                 source_locale_basis: context.basis,
                 surface_class: context.surface_class.clone(),
-                extraction_map: analysis.extraction_map().to_vec().into_boxed_slice(),
+                extraction_map: extraction_map(input, analysis, limits)?,
             },
             revision,
         )))

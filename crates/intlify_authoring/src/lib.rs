@@ -62,17 +62,22 @@ pub use context::{
     SurfaceVocabulary,
 };
 pub use declaration::{
-    resolve_declarations, AuthoringFailure, AuthoringResult, DeclarationFacts, DeclarationInput,
-    DeclarationMetadata, Outcome, ParameterBinding, SourceLocaleBasis,
+    compare_parameters, resolve_declarations, resolve_declarations_with_cancellation,
+    AuthoringFailure, AuthoringResult, DeclarationFacts, DeclarationInput, DeclarationMetadata,
+    Outcome, ParameterBinding, SourceLocaleBasis,
 };
-pub use diagnostic::{Diagnostic, DiagnosticOrigin, ReasonFamily, Severity, Stage};
+pub use diagnostic::{
+    detail, Detail, Diagnostic, DiagnosticOrigin, Location, MessageRange, ReasonFamily, Region,
+    Severity, Stage,
+};
 pub use limits::{AuthoringLimits, LimitKind, LimitsError};
 pub use message::{
-    analyze_message, ExtractionSegment, MessageAnalysis, MessageFacts, MessageFailure, MessageInput,
+    analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
+    MappingError, MessageAnalysis, MessageFacts, MessageFailure, MessageInput,
 };
 pub use primitives::{
     ByteRange, ExactInputBinding, MessageIntentId, NonemptyText, Opaque128, OwnerIdentity,
-    OwnerKind, PrimitiveError, SemanticDigest, SourceSnapshot,
+    OwnerKind, PrimitiveError, SemanticDigest, SnapshotMismatch, SourceSnapshot,
 };
 pub use primitives::{Occurrence, OccurrenceRole};
 pub use projection::{

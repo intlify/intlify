@@ -59,7 +59,14 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | Zero-width segments for the generated `{{` and `}}` | `displayed_text_round_trips_byte_for_byte` |
 | Non-overlapping, ordered, complete coverage | `displayed_text_round_trips_byte_for_byte`, `multibyte_scalars_keep_byte_ranges_on_scalar_boundaries`, `authored_mf2_maps_to_itself_so_the_segments_cover_the_emitted_message` |
 | A reported range resolves back through the map | `a_reported_range_addresses_real_bytes_and_resolves_through_the_segments` |
-| `inputMap` composition | **Deferred to Phase 2.** The host supplies the map from its own source to the decoded text; this crate has no host syntax. |
+| Composition with a host's own map | `a_verbatim_run_slices_and_the_generated_delimiters_become_insertion_points`, `a_host_escape_keeps_its_own_span_and_splits_the_run_around_it`, `an_mf2_escape_inside_a_verbatim_run_resolves_to_the_character_it_escaped`, `multibyte_text_composes_on_scalar_boundaries`, `a_crlf_the_host_normalized_answers_for_both_of_its_bytes`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `empty_text_still_has_a_position_in_source`, `a_declaration_ending_at_the_unit_boundary_composes`, `authored_mf2_composes_through_its_identity_segment` |
+| A map that does not describe the text | `a_map_that_does_not_describe_the_text_is_refused_for_the_reason_it_fails`, `a_host_map_that_does_not_describe_the_text_fails_the_invocation` |
+| A host mistake is reported whatever the author wrote | `a_broken_host_map_fails_even_when_the_declaration_is_blocked_anyway` |
+| A boundary inside a scalar | `a_boundary_inside_a_scalar_is_refused_rather_than_sliced` |
+| Text the host dropped, before and after the content | `dropped_text_before_the_content_is_not_where_the_content_begins`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `dropped_text_in_the_middle_of_a_run_contributes_no_segment_of_its_own` |
+| Omitting a map is not supplying a broken one | `a_host_map_moves_the_extraction_map_into_source_and_omitting_one_does_not` |
+| The composed map is bounded | `the_composed_map_is_bounded_by_the_invocation`, `a_bound_exhausted_while_composing_reports_as_the_bound_it_is` |
+| Supplying the map | **Deferred to Phase 2.** A host reads its own escapes; this crate composes whatever map the host establishes. |
 
 ### Parser ownership
 
@@ -133,7 +140,10 @@ The extraction rows below name the tests that assert through a shared `check_seg
 
 | Requirement | Checked by |
 | --- | --- |
-| Missing, extra and duplicate are separate diagnostics | `parameter_mismatches_are_reported_and_a_match_is_accepted` |
+| Missing, extra and duplicate are separate diagnostics | `parameter_mismatches_are_reported_and_a_match_is_accepted`, `a_parameter_mismatch_names_which_of_the_three_it_is` |
+| The three causes report in one fixed order | `the_three_parameter_causes_report_in_one_fixed_order` |
+| Each mismatch names its parameter, including a missing one that has no source position | `a_parameter_mismatch_names_which_of_the_three_it_is`, `the_three_parameter_causes_report_in_one_fixed_order` |
+| A declaration with no use site owes nothing | `a_declaration_without_a_use_site_does_not_owe_parameters` |
 | The host's evaluation order is retained | same test; the expression position travels with each binding |
 | An expression is never evaluated or serialised | `ParameterBinding` keeps only an `Occurrence`; `retained_evidence_is_readable_by_a_caller` |
 | A bound is reported by its exact kind | `parameter_bounds_report_the_exact_exhausted_limit` |
@@ -166,9 +176,11 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | A reused workspace agrees with fresh ones | `a_reused_workspace_agrees_with_fresh_ones_across_the_whole_fixture`, `fresh_and_reused_workspaces_agree_after_success_and_failure` |
 | Reuse after success and after failure | same tests |
 | Clearing leaves no semantic state and keeps capacity | `clearing_retains_capacity_and_leaves_no_semantic_state` |
+| A diagnostic region is checked against its unit | `a_region_is_checked_against_its_own_unit` |
 | Returned values borrow nothing from the scratch | `retained_evidence_is_readable_by_a_caller`; the encoder's contract is stated on `literal::encode` |
 | Bounds that no invocation could satisfy are rejected | `bounds_that_no_invocation_could_satisfy_are_rejected` |
-| Cancellation | **Deferred to Phase 2.** There is no cancellation probe in this phase's entry point. |
+| A bound holds however many records arrive | `the_sink_never_grows_past_its_budget_however_many_arrive`, `a_mismatch_is_answered_by_the_return_value_not_by_what_survived_the_bound` |
+| Cancellation yields no partial scope | `a_cancelled_invocation_returns_no_facts_at_all` |
 
 ### Measurement
 
@@ -190,7 +202,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 
 These are named so that their absence is a decision rather than an oversight.
 
-- **Host language analysis** — source discovery, annotation syntax, intrinsic bindings and `inputMap` composition belong to Phase 2. This crate takes already decoded text and occurrence evidence.
+- **Host language analysis** — source discovery, annotation syntax, intrinsic bindings, and reading a host's own escapes belong to Phase 2. This crate takes already decoded text and occurrence evidence, and composes the map a host establishes rather than establishing one.
 - **Identity** — allocating a `MessageIntentId`, reading or publishing a registry, and reconciling declaration history are Phase 3. A checked result here is authoring evidence, not an identity-resolved result.
 - **Artifact codecs** — `message-intent`, `message-reference`, `intent-registry` and their schemas are Phase 3.
 - **Production canonicalisation** — the provider behind `AuthoringContext` is a finite declared rule table. The production one is 015's Phase 2, and the trait duplicated here is unified at that integration.
