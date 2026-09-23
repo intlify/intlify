@@ -13,6 +13,8 @@
 //! locale, `und`, or a language inferred from the text, because a wrong source
 //! locale silently mistranslates rather than failing.
 
+use std::collections::BTreeSet;
+
 use crate::context::{AuthoringContext, ContextKind, LocaleFailure};
 use crate::diagnostic::{
     detail, Detail, Diagnostic, DiagnosticOrigin, MessageRange, ReasonFamily, Severity, Stage,
@@ -755,30 +757,35 @@ pub fn compare_parameters(
         .with_detail(detail)
     };
 
+    // Nothing bounds how many parameters a use site supplies, so membership is
+    // answered by ordered sets rather than by scanning a list for each name.
+    // The records still come out in the order a reader expects: supplied
+    // problems in host evaluation order, then missing names in the order the
+    // message requires them.
+    let wanted: BTreeSet<&str> = required.iter().map(String::as_str).collect();
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
     let mut matched = true;
-    let mut seen: Vec<&str> = Vec::new();
     for binding in supplied {
-        if seen.contains(&binding.name()) {
+        if !seen.insert(binding.name()) {
             matched = false;
             report(
                 mismatch(detail::parameter_duplicate())
+                    .with_parameter(binding.name())
                     .with_related(vec![binding.expression().clone()]),
             );
-            continue;
-        }
-        seen.push(binding.name());
-        if !required.iter().any(|name| name == binding.name()) {
+        } else if !wanted.contains(binding.name()) {
             matched = false;
             report(
                 mismatch(detail::parameter_extra())
+                    .with_parameter(binding.name())
                     .with_related(vec![binding.expression().clone()]),
             );
         }
     }
     for name in required {
-        if !seen.contains(&name.as_str()) {
+        if !seen.contains(name.as_str()) {
             matched = false;
-            report(mismatch(detail::parameter_missing()));
+            report(mismatch(detail::parameter_missing()).with_parameter(name));
         }
     }
     matched

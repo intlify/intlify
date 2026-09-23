@@ -142,6 +142,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | --- | --- |
 | Missing, extra and duplicate are separate diagnostics | `parameter_mismatches_are_reported_and_a_match_is_accepted`, `a_parameter_mismatch_names_which_of_the_three_it_is` |
 | The three causes report in one fixed order | `the_three_parameter_causes_report_in_one_fixed_order` |
+| Each mismatch names its parameter, including a missing one that has no source position | `a_parameter_mismatch_names_which_of_the_three_it_is`, `the_three_parameter_causes_report_in_one_fixed_order` |
 | A declaration with no use site owes nothing | `a_declaration_without_a_use_site_does_not_owe_parameters` |
 | The host's evaluation order is retained | same test; the expression position travels with each binding |
 | An expression is never evaluated or serialised | `ParameterBinding` keeps only an `Occurrence`; `retained_evidence_is_readable_by_a_caller` |

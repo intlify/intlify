@@ -423,6 +423,7 @@ pub struct Diagnostic {
     stage: Stage,
     origin: DiagnosticOrigin,
     detail: Option<Detail>,
+    parameter: Option<Box<str>>,
     severity: Severity,
     location: Location,
     message_range: Option<MessageRange>,
@@ -443,6 +444,7 @@ impl Diagnostic {
             stage,
             origin,
             detail: None,
+            parameter: None,
             severity,
             location: location.into(),
             message_range: None,
@@ -455,6 +457,19 @@ impl Diagnostic {
     #[must_use]
     pub const fn with_detail(mut self, detail: Detail) -> Self {
         self.detail = Some(detail);
+        self
+    }
+
+    /// Name the external parameter this record is about.
+    ///
+    /// A parameter mismatch says which of missing, extra, or duplicate went
+    /// wrong through its detail, but a reader still has to know which name. An
+    /// extra or duplicate name has a related expression to point at; a missing
+    /// one has no position in source at all, so without the name the record
+    /// could only say that something is missing.
+    #[must_use]
+    pub fn with_parameter(mut self, name: &str) -> Self {
+        self.parameter = Some(name.into());
         self
     }
 
@@ -487,6 +502,12 @@ impl Diagnostic {
     #[must_use]
     pub const fn detail(&self) -> Option<Detail> {
         self.detail
+    }
+
+    /// Borrow the external parameter name, when the record concerns one.
+    #[must_use]
+    pub fn parameter(&self) -> Option<&str> {
+        self.parameter.as_deref()
     }
 
     /// Return the producing stage.
@@ -572,6 +593,12 @@ impl Diagnostic {
                 self.detail
                     .map(Detail::as_str)
                     .cmp(&other.detail.map(Detail::as_str))
+            })
+            .then_with(|| {
+                self.parameter
+                    .as_deref()
+                    .map(str::as_bytes)
+                    .cmp(&other.parameter.as_deref().map(str::as_bytes))
             })
             .then_with(|| self.message_range.cmp(&other.message_range))
             .then_with(|| self.severity.cmp(&other.severity))

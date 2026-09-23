@@ -722,6 +722,12 @@ fn the_three_parameter_causes_report_in_one_fixed_order() {
             "parameter-missing"
         ]
     );
+    let names: Vec<Option<&str>> = result
+        .diagnostics()
+        .iter()
+        .map(|record| record.parameter())
+        .collect();
+    assert_eq!(names, [Some("other"), Some("other"), Some("name")]);
 }
 
 #[test]
@@ -799,6 +805,12 @@ fn a_parameter_mismatch_names_which_of_the_three_it_is() {
         ],
         "three mistakes with three different fixes stay three records"
     );
+
+    // Each record names the parameter it is about. The missing one matters
+    // most: it has no expression in source to point at, so without the name a
+    // reader could learn only that something is missing.
+    let names: Vec<Option<&str>> = reported.iter().map(|record| record.parameter()).collect();
+    assert_eq!(names, [Some("name"), Some("count"), Some("total")]);
 
     // A reference reports at the reference, not at the declaration it shares
     // with every other use of the same message.
