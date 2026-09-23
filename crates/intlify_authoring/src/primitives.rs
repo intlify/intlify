@@ -192,10 +192,10 @@ impl ExactInputBinding {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ByteRange {
-    #[schemars(with = "String")]
+    #[schemars(with = "intlify_shared_json::quantity::Quantity")]
     #[serde(serialize_with = "serialize_offset")]
     start: u64,
-    #[schemars(with = "String")]
+    #[schemars(with = "intlify_shared_json::quantity::Quantity")]
     #[serde(serialize_with = "serialize_offset")]
     end: u64,
 }
@@ -312,7 +312,7 @@ pub struct SourceSnapshot {
     unit: Token,
     revision: Token,
     grammar: VersionedIdentity,
-    #[schemars(with = "String")]
+    #[schemars(with = "intlify_shared_json::quantity::Quantity")]
     #[serde(with = "offset")]
     byte_length: u64,
     utf8_digest: IntegrityDigest,

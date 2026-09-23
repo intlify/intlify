@@ -54,6 +54,17 @@ tempfile = "3"
 name = "declaration_resolution"
 required-features = ["test-context"]
 
+# Inventories are built from real resolution, which needs a context, and the
+# only context this phase admits is the test one.
+[[test]]
+name = "inventory_admission"
+required-features = ["test-context"]
+
+# The vectors are built from real resolution, which needs the test context.
+[[example]]
+name = "generate_inventory_vectors"
+required-features = ["test-context"]
+
 [[bench]]
 name = "authoring_semantics"
 harness = false

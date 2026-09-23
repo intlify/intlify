@@ -15,6 +15,9 @@
 
 use std::collections::BTreeSet;
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::context::{AuthoringContext, ContextKind, LocaleFailure};
 use crate::diagnostic::{
     detail, Detail, Diagnostic, DiagnosticOrigin, MessageRange, ReasonFamily, Severity, Stage,
@@ -33,7 +36,10 @@ use crate::workspace::AnalysisWorkspace;
 /// Switching between the two with the same canonical locale does not change a
 /// revision, so the basis is retained as evidence rather than folded into the
 /// projection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum SourceLocaleBasis {
     Explicit,
     ContextDefault,
@@ -65,7 +71,8 @@ pub struct DeclarationMetadata<'a> {
 }
 
 /// One parameter the host supplied at a use site.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ParameterBinding {
     name: String,
     expression: Occurrence,
@@ -125,13 +132,18 @@ pub struct DeclarationInput<'a> {
 }
 
 /// The checked facts for one declaration.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// These serialize as design 017's `DeclarationFacts`. Deserializing one only
+/// reads its shape; whether it is consistent with its source, its context and
+/// the inventory around it is decided by inventory admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeclarationFacts {
     occurrence: Occurrence,
     mf2_source: String,
     projection: IntentProjection,
     source_locale_basis: SourceLocaleBasis,
-    surface_class: String,
+    surface_class: NonemptyText,
     extraction_map: Box<[ExtractionSegment]>,
 }
 
@@ -163,7 +175,7 @@ impl DeclarationFacts {
     /// Borrow the admitted surface class.
     #[must_use]
     pub fn surface_class(&self) -> &str {
-        &self.surface_class
+        self.surface_class.as_str()
     }
 
     /// Return the mapping from emitted MF2 bytes back to their origin.
@@ -519,7 +531,10 @@ fn resolve_one(
         mf2_source: analysis.mf2_source().to_owned(),
         projection,
         source_locale_basis: basis,
-        surface_class: class,
+        // A vocabulary admits only nonempty members, so an admitted class is
+        // always representable; failing here would be a defect in admission.
+        surface_class: NonemptyText::from_validated(&class)
+            .map_err(|failure| AuthoringFailure::ContextInvalid(failure.into()))?,
         extraction_map: extraction_map(input, &analysis, limits)?,
     }))
 }
@@ -988,7 +1003,10 @@ pub(crate) mod measured {
                 mf2_source: analysis.mf2_source().to_owned(),
                 projection,
                 source_locale_basis: context.basis,
-                surface_class: context.surface_class.clone(),
+                surface_class: crate::primitives::NonemptyText::from_validated(
+                    &context.surface_class,
+                )
+                .map_err(|failure| AuthoringFailure::ContextInvalid(failure.into()))?,
                 extraction_map: extraction_map(input, analysis, limits)?,
             },
             revision,

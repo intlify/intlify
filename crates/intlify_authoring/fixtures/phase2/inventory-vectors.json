@@ -1,0 +1,1060 @@
+{
+  "note": "Each vector is a complete sealed authoring-inventory artifact. An independent implementation removes the top-level integrityDigest, reframes the rest and re-hashes it under the domain below. It also recomputes every declaration's revision, and checks that vectors declared to share revisions do while their artifacts differ.",
+  "domain": "authoring-artifact-integrity",
+  "revisionDomain": "intent-semantic-revision",
+  "projectionSpecification": {
+    "identity": "intlify-intent-projection",
+    "revision": "0"
+  },
+  "vectors": [
+    {
+      "id": "complete-checked",
+      "note": "One checked unit with two declarations, two references and an exclusion.",
+      "sameRevisionsAs": [],
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "checkout-ui",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "151",
+                "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "20",
+                    "end": "27"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "44",
+                  "end": "63"
+                },
+                "role": "mf2-declaration"
+              },
+              "mf2Source": "Hello {$name}!",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Hello "
+                      },
+                      {
+                        "kind": "expression",
+                        "operand": {
+                          "kind": "variable",
+                          "name": "name"
+                        },
+                        "attributes": []
+                      },
+                      {
+                        "kind": "text",
+                        "value": "!"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": ["name"]
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "14"
+                  },
+                  "source": {
+                    "start": "48",
+                    "end": "62"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "12",
+                  "end": "29"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "151",
+                    "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                  },
+                  "range": {
+                    "start": "19",
+                    "end": "28"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "70",
+                  "end": "93"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "151",
+                    "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                  },
+                  "range": {
+                    "start": "44",
+                    "end": "63"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "151",
+                      "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                    },
+                    "range": {
+                      "start": "86",
+                      "end": "90"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            }
+          ],
+          "exclusions": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "115",
+                  "end": "150"
+                },
+                "role": "exclusion"
+              },
+              "reason": "Product name"
+            }
+          ]
+        },
+        "integrityDigest": "sha256:0320b62efdcc974125ca286ecd638c3fe202176528494a1a356dfba9a0b2635c"
+      }
+    },
+    {
+      "id": "moved-source",
+      "note": "The same unit with a line added above it. Every position moves, so the artifact changes; no message changes, so no revision does.",
+      "sameRevisionsAs": ["complete-checked"],
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "checkout-ui",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "179",
+                "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "179",
+                  "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                },
+                "range": {
+                  "start": "47",
+                  "end": "56"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "48",
+                    "end": "55"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "179",
+                  "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                },
+                "range": {
+                  "start": "72",
+                  "end": "91"
+                },
+                "role": "mf2-declaration"
+              },
+              "mf2Source": "Hello {$name}!",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Hello "
+                      },
+                      {
+                        "kind": "expression",
+                        "operand": {
+                          "kind": "variable",
+                          "name": "name"
+                        },
+                        "attributes": []
+                      },
+                      {
+                        "kind": "text",
+                        "value": "!"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": ["name"]
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "14"
+                  },
+                  "source": {
+                    "start": "76",
+                    "end": "90"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "179",
+                  "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                },
+                "range": {
+                  "start": "40",
+                  "end": "57"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "179",
+                    "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                  },
+                  "range": {
+                    "start": "47",
+                    "end": "56"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "179",
+                  "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                },
+                "range": {
+                  "start": "98",
+                  "end": "121"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "179",
+                    "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                  },
+                  "range": {
+                    "start": "72",
+                    "end": "91"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "179",
+                      "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                    },
+                    "range": {
+                      "start": "114",
+                      "end": "118"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            }
+          ],
+          "exclusions": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "179",
+                  "utf8Digest": "sha256:059360a8a55f3200bad3afac40b1ea970127746c81d014e41e51b8f22d3d85a7"
+                },
+                "range": {
+                  "start": "143",
+                  "end": "178"
+                },
+                "role": "exclusion"
+              },
+              "reason": "Product name"
+            }
+          ]
+        },
+        "integrityDigest": "sha256:973bc85773e2d8dbb21bdfc1fc46872bd5015bc1cf47582bb59ddf2dd8b50a66"
+      }
+    },
+    {
+      "id": "complete-with-failed-unit",
+      "note": "A complete scope in which one unit could not be read. A legitimate record, and not complete checked input.",
+      "sameRevisionsAs": ["complete-checked"],
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "checkout-ui",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "broken",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "9",
+                "utf8Digest": "sha256:90cdcfe37b79625ac6d36d1cbea4e5e6ee678a5489315769eee0a4d08432ecd4"
+              },
+              "outcome": "failed"
+            },
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "151",
+                "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "20",
+                    "end": "27"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "44",
+                  "end": "63"
+                },
+                "role": "mf2-declaration"
+              },
+              "mf2Source": "Hello {$name}!",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Hello "
+                      },
+                      {
+                        "kind": "expression",
+                        "operand": {
+                          "kind": "variable",
+                          "name": "name"
+                        },
+                        "attributes": []
+                      },
+                      {
+                        "kind": "text",
+                        "value": "!"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": ["name"]
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "14"
+                  },
+                  "source": {
+                    "start": "48",
+                    "end": "62"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "12",
+                  "end": "29"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "151",
+                    "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                  },
+                  "range": {
+                    "start": "19",
+                    "end": "28"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "70",
+                  "end": "93"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "151",
+                    "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                  },
+                  "range": {
+                    "start": "44",
+                    "end": "63"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "151",
+                      "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                    },
+                    "range": {
+                      "start": "86",
+                      "end": "90"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            }
+          ],
+          "exclusions": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "151",
+                  "utf8Digest": "sha256:7462b632362259250756be92b31d5237c09576c65ef5251230118d856d50148c"
+                },
+                "range": {
+                  "start": "115",
+                  "end": "150"
+                },
+                "role": "exclusion"
+              },
+              "reason": "Product name"
+            }
+          ]
+        },
+        "integrityDigest": "sha256:8ca5f14c425faac7a32c2a68b0e4f943cee9f1677b9857233e769df8745cc652"
+      }
+    }
+  ]
+}

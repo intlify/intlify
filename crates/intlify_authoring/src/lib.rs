@@ -43,6 +43,7 @@ pub mod benchmark;
 mod context;
 mod declaration;
 mod diagnostic;
+mod inventory;
 mod limits;
 mod message;
 mod primitives;
@@ -69,6 +70,13 @@ pub use declaration::{
 pub use diagnostic::{
     detail, Detail, Diagnostic, DiagnosticOrigin, Location, MessageRange, ReasonFamily, Region,
     Severity, Stage,
+};
+pub use inventory::{
+    admit_inventory, AdmissionFailure, AdmittedInventory, ArtifactKind, ArtifactRelation,
+    AuthoringArtifactReference, AuthoringInventory, Completeness, Exclusion, InventoryArtifact,
+    InventoryBuilder, InventoryFailure, ReferenceFacts, SourceBytes, UnitOutcome, UnitResult,
+    ARTIFACT_INTEGRITY_DOMAIN, ARTIFACT_SCHEMA_REVISION, AUTHORING_SPECIFICATION_IDENTITY,
+    AUTHORING_SPECIFICATION_REVISION,
 };
 pub use limits::{AuthoringLimits, LimitKind, LimitsError};
 pub use message::{

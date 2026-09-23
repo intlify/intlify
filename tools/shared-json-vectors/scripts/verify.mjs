@@ -17,6 +17,10 @@ const vectorsPath = resolve(
   here,
   '../../../crates/intlify_authoring/fixtures/phase1/revision-vectors.json'
 )
+const inventoryPath = resolve(
+  here,
+  '../../../crates/intlify_authoring/fixtures/phase2/inventory-vectors.json'
+)
 
 /** The framing vectors written out in design 017, checked before anything depends on them. */
 const framingVectors = [
@@ -88,14 +92,95 @@ function checkDistinctness(vectors) {
   return failures
 }
 
+/**
+ * Re-derive every sealed inventory's integrity digest from the artifact itself.
+ *
+ * The preimage is the artifact with only its top-level integrityDigest
+ * removed. Doing the removal here, rather than reading a published preimage,
+ * checks the exclusion rule as well as the framing and the hash.
+ *
+ * @param domain - The registered integrity domain.
+ * @param vectors - Committed sealed artifacts.
+ * @returns How many digests disagreed.
+ */
+function checkIntegrity(domain, vectors) {
+  let failures = 0
+  for (const vector of vectors) {
+    const { integrityDigest, ...preimage } = vector.artifact
+    const produced = digest(domain, preimage)
+    if (produced !== integrityDigest) {
+      console.error(`${vector.id}:\n  committed ${integrityDigest}\n  produced  ${produced}`)
+      failures += 1
+    }
+  }
+  return failures
+}
+
+/**
+ * Recompute the revision of every declaration in one artifact.
+ *
+ * @param inventory - The inventory document.
+ * @param artifact - One sealed artifact.
+ * @returns The revisions in declaration order.
+ */
+function revisionsOf(inventory, artifact) {
+  return artifact.body.declarations.map(facts =>
+    digest(inventory.revisionDomain, {
+      projectionSpecification: inventory.projectionSpecification,
+      projection: facts.projection
+    })
+  )
+}
+
+/**
+ * Check that vectors declared to share revisions do, while their artifacts differ.
+ *
+ * This is the claim that source evidence is part of what an artifact records
+ * and not part of what a message means, checked by recomputing both halves.
+ *
+ * @param inventory - The inventory document.
+ * @returns How many declared relations failed.
+ */
+function checkSharedRevisions(inventory) {
+  let failures = 0
+  const byId = new Map(inventory.vectors.map(vector => [vector.id, vector]))
+  for (const vector of inventory.vectors) {
+    for (const otherId of vector.sameRevisionsAs) {
+      const other = byId.get(otherId)
+      if (other === undefined) {
+        console.error(`${vector.id} names unknown vector ${otherId}`)
+        failures += 1
+        continue
+      }
+      const mine = revisionsOf(inventory, vector.artifact)
+      const theirs = revisionsOf(inventory, other.artifact)
+      if (JSON.stringify(mine) !== JSON.stringify(theirs)) {
+        console.error(`${vector.id} and ${otherId} are declared to share revisions but do not`)
+        failures += 1
+      }
+      if (vector.artifact.integrityDigest === other.artifact.integrityDigest) {
+        console.error(`${vector.id} and ${otherId} differ in content but share an artifact digest`)
+        failures += 1
+      }
+    }
+  }
+  return failures
+}
+
 const document = JSON.parse(readFileSync(vectorsPath, 'utf8'))
+const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'))
 const failures =
   checkFraming() +
   checkRevisions(document.domain, document.vectors) +
-  checkDistinctness(document.vectors)
+  checkDistinctness(document.vectors) +
+  checkIntegrity(inventory.domain, inventory.vectors) +
+  checkSharedRevisions(inventory)
 
 if (failures > 0) {
   console.error(`\n${failures} vector check(s) failed`)
   process.exit(1)
 }
 console.log(`${document.vectors.length} revision vectors agree with an independent implementation`)
+console.log(
+  `${inventory.vectors.length} sealed inventories agree with an independent implementation`
+)

@@ -31,7 +31,7 @@
     "bench:messages:smoke": "vp run messages-bench#bench:smoke",
     "bench:messages:validate": "vp run messages-bench#validate",
     "schema:authoring:check": "cargo run -q -p intlify_authoring --example generate_authoring_schema -- --check",
-    "vectors:authoring:check": "cargo run -q -p intlify_authoring --example generate_revision_vectors -- --check && vp run shared-json-vectors#check",
+    "vectors:authoring:check": "cargo run -q -p intlify_authoring --example generate_revision_vectors -- --check && cargo run -q -p intlify_authoring --features test-context --example generate_inventory_vectors -- --check && vp run shared-json-vectors#check",
     "bench:config:smoke": "cargo bench -p intlify_config --bench profile_resolver --features benchmark -- --profile smoke --validate",
     "bench:authoring:smoke": "cargo bench -p intlify_authoring --bench authoring_semantics --features benchmark -- --profile smoke --validate",
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",

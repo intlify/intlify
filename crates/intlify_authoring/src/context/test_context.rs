@@ -266,6 +266,30 @@ impl AuthoringContext for TestContext {
     }
 }
 
+/// Admit an inventory whose basis is an explicitly test-owned context.
+///
+/// This is the only entry that admits a test context, and it exists only in a
+/// build that can construct one. Admitting through it establishes that the
+/// record is well formed and means what it claims under the test context. It
+/// establishes nothing about production: a test inventory stays a test
+/// inventory whatever reads it.
+pub fn admit_inventory(
+    bytes: &[u8],
+    context: &TestContext,
+    sources: &[crate::inventory::SourceBytes<'_>],
+    limits: &crate::limits::AuthoringLimits,
+    workspace: &mut crate::workspace::AnalysisWorkspace,
+) -> Result<crate::inventory::AdmittedInventory, crate::inventory::AdmissionFailure> {
+    crate::inventory::admit(
+        bytes,
+        context,
+        sources,
+        limits,
+        workspace,
+        crate::inventory::Entry::TestOwned,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
