@@ -15,7 +15,7 @@
 use intlify_shared_json::token::{valid_identity, IdentityFailure};
 
 use crate::limits::LimitKind;
-use crate::primitives::{ByteRange, Occurrence, SourceSnapshot};
+use crate::primitives::{ByteRange, Occurrence, PrimitiveError, SourceSnapshot};
 
 /// Reason families owned by design 016.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -298,14 +298,50 @@ pub enum Location {
     /// One classified occurrence, in an inventory-admissible role.
     Occurrence(Occurrence),
     /// A region of one unit that carries no inventory role.
-    Region {
-        /// The unit the region belongs to.
-        source: SourceSnapshot,
-        /// The addressed half-open range.
-        range: ByteRange,
-    },
+    Region(Region),
     /// One whole source unit, when no range inside it is meaningful.
     Unit(SourceSnapshot),
+}
+
+/// A region of one source unit that carries no inventory role.
+///
+/// The range is checked against the unit for the same reason
+/// [`Occurrence::new`] checks its own: a consumer that resolves the position
+/// against actual bytes would otherwise slice past the end of them. Carrying
+/// the check on one of the two and not the other would make the guarantee
+/// depend on which variant a reporter happened to pick.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Region {
+    source: SourceSnapshot,
+    range: ByteRange,
+}
+
+impl Region {
+    /// Validate and retain one region against its own unit.
+    pub fn new(source: SourceSnapshot, range: ByteRange) -> Result<Self, PrimitiveError> {
+        if range.end() > source.byte_length() {
+            return Err(PrimitiveError::RangeOutsideSource);
+        }
+        Ok(Self { source, range })
+    }
+
+    /// Borrow the unit this region belongs to.
+    #[must_use]
+    pub const fn source(&self) -> &SourceSnapshot {
+        &self.source
+    }
+
+    /// Return the addressed half-open range.
+    #[must_use]
+    pub const fn range(&self) -> ByteRange {
+        self.range
+    }
+}
+
+impl From<Region> for Location {
+    fn from(region: Region) -> Self {
+        Self::Region(region)
+    }
 }
 
 impl From<Occurrence> for Location {
@@ -320,7 +356,8 @@ impl Location {
     pub const fn source(&self) -> &SourceSnapshot {
         match self {
             Self::Occurrence(occurrence) => occurrence.source(),
-            Self::Region { source, .. } | Self::Unit(source) => source,
+            Self::Region(region) => region.source(),
+            Self::Unit(source) => source,
         }
     }
 
@@ -329,7 +366,7 @@ impl Location {
     pub const fn range(&self) -> Option<ByteRange> {
         match self {
             Self::Occurrence(occurrence) => Some(occurrence.range()),
-            Self::Region { range, .. } => Some(*range),
+            Self::Region(region) => Some(region.range()),
             Self::Unit(_) => None,
         }
     }
@@ -339,7 +376,7 @@ impl Location {
     pub const fn occurrence(&self) -> Option<&Occurrence> {
         match self {
             Self::Occurrence(occurrence) => Some(occurrence),
-            Self::Region { .. } | Self::Unit(_) => None,
+            Self::Region(_) | Self::Unit(_) => None,
         }
     }
 
@@ -349,7 +386,7 @@ impl Location {
     const fn rank(&self) -> u8 {
         match self {
             Self::Unit(_) => 0,
-            Self::Region { .. } => 1,
+            Self::Region(_) => 1,
             Self::Occurrence(_) => 2,
         }
     }
@@ -357,7 +394,7 @@ impl Location {
     const fn role_spelling(&self) -> &'static str {
         match self {
             Self::Occurrence(occurrence) => occurrence.role().as_str(),
-            Self::Region { .. } | Self::Unit(_) => "",
+            Self::Region(_) | Self::Unit(_) => "",
         }
     }
 
@@ -709,10 +746,8 @@ mod tests {
     fn a_location_without_an_inventory_role_is_still_reportable_and_ordered() {
         let classified = occurrence(4, 8, OccurrenceRole::UiLiteral);
         let source = classified.source().clone();
-        let annotation = Location::Region {
-            source: source.clone(),
-            range: ByteRange::new(4, 8).unwrap(),
-        };
+        let annotation =
+            Location::Region(Region::new(source.clone(), ByteRange::new(4, 8).unwrap()).unwrap());
         let whole = Location::Unit(source);
 
         // A region and a unit carry no classified occurrence, so a consumer
@@ -732,6 +767,22 @@ mod tests {
         locations.sort_by(Location::canonical_cmp);
         assert_eq!(locations[0], whole);
         assert_eq!(locations[1], annotation);
+    }
+
+    #[test]
+    fn a_region_is_checked_against_its_own_unit() {
+        // The same guarantee as a classified occurrence: a consumer resolving
+        // the position against real bytes must not be handed a range that
+        // runs past them. Which variant a reporter picked cannot decide
+        // whether that holds.
+        let source = occurrence(0, 4, OccurrenceRole::UiLiteral).source().clone();
+        let length = source.byte_length();
+        assert!(Region::new(source.clone(), ByteRange::new(0, length).unwrap()).is_ok());
+        assert_eq!(
+            Region::new(source, ByteRange::new(0, length + 1).unwrap()),
+            Err(PrimitiveError::RangeOutsideSource),
+            "one byte past the unit is refused, exactly as Occurrence::new refuses it"
+        );
     }
 
     #[test]

@@ -725,6 +725,32 @@ fn the_three_parameter_causes_report_in_one_fixed_order() {
 }
 
 #[test]
+fn a_broken_host_map_fails_even_when_the_declaration_is_blocked_anyway() {
+    // A map that does not describe the text is the host's mistake whatever the
+    // author wrote. Checking it only on the way out would report an
+    // integration bug for a clean declaration and stay silent for a blocked
+    // one, so whether a host heard about its own bug would depend on what the
+    // author happened to type.
+    let short = [InputSegment::new(
+        ByteRange::new(0, 2).unwrap(),
+        ByteRange::new(1, 3).unwrap(),
+    )];
+    let mut input = declaration(MessageInput::Literal("a\u{0}b"));
+    input.input_map = Some(&short);
+    assert_eq!(
+        resolve(&context(), &[input]),
+        Err(AuthoringFailure::InputMap(MappingError::Coverage)),
+        "the host bug is reported, not the blocked declaration it hid behind"
+    );
+
+    // Without the broken map the same text is a blocked declaration, which is
+    // what makes the case above about the map rather than about the text.
+    let blocked = resolve(&context(), &[declaration(MessageInput::Literal("a\u{0}b"))])
+        .expect("an invocation that ran");
+    assert_eq!(blocked.outcome(), Outcome::Blocked);
+}
+
+#[test]
 fn a_declaration_without_a_use_site_does_not_owe_parameters() {
     // A reusable declaration is written before anything references it. Reading
     // that absence as an empty parameter object would block every message with

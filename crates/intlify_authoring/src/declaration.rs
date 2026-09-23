@@ -19,8 +19,8 @@ use crate::diagnostic::{
 };
 use crate::limits::{AuthoringLimits, LimitKind};
 use crate::message::{
-    analyze_message, compose_extraction_map, ExtractionSegment, InputSegment, MappingError,
-    MessageFailure, MessageInput,
+    analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
+    MappingError, MessageFailure, MessageInput,
 };
 use crate::primitives::{ByteRange, NonemptyText, Occurrence, PrimitiveError};
 use crate::projection::{intent_projection, IntentProjection, Usage};
@@ -443,6 +443,17 @@ fn resolve_one(
         return Ok(None);
     }
 
+    // A map that does not describe the text is the host's mistake whatever the
+    // author wrote, so it is checked before anything that could block this
+    // declaration first. Checking it only on the way out would report a host
+    // integration bug for a clean declaration and stay silent for a blocked
+    // one, which is the opposite of how the two kinds of failure are meant to
+    // separate.
+    if let Some(map) = input.input_map {
+        validate_input_map(map, input.message.text(), &input.occurrence)
+            .map_err(input_map_failure)?;
+    }
+
     let analysis = match analyze_message(input.message, &input.occurrence, limits, workspace) {
         Ok(analysis) => analysis,
         Err(MessageFailure::UnrepresentableScalar { offset }) => {
@@ -531,13 +542,19 @@ fn extraction_map(
         limits,
     )
     .map(Vec::into_boxed_slice)
-    // A named bound reports as that bound whichever path exhausted it. A host
-    // matching on the failure to name which limit it hit would otherwise have
-    // to know whether it happened to supply a map.
-    .map_err(|failure| match failure {
+    .map_err(input_map_failure)
+}
+
+/// Report a composition failure as the kind of failure it actually is.
+///
+/// A named bound reports as that bound whichever path exhausted it. A host
+/// matching on the failure to name which limit it hit would otherwise have to
+/// know whether it happened to supply a map.
+const fn input_map_failure(failure: MappingError) -> AuthoringFailure {
+    match failure {
         MappingError::Limit(kind) => AuthoringFailure::Limit(kind),
         other => AuthoringFailure::InputMap(other),
-    })
+    }
 }
 
 /// Report displayed text that MF2 pattern text cannot carry.

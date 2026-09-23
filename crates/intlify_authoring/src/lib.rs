@@ -67,13 +67,13 @@ pub use declaration::{
     Outcome, ParameterBinding, SourceLocaleBasis,
 };
 pub use diagnostic::{
-    detail, Detail, Diagnostic, DiagnosticOrigin, Location, MessageRange, ReasonFamily, Severity,
-    Stage,
+    detail, Detail, Diagnostic, DiagnosticOrigin, Location, MessageRange, ReasonFamily, Region,
+    Severity, Stage,
 };
 pub use limits::{AuthoringLimits, LimitKind, LimitsError};
 pub use message::{
-    analyze_message, compose_extraction_map, ExtractionSegment, InputSegment, MappingError,
-    MessageAnalysis, MessageFacts, MessageFailure, MessageInput,
+    analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
+    MappingError, MessageAnalysis, MessageFacts, MessageFailure, MessageInput,
 };
 pub use primitives::{
     ByteRange, ExactInputBinding, MessageIntentId, NonemptyText, Opaque128, OwnerIdentity,

@@ -61,6 +61,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | A reported range resolves back through the map | `a_reported_range_addresses_real_bytes_and_resolves_through_the_segments` |
 | Composition with a host's own map | `a_verbatim_run_slices_and_the_generated_delimiters_become_insertion_points`, `a_host_escape_keeps_its_own_span_and_splits_the_run_around_it`, `an_mf2_escape_inside_a_verbatim_run_resolves_to_the_character_it_escaped`, `multibyte_text_composes_on_scalar_boundaries`, `a_crlf_the_host_normalized_answers_for_both_of_its_bytes`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `empty_text_still_has_a_position_in_source`, `a_declaration_ending_at_the_unit_boundary_composes`, `authored_mf2_composes_through_its_identity_segment` |
 | A map that does not describe the text | `a_map_that_does_not_describe_the_text_is_refused_for_the_reason_it_fails`, `a_host_map_that_does_not_describe_the_text_fails_the_invocation` |
+| A host mistake is reported whatever the author wrote | `a_broken_host_map_fails_even_when_the_declaration_is_blocked_anyway` |
 | A boundary inside a scalar | `a_boundary_inside_a_scalar_is_refused_rather_than_sliced` |
 | Text the host dropped, before and after the content | `dropped_text_before_the_content_is_not_where_the_content_begins`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `dropped_text_in_the_middle_of_a_run_contributes_no_segment_of_its_own` |
 | Omitting a map is not supplying a broken one | `a_host_map_moves_the_extraction_map_into_source_and_omitting_one_does_not` |
@@ -174,6 +175,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | A reused workspace agrees with fresh ones | `a_reused_workspace_agrees_with_fresh_ones_across_the_whole_fixture`, `fresh_and_reused_workspaces_agree_after_success_and_failure` |
 | Reuse after success and after failure | same tests |
 | Clearing leaves no semantic state and keeps capacity | `clearing_retains_capacity_and_leaves_no_semantic_state` |
+| A diagnostic region is checked against its unit | `a_region_is_checked_against_its_own_unit` |
 | Returned values borrow nothing from the scratch | `retained_evidence_is_readable_by_a_caller`; the encoder's contract is stated on `literal::encode` |
 | Bounds that no invocation could satisfy are rejected | `bounds_that_no_invocation_could_satisfy_are_rejected` |
 | A bound holds however many records arrive | `the_sink_never_grows_past_its_budget_however_many_arrive`, `a_mismatch_is_answered_by_the_return_value_not_by_what_survived_the_bound` |

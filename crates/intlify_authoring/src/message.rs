@@ -27,7 +27,7 @@ mod mapping;
 
 pub use analysis::{analyze_message, MessageAnalysis, MessageFacts, MessageFailure, MessageInput};
 pub use literal::ExtractionSegment;
-pub use mapping::{compose_extraction_map, InputSegment, MappingError};
+pub use mapping::{compose_extraction_map, validate_input_map, InputSegment, MappingError};
 
 // The harness measures the encoder at its own boundary, so it needs the entry
 // point `analyze_message` calls rather than the combined operation.

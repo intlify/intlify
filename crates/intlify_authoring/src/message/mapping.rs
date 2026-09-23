@@ -227,6 +227,20 @@ pub fn compose_extraction_map(
 
 /// Check that an input map describes exactly the supplied text.
 ///
+/// A caller validates before it knows whether it will compose, because a map
+/// that does not describe the text is the host's mistake either way. Leaving
+/// the check inside composition would report that mistake only for the
+/// declarations that happened to be otherwise clean.
+pub fn validate_input_map(
+    input_map: &[InputSegment],
+    text: &str,
+    occurrence: &Occurrence,
+) -> Result<(), MappingError> {
+    validate(input_map, text, occurrence)
+}
+
+/// Check that an input map describes exactly the supplied text.
+///
 /// The decoded side is checked against the text itself, not only against its
 /// length. A boundary inside a Unicode scalar would be sliced by the composer
 /// and would put mid-scalar offsets into the emitted map, and a consumer
