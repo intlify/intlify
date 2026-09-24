@@ -1,0 +1,233 @@
+{
+  "note": "Host-side cases of design 016's Extraction fixture family. Each case names one source file by its exact byte length and digest, so a file whose line endings or byte order mark were rewritten fails before anything is decoded. Every string literal and template element in the file is listed in source order. A string literal's span includes its quotes; a template element's span is its content alone. A decoded literal gives its text and its input map as [decodedStart, decodedEnd, sourceStart, sourceEnd] runs; one the profile does not accept gives the form and the source range of the escape that makes it so. Every value here was derived by hand from the ECMAScript grammar and the bytes of the file, not copied from the decoder.",
+  "cases": [
+    {
+      "id": "quotes",
+      "file": "extraction/quotes.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 52,
+      "utf8Digest": "sha256:1e03dd58e1bd10eabd28c723ca1d6ca2e0564ac2db865b8adafb527022336462",
+      "literals": [
+        { "span": [2, 11], "text": "Pay now", "inputMap": [[0, 7, 3, 10]] },
+        { "span": [15, 24], "text": "Pay now", "inputMap": [[0, 7, 16, 23]] },
+        { "span": [29, 36], "text": "Pay now", "inputMap": [[0, 7, 29, 36]] },
+        { "span": [43, 50], "text": "Pay now", "inputMap": [[0, 7, 43, 50]] }
+      ]
+    },
+    {
+      "id": "newline",
+      "file": "extraction/newline.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 59,
+      "utf8Digest": "sha256:8a41b22d18b15f54afbf88c9803d11912e6a72b8d2c5f388d94641f7af816837",
+      "literals": [
+        {
+          "span": [2, 18],
+          "text": "Line 1\nLine 2",
+          "inputMap": [
+            [0, 6, 3, 9],
+            [6, 7, 9, 11],
+            [7, 13, 11, 17]
+          ]
+        },
+        { "span": [23, 36], "text": "Line 1\nLine 2", "inputMap": [[0, 13, 23, 36]] },
+        {
+          "span": [43, 57],
+          "text": "Line 1\nLine 2",
+          "inputMap": [
+            [0, 6, 43, 49],
+            [6, 7, 49, 51],
+            [7, 13, 51, 57]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mf2-backslash",
+      "file": "extraction/mf2-backslash.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 64,
+      "utf8Digest": "sha256:90b83410e8abc5f8aaadfe7bc60b53de7f6244feca0a4fe3435f1ee4efb0bcfe",
+      "literals": [
+        {
+          "span": [2, 20],
+          "text": "Use \\{braces\\}",
+          "inputMap": [
+            [0, 4, 3, 7],
+            [4, 5, 7, 9],
+            [5, 12, 9, 16],
+            [12, 13, 16, 18],
+            [13, 14, 18, 19]
+          ]
+        },
+        {
+          "span": [26, 42],
+          "text": "Use \\{braces\\}",
+          "inputMap": [
+            [0, 4, 26, 30],
+            [4, 5, 30, 32],
+            [5, 12, 32, 39],
+            [12, 13, 39, 41],
+            [13, 14, 41, 42]
+          ]
+        },
+        {
+          "span": [46, 62],
+          "text": "Use {braces}",
+          "inputMap": [
+            [0, 4, 47, 51],
+            [4, 5, 51, 53],
+            [5, 11, 53, 59],
+            [11, 12, 59, 61]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unicode",
+      "file": "extraction/unicode.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 67,
+      "utf8Digest": "sha256:aaa98bbaa097f7d9e5fdec54fbd248de6b57c5401a86bb9e54c50a3236552af4",
+      "literals": [
+        { "span": [2, 13], "text": "😀", "inputMap": [[0, 4, 3, 12]] },
+        { "span": [17, 31], "text": "😀", "inputMap": [[0, 4, 18, 30]] },
+        {
+          "span": [35, 50],
+          "text": "Aéé",
+          "inputMap": [
+            [0, 1, 36, 40],
+            [1, 3, 40, 46],
+            [3, 5, 46, 49]
+          ]
+        },
+        { "span": [54, 65], "text": "日本語", "inputMap": [[0, 9, 55, 64]] }
+      ]
+    },
+    {
+      "id": "continuation",
+      "file": "extraction/continuation.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 32,
+      "utf8Digest": "sha256:cbbb399b8c007bdd445d68a95914be02f19321d1266846a5af5e0cecfaf6722d",
+      "literals": [
+        {
+          "span": [2, 8],
+          "text": "ab",
+          "inputMap": [
+            [0, 1, 3, 4],
+            [1, 1, 4, 6],
+            [1, 2, 6, 7]
+          ]
+        },
+        {
+          "span": [12, 19],
+          "text": "ab",
+          "inputMap": [
+            [0, 1, 13, 14],
+            [1, 1, 14, 17],
+            [1, 2, 17, 18]
+          ]
+        },
+        {
+          "span": [24, 29],
+          "text": "ab",
+          "inputMap": [
+            [0, 1, 24, 25],
+            [1, 1, 25, 28],
+            [1, 2, 28, 29]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template-crlf",
+      "file": "extraction/template-crlf.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 25,
+      "utf8Digest": "sha256:f3f4d77fd3ad2fe7173abcf2f07ac3b2a017e6573074993e5ec87154c6ba8553",
+      "literals": [
+        {
+          "span": [4, 23],
+          "text": "one\ntwo\nthree\nfour",
+          "inputMap": [
+            [0, 3, 4, 7],
+            [3, 4, 7, 9],
+            [4, 18, 9, 23]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bom",
+      "file": "extraction/bom.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 16,
+      "utf8Digest": "sha256:a0034b6f7e4fe8a46d7a10273623f991962e374bfa67587f6af3cb12621ff732",
+      "literals": [{ "span": [5, 14], "text": "Pay now", "inputMap": [[0, 7, 6, 13]] }]
+    },
+    {
+      "id": "hashbang",
+      "file": "extraction/hashbang.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 33,
+      "utf8Digest": "sha256:2990efd567120fecd0e23663825bcf343cef925fd2e5d1113f6ebaa346fed435",
+      "literals": [{ "span": [22, 31], "text": "Pay now", "inputMap": [[0, 7, 23, 30]] }]
+    },
+    {
+      "id": "surrogates",
+      "file": "extraction/surrogates.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 64,
+      "utf8Digest": "sha256:3f7b33ad72737932ec8fee75467432e14b7c169c44f12fe880c7861e19b67402",
+      "literals": [
+        { "span": [2, 10], "unsupported": "surrogate-escape", "at": [3, 9] },
+        { "span": [15, 21], "unsupported": "surrogate-escape", "at": [15, 21] },
+        { "span": [26, 42], "unsupported": "surrogate-escape", "at": [27, 33] },
+        { "span": [46, 62], "unsupported": "surrogate-escape", "at": [47, 53] }
+      ]
+    },
+    {
+      "id": "tagged-invalid-escape",
+      "file": "extraction/tagged-invalid-escape.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 14,
+      "utf8Digest": "sha256:ed3fe75d6df72af46b5006beec8aeb2d802c84ebb1883fb7bdbb683d1469e03f",
+      "literals": [
+        { "span": [2, 5], "unsupported": "template-escape-invalid", "at": [2, 5] },
+        { "span": [9, 12], "unsupported": "template-escape-invalid", "at": [9, 12] }
+      ]
+    },
+    {
+      "id": "legacy-escape",
+      "file": "extraction/legacy-escape.js",
+      "grammar": "intlify-grammar-js-script",
+      "byteLength": 26,
+      "utf8Digest": "sha256:ed5d84b2cd7c093cb9d9134c16eacb15ab7247c8b55911e27eb63bb377358f78",
+      "literals": [
+        { "span": [2, 8], "unsupported": "legacy-escape", "at": [3, 7] },
+        { "span": [12, 16], "unsupported": "legacy-escape", "at": [13, 15] },
+        { "span": [20, 24], "text": "\u0000", "inputMap": [[0, 1, 21, 23]] }
+      ]
+    },
+    {
+      "id": "no-trim",
+      "file": "extraction/no-trim.js",
+      "grammar": "intlify-grammar-js-module",
+      "byteLength": 34,
+      "utf8Digest": "sha256:3cfd0158c885e728c950f2f081e84df152d285a73e4f47bfb158ec92791cb34a",
+      "literals": [
+        { "span": [2, 15], "text": "  Pay now  ", "inputMap": [[0, 11, 3, 14]] },
+        { "span": [21, 32], "text": "\n  Pay now\n", "inputMap": [[0, 11, 21, 32]] }
+      ]
+    },
+    {
+      "id": "typescript",
+      "file": "extraction/typescript.ts",
+      "grammar": "intlify-grammar-ts-module",
+      "byteLength": 42,
+      "utf8Digest": "sha256:7a1975be493392321dd2a42258f13b782a4e9516ab2e0749d80be0ba54b479b1",
+      "literals": [{ "span": [22, 31], "text": "Pay now", "inputMap": [[0, 7, 23, 30]] }]
+    }
+  ]
+}

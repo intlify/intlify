@@ -97,10 +97,10 @@ Admission never trusts what an artifact says about itself. The digest is recompu
 
 The ordinary entry admits nothing in this phase. It refuses the test context, which an ordinary build cannot construct, and it refuses the production kinds, which need checked 015 inputs and the 017/018 work later phases own. The test-owned entry is `test_context::admit_inventory`.
 
-What Phase 2 has to add on top:
+What Phase 2 has to add on top, in [`intlify_authoring_js`](../intlify_authoring_js/README.md):
 
-- **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers.
-- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules.
+- **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers. Unit admission and reading each unit under an explicit grammar exist; recognition does not yet.
+- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules. The decoder exists and is checked against the parser; the recognizers that hand its output here do not yet.
 - **Usage profile registration** — semantic usage is admitted only under a registered profile, and Phase 1 admits none from production.
 - **Enumerating references and exclusions** — finding them in host source; the representation they go into exists.
 
