@@ -861,3 +861,42 @@ fn every_committed_vector_is_admitted_from_its_committed_bytes() {
         );
     }
 }
+
+#[test]
+fn a_reference_target_has_to_be_its_declaration_exactly() {
+    // The canonical order compares everything about a snapshot except its
+    // declared length. A target that agrees with its declaration on all of
+    // that but names a different length is a contradiction about the source,
+    // not a second name for the same declaration.
+    let context = context();
+    let parts = parts("checkout", SOURCE, &context);
+    let declaration = parts.declarations[0].occurrence().clone();
+    let longer = SourceSnapshot::new(
+        owner(),
+        "checkout",
+        "1",
+        VersionedIdentity::literal("intlify-grammar-js-module", "0"),
+        SOURCE.len() as u64 + 1,
+        parts.source.utf8_digest().as_str(),
+    )
+    .unwrap();
+    let conflicting = Occurrence::new(longer, declaration.range(), declaration.role()).unwrap();
+    assert_eq!(
+        conflicting.canonical_cmp(&declaration),
+        std::cmp::Ordering::Equal,
+        "the two are neighbours in canonical order, which is what hid the conflict"
+    );
+
+    let mut builder = builder(&context, Completeness::Complete);
+    builder.unit(UnitResult::new(parts.source, UnitOutcome::Checked));
+    builder.declarations(parts.declarations);
+    builder.reference(ReferenceFacts::new(
+        parts.references[0].occurrence().clone(),
+        vec![conflicting],
+        vec![],
+    ));
+    assert_eq!(
+        builder.finish().unwrap_err(),
+        InventoryFailure::UnresolvedReference
+    );
+}

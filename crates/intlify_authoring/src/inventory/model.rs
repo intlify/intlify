@@ -331,11 +331,14 @@ impl AuthoringInventory {
             }
             canonical(reference.declarations.iter())?;
             for target in &*reference.declarations {
-                if declared
-                    .binary_search_by(|candidate| candidate.canonical_cmp(target))
-                    .is_err()
-                {
-                    return Err(InventoryFailure::UnresolvedReference);
+                // The canonical order leaves out a snapshot's declared length,
+                // so finding a neighbour at the same position is not enough. A
+                // target is never checked against its unit on its own, and a
+                // declaration always is, so requiring the two to be equal is
+                // what carries that check over to the target.
+                match declared.binary_search_by(|candidate| candidate.canonical_cmp(target)) {
+                    Ok(index) if declared[index] == target => {}
+                    _ => return Err(InventoryFailure::UnresolvedReference),
                 }
             }
             let mut names = BTreeSet::new();
