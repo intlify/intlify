@@ -66,7 +66,8 @@ Implemented:
 - external parameter requirements, and their comparison with the use site;
 - source-locale, surface-class, usage and description resolution against a checked context;
 - design 017's semantic projection, its committed JSON Schema, and the Intent revision taken over it, with independent vectors re-hashed by a separate implementation;
-- observational measurement of four operations, producing design 026's records through the shared implementation in `intlify_measurement`.
+- observational measurement of four operations, producing design 026's records through the shared implementation in `intlify_measurement`;
+- design 017's `authoring-inventory`: the declared scope of one analysis, sealed under an integrity digest, with its committed JSON Schema, its admission, and independent vectors re-hashed by a separate implementation.
 
 The fixture matrix in [`fixtures/phase1/README.md`](fixtures/phase1/README.md) maps each requirement to the test that pins it, and names the rows a later phase owns.
 
@@ -79,13 +80,28 @@ A host Producer is the next phase's work. The entry points it will use already e
 - `compare_parameters` for a reference, whose declaration was analysed separately, reporting into the caller's own bounded collector;
 - `compose_extraction_map` to carry the extraction map back through the host's own decoding;
 - `SourceSnapshot::verify` to turn supplied bytes into evidence before addressing ranges in them;
-- `AuthoringLimits` for the bounds, and `AnalysisWorkspace` for scratch reuse across declarations.
+- `AuthoringLimits` for the bounds, and `AnalysisWorkspace` for scratch reuse across declarations;
+- `InventoryBuilder` to assemble what one analysis found into the representation a later phase consumes, and `InventoryArtifact::seal` to seal it.
+
+## The inventory
+
+An inventory records one analysis: the scope the caller declared, what happened to each unit in it, and the declarations, references and exclusions found. Three questions about it are kept apart, because they have different answers.
+
+| Question | Answered by | Why it is separate |
+| --- | --- | --- |
+| Is the record well formed? | `AuthoringInventory::validate` | Order, duplicates, roles, owners and references can be checked without knowing anything else |
+| Does it mean what it claims under this context? | `admit_inventory` | A projection is rebuilt from the retained MF2 and compared; locale, class and usage are checked against the context the caller supplies |
+| Is it complete checked input a build may rely on? | `AuthoringInventory::is_complete_checked` | A complete scope in which a unit failed is a legitimate record of an attempt that did not succeed, not a malformed one |
+
+Admission never trusts what an artifact says about itself. The digest is recomputed, the projection is recomputed, and supplied bytes are checked against each unit's snapshot before any range inside it is believed. A unit whose bytes were not supplied is admitted but named as unverified, because a range checked against real bytes is a stronger result than one checked for shape.
+
+The ordinary entry admits nothing in this phase. It refuses the test context, which an ordinary build cannot construct, and it refuses the production kinds, which need checked 015 inputs and the 017/018 work later phases own. The test-owned entry is `test_context::admit_inventory`.
 
 What Phase 2 has to add on top:
 
 - **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers.
 - **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules.
 - **Usage profile registration** — semantic usage is admitted only under a registered profile, and Phase 1 admits none from production.
-- **References and inventory** — enumerating reference sites and assembling the authoring inventory.
+- **Enumerating references and exclusions** — finding them in host source; the representation they go into exists.
 
 Phase 3 adds identity: allocating a `MessageIntentId`, the registry artifacts and their codecs, and reconciling declaration history. Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.

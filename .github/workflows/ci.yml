@@ -117,6 +117,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run bench:authoring:smoke
 
+      - name: Validate authoring schemas and independent vectors
+        if: runner.os == 'Linux'
+        run: vp run schema:authoring:check && vp run vectors:authoring:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

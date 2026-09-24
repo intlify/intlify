@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Draft 7 generation for the projection this crate owns.
+//! Draft 7 generation for the representations this crate owns.
 //!
 //! The schema is a version-controlled companion to design 017, not a consumer
 //! selected plugin schema or a distribution URL. Every implementation admitting
@@ -11,11 +11,40 @@
 use schemars::{generate::SchemaSettings, JsonSchema};
 use serde_json::Value;
 
+use crate::inventory::InventoryArtifact;
 use crate::projection::IntentProjection;
+
+/// One committed schema: its generator and where it lives in this crate.
+pub struct CommittedSchema {
+    /// The path of the committed artifact, relative to the crate root.
+    pub path: &'static str,
+    /// Generate the schema the committed artifact must equal.
+    pub generate: fn() -> Result<Value, serde_json::Error>,
+}
+
+/// Every schema this crate commits, in the order they are checked.
+pub const COMMITTED_SCHEMAS: [CommittedSchema; 2] = [
+    CommittedSchema {
+        path: "schema/intent-projection-v0.schema.json",
+        generate: intent_projection_schema,
+    },
+    CommittedSchema {
+        path: "schema/authoring-inventory-v0.schema.json",
+        generate: authoring_inventory_schema,
+    },
+];
 
 /// Generate the complete closed schema of the semantic projection.
 pub fn intent_projection_schema() -> Result<Value, serde_json::Error> {
     draft7_schema::<IntentProjection>()
+}
+
+/// Generate the complete closed schema of a sealed `authoring-inventory`.
+///
+/// This is the whole artifact, envelope included, because the envelope is
+/// where the kind, schema revision and specification are pinned.
+pub fn authoring_inventory_schema() -> Result<Value, serde_json::Error> {
+    draft7_schema::<InventoryArtifact>()
 }
 
 /// Generate one model's Draft 7 schema without the generator-only root `$id`.
@@ -67,6 +96,7 @@ mod tests {
     use super::*;
 
     const COMMITTED: &str = include_str!("../schema/intent-projection-v0.schema.json");
+    const COMMITTED_INVENTORY: &str = include_str!("../schema/authoring-inventory-v0.schema.json");
 
     #[test]
     fn the_committed_schema_matches_the_current_projection() {
@@ -77,6 +107,39 @@ mod tests {
             "regenerate with: cargo run -p intlify_authoring \
              --example generate_authoring_schema -- --write"
         );
+    }
+
+    #[test]
+    fn the_committed_inventory_schema_matches_the_current_artifact() {
+        let generated = authoring_inventory_schema().unwrap();
+        let committed: Value = serde_json::from_str(COMMITTED_INVENTORY).unwrap();
+        assert_eq!(
+            generated, committed,
+            "regenerate with: cargo run -p intlify_authoring \
+             --example generate_authoring_schema -- --write"
+        );
+    }
+
+    #[test]
+    fn the_inventory_envelope_pins_one_kind_revision_and_specification() {
+        // A schema that listed all five registered kinds would admit a
+        // message-intent envelope around an inventory body, which the reader
+        // refuses. Each pin is a single value for that reason.
+        let schema = authoring_inventory_schema().unwrap();
+        let definitions = &schema["definitions"];
+        assert_eq!(
+            definitions["InventoryKind"]["enum"],
+            serde_json::json!(["authoring-inventory"])
+        );
+        assert_eq!(
+            definitions["RevisionZero"]["enum"],
+            serde_json::json!(["0"])
+        );
+        assert_eq!(
+            definitions["Design016"]["enum"],
+            serde_json::json!(["intlify-design-016"])
+        );
+        assert_eq!(schema["additionalProperties"], serde_json::json!(false));
     }
 
     #[test]

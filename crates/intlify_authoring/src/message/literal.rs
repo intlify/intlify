@@ -21,6 +21,9 @@
 //! literal content. U+0000 is the one Unicode scalar that MF2 pattern text
 //! cannot carry in any form; it is reported rather than dropped or replaced.
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::limits::{AuthoringLimits, LimitKind};
 use crate::primitives::ByteRange;
 
@@ -34,7 +37,8 @@ const CLOSE: &str = "}}";
 /// cover every emitted byte. A source range may repeat, may be zero-width for a
 /// generated delimiter, and may cover fewer bytes than the emitted run it maps
 /// to. Equal lengths never by themselves assert a byte-for-byte correspondence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExtractionSegment {
     extracted: ByteRange,
     source: ByteRange,
