@@ -21,14 +21,16 @@ export default defineConfig({
       // ESM exporter fixtures pin canonical source bytes independently of Oxfmt.
       'crates/intlify_export/fixtures/esm/**',
       // Producer fixtures are exact parser inputs rather than project source.
-      'crates/intlify_producer_js/fixtures/**'
+      'crates/intlify_producer_js/fixtures/**',
+      'crates/intlify_authoring_js/fixtures/**'
     ]
   }),
   lint: defineLintConfig({
     ignorePatterns: [
       'refers/**',
       'crates/intlify_export/fixtures/esm/**',
-      'crates/intlify_producer_js/fixtures/**'
+      'crates/intlify_producer_js/fixtures/**',
+      'crates/intlify_authoring_js/fixtures/**'
     ],
     jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
     rules: {
