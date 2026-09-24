@@ -12,7 +12,9 @@ Design 016's Phase 2 adds a host Producer on top of the language-neutral semanti
 
 Each vector is a complete artifact rather than a preimage. The independent Node checker removes the top-level `integrityDigest` itself and re-hashes what remains, so it checks the exclusion rule as well as the framing and the hash.
 
-Two vectors declare that their declarations share revisions with the first. The checker recomputes every revision and confirms both halves of that claim: the artifacts differ, because source positions are part of what an inventory records, and the revisions do not, because positions are not part of what a message means.
+Each vector also carries the revision this crate computes for each of its declarations. The checker recomputes every revision itself and compares it with those, which is what ties the two implementations together on revisions as well as on integrity.
+
+Two vectors declare that their declarations share revisions with the first. With the revisions already tied to this crate's, the checker then confirms both halves of that claim: the artifacts differ, because source positions are part of what an inventory records, and the revisions do not, because positions are not part of what a message means. Comparing the checker's own answers across vectors without the first step would prove nothing, since equal projections agree under any deterministic function, including a wrong one.
 
 ## Regenerating
 

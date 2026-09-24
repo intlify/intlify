@@ -19,8 +19,8 @@ use std::process::ExitCode;
 
 use intlify_authoring::test_context::TestContext;
 use intlify_authoring::{
-    resolve_declarations, AnalysisWorkspace, AuthoringContext, AuthoringLimits, ByteRange,
-    Completeness, DeclarationInput, DeclarationMetadata, Exclusion, InputSegment,
+    intent_revision, resolve_declarations, AnalysisWorkspace, AuthoringContext, AuthoringLimits,
+    ByteRange, Completeness, DeclarationInput, DeclarationMetadata, Exclusion, InputSegment,
     InventoryArtifact, InventoryBuilder, MessageInput, Occurrence, OccurrenceRole, OwnerIdentity,
     OwnerKind, ParameterBinding, ReferenceFacts, SourceSnapshot, SurfaceVocabulary, UnitOutcome,
     UnitResult, VersionedIdentity, ARTIFACT_INTEGRITY_DOMAIN,
@@ -170,6 +170,34 @@ fn inventory(text: &str, failed_unit: bool, context: &TestContext) -> InventoryA
     InventoryArtifact::seal(builder.finish().expect("well formed")).expect("sealable")
 }
 
+/// One vector: the sealed artifact, and the revision this crate computes for
+/// each of its declarations.
+///
+/// The revisions are written out so the independent implementation compares
+/// what it computes with what this crate computes. Comparing its own results
+/// across vectors alone would pass for any deterministic function, including a
+/// wrong one, because equal projections give equal answers.
+fn vector(id: &str, note: &str, same: &[&str], artifact: &InventoryArtifact) -> serde_json::Value {
+    let revisions: Vec<String> = artifact
+        .body()
+        .declarations()
+        .iter()
+        .map(|facts| {
+            intent_revision(facts.projection())
+                .expect("a checked projection has a revision")
+                .as_str()
+                .to_owned()
+        })
+        .collect();
+    json!({
+        "id": id,
+        "note": note,
+        "sameRevisionsAs": same,
+        "revisions": revisions,
+        "artifact": artifact,
+    })
+}
+
 fn main() -> ExitCode {
     let write = matches!(std::env::args().nth(1).as_deref(), Some("--write"));
     let context = TestContext::builder(
@@ -183,24 +211,24 @@ fn main() -> ExitCode {
 
     let moved = format!("// moved below a new header\n{SOURCE}");
     let vectors = json!([
-        {
-            "id": "complete-checked",
-            "note": "One checked unit with two declarations, two references and an exclusion.",
-            "sameRevisionsAs": [],
-            "artifact": inventory(SOURCE, false, &context),
-        },
-        {
-            "id": "moved-source",
-            "note": "The same unit with a line added above it. Every position moves, so the artifact changes; no message changes, so no revision does.",
-            "sameRevisionsAs": ["complete-checked"],
-            "artifact": inventory(&moved, false, &context),
-        },
-        {
-            "id": "complete-with-failed-unit",
-            "note": "A complete scope in which one unit could not be read. A legitimate record, and not complete checked input.",
-            "sameRevisionsAs": ["complete-checked"],
-            "artifact": inventory(SOURCE, true, &context),
-        },
+        vector(
+            "complete-checked",
+            "One checked unit with two declarations, two references and an exclusion.",
+            &[],
+            &inventory(SOURCE, false, &context),
+        ),
+        vector(
+            "moved-source",
+            "The same unit with a line added above it. Every position moves, so the artifact changes; no message changes, so no revision does.",
+            &["complete-checked"],
+            &inventory(&moved, false, &context),
+        ),
+        vector(
+            "complete-with-failed-unit",
+            "A complete scope in which one unit could not be read. A legitimate record, and not complete checked input.",
+            &["complete-checked"],
+            &inventory(SOURCE, true, &context),
+        ),
     ]);
     let document = json!({
         "note": "Each vector is a complete sealed authoring-inventory artifact. An independent implementation removes the top-level integrityDigest, reframes the rest and re-hashes it under the domain below. It also recomputes every declaration's revision, and checks that vectors declared to share revisions do while their artifacts differ.",

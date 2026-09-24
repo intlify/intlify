@@ -133,10 +133,12 @@ function revisionsOf(inventory, artifact) {
 }
 
 /**
- * Check that vectors declared to share revisions do, while their artifacts differ.
+ * Check each vector's revisions against the Rust implementation, then check
+ * that vectors declared to share revisions do while their artifacts differ.
  *
- * This is the claim that source evidence is part of what an artifact records
- * and not part of what a message means, checked by recomputing both halves.
+ * The second half is the claim that source evidence is part of what an
+ * artifact records and not part of what a message means. It only means
+ * something once the first half has tied these revisions to Rust's.
  *
  * @param inventory - The inventory document.
  * @returns How many declared relations failed.
@@ -145,6 +147,16 @@ function checkSharedRevisions(inventory) {
   let failures = 0
   const byId = new Map(inventory.vectors.map(vector => [vector.id, vector]))
   for (const vector of inventory.vectors) {
+    // Compare with what the Rust implementation computed first. Without this,
+    // the relations below compare this implementation's answers with each
+    // other, and equal projections agree under any deterministic function.
+    const produced = revisionsOf(inventory, vector.artifact)
+    if (JSON.stringify(produced) !== JSON.stringify(vector.revisions)) {
+      console.error(
+        `${vector.id}:\n  committed revisions ${JSON.stringify(vector.revisions)}\n  produced  revisions ${JSON.stringify(produced)}`
+      )
+      failures += 1
+    }
     for (const otherId of vector.sameRevisionsAs) {
       const other = byId.get(otherId)
       if (other === undefined) {
