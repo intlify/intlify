@@ -32,7 +32,7 @@ getrandom = { version = "=0.4.3" }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # Locked safe clock APIs, for duration acquisition only.
-rustix = { version = "=1.1.4", features = ["time"], optional = true }
+rustix = { version = "=1.1.5", features = ["time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.

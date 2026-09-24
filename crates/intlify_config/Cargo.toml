@@ -42,7 +42,7 @@ blake3 = { version = "=1.8.7", optional = true }
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # The kernel view this owner reports; the clock belongs to the shared
 # acquisition module.
-rustix = { version = "=1.1.4", features = ["system"], optional = true }
+rustix = { version = "=1.1.5", features = ["system"], optional = true }
 # Fresh owner-run nonce; no timestamp, PID, hostname, or caller-supplied identity.
 getrandom = { version = "=0.4.3", optional = true }
 
