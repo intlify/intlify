@@ -29,6 +29,11 @@
 *.svg     text=auto eol=lf
 *.lock    text=auto eol=lf
 
+# Host source fixtures pin exact bytes, including CRLF line endings and a byte
+# order mark. Normalizing them would test different source than the case
+# declares, and each case checks its bytes against a digest to catch that.
+crates/intlify_authoring_js/fixtures/phase2/extraction/** -text
+
 # Exclude binaries from conversion.
 *.png     binary
 *.jpg     binary
