@@ -33,10 +33,13 @@
 //! continuation are each a run of their own: several source bytes produced
 //! fewer decoded ones, and no byte inside them answers for a byte of output.
 
-use intlify_authoring::{ByteRange, InputSegment};
+use intlify_authoring::{ByteRange, Detail, InputSegment, ReasonFamily};
 use oxc_ast::ast::{StringLiteral, TemplateElement};
 
+use crate::detail;
+use crate::failure::ProducerFailure;
 use crate::limits::{JsAuthoringLimits, JsLimitKind};
+use crate::report::Reporter;
 
 /// One decoded literal and where each run of its text came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,12 +62,12 @@ pub(crate) enum Unsupported {
 }
 
 impl Unsupported {
-    /// Return the exact spelling fixtures name this form by.
-    pub(crate) const fn as_str(self) -> &'static str {
+    /// Return the detail a diagnostic about this form carries.
+    pub(crate) fn detail(self) -> Detail {
         match self {
-            Self::SurrogateEscape => "surrogate-escape",
-            Self::TemplateEscapeInvalid => "template-escape-invalid",
-            Self::LegacyEscape => "legacy-escape",
+            Self::SurrogateEscape => detail::surrogate_escape(),
+            Self::TemplateEscapeInvalid => detail::template_escape_invalid(),
+            Self::LegacyEscape => detail::legacy_escape(),
         }
     }
 }
@@ -82,6 +85,28 @@ pub(crate) enum CookFailure {
     ///
     /// Neither reading can be trusted over the other, so this is operational.
     Disagreement,
+}
+
+/// Settle a decoding for a recognizer.
+///
+/// A form the profile does not accept becomes a diagnostic at the escape
+/// responsible, and the literal yields nothing. A bound or a disagreement with
+/// the parser stops the analysis.
+pub(crate) fn settle(
+    result: Result<Cooked, CookFailure>,
+    reporter: &mut Reporter,
+) -> Result<Option<Cooked>, ProducerFailure> {
+    match result {
+        Ok(cooked) => Ok(Some(cooked)),
+        Err(CookFailure::Unsupported(form, range)) => {
+            reporter.at_range(ReasonFamily::AuthoringFormUnsupported, form.detail(), range)?;
+            Ok(None)
+        }
+        Err(CookFailure::Limit(kind)) => Err(ProducerFailure::Limit(kind)),
+        Err(CookFailure::Disagreement) => Err(ProducerFailure::DecoderDisagreement {
+            unit: reporter.source().unit().clone(),
+        }),
+    }
 }
 
 /// Which literal syntax is being decoded.

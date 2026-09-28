@@ -7,9 +7,17 @@
 //! `Default`, so adding a bound is a compile error at each construction site
 //! rather than a hidden value that silently admits unbounded work.
 //!
+//! The shared crate's own bounds are carried inside, and where a bound means
+//! the same thing on both sides it is not repeated: the declarations one unit
+//! may hold are the declarations one shared invocation accepts, and one unit's
+//! diagnostics are bounded by the shared diagnostic limit, host and shared
+//! records together.
+//!
 //! Exhausting a bound is an operational failure, as it is in
 //! `intlify_authoring`: a result is never produced from work that stopped
 //! short.
+
+use intlify_authoring::{AuthoringLimits, LimitsError};
 
 /// Which named bound an invocation exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +32,12 @@ pub enum JsLimitKind {
     AstNodes,
     /// Input map segments of one decoded literal.
     InputSegments,
+    /// References one unit makes.
+    References,
+    /// Exclusions one unit makes.
+    Exclusions,
+    /// Parameters one use site supplies.
+    ParameterBindings,
 }
 
 impl JsLimitKind {
@@ -36,6 +50,9 @@ impl JsLimitKind {
             Self::TotalBytes => "total-bytes",
             Self::AstNodes => "ast-nodes",
             Self::InputSegments => "input-segments",
+            Self::References => "references",
+            Self::Exclusions => "exclusions",
+            Self::ParameterBindings => "parameter-bindings",
         }
     }
 }
@@ -45,6 +62,8 @@ impl JsLimitKind {
 pub enum JsLimitsError {
     /// A bound was supplied that no invocation could satisfy.
     UnsatisfiableBound(JsLimitKind),
+    /// The shared crate refused one of its own bounds.
+    Authoring(LimitsError),
 }
 
 /// Inclusive upper bounds applied to one invocation.
@@ -64,15 +83,24 @@ pub struct JsAuthoringLimits {
     pub ast_nodes: u64,
     /// Input map segments of one decoded literal.
     pub input_segments: u64,
+    /// References one unit makes.
+    pub references: u64,
+    /// Exclusions one unit makes.
+    pub exclusions: u64,
+    /// Parameters one use site supplies.
+    pub parameter_bindings: u64,
+    /// The shared crate's bounds, applied to each unit's declarations.
+    pub authoring: AuthoringLimits,
 }
 
 impl JsAuthoringLimits {
     /// Check that every bound can be satisfied by some invocation.
     ///
-    /// A zero bound is admitted where it has a meaning: a scope with no units
-    /// and a unit with no bytes are both real. Every parsed unit has at least
-    /// its program node, and every decoded literal has at least one segment,
-    /// even an empty one, so those two bounds have to be positive.
+    /// A zero bound is admitted where it has a meaning: a scope with no units,
+    /// a unit with no bytes, and a unit that may make no reference are all
+    /// real. Every parsed unit has at least its program node, and every
+    /// decoded literal has at least one segment, even an empty one, so those
+    /// two bounds have to be positive.
     pub fn validate(self) -> Result<Self, JsLimitsError> {
         for (value, kind) in [
             (self.ast_nodes, JsLimitKind::AstNodes),
@@ -82,12 +110,17 @@ impl JsAuthoringLimits {
                 return Err(JsLimitsError::UnsatisfiableBound(kind));
             }
         }
+        self.authoring
+            .validate()
+            .map_err(JsLimitsError::Authoring)?;
         Ok(self)
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use intlify_authoring::LimitKind;
+
     use super::*;
 
     pub(crate) fn generous() -> JsAuthoringLimits {
@@ -97,6 +130,22 @@ pub(crate) mod tests {
             total_bytes: 1024 * 1024,
             ast_nodes: 64 * 1024,
             input_segments: 1024,
+            references: 1024,
+            exclusions: 1024,
+            parameter_bindings: 64,
+            authoring: AuthoringLimits {
+                declarations: 1024,
+                message_text_bytes: 64 * 1024,
+                emitted_mf2_bytes: 128 * 1024,
+                extraction_segments: 4096,
+                parameter_names: 64,
+                parameter_name_bytes: 256,
+                metadata_value_bytes: 4096,
+                vocabulary_members: 256,
+                projection_nodes: 4096,
+                projection_depth: 32,
+                diagnostics: 256,
+            },
         }
     }
 
@@ -117,11 +166,24 @@ pub(crate) mod tests {
                 JsLimitKind::InputSegments
             ))
         );
-        // An empty scope and an empty unit are meaningful bounds, not defects.
+        // The shared bounds are checked by the crate that owns them.
+        let mut limits = generous();
+        limits.authoring.projection_depth = 0;
+        assert_eq!(
+            limits.validate(),
+            Err(JsLimitsError::Authoring(LimitsError::UnsatisfiableBound(
+                LimitKind::ProjectionDepth
+            )))
+        );
+        // An empty scope, an empty unit, and a unit allowed no reference,
+        // exclusion or parameter are meaningful bounds, not defects.
         let mut empty = generous();
         empty.units = 0;
         empty.unit_bytes = 0;
         empty.total_bytes = 0;
+        empty.references = 0;
+        empty.exclusions = 0;
+        empty.parameter_bindings = 0;
         assert!(empty.validate().is_ok());
     }
 
@@ -133,6 +195,9 @@ pub(crate) mod tests {
             JsLimitKind::TotalBytes,
             JsLimitKind::AstNodes,
             JsLimitKind::InputSegments,
+            JsLimitKind::References,
+            JsLimitKind::Exclusions,
+            JsLimitKind::ParameterBindings,
         ];
         let mut spellings: Vec<&str> = kinds.iter().map(|kind| kind.as_str()).collect();
         spellings.sort_unstable();

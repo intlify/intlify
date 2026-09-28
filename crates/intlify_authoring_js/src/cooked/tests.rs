@@ -580,7 +580,7 @@ fn extraction_fixtures_decode_to_their_hand_derived_text_and_map() {
                         Unsupported::LegacyEscape,
                     ]
                     .into_iter()
-                    .find(|candidate| candidate.as_str() == form)
+                    .find(|candidate| candidate.detail().as_str() == form)
                     .expect("a known form");
                     unsupported(form, start, end)
                 }

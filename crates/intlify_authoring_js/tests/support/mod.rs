@@ -4,35 +4,61 @@
 //! Inputs the integration tests name explicitly.
 //!
 //! Every value a Producer needs is written out here rather than defaulted:
-//! the owner, the context and its profile pin, the grammar of each unit, and
-//! every bound.
+//! the owner, the context and its profile pin, the registered intrinsics, the
+//! grammar of each unit, and every bound.
 
 #![allow(dead_code, reason = "each test file uses its own subset")]
 
 use intlify_authoring::test_context::TestContext;
 use intlify_authoring::{
-    Completeness, IntegrityDigest, OwnerIdentity, OwnerKind, SourceSnapshot, SurfaceVocabulary,
+    AuthoringLimits, Completeness, Detail, Diagnostic, IntegrityDigest, Location, Occurrence,
+    OccurrenceRole, OwnerIdentity, OwnerKind, ReasonFamily, SourceSnapshot, SurfaceVocabulary,
 };
 use intlify_authoring_js::{
-    admit_units, AdmittedUnit, Grammar, JsAuthoringLimits, JsAuthoringProfile, SourceUnit,
-    UnitMember,
+    admit_units, analyze_unit, AdmittedUnit, Grammar, Intrinsic, IntrinsicBinding,
+    JsAnalysisWorkspace, JsAuthoringLimits, JsAuthoringProfile, ProducerFailure, SourceUnit,
+    UnitAnalysis, UnitMember,
 };
 use intlify_shared_json::encoding::digest_bytes;
+
+/// The module the fixtures register their intrinsics under.
+///
+/// It names no published package; it is only the specifier the test profile
+/// registers, and a unit has to import it for anything to be recognized.
+pub const MODULE: &str = "fixture-authoring";
+
+/// The imports most fixtures begin with.
+pub const PRELUDE: &str = "import { intent, mf2, noIntent } from 'fixture-authoring'\n";
 
 pub fn owner() -> OwnerIdentity {
     OwnerIdentity::new(OwnerKind::Application, "storefront").expect("checked project id")
 }
 
 /// A test context pinned to the profile this Producer implements.
+///
+/// It supplies the default source locale and surface class a declaration
+/// without metadata resolves against.
 pub fn context() -> TestContext {
     TestContext::builder(
         owner(),
-        SurfaceVocabulary::new(["checkout"]).expect("a vocabulary"),
+        SurfaceVocabulary::new(["checkout", "nav"]).expect("a vocabulary"),
     )
     .authoring_profile(JsAuthoringProfile::new().identity().clone())
     .default_source_locale("en")
+    .default_surface_class("checkout")
     .build()
     .expect("checked test context")
+}
+
+/// The profile registering the three fixture intrinsics.
+pub fn profile() -> JsAuthoringProfile {
+    JsAuthoringProfile::new()
+        .with_bindings([
+            IntrinsicBinding::new(MODULE, "intent", Intrinsic::Intent),
+            IntrinsicBinding::new(MODULE, "mf2", Intrinsic::Mf2),
+            IntrinsicBinding::new(MODULE, "noIntent", Intrinsic::NoIntent),
+        ])
+        .expect("a consistent binding set")
 }
 
 pub fn limits() -> JsAuthoringLimits {
@@ -42,6 +68,22 @@ pub fn limits() -> JsAuthoringLimits {
         total_bytes: 256 * 1024,
         ast_nodes: 64 * 1024,
         input_segments: 1024,
+        references: 256,
+        exclusions: 256,
+        parameter_bindings: 64,
+        authoring: AuthoringLimits {
+            declarations: 256,
+            message_text_bytes: 64 * 1024,
+            emitted_mf2_bytes: 128 * 1024,
+            extraction_segments: 4096,
+            parameter_names: 64,
+            parameter_name_bytes: 256,
+            metadata_value_bytes: 4096,
+            vocabulary_members: 256,
+            projection_nodes: 4096,
+            projection_depth: 32,
+            diagnostics: 256,
+        },
     }
     .validate()
     .expect("satisfiable bounds")
@@ -85,4 +127,113 @@ pub fn admit<'b>(units: &[(&str, Grammar, &'b [u8])]) -> Vec<AdmittedUnit<'b>> {
 /// A probe that never asks to stop.
 pub fn never() -> bool {
     false
+}
+
+/// Read one unit under a profile that registers no intrinsic.
+pub fn read_unit<C>(
+    unit: &AdmittedUnit<'_>,
+    limits: &JsAuthoringLimits,
+    workspace: &mut JsAnalysisWorkspace,
+    cancelled: &C,
+) -> Result<UnitAnalysis, ProducerFailure>
+where
+    C: Fn() -> bool + ?Sized,
+{
+    analyze_unit(
+        &context(),
+        &JsAuthoringProfile::new(),
+        unit,
+        limits,
+        workspace,
+        cancelled,
+    )
+}
+
+/// Analyze one module-goal unit holding `text` under the fixture profile.
+pub fn analyze(text: &str) -> UnitAnalysis {
+    analyze_as(Grammar::JsModule, text)
+}
+
+/// Analyze one unit holding `text` under the fixture profile.
+pub fn analyze_as(grammar: Grammar, text: &str) -> UnitAnalysis {
+    try_analyze(grammar, text, &profile(), &limits()).expect("the analysis runs")
+}
+
+/// Analyze one unit, returning an operational failure instead of panicking.
+pub fn try_analyze(
+    grammar: Grammar,
+    text: &str,
+    profile: &JsAuthoringProfile,
+    limits: &JsAuthoringLimits,
+) -> Result<UnitAnalysis, ProducerFailure> {
+    let units = admit(&[("checkout", grammar, text.as_bytes())]);
+    analyze_unit(
+        &context(),
+        profile,
+        &units[0],
+        limits,
+        &mut JsAnalysisWorkspace::new(),
+        &never,
+    )
+}
+
+/// The half-open byte range of the only occurrence of `needle` in `text`.
+///
+/// Ranges are found in the source text itself rather than read back from
+/// the analysis, so an expectation never copies what it is checking.
+pub fn at(text: &str, needle: &str) -> (u64, u64) {
+    let mut found = text.match_indices(needle);
+    let (start, _) = found
+        .next()
+        .unwrap_or_else(|| panic!("{needle:?} is in the fixture"));
+    assert!(
+        found.next().is_none(),
+        "{needle:?} occurs once in the fixture"
+    );
+    (start as u64, (start + needle.len()) as u64)
+}
+
+/// The range of the `nth` occurrence of `needle`, counting from zero.
+pub fn nth(text: &str, needle: &str, nth: usize) -> (u64, u64) {
+    let (start, _) = text
+        .match_indices(needle)
+        .nth(nth)
+        .unwrap_or_else(|| panic!("{needle:?} occurs {} times", nth + 1));
+    (start as u64, (start + needle.len()) as u64)
+}
+
+/// The range an occurrence addresses, with its role.
+pub fn occurrence(occurrence: &Occurrence) -> (OccurrenceRole, (u64, u64)) {
+    let range = occurrence.range();
+    (occurrence.role(), (range.start(), range.end()))
+}
+
+/// One diagnostic reduced to what a fixture asserts about it: the reason's
+/// code, the cause within it, and the range it points at.
+pub type Reported = (String, Option<Detail>, Option<(u64, u64)>);
+
+/// Reduce one diagnostic to what a fixture asserts about it.
+pub fn reported(diagnostic: &Diagnostic) -> Reported {
+    let range = match diagnostic.location() {
+        Location::Region(region) => Some((region.range().start(), region.range().end())),
+        Location::Occurrence(occurrence) => {
+            Some((occurrence.range().start(), occurrence.range().end()))
+        }
+        Location::Unit(_) => None,
+    };
+    (
+        diagnostic.origin().code().to_owned(),
+        diagnostic.detail(),
+        range,
+    )
+}
+
+/// Every diagnostic of an analysis, reduced.
+pub fn diagnostics(analysis: &UnitAnalysis) -> Vec<Reported> {
+    analysis.diagnostics().iter().map(reported).collect()
+}
+
+/// A reduced diagnostic, spelled the way a fixture writes one.
+pub fn expect(family: ReasonFamily, detail: Detail, range: (u64, u64)) -> Reported {
+    (family.as_str().to_owned(), Some(detail), Some(range))
 }

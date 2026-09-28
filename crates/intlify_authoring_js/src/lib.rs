@@ -14,7 +14,9 @@
 //! caller supplied before anything is parsed: the context and profile pins,
 //! each unit's owner and grammar, its bytes against its snapshot, and the
 //! declared scope. [`analyze_unit`] then reads one admitted unit, parsing it
-//! exactly once under the grammar its snapshot names.
+//! exactly once under the grammar its snapshot names, recognizing the
+//! explicit authoring forms the profile registers, and handing what it found
+//! to `intlify_authoring`.
 //!
 //! The grammar is always the caller's choice. There is no API that picks one
 //! from a file name or suffix, and a unit that fails to parse is not retried
@@ -27,23 +29,23 @@
 //! phases supply.
 
 mod analysis;
-// Decoding a message literal belongs to the recognizers that find one; until
-// they exist, only the decoder's own tests reach it.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the explicit-form recognizers are its callers")
-)]
+mod binding;
 mod cooked;
 pub mod detail;
+mod explicit;
 mod failure;
 mod grammar;
 mod limits;
+mod parameters;
 mod parse;
 mod profile;
+mod report;
+mod syntax;
 mod unit;
 mod workspace;
 
-pub use analysis::{analyze_unit, UnitAnalysis, UnitWork};
+pub use analysis::{analyze_unit, UnitAnalysis, UnitFacts, UnitWork};
+pub use binding::{BindingError, Intrinsic, IntrinsicBinding};
 pub use failure::ProducerFailure;
 pub use grammar::{Grammar, GRAMMAR_REVISION};
 pub use limits::{JsAuthoringLimits, JsLimitKind, JsLimitsError};

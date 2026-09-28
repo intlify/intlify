@@ -21,3 +21,142 @@ pub fn unit_not_text() -> Detail {
 pub fn host_syntax_invalid() -> Detail {
     Detail::literal("host-syntax-invalid")
 }
+
+/// An intrinsic is referenced other than as the callee of a direct call, or
+/// for `mf2`, as the tag of a template.
+///
+/// Assigning it, passing it, calling it optionally or through `.call`,
+/// constructing it, and exporting it all use a known intrinsic in a way this
+/// profile does not read, so each is reported rather than treated as an
+/// ordinary value.
+#[must_use]
+pub fn intrinsic_use_unsupported() -> Detail {
+    Detail::literal("intrinsic-use-unsupported")
+}
+
+/// A registered module is imported other than by a direct named import.
+#[must_use]
+pub fn import_form_unsupported() -> Detail {
+    Detail::literal("import-form-unsupported")
+}
+
+/// `intent()` has no source, a spread argument, or more than two arguments.
+#[must_use]
+pub fn intent_arguments() -> Detail {
+    Detail::literal("intent-arguments")
+}
+
+/// `intent()` chooses its declaration with a condition.
+///
+/// 016-010 accepts conditional declaration selection but defers it past the
+/// first minimum, so the condition is not evaluated and neither alternative
+/// is chosen.
+#[must_use]
+pub fn conditional_selection() -> Detail {
+    Detail::literal("conditional-selection")
+}
+
+/// `intent()` names an imported binding, which only a module reference could
+/// resolve.
+#[must_use]
+pub fn module_reference() -> Detail {
+    Detail::literal("module-reference")
+}
+
+/// `intent()` names a binding that aliases a declaration instead of naming
+/// the declaration itself.
+#[must_use]
+pub fn declaration_alias() -> Detail {
+    Detail::literal("declaration-alias")
+}
+
+/// `intent()` and `noIntent()` are nested in each other, so one position is
+/// both localized and excluded.
+#[must_use]
+pub fn explicit_forms_nested() -> Detail {
+    Detail::literal("explicit-forms-nested")
+}
+
+/// A message source is a template with substitutions.
+#[must_use]
+pub fn template_substitution() -> Detail {
+    Detail::literal("template-substitution")
+}
+
+/// A message source is computed at run time.
+#[must_use]
+pub fn message_dynamic() -> Detail {
+    Detail::literal("message-dynamic")
+}
+
+/// A parameter argument is not an object literal.
+#[must_use]
+pub fn parameters_opaque() -> Detail {
+    Detail::literal("parameters-opaque")
+}
+
+/// A parameter object spreads another object.
+#[must_use]
+pub fn parameter_spread() -> Detail {
+    Detail::literal("parameter-spread")
+}
+
+/// A parameter's key is computed, or is not an identifier or a string.
+#[must_use]
+pub fn parameter_key() -> Detail {
+    Detail::literal("parameter-key")
+}
+
+/// A parameter is a getter, a setter, or a method.
+#[must_use]
+pub fn parameter_accessor() -> Detail {
+    Detail::literal("parameter-accessor")
+}
+
+/// A parameter object sets its own prototype with `__proto__: value`.
+#[must_use]
+pub fn parameter_prototype() -> Detail {
+    Detail::literal("parameter-prototype")
+}
+
+/// `noIntent()` has a spread argument or more than two arguments.
+#[must_use]
+pub fn exclusion_arguments() -> Detail {
+    Detail::literal("exclusion-arguments")
+}
+
+/// `noIntent()` gives no reason.
+#[must_use]
+pub fn exclusion_reason_missing() -> Detail {
+    Detail::literal("exclusion-reason-missing")
+}
+
+/// `noIntent()` gives a reason computed at run time.
+#[must_use]
+pub fn exclusion_reason_dynamic() -> Detail {
+    Detail::literal("exclusion-reason-dynamic")
+}
+
+/// `noIntent()` gives an empty reason.
+#[must_use]
+pub fn exclusion_reason_empty() -> Detail {
+    Detail::literal("exclusion-reason-empty")
+}
+
+/// A literal spells a surrogate the profile does not accept.
+#[must_use]
+pub fn surrogate_escape() -> Detail {
+    Detail::literal("surrogate-escape")
+}
+
+/// A tagged template keeps an escape that has no cooked value.
+#[must_use]
+pub fn template_escape_invalid() -> Detail {
+    Detail::literal("template-escape-invalid")
+}
+
+/// A literal uses a legacy octal escape, or `\8` or `\9`.
+#[must_use]
+pub fn legacy_escape() -> Detail {
+    Detail::literal("legacy-escape")
+}

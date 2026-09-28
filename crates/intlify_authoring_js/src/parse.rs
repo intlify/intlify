@@ -19,7 +19,7 @@ use oxc_allocator::Allocator;
 use oxc_ast::ast::{Program, Statement, TSModuleReference};
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_semantic::{SemanticBuilder, Stats};
+use oxc_semantic::{Semantic, SemanticBuilder, Stats};
 use oxc_span::GetSpan;
 
 use crate::failure::ProducerFailure;
@@ -27,10 +27,10 @@ use crate::grammar::Grammar;
 use crate::limits::{JsAuthoringLimits, JsLimitKind};
 
 /// What reading one unit established.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Reading {
+#[derive(Debug)]
+pub(crate) enum Reading<'a> {
     /// The unit is a valid program under its grammar.
-    Accepted(Stats),
+    Accepted(Box<Parsed<'a>>),
     /// The host rejected the unit.
     ///
     /// The range is the earliest one the host named that could be checked, or
@@ -38,15 +38,34 @@ pub(crate) enum Reading {
     Rejected(Option<ByteRange>),
 }
 
-/// Parse one unit and check it, releasing the tree before returning.
-pub(crate) fn read<C>(
-    arena: &Allocator,
-    text: &str,
+/// An accepted unit's tree and what the semantic pass built over it.
+///
+/// Both live in the workspace's arena. Nothing borrowed from them may outlive
+/// the analysis of this unit.
+pub(crate) struct Parsed<'a> {
+    pub(crate) program: &'a Program<'a>,
+    pub(crate) semantic: Semantic<'a>,
+    pub(crate) stats: Stats,
+}
+
+impl std::fmt::Debug for Parsed<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Parsed")
+            .field("stats", &self.stats)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Parse one unit and check it.
+pub(crate) fn read<'a, C>(
+    arena: &'a Allocator,
+    text: &'a str,
     grammar: Grammar,
     limits: &JsAuthoringLimits,
     unit: &Token,
     cancelled: &C,
-) -> Result<Reading, ProducerFailure>
+) -> Result<Reading<'a>, ProducerFailure>
 where
     C: Fn() -> bool + ?Sized,
 {
@@ -99,7 +118,11 @@ where
             (left, right) => left.or(right),
         }));
     }
-    Ok(Reading::Accepted(stats))
+    Ok(Reading::Accepted(Box::new(Parsed {
+        program,
+        semantic: semantic.semantic,
+        stats,
+    })))
 }
 
 /// What a finished parse says about the unit, before any tree is read.
@@ -193,39 +216,43 @@ mod tests {
         Token::new("checkout").unwrap()
     }
 
+    /// What `read` established, without the tree it borrowed.
+    #[derive(Debug)]
+    enum Summary {
+        Accepted(Stats),
+        Rejected(Option<ByteRange>),
+    }
+
     fn read_with<C>(
         grammar: Grammar,
         text: &str,
         limits: &JsAuthoringLimits,
         cancelled: &C,
-    ) -> Result<Reading, ProducerFailure>
+    ) -> Result<Summary, ProducerFailure>
     where
         C: Fn() -> bool + ?Sized,
     {
-        read(
-            &Allocator::default(),
-            text,
-            grammar,
-            limits,
-            &unit(),
-            cancelled,
-        )
+        let allocator = Allocator::default();
+        read(&allocator, text, grammar, limits, &unit(), cancelled).map(|reading| match reading {
+            Reading::Accepted(parsed) => Summary::Accepted(parsed.stats),
+            Reading::Rejected(range) => Summary::Rejected(range),
+        })
     }
 
-    fn read_as(grammar: Grammar, text: &str) -> Result<Reading, ProducerFailure> {
+    fn read_as(grammar: Grammar, text: &str) -> Result<Summary, ProducerFailure> {
         read_with(grammar, text, &generous(), &|| false)
     }
 
     fn accepted(grammar: Grammar, text: &str) -> Stats {
         match read_as(grammar, text) {
-            Ok(Reading::Accepted(stats)) => stats,
+            Ok(Summary::Accepted(stats)) => stats,
             other => panic!("{grammar:?} {text:?} is accepted, not {other:?}"),
         }
     }
 
     fn rejected(grammar: Grammar, text: &str) -> Option<ByteRange> {
         match read_as(grammar, text) {
-            Ok(Reading::Rejected(range)) => range,
+            Ok(Summary::Rejected(range)) => range,
             other => panic!("{grammar:?} {text:?} is rejected, not {other:?}"),
         }
     }
@@ -413,7 +440,7 @@ mod tests {
         limits.ast_nodes = count;
         assert!(matches!(
             read_with(Grammar::JsModule, text, &limits, &|| false),
-            Ok(Reading::Rejected(Some(found))) if found == range(4, 5)
+            Ok(Summary::Rejected(Some(found))) if found == range(4, 5)
         ));
         // One node over the bound stops the unit before the semantic checks
         // could reject it, so the limit is what is reported.

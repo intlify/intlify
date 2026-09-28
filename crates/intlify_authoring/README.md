@@ -99,9 +99,9 @@ The ordinary entry admits nothing in this phase. It refuses the test context, wh
 
 What Phase 2 has to add on top, in [`intlify_authoring_js`](../intlify_authoring_js/README.md):
 
-- **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers. Unit admission and reading each unit under an explicit grammar exist; recognition does not yet.
-- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules. The decoder exists and is checked against the parser; the recognizers that hand its output here do not yet.
+- **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers. Unit admission, intrinsic bindings, the explicit forms and exclusion markers exist; UI surface recognition and annotations do not yet.
+- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules. Done: explicit forms hand their decoded text here with its input map.
 - **Usage profile registration** — semantic usage is admitted only under a registered profile, and Phase 1 admits none from production.
-- **Enumerating references and exclusions** — finding them in host source; the representation they go into exists.
+- **Enumerating references and exclusions** — finding them in host source. Done for the explicit forms; references from UI surfaces come with their recognition.
 
 Phase 3 adds identity: allocating a `MessageIntentId`, the registry artifacts and their codecs, and reconciling declaration history. Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.
