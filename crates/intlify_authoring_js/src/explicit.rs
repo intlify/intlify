@@ -64,10 +64,21 @@ use crate::syntax::{static_string, transparent};
 /// count toward the interval.
 const PROBE_INTERVAL: u32 = 1024;
 
+/// What a declaration's text is written in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Source {
+    /// MF2, as `intent()` sources and `mf2` tags are.
+    Authored,
+    /// Displayed text, as a literal assigned to a proven sink is. Its braces
+    /// are characters, and it carries the sink's usage.
+    Displayed,
+}
+
 /// One declaration found in the unit, ready for the shared crate.
 #[derive(Debug)]
 pub(crate) struct Declared {
     pub(crate) occurrence: Occurrence,
+    pub(crate) source: Source,
     pub(crate) text: String,
     pub(crate) input_map: Vec<InputSegment>,
     /// What the declaration's own use site supplied, when it is used where it
@@ -93,6 +104,9 @@ pub(crate) struct Recognized {
     pub(crate) declarations: Vec<Declared>,
     pub(crate) uses: Vec<Used>,
     pub(crate) exclusions: Vec<Exclusion>,
+    /// The unit's intrinsic bindings, which later recognition reads to leave
+    /// explicit forms to this recognizer.
+    pub(crate) intrinsics: IntrinsicSymbols,
 }
 
 /// Recognize the explicit authoring forms of one accepted unit.
@@ -131,7 +145,9 @@ where
     }
     recognizer.resolve()?;
     recognizer.check_overlap()?;
-    Ok(recognizer.found)
+    let mut found = recognizer.found;
+    found.intrinsics = intrinsics;
+    Ok(found)
 }
 
 /// What a `const` binding is initialized with, when that matters here.
@@ -262,6 +278,7 @@ where
         let occurrence = self.reporter.occurrence(span, role)?;
         self.found.declarations.push(Declared {
             occurrence,
+            source: Source::Authored,
             text: cooked.text,
             input_map: cooked.input_map,
             parameters,
@@ -612,7 +629,7 @@ where
 ///
 /// Declarations that only touch, one ending where the next begins, do not
 /// overlap.
-fn overlapping(declarations: &[Declared]) -> bool {
+pub(crate) fn overlapping(declarations: &[Declared]) -> bool {
     let mut ranges: Vec<_> = declarations
         .iter()
         .map(|declared| declared.occurrence.range())
@@ -1229,6 +1246,7 @@ mod tests {
                 OccurrenceRole::IntentLiteral,
             )
             .unwrap(),
+            source: Source::Authored,
             text: String::new(),
             input_map: Vec::new(),
             parameters: None,

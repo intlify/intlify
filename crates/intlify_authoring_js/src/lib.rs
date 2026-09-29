@@ -15,8 +15,8 @@
 //! each unit's owner and grammar, its bytes against its snapshot, and the
 //! declared scope. [`analyze_unit`] then reads one admitted unit, parsing it
 //! exactly once under the grammar its snapshot names, recognizing the
-//! explicit authoring forms the profile registers, and handing what it found
-//! to `intlify_authoring`.
+//! explicit authoring forms the profile registers and the UI text assigned to
+//! proven DOM receivers, and handing what it found to `intlify_authoring`.
 //!
 //! The grammar is always the caller's choice. There is no API that picks one
 //! from a file name or suffix, and a unit that fails to parse is not retried
@@ -32,6 +32,7 @@ mod analysis;
 mod binding;
 mod cooked;
 pub mod detail;
+mod dom;
 mod explicit;
 mod failure;
 mod grammar;
@@ -51,6 +52,9 @@ pub use binding::{BindingError, Intrinsic, IntrinsicBinding};
 pub use failure::ProducerFailure;
 pub use grammar::{Grammar, GRAMMAR_REVISION};
 pub use limits::{JsAuthoringLimits, JsLimitKind, JsLimitsError};
-pub use profile::{JsAuthoringProfile, AUTHORING_PROFILE_IDENTITY, AUTHORING_PROFILE_REVISION};
+pub use profile::{
+    DomGlobal, JsAuthoringProfile, AUTHORING_PROFILE_IDENTITY, AUTHORING_PROFILE_REVISION,
+    TEXT_CONTENT_USAGE, USAGE_PROFILE_IDENTITY, USAGE_PROFILE_REVISION,
+};
 pub use unit::{admit_units, AdmittedUnit, SourceUnit, UnitMember};
 pub use workspace::JsAnalysisWorkspace;

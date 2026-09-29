@@ -4,7 +4,7 @@ JavaScript and TypeScript host Producer for [Intlify](../../design/000-intlify-o
 
 > [!IMPORTANT]
 >
-> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units and recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`. Automatic DOM recognition and `@intlify` metadata are not implemented yet. See [Current status](#current-status).
+> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, and recognizes ordinary UI text assigned to a proven DOM receiver. `@intlify` metadata is not implemented yet. See [Current status](#current-status).
 
 A Producer reads host source and hands [`intlify_authoring`](../intlify_authoring/README.md) what it found, already decoded. What a message means, what its use site must supply, its locale, class and revision are all decided there, so the same text never means different things depending on which host found it. This crate owns the part specific to JavaScript: which bytes a unit is, which grammar reads them, and what a literal decodes to and from where.
 
@@ -16,7 +16,7 @@ An invocation runs in two steps.
 
 `analyze_unit` then reads one admitted unit, parsing it exactly once under the grammar its snapshot names. A unit is accepted only when the parser reports nothing, the semantic checks carrying the language's early errors report nothing, and a script contains no module syntax. Anything else rejects the whole tree, and the unit fails with one diagnostic at the earliest range the parser named. Units are analyzed independently, so a caller can run them in any order or on several workers.
 
-An accepted unit is read for the explicit forms the profile registers, and what is found is handed to `intlify_authoring`. The result says whether the unit is checked, blocked or failed. Its facts are reachable through `checked()` only when every occurrence resolved; `inspection_facts()` returns what was independently established whatever the outcome, for inspection and not as complete input.
+An accepted unit is read for the explicit forms the profile registers and, when the profile admits the standard `document`, for UI text, and what is found is handed to `intlify_authoring`. The result says whether the unit is checked, blocked or failed. Its facts are reachable through `checked()` only when every occurrence resolved; `inspection_facts()` returns what was independently established whatever the outcome, for inspection and not as complete input.
 
 ## Grammars
 
@@ -75,6 +75,23 @@ The second argument is read only as a plain object literal: static keys, plain v
 
 `noIntent(value, reason)` needs a nonempty static reason. The value is not read. An exclusion whose value is itself `intent(...)` or an `mf2` tag, or an `intent()` whose source is `noIntent(...)`, is a contradiction and is reported without making either a fact.
 
+## Automatic UI text
+
+When the profile admits the standard `document` (`with_dom_globals([DomGlobal::Document])`), a static literal assigned with `=` to `textContent` of a proven receiver is displayed text. It becomes a `ui-literal` declaration with the `text-content` usage from the `intlify-web-dom-usage` profile, used where it is assigned, and its braces stay characters. A context reading such units has to register that usage profile.
+
+A receiver is proven when it starts at `document.querySelector()` or `document.createElement()` with exactly one static string, on the `document` global itself, and reaches the assignment through `const` aliases in the same function, and when nothing on any path to the assignment may have changed what its display property does. The walk follows each function's own control flow: branches, loops until nothing more changes, `switch` fallthrough, labels, and `try`, `catch` and `finally`, including jumps that leave through a `finally`. A reference to the receiver is harmless only as the object of a member access or a method call, an operand of a comparison, `typeof`, `!` or `void`, a condition, or the initializer of a `const` alias. Passing it anywhere, storing it, assigning it to another variable, returning, yielding or exporting it, deleting or computing its properties, changing its prototype, or capturing it in a closure invalidates it for every alias, and nothing restores it.
+
+What cannot be proven is not guessed:
+
+| Receiver | Literal assigned |
+| --- | --- |
+| No known origin: a parameter, `this.el`, an import, an object property, another DOM API | Outside the profile; counted by `outside_profile()` |
+| Known origin, not followed: `let` or `var`, a script's top level, an alias in another function, a use from another function, an origin without one static string, a function with `with` or a sloppy direct `eval` | Reported as `authoring-form-unsupported` |
+| Followed, but some path invalidated it | Reported as `receiver-evidence-invalidated` |
+| Past a bound: alias chain, origins one function tracks, proof steps | Reported as `authoring-resource-limit` |
+
+A proven sink assigned anything but a literal, a compound assignment to one, or an `mf2` tag assigned to one is reported too. An `intent()` or `noIntent()` assigned to a sink is explicit authoring and is read only by the explicit recognizer, whatever the receiver: explicit forms take no usage from where they are written, so their revision never depends on the receiver around them.
+
 ## What this crate never does
 
 - It retrieves no file, package, or network resource, and evaluates no host code.
@@ -92,11 +109,11 @@ This is an unpublished, workspace-internal crate. Implemented:
 - one parse and one semantic build per unit, with host syntax errors reported as failed units;
 - the host cooked decoder and its input map, checked against the parser and against hand-derived fixtures;
 - intrinsic bindings, and the explicit forms `intent`, `mf2` and `noIntent`, handed to `intlify_authoring` with their input maps;
-- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions and parameters, a reusable workspace, and cancellation. A bound on one literal or one use site — its input map segments or its parameters, and the shared crate's bounds on one message — blocks that declaration or use with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
+- bounded DOM recognition with all-path receiver evidence, and the `text-content` usage profile;
+- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins and proof steps, a reusable workspace, and cancellation. A bound on one literal, one use site or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
 
-The profile admits no DOM global yet, so ordinary UI text is not recognized automatically. The later changes add:
+The later changes add:
 
-- bounded DOM recognition with all-path receiver evidence;
 - `@intlify` metadata;
 - assembling a checked `authoring-inventory` from the analyzed units;
 - design 026 measurement of source discovery and inventory assembly.

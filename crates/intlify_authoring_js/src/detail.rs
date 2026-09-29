@@ -157,6 +157,64 @@ pub fn template_escape_invalid() -> Detail {
     Detail::literal("template-escape-invalid")
 }
 
+/// A literal assigned to a receiver whose evidence some path invalidated.
+///
+/// The receiver starts at an admitted origin and is followed, but a call,
+/// a store or another exposure on at least one path to the assignment may
+/// have changed what its display property does.
+#[must_use]
+pub fn receiver_evidence_invalidated() -> Detail {
+    Detail::literal("receiver-evidence-invalidated")
+}
+
+/// A literal assigned to a receiver reached through a binding the tracer
+/// does not follow: `let`, `var`, a script's top level, or an alias made in
+/// another function.
+#[must_use]
+pub fn receiver_binding_unsupported() -> Detail {
+    Detail::literal("receiver-binding-unsupported")
+}
+
+/// A literal assigned, in another function, to a receiver followed in the
+/// function that made it.
+#[must_use]
+pub fn receiver_captured() -> Detail {
+    Detail::literal("receiver-captured")
+}
+
+/// A literal assigned to a receiver whose origin call does not take exactly
+/// one static string.
+#[must_use]
+pub fn origin_argument_unsupported() -> Detail {
+    Detail::literal("origin-argument-unsupported")
+}
+
+/// A literal assigned to a receiver whose origin is in a function a `with`
+/// statement or a sloppy direct `eval` makes dynamically scoped.
+#[must_use]
+pub fn origin_scope_dynamic() -> Detail {
+    Detail::literal("origin-scope-dynamic")
+}
+
+/// A proven `textContent` sink assigned a value computed at run time.
+#[must_use]
+pub fn sink_value_dynamic() -> Detail {
+    Detail::literal("sink-value-dynamic")
+}
+
+/// A proven `textContent` sink updated with a compound operator.
+#[must_use]
+pub fn sink_compound_assignment() -> Detail {
+    Detail::literal("sink-compound-assignment")
+}
+
+/// A proven `textContent` sink assigned an `mf2` tag, which declares a
+/// message but is not one to display.
+#[must_use]
+pub fn sink_descriptor() -> Detail {
+    Detail::literal("sink-descriptor")
+}
+
 /// A host bound on one literal or one use site was exhausted.
 ///
 /// The shared crate names its own bounds in the record's limit. A host bound
@@ -202,7 +260,24 @@ mod tests {
             (surrogate_escape(), "surrogate-escape"),
             (template_escape_invalid(), "template-escape-invalid"),
             (legacy_escape(), "legacy-escape"),
+            (
+                receiver_evidence_invalidated(),
+                "receiver-evidence-invalidated",
+            ),
+            (
+                receiver_binding_unsupported(),
+                "receiver-binding-unsupported",
+            ),
+            (receiver_captured(), "receiver-captured"),
+            (origin_argument_unsupported(), "origin-argument-unsupported"),
+            (origin_scope_dynamic(), "origin-scope-dynamic"),
+            (sink_value_dynamic(), "sink-value-dynamic"),
+            (sink_compound_assignment(), "sink-compound-assignment"),
+            (sink_descriptor(), "sink-descriptor"),
             (limit(JsLimitKind::InputSegments), "input-segments"),
+            (limit(JsLimitKind::AliasChain), "alias-chain"),
+            (limit(JsLimitKind::TrackedOrigins), "tracked-origins"),
+            (limit(JsLimitKind::ProofSteps), "proof-steps"),
             (limit(JsLimitKind::ParameterBindings), "parameter-bindings"),
         ];
         for (detail, spelling) in details {

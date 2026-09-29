@@ -105,6 +105,21 @@ impl<'b> AdmittedUnit<'b> {
     }
 }
 
+/// Check that the context's usage profile is the one this Producer assigns
+/// from, and that one is registered when the profile recognizes UI text.
+pub(crate) fn check_usage_profile(
+    context: &dyn AuthoringContext,
+    profile: &JsAuthoringProfile,
+) -> Result<(), ProducerFailure> {
+    let registered = context.usage_profile();
+    let ours = JsAuthoringProfile::usage_profile();
+    match registered {
+        Some(usage) if *usage != ours => Err(ProducerFailure::UsageProfileMismatch),
+        None if !profile.dom_globals().is_empty() => Err(ProducerFailure::UsageProfileMismatch),
+        _ => Ok(()),
+    }
+}
+
 /// Admit the units one invocation will read.
 ///
 /// `membership` declares every unit the scope contains. Each supplied unit has
@@ -130,6 +145,7 @@ pub fn admit_units<'b>(
     if context.basis().authoring_profile() != profile.identity() {
         return Err(ProducerFailure::ProfileMismatch);
     }
+    check_usage_profile(context, profile)?;
     // Both lists are bounded before either is sorted, so no caller-sized work
     // happens ahead of the check.
     if membership.len() as u64 > limits.units || units.len() as u64 > limits.units {
