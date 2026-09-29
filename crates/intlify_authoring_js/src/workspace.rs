@@ -3,13 +3,16 @@
 
 //! Reusable per-worker scratch for unit analysis.
 //!
-//! The workspace owns the arena a unit's syntax tree is built in. The arena is
-//! reset before every unit, so nothing one unit allocated survives into the
-//! next, and no result points into it: ranges, counts and diagnostics are
-//! copied out before the tree is released. A reused workspace and a fresh one
-//! therefore give the same result, after a success, a failure, or a
+//! The workspace owns the arena a unit's syntax tree is built in, and the
+//! shared crate's own scratch for the declarations a unit hands over. The
+//! arena is reset before every unit, so nothing one unit allocated survives
+//! into the next, and no result points into it: ranges, counts, facts and
+//! diagnostics are copied out before the tree is released. The shared scratch
+//! clears itself before every use in the same way. A reused workspace and a
+//! fresh one therefore give the same result, after a success, a failure, or a
 //! cancellation alike.
 
+use intlify_authoring::AnalysisWorkspace;
 use oxc_allocator::Allocator;
 
 /// Per-worker scratch for repeated unit analysis.
@@ -19,6 +22,7 @@ use oxc_allocator::Allocator;
 #[derive(Default)]
 pub struct JsAnalysisWorkspace {
     arena: Allocator,
+    analysis: AnalysisWorkspace,
 }
 
 impl JsAnalysisWorkspace {
@@ -37,14 +41,14 @@ impl JsAnalysisWorkspace {
         self.arena.capacity()
     }
 
-    /// Release what the previous unit allocated and lend the arena out.
+    /// Release what the previous unit allocated and lend the scratch out.
     ///
     /// Resetting here, rather than after a unit, is what makes a workspace
     /// abandoned by a failure or a cancellation safe to reuse: whatever that
     /// unit left behind is dropped before the next one starts.
-    pub(crate) fn fresh_arena(&mut self) -> &Allocator {
+    pub(crate) fn fresh(&mut self) -> (&Allocator, &mut AnalysisWorkspace) {
         self.arena.reset();
-        &self.arena
+        (&self.arena, &mut self.analysis)
     }
 }
 
@@ -53,6 +57,38 @@ impl std::fmt::Debug for JsAnalysisWorkspace {
         formatter
             .debug_struct("JsAnalysisWorkspace")
             .field("arena_capacity", &self.arena.capacity())
-            .finish()
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LARGE: usize = 64 * 1024;
+
+    #[test]
+    fn a_new_workspace_owns_no_arena_memory_yet() {
+        let workspace = JsAnalysisWorkspace::new();
+        assert_eq!(workspace.arena_capacity(), 0);
+        assert_eq!(
+            format!("{workspace:?}"),
+            "JsAnalysisWorkspace { arena_capacity: 0, .. }"
+        );
+    }
+
+    #[test]
+    fn lending_the_scratch_drops_what_the_last_unit_left_and_keeps_its_capacity() {
+        let mut workspace = JsAnalysisWorkspace::new();
+        let (arena, _) = workspace.fresh();
+        arena.alloc_str(&"x".repeat(LARGE));
+        assert!(arena.used_bytes() >= LARGE);
+        assert!(workspace.arena_capacity() >= LARGE);
+
+        // Nothing the previous unit allocated is live in the arena lent to
+        // the next one, but the memory it grew into is kept for reuse.
+        let (arena, _) = workspace.fresh();
+        assert_eq!(arena.used_bytes(), 0);
+        assert!(workspace.arena_capacity() >= LARGE);
     }
 }

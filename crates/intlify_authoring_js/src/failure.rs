@@ -10,7 +10,7 @@
 //! such as a unit that is not text or that the host rejects, is reported as a
 //! failed unit instead, and the other units are still read.
 
-use intlify_authoring::{ContextKind, SnapshotMismatch, Token};
+use intlify_authoring::{AuthoringFailure, ContextKind, SnapshotMismatch, Token};
 
 use crate::limits::JsLimitKind;
 
@@ -74,9 +74,63 @@ pub enum ProducerFailure {
         /// The unit being read.
         unit: Token,
     },
+    /// This crate's literal decoder and the host parser read one literal
+    /// differently.
+    ///
+    /// The two are written independently so that a disagreement exposes a
+    /// defect in one of them. Neither reading is trusted over the other, so
+    /// the unit yields nothing rather than a message from either.
+    DecoderDisagreement {
+        /// The unit holding the literal.
+        unit: Token,
+    },
+    /// Two declarations claim overlapping source.
+    ///
+    /// Each piece of source is read as at most one declaration, so an overlap
+    /// means the recognizer extracted something twice.
+    DeclarationOverlap {
+        /// The unit holding the declarations.
+        unit: Token,
+    },
+    /// The shared authoring semantics could not run.
+    Authoring(AuthoringFailure),
     /// The caller's probe asked the invocation to stop.
     ///
     /// Cancellation is a control-flow result, never evidence: a cancelled
     /// invocation establishes nothing about the units it did reach.
     Cancelled,
+}
+
+impl From<AuthoringFailure> for ProducerFailure {
+    fn from(failure: AuthoringFailure) -> Self {
+        match failure {
+            // A stop is a stop whichever crate noticed it.
+            AuthoringFailure::Cancelled => Self::Cancelled,
+            other => Self::Authoring(other),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use intlify_authoring::LimitKind;
+
+    use super::*;
+
+    #[test]
+    fn a_shared_failure_keeps_its_cause_and_a_stop_stays_a_stop() {
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::Limit(LimitKind::Declarations)),
+            ProducerFailure::Authoring(AuthoringFailure::Limit(LimitKind::Declarations))
+        );
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::LocaleProviderUnavailable),
+            ProducerFailure::Authoring(AuthoringFailure::LocaleProviderUnavailable)
+        );
+        // Whichever crate noticed the probe, the caller sees one kind of stop.
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::Cancelled),
+            ProducerFailure::Cancelled
+        );
+    }
 }

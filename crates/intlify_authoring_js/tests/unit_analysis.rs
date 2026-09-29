@@ -9,12 +9,12 @@ use std::cell::Cell;
 
 use intlify_authoring::{DiagnosticOrigin, Location, ReasonFamily, Severity, Stage, UnitOutcome};
 use intlify_authoring_js::{
-    analyze_unit, detail, Grammar, JsAnalysisWorkspace, JsLimitKind, ProducerFailure, UnitAnalysis,
+    detail, Grammar, JsAnalysisWorkspace, JsLimitKind, ProducerFailure, UnitAnalysis,
 };
-use support::{admit, limits, never};
+use support::{admit, limits, never, read_unit};
 
 fn analyze(unit: &intlify_authoring_js::AdmittedUnit<'_>) -> UnitAnalysis {
-    analyze_unit(unit, &limits(), &mut JsAnalysisWorkspace::new(), &never).expect("analysis runs")
+    read_unit(unit, &limits(), &mut JsAnalysisWorkspace::new(), &never).expect("analysis runs")
 }
 
 /// Assert that `analysis` failed with exactly one record of `detail`.
@@ -47,7 +47,7 @@ fn each_text_unit_is_parsed_exactly_once() {
     let attempts: Vec<u64> = units
         .iter()
         .map(|unit| {
-            analyze_unit(unit, &limits(), &mut workspace, &never)
+            read_unit(unit, &limits(), &mut workspace, &never)
                 .unwrap()
                 .work()
                 .parse_attempts
@@ -192,14 +192,14 @@ fn syntax_tree_nodes_are_bounded_exactly() {
     let mut bounded = limits();
     bounded.ast_nodes = nodes;
     assert_eq!(
-        analyze_unit(&units[0], &bounded, &mut JsAnalysisWorkspace::new(), &never)
+        read_unit(&units[0], &bounded, &mut JsAnalysisWorkspace::new(), &never)
             .unwrap()
             .outcome(),
         UnitOutcome::Checked
     );
     bounded.ast_nodes = nodes - 1;
     assert_eq!(
-        analyze_unit(&units[0], &bounded, &mut JsAnalysisWorkspace::new(), &never),
+        read_unit(&units[0], &bounded, &mut JsAnalysisWorkspace::new(), &never),
         Err(ProducerFailure::Limit(JsLimitKind::AstNodes))
     );
 }
@@ -216,7 +216,7 @@ fn cancellation_at_any_probe_is_an_operational_failure() {
             calls.get() >= stop_at
         };
         assert_eq!(
-            analyze_unit(
+            read_unit(
                 &units[0],
                 &limits(),
                 &mut JsAnalysisWorkspace::new(),
@@ -240,7 +240,7 @@ fn a_reused_workspace_gives_what_a_fresh_one_gives() {
     let fresh: Vec<UnitAnalysis> = units.iter().map(analyze).collect();
 
     let mut workspace = JsAnalysisWorkspace::new();
-    let first = analyze_unit(&units[0], &limits(), &mut workspace, &never).unwrap();
+    let first = read_unit(&units[0], &limits(), &mut workspace, &never).unwrap();
     let retained = workspace.arena_capacity();
     assert!(retained > 0, "the arena was used");
     // A unit cancelled after its tree was built leaves nothing behind for the
@@ -251,12 +251,12 @@ fn a_reused_workspace_gives_what_a_fresh_one_gives() {
         calls.get() >= 2
     };
     assert_eq!(
-        analyze_unit(&units[3], &limits(), &mut workspace, &after_parsing),
+        read_unit(&units[3], &limits(), &mut workspace, &after_parsing),
         Err(ProducerFailure::Cancelled)
     );
     let mut reused = Vec::new();
     for unit in units.iter().rev().chain(&units) {
-        reused.push(analyze_unit(unit, &limits(), &mut workspace, &never).unwrap());
+        reused.push(read_unit(unit, &limits(), &mut workspace, &never).unwrap());
     }
     assert!(workspace.arena_capacity() >= retained, "capacity is kept");
 

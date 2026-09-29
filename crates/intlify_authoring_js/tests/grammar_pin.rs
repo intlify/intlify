@@ -19,8 +19,8 @@
 mod support;
 
 use intlify_authoring::{Location, UnitOutcome};
-use intlify_authoring_js::{analyze_unit, Grammar, JsAnalysisWorkspace, GRAMMAR_REVISION};
-use support::{admit, limits, never};
+use intlify_authoring_js::{Grammar, JsAnalysisWorkspace, GRAMMAR_REVISION};
+use support::{admit, limits, never, read_unit};
 
 /// What the pinned revision does with one source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,7 +203,7 @@ const CORPUS: &[(Grammar, &str, Pinned)] = &[
 
 fn observe(grammar: Grammar, source: &str) -> Pinned {
     let units = admit(&[("corpus", grammar, source.as_bytes())]);
-    let analysis = analyze_unit(
+    let analysis = read_unit(
         &units[0],
         &limits(),
         &mut JsAnalysisWorkspace::new(),

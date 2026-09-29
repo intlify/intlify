@@ -4,7 +4,7 @@ JavaScript and TypeScript host Producer for [Intlify](../../design/000-intlify-o
 
 > [!IMPORTANT]
 >
-> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, and decodes host literals, but it does not yet recognize any authoring form. See [Current status](#current-status).
+> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units and recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`. Automatic DOM recognition and `@intlify` metadata are not implemented yet. See [Current status](#current-status).
 
 A Producer reads host source and hands [`intlify_authoring`](../intlify_authoring/README.md) what it found, already decoded. What a message means, what its use site must supply, its locale, class and revision are all decided there, so the same text never means different things depending on which host found it. This crate owns the part specific to JavaScript: which bytes a unit is, which grammar reads them, and what a literal decodes to and from where.
 
@@ -15,6 +15,8 @@ An invocation runs in two steps.
 `admit_units` checks everything the caller supplied before anything is parsed: the context's kind and profile pin, each unit's owner and grammar, its bytes against its snapshot, and the declared scope. Every refusal there is operational, because no edit to source could fix it. The one exception is a unit whose bytes are exactly what its snapshot names but are not UTF-8: that is the author's to fix, so the unit is admitted and reported as failed.
 
 `analyze_unit` then reads one admitted unit, parsing it exactly once under the grammar its snapshot names. A unit is accepted only when the parser reports nothing, the semantic checks carrying the language's early errors report nothing, and a script contains no module syntax. Anything else rejects the whole tree, and the unit fails with one diagnostic at the earliest range the parser named. Units are analyzed independently, so a caller can run them in any order or on several workers.
+
+An accepted unit is read for the explicit forms the profile registers, and what is found is handed to `intlify_authoring`. The result says whether the unit is checked, blocked or failed. Its facts are reachable through `checked()` only when every occurrence resolved; `inspection_facts()` returns what was independently established whatever the outcome, for inspection and not as complete input.
 
 ## Grammars
 
@@ -50,6 +52,29 @@ The profile does not accept, as message source:
 
 JavaScript also pairs surrogates spelled other ways, such as a `\uXXXX` escape followed by a `\u{...}` one. The pinned parser does not, and the profile does not accept a spelling its parser reads differently from the language.
 
+## Explicit forms
+
+`intent`, `mf2` and `noIntent` are recognized by the binding a name resolves to, never by its spelling. The profile registers exact module exports as intrinsics, and a unit's direct named import of one binds it under any local name. A shadowing parameter, a local function called `intent`, or an import from another module is not an intrinsic, and nothing is reported about it.
+
+A known intrinsic used other than as the callee of a direct call, or as the tag of an `mf2` template, is reported where it is used: assigned, passed, called optionally or through `.call`, constructed, wrapped in parentheses, or exported. A registered module imported another way is reported once, where it is imported: a default or namespace import, a literal dynamic `import()`, a TypeScript `import = require()`, or a re-export. A re-export would hand the intrinsics to other modules under a specifier nobody registered, where their calls would read as ordinary calls.
+
+The first argument of `intent()` is classified by its syntax, seen through parentheses and TypeScript assertions:
+
+| Argument | Result |
+| --- | --- |
+| a string, or a template without substitutions | an `intent-literal` declaration used at the call |
+| an `mf2` tagged template | an `mf2-declaration` used at the call |
+| a `const` binding initialized with an `mf2` tag | a use of that shared declaration |
+| an alias of such a binding, or an imported binding | unsupported |
+| a conditional or logical expression | unsupported; neither alternative is chosen |
+| anything else, or a template with substitutions | dynamic |
+
+An `mf2` tag not used anywhere is still a declaration. Every use of a shared declaration names the same declaration occurrence, and equal text at two declarations is two declarations.
+
+The second argument is read only as a plain object literal: static keys, plain values and shorthand properties, in source order. Values are kept by position and never evaluated. Spreads, computed or numeric keys, accessors, methods, `__proto__: value`, and anything that is not an object literal are reported, because the names they supply could change at run time. Whether the names match what the message requires is decided by `intlify_authoring`. A mismatch at a declaration's own use site blocks the declaration; a mismatch at a use of a shared declaration blocks only that use.
+
+`noIntent(value, reason)` needs a nonempty static reason. The value is not read. An exclusion whose value is itself `intent(...)` or an `mf2` tag, or an `intent()` whose source is `noIntent(...)`, is a contradiction and is reported without making either a fact.
+
 ## What this crate never does
 
 - It retrieves no file, package, or network resource, and evaluates no host code.
@@ -66,11 +91,11 @@ This is an unpublished, workspace-internal crate. Implemented:
 - unit admission, with the declared scope and completeness;
 - one parse and one semantic build per unit, with host syntax errors reported as failed units;
 - the host cooked decoder and its input map, checked against the parser and against hand-derived fixtures;
-- limits for units, bytes, syntax tree nodes and input map segments, a reusable workspace, and cancellation.
+- intrinsic bindings, and the explicit forms `intent`, `mf2` and `noIntent`, handed to `intlify_authoring` with their input maps;
+- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions and parameters, a reusable workspace, and cancellation.
 
-The profile configures no intrinsic binding and admits no DOM global yet, so no syntax in a unit is an authoring form and a checked unit has no declarations. That is the correct answer for such a configuration, and it is what the later changes build on:
+The profile admits no DOM global yet, so ordinary UI text is not recognized automatically. The later changes add:
 
-- recognizing `intent`, `mf2` and `noIntent` by binding identity, and handing their decoded literals to `intlify_authoring`;
 - bounded DOM recognition with all-path receiver evidence;
 - `@intlify` metadata;
 - assembling a checked `authoring-inventory` from the analyzed units;
