@@ -621,10 +621,16 @@ fn settling() -> (Reporter, Cooked) {
     (reporter, cooked)
 }
 
+/// The span of `'Pay now'` in the unit `settling` reports for.
+const LITERAL: oxc_span::Span = oxc_span::Span::new(7, 16);
+
 #[test]
 fn settling_a_decoded_literal_hands_it_over_and_reports_nothing() {
     let (mut reporter, cooked) = settling();
-    assert_eq!(settle(Ok(cooked.clone()), &mut reporter), Ok(Some(cooked)));
+    assert_eq!(
+        settle(Ok(cooked.clone()), LITERAL, &mut reporter),
+        Ok(Some(cooked))
+    );
     assert!(reporter.into_diagnostics().is_empty());
 }
 
@@ -638,6 +644,7 @@ fn settling_a_refused_form_reports_it_at_the_escape_and_yields_nothing() {
                 Unsupported::SurrogateEscape,
                 escape
             )),
+            LITERAL,
             &mut reporter
         ),
         Ok(None)
@@ -658,20 +665,38 @@ fn settling_a_refused_form_reports_it_at_the_escape_and_yields_nothing() {
 }
 
 #[test]
-fn settling_a_bound_or_a_disagreement_stops_the_analysis() {
+fn settling_a_literal_past_its_bound_reports_it_at_the_literal_and_yields_nothing() {
     let (mut reporter, _) = settling();
     assert_eq!(
         settle(
             Err(CookFailure::Limit(JsLimitKind::InputSegments)),
+            LITERAL,
             &mut reporter
         ),
-        Err(ProducerFailure::Limit(JsLimitKind::InputSegments))
+        Ok(None)
     );
+    let diagnostics = reporter.into_diagnostics();
+    let [record] = &*diagnostics else {
+        panic!("one record: {diagnostics:?}");
+    };
+    // The bound belongs to this literal alone, so it blocks the declaration
+    // the literal would have made and names the bound.
+    assert_eq!(record.origin().code(), "authoring-resource-limit");
+    assert_eq!(record.detail().map(Detail::as_str), Some("input-segments"));
+    let Location::Region(region) = record.location() else {
+        panic!("the record points into the unit");
+    };
+    assert_eq!((region.range().start(), region.range().end()), (7, 16));
+}
+
+#[test]
+fn settling_a_disagreement_stops_the_analysis_and_reports_nothing() {
+    let (mut reporter, _) = settling();
     assert_eq!(
-        settle(Err(CookFailure::Disagreement), &mut reporter),
+        settle(Err(CookFailure::Disagreement), LITERAL, &mut reporter),
         Err(ProducerFailure::DecoderDisagreement { unit: token(UNIT) })
     );
-    // Neither is the author's to fix, so neither is reported to them.
+    // This is not the author's to fix, so it is not reported to them.
     assert!(reporter.into_diagnostics().is_empty());
 }
 
@@ -685,6 +710,7 @@ fn settling_a_refused_form_with_no_room_left_stops_the_analysis() {
                 Unsupported::LegacyEscape,
                 ByteRange::new(8, 10).unwrap()
             )),
+            LITERAL,
             &mut reporter
         ),
         Err(ProducerFailure::Authoring(AuthoringFailure::Limit(

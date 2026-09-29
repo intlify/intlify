@@ -33,8 +33,9 @@
 //! continuation are each a run of their own: several source bytes produced
 //! fewer decoded ones, and no byte inside them answers for a byte of output.
 
-use intlify_authoring::{ByteRange, Detail, InputSegment, ReasonFamily};
+use intlify_authoring::{ByteRange, Detail, InputSegment, LimitScope, ReasonFamily};
 use oxc_ast::ast::{StringLiteral, TemplateElement};
+use oxc_span::Span;
 
 use crate::detail;
 use crate::failure::ProducerFailure;
@@ -90,16 +91,27 @@ pub(crate) enum CookFailure {
 /// Settle a decoding for a recognizer.
 ///
 /// A form the profile does not accept becomes a diagnostic at the escape
-/// responsible, and the literal yields nothing. A bound or a disagreement with
-/// the parser stops the analysis.
+/// responsible, and the literal yields nothing. A bound on the literal becomes
+/// a diagnostic at `literal`, the source the literal would have declared, and
+/// it yields nothing either. A disagreement with the parser stops the
+/// analysis.
 pub(crate) fn settle(
     result: Result<Cooked, CookFailure>,
+    literal: Span,
     reporter: &mut Reporter,
 ) -> Result<Option<Cooked>, ProducerFailure> {
     match result {
         Ok(cooked) => Ok(Some(cooked)),
         Err(CookFailure::Unsupported(form, range)) => {
             reporter.at_range(ReasonFamily::AuthoringFormUnsupported, form.detail(), range)?;
+            Ok(None)
+        }
+        Err(CookFailure::Limit(kind)) if kind.scope() == LimitScope::Declaration => {
+            reporter.at(
+                ReasonFamily::AuthoringResourceLimit,
+                detail::limit(kind),
+                literal,
+            )?;
             Ok(None)
         }
         Err(CookFailure::Limit(kind)) => Err(ProducerFailure::Limit(kind)),

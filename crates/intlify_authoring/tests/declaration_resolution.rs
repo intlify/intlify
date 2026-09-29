@@ -13,10 +13,10 @@ use intlify_authoring::test_context::{LocaleRule, TestContext};
 use intlify_authoring::{
     compare_parameters, intent_revision, resolve_declarations,
     resolve_declarations_with_cancellation, AnalysisWorkspace, AuthoringContext, AuthoringFailure,
-    AuthoringLimits, ByteRange, ContextKind, DeclarationInput, DeclarationMetadata, Detail,
-    InputSegment, MappingError, MessageInput, MessageRange, Occurrence, OccurrenceRole, Outcome,
-    OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily, SourceLocaleBasis, SourceSnapshot,
-    SurfaceVocabulary, VersionedIdentity,
+    AuthoringLimits, AuthoringResult, ByteRange, ContextKind, DeclarationInput,
+    DeclarationMetadata, Detail, InputSegment, LimitKind, MappingError, MessageInput, MessageRange,
+    Occurrence, OccurrenceRole, Outcome, OwnerIdentity, OwnerKind, ParameterBinding, ReasonFamily,
+    SourceLocaleBasis, SourceSnapshot, Stage, SurfaceVocabulary, VersionedIdentity,
 };
 
 fn limits() -> AuthoringLimits {
@@ -107,6 +107,16 @@ fn reasons(result: &intlify_authoring::AuthoringResult) -> Vec<&str> {
         .diagnostics()
         .iter()
         .map(|record| record.origin().code())
+        .collect()
+}
+
+/// Each record of an exhausted bound, as the stage it stopped and the bound.
+fn exhausted(result: &AuthoringResult) -> Vec<(Stage, Option<LimitKind>)> {
+    result
+        .diagnostics()
+        .iter()
+        .filter(|record| record.origin().code() == ReasonFamily::AuthoringResourceLimit.as_str())
+        .map(|record| (record.stage(), record.limit()))
         .collect()
 }
 
@@ -617,7 +627,16 @@ fn a_metadata_value_past_its_bound_blocks_rather_than_being_truncated() {
     let result = resolve_within(&context, &[described(first_over)], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
     assert!(result.checked().is_none());
-    assert!(reasons(&result).contains(&ReasonFamily::AuthoringMetadataInvalid.as_str()));
+    // A value that does not fit is an exhausted bound, not a malformed value:
+    // the record says which bound, so the fix is not mistaken for a typo.
+    assert_eq!(
+        exhausted(&result),
+        [(
+            Stage::ContextResolution,
+            Some(LimitKind::MetadataValueBytes)
+        )]
+    );
+    assert_eq!(reasons(&result).len(), 1);
 
     // The bound counts bytes, not characters: one multi-byte scalar can put a
     // shorter-looking description past it.
@@ -626,6 +645,24 @@ fn a_metadata_value_past_its_bound_blocks_rather_than_being_truncated() {
     assert_eq!(multibyte.len() as u64, limits.metadata_value_bytes + 1);
     let result = resolve_within(&context, &[described(multibyte)], &limits).unwrap();
     assert_eq!(result.outcome(), Outcome::Blocked);
+
+    // A usage value is bounded the same way.
+    let with_profile = TestContext::builder(owner(), SurfaceVocabulary::new(["checkout"]).unwrap())
+        .default_source_locale("en")
+        .default_surface_class("checkout")
+        .usage_profile(VersionedIdentity::literal("intlify-usage-test", "0"))
+        .build()
+        .unwrap();
+    let mut used = declaration(MessageInput::Literal("Pay now"));
+    used.usage = Some("button-label");
+    let result = resolve_within(&with_profile, &[used], &limits).unwrap();
+    assert_eq!(
+        exhausted(&result),
+        [(
+            Stage::ContextResolution,
+            Some(LimitKind::MetadataValueBytes)
+        )]
+    );
 }
 
 #[test]
@@ -681,8 +718,9 @@ fn a_host_map_that_does_not_describe_the_text_fails_the_invocation() {
 fn a_bound_exhausted_while_composing_reports_as_the_bound_it_is() {
     // Composing splits one emitted run at each host boundary, so this map needs
     // five segments where the encoder alone needed three. The bound must arrive
-    // as that bound: a host matching on the failure to name which limit it hit
-    // would otherwise have to know whether it happened to supply a map.
+    // as that bound: a host reading which limit was hit would otherwise have
+    // to know whether it happened to supply a map. It is a bound on this one
+    // message, so it blocks this declaration rather than the invocation.
     let map = [
         InputSegment::new(ByteRange::new(0, 1).unwrap(), ByteRange::new(1, 2).unwrap()),
         InputSegment::new(ByteRange::new(1, 2).unwrap(), ByteRange::new(2, 3).unwrap()),
@@ -693,9 +731,139 @@ fn a_bound_exhausted_while_composing_reports_as_the_bound_it_is() {
     let mut limits = limits();
     limits.extraction_segments = 4;
     let limits = limits.validate().expect("satisfiable bounds");
+    let result = resolve_within(&context(), &[input], &limits).unwrap();
+    assert_eq!(result.outcome(), Outcome::Blocked);
     assert_eq!(
-        resolve_within(&context(), &[input], &limits).unwrap_err(),
-        AuthoringFailure::Limit(intlify_authoring::LimitKind::ExtractionSegments)
+        exhausted(&result),
+        [(
+            Stage::ResultConstruction,
+            Some(LimitKind::ExtractionSegments)
+        )]
+    );
+    assert!(result.inspection_facts().is_empty());
+}
+
+/// A selection whose projection is larger and deeper than a plain message's.
+const SELECTING: &str = ".input {$count :number}\n.match $count\none {{You have one message}}\n* {{You have {$count} messages}}";
+
+#[test]
+fn a_bound_on_one_message_blocks_that_declaration_and_spares_the_others() {
+    // 016 confines an exceeded limit to the scope it affects. Each bound here
+    // measures one message, so its author can meet it by changing that
+    // message, and the declaration beside it is established either way.
+    type Set = fn(&mut AuthoringLimits, u64);
+    let cases: [(LimitKind, MessageInput<'static>, Set); 7] = [
+        (
+            LimitKind::MessageTextBytes,
+            MessageInput::Literal("Pay now or pay later"),
+            |limits, bound| limits.message_text_bytes = bound,
+        ),
+        (
+            LimitKind::EmittedMf2Bytes,
+            MessageInput::Literal("Pay now or pay later"),
+            |limits, bound| limits.emitted_mf2_bytes = bound,
+        ),
+        (
+            LimitKind::ExtractionSegments,
+            MessageInput::Literal("a{b}c{d}e"),
+            |limits, bound| limits.extraction_segments = bound,
+        ),
+        (
+            LimitKind::ParameterNames,
+            MessageInput::Mf2("{$a} {$b} {$c}"),
+            |limits, bound| limits.parameter_names = bound,
+        ),
+        (
+            LimitKind::ParameterNameBytes,
+            MessageInput::Mf2("{$amount}"),
+            |limits, bound| limits.parameter_name_bytes = bound,
+        ),
+        (
+            LimitKind::ProjectionNodes,
+            MessageInput::Mf2(SELECTING),
+            |limits, bound| limits.projection_nodes = bound,
+        ),
+        (
+            LimitKind::ProjectionDepth,
+            MessageInput::Mf2(SELECTING),
+            |limits, bound| limits.projection_depth = bound,
+        ),
+    ];
+    // Neither declaration has a use site, so no parameter is owed.
+    let short_at = occurrence_at(100, OccurrenceRole::UiLiteral);
+    let short = DeclarationInput {
+        occurrence: short_at.clone(),
+        parameters: None,
+        ..declaration(MessageInput::Literal("Pay"))
+    };
+    for (kind, message, set) in cases {
+        let long = DeclarationInput {
+            parameters: None,
+            ..declaration(message)
+        };
+        let within = |bound: u64| {
+            let mut limits = limits();
+            set(&mut limits, bound);
+            limits
+        };
+        // The bound is found by the long message alone, then checked from
+        // both sides with the short one beside it.
+        let bound = (1..=4096)
+            .find(|&bound| {
+                resolve_within(&context(), std::slice::from_ref(&long), &within(bound))
+                    .is_ok_and(|result| result.outcome() == Outcome::Checked)
+            })
+            .expect("some bound admits the message");
+
+        let pair = [long.clone(), short.clone()];
+        let result = resolve_within(&context(), &pair, &within(bound)).unwrap();
+        assert_eq!(result.outcome(), Outcome::Checked, "{kind:?} at its bound");
+
+        let result = resolve_within(&context(), &pair, &within(bound - 1))
+            .unwrap_or_else(|failure| panic!("{kind:?} one under its bound: {failure:?}"));
+        assert_eq!(result.outcome(), Outcome::Blocked, "{kind:?}");
+        assert_eq!(
+            exhausted(&result),
+            [(Stage::MessageAnalysis, Some(kind))],
+            "{kind:?}"
+        );
+        assert_eq!(result.diagnostics().len(), 1, "{kind:?}");
+        assert_eq!(
+            result.diagnostics()[0].occurrence(),
+            Some(&long.occurrence),
+            "{kind:?} is reported at the declaration that exceeded it"
+        );
+        let established: Vec<&Occurrence> = result
+            .inspection_facts()
+            .iter()
+            .map(intlify_authoring::DeclarationFacts::occurrence)
+            .collect();
+        assert_eq!(established, [&short_at], "{kind:?}");
+    }
+}
+
+#[test]
+fn a_bound_on_the_whole_invocation_still_fails_it() {
+    // These bound what the caller asked to be done, not one message, so no
+    // edit to a declaration meets them.
+    let pair = [
+        declaration(MessageInput::Literal("Pay")),
+        DeclarationInput {
+            occurrence: occurrence_at(100, OccurrenceRole::UiLiteral),
+            ..declaration(MessageInput::Literal("Save"))
+        },
+    ];
+    let mut limits = limits();
+    limits.declarations = 1;
+    assert_eq!(
+        resolve_within(&context(), &pair, &limits).unwrap_err(),
+        AuthoringFailure::Limit(LimitKind::Declarations)
+    );
+    let mut limits = self::limits();
+    limits.vocabulary_members = 1;
+    assert_eq!(
+        resolve_within(&context(), &pair, &limits).unwrap_err(),
+        AuthoringFailure::Limit(LimitKind::VocabularyMembers)
     );
 }
 

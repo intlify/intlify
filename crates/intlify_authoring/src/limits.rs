@@ -9,7 +9,11 @@
 //!
 //! Exhausting a bound is reported separately from an ordinary semantic
 //! mismatch: it is a resource-limit outcome, never an incomplete result
-//! promoted to success.
+//! promoted to success. What it stops depends on what the bound measures. A
+//! bound on one declaration blocks that declaration with an
+//! `authoring-resource-limit` diagnostic and leaves the others, because an
+//! exceeded limit prevents complete success for the scope it affects. A bound
+//! on the invocation as a whole fails it.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -62,6 +66,42 @@ impl LimitKind {
             Self::Diagnostics => "diagnostics",
         }
     }
+
+    /// Return what exhausting this bound stops.
+    #[must_use]
+    pub const fn scope(self) -> LimitScope {
+        match self {
+            Self::MessageTextBytes
+            | Self::EmittedMf2Bytes
+            | Self::ExtractionSegments
+            | Self::ParameterNames
+            | Self::ParameterNameBytes
+            | Self::MetadataValueBytes
+            | Self::ProjectionNodes
+            | Self::ProjectionDepth => LimitScope::Declaration,
+            Self::Declarations | Self::VocabularyMembers | Self::Diagnostics => {
+                LimitScope::Invocation
+            }
+        }
+    }
+}
+
+/// What exhausting a bound stops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitScope {
+    /// One declaration.
+    ///
+    /// The bound measures something one message holds, so exhausting it
+    /// blocks that declaration with a diagnostic, and the rest of the
+    /// invocation still establishes what it can.
+    Declaration,
+    /// The whole invocation.
+    ///
+    /// The bound measures how much work was asked for, or how much can be
+    /// reported, so exhausting it is an operational failure. The diagnostic
+    /// budget belongs here: a report cut short could make a blocked result
+    /// look checked.
+    Invocation,
 }
 
 /// Complete failure of a limit construction.
@@ -203,6 +243,31 @@ pub(crate) mod tests {
                 serde_json::to_value(kind).unwrap(),
                 serde_json::json!(kind.as_str())
             );
+        }
+    }
+
+    #[test]
+    fn a_bound_on_one_message_stops_that_declaration_and_the_rest_stop_the_invocation() {
+        let declaration = [
+            LimitKind::MessageTextBytes,
+            LimitKind::EmittedMf2Bytes,
+            LimitKind::ExtractionSegments,
+            LimitKind::ParameterNames,
+            LimitKind::ParameterNameBytes,
+            LimitKind::MetadataValueBytes,
+            LimitKind::ProjectionNodes,
+            LimitKind::ProjectionDepth,
+        ];
+        let invocation = [
+            LimitKind::Declarations,
+            LimitKind::VocabularyMembers,
+            LimitKind::Diagnostics,
+        ];
+        for kind in declaration {
+            assert_eq!(kind.scope(), LimitScope::Declaration, "{kind:?}");
+        }
+        for kind in invocation {
+            assert_eq!(kind.scope(), LimitScope::Invocation, "{kind:?}");
         }
     }
 }

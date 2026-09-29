@@ -179,6 +179,9 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | A diagnostic region is checked against its unit | `a_region_is_checked_against_its_own_unit` |
 | Returned values borrow nothing from the scratch | `retained_evidence_is_readable_by_a_caller`; the encoder's contract is stated on `literal::encode` |
 | Bounds that no invocation could satisfy are rejected | `bounds_that_no_invocation_could_satisfy_are_rejected` |
+| Each bound is on one declaration or on the invocation | `a_bound_on_one_message_stops_that_declaration_and_the_rest_stop_the_invocation` |
+| A bound on one message blocks that declaration and spares the others | `a_bound_on_one_message_blocks_that_declaration_and_spares_the_others`, `a_metadata_value_past_its_bound_blocks_rather_than_being_truncated`, `a_bound_exhausted_while_composing_reports_as_the_bound_it_is` |
+| A bound on the invocation still fails it | `a_bound_on_the_whole_invocation_still_fails_it`, `the_diagnostics_budget_bounds_what_is_collected_not_only_what_is_returned` |
 | A bound holds however many records arrive | `the_sink_never_grows_past_its_budget_however_many_arrive`, `a_mismatch_is_answered_by_the_return_value_not_by_what_survived_the_bound` |
 | Cancellation yields no partial scope | `a_cancelled_invocation_returns_no_facts_at_all` |
 

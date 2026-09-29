@@ -309,6 +309,7 @@ where
         };
         let Some(cooked) = settle(
             cook_template(self.text, element, self.limits),
+            tag.span,
             self.reporter,
         )?
         else {
@@ -347,7 +348,11 @@ where
 
         match transparent(source) {
             Expression::StringLiteral(literal) => {
-                let cooked = settle(cook_string(self.text, literal, self.limits), self.reporter)?;
+                let cooked = settle(
+                    cook_string(self.text, literal, self.limits),
+                    literal.span,
+                    self.reporter,
+                )?;
                 self.inline(literal.span, cooked, occurrence, supplied)
             }
             Expression::TemplateLiteral(template) if template.expressions.is_empty() => {
@@ -356,6 +361,7 @@ where
                 };
                 let cooked = settle(
                     cook_template(self.text, element, self.limits),
+                    template.span,
                     self.reporter,
                 )?;
                 self.inline(template.span, cooked, occurrence, supplied)
@@ -478,15 +484,18 @@ where
         }
 
         let cooked = match transparent(reason) {
-            Expression::StringLiteral(literal) => {
-                settle(cook_string(self.text, literal, self.limits), self.reporter)?
-            }
+            Expression::StringLiteral(literal) => settle(
+                cook_string(self.text, literal, self.limits),
+                literal.span,
+                self.reporter,
+            )?,
             Expression::TemplateLiteral(template) if template.expressions.is_empty() => {
                 let Some(element) = template.quasis.first() else {
                     return Ok(());
                 };
                 settle(
                     cook_template(self.text, element, self.limits),
+                    template.span,
                     self.reporter,
                 )?
             }

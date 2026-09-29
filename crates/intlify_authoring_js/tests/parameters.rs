@@ -9,7 +9,7 @@
 mod support;
 
 use intlify_authoring::{detail as shared, OccurrenceRole, ReasonFamily, UnitOutcome};
-use intlify_authoring_js::{detail, Grammar, JsLimitKind, ProducerFailure, UnitAnalysis};
+use intlify_authoring_js::{detail, Grammar, JsLimitKind, UnitAnalysis};
 use support::{
     analyze, at, diagnostics, expect, limits, nth, occurrence, profile, try_analyze, PRELUDE,
 };
@@ -208,10 +208,24 @@ fn parameters_one_use_site_supplies_are_bounded_exactly() {
     let text = source("intent('{$a} {$b}', { a, b })\n");
     let mut bounded = limits();
     bounded.parameter_bindings = 2;
-    assert!(try_analyze(Grammar::JsModule, &text, &profile(), &bounded).is_ok());
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
+    assert_eq!(analysis.outcome(), UnitOutcome::Checked);
+    assert_eq!(analysis.inspection_facts().references().len(), 1);
+
+    // One name over is a bound on this use site, not on the invocation: the
+    // object is reported, the message is still a declaration, and the use
+    // site is not established.
     bounded.parameter_bindings = 1;
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
     assert_eq!(
-        try_analyze(Grammar::JsModule, &text, &profile(), &bounded),
-        Err(ProducerFailure::Limit(JsLimitKind::ParameterBindings))
+        diagnostics(&analysis),
+        [expect(
+            ReasonFamily::AuthoringResourceLimit,
+            detail::limit(JsLimitKind::ParameterBindings),
+            at(&text, "{ a, b }")
+        )]
     );
+    assert_eq!(analysis.inspection_facts().declarations().len(), 1);
+    assert!(analysis.inspection_facts().references().is_empty());
+    assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
 }
