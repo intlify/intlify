@@ -110,3 +110,27 @@ impl From<AuthoringFailure> for ProducerFailure {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use intlify_authoring::LimitKind;
+
+    use super::*;
+
+    #[test]
+    fn a_shared_failure_keeps_its_cause_and_a_stop_stays_a_stop() {
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::Limit(LimitKind::Declarations)),
+            ProducerFailure::Authoring(AuthoringFailure::Limit(LimitKind::Declarations))
+        );
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::LocaleProviderUnavailable),
+            ProducerFailure::Authoring(AuthoringFailure::LocaleProviderUnavailable)
+        );
+        // Whichever crate noticed the probe, the caller sees one kind of stop.
+        assert_eq!(
+            ProducerFailure::from(AuthoringFailure::Cancelled),
+            ProducerFailure::Cancelled
+        );
+    }
+}

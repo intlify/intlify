@@ -299,10 +299,54 @@ fn unsupported_import(
 
 #[cfg(test)]
 mod tests {
+    use intlify_authoring::{AuthoringFailure, Diagnostic, LimitKind, Location};
+    use oxc_allocator::Allocator;
+
     use super::*;
+    use crate::grammar::Grammar;
+    use crate::test_support::{at, bindings, parse, reporter, snapshot, UNIT};
 
     fn binding(module: &str, export: &str, intrinsic: Intrinsic) -> IntrinsicBinding {
         IntrinsicBinding::new(module, export, intrinsic)
+    }
+
+    /// What scanning one unit found: each top-level binding that is an
+    /// intrinsic, by name, and each reported import, as a detail and range.
+    type Scanned = (Vec<(String, Intrinsic)>, Vec<(&'static str, (u64, u64))>);
+
+    fn scanned(grammar: Grammar, text: &str) -> Scanned {
+        let arena = Allocator::default();
+        let parsed = parse(&arena, text, grammar);
+        let mut reporter = reporter(text);
+        let symbols = scan(parsed.program, &bindings(), &mut reporter).expect("the scan runs");
+        let scoping = parsed.semantic.scoping();
+        let mut found: Vec<(String, Intrinsic)> = scoping
+            .symbol_ids()
+            .filter_map(|symbol| {
+                symbols
+                    .get(symbol)
+                    .map(|intrinsic| (scoping.symbol_name(symbol).to_owned(), intrinsic))
+            })
+            .collect();
+        found.sort();
+        let reported = reporter
+            .into_diagnostics()
+            .iter()
+            .map(|record| (detail_of(record), range_of(record)))
+            .collect();
+        (found, reported)
+    }
+
+    fn detail_of(record: &Diagnostic) -> &'static str {
+        assert_eq!(record.origin().code(), "authoring-form-unsupported");
+        record.detail().expect("a detail").as_str()
+    }
+
+    fn range_of(record: &Diagnostic) -> (u64, u64) {
+        let Location::Region(region) = record.location() else {
+            panic!("an import is reported where it is written");
+        };
+        (region.range().start(), region.range().end())
     }
 
     #[test]
@@ -368,5 +412,119 @@ mod tests {
         ])
         .is_ok());
         assert!(Bindings::new([]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_registered_binding_answers_for_its_module_export_and_intrinsic() {
+        let registered = binding("fixture-authoring", "t", Intrinsic::Intent);
+        assert_eq!(registered.module(), "fixture-authoring");
+        assert_eq!(registered.export(), "t");
+        assert_eq!(registered.intrinsic(), Intrinsic::Intent);
+    }
+
+    #[test]
+    fn a_direct_named_import_binds_its_local_name_whatever_it_is() {
+        let text =
+            "import { intent as t, mf2, noIntent as skip, format } from 'fixture-authoring'\n\
+                    import { intent } from 'other-authoring'\n";
+        let (found, reported) = scanned(Grammar::JsModule, text);
+        assert_eq!(
+            found,
+            [
+                ("mf2".to_owned(), Intrinsic::Mf2),
+                ("skip".to_owned(), Intrinsic::NoIntent),
+                ("t".to_owned(), Intrinsic::Intent),
+            ]
+        );
+        // `format` is an ordinary export of the same module, and `intent`
+        // comes from a module nobody registered: neither is a mistake.
+        assert_eq!(reported, []);
+    }
+
+    #[test]
+    fn a_type_only_import_or_export_binds_no_value() {
+        let text = "import type { intent } from 'fixture-authoring'\n\
+                    import { type mf2 } from 'fixture-authoring'\n\
+                    export type { noIntent } from 'fixture-authoring'\n\
+                    export { type intent as t } from 'fixture-authoring'\n\
+                    import 'fixture-authoring'\n";
+        assert_eq!(scanned(Grammar::TsModule, text), (vec![], vec![]));
+    }
+
+    #[test]
+    fn each_other_form_importing_a_registered_module_is_reported_where_it_is_written() {
+        let text = "import authoring, { mf2 } from 'fixture-authoring'\n\
+                    import * as all from 'fixture-authoring'\n\
+                    export { intent as localize } from 'fixture-authoring'\n\
+                    export * as everything from 'fixture-authoring'\n\
+                    export * from 'fixture-authoring'\n";
+        let (found, reported) = scanned(Grammar::JsModule, text);
+        // The named specifier beside a reported default one still binds.
+        assert_eq!(found, [("mf2".to_owned(), Intrinsic::Mf2)]);
+        let (default, _) = at(text, "authoring,");
+        assert_eq!(
+            reported,
+            [
+                ("import-form-unsupported", (default, default + 9)),
+                ("import-form-unsupported", at(text, "* as all")),
+                ("import-form-unsupported", at(text, "intent as localize")),
+                (
+                    "import-form-unsupported",
+                    at(text, "export * as everything from 'fixture-authoring'")
+                ),
+                (
+                    "import-form-unsupported",
+                    at(text, "export * from 'fixture-authoring'")
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_typescript_import_require_of_a_registered_module_is_reported() {
+        let text = "import x = require('fixture-authoring')\n\
+                    export import y = require('fixture-authoring')\n\
+                    import z = require('other-authoring')\n\
+                    import type w = require('fixture-authoring')\n\
+                    namespace N { export const v = 1 }\n\
+                    import alias = N.v\n";
+        let (found, reported) = scanned(Grammar::TsModule, text);
+        assert_eq!(found, []);
+        // An exported one is reported at the declaration after `export`.
+        assert_eq!(
+            reported,
+            [
+                (
+                    "import-form-unsupported",
+                    at(text, "import x = require('fixture-authoring')")
+                ),
+                (
+                    "import-form-unsupported",
+                    at(text, "import y = require('fixture-authoring')")
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn re_exporting_what_is_not_an_intrinsic_is_ordinary() {
+        let text = "export { format } from 'fixture-authoring'\n\
+                    export * from 'other-authoring'\n\
+                    export { intent } from 'other-authoring'\n";
+        assert_eq!(scanned(Grammar::JsModule, text), (vec![], vec![]));
+    }
+
+    #[test]
+    fn a_report_with_no_room_left_stops_the_scan() {
+        let text = "import * as all from 'fixture-authoring'\n";
+        let arena = Allocator::default();
+        let parsed = parse(&arena, text, Grammar::JsModule);
+        let mut full = Reporter::new(snapshot(UNIT, Grammar::JsModule, text.as_bytes()), 0);
+        assert_eq!(
+            scan(parsed.program, &bindings(), &mut full).map(|_| ()),
+            Err(ProducerFailure::Authoring(AuthoringFailure::Limit(
+                LimitKind::Diagnostics
+            )))
+        );
     }
 }

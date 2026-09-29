@@ -2,8 +2,9 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use intlify_authoring::{
-    validate_input_map, ByteRange, InputSegment, IntegrityDigest, Occurrence, OccurrenceRole,
-    OwnerIdentity, OwnerKind, SourceSnapshot, VersionedIdentity,
+    validate_input_map, AuthoringFailure, ByteRange, InputSegment, IntegrityDigest, LimitKind,
+    Location, Occurrence, OccurrenceRole, OwnerIdentity, OwnerKind, SourceSnapshot,
+    VersionedIdentity,
 };
 use intlify_shared_json::encoding::digest_bytes;
 use oxc_allocator::Allocator;
@@ -15,6 +16,7 @@ use serde::Deserialize;
 use super::*;
 use crate::grammar::Grammar;
 use crate::limits::tests::generous;
+use crate::test_support::{reporter, snapshot, token, UNIT};
 
 /// One literal found in a source, and what cooking it gave.
 #[derive(Debug)]
@@ -596,4 +598,97 @@ fn extraction_fixtures_decode_to_their_hand_derived_text_and_map() {
             }
         }
     }
+}
+
+#[test]
+fn each_refused_form_names_its_own_detail() {
+    assert_eq!(
+        Unsupported::SurrogateEscape.detail().as_str(),
+        "surrogate-escape"
+    );
+    assert_eq!(
+        Unsupported::TemplateEscapeInvalid.detail().as_str(),
+        "template-escape-invalid"
+    );
+    assert_eq!(Unsupported::LegacyEscape.detail().as_str(), "legacy-escape");
+}
+
+/// A reporter for a unit holding `intent('Pay now')`.
+fn settling() -> (Reporter, Cooked) {
+    let text = "intent('Pay now')\n";
+    let reporter = reporter(text);
+    let cooked = cook_one(text).expect("a decoded literal");
+    (reporter, cooked)
+}
+
+#[test]
+fn settling_a_decoded_literal_hands_it_over_and_reports_nothing() {
+    let (mut reporter, cooked) = settling();
+    assert_eq!(settle(Ok(cooked.clone()), &mut reporter), Ok(Some(cooked)));
+    assert!(reporter.into_diagnostics().is_empty());
+}
+
+#[test]
+fn settling_a_refused_form_reports_it_at_the_escape_and_yields_nothing() {
+    let (mut reporter, _) = settling();
+    let escape = ByteRange::new(8, 14).unwrap();
+    assert_eq!(
+        settle(
+            Err(CookFailure::Unsupported(
+                Unsupported::SurrogateEscape,
+                escape
+            )),
+            &mut reporter
+        ),
+        Ok(None)
+    );
+    let diagnostics = reporter.into_diagnostics();
+    let [record] = &*diagnostics else {
+        panic!("one record: {diagnostics:?}");
+    };
+    assert_eq!(record.origin().code(), "authoring-form-unsupported");
+    assert_eq!(
+        record.detail().map(Detail::as_str),
+        Some("surrogate-escape")
+    );
+    let Location::Region(region) = record.location() else {
+        panic!("the record points into the unit");
+    };
+    assert_eq!(region.range(), escape);
+}
+
+#[test]
+fn settling_a_bound_or_a_disagreement_stops_the_analysis() {
+    let (mut reporter, _) = settling();
+    assert_eq!(
+        settle(
+            Err(CookFailure::Limit(JsLimitKind::InputSegments)),
+            &mut reporter
+        ),
+        Err(ProducerFailure::Limit(JsLimitKind::InputSegments))
+    );
+    assert_eq!(
+        settle(Err(CookFailure::Disagreement), &mut reporter),
+        Err(ProducerFailure::DecoderDisagreement { unit: token(UNIT) })
+    );
+    // Neither is the author's to fix, so neither is reported to them.
+    assert!(reporter.into_diagnostics().is_empty());
+}
+
+#[test]
+fn settling_a_refused_form_with_no_room_left_stops_the_analysis() {
+    let text = "intent('Pay now')\n";
+    let mut reporter = Reporter::new(snapshot(UNIT, Grammar::JsModule, text.as_bytes()), 0);
+    assert_eq!(
+        settle(
+            Err(CookFailure::Unsupported(
+                Unsupported::LegacyEscape,
+                ByteRange::new(8, 10).unwrap()
+            )),
+            &mut reporter
+        ),
+        Err(ProducerFailure::Authoring(AuthoringFailure::Limit(
+            LimitKind::Diagnostics
+        )))
+    );
 }

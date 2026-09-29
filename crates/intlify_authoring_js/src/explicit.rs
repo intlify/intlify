@@ -58,7 +58,10 @@ use crate::parse::Parsed;
 use crate::report::Reporter;
 use crate::syntax::{static_string, transparent};
 
-/// How many nodes are visited between two cancellation probes.
+/// How many nodes the walk enters between two cancellation probes.
+///
+/// Identifier references are read without being entered, so they do not
+/// count toward the interval.
 const PROBE_INTERVAL: u32 = 1024;
 
 /// One declaration found in the unit, ready for the shared crate.
@@ -587,23 +590,28 @@ where
 
     /// Check that no two declarations claim overlapping source.
     fn check_overlap(&self) -> Result<(), ProducerFailure> {
-        let mut ranges: Vec<_> = self
-            .found
-            .declarations
-            .iter()
-            .map(|declared| declared.occurrence.range())
-            .collect();
-        ranges.sort_unstable();
-        if ranges
-            .windows(2)
-            .any(|pair| pair[1].start() < pair[0].end())
-        {
+        if overlapping(&self.found.declarations) {
             return Err(ProducerFailure::DeclarationOverlap {
                 unit: self.reporter.source().unit().clone(),
             });
         }
         Ok(())
     }
+}
+
+/// Return whether two declarations claim overlapping source.
+///
+/// Declarations that only touch, one ending where the next begins, do not
+/// overlap.
+fn overlapping(declarations: &[Declared]) -> bool {
+    let mut ranges: Vec<_> = declarations
+        .iter()
+        .map(|declared| declared.occurrence.range())
+        .collect();
+    ranges.sort_unstable();
+    ranges
+        .windows(2)
+        .any(|pair| pair[1].start() < pair[0].end())
 }
 
 impl<'a, C> Visit<'a> for Recognizer<'_, C>
@@ -725,5 +733,513 @@ where
             self.record(result);
         }
         walk::walk_import_expression(self, import);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    use std::fmt::Write;
+
+    use intlify_authoring::{AuthoringFailure, ByteRange, LimitKind, Location};
+    use oxc_allocator::Allocator;
+
+    use super::*;
+    use crate::grammar::Grammar;
+    use crate::limits::tests::generous;
+    use crate::test_support::{at, bindings, nth, parse, reporter, snapshot, PRELUDE, UNIT};
+
+    type Range = (u64, u64);
+
+    /// Each record a unit made, as its detail and range.
+    type Records = Vec<(&'static str, Range)>;
+
+    /// Everything one unit's recognition handed over, reduced to what a
+    /// fixture asserts: each declaration's role, range, decoded text and the
+    /// names its own use site supplied; each use's range, the declaration it
+    /// uses, whether that is shared, and the names it supplied; each
+    /// exclusion's range and reason; and each record's detail and range.
+    #[derive(Debug, PartialEq)]
+    struct Seen {
+        declarations: Vec<(OccurrenceRole, Range, String, Option<Vec<String>>)>,
+        uses: Vec<(Range, usize, bool, Vec<String>)>,
+        exclusions: Vec<(Range, String)>,
+        records: Records,
+    }
+
+    fn range(occurrence: &Occurrence) -> Range {
+        let range = occurrence.range();
+        (range.start(), range.end())
+    }
+
+    fn names(parameters: &[ParameterBinding]) -> Vec<String> {
+        parameters
+            .iter()
+            .map(|binding| binding.name().to_owned())
+            .collect()
+    }
+
+    /// Recognize the explicit forms in `text`, returning what was handed
+    /// over as it is and the records the unit made.
+    fn run<C>(
+        grammar: Grammar,
+        text: &str,
+        limits: &JsAuthoringLimits,
+        cancelled: &C,
+    ) -> Result<(Recognized, Records), ProducerFailure>
+    where
+        C: Fn() -> bool + ?Sized,
+    {
+        let arena = Allocator::default();
+        let parsed = parse(&arena, text, grammar);
+        let mut reporter = reporter(text);
+        let recognized = recognize(&parsed, text, &bindings(), limits, &mut reporter, cancelled)?;
+        let records = reporter
+            .into_diagnostics()
+            .iter()
+            .map(|record| {
+                let Location::Region(region) = record.location() else {
+                    panic!("a host record points into the unit");
+                };
+                (
+                    record.detail().expect("a detail").as_str(),
+                    (region.range().start(), region.range().end()),
+                )
+            })
+            .collect();
+        Ok((recognized, records))
+    }
+
+    fn seen_as(grammar: Grammar, text: &str) -> Seen {
+        let (recognized, records) =
+            run(grammar, text, &generous(), &|| false).expect("recognition runs");
+        Seen {
+            declarations: recognized
+                .declarations
+                .iter()
+                .map(|declared| {
+                    (
+                        declared.occurrence.role(),
+                        range(&declared.occurrence),
+                        declared.text.clone(),
+                        declared.parameters.as_deref().map(names),
+                    )
+                })
+                .collect(),
+            uses: recognized
+                .uses
+                .iter()
+                .map(|used| {
+                    assert_eq!(used.occurrence.role(), OccurrenceRole::Reference);
+                    (
+                        range(&used.occurrence),
+                        used.declaration,
+                        used.shared,
+                        names(&used.parameters),
+                    )
+                })
+                .collect(),
+            exclusions: recognized
+                .exclusions
+                .iter()
+                .map(|exclusion| {
+                    assert_eq!(exclusion.occurrence().role(), OccurrenceRole::Exclusion);
+                    (range(exclusion.occurrence()), exclusion.reason().to_owned())
+                })
+                .collect(),
+            records,
+        }
+    }
+
+    fn seen(body: &str) -> (String, Seen) {
+        let text = format!("{PRELUDE}{body}");
+        let seen = seen_as(Grammar::JsModule, &text);
+        (text, seen)
+    }
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn a_literal_source_is_decoded_and_used_where_it_is_written() {
+        let (text, seen) = seen("intent('Pay\\x20now')\n");
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![(
+                    OccurrenceRole::IntentLiteral,
+                    at(&text, "'Pay\\x20now'"),
+                    "Pay now".to_owned(),
+                    Some(vec![]),
+                )],
+                uses: vec![(at(&text, "intent('Pay\\x20now')"), 0, false, vec![])],
+                exclusions: vec![],
+                records: vec![],
+            }
+        );
+        // The input map leads each run of decoded text back to its source:
+        // the text either side of the escape by position, and the escape as
+        // a whole.
+        let (recognized, _) = run(Grammar::JsModule, &text, &generous(), &|| false).unwrap();
+        let map: Vec<(Range, Range)> = recognized.declarations[0]
+            .input_map
+            .iter()
+            .map(|segment| {
+                let (input, source) = (segment.input(), segment.source());
+                ((input.start(), input.end()), (source.start(), source.end()))
+            })
+            .collect();
+        assert_eq!(
+            map,
+            [
+                ((0, 3), at(&text, "Pay")),
+                ((3, 4), at(&text, "\\x20")),
+                ((4, 7), at(&text, "now")),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_nested_tag_is_declared_once_with_its_use_sites_parameters() {
+        let (text, seen) = seen("render(intent(mf2`Hello {$name}!`, { name }))\n");
+        let tag = at(&text, "mf2`Hello {$name}!`");
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![(
+                    OccurrenceRole::Mf2Declaration,
+                    tag,
+                    "Hello {$name}!".to_owned(),
+                    Some(strings(&["name"])),
+                )],
+                uses: vec![(
+                    at(&text, "intent(mf2`Hello {$name}!`, { name })"),
+                    0,
+                    false,
+                    strings(&["name"])
+                )],
+                exclusions: vec![],
+                // The tag's reference was read as part of the call, so it is
+                // not reported as a use of `mf2` somewhere else.
+                records: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn a_shared_declaration_is_resolved_wherever_it_is_written() {
+        let (text, seen) = seen(
+            "export function render(name) {\n  return intent(later, { name })\n}\n\
+             const later = mf2`Hello {$name}!`\nintent(later)\n",
+        );
+        assert_eq!(
+            seen,
+            Seen {
+                // A shared declaration has no use site of its own; each use
+                // is compared on its own.
+                declarations: vec![(
+                    OccurrenceRole::Mf2Declaration,
+                    at(&text, "mf2`Hello {$name}!`"),
+                    "Hello {$name}!".to_owned(),
+                    None,
+                )],
+                uses: vec![
+                    (
+                        at(&text, "intent(later, { name })"),
+                        0,
+                        true,
+                        strings(&["name"])
+                    ),
+                    (at(&text, "intent(later)"), 0, true, vec![]),
+                ],
+                exclusions: vec![],
+                records: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn a_tag_nothing_uses_is_still_a_declaration() {
+        let (text, seen) = seen("export const unused = mf2`Not shown yet`\n");
+        assert_eq!(
+            seen.declarations,
+            [(
+                OccurrenceRole::Mf2Declaration,
+                at(&text, "mf2`Not shown yet`"),
+                "Not shown yet".to_owned(),
+                None,
+            )]
+        );
+        assert_eq!(seen.uses, []);
+    }
+
+    #[test]
+    fn an_unreadable_parameter_object_keeps_the_declaration_without_a_use() {
+        let (text, seen) =
+            seen("intent('Pay now', params)\nconst greeting = mf2`Hi`\nintent(greeting, params)\n");
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![
+                    (
+                        OccurrenceRole::IntentLiteral,
+                        at(&text, "'Pay now'"),
+                        "Pay now".to_owned(),
+                        None,
+                    ),
+                    (
+                        OccurrenceRole::Mf2Declaration,
+                        at(&text, "mf2`Hi`"),
+                        "Hi".to_owned(),
+                        None,
+                    ),
+                ],
+                uses: vec![],
+                exclusions: vec![],
+                records: vec![
+                    ("parameters-opaque", nth(&text, "params", 0)),
+                    ("parameters-opaque", nth(&text, "params", 1)),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn an_exclusion_keeps_its_decoded_reason() {
+        let (text, seen) =
+            seen("noIntent(brand, 'Product\\x20name')\nnoIntent(comment, `User content`)\n");
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![],
+                uses: vec![],
+                exclusions: vec![
+                    (
+                        at(&text, "noIntent(brand, 'Product\\x20name')"),
+                        "Product name".to_owned()
+                    ),
+                    (
+                        at(&text, "noIntent(comment, `User content`)"),
+                        "User content".to_owned()
+                    ),
+                ],
+                records: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn a_contradiction_is_reported_once_at_the_outer_call_and_neither_side_is_read() {
+        let (text, seen) = seen(
+            "intent(noIntent(value, 'Brand'))\nnoIntent(mf2`Pay`, 'Brand')\n\
+             noIntent(intent('Pay'), 'Brand')\n",
+        );
+        let nested = "explicit-forms-nested";
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![],
+                uses: vec![],
+                exclusions: vec![],
+                // The inner form was claimed by the outer one: it is neither
+                // read again nor reported as a use of an intrinsic.
+                records: vec![
+                    (nested, at(&text, "intent(noIntent(value, 'Brand'))")),
+                    (nested, at(&text, "noIntent(mf2`Pay`, 'Brand')")),
+                    (nested, at(&text, "noIntent(intent('Pay'), 'Brand')")),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn an_identifier_is_resolved_by_what_its_binding_names() {
+        let (text, seen) = seen(
+            "import { shared } from './messages'\n\
+             const tagged = mf2`Tagged ${x}`\n\
+             const greeting = mf2`Hi`\n\
+             const alias = greeting\n\
+             const plain = 'Pay now'\n\
+             let changing = greeting\n\
+             const first = second\n\
+             const second = first\n\
+             intent(tagged)\n\
+             intent(alias)\n\
+             intent(shared)\n\
+             intent(plain)\n\
+             intent(changing)\n\
+             intent(first)\n\
+             intent(intent)\n\
+             intent(undeclared)\n",
+        );
+        let (itself, _) = at(&text, "intent(intent)");
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![(
+                    OccurrenceRole::Mf2Declaration,
+                    at(&text, "mf2`Hi`"),
+                    "Hi".to_owned(),
+                    None,
+                )],
+                uses: vec![],
+                exclusions: vec![],
+                records: vec![
+                    // The tag reported why it is no declaration, so the use
+                    // of its binding adds nothing.
+                    ("template-substitution", at(&text, "mf2`Tagged ${x}`")),
+                    ("declaration-alias", nth(&text, "alias", 1)),
+                    ("module-reference", nth(&text, "shared", 1)),
+                    // A `const` holding anything but a tag is a value.
+                    ("message-dynamic", nth(&text, "plain", 1)),
+                    ("message-dynamic", nth(&text, "changing", 1)),
+                    // An alias cycle ends; it names no declaration.
+                    ("message-dynamic", nth(&text, "first", 2)),
+                    // The intrinsic is reported where it is used, once.
+                    ("intrinsic-use-unsupported", (itself + 7, itself + 13)),
+                    ("message-dynamic", at(&text, "undeclared")),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn a_type_position_names_an_intrinsic_without_using_it() {
+        let text = format!(
+            "{PRELUDE}const kind = typeof intent\ntype Kind = typeof mf2\nintent<string>('Pay now')\n"
+        );
+        let seen = seen_as(Grammar::TsModule, &text);
+        let (use_of, _) = at(&text, "typeof intent");
+        // A value read of the intrinsic is reported; a type query is not, and
+        // type arguments leave a direct call direct.
+        assert_eq!(
+            seen,
+            Seen {
+                declarations: vec![(
+                    OccurrenceRole::IntentLiteral,
+                    at(&text, "'Pay now'"),
+                    "Pay now".to_owned(),
+                    Some(vec![]),
+                )],
+                uses: vec![(at(&text, "intent<string>('Pay now')"), 0, false, vec![])],
+                exclusions: vec![],
+                records: vec![("intrinsic-use-unsupported", (use_of + 7, use_of + 13))],
+            }
+        );
+    }
+
+    /// Recognize `text` with a probe that stops at call `stop_at`, returning
+    /// whether recognition ran and how many times the probe was asked.
+    fn probed(text: &str, stop_at: Option<u32>) -> (Result<(), ProducerFailure>, u32) {
+        let asked = Cell::new(0);
+        let probe = || {
+            asked.set(asked.get() + 1);
+            stop_at.is_some_and(|stop| asked.get() >= stop)
+        };
+        let result = run(Grammar::JsModule, text, &generous(), &probe).map(|_| ());
+        (result, asked.get())
+    }
+
+    #[test]
+    fn the_walk_asks_the_probe_once_per_interval_and_never_after_a_stop() {
+        // Too few nodes for the walk to ask at all.
+        let small = format!("{PRELUDE}intent('Pay now')\n");
+        assert_eq!(probed(&small, Some(1)), (Ok(()), 0));
+
+        // The interval counts the nodes the walk enters. Identifier
+        // references are read without being entered, so each call below
+        // enters three nodes: its statement, the call, and the literal.
+        let mut body = String::new();
+        for index in 0..800 {
+            writeln!(body, "intent('Message {index}')").expect("writing to a string");
+        }
+        let large = format!("{PRELUDE}{body}");
+        let (finished, asked) = probed(&large, None);
+        assert_eq!(finished, Ok(()));
+        assert_eq!(asked, 2, "2,400 entered nodes span two intervals");
+        for stop_at in 1..=asked {
+            assert_eq!(
+                probed(&large, Some(stop_at)),
+                (Err(ProducerFailure::Cancelled), stop_at),
+                "stopping at {stop_at}"
+            );
+        }
+    }
+
+    #[test]
+    fn what_one_unit_hands_over_is_bounded_exactly() {
+        let run_with = |body: &str, limits: &JsAuthoringLimits| {
+            run(
+                Grammar::JsModule,
+                &format!("{PRELUDE}{body}"),
+                limits,
+                &|| false,
+            )
+            .map(|_| ())
+        };
+        let declarations = "intent('One')\nintent('Two')\n";
+        let mut limits = generous();
+        limits.authoring.declarations = 2;
+        assert_eq!(run_with(declarations, &limits), Ok(()));
+        limits.authoring.declarations = 1;
+        assert_eq!(
+            run_with(declarations, &limits),
+            Err(ProducerFailure::Authoring(AuthoringFailure::Limit(
+                LimitKind::Declarations
+            )))
+        );
+
+        // Uses of a shared declaration count when they are resolved.
+        let uses = "const shared = mf2`Shared`\nintent(shared)\nintent(shared)\n";
+        let mut limits = generous();
+        limits.references = 2;
+        assert_eq!(run_with(uses, &limits), Ok(()));
+        limits.references = 1;
+        assert_eq!(
+            run_with(uses, &limits),
+            Err(ProducerFailure::Limit(JsLimitKind::References))
+        );
+
+        let exclusions = "noIntent(a, 'One')\nnoIntent(b, 'Two')\n";
+        let mut limits = generous();
+        limits.exclusions = 2;
+        assert_eq!(run_with(exclusions, &limits), Ok(()));
+        limits.exclusions = 1;
+        assert_eq!(
+            run_with(exclusions, &limits),
+            Err(ProducerFailure::Limit(JsLimitKind::Exclusions))
+        );
+    }
+
+    fn declared(start: u64, end: u64) -> Declared {
+        Declared {
+            occurrence: Occurrence::new(
+                snapshot(UNIT, Grammar::JsModule, b"0123456789"),
+                ByteRange::new(start, end).unwrap(),
+                OccurrenceRole::IntentLiteral,
+            )
+            .unwrap(),
+            text: String::new(),
+            input_map: Vec::new(),
+            parameters: None,
+        }
+    }
+
+    #[test]
+    fn declarations_overlap_when_they_share_a_byte_in_any_order() {
+        assert!(!overlapping(&[]));
+        assert!(!overlapping(&[declared(0, 4)]));
+        // Touching is not overlapping.
+        assert!(!overlapping(&[declared(0, 4), declared(4, 9)]));
+        assert!(!overlapping(&[declared(4, 9), declared(0, 4)]));
+        assert!(overlapping(&[declared(0, 9), declared(2, 4)]));
+        assert!(overlapping(&[declared(2, 4), declared(2, 4)]));
+        assert!(overlapping(&[declared(5, 9), declared(0, 6)]));
+        assert!(overlapping(&[
+            declared(7, 9),
+            declared(0, 2),
+            declared(1, 3)
+        ]));
     }
 }

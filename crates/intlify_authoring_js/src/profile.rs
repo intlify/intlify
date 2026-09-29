@@ -120,4 +120,33 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn a_new_set_replaces_the_last_and_is_kept_in_order() {
+        let profile = JsAuthoringProfile::default()
+            .with_bindings([IntrinsicBinding::new(
+                "fixture-authoring",
+                "intent",
+                Intrinsic::Intent,
+            )])
+            .unwrap()
+            .with_bindings([
+                IntrinsicBinding::new("fixture-authoring", "noIntent", Intrinsic::NoIntent),
+                IntrinsicBinding::new("fixture-authoring", "mf2", Intrinsic::Mf2),
+            ])
+            .unwrap();
+        let exports: Vec<&str> = profile
+            .bindings()
+            .iter()
+            .map(IntrinsicBinding::export)
+            .collect();
+        assert_eq!(exports, ["mf2", "noIntent"]);
+        // The recognizers read the same set the caller sees.
+        assert_eq!(profile.binding_set().entries(), profile.bindings());
+        assert_eq!(
+            profile.binding_set().find("fixture-authoring", "intent"),
+            None
+        );
+        assert_eq!(JsAuthoringProfile::default(), JsAuthoringProfile::new());
+    }
 }

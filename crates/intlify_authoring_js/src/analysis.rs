@@ -352,3 +352,202 @@ where
         result.outcome() == Outcome::Blocked,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use intlify_authoring::{AuthoringFailure, LimitKind};
+
+    use super::*;
+    use crate::grammar::Grammar;
+    use crate::limits::tests::generous;
+    use crate::test_support::{admit, at, context, profile, PRELUDE, UNIT};
+
+    fn analyzed_with(
+        profile: &JsAuthoringProfile,
+        bytes: &[u8],
+        limits: &JsAuthoringLimits,
+    ) -> Result<UnitAnalysis, ProducerFailure> {
+        let units = admit(&[(UNIT, Grammar::JsModule, bytes)]);
+        analyze_unit(
+            &context(),
+            profile,
+            &units[0],
+            limits,
+            &mut JsAnalysisWorkspace::new(),
+            &|| false,
+        )
+    }
+
+    fn analyzed(text: &str) -> UnitAnalysis {
+        analyzed_with(&profile(), text.as_bytes(), &generous()).expect("the analysis runs")
+    }
+
+    fn details(analysis: &UnitAnalysis) -> Vec<&str> {
+        analysis
+            .diagnostics()
+            .iter()
+            .map(|record| {
+                record
+                    .detail()
+                    .map_or(record.origin().code(), Detail::as_str)
+            })
+            .collect()
+    }
+
+    fn range_of(occurrence: &intlify_authoring::Occurrence) -> (u64, u64) {
+        (occurrence.range().start(), occurrence.range().end())
+    }
+
+    #[test]
+    fn a_checked_unit_hands_out_its_facts_through_both_accessors() {
+        let text = format!("{PRELUDE}intent('Pay now')\nnoIntent(brand, 'Brand')\n");
+        let analysis = analyzed(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Checked);
+        assert_eq!(analysis.source().unit().as_str(), UNIT);
+        assert!(analysis.diagnostics().is_empty());
+        assert_eq!(analysis.checked(), Some(analysis.inspection_facts()));
+        let facts = analysis.inspection_facts();
+        assert_eq!(facts.declarations().len(), 1);
+        assert_eq!(facts.references().len(), 1);
+        assert_eq!(facts.exclusions().len(), 1);
+
+        let work = analysis.work();
+        assert_eq!(work.source_bytes, text.len() as u64);
+        assert_eq!(work.parse_attempts, 1);
+        assert!(work.ast_nodes > 0);
+        assert_eq!(work.scopes, 1);
+        // The three imports are the only declared names.
+        assert_eq!(work.symbols, 3);
+        assert_eq!(work.references, 3);
+    }
+
+    #[test]
+    fn a_blocked_unit_keeps_its_facts_for_inspection_only() {
+        let analysis = analyzed(&format!("{PRELUDE}intent('Pay now')\nintent(computed())\n"));
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
+        assert_eq!(details(&analysis), ["message-dynamic"]);
+        assert_eq!(analysis.checked(), None);
+        let facts = analysis.inspection_facts();
+        assert_eq!(facts.declarations().len(), 1);
+        assert_eq!(facts.references().len(), 1);
+    }
+
+    #[test]
+    fn a_unit_that_is_not_text_fails_at_the_unit_as_a_whole_without_parsing() {
+        let analysis =
+            analyzed_with(&profile(), &[0x66, 0xff], &generous()).expect("the analysis runs");
+        assert_eq!(analysis.outcome(), UnitOutcome::Failed);
+        assert_eq!(details(&analysis), ["unit-not-text"]);
+        assert!(matches!(
+            analysis.diagnostics()[0].location(),
+            Location::Unit(_)
+        ));
+        assert_eq!(analysis.inspection_facts(), &UnitFacts::default());
+        assert_eq!(
+            analysis.work(),
+            UnitWork {
+                source_bytes: 2,
+                ..UnitWork::default()
+            }
+        );
+    }
+
+    #[test]
+    fn a_unit_the_host_rejects_fails_where_the_host_says() {
+        let text = "const = 1\n";
+        let analysis = analyzed(text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Failed);
+        assert_eq!(details(&analysis), ["host-syntax-invalid"]);
+        let Location::Region(region) = analysis.diagnostics()[0].location() else {
+            panic!("the rejection points into the unit");
+        };
+        assert_eq!(
+            (region.range().start(), region.range().end()),
+            at(text, "=")
+        );
+        assert_eq!(analysis.work().parse_attempts, 1);
+        assert_eq!(analysis.work().ast_nodes, 0);
+    }
+
+    #[test]
+    fn a_profile_that_registers_nothing_reads_no_form_but_still_reads_the_unit() {
+        let text = format!("{PRELUDE}intent('Pay now')\nregister(intent)\n");
+        let analysis = analyzed_with(&JsAuthoringProfile::new(), text.as_bytes(), &generous())
+            .expect("the analysis runs");
+        assert_eq!(analysis.outcome(), UnitOutcome::Checked);
+        assert!(analysis.diagnostics().is_empty());
+        assert_eq!(analysis.checked(), Some(&UnitFacts::default()));
+        assert!(analysis.work().ast_nodes > 0);
+    }
+
+    #[test]
+    fn facts_come_in_canonical_order_whatever_order_they_were_found_in() {
+        // The shared use is settled after the walk and the inline one during
+        // it, so they are found in the opposite of source order.
+        let text =
+            format!("{PRELUDE}const greeting = mf2`Hi`\nintent(greeting)\nintent('Pay now')\n");
+        let analysis = analyzed(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Checked);
+        let facts = analysis.inspection_facts();
+        let declarations: Vec<_> = facts
+            .declarations()
+            .iter()
+            .map(|facts| range_of(facts.occurrence()))
+            .collect();
+        assert_eq!(declarations, [at(&text, "mf2`Hi`"), at(&text, "'Pay now'")]);
+        let references: Vec<_> = facts
+            .references()
+            .iter()
+            .map(|reference| {
+                (
+                    range_of(reference.occurrence()),
+                    range_of(&reference.declarations()[0]),
+                )
+            })
+            .collect();
+        assert_eq!(
+            references,
+            [
+                (at(&text, "intent(greeting)"), at(&text, "mf2`Hi`")),
+                (at(&text, "intent('Pay now')"), at(&text, "'Pay now'")),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_use_whose_declaration_is_blocked_is_no_fact_and_adds_no_record() {
+        let text = format!(
+            "{PRELUDE}const broken = mf2`Hello {{$name`\nintent(broken, {{ name }})\n\
+             intent('Bye {{$name', {{ name }})\n"
+        );
+        let analysis = analyzed(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
+        // One record per broken message, from the shared crate, and nothing
+        // about the uses: the declarations already say why.
+        assert_eq!(analysis.diagnostics().len(), 2);
+        assert!(analysis
+            .diagnostics()
+            .iter()
+            .all(|record| record.stage() == intlify_authoring::Stage::MessageAnalysis));
+        assert_eq!(analysis.inspection_facts(), &UnitFacts::default());
+    }
+
+    #[test]
+    fn a_shared_uses_records_count_against_the_same_bound_as_every_other() {
+        let text = format!("{PRELUDE}const greeting = mf2`Hello {{$name}}!`\nintent(greeting)\n");
+        let mut limits = generous();
+        limits.authoring.diagnostics = 1;
+        let analysis = analyzed_with(&profile(), text.as_bytes(), &limits).unwrap();
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
+        assert_eq!(details(&analysis), ["parameter-missing"]);
+        // The use's comparison reports into this unit's bounded collector;
+        // with no room left the analysis stops rather than drop the record.
+        limits.authoring.diagnostics = 0;
+        assert_eq!(
+            analyzed_with(&profile(), text.as_bytes(), &limits),
+            Err(ProducerFailure::Authoring(AuthoringFailure::Limit(
+                LimitKind::Diagnostics
+            )))
+        );
+    }
+}

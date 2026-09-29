@@ -160,3 +160,46 @@ pub fn template_escape_invalid() -> Detail {
 pub fn legacy_escape() -> Detail {
     Detail::literal("legacy-escape")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_detail_is_spelled_exactly_and_names_one_cause() {
+        let details = [
+            (unit_not_text(), "unit-not-text"),
+            (host_syntax_invalid(), "host-syntax-invalid"),
+            (intrinsic_use_unsupported(), "intrinsic-use-unsupported"),
+            (import_form_unsupported(), "import-form-unsupported"),
+            (intent_arguments(), "intent-arguments"),
+            (conditional_selection(), "conditional-selection"),
+            (module_reference(), "module-reference"),
+            (declaration_alias(), "declaration-alias"),
+            (explicit_forms_nested(), "explicit-forms-nested"),
+            (template_substitution(), "template-substitution"),
+            (message_dynamic(), "message-dynamic"),
+            (parameters_opaque(), "parameters-opaque"),
+            (parameter_spread(), "parameter-spread"),
+            (parameter_key(), "parameter-key"),
+            (parameter_accessor(), "parameter-accessor"),
+            (parameter_prototype(), "parameter-prototype"),
+            (exclusion_arguments(), "exclusion-arguments"),
+            (exclusion_reason_missing(), "exclusion-reason-missing"),
+            (exclusion_reason_dynamic(), "exclusion-reason-dynamic"),
+            (exclusion_reason_empty(), "exclusion-reason-empty"),
+            (surrogate_escape(), "surrogate-escape"),
+            (template_escape_invalid(), "template-escape-invalid"),
+            (legacy_escape(), "legacy-escape"),
+        ];
+        for (detail, spelling) in details {
+            assert_eq!(detail.as_str(), spelling);
+        }
+        // A fixture tells causes apart by their detail, so no two may share
+        // one.
+        let mut spellings: Vec<&str> = details.iter().map(|(detail, _)| detail.as_str()).collect();
+        spellings.sort_unstable();
+        spellings.dedup();
+        assert_eq!(spellings.len(), details.len());
+    }
+}

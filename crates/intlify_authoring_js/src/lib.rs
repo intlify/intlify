@@ -41,6 +41,8 @@ mod parse;
 mod profile;
 mod report;
 mod syntax;
+#[cfg(test)]
+mod test_support;
 mod unit;
 mod workspace;
 

@@ -91,21 +91,18 @@ fn stopping(text: &str, stop_at: Option<u32>) -> (Result<UnitAnalysis, ProducerF
 
 #[test]
 fn stopping_at_any_probe_yields_no_result() {
-    // Just over the walk's probe interval of 1024 nodes, so the walk asks
-    // the probe itself, and with enough declarations that the shared crate
-    // asks it between them.
+    // Enough calls that the walk asks the probe itself, and enough
+    // declarations that the shared crate asks it between them. The walk's
+    // interval counts the nodes it enters, three per call here, so 400 calls
+    // pass it once; `explicit.rs` pins where the walk asks.
     let mut body = String::new();
-    for index in 0..260 {
+    for index in 0..400 {
         writeln!(body, "intent('Message {index}')").expect("writing to a string");
     }
     let text = source(&body);
     let (finished, asked) = stopping(&text, None);
     let finished = finished.expect("an unstopped analysis runs");
     assert_eq!(finished.outcome(), UnitOutcome::Checked);
-    assert!(
-        finished.work().ast_nodes >= 1024,
-        "the tree is large enough for the walk to ask"
-    );
     assert!(
         asked > 3,
         "the walk and the shared crate ask as well: {asked}"
