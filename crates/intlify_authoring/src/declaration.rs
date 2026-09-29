@@ -22,7 +22,7 @@ use crate::context::{AuthoringContext, ContextKind, LocaleFailure};
 use crate::diagnostic::{
     detail, Detail, Diagnostic, DiagnosticOrigin, MessageRange, ReasonFamily, Severity, Stage,
 };
-use crate::limits::{AuthoringLimits, LimitKind};
+use crate::limits::{AuthoringLimits, LimitKind, LimitScope};
 use crate::message::{
     analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
     MappingError, MessageFailure, MessageInput,
@@ -245,7 +245,11 @@ impl AuthoringResult {
 /// editing source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthoringFailure {
-    /// A named bound was exhausted.
+    /// A bound on the invocation as a whole was exhausted.
+    ///
+    /// A bound on one declaration blocks that declaration with an
+    /// `authoring-resource-limit` diagnostic instead, and the invocation
+    /// still runs.
     Limit(LimitKind),
     /// A message could not be analyzed.
     Message(MessageFailure),
@@ -259,8 +263,8 @@ pub enum AuthoringFailure {
     DuplicateOccurrence,
     /// A supplied input map does not describe the supplied text.
     ///
-    /// Exhausting a bound while composing is reported as [`Self::Limit`]
-    /// instead, because that map does describe the text.
+    /// Exhausting a bound while composing is reported as that bound instead,
+    /// because that map does describe the text.
     InputMap(MappingError),
     /// The caller's probe asked this invocation to stop.
     ///
@@ -332,6 +336,11 @@ impl DiagnosticSink {
 /// Every declaration is analyzed, so one blocked declaration does not suppress
 /// independent facts about the others. The invocation is checked only when no
 /// declaration was blocked.
+///
+/// A bound on one declaration, such as its message size or its projection,
+/// blocks only that declaration when it is exhausted, with a diagnostic naming
+/// the bound. A bound on the invocation, such as how many declarations or
+/// diagnostics it may hold, fails it with [`AuthoringFailure::Limit`].
 pub fn resolve_declarations(
     context: &dyn AuthoringContext,
     inputs: &[DeclarationInput<'_>],
@@ -481,6 +490,12 @@ fn resolve_one(
             );
             return Ok(None);
         }
+        // The analysis alone cannot tell a bound on this message from one on
+        // the invocation it is part of, so the decision is made here.
+        Err(MessageFailure::Limit(limit)) if limit.scope() == LimitScope::Declaration => {
+            diagnostics.push(exhausted(Stage::MessageAnalysis, input, limit));
+            return Ok(None);
+        }
         Err(other) => return Err(other.into()),
     };
     let mut blocked = analysis.is_blocked();
@@ -517,6 +532,14 @@ fn resolve_one(
         return Ok(None);
     }
 
+    let extraction_map = match extraction_map(input, &analysis, limits) {
+        Ok(map) => map,
+        Err(AuthoringFailure::Limit(limit)) if limit.scope() == LimitScope::Declaration => {
+            diagnostics.push(exhausted(Stage::ResultConstruction, input, limit));
+            return Ok(None);
+        }
+        Err(failure) => return Err(failure),
+    };
     let projection = intent_projection(
         facts.message().clone(),
         facts.parameters().to_vec().into_boxed_slice(),
@@ -535,7 +558,7 @@ fn resolve_one(
         // always representable; failing here would be a defect in admission.
         surface_class: NonemptyText::from_validated(&class)
             .map_err(|failure| AuthoringFailure::ContextInvalid(failure.into()))?,
-        extraction_map: extraction_map(input, &analysis, limits)?,
+        extraction_map,
     }))
 }
 
@@ -572,6 +595,14 @@ const fn input_map_failure(failure: MappingError) -> AuthoringFailure {
         MappingError::Limit(kind) => AuthoringFailure::Limit(kind),
         other => AuthoringFailure::InputMap(other),
     }
+}
+
+/// Report a bound one declaration exhausted.
+///
+/// The record names the bound, because meeting it means changing that
+/// message or raising that bound, not correcting what was written.
+fn exhausted(stage: Stage, input: &DeclarationInput<'_>, limit: LimitKind) -> Diagnostic {
+    authoring(stage, ReasonFamily::AuthoringResourceLimit, input).with_limit(limit)
 }
 
 /// Report displayed text that MF2 pattern text cannot carry.
@@ -689,16 +720,12 @@ fn resolve_usage(
         );
         return Err(());
     };
-    let Ok(value) = admitted_text(value, limits) else {
-        diagnostics.push(
-            authoring(
-                Stage::ContextResolution,
-                ReasonFamily::AuthoringMetadataInvalid,
-                input,
-            )
-            .with_detail(detail::metadata_value_invalid()),
-        );
-        return Err(());
+    let value = match admitted_text(value, limits) {
+        Ok(value) => value,
+        Err(rejected) => {
+            diagnostics.push(rejected.report(input));
+            return Err(());
+        }
     };
     Ok(Some(Usage {
         profile: profile.clone(),
@@ -715,25 +742,47 @@ fn resolve_description(
         // There is no shared description default: absence stays absence.
         return Ok(None);
     };
-    if admitted_text(description, limits).is_ok() {
-        return Ok(Some(description.to_owned()));
+    match admitted_text(description, limits) {
+        Ok(_) => Ok(Some(description.to_owned())),
+        Err(rejected) => {
+            diagnostics.push(rejected.report(input));
+            Err(())
+        }
     }
-    diagnostics.push(
-        authoring(
-            Stage::ContextResolution,
-            ReasonFamily::AuthoringMetadataInvalid,
-            input,
-        )
-        .with_detail(detail::metadata_value_invalid()),
-    );
-    Err(())
 }
 
-fn admitted_text(value: &str, limits: &AuthoringLimits) -> Result<NonemptyText, ()> {
-    if value.len() as u64 > limits.metadata_value_bytes {
-        return Err(());
+/// Why a metadata value was not admitted.
+#[derive(Debug, Clone, Copy)]
+enum Rejected {
+    /// It does not fit its bound.
+    Bound,
+    /// It is not a value, such as an empty one.
+    Invalid,
+}
+
+impl Rejected {
+    fn report(self, input: &DeclarationInput<'_>) -> Diagnostic {
+        match self {
+            Self::Bound => exhausted(
+                Stage::ContextResolution,
+                input,
+                LimitKind::MetadataValueBytes,
+            ),
+            Self::Invalid => authoring(
+                Stage::ContextResolution,
+                ReasonFamily::AuthoringMetadataInvalid,
+                input,
+            )
+            .with_detail(detail::metadata_value_invalid()),
+        }
     }
-    NonemptyText::from_validated(value).map_err(|_| ())
+}
+
+fn admitted_text(value: &str, limits: &AuthoringLimits) -> Result<NonemptyText, Rejected> {
+    if value.len() as u64 > limits.metadata_value_bytes {
+        return Err(Rejected::Bound);
+    }
+    NonemptyText::from_validated(value).map_err(|_| Rejected::Invalid)
 }
 
 /// Compare what a message requires with what one use site supplies.

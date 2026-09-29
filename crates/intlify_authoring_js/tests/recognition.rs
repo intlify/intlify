@@ -8,11 +8,14 @@ mod support;
 use std::cell::Cell;
 use std::fmt::Write;
 
-use intlify_authoring::{AuthoringFailure, LimitKind, UnitOutcome};
+use intlify_authoring::{AuthoringFailure, LimitKind, ReasonFamily, UnitOutcome};
 use intlify_authoring_js::{
-    analyze_unit, Grammar, JsAnalysisWorkspace, JsLimitKind, ProducerFailure, UnitAnalysis,
+    analyze_unit, detail, Grammar, JsAnalysisWorkspace, JsLimitKind, ProducerFailure, UnitAnalysis,
 };
-use support::{admit, context, limits, never, profile, try_analyze, PRELUDE};
+use support::{
+    admit, at, context, diagnostics, expect, limits, never, occurrence, profile, try_analyze,
+    PRELUDE,
+};
 
 fn source(body: &str) -> String {
     format!("{PRELUDE}{body}")
@@ -44,6 +47,56 @@ fn references_one_unit_makes_are_bounded_exactly() {
         try_analyze(Grammar::JsModule, &text, &profile(), &bounded),
         Err(ProducerFailure::Limit(JsLimitKind::References))
     );
+}
+
+#[test]
+fn a_bound_on_one_literal_blocks_only_its_declaration() {
+    // `a`, the escape and `b` are three runs, one more than allowed.
+    let text = source("intent('a\\nb')\nintent('Pay')\n");
+    let mut bounded = limits();
+    bounded.input_segments = 2;
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
+    assert_eq!(
+        diagnostics(&analysis),
+        [expect(
+            ReasonFamily::AuthoringResourceLimit,
+            detail::limit(JsLimitKind::InputSegments),
+            at(&text, "'a\\nb'")
+        )]
+    );
+    let facts = analysis.inspection_facts();
+    assert_eq!(facts.declarations().len(), 1);
+    assert_eq!(
+        occurrence(facts.declarations()[0].occurrence()).1,
+        at(&text, "'Pay'")
+    );
+    assert_eq!(facts.references().len(), 1);
+    assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
+}
+
+#[test]
+fn a_shared_bound_on_one_message_blocks_only_its_declaration() {
+    let text = source("intent('Pay')\nintent('Pay now')\n");
+    let mut bounded = limits();
+    bounded.authoring.message_text_bytes = 3;
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
+    // The shared crate names its own bound in the record's limit.
+    let [record] = analysis.diagnostics() else {
+        panic!("one record: {:?}", analysis.diagnostics());
+    };
+    assert_eq!(
+        record.origin().code(),
+        ReasonFamily::AuthoringResourceLimit.as_str()
+    );
+    assert_eq!(record.limit(), Some(LimitKind::MessageTextBytes));
+    assert_eq!(
+        record.occurrence().map(|at| occurrence(at).1),
+        Some(at(&text, "'Pay now'"))
+    );
+    let facts = analysis.inspection_facts();
+    assert_eq!(facts.declarations().len(), 1);
+    assert_eq!(facts.references().len(), 1);
+    assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
 }
 
 #[test]

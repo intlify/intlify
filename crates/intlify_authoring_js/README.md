@@ -92,7 +92,7 @@ This is an unpublished, workspace-internal crate. Implemented:
 - one parse and one semantic build per unit, with host syntax errors reported as failed units;
 - the host cooked decoder and its input map, checked against the parser and against hand-derived fixtures;
 - intrinsic bindings, and the explicit forms `intent`, `mf2` and `noIntent`, handed to `intlify_authoring` with their input maps;
-- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions and parameters, a reusable workspace, and cancellation.
+- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions and parameters, a reusable workspace, and cancellation. A bound on one literal or one use site — its input map segments or its parameters, and the shared crate's bounds on one message — blocks that declaration or use with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
 
 The profile admits no DOM global yet, so ordinary UI text is not recognized automatically. The later changes add:
 

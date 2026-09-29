@@ -51,10 +51,12 @@ One invocation produces one of three things, and they are deliberately not inter
 | Outcome | Meaning | Reachable facts |
 | --- | --- | --- |
 | Checked | Every declaration in the scope resolved | `checked()` returns them all |
-| Blocked | At least one declaration could not be resolved | `checked()` returns `None`; `inspection_facts()` returns what was independently established |
-| Operational failure | The invocation could not run — a bound was exhausted, a provider could not answer, or a context input was invalid | `Err`, with no diagnostics to show an author |
+| Blocked | At least one declaration could not be resolved, including one that exhausted a bound on its own message | `checked()` returns `None`; `inspection_facts()` returns what was independently established |
+| Operational failure | The invocation could not run — a bound on the invocation was exhausted, a provider could not answer, or a context input was invalid | `Err`, with no diagnostics to show an author |
 
 A blocked result keeps its facts because they support inspection, and puts them behind a differently named accessor because they are not the complete authoring input a build requires. An operational failure is separated from a diagnostic because the author wrote nothing wrong and cannot fix it by editing source.
+
+A bound is either on one declaration or on the invocation, and `LimitKind::scope` says which. A bound on one message — its text or emitted size, its extraction segments, its parameter names, a metadata value, or its projection — blocks that declaration with an `authoring-resource-limit` record whose `limit()` names the bound, and the other declarations are still resolved. A bound on the invocation — how many declarations, vocabulary members or diagnostics it may hold — fails it. Either way no result is built from work that stopped short.
 
 ## Current status
 

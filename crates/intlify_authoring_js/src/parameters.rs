@@ -67,7 +67,9 @@ pub(crate) fn read(
                     Some(identifier.name.as_str().to_owned())
                 }
                 PropertyKey::StringLiteral(literal) => {
-                    let Some(cooked) = settle(cook_string(text, literal, limits), reporter)? else {
+                    let Some(cooked) =
+                        settle(cook_string(text, literal, limits), literal.span, reporter)?
+                    else {
                         // The key spells an escape the profile refuses, and
                         // that has been reported at the escape.
                         readable = false;
@@ -91,7 +93,14 @@ pub(crate) fn read(
             continue;
         }
         if bindings.len() as u64 >= limits.parameter_bindings {
-            return Err(ProducerFailure::Limit(JsLimitKind::ParameterBindings));
+            // Too many names to compare is a bound on this use site. The
+            // object is reported once, and the use site is not established.
+            reporter.at(
+                ReasonFamily::AuthoringResourceLimit,
+                detail::limit(JsLimitKind::ParameterBindings),
+                object.span,
+            )?;
+            return Ok(None);
         }
         let expression =
             reporter.occurrence(property.value.span(), OccurrenceRole::ParameterExpression)?;
@@ -154,7 +163,17 @@ mod tests {
     }
 
     fn reduced(record: &Diagnostic) -> (&'static str, (u64, u64)) {
-        assert_eq!(record.origin().code(), "authoring-form-unsupported");
+        // Every detail here belongs to one family, so the detail alone says
+        // which family the record is in.
+        let family = if record
+            .detail()
+            .is_some_and(|detail| detail.as_str() == "parameter-bindings")
+        {
+            "authoring-resource-limit"
+        } else {
+            "authoring-form-unsupported"
+        };
+        assert_eq!(record.origin().code(), family);
         let Location::Region(region) = record.location() else {
             panic!("a record points into the object");
         };
@@ -268,10 +287,12 @@ mod tests {
         let mut limits = generous();
         limits.parameter_bindings = 2;
         assert!(read_in(Grammar::JsModule, text, &limits).is_ok());
+        // One name over is a bound on this use site: the object is reported
+        // once, and no parameter is handed over for it.
         limits.parameter_bindings = 1;
         assert_eq!(
             read_in(Grammar::JsModule, text, &limits),
-            Err(ProducerFailure::Limit(JsLimitKind::ParameterBindings))
+            Ok((None, vec![("parameter-bindings", at(text, "{ a, b }"))]))
         );
     }
 }

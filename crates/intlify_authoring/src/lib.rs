@@ -78,7 +78,7 @@ pub use inventory::{
     ARTIFACT_INTEGRITY_DOMAIN, ARTIFACT_SCHEMA_REVISION, AUTHORING_SPECIFICATION_IDENTITY,
     AUTHORING_SPECIFICATION_REVISION,
 };
-pub use limits::{AuthoringLimits, LimitKind, LimitsError};
+pub use limits::{AuthoringLimits, LimitKind, LimitScope, LimitsError};
 pub use message::{
     analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
     MappingError, MessageAnalysis, MessageFacts, MessageFailure, MessageInput,

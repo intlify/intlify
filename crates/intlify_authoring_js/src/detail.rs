@@ -10,6 +10,8 @@
 
 use intlify_authoring::Detail;
 
+use crate::limits::JsLimitKind;
+
 /// The unit's bytes are exactly what its snapshot names, and are not UTF-8.
 #[must_use]
 pub fn unit_not_text() -> Detail {
@@ -155,6 +157,15 @@ pub fn template_escape_invalid() -> Detail {
     Detail::literal("template-escape-invalid")
 }
 
+/// A host bound on one literal or one use site was exhausted.
+///
+/// The shared crate names its own bounds in the record's limit. A host bound
+/// has no place there, so the detail names it, spelled as the bound is.
+#[must_use]
+pub fn limit(kind: JsLimitKind) -> Detail {
+    Detail::literal(kind.as_str())
+}
+
 /// A literal uses a legacy octal escape, or `\8` or `\9`.
 #[must_use]
 pub fn legacy_escape() -> Detail {
@@ -191,6 +202,8 @@ mod tests {
             (surrogate_escape(), "surrogate-escape"),
             (template_escape_invalid(), "template-escape-invalid"),
             (legacy_escape(), "legacy-escape"),
+            (limit(JsLimitKind::InputSegments), "input-segments"),
+            (limit(JsLimitKind::ParameterBindings), "parameter-bindings"),
         ];
         for (detail, spelling) in details {
             assert_eq!(detail.as_str(), spelling);

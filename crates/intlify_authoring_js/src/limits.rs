@@ -13,11 +13,13 @@
 //! diagnostics are bounded by the shared diagnostic limit, host and shared
 //! records together.
 //!
-//! Exhausting a bound is an operational failure, as it is in
-//! `intlify_authoring`: a result is never produced from work that stopped
-//! short.
+//! Exhausting a bound never produces a result from work that stopped short.
+//! What it stops follows `intlify_authoring`. A bound on one literal or one
+//! use site blocks that declaration or use with an `authoring-resource-limit`
+//! diagnostic, and the rest of the unit is still read. A bound on the
+//! invocation or on a whole unit is an operational failure.
 
-use intlify_authoring::{AuthoringLimits, LimitsError};
+use intlify_authoring::{AuthoringLimits, LimitScope, LimitsError};
 
 /// Which named bound an invocation exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -53,6 +55,24 @@ impl JsLimitKind {
             Self::References => "references",
             Self::Exclusions => "exclusions",
             Self::ParameterBindings => "parameter-bindings",
+        }
+    }
+
+    /// Return what exhausting this bound stops.
+    ///
+    /// A literal's input map and one use site's parameters belong to one
+    /// declaration or one use. Everything else bounds a unit or the whole
+    /// invocation.
+    #[must_use]
+    pub const fn scope(self) -> LimitScope {
+        match self {
+            Self::InputSegments | Self::ParameterBindings => LimitScope::Declaration,
+            Self::Units
+            | Self::UnitBytes
+            | Self::TotalBytes
+            | Self::AstNodes
+            | Self::References
+            | Self::Exclusions => LimitScope::Invocation,
         }
     }
 }
@@ -203,5 +223,22 @@ pub(crate) mod tests {
         spellings.sort_unstable();
         spellings.dedup();
         assert_eq!(spellings.len(), kinds.len());
+    }
+
+    #[test]
+    fn a_bound_on_one_literal_or_use_site_is_scoped_to_it() {
+        for kind in [JsLimitKind::InputSegments, JsLimitKind::ParameterBindings] {
+            assert_eq!(kind.scope(), LimitScope::Declaration, "{kind:?}");
+        }
+        for kind in [
+            JsLimitKind::Units,
+            JsLimitKind::UnitBytes,
+            JsLimitKind::TotalBytes,
+            JsLimitKind::AstNodes,
+            JsLimitKind::References,
+            JsLimitKind::Exclusions,
+        ] {
+            assert_eq!(kind.scope(), LimitScope::Invocation, "{kind:?}");
+        }
     }
 }
