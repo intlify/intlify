@@ -32,6 +32,7 @@ use crate::dom;
 use crate::explicit::{self, Recognized, Source};
 use crate::failure::ProducerFailure;
 use crate::limits::{JsAuthoringLimits, JsLimitKind};
+use crate::metadata::{self, Annotation};
 use crate::parse::{self, Reading};
 use crate::profile::{JsAuthoringProfile, TEXT_CONTENT_USAGE};
 use crate::report::Reporter;
@@ -235,6 +236,18 @@ where
         outside_profile = found.outside_profile;
         merge(&mut recognized, found, limits, &reporter)?;
     }
+    // An annotation describes what the recognizers declared, so it is read
+    // after them. A profile that can declare nothing has nothing to describe.
+    if !bindings.is_empty() || profile.admits_document() {
+        metadata::attach(
+            &parsed,
+            text,
+            &mut recognized,
+            limits,
+            &mut reporter,
+            cancelled,
+        )?;
+    }
     // The tree is not needed past this point, and nothing below borrows it.
     drop(parsed);
 
@@ -339,6 +352,9 @@ where
     let inputs: Vec<DeclarationInput<'_>> = recognized
         .declarations
         .iter()
+        // A declaration whose annotation was reported is not established:
+        // what the author wrote about it is not known.
+        .filter(|declared| declared.annotation != Annotation::Rejected)
         .map(|declared| {
             // Both `intent()` sources and `mf2` tags hold MF2, not displayed
             // text, so they reach the same parser as the same kind of input.
@@ -351,11 +367,19 @@ where
                     Some(TEXT_CONTENT_USAGE),
                 ),
             };
+            let metadata = match &declared.annotation {
+                Annotation::Valid(values) => DeclarationMetadata {
+                    source_locale: values.source_locale.as_deref(),
+                    surface_class: values.surface_class.as_deref(),
+                    description: values.description.as_deref(),
+                },
+                Annotation::Absent | Annotation::Rejected => DeclarationMetadata::default(),
+            };
             DeclarationInput {
                 occurrence: declared.occurrence.clone(),
                 message,
                 input_map: Some(&declared.input_map),
-                metadata: DeclarationMetadata::default(),
+                metadata,
                 usage,
                 parameters: declared.parameters.as_deref(),
             }
@@ -549,7 +573,11 @@ mod tests {
 
     #[test]
     fn a_profile_that_registers_nothing_reads_no_form_but_still_reads_the_unit() {
-        let text = format!("{PRELUDE}intent('Pay now')\nregister(intent)\n");
+        // With nothing it could declare, an annotation has nothing to
+        // describe, so neither a misplaced nor a misspelled one is read.
+        let text = format!(
+            "{PRELUDE}intent('Pay now')\nregister(intent)\n/* @intlify {{}} */\n// @intlify\n"
+        );
         let analysis = analyzed_with(&JsAuthoringProfile::new(), text.as_bytes(), &generous())
             .expect("the analysis runs");
         assert_eq!(analysis.outcome(), UnitOutcome::Checked);

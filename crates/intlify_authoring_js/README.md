@@ -4,7 +4,7 @@ JavaScript and TypeScript host Producer for [Intlify](../../design/000-intlify-o
 
 > [!IMPORTANT]
 >
-> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, and recognizes ordinary UI text assigned to a proven DOM receiver. `@intlify` metadata is not implemented yet. See [Current status](#current-status).
+> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, recognizes ordinary UI text assigned to a proven DOM receiver, and reads `@intlify` metadata. See [Current status](#current-status).
 
 A Producer reads host source and hands [`intlify_authoring`](../intlify_authoring/README.md) what it found, already decoded. What a message means, what its use site must supply, its locale, class and revision are all decided there, so the same text never means different things depending on which host found it. This crate owns the part specific to JavaScript: which bytes a unit is, which grammar reads them, and what a literal decodes to and from where.
 
@@ -79,7 +79,7 @@ The second argument is read only as a plain object literal: static keys, plain v
 
 When the profile admits the standard `document` (`with_dom_globals([DomGlobal::Document])`), a static literal assigned with `=` to `textContent` of a proven receiver is displayed text. It becomes a `ui-literal` declaration with the `text-content` usage from the `intlify-web-dom-usage` profile, used where it is assigned, and its braces stay characters. A context reading such units has to register that usage profile.
 
-A receiver is proven when it starts at `document.querySelector()` or `document.createElement()` with exactly one static string, on the `document` global itself, and reaches the assignment through `const` aliases in the same function, and when nothing on any path to the assignment may have changed what its display property does. The walk follows each function's own control flow: branches, loops until nothing more changes, `switch` fallthrough, labels, and `try`, `catch` and `finally`, including jumps that leave through a `finally`. A reference to the receiver is harmless only as the object of a member access or a method call, an operand of a comparison, `typeof`, `!` or `void`, a condition, or the initializer of a `const` alias. Passing it anywhere, storing it, assigning it to another variable, returning, yielding or exporting it, deleting or computing its properties, changing its prototype, or capturing it in a closure invalidates it for every alias, and nothing restores it.
+A receiver is proven when it starts at `document.querySelector()` or `document.createElement()` with exactly one static string, on the `document` global itself, and reaches the assignment through `const` aliases in the same function, and when nothing on any path to the assignment may have changed what its display property does. The walk follows each function's own control flow: branches, loops until nothing more changes, `switch` fallthrough, labels, and `try`, `catch` and `finally`, including jumps that leave through a `finally`. A reference to the receiver is harmless only as the object of a member access or a method call, an operand of a comparison, `typeof`, `!` or `void`, a condition, or the initializer of a `const` alias. A member that reaches its prototype or redefines its properties (`__proto__`, `constructor`, `__defineGetter__`, `__defineSetter__`), or one whose key is known only at run time, is not harmless. Passing it anywhere, storing it, assigning it to another variable, returning, yielding or exporting it, deleting or writing computed properties, changing its prototype, or capturing it in a closure invalidates it for every alias, and nothing restores it. The one thing that starts over is a `const` running `document.createElement()` again, as a loop body does: it binds a new element, unless a hoisted function or a closure made earlier in the block already reaches it.
 
 What cannot be proven is not guessed:
 
@@ -91,6 +91,35 @@ What cannot be proven is not guessed:
 | Past a bound: alias chain, origins one function tracks, proof steps | Reported as `authoring-resource-limit` |
 
 A proven sink assigned anything but a literal, a compound assignment to one, or an `mf2` tag assigned to one is reported too. An `intent()` or `noIntent()` assigned to a sink is explicit authoring and is read only by the explicit recognizer, whatever the receiver: explicit forms take no usage from where they are written, so their revision never depends on the receiver around them.
+
+## Metadata
+
+A block comment starting with `@intlify`, followed by one JSON object, describes the declaration in the statement right after it:
+
+```js
+/* @intlify { "sourceLocale": "en", "surfaceClass": "checkout", "description": "Primary payment action" } */
+button.textContent = 'Pay now'
+```
+
+The same comment means the same thing above ordinary UI text, an `intent()` message and an `mf2` declaration. Its members are `sourceLocale`, `surfaceClass` and `description`, each optional and each a nonempty string. Whether a locale canonicalizes, whether a class is in the vocabulary, and how long a value may be are decided by `intlify_authoring`, as they are for values from anywhere else. An annotated class comes before the invocation's default, and there is no default description.
+
+A declaration belongs to a statement when that statement is the innermost member of a statement list around it, with no function or class in between. So an annotation never describes a whole function or block, and never looks past the next statement. Anything else is reported as `authoring-metadata-invalid`, never ignored:
+
+| Annotation | Detail |
+| --- | --- |
+| `// @intlify` or `/** @intlify` | `metadata-comment-form` |
+| Not exactly one JSON value | `metadata-json-malformed` |
+| Not an object | `metadata-not-object` |
+| A member named twice | `metadata-member-duplicate` |
+| Another member, such as a misspelled one | `metadata-member-unknown` |
+| A value that is not a string, or is empty | `metadata-value-not-string`, `metadata-value-empty` |
+| Inside an expression, after the last statement, or before a statement in no list | `metadata-misplaced` |
+| Two before one statement; neither applies | `metadata-repeated` |
+| The next statement declares nothing of its own | `metadata-target-absent` |
+| The next statement declares more than one message | `metadata-target-ambiguous` |
+| The next statement only uses a shared declaration, whose metadata a use cannot redefine | `metadata-target-reference` |
+
+A reported annotation that belongs to one declaration keeps that declaration from being established, since what the author wrote about it is not known. An annotation longer than the `annotation_bytes` bound is reported as `authoring-resource-limit`. When the statement after an annotation holds only something already reported, such as a sink whose receiver could not be proven, no second record is made. A profile that registers no intrinsic and admits no DOM global can declare nothing, so it reads no annotation.
 
 ## What this crate never does
 
@@ -110,11 +139,11 @@ This is an unpublished, workspace-internal crate. Implemented:
 - the host cooked decoder and its input map, checked against the parser and against hand-derived fixtures;
 - intrinsic bindings, and the explicit forms `intent`, `mf2` and `noIntent`, handed to `intlify_authoring` with their input maps;
 - bounded DOM recognition with all-path receiver evidence, and the `text-content` usage profile;
-- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins and proof steps, a reusable workspace, and cancellation. A bound on one literal, one use site or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
+- `@intlify` metadata, attached to exactly one declaration;
+- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins, proof steps and annotation bytes, a reusable workspace, and cancellation. A bound on one literal, one use site, one annotation or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
 
 The later changes add:
 
-- `@intlify` metadata;
 - assembling a checked `authoring-inventory` from the analyzed units;
 - design 026 measurement of source discovery and inventory assembly.
 

@@ -230,6 +230,94 @@ pub fn legacy_escape() -> Detail {
     Detail::literal("legacy-escape")
 }
 
+/// A comment names `@intlify` but is not a block comment that starts with
+/// it: a line comment or a documentation comment.
+///
+/// It is reported rather than ignored, so an author whose metadata would
+/// otherwise be silently lost learns that it is not read.
+#[must_use]
+pub fn metadata_comment_form() -> Detail {
+    Detail::literal("metadata-comment-form")
+}
+
+/// What follows `@intlify` is not exactly one JSON value.
+///
+/// This covers a syntax error, text after the value, and an escape that
+/// does not decode to Unicode scalar values.
+#[must_use]
+pub fn metadata_json_malformed() -> Detail {
+    Detail::literal("metadata-json-malformed")
+}
+
+/// The annotation's JSON value is not an object.
+#[must_use]
+pub fn metadata_not_object() -> Detail {
+    Detail::literal("metadata-not-object")
+}
+
+/// The annotation names one member twice.
+#[must_use]
+pub fn metadata_member_duplicate() -> Detail {
+    Detail::literal("metadata-member-duplicate")
+}
+
+/// The annotation has a member other than `sourceLocale`, `surfaceClass`
+/// and `description`, such as a misspelled one.
+#[must_use]
+pub fn metadata_member_unknown() -> Detail {
+    Detail::literal("metadata-member-unknown")
+}
+
+/// An annotation member's value is not a string.
+#[must_use]
+pub fn metadata_value_not_string() -> Detail {
+    Detail::literal("metadata-value-not-string")
+}
+
+/// An annotation member's value is the empty string.
+#[must_use]
+pub fn metadata_value_empty() -> Detail {
+    Detail::literal("metadata-value-empty")
+}
+
+/// An annotation is not directly before a statement of a statement list:
+/// it is inside an expression, after the last statement, or before a
+/// statement that is not in a list.
+#[must_use]
+pub fn metadata_misplaced() -> Detail {
+    Detail::literal("metadata-misplaced")
+}
+
+/// More than one annotation comes before the same statement. None of them
+/// applies; they are neither merged nor chosen between.
+#[must_use]
+pub fn metadata_repeated() -> Detail {
+    Detail::literal("metadata-repeated")
+}
+
+/// The statement after an annotation declares no message of its own.
+///
+/// A declaration inside a nested function, class or block is not one, since
+/// an annotation never applies to a whole function or block.
+#[must_use]
+pub fn metadata_target_absent() -> Detail {
+    Detail::literal("metadata-target-absent")
+}
+
+/// The statement after an annotation declares more than one message, so
+/// which one it describes is not known.
+#[must_use]
+pub fn metadata_target_ambiguous() -> Detail {
+    Detail::literal("metadata-target-ambiguous")
+}
+
+/// The statement after an annotation only uses a shared declaration, whose
+/// metadata a use cannot redefine.
+#[must_use]
+pub fn metadata_target_reference() -> Detail {
+    Detail::literal("metadata-target-reference")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +367,19 @@ mod tests {
             (limit(JsLimitKind::TrackedOrigins), "tracked-origins"),
             (limit(JsLimitKind::ProofSteps), "proof-steps"),
             (limit(JsLimitKind::ParameterBindings), "parameter-bindings"),
+            (limit(JsLimitKind::AnnotationBytes), "annotation-bytes"),
+            (metadata_comment_form(), "metadata-comment-form"),
+            (metadata_json_malformed(), "metadata-json-malformed"),
+            (metadata_not_object(), "metadata-not-object"),
+            (metadata_member_duplicate(), "metadata-member-duplicate"),
+            (metadata_member_unknown(), "metadata-member-unknown"),
+            (metadata_value_not_string(), "metadata-value-not-string"),
+            (metadata_value_empty(), "metadata-value-empty"),
+            (metadata_misplaced(), "metadata-misplaced"),
+            (metadata_repeated(), "metadata-repeated"),
+            (metadata_target_absent(), "metadata-target-absent"),
+            (metadata_target_ambiguous(), "metadata-target-ambiguous"),
+            (metadata_target_reference(), "metadata-target-reference"),
         ];
         for (detail, spelling) in details {
             assert_eq!(detail.as_str(), spelling);
