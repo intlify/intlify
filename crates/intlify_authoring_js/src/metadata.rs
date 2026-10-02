@@ -587,7 +587,7 @@ mod tests {
                 detail::metadata_member_duplicate(),
             ),
             (
-                r#"{ "descripton": "Pay" }"#,
+                r#"{ "descripton": "Pay" }"#, // spellchecker:disable-line
                 detail::metadata_member_unknown(),
             ),
             (

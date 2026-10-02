@@ -136,7 +136,7 @@ fn an_invalid_annotation_is_reported_and_withholds_its_declaration() {
             "a member named twice",
         ),
         (
-            r#"/* @intlify { "descripton": "Pay" } */"#,
+            r#"/* @intlify { "descripton": "Pay" } */"#, // spellchecker:disable-line
             detail::metadata_member_unknown(),
             "a misspelled member is not silently lost",
         ),

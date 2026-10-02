@@ -17,6 +17,13 @@ extend-exclude = [
   "crates/ox_mf2_parser/fixtures/**"
 ]
 
+[default]
+# A fixture may misspell a word on purpose, such as an `@intlify` member
+# name that has to be reported as unknown rather than silently lost. Only a
+# line that ends with `spellchecker:disable-line` is skipped, so the word is
+# still checked everywhere else.
+extend-ignore-re = ["(?Rm)^.*//\\s*spellchecker:disable-line$"]
+
 [default.extend-words]
 # Paired benchmark schedules use A/B ordering such as AB, BA, and ABBA.
 BA = "BA"
