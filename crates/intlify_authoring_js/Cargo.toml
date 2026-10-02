@@ -21,7 +21,7 @@ serde_json = "1.0.106"
 # Keep the exact pins aligned with intlify_producer_js, because Oxc crates
 # share internal API contracts and upgrading one without the other breaks both.
 oxc_allocator = "=0.141.0"
-oxc_ast = "=0.141.0"
+oxc_ast = "=0.151.0"
 oxc_ast_visit = "=0.141.0"
 oxc_diagnostics = "=0.141.0"
 # The default feature validates regular expression literals, whose syntax
