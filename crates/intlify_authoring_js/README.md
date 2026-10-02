@@ -4,19 +4,21 @@ JavaScript and TypeScript host Producer for [Intlify](../../design/000-intlify-o
 
 > [!IMPORTANT]
 >
-> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, recognizes ordinary UI text assigned to a proven DOM receiver, and reads `@intlify` metadata. See [Current status](#current-status).
+> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, recognizes ordinary UI text assigned to a proven DOM receiver, reads `@intlify` metadata, and assembles the units into a sealed `authoring-inventory`. See [Current status](#current-status).
 
 A Producer reads host source and hands [`intlify_authoring`](../intlify_authoring/README.md) what it found, already decoded. What a message means, what its use site must supply, its locale, class and revision are all decided there, so the same text never means different things depending on which host found it. This crate owns the part specific to JavaScript: which bytes a unit is, which grammar reads them, and what a literal decodes to and from where.
 
 ## Reading a unit
 
-An invocation runs in two steps.
+An invocation runs in three steps.
 
 `admit_units` checks everything the caller supplied before anything is parsed: the context's kind and profile pin, each unit's owner and grammar, its bytes against its snapshot, and the declared scope. Every refusal there is operational, because no edit to source could fix it. The one exception is a unit whose bytes are exactly what its snapshot names but are not UTF-8: that is the author's to fix, so the unit is admitted and reported as failed.
 
 `analyze_unit` then reads one admitted unit, parsing it exactly once under the grammar its snapshot names. A unit is accepted only when the parser reports nothing, the semantic checks carrying the language's early errors report nothing, and a script contains no module syntax. Anything else rejects the whole tree, and the unit fails with one diagnostic at the earliest range the parser named. Units are analyzed independently, so a caller can run them in any order or on several workers.
 
 An accepted unit is read for the explicit forms the profile registers and, when the profile admits the standard `document`, for UI text, and what is found is handed to `intlify_authoring`. The result says whether the unit is checked, blocked or failed. Its facts are reachable through `checked()` only when every occurrence resolved; `inspection_facts()` returns what was independently established whatever the outcome, for inspection and not as complete input.
+
+`assemble_inventory` finally merges the analyses into one inventory, sealed as an `authoring-inventory` artifact that `intlify_authoring` admits. See [Assembling an inventory](#assembling-an-inventory).
 
 ## Grammars
 
@@ -121,6 +123,22 @@ A declaration belongs to a statement when that statement is the innermost member
 
 A reported annotation that belongs to one declaration keeps that declaration from being established, since what the author wrote about it is not known. An annotation longer than the `annotation_bytes` bound is reported as `authoring-resource-limit`. When the statement after an annotation holds only something already reported, such as a sink whose receiver could not be proven, no second record is made. A profile that registers no intrinsic and admits no DOM global can declare nothing, so it reads no annotation.
 
+## Assembling an inventory
+
+`assemble_inventory` takes the analyses of one invocation's units, in any order, together with the scope they were admitted for. Before it copies a single fact it checks that each analysis is a member of that scope at the revision it read, was read under this context and this profile, belongs to this owner, and is handed over once, and that a complete scope has every member read. The declarations and diagnostics of all units together are bounded by the shared crate's limits on one invocation. Every refusal is operational.
+
+The facts are then put in canonical order, validated as an `AuthoringInventory`, and sealed with their integrity digest. The result depends only on which analyses were given: supplying the units in another order, or reading each on its own thread, gives the same artifact bytes. Diagnostics come in design 016's reporting order across units.
+
+What the result may be used for is answered by type:
+
+| Outcome | `checked_inventory()` | Use |
+| --- | --- | --- |
+| every unit checked, complete scope | `Some(CheckedInventory::Complete(_))` | complete checked authoring input |
+| every unit checked, partial scope | `Some(CheckedInventory::Partial(_))` | checked facts about that part only; never evidence that a declaration is absent from the project |
+| some unit blocked or failed | `None` | `inspection_inventory()` still returns the sealed record, for inspection only |
+
+A failed unit is recorded with its outcome and no facts, because a unit that could not be read is not evidence that it declares nothing. A reference records where it is written, not whether it runs.
+
 ## What this crate never does
 
 - It retrieves no file, package, or network resource, and evaluates no host code.
@@ -140,11 +158,11 @@ This is an unpublished, workspace-internal crate. Implemented:
 - intrinsic bindings, and the explicit forms `intent`, `mf2` and `noIntent`, handed to `intlify_authoring` with their input maps;
 - bounded DOM recognition with all-path receiver evidence, and the `text-content` usage profile;
 - `@intlify` metadata, attached to exactly one declaration;
+- assembling the analyzed units into a sealed `authoring-inventory`, checked against the declared scope and the same however the units were scheduled;
 - limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins, proof steps and annotation bytes, a reusable workspace, and cancellation. A bound on one literal, one use site, one annotation or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
 
 The later changes add:
 
-- assembling a checked `authoring-inventory` from the analyzed units;
 - design 026 measurement of source discovery and inventory assembly.
 
 As in `intlify_authoring`, the only context kind this phase admits is the test context. A context claiming a production kind is refused before anything is read, because production admission needs checked 015 inputs that later phases supply.

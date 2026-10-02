@@ -105,5 +105,6 @@ What Phase 2 has to add on top, in [`intlify_authoring_js`](../intlify_authoring
 - **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules. Done: explicit forms hand their decoded text here with its input map.
 - **Usage profile registration** — semantic usage is admitted only under a registered profile. The JavaScript Producer assigns `text-content` from its `intlify-web-dom-usage` profile to UI text at proven sinks; no production context admits one yet.
 - **Enumerating references and exclusions** — finding them in host source. Done for the explicit forms and for UI text at proven DOM sinks.
+- **Assembling the inventory** — merging every unit's facts into one `authoring-inventory` this crate admits. Done: `assemble_inventory` seals one from the analyzed units, checked against the declared scope.
 
 Phase 3 adds identity: allocating a `MessageIntentId`, the registry artifacts and their codecs, and reconciling declaration history. Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.

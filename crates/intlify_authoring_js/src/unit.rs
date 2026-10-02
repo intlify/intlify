@@ -120,6 +120,47 @@ pub(crate) fn check_usage_profile(
     }
 }
 
+/// Check what an invocation is put together from, before any unit.
+///
+/// Only the test context is admitted in this phase, the context has to pin
+/// the authoring profile this Producer implements, and its usage profile has
+/// to be the one this Producer assigns from.
+pub(crate) fn check_invocation(
+    context: &dyn AuthoringContext,
+    profile: &JsAuthoringProfile,
+) -> Result<(), ProducerFailure> {
+    let kind = context.basis().context_kind();
+    if kind != ContextKind::TestContext {
+        return Err(ProducerFailure::ProductionContextUnsupported(kind));
+    }
+    if context.basis().authoring_profile() != profile.identity() {
+        return Err(ProducerFailure::ProfileMismatch);
+    }
+    check_usage_profile(context, profile)
+}
+
+/// Put the declared membership in unit order, refusing a unit named twice.
+pub(crate) fn sorted_members(
+    membership: &[UnitMember],
+) -> Result<Vec<&UnitMember>, ProducerFailure> {
+    let mut members: Vec<&UnitMember> = membership.iter().collect();
+    members.sort_unstable_by(|left, right| left.unit.cmp(&right.unit));
+    if let Some(pair) = members.windows(2).find(|pair| pair[0].unit == pair[1].unit) {
+        return Err(ProducerFailure::DuplicateMember {
+            unit: pair[0].unit.clone(),
+        });
+    }
+    Ok(members)
+}
+
+/// Return whether a snapshot is a member of the sorted membership at its own
+/// revision.
+pub(crate) fn is_member(members: &[&UnitMember], snapshot: &SourceSnapshot) -> bool {
+    members
+        .binary_search_by(|member| member.unit.cmp(snapshot.unit()))
+        .is_ok_and(|index| members[index].revision == *snapshot.revision())
+}
+
 /// Admit the units one invocation will read.
 ///
 /// `membership` declares every unit the scope contains. Each supplied unit has
@@ -138,27 +179,14 @@ pub fn admit_units<'b>(
     units: &[SourceUnit<'b>],
     limits: &JsAuthoringLimits,
 ) -> Result<Vec<AdmittedUnit<'b>>, ProducerFailure> {
-    let kind = context.basis().context_kind();
-    if kind != ContextKind::TestContext {
-        return Err(ProducerFailure::ProductionContextUnsupported(kind));
-    }
-    if context.basis().authoring_profile() != profile.identity() {
-        return Err(ProducerFailure::ProfileMismatch);
-    }
-    check_usage_profile(context, profile)?;
+    check_invocation(context, profile)?;
     // Both lists are bounded before either is sorted, so no caller-sized work
     // happens ahead of the check.
     if membership.len() as u64 > limits.units || units.len() as u64 > limits.units {
         return Err(ProducerFailure::Limit(JsLimitKind::Units));
     }
 
-    let mut members: Vec<&UnitMember> = membership.iter().collect();
-    members.sort_unstable_by(|left, right| left.unit.cmp(&right.unit));
-    if let Some(pair) = members.windows(2).find(|pair| pair[0].unit == pair[1].unit) {
-        return Err(ProducerFailure::DuplicateMember {
-            unit: pair[0].unit.clone(),
-        });
-    }
+    let members = sorted_members(membership)?;
 
     let mut supplied: Vec<&SourceUnit<'b>> = units.iter().collect();
     supplied.sort_unstable_by(|left, right| left.snapshot.unit().cmp(right.snapshot.unit()));
@@ -182,8 +210,7 @@ pub fn admit_units<'b>(
         let Some(grammar) = Grammar::from_identity(snapshot.grammar()) else {
             return Err(ProducerFailure::UnregisteredGrammar { unit: name() });
         };
-        let member = members.binary_search_by(|member| member.unit.cmp(snapshot.unit()));
-        if !member.is_ok_and(|index| members[index].revision == *snapshot.revision()) {
+        if !is_member(&members, snapshot) {
             return Err(ProducerFailure::NotAMember { unit: name() });
         }
         let length = unit.bytes.len() as u64;
@@ -305,6 +332,25 @@ mod tests {
         assert_eq!(member.revision(), &token("7"));
         assert!(UnitMember::new("", "1").is_err());
         assert!(UnitMember::new("checkout", "").is_err());
+    }
+
+    #[test]
+    fn membership_is_sorted_once_and_matched_at_its_revision() {
+        let membership = [member("b"), member("a")];
+        let members = sorted_members(&membership).unwrap();
+        let names: Vec<&str> = members
+            .iter()
+            .map(|member| member.unit().as_str())
+            .collect();
+        assert_eq!(names, ["a", "b"]);
+        assert!(is_member(&members, &snapshot("a", Grammar::JsModule, A)));
+        assert!(!is_member(&members, &snapshot("c", Grammar::JsModule, A)));
+        let later = UnitMember::new("a", "2").unwrap();
+        assert!(!is_member(&[&later], &snapshot("a", Grammar::JsModule, A)));
+        assert_eq!(
+            sorted_members(&[member("a"), member("a")]),
+            Err(ProducerFailure::DuplicateMember { unit: token("a") })
+        );
     }
 
     #[test]

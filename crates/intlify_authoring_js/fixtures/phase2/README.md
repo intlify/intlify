@@ -10,6 +10,7 @@ Host source fixtures for the JavaScript and TypeScript Producer. Each one is a f
 | --- | --- | --- |
 | `extraction.json` | The host-side cases of 016's Extraction family: what each literal in a file decodes to, and where each run of decoded text came from | `src/cooked/tests.rs` |
 | `extraction/*` | The source files those cases name | the same test, through the case's digest |
+| `representative-application.js` | Design 028's representative application, byte for byte as the design writes it | `tests/inventory.rs` |
 
 ## Exact bytes
 
