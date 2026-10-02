@@ -53,6 +53,7 @@ use crate::cooked::{cook_string, cook_template, settle, Cooked};
 use crate::detail;
 use crate::failure::ProducerFailure;
 use crate::limits::{JsAuthoringLimits, JsLimitKind};
+use crate::metadata::Annotation;
 use crate::parameters;
 use crate::parse::Parsed;
 use crate::report::Reporter;
@@ -84,6 +85,8 @@ pub(crate) struct Declared {
     /// What the declaration's own use site supplied, when it is used where it
     /// is declared and that use site could be read.
     pub(crate) parameters: Option<Vec<ParameterBinding>>,
+    /// What an `@intlify` annotation says about it, once annotations are read.
+    pub(crate) annotation: Annotation,
 }
 
 /// One use site found in the unit.
@@ -282,6 +285,7 @@ where
             text: cooked.text,
             input_map: cooked.input_map,
             parameters,
+            annotation: Annotation::Absent,
         });
         Ok(self.found.declarations.len() - 1)
     }
@@ -1250,6 +1254,7 @@ mod tests {
             text: String::new(),
             input_map: Vec::new(),
             parameters: None,
+            annotation: Annotation::Absent,
         }
     }
 

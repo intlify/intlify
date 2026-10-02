@@ -416,8 +416,8 @@ fn the_mf2_parser_keeps_its_own_codes_through_the_host() {
 fn the_representative_module_is_read_for_its_explicit_forms() {
     // Design 028's representative application, under a profile that admits
     // no DOM global: the `'Save'` assignment is outside it, and `dom_sinks.rs`
-    // reads the same module with `document` admitted. `@intlify` metadata
-    // comes in a later change, so the annotation is an ordinary comment.
+    // reads the same module with `document` admitted. The annotation
+    // describes the greeting alone.
     let text = "import { intent, mf2, noIntent } from 'fixture-authoring'\n\
                 \n\
                 /* @intlify { \"description\": \"Greeting addressed to the signed-in user\" } */\n\
@@ -454,6 +454,22 @@ fn the_representative_module_is_read_for_its_explicit_forms() {
             (nth(text, "intent(greeting, { name })", 0), vec![tag]),
             (nth(text, "intent(greeting, { name })", 1), vec![tag]),
         ]
+    );
+    let descriptions: Vec<Option<&str>> = analysis
+        .inspection_facts()
+        .declarations()
+        .iter()
+        .map(|facts| {
+            facts
+                .projection()
+                .description
+                .as_ref()
+                .map(intlify_authoring::NonemptyText::as_str)
+        })
+        .collect();
+    assert_eq!(
+        descriptions,
+        [Some("Greeting addressed to the signed-in user"), None]
     );
     let exclusions = analysis.inspection_facts().exclusions();
     assert_eq!(exclusions.len(), 1);

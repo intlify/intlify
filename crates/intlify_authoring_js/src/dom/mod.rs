@@ -38,6 +38,7 @@ use crate::detail;
 use crate::explicit::{Declared, Source, Used};
 use crate::failure::ProducerFailure;
 use crate::limits::{JsAuthoringLimits, JsLimitKind};
+use crate::metadata::Annotation;
 use crate::parse::Parsed;
 use crate::report::Reporter;
 
@@ -186,6 +187,7 @@ fn classify(
                 // The assignment supplies no parameter, and a literal
                 // requires none.
                 parameters: Some(Vec::new()),
+                annotation: Annotation::Absent,
             });
             let used = reporter.occurrence(assignment, OccurrenceRole::Reference)?;
             found.uses.push(Used {

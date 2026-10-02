@@ -9,7 +9,7 @@
 
 #![allow(dead_code, reason = "each test file uses its own subset")]
 
-use intlify_authoring::test_context::TestContext;
+use intlify_authoring::test_context::{TestContext, TestContextBuilder};
 use intlify_authoring::{
     AuthoringLimits, Completeness, Detail, Diagnostic, IntegrityDigest, Location, Occurrence,
     OccurrenceRole, OwnerIdentity, OwnerKind, ReasonFamily, SourceSnapshot, SurfaceVocabulary,
@@ -34,12 +34,11 @@ pub fn owner() -> OwnerIdentity {
     OwnerIdentity::new(OwnerKind::Application, "storefront").expect("checked project id")
 }
 
-/// A test context pinned to the profile this Producer implements.
+/// The test context below, before its surface class default.
 ///
-/// It supplies the default source locale and surface class a declaration
-/// without metadata resolves against, and registers the usage profile
-/// automatically recognized text takes its usage from.
-pub fn context() -> TestContext {
+/// A fixture that needs another class default, none, or a locale rule starts
+/// from this.
+pub fn context_builder() -> TestContextBuilder {
     TestContext::builder(
         owner(),
         SurfaceVocabulary::new(["checkout", "nav"]).expect("a vocabulary"),
@@ -47,9 +46,18 @@ pub fn context() -> TestContext {
     .authoring_profile(JsAuthoringProfile::new().identity().clone())
     .usage_profile(JsAuthoringProfile::usage_profile())
     .default_source_locale("en")
-    .default_surface_class("checkout")
-    .build()
-    .expect("checked test context")
+}
+
+/// A test context pinned to the profile this Producer implements.
+///
+/// It supplies the default source locale and surface class a declaration
+/// without metadata resolves against, and registers the usage profile
+/// automatically recognized text takes its usage from.
+pub fn context() -> TestContext {
+    context_builder()
+        .default_surface_class("checkout")
+        .build()
+        .expect("checked test context")
 }
 
 /// The profile registering the three fixture intrinsics.
@@ -91,6 +99,7 @@ pub fn limits() -> JsAuthoringLimits {
         alias_chain: 16,
         tracked_origins: 64,
         proof_steps: 1 << 20,
+        annotation_bytes: 4096,
         authoring: AuthoringLimits {
             declarations: 256,
             message_text_bytes: 64 * 1024,
@@ -186,9 +195,20 @@ pub fn try_analyze(
     profile: &JsAuthoringProfile,
     limits: &JsAuthoringLimits,
 ) -> Result<UnitAnalysis, ProducerFailure> {
+    try_analyze_in(&context(), grammar, text, profile, limits)
+}
+
+/// Analyze one unit against another context.
+pub fn try_analyze_in(
+    context: &TestContext,
+    grammar: Grammar,
+    text: &str,
+    profile: &JsAuthoringProfile,
+    limits: &JsAuthoringLimits,
+) -> Result<UnitAnalysis, ProducerFailure> {
     let units = admit(&[("checkout", grammar, text.as_bytes())]);
     analyze_unit(
-        &context(),
+        context,
         profile,
         &units[0],
         limits,

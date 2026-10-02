@@ -16,7 +16,8 @@
 //! declared scope. [`analyze_unit`] then reads one admitted unit, parsing it
 //! exactly once under the grammar its snapshot names, recognizing the
 //! explicit authoring forms the profile registers and the UI text assigned to
-//! proven DOM receivers, and handing what it found to `intlify_authoring`.
+//! proven DOM receivers, attaching `@intlify` metadata to what they declared,
+//! and handing what it found to `intlify_authoring`.
 //!
 //! The grammar is always the caller's choice. There is no API that picks one
 //! from a file name or suffix, and a unit that fails to parse is not retried
@@ -37,6 +38,7 @@ mod explicit;
 mod failure;
 mod grammar;
 mod limits;
+mod metadata;
 mod parameters;
 mod parse;
 mod profile;

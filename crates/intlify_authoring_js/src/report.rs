@@ -109,6 +109,21 @@ impl Reporter {
         Ok(())
     }
 
+    /// Return the range of each retained record that points inside the unit.
+    pub(crate) fn ranges(&self) -> Vec<(u64, u64)> {
+        self.diagnostics
+            .iter()
+            .filter_map(|diagnostic| {
+                let range = match diagnostic.location() {
+                    Location::Occurrence(occurrence) => occurrence.range(),
+                    Location::Region(region) => region.range(),
+                    Location::Unit(_) => return None,
+                };
+                Some((range.start(), range.end()))
+            })
+            .collect()
+    }
+
     /// Return whether any retained record blocks a checked result.
     pub(crate) fn blocks(&self) -> bool {
         self.diagnostics.iter().any(Diagnostic::is_blocking)

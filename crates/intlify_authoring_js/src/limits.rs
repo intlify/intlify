@@ -46,6 +46,8 @@ pub enum JsLimitKind {
     TrackedOrigins,
     /// Steps spent proving receiver evidence in one function.
     ProofSteps,
+    /// Bytes of one `@intlify` annotation, its delimiters included.
+    AnnotationBytes,
 }
 
 impl JsLimitKind {
@@ -64,15 +66,16 @@ impl JsLimitKind {
             Self::AliasChain => "alias-chain",
             Self::TrackedOrigins => "tracked-origins",
             Self::ProofSteps => "proof-steps",
+            Self::AnnotationBytes => "annotation-bytes",
         }
     }
 
     /// Return what exhausting this bound stops.
     ///
-    /// A literal's input map and one use site's parameters belong to one
-    /// declaration or one use, and the receiver evidence of one function
-    /// belongs to the automatic candidates in it. Everything else bounds a
-    /// unit or the whole invocation.
+    /// A literal's input map, one use site's parameters and one annotation
+    /// belong to one declaration or one use, and the receiver evidence of one
+    /// function belongs to the automatic candidates in it. Everything else
+    /// bounds a unit or the whole invocation.
     #[must_use]
     pub const fn scope(self) -> LimitScope {
         match self {
@@ -80,7 +83,8 @@ impl JsLimitKind {
             | Self::ParameterBindings
             | Self::AliasChain
             | Self::TrackedOrigins
-            | Self::ProofSteps => LimitScope::Declaration,
+            | Self::ProofSteps
+            | Self::AnnotationBytes => LimitScope::Declaration,
             Self::Units
             | Self::UnitBytes
             | Self::TotalBytes
@@ -129,6 +133,8 @@ pub struct JsAuthoringLimits {
     pub tracked_origins: u64,
     /// Steps spent proving receiver evidence in one function.
     pub proof_steps: u64,
+    /// Bytes of one `@intlify` annotation, its delimiters included.
+    pub annotation_bytes: u64,
     /// The shared crate's bounds, applied to each unit's declarations.
     pub authoring: AuthoringLimits,
 }
@@ -176,6 +182,7 @@ pub(crate) mod tests {
             alias_chain: 16,
             tracked_origins: 64,
             proof_steps: 1 << 20,
+            annotation_bytes: 4096,
             authoring: AuthoringLimits {
                 declarations: 1024,
                 message_text_bytes: 64 * 1024,
@@ -230,6 +237,7 @@ pub(crate) mod tests {
         empty.alias_chain = 0;
         empty.tracked_origins = 0;
         empty.proof_steps = 0;
+        empty.annotation_bytes = 0;
         assert!(empty.validate().is_ok());
     }
 
@@ -247,6 +255,7 @@ pub(crate) mod tests {
             JsLimitKind::AliasChain,
             JsLimitKind::TrackedOrigins,
             JsLimitKind::ProofSteps,
+            JsLimitKind::AnnotationBytes,
         ];
         let mut spellings: Vec<&str> = kinds.iter().map(|kind| kind.as_str()).collect();
         spellings.sort_unstable();
@@ -262,6 +271,7 @@ pub(crate) mod tests {
             JsLimitKind::AliasChain,
             JsLimitKind::TrackedOrigins,
             JsLimitKind::ProofSteps,
+            JsLimitKind::AnnotationBytes,
         ] {
             assert_eq!(kind.scope(), LimitScope::Declaration, "{kind:?}");
         }
