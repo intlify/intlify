@@ -117,6 +117,9 @@ pub(super) struct Candidate {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Origin {
     pub(super) root: Key,
+    /// Whether each call makes a new element, as `document.createElement()`
+    /// does. A query can find an element some earlier code already reached.
+    pub(super) fresh: bool,
 }
 
 /// Everything the survey found.
@@ -172,8 +175,13 @@ pub(super) fn survey(
         limits,
         stack: Vec::new(),
         declarations: Vec::new(),
+        declaring: true,
         found: Survey::default(),
     };
+    // Every binding is known before any use is read: a function written
+    // before a declaration still reaches it once it runs.
+    surveyor.visit_program(program);
+    surveyor.declaring = false;
     surveyor.visit_program(program);
     for (owner, declared) in std::mem::take(&mut surveyor.declarations) {
         if let Some(captured) = surveyor.found.captures.get(&declared).cloned() {
@@ -198,12 +206,14 @@ struct Surveyor<'s> {
     stack: Vec<Key>,
     /// Function declarations with the scope that owns them.
     declarations: Vec<(Key, Key)>,
+    /// Whether this pass only declares bindings. The next one reads uses.
+    declaring: bool,
     found: Survey,
 }
 
 /// What an expression is as a DOM origin.
 enum OriginCall {
-    Admitted,
+    Admitted { fresh: bool },
     BadArgument,
 }
 
@@ -272,7 +282,9 @@ impl Surveyor<'_> {
         Some(match call.arguments.as_slice() {
             [Argument::SpreadElement(_)] => OriginCall::BadArgument,
             [argument] => match argument.as_expression().and_then(static_string) {
-                Some(_) => OriginCall::Admitted,
+                Some(_) => OriginCall::Admitted {
+                    fresh: member.property.name == "createElement",
+                },
                 None => OriginCall::BadArgument,
             },
             _ => OriginCall::BadArgument,
@@ -280,9 +292,10 @@ impl Surveyor<'_> {
     }
 
     /// Record a new origin made in the current scope.
-    fn new_origin(&mut self) -> usize {
+    fn new_origin(&mut self, fresh: bool) -> usize {
         self.found.origins.push(Origin {
             root: self.current(),
+            fresh,
         });
         self.found.origins.len() - 1
     }
@@ -340,7 +353,7 @@ impl Surveyor<'_> {
         let object = transparent(object);
         if let Some(origin) = self.origin_call(object) {
             return Some(match origin {
-                OriginCall::Admitted => Receiver::Direct {
+                OriginCall::Admitted { .. } => Receiver::Direct {
                     root: self.current(),
                 },
                 OriginCall::BadArgument => Receiver::Unestablished(Unestablished::Argument),
@@ -376,12 +389,12 @@ impl Surveyor<'_> {
         let tracking = if let Some(origin) = self.origin_call(init) {
             match origin {
                 OriginCall::BadArgument => Tracking::Unestablished(Unestablished::Argument),
-                OriginCall::Admitted if followed => Tracking::Tracked {
-                    origin: self.new_origin(),
+                OriginCall::Admitted { fresh } if followed => Tracking::Tracked {
+                    origin: self.new_origin(fresh),
                     root: self.current(),
                     depth: 0,
                 },
-                OriginCall::Admitted => Tracking::Unestablished(Unestablished::Binding),
+                OriginCall::Admitted { .. } => Tracking::Unestablished(Unestablished::Binding),
             }
         } else if let Expression::Identifier(aliased) = transparent(init) {
             let Some(tracking) = self
@@ -452,7 +465,7 @@ impl<'a> Visit<'a> for Surveyor<'_> {
 
     fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {
         let scope = key(function.span);
-        if function.is_declaration() {
+        if function.is_declaration() && !self.declaring {
             self.declarations.push((self.current(), scope));
         }
         self.enter(scope);
@@ -479,14 +492,16 @@ impl<'a> Visit<'a> for Surveyor<'_> {
     }
 
     fn visit_with_statement(&mut self, statement: &WithStatement<'a>) {
-        self.found.dynamic.insert(self.current());
+        if !self.declaring {
+            self.found.dynamic.insert(self.current());
+        }
         walk::walk_with_statement(self, statement);
     }
 
     fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
         // A direct `eval` in sloppy code can declare bindings in the scope
         // it runs in. Modules are always strict.
-        if self.script {
+        if self.script && !self.declaring {
             if let Expression::Identifier(callee) = &call.callee {
                 let unresolved = callee.reference_id.get().is_some_and(|reference| {
                     self.scoping.get_reference(reference).symbol_id().is_none()
@@ -500,29 +515,39 @@ impl<'a> Visit<'a> for Surveyor<'_> {
     }
 
     fn visit_variable_declarator(&mut self, declarator: &VariableDeclarator<'a>) {
-        self.declare(declarator);
+        if self.declaring {
+            self.declare(declarator);
+        }
         walk::walk_variable_declarator(self, declarator);
     }
 
     fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'a>) {
-        if let Some(Declaration::VariableDeclaration(declaration)) = &export.declaration {
-            for declarator in &declaration.declarations {
-                if let BindingPattern::BindingIdentifier(binding) = &declarator.id {
-                    if let Some(symbol) = binding.symbol_id.get() {
-                        self.found.exported.insert(symbol);
+        match &export.declaration {
+            Some(Declaration::VariableDeclaration(declaration)) if !self.declaring => {
+                for declarator in &declaration.declarations {
+                    if let BindingPattern::BindingIdentifier(binding) = &declarator.id {
+                        if let Some(symbol) = binding.symbol_id.get() {
+                            self.found.exported.insert(symbol);
+                        }
                     }
                 }
             }
+            _ => {}
         }
         walk::walk_export_named_declaration(self, export);
     }
 
     fn visit_assignment_expression(&mut self, assignment: &AssignmentExpression<'a>) {
-        self.assign(assignment);
+        if !self.declaring {
+            self.assign(assignment);
+        }
         walk::walk_assignment_expression(self, assignment);
     }
 
     fn visit_identifier_reference(&mut self, identifier: &IdentifierReference<'a>) {
+        if self.declaring {
+            return;
+        }
         let Some(Tracking::Tracked { origin, root, .. }) = self
             .symbol(identifier)
             .and_then(|symbol| self.found.bindings.get(&symbol))

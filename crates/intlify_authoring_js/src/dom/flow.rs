@@ -5,15 +5,18 @@
 //!
 //! One function is walked at a time, following the structure of its
 //! statements and expressions rather than a prebuilt graph. The state is the
-//! set of origins whose evidence some path has invalidated. It only grows:
-//! nothing restores evidence, so a join is a union, a loop is walked until
-//! its head stops growing, and a sink is proven only if its origin is valid
-//! in every state the walk reaches it with.
+//! set of origins whose evidence some path has invalidated. Nothing restores
+//! evidence, so a join is a union, a loop is walked until its head stops
+//! growing, and a sink is proven only if its origin is valid in every state
+//! the walk reaches it with. The one thing that starts over is a declaration
+//! running `document.createElement()` again, as a loop body does: it binds a
+//! new element, which nothing has reached yet.
 //!
 //! What counts as invalidating is decided by position, from an allow list. A
 //! reference to a followed binding is harmless only as the object of a member
-//! access, an operand of a comparison, `typeof`, `!` or `void`, a condition,
-//! a discarded value, or the initializer of the `const` alias it names.
+//! access that neither reaches its prototype nor redefines its properties, an
+//! operand of a comparison, `typeof`, `!` or `void`, a condition, a discarded
+//! value, or the initializer of the `const` alias it names.
 //! Anywhere else it exposes the receiver, so a syntax this walk does not
 //! know falls on the side of invalidating. A reference from a nested function
 //! is a capture, which takes effect where the function is made, or where the
@@ -58,6 +61,10 @@ impl Bits {
 
     pub(super) fn set(&mut self, bit: usize) {
         self.0[bit / 64] |= 1 << (bit % 64);
+    }
+
+    pub(super) fn clear(&mut self, bit: usize) {
+        self.0[bit / 64] &= !(1 << (bit % 64));
     }
 
     pub(super) fn contains(&self, bit: usize) -> bool {
@@ -113,6 +120,9 @@ pub(super) struct Root {
     pub(super) width: usize,
     /// The followed bindings made in this function.
     pub(super) symbols: BTreeMap<SymbolId, usize>,
+    /// The followed bindings whose declaration makes a new element each time
+    /// it runs.
+    pub(super) fresh: BTreeMap<SymbolId, usize>,
     /// What each nested function-like scope captures.
     pub(super) captures: BTreeMap<Key, Vec<usize>>,
     /// What hoisted function declarations capture, from the function start.
@@ -339,6 +349,15 @@ where
     }
 }
 
+/// Whether reading a member of a receiver reaches its prototype or a way to
+/// redefine its properties, which changes what assigning to it does.
+fn reflective(name: &str) -> bool {
+    matches!(
+        name,
+        "__proto__" | "constructor" | "__defineGetter__" | "__defineSetter__"
+    )
+}
+
 /// Collect the references an expression's value can be, through wrappers
 /// and value-preserving operators.
 fn leaves(expression: &Expression<'_>, found: &mut Vec<Key>) {
@@ -419,12 +438,20 @@ where
     }
 
     fn visit_static_member_expression(&mut self, member: &StaticMemberExpression<'a>) {
-        self.mark(&member.object);
+        if reflective(&member.property.name) {
+            self.force(&member.object);
+        } else {
+            self.mark(&member.object);
+        }
         walk::walk_static_member_expression(self, member);
     }
 
     fn visit_computed_member_expression(&mut self, member: &ComputedMemberExpression<'a>) {
-        self.mark(&member.object);
+        // A key known only at run time can be any member.
+        match member.static_property_name() {
+            Some(name) if !reflective(&name) => self.mark(&member.object),
+            _ => self.force(&member.object),
+        }
         walk::walk_computed_member_expression(self, member);
     }
 
@@ -502,6 +529,21 @@ where
             }
         }
         walk::walk_variable_declarator(self, declarator);
+        // What an earlier iteration did reached the element it made then, not
+        // this one. A function made before this point in the same block, or
+        // a hoisted one, can already reach this binding.
+        if let Some(&bit) = bound.and_then(|symbol| self.root.fresh.get(&symbol)) {
+            let start = declarator.span.start;
+            let reached = self.root.hoisted.contains(&bit)
+                || self
+                    .root
+                    .captures
+                    .iter()
+                    .any(|(scope, bits)| scope.0 < start && bits.contains(&bit));
+            if !reached {
+                self.flow.invalid.clear(bit);
+            }
+        }
         if let (Some(symbol), Some(bit)) = (bound, followed) {
             if self.root.exported.contains(&symbol) {
                 self.invalidate(bit);
@@ -892,6 +934,7 @@ mod tests {
         Root {
             width,
             symbols: BTreeMap::new(),
+            fresh: BTreeMap::new(),
             captures: BTreeMap::new(),
             hoisted: Vec::new(),
             exported: BTreeSet::new(),
@@ -906,7 +949,25 @@ mod tests {
         assert!(!first.contains(1) && !first.contains(128));
         first.union(&bits(130, &[1, 128]));
         assert_eq!(first, bits(130, &[0, 1, 64, 128, 129]));
+        first.clear(64);
+        first.clear(2);
+        assert_eq!(first, bits(130, &[0, 1, 128, 129]));
         assert_eq!(Bits::new(0), Bits(Vec::new()));
+    }
+
+    #[test]
+    fn only_members_that_reach_the_prototype_or_redefine_properties_are_reflective() {
+        for name in [
+            "__proto__",
+            "constructor",
+            "__defineGetter__",
+            "__defineSetter__",
+        ] {
+            assert!(reflective(name), "{name}");
+        }
+        for name in ["textContent", "id", "__lookupGetter__", "prototype", ""] {
+            assert!(!reflective(name), "{name}");
+        }
     }
 
     #[test]

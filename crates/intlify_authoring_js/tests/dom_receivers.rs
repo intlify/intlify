@@ -194,6 +194,7 @@ fn a_method_call_or_a_harmless_read_keeps_the_evidence() {
         "  pay.addEventListener('click', handle)\n\
          \x20 if (pay && typeof pay === 'object' && !pay.hidden && pay instanceof HTMLElement) { log(pay.id) }\n\
          \x20 pay.dataset.state = 'ready'\n\
+         \x20 log(pay['id'], pay[`title`])\n\
          \x20 pay.textContent = 'Loading'",
     );
     let analysis = analyze_dom(&text);
@@ -210,6 +211,30 @@ fn every_other_effect_on_a_receiver_invalidates_it() {
         ),
         ("  pay.__proto__ = other", "changing the prototype"),
         ("  pay[other] = 1", "a computed write"),
+        (
+            "  pay.__defineSetter__('textContent', other)",
+            "installing an accessor",
+        ),
+        (
+            "  pay.__defineGetter__('textContent', other)",
+            "installing a getter",
+        ),
+        (
+            "  Object.defineProperty(pay.__proto__, 'textContent', other)",
+            "redefining the display property on the prototype",
+        ),
+        (
+            "  customize(pay.constructor.prototype)",
+            "reaching the prototype through the constructor",
+        ),
+        (
+            "  pay['__defineSetter__']('textContent', other)",
+            "a reflective member by a static key",
+        ),
+        (
+            "  pay[other]('textContent', 1)",
+            "a member chosen at run time",
+        ),
         ("  const box = { pay }", "storing in an object"),
         ("  const list = [pay]", "storing in an array"),
         ("  let copy = pay", "assigning to another variable"),
@@ -264,6 +289,42 @@ fn a_capture_counts_from_where_the_closure_is_made() {
         declared(&analysis),
         [(OccurrenceRole::UiLiteral, at(text, "'Before'"))]
     );
+}
+
+#[test]
+fn a_function_written_before_the_declaration_captures_it_too() {
+    // Calling either runs after the declaration, so where it is written
+    // does not decide what it reaches.
+    for (made, why) in [
+        (
+            "function helper() { customize(pay) }",
+            "a hoisted declaration",
+        ),
+        ("const helper = () => customize(pay)", "a closure"),
+    ] {
+        let text = format!(
+            "{PRELUDE}export function render(customize) {{\n  {made}\n  const pay = document.querySelector('#pay')\n  helper()\n  pay.textContent = 'Pay now'\n}}\n"
+        );
+        assert_eq!(
+            diagnostics(&analyze_dom(&text)),
+            [invalidated(&text, SINK)],
+            "{why}"
+        );
+    }
+    let text = "export function render() {\n\
+                \x20 const later = () => { pay.textContent = 'Later' }\n\
+                \x20 const pay = document.querySelector('#pay')\n\
+                \x20 return later\n}\n";
+    let analysis = analyze_dom(text);
+    assert_eq!(
+        diagnostics(&analysis),
+        [expect(
+            ReasonFamily::AuthoringFormUnsupported,
+            detail::receiver_captured(),
+            at(text, "pay.textContent = 'Later'")
+        )]
+    );
+    assert_eq!(analysis.outside_profile(), 0);
 }
 
 #[test]

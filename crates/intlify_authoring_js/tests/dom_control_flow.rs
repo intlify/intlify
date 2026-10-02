@@ -156,6 +156,24 @@ fn a_loop_carries_what_an_earlier_iteration_did() {
 }
 
 #[test]
+fn a_new_element_starts_each_iteration_with_its_own_evidence() {
+    // These shadow `pay` inside the loop body.
+    for (body, expected, why) in [
+        ("for (const x of xs) { const pay = document.createElement('li'); pay.textContent = 'Pay now'; customize(pay) }", true, "each iteration makes a new element"),
+        ("for (const x of xs) { const made = document.createElement('li'); const pay = made; pay.textContent = 'Pay now'; customize(made) }", true, "an alias is made again with it"),
+        ("for (const x of xs) { const pay = document.createElement('li'); pay.textContent = 'Pay now'; pay.addEventListener('click', () => pay.remove()); customize(pay) }", true, "a closure made after it reaches only that iteration's element"),
+        ("for (const x of xs) { const pay = document.querySelector('#pay'); pay.textContent = 'Pay now'; customize(pay) }", false, "a query can find the same element again"),
+        ("for (const x of xs) { const pay = document.createElement('li'); customize(pay); pay.textContent = 'Pay now' }", false, "an effect earlier in the same iteration"),
+        ("for (const x of xs) { const made = document.createElement('li'); customize(made); const pay = made; pay.textContent = 'Pay now' }", false, "an alias declaration does not start over"),
+        ("for (const x of xs) { const later = () => pay.remove(); const pay = document.createElement('li'); pay.textContent = 'Pay now'; later() }", false, "a closure made before it in the same block"),
+        ("for (const x of xs) { const pay = document.createElement('li'); pay.textContent = 'Pay now'; function tweak() { return pay } }", false, "a hoisted declaration reaches it from the block start"),
+        ("for (const pay = document.createElement('li'); c; ) { pay.textContent = 'Pay now'; customize(pay) }", false, "a loop head declaration runs once"),
+    ] {
+        assert_eq!(proven(body), expected, "{why}: {body}");
+    }
+}
+
+#[test]
 fn labels_send_a_state_where_the_jump_goes() {
     for (body, expected, why) in [
         ("block: { if (c) break block; customize(pay) }\n  pay.textContent = 'Pay now'", false, "the path past the break"),

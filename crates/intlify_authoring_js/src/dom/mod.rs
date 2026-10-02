@@ -250,6 +250,20 @@ fn roots(survey: &Survey, limits: &JsAuthoringLimits) -> (BTreeMap<Key, Root>, B
                 _ => None,
             })
             .collect();
+        let fresh = survey
+            .bindings
+            .iter()
+            .filter_map(|(&symbol, tracking)| match *tracking {
+                Tracking::Tracked {
+                    origin,
+                    root,
+                    depth: 0,
+                } if root == scope && survey.origins[origin].fresh => {
+                    bit_of.get(&origin).map(|&bit| (symbol, bit))
+                }
+                _ => None,
+            })
+            .collect();
         let captures = survey
             .captures
             .iter()
@@ -272,6 +286,7 @@ fn roots(survey: &Survey, limits: &JsAuthoringLimits) -> (BTreeMap<Key, Root>, B
             Root {
                 width: origins.len(),
                 symbols,
+                fresh,
                 captures,
                 hoisted,
                 exported: survey.exported.clone(),
@@ -424,7 +439,7 @@ mod tests {
 
     #[test]
     fn each_walk_is_prepared_with_only_its_own_origins_as_bits() {
-        let text = "const top = document.querySelector('#top')\n\
+        let text = "const top = document.createElement('p')\nconst again = top\n\
                     export function render() {\n  const pay = document.querySelector('#pay')\n  \
                     const alias = pay\n  pay.textContent = 'Pay'\n  const later = () => [pay, top]\n}\n\
                     top.textContent = 'Top'\n";
@@ -462,13 +477,23 @@ mod tests {
             walk.sinks,
             BTreeMap::from([((sink.0 as u32, sink.1 as u32), 0)])
         );
-        assert_eq!(roots[&program].width, 1);
+        // A query finds an element again; only a made one starts over.
+        assert!(walk.fresh.is_empty());
+        let module = &roots[&program];
+        assert_eq!(module.width, 1);
+        assert_eq!(module.symbols.len(), 2);
+        // Only the binding that runs the call starts over, not its alias.
+        assert_eq!(module.fresh.len(), 1);
+        assert!(module.fresh.values().all(|&bit| bit == 0));
     }
 
     #[test]
     fn evidence_follows_the_receiver_and_the_walk() {
         let survey = Survey {
-            origins: vec![survey::Origin { root: (0, 10) }],
+            origins: vec![survey::Origin {
+                root: (0, 10),
+                fresh: false,
+            }],
             dynamic: BTreeSet::from([(20, 30)]),
             ..Survey::default()
         };
