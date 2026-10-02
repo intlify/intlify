@@ -21,19 +21,21 @@
 //! diagnostics say why, so the use adds none.
 
 use intlify_authoring::{
-    compare_parameters, resolve_declarations_with_cancellation, AuthoringContext, DeclarationFacts,
-    DeclarationInput, DeclarationMetadata, Detail, Diagnostic, Exclusion, Location, MessageInput,
-    Outcome, ReasonFamily, ReferenceFacts, Region, SourceSnapshot, UnitOutcome,
+    compare_parameters, resolve_declarations_with_cancellation, AuthoringContext, AuthoringFailure,
+    DeclarationFacts, DeclarationInput, DeclarationMetadata, Detail, Diagnostic, Exclusion,
+    LimitKind, Location, MessageInput, Outcome, ReasonFamily, ReferenceFacts, Region,
+    SourceSnapshot, UnitOutcome,
 };
 
 use crate::detail;
-use crate::explicit::{self, Recognized};
+use crate::dom;
+use crate::explicit::{self, Recognized, Source};
 use crate::failure::ProducerFailure;
-use crate::limits::JsAuthoringLimits;
+use crate::limits::{JsAuthoringLimits, JsLimitKind};
 use crate::parse::{self, Reading};
-use crate::profile::JsAuthoringProfile;
+use crate::profile::{JsAuthoringProfile, TEXT_CONTENT_USAGE};
 use crate::report::Reporter;
-use crate::unit::AdmittedUnit;
+use crate::unit::{check_usage_profile, AdmittedUnit};
 use crate::workspace::JsAnalysisWorkspace;
 
 /// What analyzing one unit established.
@@ -47,6 +49,7 @@ pub struct UnitAnalysis {
     facts: UnitFacts,
     diagnostics: Box<[Diagnostic]>,
     work: UnitWork,
+    outside_profile: u64,
 }
 
 impl UnitAnalysis {
@@ -90,6 +93,17 @@ impl UnitAnalysis {
     #[must_use]
     pub const fn work(&self) -> UnitWork {
         self.work
+    }
+
+    /// Return how many literals were assigned to `textContent` of a receiver
+    /// with no known DOM origin.
+    ///
+    /// Such an assignment is outside the profile, so it is neither
+    /// recognized nor reported; this count is how coverage can be inspected.
+    /// It is counted only when the profile admits a DOM global.
+    #[must_use]
+    pub const fn outside_profile(&self) -> u64 {
+        self.outside_profile
     }
 }
 
@@ -160,6 +174,7 @@ pub fn analyze_unit<C>(
 where
     C: Fn() -> bool + ?Sized,
 {
+    check_usage_profile(context, profile)?;
     let source = unit.snapshot().clone();
     let mut reporter = Reporter::new(source.clone(), limits.authoring.diagnostics);
     let mut work = UnitWork {
@@ -201,11 +216,25 @@ where
     // With no intrinsic registered, no syntax is an authoring form, so there
     // is nothing to walk for.
     let bindings = profile.binding_set();
-    let recognized = if bindings.is_empty() {
+    let mut recognized = if bindings.is_empty() {
         Recognized::default()
     } else {
         explicit::recognize(&parsed, text, bindings, limits, &mut reporter, cancelled)?
     };
+    let mut outside_profile = 0;
+    if profile.admits_document() {
+        let found = dom::recognize(
+            &parsed,
+            text,
+            unit.grammar().is_script(),
+            &recognized.intrinsics,
+            limits,
+            &mut reporter,
+            cancelled,
+        )?;
+        outside_profile = found.outside_profile;
+        merge(&mut recognized, found, limits, &reporter)?;
+    }
     // The tree is not needed past this point, and nothing below borrows it.
     drop(parsed);
 
@@ -228,7 +257,44 @@ where
         facts,
         diagnostics: reporter.into_diagnostics(),
         work,
+        outside_profile,
     })
+}
+
+/// Add what automatic recognition found to the explicit forms.
+///
+/// The two recognizers never read the same source: a sink whose value is an
+/// explicit form is left to the explicit recognizer. The overlap check runs
+/// again over both, so a defect that let them disagree stops the analysis
+/// instead of extracting one literal twice.
+fn merge(
+    recognized: &mut Recognized,
+    found: dom::Found,
+    limits: &JsAuthoringLimits,
+    reporter: &Reporter,
+) -> Result<(), ProducerFailure> {
+    let offset = recognized.declarations.len();
+    recognized.declarations.extend(found.declarations);
+    if recognized.declarations.len() as u64 > limits.authoring.declarations {
+        return Err(ProducerFailure::Authoring(AuthoringFailure::Limit(
+            LimitKind::Declarations,
+        )));
+    }
+    recognized
+        .uses
+        .extend(found.uses.into_iter().map(|mut used| {
+            used.declaration += offset;
+            used
+        }));
+    if recognized.uses.len() as u64 > limits.references {
+        return Err(ProducerFailure::Limit(JsLimitKind::References));
+    }
+    if explicit::overlapping(&recognized.declarations) {
+        return Err(ProducerFailure::DeclarationOverlap {
+            unit: reporter.source().unit().clone(),
+        });
+    }
+    Ok(())
 }
 
 /// Report a unit the author has to fix, establishing nothing.
@@ -245,6 +311,7 @@ fn failed(
         facts: UnitFacts::default(),
         diagnostics: reporter.into_diagnostics(),
         work,
+        outside_profile: 0,
     })
 }
 
@@ -272,15 +339,26 @@ where
     let inputs: Vec<DeclarationInput<'_>> = recognized
         .declarations
         .iter()
-        .map(|declared| DeclarationInput {
-            occurrence: declared.occurrence.clone(),
+        .map(|declared| {
             // Both `intent()` sources and `mf2` tags hold MF2, not displayed
             // text, so they reach the same parser as the same kind of input.
-            message: MessageInput::Mf2(&declared.text),
-            input_map: Some(&declared.input_map),
-            metadata: DeclarationMetadata::default(),
-            usage: None,
-            parameters: declared.parameters.as_deref(),
+            // A literal at a proven sink is displayed text, and its braces
+            // stay characters; only it takes a usage from where it is.
+            let (message, usage) = match declared.source {
+                Source::Authored => (MessageInput::Mf2(&declared.text), None),
+                Source::Displayed => (
+                    MessageInput::Literal(&declared.text),
+                    Some(TEXT_CONTENT_USAGE),
+                ),
+            };
+            DeclarationInput {
+                occurrence: declared.occurrence.clone(),
+                message,
+                input_map: Some(&declared.input_map),
+                metadata: DeclarationMetadata::default(),
+                usage,
+                parameters: declared.parameters.as_deref(),
+            }
         })
         .collect();
     let result = resolve_declarations_with_cancellation(

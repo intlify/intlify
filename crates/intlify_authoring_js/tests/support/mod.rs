@@ -15,7 +15,7 @@ use intlify_authoring::{
     OccurrenceRole, OwnerIdentity, OwnerKind, ReasonFamily, SourceSnapshot, SurfaceVocabulary,
 };
 use intlify_authoring_js::{
-    admit_units, analyze_unit, AdmittedUnit, Grammar, Intrinsic, IntrinsicBinding,
+    admit_units, analyze_unit, AdmittedUnit, DomGlobal, Grammar, Intrinsic, IntrinsicBinding,
     JsAnalysisWorkspace, JsAuthoringLimits, JsAuthoringProfile, ProducerFailure, SourceUnit,
     UnitAnalysis, UnitMember,
 };
@@ -37,13 +37,15 @@ pub fn owner() -> OwnerIdentity {
 /// A test context pinned to the profile this Producer implements.
 ///
 /// It supplies the default source locale and surface class a declaration
-/// without metadata resolves against.
+/// without metadata resolves against, and registers the usage profile
+/// automatically recognized text takes its usage from.
 pub fn context() -> TestContext {
     TestContext::builder(
         owner(),
         SurfaceVocabulary::new(["checkout", "nav"]).expect("a vocabulary"),
     )
     .authoring_profile(JsAuthoringProfile::new().identity().clone())
+    .usage_profile(JsAuthoringProfile::usage_profile())
     .default_source_locale("en")
     .default_surface_class("checkout")
     .build()
@@ -61,6 +63,21 @@ pub fn profile() -> JsAuthoringProfile {
         .expect("a consistent binding set")
 }
 
+/// The fixture profile, also admitting the standard `document`.
+pub fn dom_profile() -> JsAuthoringProfile {
+    profile().with_dom_globals([DomGlobal::Document])
+}
+
+/// Analyze one module-goal unit holding `text` under the DOM profile.
+pub fn analyze_dom(text: &str) -> UnitAnalysis {
+    analyze_dom_as(Grammar::JsModule, text)
+}
+
+/// Analyze one unit holding `text` under the DOM profile.
+pub fn analyze_dom_as(grammar: Grammar, text: &str) -> UnitAnalysis {
+    try_analyze(grammar, text, &dom_profile(), &limits()).expect("the analysis runs")
+}
+
 pub fn limits() -> JsAuthoringLimits {
     JsAuthoringLimits {
         units: 16,
@@ -71,6 +88,9 @@ pub fn limits() -> JsAuthoringLimits {
         references: 256,
         exclusions: 256,
         parameter_bindings: 64,
+        alias_chain: 16,
+        tracked_origins: 64,
+        proof_steps: 1 << 20,
         authoring: AuthoringLimits {
             declarations: 256,
             message_text_bytes: 64 * 1024,

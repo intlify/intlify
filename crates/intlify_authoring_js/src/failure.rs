@@ -24,6 +24,13 @@ pub enum ProducerFailure {
     ProductionContextUnsupported(ContextKind),
     /// The context pins an authoring profile this Producer does not implement.
     ProfileMismatch,
+    /// The context's usage profile is not the one this Producer assigns from.
+    ///
+    /// A profile that admits a DOM global needs the context to register this
+    /// Producer's usage profile, because automatically recognized text
+    /// carries a usage from it. A context registering another usage profile
+    /// is refused whatever the profile admits.
+    UsageProfileMismatch,
     /// A named bound was exhausted.
     Limit(JsLimitKind),
     /// Two membership entries name one unit.

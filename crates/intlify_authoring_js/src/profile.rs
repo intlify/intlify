@@ -9,10 +9,14 @@
 //! one refuses to run, rather than reading the source by its own rules while
 //! the result carries the context's pin.
 //!
-//! The caller registers the module exports that are intrinsics. A profile with
-//! none registered recognizes no explicit form, which is the right answer for
-//! a project that does not use them, not a misconfiguration. No DOM global is
-//! admitted yet, so nothing is recognized automatically.
+//! The caller registers the module exports that are intrinsics, and admits
+//! the DOM globals whose calls start a receiver. A profile with no intrinsic
+//! recognizes no explicit form, and one that admits no DOM global recognizes
+//! nothing automatically. Both are the right answer for a project that does
+//! not use them, not a misconfiguration.
+//!
+//! Text recognized automatically carries a semantic usage from a closed
+//! profile, so a context reading such a unit has to register that profile.
 
 use intlify_authoring::VersionedIdentity;
 
@@ -24,11 +28,33 @@ pub const AUTHORING_PROFILE_IDENTITY: &str = "intlify-js-dom-authoring";
 /// Revision of the authoring profile this Producer implements.
 pub const AUTHORING_PROFILE_REVISION: &str = "0";
 
+/// Identity of the usage profile automatic recognition assigns from.
+pub const USAGE_PROFILE_IDENTITY: &str = "intlify-web-dom-usage";
+
+/// Revision of the usage profile automatic recognition assigns from.
+pub const USAGE_PROFILE_REVISION: &str = "0";
+
+/// The usage of text assigned to a proven `textContent` sink.
+///
+/// It is the only value the usage profile has. Explicit forms take no usage
+/// from where they are written, so a message's revision never depends on
+/// whether the receiver around it could be proven.
+pub const TEXT_CONTENT_USAGE: &str = "text-content";
+
+/// A host global whose calls can start a proven DOM receiver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DomGlobal {
+    /// The standard `document`, whose `querySelector` and `createElement`
+    /// calls with one static string are the admitted receiver origins.
+    Document,
+}
+
 /// The authoring profile one invocation reads source under.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsAuthoringProfile {
     identity: VersionedIdentity,
     bindings: Bindings,
+    dom: Box<[DomGlobal]>,
 }
 
 impl JsAuthoringProfile {
@@ -42,6 +68,7 @@ impl JsAuthoringProfile {
                 AUTHORING_PROFILE_REVISION,
             ),
             bindings: Bindings::default(),
+            dom: Box::default(),
         }
     }
 
@@ -57,6 +84,36 @@ impl JsAuthoringProfile {
     ) -> Result<Self, BindingError> {
         self.bindings = Bindings::new(bindings)?;
         Ok(self)
+    }
+
+    /// Admit the DOM globals whose calls start a receiver.
+    ///
+    /// The set replaces any admitted before. A global is admitted only as
+    /// itself: a local binding of the same name is still not it.
+    #[must_use]
+    pub fn with_dom_globals(mut self, globals: impl IntoIterator<Item = DomGlobal>) -> Self {
+        let mut globals: Vec<DomGlobal> = globals.into_iter().collect();
+        globals.sort_unstable();
+        globals.dedup();
+        self.dom = globals.into_boxed_slice();
+        self
+    }
+
+    /// Borrow the admitted DOM globals, in order.
+    #[must_use]
+    pub fn dom_globals(&self) -> &[DomGlobal] {
+        &self.dom
+    }
+
+    /// Return the usage profile pin a context reading automatic recognition
+    /// has to name.
+    #[must_use]
+    pub fn usage_profile() -> VersionedIdentity {
+        VersionedIdentity::literal(USAGE_PROFILE_IDENTITY, USAGE_PROFILE_REVISION)
+    }
+
+    pub(crate) fn admits_document(&self) -> bool {
+        self.dom.contains(&DomGlobal::Document)
     }
 
     /// Borrow the exact pin a context has to name.
@@ -148,5 +205,19 @@ mod tests {
             None
         );
         assert_eq!(JsAuthoringProfile::default(), JsAuthoringProfile::new());
+    }
+
+    #[test]
+    fn dom_globals_are_a_set_and_the_usage_pin_is_fixed() {
+        let profile = JsAuthoringProfile::new();
+        assert!(profile.dom_globals().is_empty());
+        assert!(!profile.admits_document());
+        let profile = profile.with_dom_globals([DomGlobal::Document, DomGlobal::Document]);
+        assert_eq!(profile.dom_globals(), [DomGlobal::Document]);
+        assert!(profile.admits_document());
+        assert_eq!(profile.identity(), JsAuthoringProfile::new().identity());
+        let usage = JsAuthoringProfile::usage_profile();
+        assert_eq!(usage.identity().as_str(), "intlify-web-dom-usage");
+        assert_eq!(usage.revision().as_str(), "0");
     }
 }

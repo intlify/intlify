@@ -40,6 +40,12 @@ pub enum JsLimitKind {
     Exclusions,
     /// Parameters one use site supplies.
     ParameterBindings,
+    /// Links in one chain of `const` aliases from a DOM receiver origin.
+    AliasChain,
+    /// DOM receiver origins one function tracks.
+    TrackedOrigins,
+    /// Steps spent proving receiver evidence in one function.
+    ProofSteps,
 }
 
 impl JsLimitKind {
@@ -55,18 +61,26 @@ impl JsLimitKind {
             Self::References => "references",
             Self::Exclusions => "exclusions",
             Self::ParameterBindings => "parameter-bindings",
+            Self::AliasChain => "alias-chain",
+            Self::TrackedOrigins => "tracked-origins",
+            Self::ProofSteps => "proof-steps",
         }
     }
 
     /// Return what exhausting this bound stops.
     ///
     /// A literal's input map and one use site's parameters belong to one
-    /// declaration or one use. Everything else bounds a unit or the whole
-    /// invocation.
+    /// declaration or one use, and the receiver evidence of one function
+    /// belongs to the automatic candidates in it. Everything else bounds a
+    /// unit or the whole invocation.
     #[must_use]
     pub const fn scope(self) -> LimitScope {
         match self {
-            Self::InputSegments | Self::ParameterBindings => LimitScope::Declaration,
+            Self::InputSegments
+            | Self::ParameterBindings
+            | Self::AliasChain
+            | Self::TrackedOrigins
+            | Self::ProofSteps => LimitScope::Declaration,
             Self::Units
             | Self::UnitBytes
             | Self::TotalBytes
@@ -109,6 +123,12 @@ pub struct JsAuthoringLimits {
     pub exclusions: u64,
     /// Parameters one use site supplies.
     pub parameter_bindings: u64,
+    /// Links in one chain of `const` aliases from a DOM receiver origin.
+    pub alias_chain: u64,
+    /// DOM receiver origins one function tracks.
+    pub tracked_origins: u64,
+    /// Steps spent proving receiver evidence in one function.
+    pub proof_steps: u64,
     /// The shared crate's bounds, applied to each unit's declarations.
     pub authoring: AuthoringLimits,
 }
@@ -153,6 +173,9 @@ pub(crate) mod tests {
             references: 1024,
             exclusions: 1024,
             parameter_bindings: 64,
+            alias_chain: 16,
+            tracked_origins: 64,
+            proof_steps: 1 << 20,
             authoring: AuthoringLimits {
                 declarations: 1024,
                 message_text_bytes: 64 * 1024,
@@ -204,6 +227,9 @@ pub(crate) mod tests {
         empty.references = 0;
         empty.exclusions = 0;
         empty.parameter_bindings = 0;
+        empty.alias_chain = 0;
+        empty.tracked_origins = 0;
+        empty.proof_steps = 0;
         assert!(empty.validate().is_ok());
     }
 
@@ -218,6 +244,9 @@ pub(crate) mod tests {
             JsLimitKind::References,
             JsLimitKind::Exclusions,
             JsLimitKind::ParameterBindings,
+            JsLimitKind::AliasChain,
+            JsLimitKind::TrackedOrigins,
+            JsLimitKind::ProofSteps,
         ];
         let mut spellings: Vec<&str> = kinds.iter().map(|kind| kind.as_str()).collect();
         spellings.sort_unstable();
@@ -227,7 +256,13 @@ pub(crate) mod tests {
 
     #[test]
     fn a_bound_on_one_literal_or_use_site_is_scoped_to_it() {
-        for kind in [JsLimitKind::InputSegments, JsLimitKind::ParameterBindings] {
+        for kind in [
+            JsLimitKind::InputSegments,
+            JsLimitKind::ParameterBindings,
+            JsLimitKind::AliasChain,
+            JsLimitKind::TrackedOrigins,
+            JsLimitKind::ProofSteps,
+        ] {
             assert_eq!(kind.scope(), LimitScope::Declaration, "{kind:?}");
         }
         for kind in [

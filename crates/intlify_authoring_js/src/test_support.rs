@@ -47,6 +47,7 @@ pub(crate) fn context() -> TestContext {
         SurfaceVocabulary::new(["checkout", "nav"]).expect("a vocabulary"),
     )
     .authoring_profile(JsAuthoringProfile::new().identity().clone())
+    .usage_profile(JsAuthoringProfile::usage_profile())
     .default_source_locale("en")
     .default_surface_class("checkout")
     .build()
