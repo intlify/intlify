@@ -28,7 +28,7 @@ oxc_diagnostics = "=0.141.0"
 # errors are early errors a conforming host rejects.
 oxc_parser = "=0.141.0"
 oxc_semantic = "=0.141.0"
-oxc_span = "=0.141.0"
+oxc_span = "=0.151.0"
 
 [dev-dependencies]
 # The only context this phase admits is the explicitly test-owned one. Enabling
