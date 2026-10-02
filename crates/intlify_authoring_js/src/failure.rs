@@ -10,7 +10,8 @@
 //! such as a unit that is not text or that the host rejects, is reported as a
 //! failed unit instead, and the other units are still read.
 
-use intlify_authoring::{AuthoringFailure, ContextKind, SnapshotMismatch, Token};
+use intlify_authoring::{AuthoringFailure, ContextKind, InventoryFailure, SnapshotMismatch, Token};
+use intlify_shared_json::encoding::EncodingFailure;
 
 use crate::limits::JsLimitKind;
 
@@ -99,6 +100,25 @@ pub enum ProducerFailure {
         /// The unit holding the declarations.
         unit: Token,
     },
+    /// A unit analysis handed to assembly was read under another context
+    /// basis or another profile than the one assembling.
+    ///
+    /// An inventory records one basis, so units read under different inputs
+    /// cannot be put into one without misstating what some were read under.
+    ForeignAnalysis {
+        /// The unit read under other inputs.
+        unit: Token,
+    },
+    /// The declared scope is not a valid token.
+    InvalidScope,
+    /// The assembled inventory breaks a structural rule.
+    ///
+    /// Every unit's facts were checked when the unit was read, so this means
+    /// this crate assembled them wrongly, not that the author wrote anything
+    /// wrong.
+    Inventory(InventoryFailure),
+    /// The inventory could not be sealed in the shared encoding.
+    Sealing(EncodingFailure),
     /// The shared authoring semantics could not run.
     Authoring(AuthoringFailure),
     /// The caller's probe asked the invocation to stop.
