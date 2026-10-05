@@ -205,7 +205,7 @@ pub(super) fn execution_state(operation: Operation) -> Execution {
 /// Everything this owner observed about how one case was measured.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Descriptors {
+pub struct Descriptors {
     pub(super) boundary: Boundary,
     pub(super) method: Method,
     pub(super) clock_observation: ClockObservation,

@@ -28,6 +28,8 @@ pub mod execution;
 pub mod identity;
 pub mod measurement;
 pub mod owner;
+#[cfg(feature = "owner-run")]
+pub mod owner_run;
 pub mod pipeline;
 pub mod plan;
 pub mod reason;

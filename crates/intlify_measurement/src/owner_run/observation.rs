@@ -1,31 +1,63 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! This owner's observation codec, revision 0.
+//! The native observation codec an owner run computes its checksums with.
 //!
 //! These digests are not 017 artifact digests, Intent revisions, identity
 //! values, or evidence-disclosure tokens. They exist so that two runs of the
-//! same fixture can be compared for the same result, and the framing that
-//! produced them travels beside every value.
+//! same fixture can be compared for the same result. The algorithm is fixed
+//! here; the framing is the owner's, and every value is recorded beside it.
 
 use std::fmt;
 
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
+/// The framing label an owner registers for every checksum it computes.
+///
+/// It is written into the hash ahead of each domain, so two owners that frame
+/// the same values never produce the same checksum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Framing(&'static str);
+
+impl Framing {
+    /// Register one framing label.
+    #[must_use]
+    pub const fn new(label: &'static str) -> Self {
+        Self(label)
+    }
+
+    /// Return the label exactly as registered.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        self.0
+    }
+
+    /// Open one frame under this framing and the given domain.
+    #[must_use]
+    pub fn frame(self, domain: &str) -> Frame {
+        let mut frame = Frame(blake3::Hasher::new());
+        frame.bytes(self.0.as_bytes());
+        frame.text(domain);
+        frame
+    }
+}
+
 /// One complete 256-bit observation value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Digest([u8; 32]);
+pub struct Digest([u8; 32]);
 
 impl Digest {
-    pub(super) const fn bytes(self) -> [u8; 32] {
+    /// Return the complete value.
+    #[must_use]
+    pub const fn bytes(self) -> [u8; 32] {
         self.0
     }
 }
 
 impl schemars::JsonSchema for Digest {
     fn schema_name() -> std::borrow::Cow<'static, str> {
-        "AuthoringObservationChecksum".into()
+        "OwnerObservationChecksum".into()
     }
     fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
         schemars::json_schema!({"type": "string", "pattern": "^[0-9a-f]{64}$"})
@@ -74,21 +106,22 @@ impl<'de> Deserialize<'de> for Digest {
 
 /// One complete observation of a measured operation's result.
 ///
-/// `entry` carries what the operation produced beyond its semantic value —
+/// `positions` carries what the operation produced beyond its semantic value —
 /// positions, mappings, and reported diagnostics — so that a run which agrees
 /// semantically but disagrees about where things are is still a disagreement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Observation {
-    pub(super) semantic: Digest,
+pub struct Observation {
+    pub semantic: Digest,
     #[serde(deserialize_with = "Option::deserialize")]
-    pub(super) positions: Option<Digest>,
+    pub positions: Option<Digest>,
 }
 
 impl Observation {
     /// Reduce the complete observation to one identity value.
-    pub(super) fn identity(self) -> Digest {
-        let mut frame = Frame::new("observation");
+    #[must_use]
+    pub fn identity(self, framing: Framing) -> Digest {
+        let mut frame = framing.frame("observation");
         frame.digest(self.semantic);
         frame.flag(self.positions.is_some());
         if let Some(positions) = self.positions {
@@ -99,37 +132,43 @@ impl Observation {
 }
 
 /// A length-prefixed framing, so that concatenation cannot be ambiguous.
-pub(super) struct Frame(blake3::Hasher);
+pub struct Frame(blake3::Hasher);
 
 impl Frame {
-    pub(super) fn new(domain: &str) -> Self {
-        let mut frame = Self(blake3::Hasher::new());
-        frame.bytes(b"intlify-authoring-minimum-observation/0");
-        frame.text(domain);
-        frame
-    }
-    pub(super) fn uint(&mut self, value: u64) {
+    /// Frame one unsigned integer.
+    pub fn uint(&mut self, value: u64) {
         self.0.update(&value.to_le_bytes());
     }
-    pub(super) fn flag(&mut self, value: bool) {
+
+    /// Frame one flag.
+    pub fn flag(&mut self, value: bool) {
         self.0.update(&[u8::from(value)]);
     }
-    pub(super) fn bytes(&mut self, bytes: &[u8]) {
+
+    /// Frame one run of bytes, prefixed with its length.
+    pub fn bytes(&mut self, bytes: &[u8]) {
         self.uint(u64::try_from(bytes.len()).expect("addressable fixture length"));
         self.0.update(bytes);
     }
-    pub(super) fn text(&mut self, value: &str) {
+
+    /// Frame one string, as its bytes.
+    pub fn text(&mut self, value: &str) {
         self.bytes(value.as_bytes());
     }
-    pub(super) fn digest(&mut self, value: Digest) {
+
+    /// Frame one digest, which is always exactly 32 bytes.
+    pub fn digest(&mut self, value: Digest) {
         self.0.update(&value.0);
     }
-    pub(super) fn finish(self) -> Digest {
+
+    /// Close the frame.
+    #[must_use]
+    pub fn finish(self) -> Digest {
         Digest(*self.0.finalize().as_bytes())
     }
 
-    /// Frame one admitted JSON value produced by this crate's own models.
-    pub(super) fn json(&mut self, value: &Value) {
+    /// Frame one admitted JSON value produced by an owner's own models.
+    pub fn json(&mut self, value: &Value) {
         match value {
             Value::Null => self.uint(0),
             Value::Bool(value) => {
@@ -169,8 +208,10 @@ impl Frame {
 mod tests {
     use super::*;
 
+    const FRAMING: Framing = Framing::new("intlify-measurement-test-observation/0");
+
     fn digest(domain: &str, value: &str) -> Digest {
-        let mut frame = Frame::new(domain);
+        let mut frame = FRAMING.frame(domain);
         frame.text(value);
         frame.finish()
     }
@@ -180,12 +221,25 @@ mod tests {
         assert_ne!(digest("one", "ab"), digest("two", "ab"));
         // Length prefixes mean two adjacent runs never collide with one longer
         // run that happens to concatenate to the same bytes.
-        let mut split = Frame::new("d");
+        let mut split = FRAMING.frame("d");
         split.text("a");
         split.text("b");
-        let mut joined = Frame::new("d");
+        let mut joined = FRAMING.frame("d");
         joined.text("ab");
         assert_ne!(split.finish(), joined.finish());
+    }
+
+    #[test]
+    fn two_owners_framing_the_same_values_do_not_agree() {
+        // The framing label is hashed ahead of the domain, so an owner cannot
+        // produce another owner's checksum by framing the same content.
+        let other = Framing::new("intlify-measurement-other-observation/0");
+        let mut mine = FRAMING.frame("d");
+        mine.text("value");
+        let mut theirs = other.frame("d");
+        theirs.text("value");
+        assert_ne!(mine.finish(), theirs.finish());
+        assert_eq!(other.label(), "intlify-measurement-other-observation/0");
     }
 
     #[test]
@@ -200,8 +254,8 @@ mod tests {
             semantic,
             positions: Some(positions),
         };
-        assert_ne!(without.identity(), with.identity());
-        assert_eq!(without.identity(), without.identity());
+        assert_ne!(without.identity(FRAMING), with.identity(FRAMING));
+        assert_eq!(without.identity(FRAMING), without.identity(FRAMING));
     }
 
     #[test]
@@ -221,15 +275,24 @@ mod tests {
             serde_json::from_value::<Observation>(value).unwrap(),
             observation
         );
+        // A missing member is not an absent one: `positions` must be present.
+        assert!(serde_json::from_value::<Observation>(serde_json::json!({
+            "semantic": "0".repeat(64)
+        }))
+        .is_err());
+        // Uppercase or short values are not this codec's spelling.
+        for invalid in ["A".repeat(64), "0".repeat(63)] {
+            assert!(serde_json::from_value::<Digest>(serde_json::json!(invalid)).is_err());
+        }
     }
 
     #[test]
     fn json_framing_keeps_the_models_own_member_order() {
         // A projection's member order is part of what it means, so two objects
         // that differ only in order are different observations.
-        let mut first = Frame::new("d");
+        let mut first = FRAMING.frame("d");
         first.json(&serde_json::json!({"a": "1", "b": "2"}));
-        let mut second = Frame::new("d");
+        let mut second = FRAMING.frame("d");
         second.json(&serde_json::json!({"b": "2", "a": "1"}));
         assert_ne!(first.finish(), second.finish());
     }

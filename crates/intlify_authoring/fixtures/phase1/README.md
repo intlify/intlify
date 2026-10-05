@@ -187,18 +187,21 @@ The extraction rows below name the tests that assert through a shared `check_seg
 
 ### Measurement
 
+The owner run — capture, the sealed owner record, its admission, and the smoke runner — is shared with every observing owner, so the tests that pin it are in `intlify_measurement`'s `owner_run` module and drive a minimal test owner there. They are marked _(shared)_. The rest pin this owner's fixtures and operations.
+
 | Requirement | Checked by |
 | --- | --- |
 | Every fixture prepares and takes its declared path | `every_fixture_prepares_from_the_fixed_inputs_alone`, `every_fixture_takes_the_path_it_declares` |
 | Two captures agree on observation and counted work | `every_fixture_captures_and_repeats_the_same_observation` |
-| A missing record | `a_withheld_record_is_not_a_successful_run`, `no_owner_document_at_all_is_not_a_complete_run`; the smoke repeats this on the files it wrote |
-| An altered record with its digest recomputed | `a_rehashed_change_to_a_saved_record_is_not_admitted` |
-| A duplicate owner document | `two_owner_documents_for_one_run_are_an_ambiguous_binding` |
-| A document from another run | `a_document_from_another_run_does_not_bind_to_this_one` |
-| A repetition sum past the quantity domain | `a_repetition_sum_past_the_quantity_domain_fails_the_case` |
-| Warmup is counted, never sampled | `every_fixture_captures_and_repeats_the_same_observation`; the boundary declares it excluded in `the_expectation_and_the_warmup_are_outside_the_interval` |
+| A missing record | `a_withheld_record_is_not_a_successful_run` (here and _shared_), `no_owner_document_at_all_is_not_a_complete_run` _(shared)_; the smoke repeats this on the files it wrote |
+| An altered record with its digest recomputed | `a_rehashed_change_to_a_saved_record_is_not_admitted` _(shared)_, `a_resealed_owner_document_is_not_what_was_captured` _(shared)_ |
+| A duplicate owner document | `two_owner_documents_for_one_run_are_an_ambiguous_binding` _(shared)_ |
+| A document from another run | `a_document_from_another_run_does_not_bind_to_this_one` (here and _shared_) |
+| A repetition sum past the quantity domain | `a_repetition_sum_past_the_quantity_domain_fails_the_case` _(shared)_ |
+| A different result is a mismatch, not a sample | `a_different_result_is_a_semantic_mismatch_rather_than_a_sample`, `a_result_that_drifts_from_its_expectation_invalidates_the_run` _(shared)_ |
+| Warmup is counted, never sampled | `every_fixture_captures_and_repeats_the_same_observation`, `warmups_are_counted_and_every_sample_aggregates_its_repetitions` _(shared)_; the boundary declares it excluded in `the_expectation_and_the_warmup_are_outside_the_interval` |
 | The case projection carries no run dimension | `a_projection_carries_no_run_clock_or_sample_dimension`, `a_case_identity_does_not_change_between_two_preparations` |
-| Every unobserved environment field states its reason | `every_unobserved_field_carries_its_reason_and_names_this_record` |
+| Every unobserved environment field states its reason | `every_unobserved_field_carries_its_reason_and_names_this_record` _(shared)_ |
 | The existing 015 path is unchanged | `vp run bench:config:smoke`: 127 planned, 127 measured, complete |
 
 ## Deliberately not covered in Phase 1

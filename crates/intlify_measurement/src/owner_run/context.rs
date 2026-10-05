@@ -1,44 +1,31 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! What this owner observed about the build and the machine it ran on.
+//! What an owner run observed about the build and the machine it ran on.
 //!
-//! This harness collects very little. That is a statement, not an omission:
+//! The harness collects very little. That is a statement, not an omission:
 //! every field it does not collect is reported as unavailable with the reason,
 //! because an absent observation must never read as a weaker one. What it does
 //! observe — the package it measures, the clock it acquired, the concurrency
 //! it used, the instrumentation it installed — it observes directly.
 
-use intlify_measurement::acquisition::{ClockFailure, MonotonicClock};
-use intlify_measurement::build::{missing as missing_build, Build};
-use intlify_measurement::environment::{
+use intlify_shared_json::quantity::{Quantity, Repetitions};
+use serde::{Deserialize, Serialize};
+
+use super::observation::{Digest, Framing};
+use super::{Labels, Package};
+use crate::acquisition::{ClockFailure, MonotonicClock};
+use crate::build::{missing as missing_build, Build, SourceControlState};
+use crate::environment::{
     missing as missing_field, ClockObservation, Concurrency, ConditionalObservation, Datum,
     Environment, Instrumentation, InventoryFailure, Observation as FieldObservation,
     RequiredObservation, RunnerContext,
 };
-use intlify_measurement::identity::{
+use crate::identity::{
     IdentityFailure, NativeChecksum, OwnerLabel, RecordIdentity, Token, VersionedIdentity,
 };
-use intlify_measurement::plan::BuildIdentity;
-use intlify_measurement::reason::{BuildField, EnvironmentField as Field, MissingObservation};
-use intlify_shared_json::quantity::{Quantity, Repetitions};
-use serde::{Deserialize, Serialize};
-
-use super::observation::{Digest, Frame};
-
-/// The harness that produced these observations.
-pub(super) fn harness() -> VersionedIdentity {
-    VersionedIdentity::literal("intlify-authoring-owner-run-harness", "1")
-}
-
-/// The projection from this owner's records into 026's.
-pub(super) fn projection() -> VersionedIdentity {
-    VersionedIdentity::literal("intlify-authoring-minimum-to-026", "0")
-}
-
-fn owner_framing() -> OwnerLabel {
-    OwnerLabel::literal("intlify-authoring-minimum-observation/0")
-}
+use crate::plan::BuildIdentity;
+use crate::reason::{BuildField, EnvironmentField as Field, MissingObservation};
 
 // Generic over the field's own value type: each Build field admits its own, so
 // one closure cannot stand in for all of them.
@@ -52,57 +39,57 @@ fn unattested<T>(
     }
 }
 
-/// What this owner could observe about the build it measured.
+/// What an owner run could observe about the build it measured.
 ///
 /// It is deliberately narrow. No source tree digest, dependency lock, or
 /// effective compiler configuration is collected, so none of them is claimed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct BuildObservation {
-    pub(super) package: String,
-    pub(super) version: String,
-    pub(super) architecture: String,
-    pub(super) operating_system: String,
-    pub(super) assertions: bool,
-    pub(super) checksum: Digest,
+pub struct BuildObservation {
+    pub package: String,
+    pub version: String,
+    pub architecture: String,
+    pub operating_system: String,
+    pub assertions: bool,
+    pub checksum: Digest,
 }
 
 impl BuildObservation {
-    fn acquire() -> Self {
-        let package = env!("CARGO_PKG_NAME");
-        let version = env!("CARGO_PKG_VERSION");
+    /// Observe the owner's package, as its own crate described it.
+    #[must_use]
+    pub fn acquire(framing: Framing, package: Package) -> Self {
         let architecture = std::env::consts::ARCH;
         let operating_system = std::env::consts::OS;
-        let assertions = cfg!(debug_assertions);
-        let mut frame = Frame::new("build-observation");
-        frame.text(package);
-        frame.text(version);
+        let mut frame = framing.frame("build-observation");
+        frame.text(package.name);
+        frame.text(package.version);
         frame.text(architecture);
         frame.text(operating_system);
-        frame.flag(assertions);
+        frame.flag(package.assertions);
         Self {
-            package: package.into(),
-            version: version.into(),
+            package: package.name.into(),
+            version: package.version.into(),
             architecture: architecture.into(),
             operating_system: operating_system.into(),
-            assertions,
+            assertions: package.assertions,
             checksum: frame.finish(),
         }
     }
 
     /// Bind the Run Plan to this observation's exact content.
-    pub(super) fn identity(&self) -> BuildIdentity {
+    #[must_use]
+    pub fn identity(&self, labels: &Labels) -> BuildIdentity {
         BuildIdentity {
-            owner_schema: OwnerLabel::literal("intlify-authoring-build-observation/0"),
+            owner_schema: OwnerLabel::literal(labels.build_schema),
             algorithm: OwnerLabel::literal("blake3-256"),
-            framing: owner_framing(),
+            framing: OwnerLabel::literal(labels.framing.label()),
             domain: OwnerLabel::literal("build-observation"),
             checksum: NativeChecksum::from_bytes(self.checksum.bytes()),
         }
     }
 
     /// Project the applicable Build fields, naming every absence.
-    pub(super) fn build(
+    pub fn build(
         &self,
         parent: &RecordIdentity,
         profile: VersionedIdentity,
@@ -131,7 +118,7 @@ impl BuildObservation {
                 MissingObservation::EffectiveBuildNotAttested,
             ),
             physical_engine: OwnerLabel::literal("rust-native-component"),
-            source_control_state: unattested::<intlify_measurement::build::SourceControlState>(
+            source_control_state: unattested::<SourceControlState>(
                 parent,
                 BuildField::SourceControlState,
                 MissingObservation::SourceControlStateNotAttested,
@@ -141,63 +128,88 @@ impl BuildObservation {
     }
 }
 
-/// The sampling this run performs, fixed before any capture.
+/// The sampling a run performs, fixed before any capture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct SamplingPolicy {
-    pub(super) warmup_repetitions: Quantity,
-    pub(super) measured_samples: Repetitions,
-    pub(super) repetitions_per_sample: Repetitions,
+pub struct SamplingPolicy {
+    pub warmup_repetitions: Quantity,
+    pub measured_samples: Repetitions,
+    pub repetitions_per_sample: Repetitions,
+}
+
+impl SamplingPolicy {
+    /// The sampling the first smoke profile performs.
+    ///
+    /// Fixed warmups and one measured sample of one repetition. It is not a
+    /// numeric profile, so nothing here is tuned for a stable statistic.
+    #[must_use]
+    pub fn smoke() -> Self {
+        Self {
+            warmup_repetitions: Quantity::new(2),
+            measured_samples: Repetitions::new(1).expect("one measured sample"),
+            repetitions_per_sample: Repetitions::new(1).expect("one repetition"),
+        }
+    }
 }
 
 /// Everything fixed at acquisition, retained with the run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct ContextObservation {
-    pub(super) profile: VersionedIdentity,
-    pub(super) sampling: SamplingPolicy,
-    pub(super) clock: ClockObservation,
-    pub(super) build: BuildObservation,
+pub struct ContextObservation {
+    pub profile: VersionedIdentity,
+    pub sampling: SamplingPolicy,
+    pub clock: ClockObservation,
+    pub build: BuildObservation,
 }
 
 /// The clock and the observations one run was acquired with.
-pub(super) struct CaptureContext {
+pub struct CaptureContext {
     clock: MonotonicClock,
     observation: ContextObservation,
 }
 
 impl CaptureContext {
-    /// Acquire the clock and record what this owner can observe.
-    pub(super) fn acquire(
+    /// Acquire the clock and record what this run can observe.
+    pub fn acquire(
         profile: VersionedIdentity,
         sampling: SamplingPolicy,
+        build: BuildObservation,
     ) -> Result<Self, ClockFailure> {
         let clock = MonotonicClock::acquire()?;
         let observation = ContextObservation {
             profile,
             sampling,
             clock: clock.description().observation(),
-            build: BuildObservation::acquire(),
+            build,
         };
         Ok(Self { clock, observation })
     }
 
-    pub(super) const fn clock(&self) -> &MonotonicClock {
+    /// Borrow the acquired clock.
+    #[must_use]
+    pub const fn clock(&self) -> &MonotonicClock {
         &self.clock
     }
 
-    pub(super) const fn observation(&self) -> &ContextObservation {
+    /// Borrow what was observed at acquisition.
+    #[must_use]
+    pub const fn observation(&self) -> &ContextObservation {
         &self.observation
     }
 }
 
-/// Project this owner's observations into 026's complete field inventory.
-pub(super) fn environment(
+/// Project a native owner run's observations into 026's field inventory.
+///
+/// It describes one Rust component measured in the calling process, on the
+/// calling thread, with no instrumentation beyond the clock. The measured
+/// context canonicalizes from a finite declared rule table, which is not a
+/// locale service with a profile.
+pub fn native_environment(
+    labels: &Labels,
     context: &ContextObservation,
     parent: &RecordIdentity,
 ) -> Result<Environment, InventoryFailure> {
-    let native_rule =
-        || VersionedIdentity::literal("intlify-authoring-native-unmanaged-component-context", "0");
+    let native_rule = || labels.native_rule.versioned();
     macro_rules! absent {
         ($field:ident, $cause:ident) => {
             FieldObservation::Unavailable {
@@ -248,10 +260,7 @@ pub(super) fn environment(
             Datum::BuildConfiguration(absent!(BuildConfiguration, EffectiveBuildNotAttested)),
             Datum::Instrumentation(RequiredObservation::Observed {
                 value: Instrumentation {
-                    descriptor: VersionedIdentity::literal(
-                        "intlify-authoring-owner-run-instrumentation",
-                        "0",
-                    ),
+                    descriptor: labels.instrumentation.versioned(),
                     timing: Token::literal("compiled-and-enabled-posix-monotonic-invocation"),
                     allocation: Token::literal("not-installed-by-this-harness"),
                     trace: Token::literal("not-installed-by-this-harness"),
@@ -261,20 +270,14 @@ pub(super) fn environment(
             }),
             Datum::Allocator(conditionally_absent!(Allocator, NotCollected)),
             Datum::MemoryObserver(ConditionalObservation::NotApplicable {
-                applicability_rule: VersionedIdentity::literal(
-                    "intlify-authoring-duration-only-no-memory-observer",
-                    "0",
-                ),
+                applicability_rule: labels.memory_rule.versioned(),
             }),
             Datum::ClockOrSampler(ConditionalObservation::Observed {
                 value: context.clock.clone(),
             }),
             Datum::Concurrency(FieldObservation::Observed {
                 value: Concurrency {
-                    descriptor: VersionedIdentity::literal(
-                        "intlify-authoring-owner-run-concurrency",
-                        "0",
-                    ),
+                    descriptor: labels.concurrency.versioned(),
                     scope: Token::literal("one-owner-run-in-the-calling-process"),
                     processes: Repetitions::new(1).expect("one process"),
                     calling_threads: Repetitions::new(1).expect("one calling thread"),
@@ -289,15 +292,15 @@ pub(super) fn environment(
                 ContainerEmulatorSimulator,
                 NotCollected
             )),
-            // The measured context canonicalizes from a finite declared rule
-            // table, which is not a locale service with a profile.
             Datum::LocaleService(conditionally_absent!(
                 LocaleService,
                 FiniteProviderHasNoLocaleServiceProfile
             )),
-            Datum::Harness(RequiredObservation::Observed { value: harness() }),
+            Datum::Harness(RequiredObservation::Observed {
+                value: labels.harness.versioned(),
+            }),
             Datum::Projection(RequiredObservation::Observed {
-                value: projection(),
+                value: labels.projection.versioned(),
             }),
         ],
     )
@@ -306,20 +309,22 @@ pub(super) fn environment(
 #[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
 mod tests {
     use super::*;
-    use intlify_measurement::identity::CommonDomain;
+    use crate::identity::CommonDomain;
+    use crate::owner_run::test_owner::LABELS;
 
-    fn sampling() -> SamplingPolicy {
-        SamplingPolicy {
-            warmup_repetitions: Quantity::new(2),
-            measured_samples: Repetitions::new(1).unwrap(),
-            repetitions_per_sample: Repetitions::new(1).unwrap(),
+    fn package() -> Package {
+        Package {
+            name: "intlify_measurement",
+            version: "0.0.0",
+            assertions: true,
         }
     }
 
     fn context() -> ContextObservation {
         CaptureContext::acquire(
-            VersionedIdentity::literal("intlify-authoring-minimum-smoke", "0"),
-            sampling(),
+            LABELS.profile.versioned(),
+            SamplingPolicy::smoke(),
+            BuildObservation::acquire(LABELS.framing, package()),
         )
         .unwrap()
         .observation
@@ -329,16 +334,25 @@ mod tests {
     fn the_build_observation_is_the_same_for_two_acquisitions_of_one_build() {
         // Nothing in it comes from the clock or the run, so the Run Plan's
         // build binding does not change between runs of the same binary.
-        let first = BuildObservation::acquire();
-        let second = BuildObservation::acquire();
+        let first = BuildObservation::acquire(LABELS.framing, package());
+        let second = BuildObservation::acquire(LABELS.framing, package());
         assert_eq!(first, second);
-        assert_eq!(first.identity(), second.identity());
+        assert_eq!(first.identity(&LABELS), second.identity(&LABELS));
+        // What the owner's crate says about itself is part of the binding.
+        let other = BuildObservation::acquire(
+            LABELS.framing,
+            Package {
+                assertions: false,
+                ..package()
+            },
+        );
+        assert_ne!(first.identity(&LABELS), other.identity(&LABELS));
     }
 
     #[test]
     fn every_unobserved_field_carries_its_reason_and_names_this_record() {
         let parent = RecordIdentity::fresh(CommonDomain::Record).unwrap();
-        let inventory = environment(&context(), &parent).unwrap();
+        let inventory = native_environment(&LABELS, &context(), &parent).unwrap();
         assert!(inventory.reasons_are_valid(&parent));
         // The reasons belong to the record they name, so an inventory built
         // for one Evidence Set does not validate against another.
@@ -350,7 +364,8 @@ mod tests {
     fn what_this_harness_does_observe_is_observed_rather_than_described() {
         let context = context();
         let parent = RecordIdentity::fresh(CommonDomain::Record).unwrap();
-        let value = serde_json::to_value(environment(&context, &parent).unwrap()).unwrap();
+        let value =
+            serde_json::to_value(native_environment(&LABELS, &context, &parent).unwrap()).unwrap();
         let field = |name: &str| {
             value["fields"]
                 .as_array()
@@ -378,26 +393,25 @@ mod tests {
         // A field this harness does not collect says so, with its reason.
         let family = field("os_family");
         assert_eq!(family["observation"]["state"]["kind"], "unavailable");
+        // The harness and projection are the owner's own, as registered.
+        assert_eq!(
+            field("harness")["observation"]["state"]["value"]["identity"],
+            LABELS.harness.identity
+        );
     }
 
     #[test]
     fn a_build_projection_attests_only_to_what_was_read() {
         let parent = RecordIdentity::fresh(CommonDomain::Record).unwrap();
-        let build = BuildObservation::acquire()
-            .build(
-                &parent,
-                VersionedIdentity::literal("intlify-authoring-minimum-smoke", "0"),
-            )
+        let build = BuildObservation::acquire(LABELS.framing, package())
+            .build(&parent, LABELS.profile.versioned())
             .unwrap();
         let value = serde_json::to_value(&build).unwrap();
-        // The package this harness measures is observed under its own cargo
-        // name, not a prettier registered alias. Everything that would need a
-        // build script or a source digest is not claimed.
-        assert_eq!(value["implementation"]["identity"], env!("CARGO_PKG_NAME"));
-        assert_eq!(
-            value["implementation"]["revision"],
-            env!("CARGO_PKG_VERSION")
-        );
+        // The package is observed under the name its own crate gave, not a
+        // prettier registered alias. Everything that would need a build script
+        // or a source digest is not claimed.
+        assert_eq!(value["implementation"]["identity"], "intlify_measurement");
+        assert_eq!(value["implementation"]["revision"], "0.0.0");
         for absent in [
             "sourceContent",
             "executable",

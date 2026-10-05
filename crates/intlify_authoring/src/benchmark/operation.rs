@@ -10,11 +10,12 @@
 
 use std::cell::RefCell;
 
+use intlify_measurement::owner_run::observation::Observation;
 use intlify_shared_json::quantity::Quantity;
 use intlify_shared_json::token::{Token, VersionedIdentity};
 use serde::{Deserialize, Serialize};
 
-use super::observation::{Frame, Observation};
+use super::owner::LABELS;
 use crate::context::test_context::TestContext;
 use crate::declaration::measured::{self, ContextFacts};
 use crate::declaration::{DeclarationFacts, DeclarationInput};
@@ -88,7 +89,7 @@ pub(super) struct WorkFact {
 /// The complete logical work one case performed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct LogicalWork {
+pub struct LogicalWork {
     pub(super) specification: VersionedIdentity,
     pub(super) facts: Vec<WorkFact>,
 }
@@ -109,16 +110,7 @@ impl LogicalWork {
 }
 
 /// What one measured invocation produced, observed after the interval closed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Observed {
-    pub(super) observation: Observation,
-    pub(super) work: LogicalWork,
-    /// Whether the operation produced its complete result.
-    ///
-    /// A fixture declares which path it expects, and this is what that
-    /// declaration is checked against.
-    pub(super) complete: bool,
-}
+pub(super) type Observed = intlify_measurement::owner_run::capture::Observed<LogicalWork>;
 
 // --- literal encoding ------------------------------------------------------
 
@@ -137,7 +129,7 @@ pub(super) fn invoke_encode(input: EncodeInput<'_>) -> EncodeOutput {
 
 pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> Observed {
     let (text, _, segments) = input;
-    let mut semantic = Frame::new("literal-encode");
+    let mut semantic = LABELS.framing.frame("literal-encode");
     let segments = segments.borrow();
     let Ok(encoded) = output else {
         semantic.uint(0);
@@ -152,7 +144,7 @@ pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> O
     };
     semantic.uint(1);
     semantic.text(encoded);
-    let mut positions = Frame::new("literal-encode-positions");
+    let mut positions = LABELS.framing.frame("literal-encode-positions");
     for segment in segments.iter() {
         positions.uint(segment.extracted().start());
         positions.uint(segment.extracted().end());
@@ -201,8 +193,8 @@ pub(super) fn invoke_mf2(input: Mf2Input<'_>) -> Option<MessageAnalysis> {
     reason = "the capture contract fixes this signature"
 )]
 pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> Observed {
-    let mut semantic = Frame::new("mf2-semantics");
-    let mut positions = Frame::new("mf2-semantics-positions");
+    let mut semantic = LABELS.framing.frame("mf2-semantics");
+    let mut positions = LABELS.framing.frame("mf2-semantics-positions");
     let Some(analysis) = output else {
         semantic.uint(0);
         return Observed {
@@ -274,7 +266,7 @@ pub(super) fn observe_context(
     output: &Option<Result<ContextFacts, usize>>,
     _: ContextInput<'_>,
 ) -> Observed {
-    let mut semantic = Frame::new("context-resolution");
+    let mut semantic = LABELS.framing.frame("context-resolution");
     match output {
         None => {
             semantic.uint(0);
@@ -353,7 +345,7 @@ pub(super) fn invoke_facts(input: FactsInput<'_>) -> FactsOutput {
     reason = "the capture contract fixes this signature"
 )]
 pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed {
-    let mut semantic = Frame::new("declaration-facts");
+    let mut semantic = LABELS.framing.frame("declaration-facts");
     match output {
         None => {
             semantic.uint(0);
@@ -386,7 +378,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
             // The revision is the point of the operation, so it is observed
             // directly rather than through the projection that produced it.
             semantic.text(revision.as_str());
-            let mut positions = Frame::new("declaration-facts-positions");
+            let mut positions = LABELS.framing.frame("declaration-facts-positions");
             for segment in facts.extraction_map() {
                 positions.uint(segment.extracted().start());
                 positions.uint(segment.extracted().end());
