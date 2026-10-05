@@ -10,14 +10,17 @@
 //! owns is the part specific to JavaScript: which bytes a unit is, which
 //! grammar reads them, and what a literal decodes to and from where.
 //!
-//! An invocation runs in two steps. [`admit_units`] checks everything the
+//! An invocation runs in three steps. [`admit_units`] checks everything the
 //! caller supplied before anything is parsed: the context and profile pins,
 //! each unit's owner and grammar, its bytes against its snapshot, and the
 //! declared scope. [`analyze_unit`] then reads one admitted unit, parsing it
 //! exactly once under the grammar its snapshot names, recognizing the
 //! explicit authoring forms the profile registers and the UI text assigned to
 //! proven DOM receivers, attaching `@intlify` metadata to what they declared,
-//! and handing what it found to `intlify_authoring`.
+//! and handing what it found to `intlify_authoring`. Units are independent, so
+//! the caller may read them in any order and on any workers it owns.
+//! [`assemble_inventory`] finally merges the analyses into one sealed
+//! `authoring-inventory`, the same bytes however they were scheduled.
 //!
 //! The grammar is always the caller's choice. There is no API that picks one
 //! from a file name or suffix, and a unit that fails to parse is not retried
@@ -37,6 +40,7 @@ mod dom;
 mod explicit;
 mod failure;
 mod grammar;
+mod inventory;
 mod limits;
 mod metadata;
 mod parameters;
@@ -53,6 +57,7 @@ pub use analysis::{analyze_unit, UnitAnalysis, UnitFacts, UnitWork};
 pub use binding::{BindingError, Intrinsic, IntrinsicBinding};
 pub use failure::ProducerFailure;
 pub use grammar::{Grammar, GRAMMAR_REVISION};
+pub use inventory::{assemble_inventory, AssembledInventory, CheckedInventory};
 pub use limits::{JsAuthoringLimits, JsLimitKind, JsLimitsError};
 pub use profile::{
     DomGlobal, JsAuthoringProfile, AUTHORING_PROFILE_IDENTITY, AUTHORING_PROFILE_REVISION,

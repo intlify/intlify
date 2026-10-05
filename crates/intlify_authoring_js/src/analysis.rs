@@ -21,9 +21,9 @@
 //! diagnostics say why, so the use adds none.
 
 use intlify_authoring::{
-    compare_parameters, resolve_declarations_with_cancellation, AuthoringContext, AuthoringFailure,
-    DeclarationFacts, DeclarationInput, DeclarationMetadata, Detail, Diagnostic, Exclusion,
-    LimitKind, Location, MessageInput, Outcome, ReasonFamily, ReferenceFacts, Region,
+    compare_parameters, resolve_declarations_with_cancellation, AuthoringBasis, AuthoringContext,
+    AuthoringFailure, DeclarationFacts, DeclarationInput, DeclarationMetadata, Detail, Diagnostic,
+    Exclusion, LimitKind, Location, MessageInput, Outcome, ReasonFamily, ReferenceFacts, Region,
     SourceSnapshot, UnitOutcome,
 };
 
@@ -51,6 +51,10 @@ pub struct UnitAnalysis {
     diagnostics: Box<[Diagnostic]>,
     work: UnitWork,
     outside_profile: u64,
+    /// What the unit was read under, so that an inventory is never assembled
+    /// from units read under different contexts or profiles.
+    basis: AuthoringBasis,
+    profile: JsAuthoringProfile,
 }
 
 impl UnitAnalysis {
@@ -105,6 +109,12 @@ impl UnitAnalysis {
     #[must_use]
     pub const fn outside_profile(&self) -> u64 {
         self.outside_profile
+    }
+
+    /// Return whether the unit was read under this context basis and
+    /// profile.
+    pub(crate) fn read_under(&self, basis: &AuthoringBasis, profile: &JsAuthoringProfile) -> bool {
+        self.basis == *basis && self.profile == *profile
     }
 }
 
@@ -186,7 +196,8 @@ where
         // No range can address bytes that are not text, so the record
         // points at the unit as a whole.
         let location = Location::Unit(source.clone());
-        return failed(reporter, detail::unit_not_text(), location, work);
+        let read = (context.basis().clone(), profile.clone());
+        return failed(reporter, detail::unit_not_text(), location, work, read);
     };
 
     work.parse_attempts = 1;
@@ -206,7 +217,14 @@ where
             let location = range
                 .and_then(|range| Region::new(source.clone(), range).ok())
                 .map_or_else(|| Location::Unit(source.clone()), Location::Region);
-            return failed(reporter, detail::host_syntax_invalid(), location, work);
+            let read = (context.basis().clone(), profile.clone());
+            return failed(
+                reporter,
+                detail::host_syntax_invalid(),
+                location,
+                work,
+                read,
+            );
         }
     };
     work.ast_nodes = u64::from(parsed.stats.nodes);
@@ -271,6 +289,8 @@ where
         diagnostics: reporter.into_diagnostics(),
         work,
         outside_profile,
+        basis: context.basis().clone(),
+        profile: profile.clone(),
     })
 }
 
@@ -316,6 +336,7 @@ fn failed(
     detail: Detail,
     location: Location,
     work: UnitWork,
+    (basis, profile): (AuthoringBasis, JsAuthoringProfile),
 ) -> Result<UnitAnalysis, ProducerFailure> {
     reporter.at_location(ReasonFamily::AuthoringInputInvalid, detail, location)?;
     Ok(UnitAnalysis {
@@ -325,6 +346,8 @@ fn failed(
         diagnostics: reporter.into_diagnostics(),
         work,
         outside_profile: 0,
+        basis,
+        profile,
     })
 }
 
