@@ -155,12 +155,19 @@ fn observe(output: &Option<usize>, text: &'static str) -> Observed<Work> {
     }
 }
 
+/// The same operation, failing every time it is measured.
+fn failing(text: &'static str) -> Option<usize> {
+    panic!("a measured invocation of {} bytes failed", text.len())
+}
+
 /// How the test owner misbehaves, if at all.
 pub(super) const SOUND: u8 = 0;
 /// The blocked fixture cannot be prepared.
 pub(super) const UNPREPARED: u8 = 1;
 /// Every measured invocation disagrees with the expectation.
 pub(super) const DRIFTING: u8 = 2;
+/// Every measured invocation fails, so no case has a sample.
+pub(super) const FAILING: u8 = 3;
 
 pub(super) struct TestOwner<const MODE: u8>;
 
@@ -227,7 +234,11 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
         capturing: &Capturing<'_, C>,
         prepared: &Prepared,
     ) -> Result<Capture<Work>, CaptureFailure> {
-        let operation = if MODE == DRIFTING { drifting } else { invoke };
+        let operation = match MODE {
+            DRIFTING => drifting,
+            FAILING => failing,
+            _ => invoke,
+        };
         capturing.capture(
             &prepared.expected,
             prepared.fixture.text,
@@ -330,6 +341,26 @@ mod tests {
         assert!(matches!(
             OwnerRun::admit(first.run(), second.owner_document()),
             Err(crate::owner::Rejection::Binding(Some(_)))
+        ));
+
+        // Changed as well, it is still another run's document first: which
+        // run it names is checked before whether its content matches its
+        // checksum, so it is not reported as a corrupt document of this run.
+        let mut value: serde_json::Value = serde_json::from_slice(second.owner_document()).unwrap();
+        value["result"]["outcome"] = serde_json::json!("invalid");
+        let changed = serde_json::to_vec(&value).unwrap();
+        let identity = serde_json::from_value(value["result"]["recordIdentity"].clone()).unwrap();
+        assert_eq!(
+            OwnerRun::admit(first.run(), &changed).err(),
+            Some(crate::owner::Rejection::Binding(Some(identity)))
+        );
+        // The same change to this run's own document is a corrupt document.
+        let mut value: serde_json::Value = serde_json::from_slice(first.owner_document()).unwrap();
+        value["result"]["outcome"] = serde_json::json!("invalid");
+        let changed = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            OwnerRun::admit(first.run(), &changed),
+            Err(crate::owner::Rejection::Integrity(_))
         ));
     }
 
@@ -456,6 +487,30 @@ mod tests {
             .records()
             .iter()
             .all(|(name, _)| *name != "measurement-evidence.json"));
+    }
+
+    #[test]
+    fn a_measurement_that_fails_leaves_the_run_incomplete_rather_than_invalid() {
+        // A failed invocation is a missing measurement, not a wrong result: the
+        // run is incomplete, and each case names the failure.
+        let run = recorded::<TestOwner<FAILING>>();
+        let admitted = OwnerRun::admit(&run, &run.encode().unwrap()).unwrap();
+        assert_eq!(
+            run.outcomes(&admitted),
+            vec![
+                CaseOutcome::Failed(crate::reason::InvocationFailure::InvocationPanicked);
+                FIXTURES.len()
+            ]
+        );
+        assert_eq!(
+            admitted.document().result().outcome,
+            OwnerOutcome::Incomplete
+        );
+        let observation = observe_smoke::<TestOwner<FAILING>>().unwrap();
+        let summary = observation.verify_saved(&saved(&observation)).unwrap();
+        assert_eq!(summary.outcome, ObservationOutcome::Incomplete);
+        assert_eq!(summary.measured_cases, 0);
+        assert_eq!(summary.non_measured_cases, FIXTURES.len());
     }
 
     #[test]

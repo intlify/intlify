@@ -158,6 +158,8 @@ mod tests {
             b"bad compiler".as_slice(),
             b"rustc 1.95.0\nrelease: private-secret\ncommit-hash: unknown\nLLVM version: 22.0.0\n",
             b"rustc 1.95.0\nrelease: 1.95.0\ncommit-hash: ABCDEF\nLLVM version: 22.0.0\n",
+            // A full-length commit in uppercase is not the form rustc reports.
+            b"rustc 1.95.0\nrelease: 1.95.0\ncommit-hash: 0123456789ABCDEF0123456789ABCDEF01234567\nLLVM version: 22.0.0\n",
             &[0xff],
         ] {
             let view = read(parse_compiler(bad), Ok("wasm32-unknown-unknown"));

@@ -249,3 +249,36 @@ impl<O: Owner> OwnerRun for RecordedRun<O> {
             .map_err(|_| OwnerFailure)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_failed_measurement_keeps_its_common_cause() {
+        for (failure, cause) in [
+            (
+                MeasurementFailure::Clock(ClockFailure::DurationConversionOverflow),
+                InvocationFailure::DurationConversionOverflow,
+            ),
+            (
+                MeasurementFailure::Clock(ClockFailure::ReversedClock),
+                InvocationFailure::ClockFailure,
+            ),
+            (
+                MeasurementFailure::Clock(ClockFailure::UnsupportedPlatform),
+                InvocationFailure::ClockFailure,
+            ),
+            (
+                MeasurementFailure::InvocationPanicked,
+                InvocationFailure::InvocationPanicked,
+            ),
+            (
+                MeasurementFailure::PrerequisiteUnavailable,
+                InvocationFailure::PrerequisiteUnavailable,
+            ),
+        ] {
+            assert_eq!(failed_invocation(failure), cause, "{failure:?}");
+        }
+    }
+}

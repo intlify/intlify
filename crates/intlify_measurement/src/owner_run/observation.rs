@@ -287,6 +287,67 @@ mod tests {
     }
 
     #[test]
+    fn the_framing_is_exactly_its_registered_byte_layout() {
+        // Records already written depend on these exact bytes, so the layout
+        // is pinned against a separate computation rather than against itself.
+        fn prefixed(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+            hasher.update(&(bytes.len() as u64).to_le_bytes());
+            hasher.update(bytes);
+        }
+        let opened = |domain: &[u8]| {
+            let mut hasher = blake3::Hasher::new();
+            prefixed(&mut hasher, FRAMING.label().as_bytes());
+            prefixed(&mut hasher, domain);
+            hasher
+        };
+        let semantic = digest("semantic", "value");
+        let positions = digest("positions", "value");
+        for recorded in [None, Some(positions)] {
+            let mut expected = opened(b"observation");
+            expected.update(&semantic.bytes());
+            expected.update(&[u8::from(recorded.is_some())]);
+            if let Some(positions) = recorded {
+                expected.update(&positions.bytes());
+            }
+            let observation = Observation {
+                semantic,
+                positions: recorded,
+            };
+            assert_eq!(
+                observation.identity(FRAMING).bytes(),
+                *expected.finalize().as_bytes()
+            );
+        }
+
+        let mut frame = FRAMING.frame("d");
+        frame.uint(7);
+        frame.flag(true);
+        frame.text("ab");
+        frame.digest(semantic);
+        frame.json(&serde_json::json!({"k": [null, false, "s", 1]}));
+        let mut expected = opened(b"d");
+        expected.update(&7_u64.to_le_bytes());
+        expected.update(&[1]);
+        prefixed(&mut expected, b"ab");
+        expected.update(&semantic.bytes());
+        // An object of one member, then an array of four values: each value
+        // is its tag, then its own content.
+        for tag in [5_u64, 1] {
+            expected.update(&tag.to_le_bytes());
+        }
+        prefixed(&mut expected, b"k");
+        for tag in [4_u64, 4, 0, 1] {
+            expected.update(&tag.to_le_bytes());
+        }
+        expected.update(&[0]);
+        expected.update(&3_u64.to_le_bytes());
+        prefixed(&mut expected, b"s");
+        expected.update(&2_u64.to_le_bytes());
+        prefixed(&mut expected, b"1");
+        assert_eq!(frame.finish().bytes(), *expected.finalize().as_bytes());
+    }
+
+    #[test]
     fn json_framing_keeps_the_models_own_member_order() {
         // A projection's member order is part of what it means, so two objects
         // that differ only in order are different observations.

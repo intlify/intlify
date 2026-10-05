@@ -505,3 +505,67 @@ fn outcome<O: Owner>(attempts: &[AttemptOf<O>]) -> OwnerOutcome {
         .max()
         .unwrap_or(OwnerOutcome::Invalid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::acquisition::{ClockFailure, MeasurementFailure};
+    use crate::owner_run::test_owner::{TestOwner, LABELS, SOUND};
+
+    type Sound = TestOwner<SOUND>;
+
+    fn attempt(
+        result: AttemptResult<<Sound as Owner>::Descriptors, <Sound as Owner>::Work>,
+    ) -> AttemptOf<Sound> {
+        let digest = |value: &str| {
+            let mut frame = LABELS.framing.frame("test-binding");
+            frame.text(value);
+            frame.finish()
+        };
+        CaseAttempt {
+            ordinal: Quantity::new(0),
+            binding: Binding {
+                run: digest("run"),
+                case: digest("case"),
+            },
+            result,
+        }
+    }
+
+    #[test]
+    fn a_missing_measurement_is_incomplete_and_a_wrong_result_is_invalid() {
+        let failed = |failure| attempt(AttemptResult::CaptureFailed(failure));
+        for missing in [
+            CaptureFailure::Overflow,
+            CaptureFailure::Measurement(MeasurementFailure::InvocationPanicked),
+            CaptureFailure::Measurement(MeasurementFailure::Clock(ClockFailure::ReversedClock)),
+        ] {
+            assert_eq!(
+                outcome::<Sound>(&[failed(missing)]),
+                OwnerOutcome::Incomplete
+            );
+        }
+        for wrong in [
+            CaptureFailure::SemanticMismatch,
+            CaptureFailure::Preparation(PreparationFailure::PriorStage),
+        ] {
+            assert_eq!(outcome::<Sound>(&[failed(wrong)]), OwnerOutcome::Invalid);
+        }
+        assert_eq!(
+            outcome::<Sound>(&[attempt(AttemptResult::PreparationFailed(
+                PreparationFailure::Fixture
+            ))]),
+            OwnerOutcome::Invalid
+        );
+        // The worst attempt decides, and a run with no attempt at all is not a
+        // complete one.
+        assert_eq!(
+            outcome::<Sound>(&[
+                failed(CaptureFailure::Overflow),
+                failed(CaptureFailure::SemanticMismatch),
+            ]),
+            OwnerOutcome::Invalid
+        );
+        assert_eq!(outcome::<Sound>(&[]), OwnerOutcome::Invalid);
+    }
+}
