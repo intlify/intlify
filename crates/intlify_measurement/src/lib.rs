@@ -8,11 +8,17 @@
 //! digest domains, the reason vocabulary, and the Run Plan, Evidence, Run
 //! Evaluation, and structured report bodies.
 //!
-//! It owns no fixtures, no clock, no workload, and no owner vocabulary. An
-//! owner supplies its own case projection, descriptors, and native checksum
-//! through the adapter in [`owner`], and this crate never recaptures a
-//! duration, invents an absent observation, or turns a submitted record into
-//! its own input authority.
+//! It owns no fixtures, no workload, and no owner vocabulary. An owner supplies
+//! its own case projection, descriptors, and native checksum framing through
+//! the adapter in [`owner`], and this crate never recaptures a duration,
+//! invents an absent observation, or turns a submitted record into its own
+//! input authority.
+//!
+//! Two non-default features add what every observing owner would otherwise
+//! duplicate. `acquisition` reads the clock and the host and toolchain views,
+//! once, the same way for every owner. `owner-run` adds the run those owners
+//! share: capture, the sealed owner record and its admission, and the smoke
+//! runner, driven through `owner_run::Owner`. Reading a record needs neither.
 //!
 //! Producing a record is not admission. Integrity, binding, inventory, and
 //! projection eligibility remain separate checks, and a failed or absent case
