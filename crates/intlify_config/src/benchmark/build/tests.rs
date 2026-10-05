@@ -16,17 +16,22 @@ fn the_compiled_build_observation_is_owned_and_excludes_runtime_checkout_state()
     assert_eq!(value["dependencyLock"]["state"], "observed");
     // Wrappers or an unsupported compiler's metadata remain explicit. They
     // do not force this observational test to claim an unwrapped rustc build.
+    // The compiler is the shared toolchain acquisition's, retained unchanged.
     match &build.document().compiler {
-        Acquisition::Observed { value } => assert_eq!(value.identity, "rustc"),
-        Acquisition::Unavailable { reason } => assert!(matches!(
+        Acquired::Observed { value } => assert_eq!(value.identity, "rustc"),
+        Acquired::Unavailable { reason } => assert!(matches!(
             reason,
-            AcquisitionReason::MissingInput
-                | AcquisitionReason::CompilerInvocationFailed
-                | AcquisitionReason::CompilerOutputUnsupported
-                | AcquisitionReason::CompilerOutputLimit
-                | AcquisitionReason::CompilerWrappersPresent
+            intlify_measurement::acquisition::AcquisitionReason::MissingInput
+                | intlify_measurement::acquisition::AcquisitionReason::CompilerInvocationFailed
+                | intlify_measurement::acquisition::AcquisitionReason::CompilerOutputUnsupported
+                | intlify_measurement::acquisition::AcquisitionReason::CompilerOutputLimit
+                | intlify_measurement::acquisition::AcquisitionReason::CompilerWrappersPresent
         )),
     }
+    assert_eq!(
+        build.document().compiler,
+        intlify_measurement::acquisition::toolchain::ToolchainView::acquire().compiler
+    );
     assert_eq!(value["effectiveConfiguration"]["state"], "unavailable");
     assert_eq!(
         value["effectiveConfiguration"]["reason"],

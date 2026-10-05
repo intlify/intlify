@@ -8,9 +8,10 @@
 //! what this owner actually observed and, for every field it did not, the exact
 //! reason it is absent. A native hint never becomes a stronger fact.
 
+use intlify_measurement::acquisition::host::{cpu_architecture, system_family, uname_method};
 use intlify_measurement::environment::{
-    missing, Architecture, Concurrency, ConditionalObservation, Datum, Instrumentation,
-    Observation, ReportedIdentifier, RequiredObservation, RunnerContext, SystemFamily,
+    missing, Concurrency, ConditionalObservation, Datum, Instrumentation, Observation,
+    ReportedIdentifier, RequiredObservation, RunnerContext,
 };
 
 pub(super) use intlify_measurement::environment::{Environment, Toolchain};
@@ -18,7 +19,7 @@ pub(super) use intlify_measurement::environment::{Environment, Toolchain};
 use super::identity::{IdentityFailure, RecordIdentity, Token, VersionedIdentity};
 use super::reason::{EnvironmentField as Field, MissingObservation as Missing};
 use crate::benchmark::build::{Acquisition, BuildObservation};
-use crate::benchmark::environment::{self as native, Acquired};
+use crate::benchmark::environment::Acquired;
 use crate::benchmark::quantity::{Quantity, Repetitions};
 use crate::benchmark::run::ProjectionSource;
 
@@ -31,12 +32,8 @@ pub(super) fn projection_identity() -> VersionedIdentity {
 
 pub(super) fn toolchain(build: &BuildObservation) -> Result<Option<Toolchain>, IdentityFailure> {
     match &build.compiler {
-        Acquisition::Observed { value } => Ok(Some(Toolchain {
-            compiler: VersionedIdentity::new(&value.identity, &value.release)?,
-            commit: value.commit.as_deref().map(Token::new).transpose()?,
-            backend: VersionedIdentity::new("llvm", &value.llvm)?,
-        })),
-        Acquisition::Unavailable { .. } => Ok(None),
+        Acquired::Observed { value } => value.toolchain().map(Some),
+        Acquired::Unavailable { .. } => Ok(None),
     }
 }
 
@@ -48,36 +45,8 @@ pub(super) fn project(
     let context = &source.document().result().context;
     let build = &context.build;
     let native_context = &context.environment;
-    let uname_method = || {
-        VersionedIdentity::new("posix-uname-controlled-kernel-view", "0")
-            .expect("registered method")
-    };
-    let family = match &native_context.kernel_view {
-        Acquired::Observed { value } => match value.family {
-            Acquired::Observed { value } => Some(match value {
-                native::KernelFamily::Linux => SystemFamily::Linux,
-                native::KernelFamily::Darwin => SystemFamily::Darwin,
-            }),
-            Acquired::Unavailable { .. } => None,
-        },
-        Acquired::Unavailable { .. } => None,
-    };
-    let architecture = match &native_context.kernel_view {
-        Acquired::Observed { value } => match value.machine {
-            Acquired::Observed { value } => Some(match value {
-                native::Architecture::X86 => Architecture::X86,
-                native::Architecture::X86_64 => Architecture::X86_64,
-                native::Architecture::Arm => Architecture::Arm,
-                native::Architecture::Aarch64 => Architecture::Aarch64,
-                native::Architecture::Riscv32 => Architecture::Riscv32,
-                native::Architecture::Riscv64 => Architecture::Riscv64,
-                native::Architecture::Wasm32 => Architecture::Wasm32,
-                native::Architecture::Wasm64 => Architecture::Wasm64,
-            }),
-            Acquired::Unavailable { .. } => None,
-        },
-        Acquired::Unavailable { .. } => None,
-    };
+    let family = system_family(&native_context.kernel_view);
+    let architecture = cpu_architecture(&native_context.kernel_view);
     let native_rule = || {
         VersionedIdentity::new("intlify-config-native-unmanaged-component-context", "0")
             .expect("registered rule")

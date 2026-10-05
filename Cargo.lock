@@ -591,7 +591,6 @@ dependencies = [
  "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
- "rustix",
  "schemars",
  "serde",
  "serde_json",

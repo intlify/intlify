@@ -2,7 +2,8 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Build-script-only observation acquisition. No source paths, arbitrary flags,
-//! environment values, command lines, or compiler stderr enter the output.
+//! environment values, or command lines enter the output. The compiler is asked
+//! by the shared toolchain acquisition in `intlify_measurement`, not here.
 //! Source checksums describe this bounded input snapshot, not an attestation of
 //! the complete compiler dependency graph or a 017 artifact/integrity encoding.
 
@@ -10,7 +11,6 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use serde_json::{json, Value};
 
@@ -18,7 +18,6 @@ pub(super) const CODEC: &str = "intlify-config-build-observation/0";
 const SOURCE_FRAMING: &str = "intlify-config-build-source/0";
 const MAX_SOURCE_FILES: usize = 512;
 const MAX_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
-const MAX_COMPILER_OUTPUT: u64 = 16 * 1024;
 
 /// Closed acquisition causes. Error objects/paths and rejected text are dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,10 +29,6 @@ pub(super) enum Failure {
     UnsupportedSourceEntry,
     InvalidSourcePath,
     SourceChanged,
-    CompilerInvocationFailed,
-    CompilerOutputUnsupported,
-    CompilerOutputLimit,
-    CompilerWrappersPresent,
 }
 
 impl Failure {
@@ -46,10 +41,6 @@ impl Failure {
             Self::UnsupportedSourceEntry => "unsupported-source-entry",
             Self::InvalidSourcePath => "invalid-source-path",
             Self::SourceChanged => "source-changed",
-            Self::CompilerInvocationFailed => "compiler-invocation-failed",
-            Self::CompilerOutputUnsupported => "compiler-output-unsupported",
-            Self::CompilerOutputLimit => "compiler-output-limit",
-            Self::CompilerWrappersPresent => "compiler-wrappers-present",
         }
     }
 }
@@ -243,96 +234,6 @@ fn lock_observation(bytes: &[u8]) -> Value {
         "digest": blake3::hash(bytes).to_hex().to_string(), "bytes": bytes.len().to_string()})
 }
 
-fn numeric_version(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 32
-        && value
-            .split('.')
-            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
-}
-
-fn compiler_release(value: &str) -> bool {
-    let (base, suffix) = value.split_once('-').unwrap_or((value, ""));
-    numeric_version(base) && ["", "nightly", "beta", "dev"].contains(&suffix)
-}
-
-pub(super) fn parse_compiler(bytes: &[u8]) -> Result<Value, Failure> {
-    if bytes.len() > usize::try_from(MAX_COMPILER_OUTPUT).expect("small fixed bound") {
-        return Err(Failure::CompilerOutputLimit);
-    }
-    let text = std::str::from_utf8(bytes).map_err(|_| Failure::CompilerOutputUnsupported)?;
-    if !text
-        .lines()
-        .next()
-        .is_some_and(|line| line.starts_with("rustc "))
-    {
-        return Err(Failure::CompilerOutputUnsupported);
-    }
-    let field = |name: &str| -> Result<&str, Failure> {
-        let mut matches = text.lines().filter_map(|line| line.strip_prefix(name));
-        let value = matches.next().ok_or(Failure::CompilerOutputUnsupported)?;
-        if matches.next().is_some() {
-            return Err(Failure::CompilerOutputUnsupported);
-        }
-        Ok(value)
-    };
-    let release = field("release: ")?;
-    let commit = field("commit-hash: ")?;
-    let llvm = field("LLVM version: ")?;
-    if !compiler_release(release)
-        || !numeric_version(llvm)
-        || !(commit == "unknown"
-            || (commit.len() == 40
-                && commit
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))))
-    {
-        return Err(Failure::CompilerOutputUnsupported);
-    }
-    Ok(json!({"identity": "rustc", "release": release,
-        "commit": (commit != "unknown").then_some(commit), "llvm": llvm}))
-}
-
-fn compiler_snapshot(wrappers: bool) -> Result<Value, Failure> {
-    if wrappers {
-        return Err(Failure::CompilerWrappersPresent);
-    }
-    let compiler = std::env::var_os("RUSTC").ok_or(Failure::MissingInput)?;
-    let mut child = Command::new(compiler)
-        .args(["--version", "--verbose"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| Failure::CompilerInvocationFailed)?;
-    let Some(stdout) = child.stdout.take() else {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(Failure::CompilerInvocationFailed);
-    };
-    let mut bytes = Vec::new();
-    let read = stdout.take(MAX_COMPILER_OUTPUT + 1).read_to_end(&mut bytes);
-    if read.is_err()
-        || bytes.len() > usize::try_from(MAX_COMPILER_OUTPUT).expect("small fixed bound")
-    {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(if read.is_err() {
-            Failure::CompilerInvocationFailed
-        } else {
-            Failure::CompilerOutputLimit
-        });
-    }
-    if !child
-        .wait()
-        .map_err(|_| Failure::CompilerInvocationFailed)?
-        .success()
-    {
-        return Err(Failure::CompilerInvocationFailed);
-    }
-    parse_compiler(&bytes)
-}
-
 pub(super) fn emit() {
     for path in [
         "src",
@@ -345,8 +246,10 @@ pub(super) fn emit() {
     ] {
         println!("cargo::rerun-if-changed={path}");
     }
+    // The compiler itself is asked by the shared toolchain acquisition. This
+    // script still records whether a wrapper stands in front of it, as one of
+    // this crate's Cargo inputs.
     for name in [
-        "RUSTC",
         "RUSTC_WRAPPER",
         "RUSTC_WORKSPACE_WRAPPER",
         "CARGO_ENCODED_RUSTFLAGS",
@@ -387,7 +290,6 @@ pub(super) fn emit() {
         "package": {"identity": env!("CARGO_PKG_NAME"), "revision": env!("CARGO_PKG_VERSION")},
         "source": source,
         "dependencyLock": dependency_lock,
-        "compiler": observation(compiler_snapshot(wrapper || workspace_wrapper)),
         "cargoInputs": {
             "profile": input("PROFILE", &["debug", "release"]),
             "optimization": input("OPT_LEVEL", &["0", "1", "2", "3", "s", "z"]),

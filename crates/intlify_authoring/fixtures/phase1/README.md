@@ -213,4 +213,4 @@ These are named so that their absence is a decision rather than an oversight.
 - **Artifact codecs** — `message-intent`, `message-reference`, `intent-registry` and their schemas are Phase 3.
 - **Production canonicalisation** — the provider behind `AuthoringContext` is a finite declared rule table. The production one is 015's Phase 2, and the trait duplicated here is unified at that integration.
 - **Conditional selection and the production profile** — no production `ContextKind` is admitted, and a context claiming one is refused.
-- **Kernel and toolchain observation** — the measurement harness reports these environment fields as not collected. Acquiring them belongs in the shared acquisition module so both owners report the same way.
+- **Kernel and toolchain observation** — the Phase 1 harness reported these environment fields as not collected. Phase 2 moved their acquisition into `intlify_measurement`, where every owner reads them the same way; this owner's result schema moved to revision 2 to record them, which changed its case identities.

@@ -66,6 +66,12 @@ pub(super) struct Variant {
     expected: Expected,
 }
 
+/// The revision of the owner result schema a case is recorded under.
+///
+/// It is the revision the result codec names, so a case recorded in another
+/// result schema is a different case.
+const RESULT_SCHEMA_REVISION: &str = "2";
+
 /// The complete projection of one measured case.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -112,7 +118,7 @@ impl CaseProjection {
         let operation = prepared.fixture.operation;
         Self {
             owner_identity: Token::literal("intlify-authoring"),
-            owner_result_schema_revision: Token::literal("1"),
+            owner_result_schema_revision: Token::literal(RESULT_SCHEMA_REVISION),
             owner_benchmark_profile_revision: Token::literal("0"),
             owner_phase: operation.phase().into(),
             owner_cost: operation.cost().into(),
@@ -165,6 +171,18 @@ mod tests {
             let second = case_identity(&CaseProjection::of(&prepare(fixture).unwrap())).unwrap();
             assert_eq!(first, second, "{}", fixture.name);
         }
+    }
+
+    #[test]
+    fn the_projection_names_the_result_schema_revision_the_run_records() {
+        let codec = super::super::owner::LABELS.result_codec;
+        assert_eq!(
+            codec.rsplit_once('/').map(|(_, revision)| revision),
+            Some(RESULT_SCHEMA_REVISION)
+        );
+        let prepared = prepare(FIXTURES[0]).unwrap();
+        let value = serde_json::to_value(CaseProjection::of(&prepared)).unwrap();
+        assert_eq!(value["ownerResultSchemaRevision"], RESULT_SCHEMA_REVISION);
     }
 
     #[test]

@@ -3,23 +3,26 @@
 
 //! What an owner run observed about the build and the machine it ran on.
 //!
-//! The harness collects very little. That is a statement, not an omission:
-//! every field it does not collect is reported as unavailable with the reason,
+//! The harness collects little. That is a statement, not an omission: every
+//! field it does not collect is reported as unavailable with the reason,
 //! because an absent observation must never read as a weaker one. What it does
-//! observe — the package it measures, the clock it acquired, the concurrency
-//! it used, the instrumentation it installed — it observes directly.
+//! observe — the package it measures, the clock it acquired, the host and
+//! toolchain views, the concurrency it used, the instrumentation it installed
+//! — it observes directly, and keeps in the owner record it seals.
 
 use intlify_shared_json::quantity::{Quantity, Repetitions};
 use serde::{Deserialize, Serialize};
 
 use super::observation::{Digest, Framing};
 use super::{Labels, Package};
+use crate::acquisition::host::{cpu_architecture, system_family, uname_method, HostView};
+use crate::acquisition::toolchain::ToolchainView;
 use crate::acquisition::{ClockFailure, MonotonicClock};
 use crate::build::{missing as missing_build, Build, SourceControlState};
 use crate::environment::{
     missing as missing_field, ClockObservation, Concurrency, ConditionalObservation, Datum,
     Environment, Instrumentation, InventoryFailure, Observation as FieldObservation,
-    RequiredObservation, RunnerContext,
+    ReportedIdentifier, RequiredObservation, RunnerContext,
 };
 use crate::identity::{
     IdentityFailure, NativeChecksum, OwnerLabel, RecordIdentity, Token, VersionedIdentity,
@@ -160,6 +163,8 @@ pub struct ContextObservation {
     pub sampling: SamplingPolicy,
     pub clock: ClockObservation,
     pub build: BuildObservation,
+    pub host: HostView,
+    pub toolchain: ToolchainView,
 }
 
 /// The clock and the observations one run was acquired with.
@@ -181,6 +186,8 @@ impl CaptureContext {
             sampling,
             clock: clock.description().observation(),
             build,
+            host: HostView::acquire(),
+            toolchain: ToolchainView::acquire(),
         };
         Ok(Self { clock, observation })
     }
@@ -198,6 +205,15 @@ impl CaptureContext {
     }
 }
 
+// Generic over the identifier's own type: the family and the machine are
+// different vocabularies read by the same method.
+fn reported<T>(identity: T) -> ReportedIdentifier<T> {
+    ReportedIdentifier {
+        identity,
+        method: uname_method(),
+    }
+}
+
 /// Project a native owner run's observations into 026's field inventory.
 ///
 /// It describes one Rust component measured in the calling process, on the
@@ -210,6 +226,7 @@ pub fn native_environment(
     parent: &RecordIdentity,
 ) -> Result<Environment, InventoryFailure> {
     let native_rule = || labels.native_rule.versioned();
+    let kernel = &context.host.kernel_view;
     macro_rules! absent {
         ($field:ident, $cause:ident) => {
             FieldObservation::Unavailable {
@@ -227,20 +244,41 @@ pub fn native_environment(
     Environment::new(
         parent,
         [
-            // A kernel view is acquirable, but this harness does not acquire
-            // one. Reporting it as not collected is the honest answer; it is
-            // not evidence that the machine has no operating system.
-            Datum::OsFamily(absent!(OsFamily, NotCollected)),
+            // The kernel names its family and machine. Its release is neither
+            // an operating system version nor a build identity, so neither of
+            // those is claimed from it.
+            Datum::OsFamily(system_family(kernel).map_or_else(
+                || absent!(OsFamily, NativeAcquisitionUnavailable),
+                |family| FieldObservation::Observed {
+                    value: reported(family),
+                },
+            )),
             Datum::OsVersion(absent!(OsVersion, NotCollected)),
-            Datum::KernelBuild(conditionally_absent!(KernelBuild, NotCollected)),
-            Datum::CpuArchitecture(absent!(CpuArchitecture, NotCollected)),
-            Datum::TargetTriple(conditionally_absent!(TargetTriple, NotCollected)),
+            Datum::KernelBuild(conditionally_absent!(
+                KernelBuild,
+                KernelReleaseIsNotBuildIdentity
+            )),
+            Datum::CpuArchitecture(cpu_architecture(kernel).map_or_else(
+                || absent!(CpuArchitecture, NativeAcquisitionUnavailable),
+                |architecture| FieldObservation::Observed {
+                    value: reported(architecture),
+                },
+            )),
+            Datum::TargetTriple(match context.toolchain.target_triple()? {
+                Some(value) => ConditionalObservation::Observed { value },
+                None => conditionally_absent!(TargetTriple, NativeAcquisitionUnavailable),
+            }),
             Datum::RunnerContext(RequiredObservation::Observed {
                 value: RunnerContext::LocalUncontrolled {},
             }),
             Datum::ExecutionKind(absent!(ExecutionKind, NotCollected)),
             Datum::ProcessorClass(absent!(ProcessorClass, NotCollected)),
-            Datum::LogicalCpuCount(absent!(LogicalCpuCount, NotCollected)),
+            // The parallelism hint is acquired, but it is not a logical CPU
+            // count, so the count stays absent rather than inferred from it.
+            Datum::LogicalCpuCount(absent!(
+                LogicalCpuCount,
+                ParallelismHintIsNotLogicalCpuCount
+            )),
             Datum::MemoryCapacityClass(absent!(MemoryCapacityClass, NotCollected)),
             Datum::PowerThermalPolicy(conditionally_absent!(PowerThermalPolicy, NotCollected)),
             Datum::LanguageRuntime(ConditionalObservation::NotApplicable {
@@ -256,7 +294,10 @@ pub fn native_environment(
             Datum::JitGcConfiguration(ConditionalObservation::NotApplicable {
                 applicability_rule: native_rule(),
             }),
-            Datum::Toolchain(absent!(Toolchain, NotCollected)),
+            Datum::Toolchain(context.toolchain.toolchain()?.map_or_else(
+                || absent!(Toolchain, NativeAcquisitionUnavailable),
+                |value| FieldObservation::Observed { value },
+            )),
             Datum::BuildConfiguration(absent!(BuildConfiguration, EffectiveBuildNotAttested)),
             Datum::Instrumentation(RequiredObservation::Observed {
                 value: Instrumentation {
@@ -390,14 +431,91 @@ mod tests {
                 .unwrap()
                 > 0
         );
-        // A field this harness does not collect says so, with its reason.
-        let family = field("os_family");
-        assert_eq!(family["observation"]["state"]["kind"], "unavailable");
+        // The kernel's family and machine are reported with the method that
+        // read them.
+        for name in ["os_family", "cpu_architecture"] {
+            let observed = field(name);
+            assert_eq!(
+                observed["observation"]["state"]["kind"], "observed",
+                "{name}"
+            );
+            assert_eq!(
+                observed["observation"]["state"]["value"]["method"]["identity"],
+                "posix-uname-controlled-kernel-view"
+            );
+        }
+        // A field this harness does not collect says so, with its reason, and
+        // a hint is not promoted into the field it only resembles.
+        for name in ["os_version", "kernel_build", "logical_cpu_count"] {
+            let absent = field(name);
+            assert_eq!(
+                absent["observation"]["state"]["kind"], "unavailable",
+                "{name}"
+            );
+            assert!(!absent["observation"]["state"]["reasons"]
+                .as_array()
+                .unwrap()
+                .is_empty());
+        }
         // The harness and projection are the owner's own, as registered.
         assert_eq!(
             field("harness")["observation"]["state"]["value"]["identity"],
             LABELS.harness.identity
         );
+    }
+
+    #[test]
+    fn the_toolchain_is_reported_exactly_when_the_build_script_observed_it() {
+        let context = context();
+        let parent = RecordIdentity::fresh(CommonDomain::Record).unwrap();
+        let value =
+            serde_json::to_value(native_environment(&LABELS, &context, &parent).unwrap()).unwrap();
+        let state = |name: &str| {
+            value["fields"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["observation"]["field"] == name)
+                .expect("registered field")["observation"]["state"]["kind"]
+                .clone()
+        };
+        let observed = |acquired: bool| if acquired { "observed" } else { "unavailable" };
+        assert_eq!(
+            state("toolchain"),
+            observed(context.toolchain.toolchain().unwrap().is_some())
+        );
+        assert_eq!(
+            state("target_triple"),
+            observed(context.toolchain.target_triple().unwrap().is_some())
+        );
+    }
+
+    #[test]
+    fn a_projection_changes_with_the_views_it_was_built_from() {
+        // The environment is rebuilt from the retained context, so a kernel
+        // view that was not acquired is reported unavailable, not observed.
+        let mut context = context();
+        context.host.kernel_view = crate::acquisition::Acquired::Unavailable {
+            reason: crate::acquisition::AcquisitionReason::UnsupportedPlatform,
+        };
+        context.toolchain.target = crate::acquisition::Acquired::Unavailable {
+            reason: crate::acquisition::AcquisitionReason::UnsupportedInput,
+        };
+        let parent = RecordIdentity::fresh(CommonDomain::Record).unwrap();
+        let value =
+            serde_json::to_value(native_environment(&LABELS, &context, &parent).unwrap()).unwrap();
+        for name in ["os_family", "cpu_architecture", "target_triple"] {
+            let entry = value["fields"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["observation"]["field"] == name)
+                .unwrap();
+            assert_eq!(
+                entry["observation"]["state"]["kind"], "unavailable",
+                "{name}"
+            );
+        }
     }
 
     #[test]

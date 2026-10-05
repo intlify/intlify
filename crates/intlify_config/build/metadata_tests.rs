@@ -183,52 +183,6 @@ fn symlinked_source_entries_are_not_followed_or_disclosed() {
 }
 
 #[test]
-fn compiler_projection_retains_controlled_fields_without_host_or_path_text() {
-    let output = b"rustc 1.95.0 (ignored)\nbinary: rustc\ncommit-hash: 0123456789abcdef0123456789abcdef01234567\ncommit-date: 2026-01-01\nhost: private-host-name\nrelease: 1.95.0\nLLVM version: 22.1.0\nprivate: /Users/private/repository\n";
-    let result = parse_compiler(output).unwrap();
-    assert_eq!(
-        result,
-        json!({"identity": "rustc", "release": "1.95.0", "commit": "0123456789abcdef0123456789abcdef01234567", "llvm": "22.1.0"})
-    );
-    let text = serde_json::to_string(&result).unwrap();
-    assert!(!text.contains("private"));
-    assert!(!text.contains("Users"));
-    for release in ["1.95.0-nightly", "1.95.0-beta", "1.95.0-dev"] {
-        assert!(compiler_release(release));
-    }
-    let unknown = b"rustc 1.95.0\ncommit-hash: unknown\nrelease: 1.95.0\nLLVM version: 22.1.0\n";
-    assert_eq!(parse_compiler(unknown).unwrap()["commit"], Value::Null);
-    let duplicate = [output.as_slice(), b"release: 1.95.0\n"].concat();
-    assert_eq!(
-        parse_compiler(&duplicate),
-        Err(Failure::CompilerOutputUnsupported)
-    );
-    assert_eq!(
-        parse_compiler(&vec![
-            b'a';
-            usize::try_from(MAX_COMPILER_OUTPUT).unwrap() + 1
-        ]),
-        Err(Failure::CompilerOutputLimit)
-    );
-    for bad in [
-        b"bad compiler".as_slice(),
-        b"rustc 1.95.0\nrelease: private-secret\ncommit-hash: unknown\nLLVM version: 22.0.0\n",
-        &[0xff],
-    ] {
-        let reason = observation(parse_compiler(bad));
-        assert_eq!(
-            reason,
-            json!({"state": "unavailable", "reason": "compiler-output-unsupported"})
-        );
-    }
-    // A wrapper is not silently described as the inner unwrapped compiler.
-    assert_eq!(
-        compiler_snapshot(true),
-        Err(Failure::CompilerWrappersPresent)
-    );
-}
-
-#[test]
 fn cargo_input_whitelists_do_not_echo_unknown_or_missing_environment_values() {
     assert_eq!(
         controlled(Some(OsStr::new("release")), &["debug", "release"]),
