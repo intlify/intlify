@@ -34,6 +34,9 @@ pub enum Expected {
     Complete,
     /// The operation reports why it cannot, which is also measured.
     Blocked,
+    /// The operation stops with an operational failure and no result. The
+    /// cost of refusing an input, such as one past a bound, is also measured.
+    OperationalFailure,
 }
 
 /// A fixture could not be prepared, so its case produced no measurement.
@@ -305,7 +308,7 @@ impl<O: Owner> PreparedRun<O> {
             // A fixture that quietly takes the other path would be measured as
             // the work it names while doing different work, and its samples
             // would still agree with each other. Only its declaration shows it.
-            if expected.complete != (fixture.path() == Expected::Complete) {
+            if expected.path != fixture.path() {
                 return Err(RunFailure::PathMismatch);
             }
             let expectation = Expectation {

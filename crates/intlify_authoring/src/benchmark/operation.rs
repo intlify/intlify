@@ -11,6 +11,7 @@
 use std::cell::RefCell;
 
 use intlify_measurement::owner_run::observation::Observation;
+use intlify_measurement::owner_run::run::Expected;
 use intlify_shared_json::quantity::Quantity;
 use intlify_shared_json::token::{Token, VersionedIdentity};
 use serde::{Deserialize, Serialize};
@@ -139,7 +140,9 @@ pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> O
                 positions: None,
             },
             work: LogicalWork::new([("input_bytes", text.len() as u64), ("emitted_bytes", 0)]),
-            complete: false,
+            // The encoder returned no text at all, rather than a text with a
+            // report about it.
+            path: Expected::OperationalFailure,
         };
     };
     semantic.uint(1);
@@ -161,7 +164,7 @@ pub(super) fn observe_encode(output: &EncodeOutput, input: EncodeInput<'_>) -> O
             ("emitted_bytes", encoded.len() as u64),
             ("extraction_segments", segments.len() as u64),
         ]),
-        complete: true,
+        path: Expected::Complete,
     }
 }
 
@@ -203,7 +206,7 @@ pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> 
                 positions: None,
             },
             work: LogicalWork::new([("operational_failure", 1)]),
-            complete: false,
+            path: Expected::OperationalFailure,
         };
     };
     semantic.uint(1);
@@ -238,7 +241,11 @@ pub(super) fn observe_mf2(output: &Option<MessageAnalysis>, _: Mf2Input<'_>) -> 
         ]),
         // Returning an analysis is not producing facts: a message the parser
         // reported on was understood well enough to be rejected, not to be used.
-        complete: analysis.facts().is_some(),
+        path: if analysis.facts().is_some() {
+            Expected::Complete
+        } else {
+            Expected::Blocked
+        },
     }
 }
 
@@ -276,7 +283,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("operational_failure", 1)]),
-                complete: false,
+                path: Expected::OperationalFailure,
             }
         }
         Some(Err(reported)) => {
@@ -288,7 +295,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("diagnostics", *reported as u64)]),
-                complete: false,
+                path: Expected::Blocked,
             }
         }
         Some(Ok(facts)) => {
@@ -307,7 +314,7 @@ pub(super) fn observe_context(
                     positions: None,
                 },
                 work: LogicalWork::new([("resolved_facts", 4), ("diagnostics", 0)]),
-                complete: true,
+                path: Expected::Complete,
             }
         }
     }
@@ -355,7 +362,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     positions: None,
                 },
                 work: LogicalWork::new([("operational_failure", 1)]),
-                complete: false,
+                path: Expected::OperationalFailure,
             }
         }
         Some(Err(reported)) => {
@@ -367,7 +374,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     positions: None,
                 },
                 work: LogicalWork::new([("diagnostics", *reported as u64)]),
-                complete: false,
+                path: Expected::Blocked,
             }
         }
         Some(Ok((facts, revision))) => {
@@ -394,7 +401,7 @@ pub(super) fn observe_facts(output: &FactsOutput, _: FactsInput<'_>) -> Observed
                     ("mf2_bytes", facts.mf2_source().len() as u64),
                     ("extraction_segments", facts.extraction_map().len() as u64),
                 ]),
-                complete: true,
+                path: Expected::Complete,
             }
         }
     }

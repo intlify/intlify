@@ -353,11 +353,7 @@ pub(super) fn prepare(fixture: Fixture) -> Result<Prepared, PreparationFailure> 
 /// Report which path a prepared case takes, from its established expectation.
 #[cfg(test)]
 pub(super) fn path_of(prepared: &Prepared) -> Expected {
-    if prepared.expected().complete {
-        Expected::Complete
-    } else {
-        Expected::Blocked
-    }
+    prepared.expected().path
 }
 
 /// Invoke one prepared case once, outside measurement, and observe it.
