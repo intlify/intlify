@@ -15,13 +15,15 @@
 
 use intlify_measurement::execution::Execution;
 use intlify_measurement::measurement::{Aggregation, Category, Metric, OperationClass, Surface};
-use intlify_measurement::plan::{CaseProjection as CommonProjection, Subject, SubjectKind};
+use intlify_measurement::owner_run::run::{subject, Expected};
+use intlify_measurement::plan::{CaseProjection as CommonProjection, Subject};
 use intlify_shared_json::token::{Token, VersionedIdentity};
 use serde::{Deserialize, Serialize};
 
-use super::cases::{Expected, Prepared};
+use super::cases::Prepared;
 use super::descriptor::{execution_state, Boundary, Method};
 use super::operation::LogicalWork;
+use super::owner::AuthoringSemantics;
 
 macro_rules! literal {
     ($name:ident, $value:literal, $doc:literal) => {
@@ -64,23 +66,16 @@ pub(super) struct Variant {
     expected: Expected,
 }
 
-/// What exactly this owner measures.
-pub(super) fn subject() -> Subject {
-    Subject {
-        kind: SubjectKind::Value,
-        identity: Token::literal("intlify-authoring-phase1-semantics"),
-    }
-}
-
-/// The measurement profile this owner runs under.
-pub(super) fn profile() -> VersionedIdentity {
-    VersionedIdentity::literal("intlify-authoring-minimum-smoke", "0")
-}
+/// The revision of the owner result schema a case is recorded under.
+///
+/// It is the revision the result codec names, so a case recorded in another
+/// result schema is a different case.
+const RESULT_SCHEMA_REVISION: &str = "2";
 
 /// The complete projection of one measured case.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct CaseProjection {
+pub struct CaseProjection {
     owner_identity: Token,
     owner_result_schema_revision: Token,
     owner_benchmark_profile_revision: Token,
@@ -123,7 +118,7 @@ impl CaseProjection {
         let operation = prepared.fixture.operation;
         Self {
             owner_identity: Token::literal("intlify-authoring"),
-            owner_result_schema_revision: Token::literal("1"),
+            owner_result_schema_revision: Token::literal(RESULT_SCHEMA_REVISION),
             owner_benchmark_profile_revision: Token::literal("0"),
             owner_phase: operation.phase().into(),
             owner_cost: operation.cost().into(),
@@ -137,7 +132,7 @@ impl CaseProjection {
                 expected: prepared.fixture.expected,
             },
             scale: Scale::Value,
-            verification_subject: subject(),
+            verification_subject: subject::<AuthoringSemantics>(),
             execution_model: ExecutionModel::Value,
             execution_state: execution_state(operation),
             concurrency: Concurrency::Value,
@@ -176,6 +171,18 @@ mod tests {
             let second = case_identity(&CaseProjection::of(&prepare(fixture).unwrap())).unwrap();
             assert_eq!(first, second, "{}", fixture.name);
         }
+    }
+
+    #[test]
+    fn the_projection_names_the_result_schema_revision_the_run_records() {
+        let codec = super::super::owner::LABELS.result_codec;
+        assert_eq!(
+            codec.rsplit_once('/').map(|(_, revision)| revision),
+            Some(RESULT_SCHEMA_REVISION)
+        );
+        let prepared = prepare(FIXTURES[0]).unwrap();
+        let value = serde_json::to_value(CaseProjection::of(&prepared)).unwrap();
+        assert_eq!(value["ownerResultSchemaRevision"], RESULT_SCHEMA_REVISION);
     }
 
     #[test]

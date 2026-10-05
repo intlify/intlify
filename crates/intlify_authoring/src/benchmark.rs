@@ -3,10 +3,10 @@
 
 //! Observational measurement of this crate's own operations.
 //!
-//! The records, their admission, and the duration acquisition belong to
-//! `intlify_measurement`. What lives here is what only this owner knows: which
-//! operations are measured, which fixtures they run against, what counts as
-//! the same result, and how each planned case turned out.
+//! The records, their admission, the duration acquisition, and the owner run
+//! that captures and seals them belong to `intlify_measurement`. What lives
+//! here is what only this owner knows: which operations are measured, which
+//! fixtures they run against, and what counts as the same result.
 //!
 //! The harness calls the ordinary internal operations. It does not reimplement
 //! any of them for measurement, and nothing it observes is derived from a
@@ -14,12 +14,8 @@
 
 pub mod facade;
 
-mod adapter;
-mod capture;
 mod cases;
-mod context;
 mod descriptor;
-mod observation;
 mod operation;
+mod owner;
 mod projection;
-mod run;

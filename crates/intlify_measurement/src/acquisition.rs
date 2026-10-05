@@ -13,8 +13,14 @@
 //! destruction are outside it. The output black box and the preserved
 //! invocation are inside it and are declared rather than subtracted.
 //!
+//! The host and toolchain views a run is acquired with are read here too, once
+//! for every owner, so two owners never describe the same machine differently.
+//!
 //! This module is compiled only under the non-default `acquisition` feature:
 //! reading a clock is not part of reading a record.
+
+pub mod host;
+pub mod toolchain;
 
 use std::hint::black_box;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -22,6 +28,36 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use intlify_shared_json::quantity::Quantity;
 
 use crate::environment::ClockObservation;
+
+/// Why one host or toolchain view could not be acquired.
+///
+/// The cause is all that is kept: the rejected value, an error object, or a
+/// path never travels with it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AcquisitionReason {
+    UnsupportedPlatform,
+    UnsupportedSystemIdentifier,
+    UnsupportedArchitecture,
+    UnsupportedKernelRelease,
+    ParallelismQueryFailed,
+    InvalidParallelism,
+    QuantityOverflow,
+    MissingInput,
+    UnsupportedInput,
+    CompilerInvocationFailed,
+    CompilerOutputUnsupported,
+    CompilerOutputLimit,
+    CompilerWrappersPresent,
+}
+
+/// One acquired view, or why it is absent.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum Acquired<T> {
+    Observed { value: T },
+    Unavailable { reason: AcquisitionReason },
+}
 
 /// Complete failure to read a clock or convert an interval.
 ///

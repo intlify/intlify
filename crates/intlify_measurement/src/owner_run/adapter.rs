@@ -1,50 +1,44 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! This owner's answers to the common pipeline.
+//! An owner run's answers to the common pipeline.
 //!
 //! The pipeline asks four things: what was planned, whether a submitted
 //! document is the one this run issued, how each planned case turned out, and
-//! what the measured cases project to. Everything else — the record shapes,
-//! the reason vocabulary, admission — belongs to `intlify_measurement`.
+//! what the measured cases project to. A recorded run answers all four from
+//! what it retained; the owner contributes only its labels, its projections,
+//! its descriptors, and its environment.
 
-use intlify_measurement::acquisition::{ClockFailure, MeasurementFailure};
-use intlify_measurement::identity::{
-    CaseIdentity, NativeChecksum, OwnerLabel, OwnerRecordIdentity, RecordIdentity, Token,
-    VersionedIdentity,
-};
-use intlify_measurement::measurement::{
-    ChecksumMethod, ExpectedOwner, MeasuredCase as CommonCase, OwnerBinding, OwnerResultFacts,
-    RunBinding, SampleDomains, SampleFacts, SamplingFacts,
-};
-use intlify_measurement::owner::{
-    CaseOutcome, OwnerEvidenceBody, OwnerFailure, OwnerRun, Rejection,
-};
-use intlify_measurement::plan::RunPlanRecord;
-use intlify_measurement::reason::InvocationFailure;
-use intlify_measurement::record::Reference;
 use intlify_shared_json::quantity::Quantity;
 
 use super::capture::CaptureFailure;
-use super::context::projection;
-use super::descriptor::Descriptors;
-use super::observation::Observation;
-use super::projection::CaseProjection;
 use super::run::{
-    producing_tool, AttemptResult, CheckedOwnerRecord, OwnerRecord, RecordedRun, RunIssue,
-    RESULT_CODEC,
+    producing_tool, AttemptResult, CheckedOwnerRecord, RecordOf, RecordedRun, RunIssue,
 };
+use super::Owner;
+use crate::acquisition::{ClockFailure, MeasurementFailure};
+use crate::identity::{
+    NativeChecksum, OwnerLabel, OwnerRecordIdentity, RecordIdentity, Token, VersionedIdentity,
+};
+use crate::measurement::{
+    owner_attempt_reference, CaseEvidence, ChecksumMethod, ExpectedOwner, MeasuredCase,
+    OwnerBinding, OwnerResultFacts, RunBinding, SampleDomains, SampleFacts, SamplingFacts,
+};
+use crate::owner::{CaseOutcome, OwnerEvidenceBody, OwnerFailure, OwnerRun, Rejection};
+use crate::plan::RunPlanRecord;
+use crate::reason::InvocationFailure;
+use crate::record::Reference;
 
-/// How this owner computes every checksum it records.
-fn method() -> ChecksumMethod {
+/// How an owner computes every checksum it records.
+fn method<O: Owner>() -> ChecksumMethod {
     ChecksumMethod {
-        owner_identity: Token::literal("intlify-authoring"),
+        owner_identity: Token::literal(O::LABELS.owner),
         algorithm: OwnerLabel::literal("blake3-256"),
-        framing: OwnerLabel::literal("intlify-authoring-minimum-observation/0"),
+        framing: OwnerLabel::literal(O::LABELS.framing.label()),
     }
 }
 
-/// The digest domains this owner separates inside one measured case.
+/// The digest domains the capture separates inside one measured case.
 fn domains() -> SampleDomains {
     SampleDomains {
         semantic: OwnerLabel::literal("observation"),
@@ -52,8 +46,8 @@ fn domains() -> SampleDomains {
     }
 }
 
-fn result_schema() -> OwnerLabel {
-    OwnerLabel::literal(RESULT_CODEC)
+fn result_schema<O: Owner>() -> OwnerLabel {
+    OwnerLabel::literal(O::LABELS.result_codec)
 }
 
 fn failed_invocation(failure: MeasurementFailure) -> InvocationFailure {
@@ -67,38 +61,38 @@ fn failed_invocation(failure: MeasurementFailure) -> InvocationFailure {
     }
 }
 
-impl OwnerRun for RecordedRun {
-    type Projection = CaseProjection;
-    type Descriptors = Descriptors;
-    type Observation = Observation;
-    type Admitted = CheckedOwnerRecord;
+impl<O: Owner> OwnerRun for RecordedRun<O> {
+    type Projection = O::Projection;
+    type Descriptors = O::Descriptors;
+    type Observation = super::observation::Observation;
+    type Admitted = CheckedOwnerRecord<O>;
 
     fn plan(&self) -> &RunPlanRecord {
         self.plan_record()
     }
 
-    fn projections(&self) -> &[CaseProjection] {
+    fn projections(&self) -> &[O::Projection] {
         self.common_plan().projections()
     }
 
     fn expected(&self) -> ExpectedOwner {
         ExpectedOwner::new(
             self.expected_owner_identity().clone(),
-            result_schema(),
+            result_schema::<O>(),
             self.plan_record().body.measurement_profile.clone(),
         )
     }
 
     fn producing_tool(&self) -> VersionedIdentity {
-        producing_tool()
+        producing_tool::<O>()
     }
 
     fn encode(&self) -> Result<Vec<u8>, OwnerFailure> {
         Self::encode(self).map_err(|_| OwnerFailure)
     }
 
-    fn admit(&self, bytes: &[u8]) -> Result<CheckedOwnerRecord, Rejection> {
-        let Ok(value) = intlify_measurement::decode::value(bytes, false) else {
+    fn admit(&self, bytes: &[u8]) -> Result<CheckedOwnerRecord<O>, Rejection> {
+        let Ok(value) = crate::decode::value(bytes, false) else {
             return Err(Rejection::Unreadable);
         };
         // The exact tuple is selected before the body is strictly typed, so a
@@ -107,11 +101,11 @@ impl OwnerRun for RecordedRun {
             .pointer("/result/codec")
             .and_then(serde_json::Value::as_str)
         {
-            Some(RESULT_CODEC) => {}
+            Some(codec) if codec == O::LABELS.result_codec => {}
             Some(_) => return Err(Rejection::UnsupportedCodec),
             None => return Err(Rejection::Unreadable),
         }
-        let Ok(document) = intlify_measurement::decode::typed::<OwnerRecord>(value) else {
+        let Ok(document) = crate::decode::typed::<RecordOf<O>>(value) else {
             return Err(Rejection::Unreadable);
         };
         let submitted = document.result().record_identity.clone();
@@ -129,11 +123,11 @@ impl OwnerRun for RecordedRun {
         }
     }
 
-    fn result_identity<'a>(&self, admitted: &'a CheckedOwnerRecord) -> &'a OwnerRecordIdentity {
+    fn result_identity<'a>(&self, admitted: &'a CheckedOwnerRecord<O>) -> &'a OwnerRecordIdentity {
         &admitted.document().result().record_identity
     }
 
-    fn outcomes(&self, admitted: &CheckedOwnerRecord) -> Vec<CaseOutcome> {
+    fn outcomes(&self, admitted: &CheckedOwnerRecord<O>) -> Vec<CaseOutcome> {
         admitted
             .document()
             .result()
@@ -160,9 +154,10 @@ impl OwnerRun for RecordedRun {
 
     fn evidence(
         &self,
-        admitted: &CheckedOwnerRecord,
+        admitted: &CheckedOwnerRecord<O>,
         parent: &RecordIdentity,
     ) -> Result<Option<OwnerEvidenceBody<Self>>, OwnerFailure> {
+        let labels = O::LABELS;
         let document = admitted.document();
         let result = document.result();
         let plan = self.plan_record();
@@ -178,13 +173,13 @@ impl OwnerRun for RecordedRun {
             };
             let sampling = &result.context.sampling;
             cases.push(
-                intlify_measurement::measurement::CaseEvidence::project(
-                    &method(),
+                CaseEvidence::project(
+                    &method::<O>(),
                     &domains(),
                     &result.record_identity,
                     &planned.case_identity,
                     projection.clone(),
-                    CommonCase {
+                    MeasuredCase {
                         ordinal: attempt.ordinal,
                         descriptors: measured.descriptors.clone(),
                         sampling: SamplingFacts {
@@ -206,7 +201,7 @@ impl OwnerRun for RecordedRun {
                                 aggregate_quantity: sample.aggregate_nanoseconds,
                                 semantic_observation: sample.semantic_observation,
                                 semantic_identity: NativeChecksum::from_bytes(
-                                    sample.semantic_observation.identity().bytes(),
+                                    sample.semantic_observation.identity(labels.framing).bytes(),
                                 ),
                                 execution_identity: NativeChecksum::from_bytes(
                                     sample.execution_identity.bytes(),
@@ -227,10 +222,10 @@ impl OwnerRun for RecordedRun {
         let context = self.context();
         Ok(Some(OwnerEvidenceBody::<Self> {
             binding: RunBinding::from_plan(plan),
-            projection: projection(),
+            projection: labels.projection.versioned(),
             owner_result: OwnerBinding::new(OwnerResultFacts {
-                method: method(),
-                result_schema: result_schema(),
+                method: method::<O>(),
+                result_schema: result_schema::<O>(),
                 benchmark_profile: context.profile.clone(),
                 result_identity: result.record_identity.clone(),
                 domain: OwnerLabel::literal("owner-run-result"),
@@ -240,25 +235,50 @@ impl OwnerRun for RecordedRun {
                 .build
                 .build(parent, context.profile.clone())
                 .map_err(|_| OwnerFailure)?,
-            environment: super::context::environment(context, parent).map_err(|_| OwnerFailure)?,
+            environment: O::environment(context, parent).map_err(|_| OwnerFailure)?,
             cases,
         }))
     }
 
     fn attempt_reference(
         &self,
-        admitted: &CheckedOwnerRecord,
+        admitted: &CheckedOwnerRecord<O>,
         ordinal: Quantity,
     ) -> Result<Reference, OwnerFailure> {
-        intlify_measurement::measurement::owner_attempt_reference(
-            &admitted.document().result().record_identity,
-            ordinal,
-        )
-        .map_err(|_| OwnerFailure)
+        owner_attempt_reference(&admitted.document().result().record_identity, ordinal)
+            .map_err(|_| OwnerFailure)
     }
 }
 
-// The case identity is the common plan's, so this alias only documents that
-// the adapter never mints one of its own.
-#[allow(dead_code)]
-type PlannedCaseIdentity = CaseIdentity;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_failed_measurement_keeps_its_common_cause() {
+        for (failure, cause) in [
+            (
+                MeasurementFailure::Clock(ClockFailure::DurationConversionOverflow),
+                InvocationFailure::DurationConversionOverflow,
+            ),
+            (
+                MeasurementFailure::Clock(ClockFailure::ReversedClock),
+                InvocationFailure::ClockFailure,
+            ),
+            (
+                MeasurementFailure::Clock(ClockFailure::UnsupportedPlatform),
+                InvocationFailure::ClockFailure,
+            ),
+            (
+                MeasurementFailure::InvocationPanicked,
+                InvocationFailure::InvocationPanicked,
+            ),
+            (
+                MeasurementFailure::PrerequisiteUnavailable,
+                InvocationFailure::PrerequisiteUnavailable,
+            ),
+        ] {
+            assert_eq!(failed_invocation(failure), cause, "{failure:?}");
+        }
+    }
+}

@@ -529,8 +529,6 @@ dependencies = [
 name = "intlify_authoring"
 version = "0.14.0-alpha.12"
 dependencies = [
- "blake3",
- "getrandom 0.4.3",
  "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
@@ -593,7 +591,6 @@ dependencies = [
  "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
- "rustix",
  "schemars",
  "serde",
  "serde_json",
@@ -661,6 +658,7 @@ dependencies = [
 name = "intlify_measurement"
 version = "0.14.0-alpha.12"
 dependencies = [
+ "blake3",
  "getrandom 0.4.3",
  "intlify_shared_json",
  "jsonschema",

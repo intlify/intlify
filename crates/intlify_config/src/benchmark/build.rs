@@ -6,6 +6,8 @@
 //! common Build Identity, or 017 digest. Cargo inputs are not automatically the
 //! effective compiler/linker configuration. Missing attestations stay explicit.
 
+use intlify_measurement::acquisition::toolchain::{Compiler, ToolchainView};
+use intlify_measurement::acquisition::Acquired;
 use serde::{Deserialize, Serialize};
 
 use super::observation::{Digest, Frame};
@@ -24,10 +26,6 @@ pub(super) enum AcquisitionReason {
     UnsupportedSourceEntry,
     InvalidSourcePath,
     SourceChanged,
-    CompilerInvocationFailed,
-    CompilerOutputUnsupported,
-    CompilerOutputLimit,
-    CompilerWrappersPresent,
     EffectiveInvocationNotAttested,
     ExecutedImageNotAttested,
 }
@@ -67,16 +65,6 @@ pub(super) struct LockSnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Compiler {
-    pub(super) identity: String,
-    pub(super) release: String,
-    #[serde(deserialize_with = "Option::deserialize")]
-    pub(super) commit: Option<String>,
-    pub(super) llvm: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CargoInputs {
     pub(super) profile: Acquisition<String>,
     pub(super) optimization: Acquisition<String>,
@@ -110,7 +98,9 @@ pub(super) struct BuildObservation {
     pub(super) package: Package,
     pub(super) source: Acquisition<SourceSnapshot>,
     pub(super) dependency_lock: Acquisition<LockSnapshot>,
-    pub(super) compiler: Acquisition<Compiler>,
+    // The compiler is the shared toolchain acquisition's: the one compiler that
+    // built this crate built every owner in the same Cargo invocation.
+    pub(super) compiler: Acquired<Compiler>,
     pub(super) cargo_inputs: CargoInputs,
     pub(super) effective_configuration: Unattested,
     pub(super) executable: Unattested,
@@ -146,18 +136,23 @@ impl ObservedBuild {
             .as_object_mut()
             .ok_or(BuildIssue::MalformedEmbeddedObservation)?;
         // Execution facts come from the actual linked library, not build.rs's
-        // host/optimization context. Do not overwrite an unexpected input field.
-        if fields
-            .insert(
-                "execution".into(),
+        // host/optimization context, and the compiler from the shared
+        // toolchain acquisition. Do not overwrite an unexpected input field.
+        let compiler = serde_json::to_value(ToolchainView::acquire().compiler)
+            .map_err(|_| BuildIssue::Encoding)?;
+        for (name, value) in [
+            ("compiler", compiler),
+            (
+                "execution",
                 serde_json::json!({
                     "debugAssertions": cfg!(debug_assertions),
                     "pointerWidthBits": usize::BITS.to_string(),
                 }),
-            )
-            .is_some()
-        {
-            return Err(BuildIssue::MalformedEmbeddedObservation);
+            ),
+        ] {
+            if fields.insert(name.into(), value).is_some() {
+                return Err(BuildIssue::MalformedEmbeddedObservation);
+            }
         }
         let document: BuildObservation =
             serde_json::from_value(value).map_err(|_| BuildIssue::MalformedEmbeddedObservation)?;

@@ -12,9 +12,14 @@ workspace = true
 
 [features]
 default = []
-# Reading a clock is not part of reading a record, so ordinary consumers of
-# these records never pull in a system time API.
+# Reading a clock, the kernel, or the compiler is not part of reading a record,
+# so ordinary consumers of these records never pull in a system API or run the
+# build script's compiler query.
 acquisition = ["dep:rustix"]
+# The scaffolding an observing owner runs on: capture, its own sealed record,
+# the adapter onto the common pipeline, and the smoke runner. It reads a clock,
+# so it needs acquisition, and it frames native checksums with blake3.
+owner-run = ["acquisition", "dep:blake3"]
 
 [dependencies]
 # 017 token grammars, exact quantities, canonical framing, domain-separated
@@ -29,10 +34,14 @@ serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve
 # clock and system views that are POSIX-only stay with the owner that acquires
 # them.
 getrandom = { version = "=0.4.3" }
+# The owner-run native checksum algorithm. Every owner frames its own values
+# under its own label, so one algorithm does not make two owners' checksums
+# comparable.
+blake3 = { version = "=1.8.7", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
-# Locked safe clock APIs, for duration acquisition only.
-rustix = { version = "=1.1.5", features = ["time"], optional = true }
+# Locked safe clock and kernel-view APIs, for acquisition only.
+rustix = { version = "=1.1.5", features = ["system", "time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.

@@ -20,6 +20,8 @@ use crate::primitives::{
     ByteRange, Occurrence, OccurrenceRole, OwnerIdentity, OwnerKind, SourceSnapshot,
 };
 use crate::workspace::AnalysisWorkspace;
+use intlify_measurement::owner_run::run::{Expected, PreparationFailure};
+use intlify_measurement::owner_run::Case;
 use intlify_shared_json::token::VersionedIdentity;
 
 use super::operation::{Observed, Operation};
@@ -33,25 +35,9 @@ pub(super) enum Input {
     Mf2(&'static str),
 }
 
-/// Which path a fixture is declared to take.
-///
-/// A fixture states its expected result, so a change that silently moves it
-/// onto another path — a fast failure instead of the work it claims to
-/// measure — fails a test rather than producing plausible samples.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "kebab-case")]
-pub(super) enum Expected {
-    /// The operation produces its complete result.
-    Complete,
-    /// The operation reports why it cannot, which is also measured.
-    Blocked,
-}
-
 /// One fixed case this owner measures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Fixture {
+pub struct Fixture {
     pub(super) operation: Operation,
     pub(super) name: &'static str,
     pub(super) input: Input,
@@ -63,6 +49,15 @@ pub(super) struct Fixture {
     pub(super) parameters: &'static [&'static str],
     /// The path this fixture is declared to take.
     pub(super) expected: Expected,
+}
+
+impl Case for Fixture {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn path(&self) -> Expected {
+        self.expected
+    }
 }
 
 const fn message(
@@ -258,18 +253,8 @@ fn occurrence() -> Result<Occurrence, PreparationFailure> {
     .map_err(|_| PreparationFailure::Fixture)
 }
 
-/// A fixture could not be prepared, so its case produced no measurement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub(super) enum PreparationFailure {
-    /// The fixed inputs this harness declares are not themselves admissible.
-    Fixture,
-    /// The prior stage a measured boundary starts from did not complete.
-    PriorStage,
-}
-
 /// Everything one case needs, prepared before any interval opens.
-pub(super) struct Prepared {
+pub struct Prepared {
     pub(super) fixture: Fixture,
     pub(super) limits: AuthoringLimits,
     pub(super) occurrence: Occurrence,
