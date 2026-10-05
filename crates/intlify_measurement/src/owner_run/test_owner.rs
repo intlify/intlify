@@ -368,9 +368,10 @@ mod tests {
         // selected, and the records that claim one resolved are refused.
         let observation = observe_smoke::<Sound>().unwrap();
         let owner = observation.owner_document();
-        assert!(observation
-            .validate(&[owner, owner], &common(&observation))
-            .is_err());
+        assert_eq!(
+            observation.validate(&[owner, owner], &common(&observation)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
     }
 
     #[test]
@@ -385,9 +386,10 @@ mod tests {
             second.run().plan_record().body.case_inventory,
             "the two runs plan the same cases"
         );
-        assert!(first
-            .validate(&[second.owner_document()], &common(&first))
-            .is_err());
+        assert_eq!(
+            first.validate(&[second.owner_document()], &common(&first)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
         assert!(matches!(
             OwnerRun::admit(first.run(), second.owner_document()),
             Err(crate::owner::Rejection::Binding(Some(_)))
@@ -417,7 +419,10 @@ mod tests {
     #[test]
     fn no_owner_document_at_all_is_not_a_complete_run() {
         let observation = observe_smoke::<Sound>().unwrap();
-        assert!(observation.validate(&[], &common(&observation)).is_err());
+        assert_eq!(
+            observation.validate(&[], &common(&observation)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
     }
 
     #[test]

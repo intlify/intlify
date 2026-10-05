@@ -33,6 +33,8 @@
 //! phases supply.
 
 mod analysis;
+#[cfg(feature = "benchmark")]
+pub mod benchmark;
 mod binding;
 mod cooked;
 pub mod detail;

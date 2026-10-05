@@ -117,6 +117,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run bench:authoring:smoke
 
+      - name: Validate source discovery observation records
+        if: runner.os == 'Linux'
+        run: vp run bench:authoring-js:smoke
+
       - name: Validate authoring schemas and independent vectors
         if: runner.os == 'Linux'
         run: vp run schema:authoring:check && vp run vectors:authoring:check

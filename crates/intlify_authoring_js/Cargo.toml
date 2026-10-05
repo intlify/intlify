@@ -10,6 +10,20 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+default = []
+# Observational measurement of source discovery and inventory assembly,
+# excluded from ordinary Producer consumers. It enables the shared crate's
+# test context because the only context this phase admits is the test-owned
+# one: what is measured is the real analysis, and the owner record says where
+# its inputs came from.
+benchmark = [
+  "dep:intlify_measurement",
+  "dep:schemars",
+  "dep:serde",
+  "intlify_authoring/test-context"
+]
+
 [dependencies]
 # Every meaning is decided there: this crate reads host syntax and hands the
 # decoded result over, so it never re-derives what a message is.
@@ -30,6 +44,12 @@ oxc_diagnostics = "=0.141.0"
 oxc_parser = "=0.141.0"
 oxc_semantic = "=0.141.0"
 oxc_span = "=0.141.0"
+# The owner-neutral 026 records and the owner run that captures and seals them,
+# with the derives this owner's own record fragments need. Ordinary consumers
+# never build any of them.
+intlify_measurement = { path = "../intlify_measurement", features = ["owner-run"], optional = true }
+schemars = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 # The only context this phase admits is the explicitly test-owned one. Enabling
@@ -38,3 +58,10 @@ intlify_authoring = { path = "../intlify_authoring", features = ["test-context"]
 # Fixtures name their bytes by digest, as a caller would.
 intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
 serde = { version = "1", features = ["derive"] }
+tempfile = "3"
+
+[[bench]]
+name = "authoring_js_discovery"
+harness = false
+test = false
+required-features = ["benchmark"]
