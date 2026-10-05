@@ -72,6 +72,25 @@ const FIXTURES: [Fixture; 3] = [
     },
 ];
 
+/// The same fixtures, except that the empty text is declared to complete.
+const MISDECLARED_FIXTURES: [Fixture; 3] = [
+    Fixture {
+        name: "ascii",
+        text: "Pay now",
+        path: Expected::Complete,
+    },
+    Fixture {
+        name: "multibyte",
+        text: "日本語",
+        path: Expected::Complete,
+    },
+    Fixture {
+        name: "empty",
+        text: "",
+        path: Expected::Complete,
+    },
+];
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Work {
@@ -168,6 +187,8 @@ pub(super) const UNPREPARED: u8 = 1;
 pub(super) const DRIFTING: u8 = 2;
 /// Every measured invocation fails, so no case has a sample.
 pub(super) const FAILING: u8 = 3;
+/// A fixture declares the path it does not take.
+pub(super) const MISDECLARED: u8 = 4;
 
 pub(super) struct TestOwner<const MODE: u8>;
 
@@ -186,7 +207,11 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
     type Work = Work;
 
     fn fixtures() -> &'static [Fixture] {
-        &FIXTURES
+        if MODE == MISDECLARED {
+            &MISDECLARED_FIXTURES
+        } else {
+            &FIXTURES
+        }
     }
 
     fn prepare(fixture: Fixture) -> Result<Prepared, PreparationFailure> {
@@ -464,6 +489,18 @@ mod tests {
             PreparedRun::<TestOwner<UNPREPARED>>::acquire().err(),
             Some(RunFailure::Plan(PlanFailure::InvalidRecord))
         );
+    }
+
+    #[test]
+    fn a_fixture_that_takes_another_path_than_it_declares_is_never_planned() {
+        // The empty text reports why it cannot count, which is the blocked
+        // path. Declared complete, it would be planned as counting work it
+        // never does, so the run stops before issuing the Plan.
+        assert_eq!(
+            PreparedRun::<TestOwner<MISDECLARED>>::acquire().err(),
+            Some(RunFailure::PathMismatch)
+        );
+        assert!(PreparedRun::<Sound>::acquire().is_ok());
     }
 
     #[test]

@@ -177,6 +177,8 @@ type AttemptOf<O> = CaseAttempt<<O as Owner>::Descriptors, <O as Owner>::Work>;
 pub enum RunFailure {
     ClockUnavailable,
     EntropyUnavailable,
+    /// A fixture's expectation takes the other path than the one it declares.
+    PathMismatch,
     Plan(PlanFailure),
     Encoding,
     SizeLimit,
@@ -300,6 +302,12 @@ impl<O: Owner> PreparedRun<O> {
             };
             let projection = O::project(ready);
             let expected = O::expected(ready);
+            // A fixture that quietly takes the other path would be measured as
+            // the work it names while doing different work, and its samples
+            // would still agree with each other. Only its declaration shows it.
+            if expected.complete != (fixture.path() == Expected::Complete) {
+                return Err(RunFailure::PathMismatch);
+            }
             let expectation = Expectation {
                 fixture: fixture.name().into(),
                 path: fixture.path(),
