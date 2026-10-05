@@ -287,6 +287,10 @@ fn proof_steps_are_bounded_exactly_and_an_unfinished_proof_proves_nothing() {
         .expect("some bound finishes the proof");
     assert!(steps > 0);
     assert_eq!(diagnostics(&within(steps)), []);
+    // The analysis reports the steps the proof took, which is exactly the
+    // smallest bound it finishes under. Running out does not stop the count.
+    assert_eq!(within(4096).work().proof_steps, steps);
+    assert_eq!(within(steps - 1).work().proof_steps, steps);
     assert_eq!(
         diagnostics(&within(steps - 1)),
         [expect(

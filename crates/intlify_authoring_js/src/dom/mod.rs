@@ -50,6 +50,8 @@ pub(crate) struct Found {
     pub(crate) uses: Vec<Used>,
     /// Literal `textContent` assignments to receivers with no known origin.
     pub(crate) outside_profile: u64,
+    /// Steps every function's proof took, together.
+    pub(crate) proof_steps: u64,
 }
 
 /// Recognize the proven `textContent` sinks of one accepted unit.
@@ -87,6 +89,7 @@ where
 
     let mut found = Found {
         outside_profile: survey.outside_profile,
+        proof_steps: verdicts.values().map(|verdict| verdict.steps).sum(),
         ..Found::default()
     };
     for candidate in &survey.candidates {
@@ -508,6 +511,7 @@ mod tests {
         let verdict = |valid, exhausted| Verdict {
             valid: BTreeMap::from([((1, 5), valid)]),
             exhausted,
+            steps: 1,
         };
         let proven = |receiver, verdicts: &BTreeMap<Key, Verdict>| {
             evidence(&survey, &candidate(receiver), &BTreeSet::new(), verdicts)
