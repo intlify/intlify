@@ -205,7 +205,10 @@ pub enum ReadFailure {
     /// A registered kind read as another is reported here too, rather than as
     /// a malformed body.
     Unsupported,
-    /// The value is not the closed shape of the requested kind.
+    /// The value is not the closed shape of the requested kind, or its
+    /// integrity preimage cannot be built or encoded under the shared
+    /// encoding's limits. Either way the digest cannot be checked, which is
+    /// different from a digest that was checked and does not match.
     Shape,
     /// The stored digest is not the digest of the stored content.
     Integrity,

@@ -51,7 +51,8 @@ pub enum AdmissionFailure {
     /// implements. A registered kind this reader does not implement yet is
     /// reported here too, rather than as a malformed body.
     Unsupported,
-    /// The value is not the closed shape of this artifact.
+    /// The value is not the closed shape of this artifact, or its integrity
+    /// preimage cannot be built or encoded under the shared encoding's limits.
     Shape,
     /// The stored digest is not the digest of the stored content.
     Integrity,
