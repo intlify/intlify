@@ -157,9 +157,9 @@ impl Method {
             metric: "wall_duration".into(),
             canonical_unit: "nanosecond".into(),
             provider: "rustix".into(),
-            // The clock description the shared acquisition records names the
-            // same revision, and the two have to agree.
-            provider_revision: "1.1.4".into(),
+            // The revision the clock is read through, as the shared
+            // acquisition records it beside every reading.
+            provider_revision: intlify_measurement::acquisition::PROVIDER_REVISION.into(),
             clock: "posix-clock-monotonic".into(),
             observation_domain: "owner-boundary-complete-operation-invocation".into(),
             excluded_domain: "ordered-owner-boundary-excluded-markers".into(),

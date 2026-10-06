@@ -174,7 +174,7 @@ impl KernelView {
         Acquired::Observed {
             value: Self {
                 provider: "rustix".into(),
-                provider_revision: "1.1.4".into(),
+                provider_revision: super::PROVIDER_REVISION.into(),
                 method: "uname-controlled-kernel-view".into(),
                 family: kernel_family(uname.sysname().to_bytes()),
                 machine: architecture(uname.machine().to_bytes()),
@@ -402,7 +402,7 @@ mod tests {
         let observed = |family, machine| Acquired::Observed {
             value: KernelView {
                 provider: "rustix".into(),
-                provider_revision: "1.1.4".into(),
+                provider_revision: crate::acquisition::PROVIDER_REVISION.into(),
                 method: "uname-controlled-kernel-view".into(),
                 family,
                 machine,

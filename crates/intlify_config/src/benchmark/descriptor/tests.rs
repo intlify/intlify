@@ -20,7 +20,7 @@ fn prepared(operation: Operation) -> Prepared {
 fn clock(resolution: u64) -> ClockDescription {
     ClockDescription {
         provider: "rustix",
-        provider_revision: "1.1.4",
+        provider_revision: intlify_measurement::acquisition::PROVIDER_REVISION,
         clock: "posix-clock-monotonic",
         resolution_nanoseconds: Quantity::new(resolution),
         resolution_source: "clock-getres-reported-granularity",
