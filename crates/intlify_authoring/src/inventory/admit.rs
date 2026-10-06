@@ -17,15 +17,12 @@
 
 use std::collections::BTreeSet;
 
-use intlify_shared_json::decode::{self, DecodeFailure};
+use intlify_shared_json::decode::DecodeFailure;
 use intlify_shared_json::token::Token;
-use serde_json::Value;
 
-use super::artifact::{
-    ArtifactKind, AuthoringArtifactReference, InventoryArtifact, ARTIFACT_SCHEMA_REVISION,
-    AUTHORING_SPECIFICATION_IDENTITY, AUTHORING_SPECIFICATION_REVISION,
-};
+use super::artifact::InventoryArtifact;
 use super::model::{AuthoringInventory, InventoryFailure, UnitOutcome};
+use crate::artifact::{read_sealed, AuthoringArtifactReference, ReadFailure};
 use crate::context::{AuthoringContext, CanonicalLocale, ContextKind, LocaleFailure};
 use crate::declaration::{
     compare_parameters, DeclarationFacts, ParameterBinding, SourceLocaleBasis,
@@ -84,6 +81,17 @@ pub enum AdmissionFailure {
     Limit(LimitKind),
     /// Re-analysis of a retained message failed operationally.
     Message(MessageFailure),
+}
+
+impl From<ReadFailure> for AdmissionFailure {
+    fn from(failure: ReadFailure) -> Self {
+        match failure {
+            ReadFailure::Unreadable(cause) => Self::Unreadable(cause),
+            ReadFailure::Unsupported => Self::Unsupported,
+            ReadFailure::Shape => Self::Shape,
+            ReadFailure::Integrity => Self::Integrity,
+        }
+    }
 }
 
 impl From<MessageFailure> for AdmissionFailure {
@@ -166,15 +174,7 @@ pub(crate) fn admit(
     workspace: &mut AnalysisWorkspace,
     entry: Entry,
 ) -> Result<AdmittedInventory, AdmissionFailure> {
-    let value = decode::value(bytes, true).map_err(AdmissionFailure::Unreadable)?;
-    select(&value)?;
-    let artifact: InventoryArtifact = decode::typed(value).map_err(|_| AdmissionFailure::Shape)?;
-    if !artifact
-        .verify_integrity()
-        .map_err(|_| AdmissionFailure::Shape)?
-    {
-        return Err(AdmissionFailure::Integrity);
-    }
+    let artifact: InventoryArtifact = read_sealed(bytes)?;
     let inventory = artifact.body();
     inventory.validate().map_err(AdmissionFailure::Inventory)?;
 
@@ -191,43 +191,6 @@ pub(crate) fn admit(
         artifact,
         unverified: unverified.into_boxed_slice(),
     })
-}
-
-/// Select the exact tuple before decoding the body.
-///
-/// A different kind or revision has a different body shape, so decoding it as
-/// an inventory would report a shape failure for what is really a version this
-/// reader does not implement.
-fn select(value: &Value) -> Result<(), AdmissionFailure> {
-    let object = value.as_object().ok_or(AdmissionFailure::Shape)?;
-    let text = |member: &str| {
-        object
-            .get(member)
-            .and_then(Value::as_str)
-            .ok_or(AdmissionFailure::Shape)
-    };
-    if ArtifactKind::from_wire(text("kind")?) != Some(ArtifactKind::AuthoringInventory) {
-        return Err(AdmissionFailure::Unsupported);
-    }
-    if text("schemaRevision")? != ARTIFACT_SCHEMA_REVISION {
-        return Err(AdmissionFailure::Unsupported);
-    }
-    let specification = object
-        .get("authoringSpecification")
-        .and_then(Value::as_object)
-        .ok_or(AdmissionFailure::Shape)?;
-    let part = |member: &str| {
-        specification
-            .get(member)
-            .and_then(Value::as_str)
-            .ok_or(AdmissionFailure::Shape)
-    };
-    if part("identity")? != AUTHORING_SPECIFICATION_IDENTITY
-        || part("revision")? != AUTHORING_SPECIFICATION_REVISION
-    {
-        return Err(AdmissionFailure::Unsupported);
-    }
-    Ok(())
 }
 
 fn admit_context(

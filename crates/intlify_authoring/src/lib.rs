@@ -38,6 +38,7 @@
 //! that later phases own. That rejection is asserted in
 //! `tests/declaration_resolution.rs`.
 
+pub mod artifact;
 #[cfg(feature = "benchmark")]
 pub mod benchmark;
 mod context;
@@ -56,6 +57,11 @@ mod workspace;
 // caller does not need a direct dependency on the shared crate to use them.
 pub use intlify_shared_json::token::{IntegrityDigest, Token, VersionedIdentity};
 
+pub use artifact::{
+    read_sealed, ArtifactKind, ArtifactRelation, AuthoringArtifact, AuthoringArtifactReference,
+    ReadFailure, ARTIFACT_INTEGRITY_DOMAIN, ARTIFACT_SCHEMA_REVISION,
+    AUTHORING_SPECIFICATION_IDENTITY, AUTHORING_SPECIFICATION_REVISION,
+};
 #[cfg(feature = "test-context")]
 pub use context::test_context;
 pub use context::{
@@ -72,11 +78,9 @@ pub use diagnostic::{
     Severity, Stage,
 };
 pub use inventory::{
-    admit_inventory, AdmissionFailure, AdmittedInventory, ArtifactKind, ArtifactRelation,
-    AuthoringArtifactReference, AuthoringInventory, Completeness, Exclusion, InventoryArtifact,
-    InventoryBuilder, InventoryFailure, ReferenceFacts, SourceBytes, UnitOutcome, UnitResult,
-    ARTIFACT_INTEGRITY_DOMAIN, ARTIFACT_SCHEMA_REVISION, AUTHORING_SPECIFICATION_IDENTITY,
-    AUTHORING_SPECIFICATION_REVISION,
+    admit_inventory, AdmissionFailure, AdmittedInventory, AuthoringInventory, Completeness,
+    Exclusion, InventoryArtifact, InventoryBuilder, InventoryFailure, ReferenceFacts, SourceBytes,
+    UnitOutcome, UnitResult,
 };
 pub use limits::{AuthoringLimits, LimitKind, LimitScope, LimitsError};
 pub use message::{
