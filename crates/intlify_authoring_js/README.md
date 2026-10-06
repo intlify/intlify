@@ -4,7 +4,7 @@ JavaScript and TypeScript host Producer for [Intlify](../../design/000-intlify-o
 
 > [!IMPORTANT]
 >
-> This crate implements part of Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, recognizes ordinary UI text assigned to a proven DOM receiver, reads `@intlify` metadata, and assembles the units into a sealed `authoring-inventory`. See [Current status](#current-status).
+> This crate implements Phase 2 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). It admits and reads source units, recognizes the explicit authoring forms `intent`, `mf2` and `noIntent`, recognizes ordinary UI text assigned to a proven DOM receiver, reads `@intlify` metadata, and assembles the units into a sealed `authoring-inventory`. See [Current status](#current-status).
 
 A Producer reads host source and hands [`intlify_authoring`](../intlify_authoring/README.md) what it found, already decoded. What a message means, what its use site must supply, its locale, class and revision are all decided there, so the same text never means different things depending on which host found it. This crate owns the part specific to JavaScript: which bytes a unit is, which grammar reads them, and what a literal decodes to and from where.
 
@@ -42,7 +42,7 @@ A unit's text is its bytes, a byte order mark included. To the language that mar
 
 ## Decoding literals
 
-016 reads a message from the host's cooked value, so `intent('a\nb')` and a `mf2` template with the same escape both hand MF2 a line feed. The parser computes that value but not where each decoded byte came from. The decoder here reads the literal again from its source bytes, recording an `InputSegment` per run as it goes, and requires its text to equal the parser's byte for byte. A disagreement stops the invocation rather than choosing one reading.
+016 reads a message from the host's cooked value, so `intent('a\nb')` and a `mf2` template with the same escape both hand MF2 a line feed. The parser computes that value but not where each decoded byte came from. The decoder here reads the literal again from its source bytes, recording an `InputSegment` per run as it goes, and requires its text to equal the parser's byte for byte. A disagreement stops the invocation rather than choosing one reading. The same map locates what the shared crate reports inside a message: an MF2 syntax error carries the decoded range the parser saw and, as `source_range()`, the bytes of the unit it came from, even when its declaration is blocked.
 
 Runs split wherever a source byte stops answering for exactly one decoded byte. Verbatim text and a lone carriage return a template reads as a line feed are positional; an escape, a CRLF a template reads as one line feed, and a line continuation are each a run of their own.
 
@@ -93,6 +93,24 @@ What cannot be proven is not guessed:
 | Past a bound: alias chain, origins one function tracks, proof steps | Reported as `authoring-resource-limit` |
 
 A proven sink assigned anything but a literal, a compound assignment to one, or an `mf2` tag assigned to one is reported too. An `intent()` or `noIntent()` assigned to a sink is explicit authoring and is read only by the explicit recognizer, whatever the receiver: explicit forms take no usage from where they are written, so their revision never depends on the receiver around them.
+
+### What the empty analyzed-callee list blocks
+
+016-022 invalidates a receiver passed to a call whose effects on it are not analyzed. This profile analyzes no callee, so every call that receives a tracked receiver invalidates it, however ordinary the call. `inserting_a_receiver_or_writing_it_from_a_callback_blocks_the_sinks_after_it` in `tests/dom_receivers.rs` reads four common ways of building and updating a page. Of their nine `textContent` literals, the four written before the element is handed over are proven, and the other five are reported:
+
+| Code | Reported |
+| --- | --- |
+| `list.appendChild(item)`, then `item.textContent = 'Saved'` | `receiver-evidence-invalidated` |
+| `dialog.append(title)` and `document.body.appendChild(dialog)`, then `title.textContent = 'Payment confirmed'` | `receiver-evidence-invalidated` |
+| `container.replaceChildren(label)`, then `label.textContent = 'New'` | `receiver-evidence-invalidated` |
+| `button.addEventListener('click', () => { button.textContent = 'Paying' })` | `receiver-captured` in the callback, and `receiver-evidence-invalidated` at `button.textContent = 'Pay'` after it |
+
+Setting text before an element is inserted is proven; updating it afterwards is not, and that is most of what interactive code does with displayed text. Two profile extensions could change this, each with its own revision and fixtures:
+
+- **Insertion callees.** Inserting an element leaves its `textContent` alone, but an entry for `appendChild`, `append`, `replaceChildren` and the like is sound only when the call is the standard method and runs no author code that could reach the element. Neither follows from the call's spelling: the parent would have to be a proven receiver itself, which `list`, `container` and `document.body` above are not, and connecting or disconnecting custom elements runs their callbacks during the call.
+- **Callbacks.** A callback may run at any later time, after effects the walk of the enclosing function never sees, so a sink inside it cannot be proven the way straight-line code is, and making it exposes the receiver to the code after it.
+
+Until then `intent()` covers each of these, because an explicit form needs no receiver evidence.
 
 ## Metadata
 
@@ -182,3 +200,18 @@ This is an unpublished, workspace-internal crate. Implemented:
 - design 026 measurement of source discovery and inventory assembly.
 
 As in `intlify_authoring`, the only context kind this phase admits is the test context. A context claiming a production kind is refused before anything is read, because production admission needs checked 015 inputs that later phases supply.
+
+The fixture matrix in [`fixtures/phase2/README.md`](fixtures/phase2/README.md) maps each design 016 fixture family to the tests that pin it, here and in the two crates this one builds on, and names the families a later phase owns.
+
+## What later phases build on
+
+Phase 3 assigns persistent identity, starting from what this crate hands on:
+
+- `assemble_inventory`, whose `checked_inventory()` is `Some(CheckedInventory::Complete(_))` only for a complete scope in which every unit is checked. That artifact's `reference()` is the `AuthoringArtifactReference` a registry update cites, and `intlify_authoring` admits its bytes again.
+- Declaration occurrences. Every use of a shared `mf2` declaration names the occurrence it uses, equal text at two declarations is two occurrences, and a reference records where it is written, not whether it runs. No identifier is assigned here.
+- Completeness and unit outcomes. A partial scope is checked only for its part, and a blocked or failed unit is a record, not complete input; neither may support a retirement.
+- Diagnostics with their stage, unit, range, family, detail and related occurrences, and for a range inside a message the `source_range()` that locates it in the unit, as design 019's diagnostic projection will need.
+
+Rewriting `el.textContent = 'Pay now'` as `intent('Pay now')` changes both the role and the revision, because an explicit form takes no usage from its sink. Whether that continues one identity is for Phase 3's continuity rules to decide.
+
+The registry, its codecs, allocation and reconciliation are listed in [`intlify_authoring`](../intlify_authoring/README.md#what-phase-3-adds), with the two questions open with designs 017 and 019. Beyond Phase 3 come conditional selection under 016-010, module references, production profile inputs, the lowering consumer that has to keep the host's evaluation order, and the profile extensions above, each with its own fixtures.

@@ -9,7 +9,8 @@
 mod support;
 
 use intlify_authoring::{
-    intent_revision, Location, OccurrenceRole, ReasonFamily, Stage, UnitOutcome,
+    intent_revision, ByteRange, Location, MessageRange, OccurrenceRole, ReasonFamily, Stage,
+    UnitOutcome,
 };
 use intlify_authoring_js::{detail, Grammar, UnitAnalysis};
 use support::{analyze, analyze_as, at, diagnostics, expect, nth, occurrence, PRELUDE};
@@ -162,6 +163,67 @@ fn equal_text_at_separate_declarations_is_separate_facts_with_one_meaning() {
         .collect();
     assert!(revisions.windows(2).all(|pair| pair[0] == pair[1]));
     assert_ne!(declared[0].occurrence(), declared[2].occurrence());
+}
+
+#[test]
+fn host_spelling_and_parameter_values_leave_a_revision_alone() {
+    // A revision is what a message means, not how the host spelled it. Each
+    // body declares one message; the cooked value is what reaches MF2.
+    let revision = |body: &str| {
+        let analysis = analyze(&source(body));
+        assert_eq!(diagnostics(&analysis), [], "{body:?}");
+        let declared = analysis.inspection_facts().declarations();
+        assert_eq!(declared.len(), 1, "{body:?}");
+        intent_revision(declared[0].projection()).expect("a revision")
+    };
+
+    // Quotes, an escape for a character, parentheses, and the `mf2` form.
+    let pay = revision("intent('Pay now')\n");
+    for body in [
+        "intent(\"Pay now\")\n",
+        "intent(`Pay now`)\n",
+        "intent('\\u0050ay now')\n",
+        "intent(('Pay now'))\n",
+        "const pay = mf2`Pay now`\n",
+    ] {
+        assert_eq!(revision(body), pay, "{body:?}");
+    }
+    // A newline escape and a newline written in a template are one line feed,
+    // and an MF2 escape carried by a host escape is the same MF2 either way.
+    let lines = revision("intent('Line 1\\nLine 2')\n");
+    for body in [
+        "intent(`Line 1\nLine 2`)\n",
+        "const lines = mf2`Line 1\\nLine 2`\n",
+    ] {
+        assert_eq!(revision(body), lines, "{body:?}");
+    }
+    assert_eq!(
+        revision("intent('Use \\\\{braces\\\\}')\n"),
+        revision("const braces = mf2`Use \\\\{braces\\\\}`\n")
+    );
+    // The expressions supplying a parameter are positions, not meaning.
+    let greeting = revision("intent('Hi {$name}', { name })\n");
+    for body in [
+        "intent('Hi {$name}', { name: user.name })\n",
+        "intent('Hi {$name}', { 'name': compute() })\n",
+    ] {
+        assert_eq!(revision(body), greeting, "{body:?}");
+    }
+
+    // Characters are compared exactly: a space, a mark or a case changes
+    // the message, and nothing is normalized.
+    for body in [
+        "intent('Pay  now')\n",
+        "intent('Pay now!')\n",
+        "intent('pay now')\n",
+    ] {
+        assert_ne!(revision(body), pay, "{body:?}");
+    }
+    assert_eq!(revision("intent('é')\n"), revision("intent('\\u00e9')\n"));
+    assert_ne!(
+        revision("intent('\\u00e9')\n"),
+        revision("intent('e\\u0301')\n")
+    );
 }
 
 #[test]
@@ -410,6 +472,36 @@ fn the_mf2_parser_keeps_its_own_codes_through_the_host() {
         .map(|record| record.origin().code())
         .collect();
     assert_eq!(codes, ["duplicate-declaration"]);
+}
+
+#[test]
+fn a_message_error_is_located_where_it_is_written_past_what_the_host_decoded() {
+    // The parser reads decoded MF2, so its range counts decoded bytes. The
+    // record also names the bytes of the unit they came from: here six
+    // source bytes spell the first character, and a template reads CR LF as
+    // one line feed, and either way the placeholder is decoded [3, 9).
+    for body in [
+        "intent('\\u0048i {$name')\n",
+        "const greeting = mf2`Hi\r\n{$name`\n",
+    ] {
+        let text = source(body);
+        let analysis = analyze(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked, "{body:?}");
+        let [record] = analysis.diagnostics() else {
+            panic!("one parser record: {:?}", analysis.diagnostics());
+        };
+        assert_eq!(
+            record.message_range(),
+            Some(MessageRange::Emitted(ByteRange::new(3, 9).unwrap())),
+            "{body:?}"
+        );
+        let written = record.source_range().expect("located through the host map");
+        assert_eq!(
+            (written.start(), written.end()),
+            at(&text, "{$name"),
+            "{body:?}"
+        );
+    }
 }
 
 #[test]

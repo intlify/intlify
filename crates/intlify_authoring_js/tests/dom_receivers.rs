@@ -147,6 +147,88 @@ fn a_receiver_reached_only_through_data_is_outside_the_profile() {
 }
 
 #[test]
+fn a_receiver_that_comes_back_from_a_call_has_no_known_origin() {
+    // A call's result is not an origin call, whatever the callee returned,
+    // so the literals assigned through one are outside the profile rather
+    // than reported. Inside `make` its own receiver is followed, and
+    // returning it ends that path.
+    let text = "function make() {\n  const made = document.createElement('p')\n  made.textContent = 'Made'\n  return made\n}\n\
+                function find() { return document.querySelector('#found') }\n\
+                const first = make()\nfirst.textContent = 'First'\n\
+                const second = find()\nsecond.textContent = 'Second'\n";
+    let analysis = analyze_dom(text);
+    assert_eq!(diagnostics(&analysis), []);
+    assert_eq!(
+        declared(&analysis),
+        [(OccurrenceRole::UiLiteral, at(text, "'Made'"))]
+    );
+    assert_eq!(analysis.outside_profile(), 2);
+}
+
+#[test]
+fn inserting_a_receiver_or_writing_it_from_a_callback_blocks_the_sinks_after_it() {
+    // Ordinary page code. This profile analyzes no callee, so handing an
+    // element to `appendChild`, `append` or `replaceChildren` invalidates it
+    // like any other call, even on `document.body`, and a callback that
+    // writes it is another function. Text set before the element is handed
+    // over stays proven. These are the blocks an analyzed-callee list in a
+    // later profile would have to remove.
+    let text = "export function renderTodo(list) {\n\
+                \x20 const item = document.createElement('li')\n\
+                \x20 item.textContent = 'New task'\n\
+                \x20 list.appendChild(item)\n\
+                \x20 item.textContent = 'Saved'\n\
+                }\n\
+                export function renderDialog() {\n\
+                \x20 const dialog = document.createElement('dialog')\n\
+                \x20 const title = document.createElement('h2')\n\
+                \x20 title.textContent = 'Confirm payment'\n\
+                \x20 dialog.append(title)\n\
+                \x20 document.body.appendChild(dialog)\n\
+                \x20 dialog.showModal()\n\
+                \x20 title.textContent = 'Payment confirmed'\n\
+                }\n\
+                export function bindButton() {\n\
+                \x20 const button = document.querySelector('#pay')\n\
+                \x20 button.textContent = 'Pay now'\n\
+                \x20 button.addEventListener('click', () => {\n\
+                \x20   button.textContent = 'Paying'\n\
+                \x20 })\n\
+                \x20 button.textContent = 'Pay'\n\
+                }\n\
+                export function swap(container) {\n\
+                \x20 const label = document.createElement('span')\n\
+                \x20 label.textContent = 'Old'\n\
+                \x20 container.replaceChildren(label)\n\
+                \x20 label.textContent = 'New'\n\
+                }\n";
+    let analysis = analyze_dom(text);
+    assert_eq!(
+        diagnostics(&analysis),
+        [
+            invalidated(text, "item.textContent = 'Saved'"),
+            invalidated(text, "title.textContent = 'Payment confirmed'"),
+            expect(
+                ReasonFamily::AuthoringFormUnsupported,
+                detail::receiver_captured(),
+                at(text, "button.textContent = 'Paying'")
+            ),
+            invalidated(text, "button.textContent = 'Pay'"),
+            invalidated(text, "label.textContent = 'New'"),
+        ]
+    );
+    assert_eq!(
+        declared(&analysis),
+        [
+            (OccurrenceRole::UiLiteral, at(text, "'New task'")),
+            (OccurrenceRole::UiLiteral, at(text, "'Confirm payment'")),
+            (OccurrenceRole::UiLiteral, at(text, "'Pay now'")),
+            (OccurrenceRole::UiLiteral, at(text, "'Old'")),
+        ]
+    );
+}
+
+#[test]
 fn passing_a_receiver_anywhere_invalidates_every_alias_of_it() {
     for (effect, why) in [
         ("  customize(pay)", "an argument"),

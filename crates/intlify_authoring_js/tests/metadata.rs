@@ -529,6 +529,25 @@ fn an_annotation_is_bounded_exactly_by_its_bytes() {
     );
     assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
     assert_eq!(carried(&analysis), []);
+
+    // The bound counts bytes: a bound counted in characters would admit this
+    // annotation at a bound below its byte length.
+    let multibyte = r#"/* @intlify { "description": "支払う" } */"#;
+    assert_eq!(multibyte.len() - multibyte.chars().count(), 6);
+    let text = format!("{PRELUDE}{multibyte}\nintent('Pay now')\n");
+    bounded.annotation_bytes = multibyte.len() as u64;
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
+    assert_eq!(diagnostics(&analysis), []);
+    bounded.annotation_bytes = multibyte.chars().count() as u64;
+    let analysis = try_analyze(Grammar::JsModule, &text, &profile(), &bounded).unwrap();
+    assert_eq!(
+        diagnostics(&analysis),
+        [expect(
+            ReasonFamily::AuthoringResourceLimit,
+            detail::limit(JsLimitKind::AnnotationBytes),
+            at(&text, multibyte)
+        )]
+    );
 }
 
 #[test]

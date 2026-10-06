@@ -24,8 +24,8 @@ use crate::diagnostic::{
 };
 use crate::limits::{AuthoringLimits, LimitKind, LimitScope};
 use crate::message::{
-    analyze_message, compose_extraction_map, validate_input_map, ExtractionSegment, InputSegment,
-    MappingError, MessageFailure, MessageInput,
+    analyze_message, compose_extraction_map, resolve_message_range, validate_input_map,
+    ExtractionSegment, InputSegment, MappingError, MessageFailure, MessageInput,
 };
 use crate::primitives::{ByteRange, NonemptyText, Occurrence, PrimitiveError};
 use crate::projection::{intent_projection, IntentProjection, Usage};
@@ -315,12 +315,6 @@ impl DiagnosticSink {
         self.reported.push(diagnostic);
     }
 
-    fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
-        for diagnostic in diagnostics {
-            self.push(diagnostic);
-        }
-    }
-
     const fn exhausted(&self) -> bool {
         self.exhausted
     }
@@ -484,10 +478,10 @@ fn resolve_one(
             // reportable authoring form rather than a failed invocation. The
             // encoder alone cannot know that, which is why it reports the
             // position and leaves the decision to the caller that has one.
-            diagnostics.push(
-                unrepresentable(input, offset)
-                    .ok_or(MessageFailure::UnrepresentableScalar { offset })?,
-            );
+            let record = unrepresentable(input, offset)
+                .ok_or(MessageFailure::UnrepresentableScalar { offset })?;
+            // Its range is in the supplied text, so no extraction map is read.
+            diagnostics.push(locate(record, input, &[], 0)?);
             return Ok(None);
         }
         // The analysis alone cannot tell a bound on this message from one on
@@ -499,7 +493,15 @@ fn resolve_one(
         Err(other) => return Err(other.into()),
     };
     let mut blocked = analysis.is_blocked();
-    diagnostics.extend(analysis.diagnostics().iter().cloned());
+    let emitted_len = analysis.mf2_source().len() as u64;
+    for record in analysis.diagnostics() {
+        diagnostics.push(locate(
+            record.clone(),
+            input,
+            analysis.extraction_map(),
+            emitted_len,
+        )?);
+    }
 
     let locale = resolve_locale(context, input, diagnostics)?;
     let class = resolve_surface_class(context, input, diagnostics);
@@ -583,6 +585,33 @@ fn extraction_map(
     )
     .map(Vec::into_boxed_slice)
     .map_err(input_map_failure)
+}
+
+/// Say where in source a record's message range is, when the host gave a map.
+///
+/// The extraction map and the host's map are both at hand only here, while
+/// the declaration is being resolved. A blocked declaration never composes
+/// its map, so this is the one place its records can still be located.
+fn locate(
+    record: Diagnostic,
+    input: &DeclarationInput<'_>,
+    extraction: &[ExtractionSegment],
+    emitted_len: u64,
+) -> Result<Diagnostic, AuthoringFailure> {
+    let (Some(map), Some(range)) = (input.input_map, record.message_range()) else {
+        return Ok(record);
+    };
+    // The map was checked against the text before analysis began, so a range
+    // it cannot resolve means the two maps disagree about the text.
+    let source = resolve_message_range(
+        range,
+        extraction,
+        emitted_len,
+        map,
+        input.message.text().len() as u64,
+    )
+    .map_err(input_map_failure)?;
+    Ok(record.with_source_range(source))
 }
 
 /// Report a composition failure as the kind of failure it actually is.
@@ -937,13 +966,17 @@ mod tests {
     #[test]
     fn a_sink_inside_its_budget_reports_everything_and_is_not_exhausted() {
         let mut sink = DiagnosticSink::new(3);
-        sink.extend([diagnostic(), diagnostic()]);
+        for record in [diagnostic(), diagnostic()] {
+            sink.push(record);
+        }
         assert!(!sink.exhausted());
         assert_eq!(sink.into_reported().len(), 2);
 
         // The boundary is exact: filling the budget is not exceeding it.
         let mut exact = DiagnosticSink::new(2);
-        exact.extend([diagnostic(), diagnostic()]);
+        for record in [diagnostic(), diagnostic()] {
+            exact.push(record);
+        }
         assert!(!exact.exhausted());
         assert_eq!(exact.into_reported().len(), 2);
     }

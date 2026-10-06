@@ -66,6 +66,7 @@ The extraction rows below name the tests that assert through a shared `check_seg
 | Text the host dropped, before and after the content | `dropped_text_before_the_content_is_not_where_the_content_begins`, `text_the_host_dropped_is_not_part_of_the_content_it_surrounds`, `dropped_text_in_the_middle_of_a_run_contributes_no_segment_of_its_own` |
 | Omitting a map is not supplying a broken one | `a_host_map_moves_the_extraction_map_into_source_and_omitting_one_does_not` |
 | The composed map is bounded | `the_composed_map_is_bounded_by_the_invocation`, `a_bound_exhausted_while_composing_reports_as_the_bound_it_is` |
+| A record inside a message resolves into source, even for a blocked declaration | `a_message_record_says_where_in_source_it_is_even_when_its_declaration_is_blocked`, `one_range_resolves_through_positional_runs_to_exactly_its_bytes`, `one_range_touching_an_escape_answers_with_the_whole_escape`, `an_emitted_range_passes_through_the_extraction_map_before_the_host_map`, `an_insertion_point_resolves_to_an_insertion_point`, `a_range_the_map_does_not_describe_is_refused` |
 | Supplying the map | **Deferred to Phase 2.** A host reads its own escapes; this crate composes whatever map the host establishes. |
 
 ### Parser ownership
