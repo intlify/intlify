@@ -1,0 +1,2503 @@
+{
+  "note": "One registry chain: a genesis and three updates, each planned from a real inventory of the source texts below. An independent implementation removes each artifact's top-level integrityDigest, reframes the rest and re-hashes it under the domain below. It also resolves every reference to the earlier artifact it names, checks that a chain keeps its owner, scope and registry identity, checks every snapshot against the text it names, and replays every source edit over that text.",
+  "domain": "authoring-artifact-integrity",
+  "sources": [
+    {
+      "unit": "checkout",
+      "revision": "1",
+      "text": "const pay = intent('Pay now')\nconst cancel = intent('Cancel')\n"
+    },
+    {
+      "unit": "checkout",
+      "revision": "2",
+      "text": "// checkout actions\nconst pay = intent('Pay now')\nconst payLater = intent('Pay now')\n"
+    },
+    {
+      "unit": "checkout",
+      "revision": "3",
+      "text": "// checkout actions\nconst pay = intent('Pay now')\nconst payLater = intent('Pay now')\nconst cancel = intent('Cancel')\n"
+    },
+    {
+      "unit": "nav",
+      "revision": "1",
+      "text": "const home = intent('Home')\n"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "inventory-1",
+      "note": "Checkout revision 1 with pay and cancel, and the navigation unit with home.",
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "62",
+                "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+              },
+              "outcome": "checked"
+            },
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "nav",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "28",
+                "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "20",
+                    "end": "27"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Cancel",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Cancel"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "6"
+                  },
+                  "source": {
+                    "start": "53",
+                    "end": "59"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Home",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Home"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "4"
+                  },
+                  "source": {
+                    "start": "21",
+                    "end": "25"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "12",
+                  "end": "29"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "62",
+                    "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                  },
+                  "range": {
+                    "start": "19",
+                    "end": "28"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "45",
+                  "end": "61"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "62",
+                    "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                  },
+                  "range": {
+                    "start": "52",
+                    "end": "60"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "13",
+                  "end": "27"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "nav",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "28",
+                    "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                  },
+                  "range": {
+                    "start": "20",
+                    "end": "26"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            }
+          ],
+          "exclusions": []
+        },
+        "integrityDigest": "sha256:102254ef778892b8d0dd0f6e754b72df4fbd88424b74d434da802c7d3a2e0ab0"
+      }
+    },
+    {
+      "id": "registry-0",
+      "note": "The genesis: no history and no entries.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "f55ca0b3224c28776d729daf805177d7",
+          "entries": []
+        },
+        "integrityDigest": "sha256:2d2e546f93a7059282ea024c53b8e68df7e22db6ba60f4ac9a164b0af66548b7"
+      }
+    },
+    {
+      "id": "update-1",
+      "note": "Three allocations against the genesis. The base has no history, so every declaration is new.",
+      "artifact": {
+        "kind": "intent-registry-update",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:2d2e546f93a7059282ea024c53b8e68df7e22db6ba60f4ac9a164b0af66548b7"
+          },
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:102254ef778892b8d0dd0f6e754b72df4fbd88424b74d434da802c7d3a2e0ab0"
+          },
+          "decisions": [
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            },
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "6ad022577a9ed7bb6d5f141f06e99df9"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            },
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            }
+          ],
+          "lineageLinks": []
+        },
+        "integrityDigest": "sha256:b578fe254e00b637fa282c99bd35b1f8ff0e034680e9f31b554e0567f8b6f834"
+      }
+    },
+    {
+      "id": "registry-1",
+      "note": "Three active entries.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "f55ca0b3224c28776d729daf805177d7",
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:2d2e546f93a7059282ea024c53b8e68df7e22db6ba60f4ac9a164b0af66548b7"
+          },
+          "update": {
+            "kind": "intent-registry-update",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:b578fe254e00b637fa282c99bd35b1f8ff0e034680e9f31b554e0567f8b6f834"
+          },
+          "entries": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "6ad022577a9ed7bb6d5f141f06e99df9"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:7b5a9df415f30daf0b92bda1b0a8bcef804ce3e4ed29b99824fd3f8270577201"
+      }
+    },
+    {
+      "id": "inventory-2",
+      "note": "Checkout revision 2: a header above pay, and cancel's line replaced by a copy of pay.",
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "2",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "85",
+                "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+              },
+              "outcome": "checked"
+            },
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "nav",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "28",
+                "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "40",
+                    "end": "47"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "75",
+                    "end": "82"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Home",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Home"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "4"
+                  },
+                  "source": {
+                    "start": "21",
+                    "end": "25"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "32",
+                  "end": "49"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "85",
+                    "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                  },
+                  "range": {
+                    "start": "39",
+                    "end": "48"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "67",
+                  "end": "84"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "85",
+                    "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                  },
+                  "range": {
+                    "start": "74",
+                    "end": "83"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "13",
+                  "end": "27"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "nav",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "28",
+                    "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                  },
+                  "range": {
+                    "start": "20",
+                    "end": "26"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            }
+          ],
+          "exclusions": []
+        },
+        "integrityDigest": "sha256:bb184b397ab7cb40fcb1e4921fc77e7dcfd0361a0f42aa71ebf5c12ad11f6edf"
+      }
+    },
+    {
+      "id": "update-2",
+      "note": "Pay continues across a verified edit, cancel is retired, and the copy gets a new ID linked to pay.",
+      "artifact": {
+        "kind": "intent-registry-update",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:7b5a9df415f30daf0b92bda1b0a8bcef804ce3e4ed29b99824fd3f8270577201"
+          },
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:bb184b397ab7cb40fcb1e4921fc77e7dcfd0361a0f42aa71ebf5c12ad11f6edf"
+          },
+          "decisions": [
+            {
+              "kind": "continue",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "from": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "19",
+                  "end": "28"
+                },
+                "role": "intent-literal"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "verified-edit",
+                "profile": {
+                  "identity": "intlify-continuity-edit-replay",
+                  "revision": "0"
+                },
+                "changes": [
+                  {
+                    "before": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "62",
+                      "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                    },
+                    "after": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "2",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "85",
+                      "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                    },
+                    "replacements": [
+                      {
+                        "range": {
+                          "start": "0",
+                          "end": "0"
+                        },
+                        "text": "// checkout actions\n"
+                      },
+                      {
+                        "range": {
+                          "start": "30",
+                          "end": "62"
+                        },
+                        "text": "const payLater = intent('Pay now')\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "retire",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "from": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "complete-absence"
+              }
+            },
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "9df4f5956d01f3abac8b34bb29314486"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            }
+          ],
+          "lineageLinks": [
+            {
+              "kind": "copy",
+              "predecessors": [
+                {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "value": "495c5869254a66216d162abaff700528"
+                }
+              ],
+              "successors": [
+                {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "value": "9df4f5956d01f3abac8b34bb29314486"
+                }
+              ]
+            }
+          ]
+        },
+        "integrityDigest": "sha256:0c4006da09356ef347e6a943dc3aa2e528b35d2465611f1c916ebba90abc276c"
+      }
+    },
+    {
+      "id": "registry-2",
+      "note": "Cancel is retired and keeps its last declaration; home's entry is copied unchanged.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "f55ca0b3224c28776d729daf805177d7",
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:7b5a9df415f30daf0b92bda1b0a8bcef804ce3e4ed29b99824fd3f8270577201"
+          },
+          "update": {
+            "kind": "intent-registry-update",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:0c4006da09356ef347e6a943dc3aa2e528b35d2465611f1c916ebba90abc276c"
+          },
+          "entries": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "6ad022577a9ed7bb6d5f141f06e99df9"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "state": "retired",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "9df4f5956d01f3abac8b34bb29314486"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:6b70e42f06d1f81120745e6c63898c96e461db2c36e9b46521e41825696aa22c"
+      }
+    },
+    {
+      "id": "inventory-3",
+      "note": "Checkout revision 3: cancel's line added back at the end.",
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-authoring-phase1-test",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:e9e144d730957d7e1ed3f0ee769ef3e45ab9246bcd5e2ea762d9db68f4c5c2cd"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "checkout",
+                "revision": "3",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "117",
+                "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+              },
+              "outcome": "checked"
+            },
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "nav",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "28",
+                "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "40",
+                    "end": "47"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Pay now",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Pay now"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "75",
+                    "end": "82"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "107",
+                  "end": "115"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Cancel",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Cancel"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "6"
+                  },
+                  "source": {
+                    "start": "108",
+                    "end": "114"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Home",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Home"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "4"
+                  },
+                  "source": {
+                    "start": "21",
+                    "end": "25"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "32",
+                  "end": "49"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "3",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "117",
+                    "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                  },
+                  "range": {
+                    "start": "39",
+                    "end": "48"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "67",
+                  "end": "84"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "3",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "117",
+                    "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                  },
+                  "range": {
+                    "start": "74",
+                    "end": "83"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "100",
+                  "end": "116"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "checkout",
+                    "revision": "3",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "117",
+                    "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                  },
+                  "range": {
+                    "start": "107",
+                    "end": "115"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "13",
+                  "end": "27"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "nav",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "28",
+                    "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                  },
+                  "range": {
+                    "start": "20",
+                    "end": "26"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            }
+          ],
+          "exclusions": []
+        },
+        "integrityDigest": "sha256:702dea4d8a6025069dee99440f9f5cb7940bf9675aea997215571f6e9b655e75"
+      }
+    },
+    {
+      "id": "update-3",
+      "note": "Pay and its copy continue across a verified edit; cancel's old ID is restored by explicit choice.",
+      "artifact": {
+        "kind": "intent-registry-update",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6b70e42f06d1f81120745e6c63898c96e461db2c36e9b46521e41825696aa22c"
+          },
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:702dea4d8a6025069dee99440f9f5cb7940bf9675aea997215571f6e9b655e75"
+          },
+          "decisions": [
+            {
+              "kind": "continue",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "from": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "verified-edit",
+                "profile": {
+                  "identity": "intlify-continuity-edit-replay",
+                  "revision": "0"
+                },
+                "changes": [
+                  {
+                    "before": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "2",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "85",
+                      "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                    },
+                    "after": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "3",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "117",
+                      "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                    },
+                    "replacements": [
+                      {
+                        "range": {
+                          "start": "85",
+                          "end": "85"
+                        },
+                        "text": "const cancel = intent('Cancel')\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "restore",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "from": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "62",
+                  "utf8Digest": "sha256:dfe9273b6d2ac5895b10fa460cbdaa36b9da1f74adc5771fb26567867a8c111d"
+                },
+                "range": {
+                  "start": "52",
+                  "end": "60"
+                },
+                "role": "intent-literal"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "107",
+                  "end": "115"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "explicit",
+                "reason": "The cancel action came back with the same meaning."
+              }
+            },
+            {
+              "kind": "continue",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "9df4f5956d01f3abac8b34bb29314486"
+              },
+              "from": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "85",
+                  "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "verified-edit",
+                "profile": {
+                  "identity": "intlify-continuity-edit-replay",
+                  "revision": "0"
+                },
+                "changes": [
+                  {
+                    "before": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "2",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "85",
+                      "utf8Digest": "sha256:06c280e9aba994d210d007c81d485a4728dfeec9fdf6581987870d281f18b2fd"
+                    },
+                    "after": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "checkout",
+                      "revision": "3",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "117",
+                      "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                    },
+                    "replacements": [
+                      {
+                        "range": {
+                          "start": "85",
+                          "end": "85"
+                        },
+                        "text": "const cancel = intent('Cancel')\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "lineageLinks": []
+        },
+        "integrityDigest": "sha256:f4113b4047e567b6256c83268c971b8ef6aac518c0900d9622f86848f3656e1e"
+      }
+    },
+    {
+      "id": "registry-3",
+      "note": "Four active entries.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "f55ca0b3224c28776d729daf805177d7",
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6b70e42f06d1f81120745e6c63898c96e461db2c36e9b46521e41825696aa22c"
+          },
+          "update": {
+            "kind": "intent-registry-update",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:f4113b4047e567b6256c83268c971b8ef6aac518c0900d9622f86848f3656e1e"
+          },
+          "entries": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "495c5869254a66216d162abaff700528"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "39",
+                  "end": "48"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "6ad022577a9ed7bb6d5f141f06e99df9"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "nav",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "28",
+                  "utf8Digest": "sha256:a10c855e5c0ed76922b49866cfacedf558dbcbaa58aefae36e0c6929bfc31fb8"
+                },
+                "range": {
+                  "start": "20",
+                  "end": "26"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "90389776033b3b9459b46b618e9cc041"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "107",
+                  "end": "115"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "9df4f5956d01f3abac8b34bb29314486"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "checkout",
+                  "revision": "3",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "117",
+                  "utf8Digest": "sha256:2624224001140064da9c9de38a179bf110728e3d31ec89dfa0bb20371324ead1"
+                },
+                "range": {
+                  "start": "74",
+                  "end": "83"
+                },
+                "role": "intent-literal"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:37aebe07bfbb999cb5122d010e0d953030347025f37372b9023b8532fd6ecef1"
+      }
+    }
+  ]
+}

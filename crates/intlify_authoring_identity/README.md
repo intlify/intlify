@@ -43,12 +43,15 @@ A chain starts with a genesis, which has no history and no entries. Every later 
 
 Admission is deliberately narrow. An admitted snapshot is well formed and unaltered since sealing; that is not proof it is the result of its update, that its chain starts from an accepted anchor, or that it is current. An admitted update is well formed; a `verified-edit` or `confirmed-new` label proves nothing by being well formed.
 
-## Schemas
+## Schemas and vectors
 
 | File | Contents | Checked by |
 | --- | --- | --- |
 | `schema/intent-registry-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `schema/intent-registry-update-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry-update` | `vp run schema:authoring:check`, `src/schema.rs` |
+| `fixtures/phase3/registry-vectors.json` | One real chain, a genesis and three updates, with the inventories and source texts behind it | `vp run vectors:authoring:check`, `tests/registry_admission.rs` |
+
+See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vectors hold and what the independent checker verifies.
 
 ## Current status
 
