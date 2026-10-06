@@ -166,6 +166,67 @@ fn equal_text_at_separate_declarations_is_separate_facts_with_one_meaning() {
 }
 
 #[test]
+fn host_spelling_and_parameter_values_leave_a_revision_alone() {
+    // A revision is what a message means, not how the host spelled it. Each
+    // body declares one message; the cooked value is what reaches MF2.
+    let revision = |body: &str| {
+        let analysis = analyze(&source(body));
+        assert_eq!(diagnostics(&analysis), [], "{body:?}");
+        let declared = analysis.inspection_facts().declarations();
+        assert_eq!(declared.len(), 1, "{body:?}");
+        intent_revision(declared[0].projection()).expect("a revision")
+    };
+
+    // Quotes, an escape for a character, parentheses, and the `mf2` form.
+    let pay = revision("intent('Pay now')\n");
+    for body in [
+        "intent(\"Pay now\")\n",
+        "intent(`Pay now`)\n",
+        "intent('\\u0050ay now')\n",
+        "intent(('Pay now'))\n",
+        "const pay = mf2`Pay now`\n",
+    ] {
+        assert_eq!(revision(body), pay, "{body:?}");
+    }
+    // A newline escape and a newline written in a template are one line feed,
+    // and an MF2 escape carried by a host escape is the same MF2 either way.
+    let lines = revision("intent('Line 1\\nLine 2')\n");
+    for body in [
+        "intent(`Line 1\nLine 2`)\n",
+        "const lines = mf2`Line 1\\nLine 2`\n",
+    ] {
+        assert_eq!(revision(body), lines, "{body:?}");
+    }
+    assert_eq!(
+        revision("intent('Use \\\\{braces\\\\}')\n"),
+        revision("const braces = mf2`Use \\\\{braces\\\\}`\n")
+    );
+    // The expressions supplying a parameter are positions, not meaning.
+    let greeting = revision("intent('Hi {$name}', { name })\n");
+    for body in [
+        "intent('Hi {$name}', { name: user.name })\n",
+        "intent('Hi {$name}', { 'name': compute() })\n",
+    ] {
+        assert_eq!(revision(body), greeting, "{body:?}");
+    }
+
+    // Characters are compared exactly: a space, a mark or a case changes
+    // the message, and nothing is normalized.
+    for body in [
+        "intent('Pay  now')\n",
+        "intent('Pay now!')\n",
+        "intent('pay now')\n",
+    ] {
+        assert_ne!(revision(body), pay, "{body:?}");
+    }
+    assert_eq!(revision("intent('é')\n"), revision("intent('\\u00e9')\n"));
+    assert_ne!(
+        revision("intent('\\u00e9')\n"),
+        revision("intent('e\\u0301')\n")
+    );
+}
+
+#[test]
 fn a_declaration_nothing_uses_is_still_a_declaration() {
     let text = source("export const unused = mf2`Not shown yet`\n");
     let analysis = analyze(&text);

@@ -2,7 +2,7 @@
 
 # Phase 2 fixtures
 
-Design 016's Phase 2 adds a host Producer on top of the language-neutral semantics in this crate. The fixtures here pin the representation that Producer fills. The complete matrix from each 016 fixture family to the test that checks it is written when the phase closes.
+Design 016's Phase 2 adds a host Producer on top of the language-neutral semantics in this crate. The fixtures here pin the representation that Producer fills. The matrix from each 016 fixture family to the tests that check it, on both sides of the Producer, is in [`intlify_authoring_js/fixtures/phase2/README.md`](../../../intlify_authoring_js/fixtures/phase2/README.md).
 
 ## Data files
 

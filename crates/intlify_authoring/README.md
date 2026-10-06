@@ -73,9 +73,9 @@ Implemented:
 
 The fixture matrix in [`fixtures/phase1/README.md`](fixtures/phase1/README.md) maps each requirement to the test that pins it, and names the rows a later phase owns.
 
-## What Phase 2 adds
+## What a host Producer uses
 
-A host Producer is the next phase's work. The entry points it will use already exist and are not expected to change shape:
+A host Producer reads its own syntax and hands the rest here. [`intlify_authoring_js`](../intlify_authoring_js/README.md) is the first, and these are the entry points it uses:
 
 - `resolve_declarations(context, inputs, limits, workspace)` for a batch, or `resolve_declarations_with_cancellation` when the caller owns a probe;
 - `AuthoringResult`'s accessors for facts and diagnostics;
@@ -99,12 +99,18 @@ Admission never trusts what an artifact says about itself. The digest is recompu
 
 The ordinary entry admits nothing in this phase. It refuses the test context, which an ordinary build cannot construct, and it refuses the production kinds, which need checked 015 inputs and the 017/018 work later phases own. The test-owned entry is `test_context::admit_inventory`.
 
-What Phase 2 has to add on top, in [`intlify_authoring_js`](../intlify_authoring_js/README.md):
+## What Phase 3 adds
 
-- **Host analysis** — source discovery, intrinsic bindings, UI surface recognition, annotation syntax, and exclusion markers. Unit admission, intrinsic bindings, the explicit forms, exclusion markers, bounded DOM recognition and `@intlify` annotations exist.
-- **Reading host escapes** — producing the input map this crate composes with, from the host's own decoding rules. Done: explicit forms hand their decoded text here with its input map.
-- **Usage profile registration** — semantic usage is admitted only under a registered profile. The JavaScript Producer assigns `text-content` from its `intlify-web-dom-usage` profile to UI text at proven sinks; no production context admits one yet.
-- **Enumerating references and exclusions** — finding them in host source. Done for the explicit forms and for UI text at proven DOM sinks.
-- **Assembling the inventory** — merging every unit's facts into one `authoring-inventory` this crate admits. Done: `assemble_inventory` seals one from the analyzed units, checked against the declared scope.
+Phase 2 is complete. [`intlify_authoring_js`](../intlify_authoring_js/README.md) reads JavaScript and TypeScript units, recognises the explicit forms and bounded DOM text, reads `@intlify` metadata, and assembles the units into an inventory this crate admits. Its [fixture matrix](../intlify_authoring_js/fixtures/phase2/README.md) maps design 016's families to the tests on both sides.
 
-Phase 3 adds identity: allocating a `MessageIntentId`, the registry artifacts and their codecs, and reconciling declaration history. Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.
+Phase 3 adds identity, and builds on these without changing their shape:
+
+- a complete checked inventory, one for which `is_complete_checked()` holds, and its `AuthoringArtifactReference` from `InventoryArtifact::reference`, which a registry update cites. `ArtifactRelation` tells the same artifact from a conflicting one under one reference;
+- the declaration occurrence as the unit of identity. A reference names the occurrence it uses, equal text at two declarations is two occurrences, and no identifier is recorded;
+- `completeness()` and each unit's `outcome()`, which decide whether an inventory may support a retirement. A partial scope, or one with a blocked or failed unit, never does.
+
+What it adds is allocating a `MessageIntentId` from operating-system randomness on the host that publishes an update; the `intent-registry`, `intent-registry-update`, `message-intent` and `message-reference` codecs and their schemas; continuity verification against an exact base registry and the snapshots before and after; reconciliation plans; and checking a read-only compilation against the registry.
+
+Two questions are open with designs 017 and 019 before that. Whether scope membership is recorded where admission can check it: a unit removed from a sealed complete inventory is not detected today. And whether a host's binding configuration belongs in the basis: two configurations read the same source differently, and the basis records only the profile pin.
+
+Production locale canonicalisation is design 015's Phase 2; the provider trait duplicated here is unified at that integration.

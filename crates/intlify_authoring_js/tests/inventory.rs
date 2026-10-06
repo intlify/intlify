@@ -9,6 +9,8 @@
 
 mod support;
 
+use std::collections::BTreeSet;
+
 use intlify_authoring::test_context::{admit_inventory, LocaleRule, TestContext};
 use intlify_authoring::{
     intent_revision, AnalysisWorkspace, AuthoringFailure, AuthoringInventory, Completeness,
@@ -397,6 +399,36 @@ fn a_reference_records_where_it_is_written_not_whether_it_runs() {
             nth(&text, "intent(greeting)", 2),
         ]
     );
+}
+
+#[test]
+fn the_inventory_hands_on_occurrences_and_no_identity() {
+    // Identity is a later phase's to assign. What this record hands on names
+    // each declaration by where it is written, and no member anywhere in it
+    // holds an identifier of its own.
+    fn member_names(value: &Value, names: &mut BTreeSet<String>) {
+        match value {
+            Value::Object(members) => {
+                for (name, member) in members {
+                    names.insert(name.clone());
+                    member_names(member, names);
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|item| member_names(item, names)),
+            _ => {}
+        }
+    }
+    let assembled = complete(&[("app", APPLICATION.as_bytes())]);
+    let value = serde_json::to_value(assembled.inspection_inventory()).unwrap();
+    let mut names = BTreeSet::new();
+    member_names(&value, &mut names);
+    assert!(names.contains("occurrence"), "the walk read the facts");
+    for name in &names {
+        assert!(
+            name != "id" && !name.ends_with("Id") && !name.to_lowercase().contains("intent"),
+            "{name} looks like an identity"
+        );
+    }
 }
 
 #[test]
