@@ -1,0 +1,340 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ArtifactKind": {
+      "description": "The five authoring artifact kinds design 017 registers.",
+      "enum": [
+        "authoring-inventory",
+        "message-intent",
+        "message-reference",
+        "intent-registry",
+        "intent-registry-update"
+      ],
+      "type": "string"
+    },
+    "AuthoringArtifactReference": {
+      "additionalProperties": false,
+      "description": "The fields another artifact uses to name one authoring artifact.",
+      "properties": {
+        "authoringSpecification": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "integrityDigest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        },
+        "kind": {
+          "$ref": "#/definitions/ArtifactKind"
+        },
+        "schemaRevision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["kind", "schemaRevision", "authoringSpecification", "integrityDigest"],
+      "type": "object"
+    },
+    "AuthoringSpecification": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Design016"
+        },
+        "revision": {
+          "$ref": "#/definitions/RevisionZero"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "ByteRange": {
+      "description": "One half-open UTF-8 byte range.\n\nEmpty insertion ranges and end-of-input positions are representable. A range\naddresses bytes, never Unicode scalar values or UTF-16 code units.",
+      "properties": {
+        "end": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "start": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": ["start", "end"],
+      "type": "object"
+    },
+    "Design016": {
+      "enum": ["intlify-design-016"],
+      "type": "string"
+    },
+    "EntryState": {
+      "description": "Whether an Intent ID is in use.",
+      "oneOf": [
+        {
+          "const": "active",
+          "description": "The ID names a current declaration.",
+          "type": "string"
+        },
+        {
+          "const": "retired",
+          "description": "The ID is retired. It keeps its last declaration and is never reused.",
+          "type": "string"
+        }
+      ]
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "IntentRegistrySnapshot": {
+      "additionalProperties": false,
+      "description": "One immutable registry state for one owner and scope.\n\nDeserializing one reads its shape only. [`IntentRegistrySnapshot::validate`]\nchecks the structural rules, and neither says that this state is the\nresult of its update or that it is current.",
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AuthoringArtifactReference"
+                },
+                {
+                  "properties": {
+                    "authoringSpecification": {
+                      "properties": {
+                        "identity": {
+                          "enum": ["intlify-design-016"]
+                        },
+                        "revision": {
+                          "enum": ["0"]
+                        }
+                      }
+                    },
+                    "kind": {
+                      "enum": ["intent-registry"]
+                    },
+                    "schemaRevision": {
+                      "enum": ["0"]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/RegistryEntry"
+          },
+          "type": "array"
+        },
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "registryIdentity": {
+          "$ref": "#/definitions/RegistryIdentity"
+        },
+        "scope": {
+          "$ref": "#/definitions/Token"
+        },
+        "update": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AuthoringArtifactReference"
+                },
+                {
+                  "properties": {
+                    "authoringSpecification": {
+                      "properties": {
+                        "identity": {
+                          "enum": ["intlify-design-016"]
+                        },
+                        "revision": {
+                          "enum": ["0"]
+                        }
+                      }
+                    },
+                    "kind": {
+                      "enum": ["intent-registry-update"]
+                    },
+                    "schemaRevision": {
+                      "enum": ["0"]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["owner", "scope", "registryIdentity", "entries"],
+      "type": "object"
+    },
+    "MessageIntentId": {
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "value": {
+          "$ref": "#/definitions/Opaque128"
+        }
+      },
+      "required": ["owner", "value"],
+      "type": "object"
+    },
+    "Occurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ByteRange"
+        },
+        "role": {
+          "$ref": "#/definitions/OccurrenceRole"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceSnapshot"
+        }
+      },
+      "required": ["source", "range", "role"],
+      "type": "object"
+    },
+    "OccurrenceRole": {
+      "description": "The syntax role an occurrence plays in its source unit.\n\nDeclaration facts admit only the three declaration roles. The remaining\nroles describe use sites, parameter expressions, and explicit exclusions.",
+      "enum": [
+        "ui-literal",
+        "intent-literal",
+        "mf2-declaration",
+        "reference",
+        "parameter-expression",
+        "exclusion"
+      ],
+      "type": "string"
+    },
+    "Opaque128": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "OwnerIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "kind": {
+          "$ref": "#/definitions/OwnerKind"
+        }
+      },
+      "required": ["kind", "identity"],
+      "type": "object"
+    },
+    "OwnerKind": {
+      "description": "Which owner domain an identity belongs to.\n\nThe same identity token under the two kinds denotes different owners.\nSpelling is not proof of publisher identity or authorization.",
+      "enum": ["application", "library"],
+      "type": "string"
+    },
+    "RegistryEntry": {
+      "additionalProperties": false,
+      "description": "One Intent ID, its state, and the declaration it was last associated with.",
+      "properties": {
+        "declaration": {
+          "$ref": "#/definitions/Occurrence"
+        },
+        "intentId": {
+          "$ref": "#/definitions/MessageIntentId"
+        },
+        "state": {
+          "$ref": "#/definitions/EntryState"
+        }
+      },
+      "required": ["intentId", "state", "declaration"],
+      "type": "object"
+    },
+    "RegistryIdentity": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/Opaque128"
+        }
+      ],
+      "description": "The identity of one owner's registry chain.\n\nDesign 017 spells it like the value of an Intent ID, 32 lowercase\nhexadecimal digits from 16 random bytes, but gives it a separate role: it\nnames the one chain an owner's identity history lives in, and stays the\nsame for that chain's whole life. Being its own type keeps it from being\ncompared with an Intent ID, or used as one."
+    },
+    "RegistryKind": {
+      "enum": ["intent-registry"],
+      "type": "string"
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "SourceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "byteLength": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "grammar": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        },
+        "unit": {
+          "$ref": "#/definitions/Token"
+        },
+        "utf8Digest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        }
+      },
+      "required": ["owner", "unit", "revision", "grammar", "byteLength", "utf8Digest"],
+      "type": "object"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    }
+  },
+  "description": "One sealed `intent-registry` artifact.\n\nThis is the `intent-registry` case of 017's `AuthoringArtifact<K, B>`.\nDeserializing one does not check its digest; admission does, before\nanything reads the body.",
+  "properties": {
+    "authoringSpecification": {
+      "$ref": "#/definitions/AuthoringSpecification"
+    },
+    "body": {
+      "$ref": "#/definitions/IntentRegistrySnapshot"
+    },
+    "integrityDigest": {
+      "$ref": "#/definitions/IntegrityDigest"
+    },
+    "kind": {
+      "$ref": "#/definitions/RegistryKind"
+    },
+    "schemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    }
+  },
+  "required": ["kind", "schemaRevision", "authoringSpecification", "body", "integrityDigest"],
+  "title": "RegistryArtifact",
+  "type": "object"
+}

@@ -1,0 +1,51 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
+//! Explicit finite limits for reading registry history.
+//!
+//! Design 017 puts every size and collection count under a caller-supplied
+//! finite limit. The shared decoder already bounds the bytes and the nesting;
+//! these bound what the decoded value asks the reader to look at. Like
+//! `AuthoringLimits`, the type has no `Default`, so a caller that does not know
+//! a bound decides one rather than inheriting a value from this crate.
+
+/// Which named bound a registry artifact exhausted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum IdentityLimitKind {
+    /// Entries in one registry snapshot.
+    Entries,
+    /// Decisions in one update.
+    Decisions,
+    /// Lineage links in one update.
+    LineageLinks,
+    /// Intent IDs named across one update's lineage links.
+    LineageMembers,
+    /// Source edits across one update's decisions.
+    SourceEdits,
+    /// Replacements across one update's source edits.
+    Replacements,
+    /// Bytes of replacement text across one update.
+    ReplacementBytes,
+}
+
+/// Inclusive upper bounds applied to reading one registry artifact.
+///
+/// Every bound admits zero: a registry with no entries and an update with no
+/// decisions are both meaningful, so no bound is unsatisfiable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IdentityLimits {
+    /// Entries in one registry snapshot.
+    pub entries: u64,
+    /// Decisions in one update.
+    pub decisions: u64,
+    /// Lineage links in one update.
+    pub lineage_links: u64,
+    /// Intent IDs named across one update's lineage links.
+    pub lineage_members: u64,
+    /// Source edits across one update's decisions.
+    pub source_edits: u64,
+    /// Replacements across one update's source edits.
+    pub replacements: u64,
+    /// Bytes of replacement text across one update.
+    pub replacement_bytes: u64,
+}
