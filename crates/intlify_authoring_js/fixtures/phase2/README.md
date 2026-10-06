@@ -64,7 +64,7 @@ The decoder's output is also compared with the parser's own cooked value on ever
 
 ## The matrix
 
-The families follow 016's [Conformance and Fixtures](../../../../design/016-intlify-source-authoring-and-intent-identity-design.md#conformance-and-fixtures) table, followed by the inventory and measurement families Phase 2 adopts from 017 and 026.
+The first nineteen families follow 016's [Conformance and Fixtures](../../../../design/016-intlify-source-authoring-and-intent-identity-design.md#conformance-and-fixtures) table in its order. The last four are what Phase 2 adopts from designs 017 and 026: the inventory, its artifact and admission, determinism and storage, and measurement.
 
 ### Binding identity
 
@@ -182,14 +182,6 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | No shared description default | `one_annotation_means_the_same_above_every_declaration_form` |
 | An imported declaration keeps its own context | **Phase 4.** A module reference is refused here (`only_a_const_bound_to_the_tag_itself_names_a_declaration`), so no consumer default can reach one yet. |
 
-### Locale handoff
-
-| Requirement | Checked by |
-| --- | --- |
-| An explicit locale and the inherited default reaching one canonical locale give one revision | `an_explicit_locale_reaching_the_default_gives_the_same_revision` |
-| An absent default, invalid and unsupported input, a changed binding | Language-neutral, in the [Phase 1 matrix](../../../intlify_authoring/fixtures/phase1/README.md#locale-handoff) |
-| A library's source locale is preserved | **Phase 4**, with module references. |
-
 ### Extraction
 
 | Requirement | Checked by |
@@ -228,14 +220,13 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | A dynamic or unbounded source, and the wrong arguments | `a_source_computed_at_run_time_is_dynamic`, `intent_takes_a_source_and_at_most_a_parameter_object` |
 | Incompatible alternatives | **Later**, with conditional selection (016-010), which this profile reports as unsupported. |
 
-### Revision comparison
+### Locale handoff
 
 | Requirement | Checked by |
 | --- | --- |
-| Host quoting, escapes, wrappers and parameter value expressions leave a revision alone; characters, spaces and case are compared exactly, without normalization | `host_spelling_and_parameter_values_leave_a_revision_alone` |
-| Host declarations reach the independent revision vectors | `host_declarations_reach_the_committed_independent_revision_vectors` |
-| Explicit forms take no usage from the receiver around them | `an_explicit_revision_does_not_depend_on_the_receiver_around_it` |
-| The language-neutral pairs | In the [Phase 1 matrix](../../../intlify_authoring/fixtures/phase1/README.md#revision) |
+| An explicit locale and the inherited default reaching one canonical locale give one revision | `an_explicit_locale_reaching_the_default_gives_the_same_revision` |
+| An absent default, invalid and unsupported input, a changed binding | Language-neutral, in the [Phase 1 matrix](../../../intlify_authoring/fixtures/phase1/README.md#locale-handoff) |
+| A library's source locale is preserved | **Phase 4**, with module references. |
 
 ### Identity equivalence
 
@@ -245,6 +236,15 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | Every use of a shared declaration names one occurrence | `every_use_of_a_shared_declaration_names_the_same_occurrence` |
 | Changed source evidence with an unchanged projection | `moving_source_changes_the_artifact_and_leaves_every_revision_alone` _(authoring)_ |
 | The same declaration after an edit or a move, and significant wording or context edits | **Phase 3.** |
+
+### Revision comparison
+
+| Requirement | Checked by |
+| --- | --- |
+| Host quoting, escapes, wrappers and parameter value expressions leave a revision alone; characters, spaces and case are compared exactly, without normalization | `host_spelling_and_parameter_values_leave_a_revision_alone` |
+| Host declarations reach the independent revision vectors | `host_declarations_reach_the_committed_independent_revision_vectors` |
+| Explicit forms take no usage from the receiver around them | `an_explicit_revision_does_not_depend_on_the_receiver_around_it` |
+| The language-neutral pairs | In the [Phase 1 matrix](../../../intlify_authoring/fixtures/phase1/README.md#revision) |
 
 ### Inventory completeness
 
@@ -261,6 +261,39 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | No complete claim from a partial or blocked result | `a_partial_checked_inventory_is_never_complete_input`, `a_blocked_result_is_never_complete_input`, `a_complete_scope_with_a_failed_unit_is_a_record_but_not_checked_input` _(authoring)_ |
 | An empty complete scope | `an_empty_complete_scope_is_admitted`, `an_empty_complete_scope_is_complete_checked_input` |
 | No accidental retirement | **Phase 3.** Nothing here retires; an inventory records what one analysis found. |
+
+### Test-only Profile inputs
+
+| Requirement | Checked by |
+| --- | --- |
+| A context pinning another profile, and a production context, are refused before anything is read | `a_context_pinning_another_profile_is_refused`, `a_production_context_is_refused_before_anything_is_read` |
+| The context registers the usage profile this Producer assigns from | `a_context_has_to_register_the_usage_profile_this_producer_assigns_from` |
+| Missing information stays missing | `an_annotated_class_comes_before_the_invocation_default`, `absent_inputs_stay_absent_rather_than_acquiring_a_hidden_default` _(authoring)_ |
+| The profile, usage and grammar pins are exact | `the_pin_is_the_exact_registered_pair`, `dom_globals_are_a_set_and_the_usage_pin_is_fixed`, `a_grammar_is_found_only_by_its_exact_identity_and_revision` |
+| An ordinary build cannot construct the test context | The test context is enabled only by this crate's development dependencies and its `benchmark` feature, so the `cargo tree` command above lists no `test-context` feature. |
+
+### Handoff
+
+| Requirement | Checked by |
+| --- | --- |
+| Finite references make no claim of final reachability | `a_reference_records_where_it_is_written_not_whether_it_runs` |
+| A blocked result, or a partial checked one, is never complete input | `a_blocked_result_is_never_complete_input`, `a_partial_scope_is_checked_for_its_part_and_claims_no_more` |
+| The inventory hands on occurrences and no identity | `the_inventory_hands_on_occurrences_and_no_identity` |
+| A later phase cites the artifact by its reference | `the_sealed_artifact_is_admitted_again_against_its_own_bytes` |
+| A stable ID distinct from a target handle, and a source artifact without Provider work | **Phase 3** for the ID, **Phase 4** for the consumer artifacts. |
+
+### Performance safety
+
+| Requirement | Checked by |
+| --- | --- |
+| Units, unit bytes and total bytes | `unit_counts_are_bounded_exactly_for_the_scope_and_the_supply`, `unit_bytes_are_bounded_exactly_and_counted_as_bytes`, `total_bytes_are_bounded_exactly`, `each_bound_admits_exactly_its_value` |
+| Syntax tree nodes, before the semantic checks | `syntax_tree_nodes_are_bounded_exactly`, `the_node_limit_applies_before_the_semantic_checks` |
+| Declarations, references and records of one unit | `declarations_one_unit_holds_are_the_shared_bound_exactly`, `references_one_unit_makes_are_bounded_exactly`, `diagnostics_are_the_shared_bound_for_host_and_shared_records_together`, `records_are_retained_up_to_the_budget_exactly`, `what_one_unit_hands_over_is_bounded_exactly` |
+| A bound on one literal, use site or message blocks only what it bounds | `a_bound_on_one_literal_blocks_only_its_declaration`, `a_shared_bound_on_one_message_blocks_only_its_declaration`, `a_bound_on_one_literal_or_use_site_is_scoped_to_it` |
+| Bounds no invocation could satisfy are refused | `bounds_that_no_invocation_could_satisfy_are_rejected` |
+| The other bounds | In their families: alias chain, proof steps and tracked origins, annotation bytes, parameters, exclusions, input segments, and the whole invocation |
+| Optional instrumentation stays out of ordinary builds | The `benchmark` feature is off by default, so the `cargo tree` command above lists no measurement crate. |
+| A bounded registry lookup | **Phase 3.** |
 
 ### Inventory
 
@@ -291,26 +324,6 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | A unit whose bytes were not supplied is named as unverified | `a_unit_without_supplied_bytes_is_admitted_but_named_as_unverified` _(authoring)_ |
 | Admission is bounded by the caller | `admission_is_bounded_by_the_caller_limits` _(authoring)_ |
 
-### Handoff
-
-| Requirement | Checked by |
-| --- | --- |
-| Finite references make no claim of final reachability | `a_reference_records_where_it_is_written_not_whether_it_runs` |
-| A blocked result, or a partial checked one, is never complete input | `a_blocked_result_is_never_complete_input`, `a_partial_scope_is_checked_for_its_part_and_claims_no_more` |
-| The inventory hands on occurrences and no identity | `the_inventory_hands_on_occurrences_and_no_identity` |
-| A later phase cites the artifact by its reference | `the_sealed_artifact_is_admitted_again_against_its_own_bytes` |
-| A stable ID distinct from a target handle, and a source artifact without Provider work | **Phase 3** for the ID, **Phase 4** for the consumer artifacts. |
-
-### Test-only Profile inputs
-
-| Requirement | Checked by |
-| --- | --- |
-| A context pinning another profile, and a production context, are refused before anything is read | `a_context_pinning_another_profile_is_refused`, `a_production_context_is_refused_before_anything_is_read` |
-| The context registers the usage profile this Producer assigns from | `a_context_has_to_register_the_usage_profile_this_producer_assigns_from` |
-| Missing information stays missing | `an_annotated_class_comes_before_the_invocation_default`, `absent_inputs_stay_absent_rather_than_acquiring_a_hidden_default` _(authoring)_ |
-| The profile, usage and grammar pins are exact | `the_pin_is_the_exact_registered_pair`, `dom_globals_are_a_set_and_the_usage_pin_is_fixed`, `a_grammar_is_found_only_by_its_exact_identity_and_revision` |
-| An ordinary build cannot construct the test context | The test context is enabled only by this crate's development dependencies and its `benchmark` feature, so the `cargo tree` command above lists no `test-context` feature. |
-
 ### Determinism and storage
 
 | Requirement | Checked by |
@@ -321,19 +334,6 @@ The families follow 016's [Conformance and Fixtures](../../../../design/016-intl
 | No hash order reaches what is returned | `facts_come_in_canonical_order_whatever_order_they_were_found_in`, `records_come_out_in_reporting_order_whatever_order_they_arrived_in`, `the_artifact_does_not_depend_on_order_or_scheduling` |
 | The grammar's revision is pinned by a corpus | `every_grammar_accepts_and_rejects_what_its_revision_was_pinned_with`, `every_grammar_is_pinned_by_both_an_acceptance_and_a_rejection` |
 | A script carries no module syntax, and a byte order mark is part of a unit | `a_script_carrying_module_syntax_is_rejected_in_either_language`, `a_byte_order_mark_and_a_hashbang_are_read_as_part_of_the_unit` |
-
-### Performance safety
-
-| Requirement | Checked by |
-| --- | --- |
-| Units, unit bytes and total bytes | `unit_counts_are_bounded_exactly_for_the_scope_and_the_supply`, `unit_bytes_are_bounded_exactly_and_counted_as_bytes`, `total_bytes_are_bounded_exactly`, `each_bound_admits_exactly_its_value` |
-| Syntax tree nodes, before the semantic checks | `syntax_tree_nodes_are_bounded_exactly`, `the_node_limit_applies_before_the_semantic_checks` |
-| Declarations, references and records of one unit | `declarations_one_unit_holds_are_the_shared_bound_exactly`, `references_one_unit_makes_are_bounded_exactly`, `diagnostics_are_the_shared_bound_for_host_and_shared_records_together`, `records_are_retained_up_to_the_budget_exactly`, `what_one_unit_hands_over_is_bounded_exactly` |
-| A bound on one literal, use site or message blocks only what it bounds | `a_bound_on_one_literal_blocks_only_its_declaration`, `a_shared_bound_on_one_message_blocks_only_its_declaration`, `a_bound_on_one_literal_or_use_site_is_scoped_to_it` |
-| Bounds no invocation could satisfy are refused | `bounds_that_no_invocation_could_satisfy_are_rejected` |
-| The other bounds | In their families: alias chain, proof steps and tracked origins, annotation bytes, parameters, exclusions, input segments, and the whole invocation |
-| Optional instrumentation stays out of ordinary builds | The `benchmark` feature is off by default, so the `cargo tree` command above lists no measurement crate. |
-| A bounded registry lookup | **Phase 3.** |
 
 ### Measurement
 
