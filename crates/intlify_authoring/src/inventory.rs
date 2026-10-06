@@ -23,11 +23,7 @@ mod model;
 #[cfg(feature = "test-context")]
 pub(crate) use admit::{admit, Entry};
 pub use admit::{admit_inventory, AdmissionFailure, AdmittedInventory, SourceBytes};
-pub use artifact::{
-    ArtifactKind, ArtifactRelation, AuthoringArtifactReference, InventoryArtifact,
-    ARTIFACT_INTEGRITY_DOMAIN, ARTIFACT_SCHEMA_REVISION, AUTHORING_SPECIFICATION_IDENTITY,
-    AUTHORING_SPECIFICATION_REVISION,
-};
+pub use artifact::InventoryArtifact;
 pub use model::{
     AuthoringInventory, Completeness, Exclusion, InventoryBuilder, InventoryFailure,
     ReferenceFacts, UnitOutcome, UnitResult,

@@ -53,6 +53,25 @@ intlify_shared_json::shared_string_type!(
     "invalid 128-bit opaque value"
 );
 
+impl Opaque128 {
+    /// Spell 16 bytes as the 32 lowercase hexadecimal digits 017 registers.
+    ///
+    /// This is spelling, not allocation. Whether a value is a fresh identity
+    /// depends on where its bytes came from, and 017 requires them to come
+    /// from operating-system randomness on an authorized update host, outside
+    /// read-only authoring.
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 16]) -> Self {
+        const DIGITS: &[u8; 16] = b"0123456789abcdef";
+        let mut text = String::with_capacity(32);
+        for byte in bytes {
+            text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+            text.push(char::from(DIGITS[usize::from(byte & 15)]));
+        }
+        Self(text)
+    }
+}
+
 // A JSON Schema pattern is an ECMA-262 regular expression, which has no inline
 // dot-all flag, so the character class spells out "any scalar, newline
 // included" rather than relying on one.
@@ -141,6 +160,15 @@ impl MessageIntentId {
     #[must_use]
     pub const fn owner(&self) -> &OwnerIdentity {
         &self.owner
+    }
+
+    /// Borrow the owner-local value.
+    ///
+    /// The value alone does not identify an Intent; equal values under two
+    /// owners are two Intents.
+    #[must_use]
+    pub const fn value(&self) -> &Opaque128 {
+        &self.value
     }
 }
 
@@ -631,6 +659,29 @@ mod tests {
                 Err(PrimitiveError::InvalidToken)
             );
         }
+    }
+
+    #[test]
+    fn sixteen_bytes_spell_the_registered_lowercase_digits() {
+        // The digits are written out rather than formatted, so the check does
+        // not reuse the code under test.
+        let ascending: [u8; 16] = std::array::from_fn(|index| index as u8);
+        assert_eq!(
+            Opaque128::from_bytes(ascending).as_str(),
+            "000102030405060708090a0b0c0d0e0f"
+        );
+        assert_eq!(
+            Opaque128::from_bytes([0xff; 16]).as_str(),
+            "ffffffffffffffffffffffffffffffff"
+        );
+        // Every spelled value is one the decoder admits.
+        let spelled = Opaque128::from_bytes([0xa5; 16]);
+        assert_eq!(
+            Opaque128::from_validated(spelled.as_str()),
+            Ok(spelled.clone())
+        );
+        let id = MessageIntentId::retained(owner(), spelled.as_str()).unwrap();
+        assert_eq!(id.value(), &spelled);
     }
 
     #[test]

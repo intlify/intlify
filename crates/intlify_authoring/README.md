@@ -97,6 +97,8 @@ An inventory records one analysis: the scope the caller declared, what happened 
 
 Admission never trusts what an artifact says about itself. The digest is recomputed, the projection is recomputed, and supplied bytes are checked against each unit's snapshot before any range inside it is believed. A unit whose bytes were not supplied is admitted but named as unverified, because a range checked against real bytes is a stronger result than one checked for shape.
 
+The envelope is shared with the other four kinds 017 registers. Each kind is its own type implementing `artifact::AuthoringArtifact`, which supplies sealing, integrity, references and comparison once, and `artifact::read_sealed` reads any of them in 017's order: bounded strict decoding, the exact kind tuple, the closed body, then the digest.
+
 The ordinary entry admits nothing in this phase. It refuses the test context, which an ordinary build cannot construct, and it refuses the production kinds, which need checked 015 inputs and the 017/018 work later phases own. The test-owned entry is `test_context::admit_inventory`.
 
 ## What Phase 3 adds
@@ -109,7 +111,7 @@ Phase 3 adds identity, and builds on these without changing their shape:
 - the declaration occurrence as the unit of identity. A reference names the occurrence it uses, equal text at two declarations is two occurrences, and no identifier is recorded;
 - `completeness()` and each unit's `outcome()`, which decide whether an inventory may support a retirement. A partial scope, or one with a blocked or failed unit, never does.
 
-What it adds is allocating a `MessageIntentId` from operating-system randomness on the host that publishes an update; the `intent-registry`, `intent-registry-update`, `message-intent` and `message-reference` codecs and their schemas; continuity verification against an exact base registry and the snapshots before and after; reconciliation plans; and checking a read-only compilation against the registry.
+What Phase 3 adds is allocating a `MessageIntentId` from operating-system randomness on the host that publishes an update; the `intent-registry`, `intent-registry-update`, `message-intent` and `message-reference` codecs and their schemas; continuity verification against an exact base registry and the snapshots before and after; reconciliation plans; and checking a read-only compilation against the registry. The work has started in [`intlify_authoring_identity`](../intlify_authoring_identity/README.md), which never generates a value itself: randomness stays with the host.
 
 Two questions are open with designs 017 and 019 before that. Whether scope membership is recorded where admission can check it: a unit removed from a sealed complete inventory is not detected today. And whether a host's binding configuration belongs in the basis: two configurations read the same source differently, and the basis records only the profile pin.
 

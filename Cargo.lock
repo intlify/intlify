@@ -541,6 +541,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_authoring_identity"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "intlify_authoring",
+ "schemars",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "intlify_authoring_js"
 version = "0.14.0-alpha.12"
 dependencies = [
