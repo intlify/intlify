@@ -140,6 +140,8 @@ pub(super) struct Verdict {
     pub(super) valid: BTreeMap<Key, bool>,
     /// Whether the walk ran out of steps before it finished.
     pub(super) exhausted: bool,
+    /// The steps the walk took, counted whether or not it ran out.
+    pub(super) steps: u64,
 }
 
 /// Walk one function body.
@@ -183,6 +185,7 @@ where
     Ok(Verdict {
         valid: walker.valid,
         exhausted: walker.exhausted,
+        steps: walker.steps,
     })
 }
 

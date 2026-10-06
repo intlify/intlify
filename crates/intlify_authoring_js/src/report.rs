@@ -124,6 +124,12 @@ impl Reporter {
             .collect()
     }
 
+    /// Borrow the retained records, in the order they arrived.
+    #[cfg(feature = "benchmark")]
+    pub(crate) fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
     /// Return whether any retained record blocks a checked result.
     pub(crate) fn blocks(&self) -> bool {
         self.diagnostics.iter().any(Diagnostic::is_blocking)

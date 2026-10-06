@@ -139,6 +139,25 @@ What the result may be used for is answered by type:
 
 A failed unit is recorded with its outcome and no facts, because a unit that could not be read is not evidence that it declares nothing. A reference records where it is written, not whether it runs.
 
+## Measurement
+
+The non-default `benchmark` feature measures two operations as a design 026 owner, through the owner run in `intlify_measurement`. Ordinary builds never include it.
+
+| Operation | Inside the interval | Outside it |
+| --- | --- | --- |
+| `source_discovery / parse_and_classify` | One admitted unit to its classified declarations, uses, exclusions and host diagnostics: parsing, the semantic build, the explicit forms, DOM receiver proofs, and annotations | Admission and its digest check, and handing declarations to `intlify_authoring`, which is Phase 1's message analysis |
+| `authoring_result / inventory_assembly` | Analyzed units to the sealed inventory and its JSON bytes | Analyzing the units |
+
+Source discovery runs the same function `analyze_unit` runs first, so nothing is reimplemented for measurement.
+
+The 30 fixtures are design 016's required workloads for this phase: a unit with no candidates, short UI literals at three scales, equal text at distinct declarations, complex MF2, sparse and dense parameters, many references to one declaration at three scales, design 028's representative application, conditional selection, an escaped receiver, invalid host syntax, a complete and a partial inventory of the same units, and the exact and first-over sides of the bounds on syntax tree nodes, alias chains, proof steps, annotation bytes, parameters, unit bytes and units.
+
+Each fixture declares the path it takes: complete, blocked, or refused with an operational failure. One that takes another path stops the run before its Plan is issued. A bound is taken from the fixture itself, so its exact side is the fixture's own count and its first-over side is one below. A bound on one declaration or use site blocks it; a bound on a unit or the invocation refuses. A unit over its byte bound is refused at admission, outside both intervals, so only its exact side is measured.
+
+Every measured invocation reuses its case's workspace and is compared with an expectation established on a fresh one. The tests also compare each unit fixture after the workspace served a success, a failure, and a cancellation. The logical work records each count as exact, as a lower bound when the operation stopped past it, as unavailable when this harness does not count it, or as not applicable when the path does no such work.
+
+`vp run bench:authoring-js:smoke` captures one run, writes its records, reads them back, and re-admits them; withholding any one record is refused. The numbers are for presentation only: nothing compares them with a threshold.
+
 ## What this crate never does
 
 - It retrieves no file, package, or network resource, and evaluates no host code.
@@ -159,10 +178,7 @@ This is an unpublished, workspace-internal crate. Implemented:
 - bounded DOM recognition with all-path receiver evidence, and the `text-content` usage profile;
 - `@intlify` metadata, attached to exactly one declaration;
 - assembling the analyzed units into a sealed `authoring-inventory`, checked against the declared scope and the same however the units were scheduled;
-- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins, proof steps and annotation bytes, a reusable workspace, and cancellation. A bound on one literal, one use site, one annotation or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure.
-
-The later changes add:
-
+- limits for units, bytes, syntax tree nodes, input map segments, references, exclusions, parameters, alias chains, tracked origins, proof steps and annotation bytes, a reusable workspace, and cancellation. A bound on one literal, one use site, one annotation or one function's proof — and the shared crate's bounds on one message — blocks what it bounds with an `authoring-resource-limit` record, and the rest of the unit is still read. A bound on the invocation or a whole unit is an operational failure;
 - design 026 measurement of source discovery and inventory assembly.
 
 As in `intlify_authoring`, the only context kind this phase admits is the test context. A context claiming a production kind is refused before anything is read, because production admission needs checked 015 inputs that later phases supply.

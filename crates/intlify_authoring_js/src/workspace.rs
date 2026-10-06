@@ -41,14 +41,19 @@ impl JsAnalysisWorkspace {
         self.arena.capacity()
     }
 
-    /// Release what the previous unit allocated and lend the scratch out.
+    /// Release what the previous unit allocated and lend the arena out.
     ///
     /// Resetting here, rather than after a unit, is what makes a workspace
     /// abandoned by a failure or a cancellation safe to reuse: whatever that
     /// unit left behind is dropped before the next one starts.
-    pub(crate) fn fresh(&mut self) -> (&Allocator, &mut AnalysisWorkspace) {
+    pub(crate) fn fresh(&mut self) -> &Allocator {
         self.arena.reset();
-        (&self.arena, &mut self.analysis)
+        &self.arena
+    }
+
+    /// Lend the shared crate's scratch, which clears itself before each use.
+    pub(crate) fn shared(&mut self) -> &mut AnalysisWorkspace {
+        &mut self.analysis
     }
 }
 
@@ -80,14 +85,14 @@ mod tests {
     #[test]
     fn lending_the_scratch_drops_what_the_last_unit_left_and_keeps_its_capacity() {
         let mut workspace = JsAnalysisWorkspace::new();
-        let (arena, _) = workspace.fresh();
+        let arena = workspace.fresh();
         arena.alloc_str(&"x".repeat(LARGE));
         assert!(arena.used_bytes() >= LARGE);
         assert!(workspace.arena_capacity() >= LARGE);
 
         // Nothing the previous unit allocated is live in the arena lent to
         // the next one, but the memory it grew into is kept for reuse.
-        let (arena, _) = workspace.fresh();
+        let arena = workspace.fresh();
         assert_eq!(arena.used_bytes(), 0);
         assert!(workspace.arena_capacity() >= LARGE);
     }

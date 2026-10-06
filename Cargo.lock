@@ -545,6 +545,7 @@ name = "intlify_authoring_js"
 version = "0.14.0-alpha.12"
 dependencies = [
  "intlify_authoring",
+ "intlify_measurement",
  "intlify_shared_json",
  "oxc_allocator",
  "oxc_ast",
@@ -553,8 +554,10 @@ dependencies = [
  "oxc_parser",
  "oxc_semantic",
  "oxc_span",
+ "schemars",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

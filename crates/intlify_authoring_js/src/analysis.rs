@@ -165,6 +165,9 @@ pub struct UnitWork {
     pub symbols: u64,
     /// Identifier references in an accepted unit.
     pub references: u64,
+    /// Steps spent proving DOM receiver evidence, every function's together.
+    /// Nothing is proven, and so nothing counted, without a DOM global.
+    pub proof_steps: u64,
 }
 
 /// Analyze one admitted unit.
@@ -185,6 +188,82 @@ pub fn analyze_unit<C>(
 where
     C: Fn() -> bool + ?Sized,
 {
+    let Classified {
+        recognized,
+        mut reporter,
+        work,
+        outside_profile,
+    } = match classify(context, profile, unit, limits, workspace, cancelled)? {
+        Classification::Failed(analysis) => return Ok(analysis),
+        Classification::Read(classified) => classified,
+    };
+    let (facts, blocked_by_shared) = hand_over(
+        context,
+        recognized,
+        limits,
+        workspace.shared(),
+        &mut reporter,
+        cancelled,
+    )?;
+    let outcome = if blocked_by_shared || reporter.blocks() {
+        UnitOutcome::Blocked
+    } else {
+        UnitOutcome::Checked
+    };
+    Ok(UnitAnalysis {
+        source: reporter.source().clone(),
+        outcome,
+        facts,
+        diagnostics: reporter.into_diagnostics(),
+        work,
+        outside_profile,
+        basis: context.basis().clone(),
+        profile: profile.clone(),
+    })
+}
+
+/// What reading one unit's host syntax established.
+#[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "one value per unit, matched as soon as it is returned"
+)]
+pub(crate) enum Classification {
+    /// The unit could not be read, and its analysis already says why.
+    Failed(UnitAnalysis),
+    /// The unit was read, and what it declares is classified.
+    Read(Classified),
+}
+
+/// One read unit's candidates, before any of them reaches `intlify_authoring`.
+///
+/// Nothing in it borrows the workspace: the tree is released before it is
+/// returned.
+#[derive(Debug)]
+pub(crate) struct Classified {
+    pub(crate) recognized: Recognized,
+    pub(crate) reporter: Reporter,
+    pub(crate) work: UnitWork,
+    pub(crate) outside_profile: u64,
+}
+
+/// Read one admitted unit's host syntax and classify what it declares.
+///
+/// This is everything [`analyze_unit`] does before it hands declarations to
+/// `intlify_authoring`: parsing, the semantic checks, the explicit forms, the
+/// proven DOM sinks, and the annotations that describe them. No message is
+/// analyzed and no use site is compared yet.
+pub(crate) fn classify<C>(
+    context: &dyn AuthoringContext,
+    profile: &JsAuthoringProfile,
+    unit: &AdmittedUnit<'_>,
+    limits: &JsAuthoringLimits,
+    workspace: &mut JsAnalysisWorkspace,
+    cancelled: &C,
+) -> Result<Classification, ProducerFailure>
+where
+    C: Fn() -> bool + ?Sized,
+{
     check_usage_profile(context, profile)?;
     let source = unit.snapshot().clone();
     let mut reporter = Reporter::new(source.clone(), limits.authoring.diagnostics);
@@ -201,9 +280,8 @@ where
     };
 
     work.parse_attempts = 1;
-    let (arena, shared) = workspace.fresh();
     let parsed = match parse::read(
-        arena,
+        workspace.fresh(),
         text,
         unit.grammar(),
         limits,
@@ -252,6 +330,7 @@ where
             cancelled,
         )?;
         outside_profile = found.outside_profile;
+        work.proof_steps = found.proof_steps;
         merge(&mut recognized, found, limits, &reporter)?;
     }
     // An annotation describes what the recognizers declared, so it is read
@@ -266,32 +345,14 @@ where
             cancelled,
         )?;
     }
-    // The tree is not needed past this point, and nothing below borrows it.
+    // The tree is not needed past this point, and nothing returned borrows it.
     drop(parsed);
-
-    let (facts, blocked_by_shared) = hand_over(
-        context,
+    Ok(Classification::Read(Classified {
         recognized,
-        limits,
-        shared,
-        &mut reporter,
-        cancelled,
-    )?;
-    let outcome = if blocked_by_shared || reporter.blocks() {
-        UnitOutcome::Blocked
-    } else {
-        UnitOutcome::Checked
-    };
-    Ok(UnitAnalysis {
-        source,
-        outcome,
-        facts,
-        diagnostics: reporter.into_diagnostics(),
+        reporter,
         work,
         outside_profile,
-        basis: context.basis().clone(),
-        profile: profile.clone(),
-    })
+    }))
 }
 
 /// Add what automatic recognition found to the explicit forms.
@@ -337,9 +398,9 @@ fn failed(
     location: Location,
     work: UnitWork,
     (basis, profile): (AuthoringBasis, JsAuthoringProfile),
-) -> Result<UnitAnalysis, ProducerFailure> {
+) -> Result<Classification, ProducerFailure> {
     reporter.at_location(ReasonFamily::AuthoringInputInvalid, detail, location)?;
-    Ok(UnitAnalysis {
+    Ok(Classification::Failed(UnitAnalysis {
         source: reporter.source().clone(),
         outcome: UnitOutcome::Failed,
         facts: UnitFacts::default(),
@@ -348,7 +409,7 @@ fn failed(
         outside_profile: 0,
         basis,
         profile,
-    })
+    }))
 }
 
 /// Hand the declarations to the shared crate and settle every use.
@@ -521,6 +582,45 @@ mod tests {
 
     fn range_of(occurrence: &intlify_authoring::Occurrence) -> (u64, u64) {
         (occurrence.range().start(), occurrence.range().end())
+    }
+
+    fn classified(text: &[u8]) -> Classification {
+        let units = admit(&[(UNIT, Grammar::JsModule, text)]);
+        classify(
+            &context(),
+            &profile(),
+            &units[0],
+            &generous(),
+            &mut JsAnalysisWorkspace::new(),
+            &|| false,
+        )
+        .expect("the unit is read")
+    }
+
+    #[test]
+    fn classifying_stops_before_any_message_is_analyzed() {
+        // The message is malformed MF2. Whether a message is valid is decided
+        // when it is handed over, so classifying finds a declaration and no
+        // reason to block it, and only the whole analysis blocks the unit.
+        let text = format!("{PRELUDE}intent('Hello {{$name')\n");
+        let Classification::Read(read) = classified(text.as_bytes()) else {
+            panic!("a text unit is read");
+        };
+        assert_eq!(read.recognized.declarations.len(), 1);
+        assert!(!read.reporter.blocks());
+        let analysis = analyzed(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked);
+        // Everything counted was counted while classifying.
+        assert_eq!(analysis.work(), read.work);
+    }
+
+    #[test]
+    fn a_unit_that_cannot_be_read_is_already_its_analysis_when_classified() {
+        let Classification::Failed(analysis) = classified(&[0xff]) else {
+            panic!("bytes that are not text are not read");
+        };
+        assert_eq!(analysis.outcome(), UnitOutcome::Failed);
+        assert_eq!(details(&analysis), ["unit-not-text"]);
     }
 
     #[test]

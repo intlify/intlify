@@ -29,6 +29,15 @@ use intlify_shared_json::quantity::Quantity;
 
 use crate::environment::ClockObservation;
 
+/// The revision of `rustix` every clock reading and kernel view is taken
+/// through.
+///
+/// It is the locked dependency's own version. Records name it beside every
+/// reading and owners name it in their method descriptors, so it is part of a
+/// case's identity: moving the lock to another revision changes the method,
+/// and a test fails until this constant follows it.
+pub const PROVIDER_REVISION: &str = "1.1.5";
+
 /// Why one host or toolchain view could not be acquired.
 ///
 /// The cause is all that is kept: the rejected value, an error object, or a
@@ -163,7 +172,7 @@ impl MonotonicClock {
         Ok(Self {
             description: ClockDescription {
                 provider: "rustix",
-                provider_revision: "1.1.4",
+                provider_revision: PROVIDER_REVISION,
                 clock: "posix-clock-monotonic",
                 resolution_nanoseconds: Quantity::new(resolution),
                 resolution_source: "clock-getres-reported-granularity",
@@ -247,6 +256,27 @@ pub fn measure<Input, Output>(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_provider_revision_is_the_locked_dependency() {
+        // A dependency update that moves the lock without this constant would
+        // leave every record naming a revision it was not read through.
+        let lock = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock"),
+        )
+        .expect("the workspace lock file");
+        let locked = lock
+            .split("[[package]]")
+            .filter(|block| block.lines().any(|line| line.trim() == "name = \"rustix\""))
+            .filter_map(|block| {
+                block
+                    .lines()
+                    .find_map(|line| line.trim().strip_prefix("version = "))
+                    .map(|version| version.trim_matches('"'))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(locked, [PROVIDER_REVISION]);
+    }
+
     use super::*;
     use std::cell::{Cell, RefCell};
     use std::collections::VecDeque;

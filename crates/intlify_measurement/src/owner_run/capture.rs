@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::context::SamplingPolicy;
 use super::observation::{Digest, Framing, Observation};
-use super::run::PreparationFailure;
+use super::run::{Expected, PreparationFailure};
 use crate::acquisition::{measure, Clock, MeasurementFailure};
 
 /// What one measured invocation produced, observed after the interval closed.
@@ -27,11 +27,11 @@ pub struct Observed<W> {
     pub observation: Observation,
     /// The logical work the invocation performed, in the owner's vocabulary.
     pub work: W,
-    /// Whether the operation produced its complete result.
+    /// The path the operation took.
     ///
     /// A fixture declares which path it expects, and this is what that
     /// declaration is checked against.
-    pub complete: bool,
+    pub path: Expected,
 }
 
 /// The binding one case's samples are local to.
@@ -234,7 +234,7 @@ mod tests {
                 positions: None,
             },
             work: *output as u64,
-            complete: true,
+            path: Expected::Complete,
         }
     }
 

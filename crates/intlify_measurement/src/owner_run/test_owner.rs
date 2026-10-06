@@ -91,6 +91,25 @@ const MISDECLARED_FIXTURES: [Fixture; 3] = [
     },
 ];
 
+/// The same fixtures, except that the empty text is declared to fail operationally.
+const MISDECLARED_FAILURE_FIXTURES: [Fixture; 3] = [
+    Fixture {
+        name: "ascii",
+        text: "Pay now",
+        path: Expected::Complete,
+    },
+    Fixture {
+        name: "multibyte",
+        text: "日本語",
+        path: Expected::Complete,
+    },
+    Fixture {
+        name: "empty",
+        text: "",
+        path: Expected::OperationalFailure,
+    },
+];
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Work {
@@ -170,7 +189,11 @@ fn observe(output: &Option<usize>, text: &'static str) -> Observed<Work> {
             bytes: Quantity::new(text.len() as u64),
             characters: Quantity::new(output.unwrap_or(0) as u64),
         },
-        complete: output.is_some(),
+        path: if output.is_some() {
+            Expected::Complete
+        } else {
+            Expected::Blocked
+        },
     }
 }
 
@@ -189,6 +212,8 @@ pub(super) const DRIFTING: u8 = 2;
 pub(super) const FAILING: u8 = 3;
 /// A fixture declares the path it does not take.
 pub(super) const MISDECLARED: u8 = 4;
+/// A fixture declares an operational failure where it reports why it cannot.
+pub(super) const MISDECLARED_FAILURE: u8 = 5;
 
 pub(super) struct TestOwner<const MODE: u8>;
 
@@ -207,10 +232,10 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
     type Work = Work;
 
     fn fixtures() -> &'static [Fixture] {
-        if MODE == MISDECLARED {
-            &MISDECLARED_FIXTURES
-        } else {
-            &FIXTURES
+        match MODE {
+            MISDECLARED => &MISDECLARED_FIXTURES,
+            MISDECLARED_FAILURE => &MISDECLARED_FAILURE_FIXTURES,
+            _ => &FIXTURES,
         }
     }
 
@@ -343,9 +368,10 @@ mod tests {
         // selected, and the records that claim one resolved are refused.
         let observation = observe_smoke::<Sound>().unwrap();
         let owner = observation.owner_document();
-        assert!(observation
-            .validate(&[owner, owner], &common(&observation))
-            .is_err());
+        assert_eq!(
+            observation.validate(&[owner, owner], &common(&observation)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
     }
 
     #[test]
@@ -360,9 +386,10 @@ mod tests {
             second.run().plan_record().body.case_inventory,
             "the two runs plan the same cases"
         );
-        assert!(first
-            .validate(&[second.owner_document()], &common(&first))
-            .is_err());
+        assert_eq!(
+            first.validate(&[second.owner_document()], &common(&first)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
         assert!(matches!(
             OwnerRun::admit(first.run(), second.owner_document()),
             Err(crate::owner::Rejection::Binding(Some(_)))
@@ -392,7 +419,10 @@ mod tests {
     #[test]
     fn no_owner_document_at_all_is_not_a_complete_run() {
         let observation = observe_smoke::<Sound>().unwrap();
-        assert!(observation.validate(&[], &common(&observation)).is_err());
+        assert_eq!(
+            observation.validate(&[], &common(&observation)),
+            Err(SmokeFailure::Admission(ValidationFailure::Evidence))
+        );
     }
 
     #[test]
@@ -498,6 +528,12 @@ mod tests {
         // never does, so the run stops before issuing the Plan.
         assert_eq!(
             PreparedRun::<TestOwner<MISDECLARED>>::acquire().err(),
+            Some(RunFailure::PathMismatch)
+        );
+        // Reporting why it cannot is not failing operationally either: the
+        // three paths are told apart, not only complete from the rest.
+        assert_eq!(
+            PreparedRun::<TestOwner<MISDECLARED_FAILURE>>::acquire().err(),
             Some(RunFailure::PathMismatch)
         );
         assert!(PreparedRun::<Sound>::acquire().is_ok());

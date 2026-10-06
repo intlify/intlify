@@ -8,9 +8,9 @@
 //! so a reader can tell what a duration is a duration *of*.
 //!
 //! Anything the harness does inside the interval is declared here rather than
-//! subtracted from the result. That includes the scratch buffer the harness
-//! lends to the operation: borrowing it is cheap, but it is not free, and a
-//! measurement that hides it is describing a different operation.
+//! subtracted from the result. That includes the workspace it lends to source
+//! discovery and the serialization of the sealed inventory: both are inside,
+//! because a caller pays for both.
 
 use intlify_measurement::environment::ClockObservation;
 use intlify_measurement::execution::{Execution, OutputBuffer};
@@ -44,6 +44,50 @@ pub(super) struct Boundary {
 
 impl Boundary {
     pub(super) fn for_operation(operation: Operation) -> Self {
+        let (included, excluded): (&[&str], &[&str]) = match operation {
+            Operation::ParseAndClassify => (
+                &[
+                    "preserved-operation-invocation",
+                    "lent-scratch-borrow",
+                    "ordinary-complete-result-construction",
+                    "complete-output-black-box",
+                ],
+                &[
+                    "fixture-and-input-preparation",
+                    "unit-admission-and-snapshot-digest-check",
+                    "phase-1-declaration-resolution",
+                    "expectation-establishment",
+                    "clock-acquisition",
+                    "warmup-invocations",
+                    "duration-conversion-and-aggregation",
+                    "observation-encoding-and-comparison",
+                    "logical-work-counting",
+                    "record-assembly-and-reporting",
+                    "output-destruction-and-teardown",
+                ],
+            ),
+            Operation::InventoryAssembly => (
+                &[
+                    "preserved-operation-invocation",
+                    "ordinary-complete-result-construction",
+                    "artifact-serialization",
+                    "complete-output-black-box",
+                ],
+                &[
+                    "fixture-and-input-preparation",
+                    "unit-admission-and-snapshot-digest-check",
+                    "prior-stage-establishment",
+                    "expectation-establishment",
+                    "clock-acquisition",
+                    "warmup-invocations",
+                    "duration-conversion-and-aggregation",
+                    "observation-encoding-and-comparison",
+                    "logical-work-counting",
+                    "record-assembly-and-reporting",
+                    "output-destruction-and-teardown",
+                ],
+            ),
+        };
         Self {
             identity: operation.boundary().into(),
             revision: "0".into(),
@@ -54,24 +98,8 @@ impl Boundary {
             occurrence_policy: "single".into(),
             first_included_marker: "preserved-operation-invocation".into(),
             final_included_marker: "complete-output-black-box".into(),
-            included_markers: strings(&[
-                "preserved-operation-invocation",
-                "lent-scratch-borrow",
-                "ordinary-complete-result-construction",
-                "complete-output-black-box",
-            ]),
-            excluded_markers: strings(&[
-                "fixture-and-input-preparation",
-                "prior-stage-establishment",
-                "expectation-establishment",
-                "clock-acquisition",
-                "warmup-invocations",
-                "duration-conversion-and-aggregation",
-                "observation-encoding-and-comparison",
-                "logical-work-counting",
-                "record-assembly-and-reporting",
-                "output-destruction-and-teardown",
-            ]),
+            included_markers: strings(included),
+            excluded_markers: strings(excluded),
             // No workflow interval or profiler span is active in this profile.
             direct_parents: Vec::new(),
             direct_children: Vec::new(),
@@ -124,11 +152,13 @@ pub(super) struct Method {
 impl Method {
     pub(super) fn monotonic_invocation() -> Self {
         Self {
-            identity: "intlify-authoring-posix-monotonic-invocation".into(),
+            identity: "intlify-authoring-js-posix-monotonic-invocation".into(),
             revision: "0".into(),
             metric: "wall_duration".into(),
             canonical_unit: "nanosecond".into(),
             provider: "rustix".into(),
+            // The revision the clock is read through, as the shared
+            // acquisition records it beside every reading.
             provider_revision: intlify_measurement::acquisition::PROVIDER_REVISION.into(),
             clock: "posix-clock-monotonic".into(),
             observation_domain: "owner-boundary-complete-operation-invocation".into(),
@@ -151,7 +181,7 @@ impl Method {
             ]),
             estimated_overhead_subtraction: false,
             optimization_barrier: OptimizationBarrier {
-                identity: "intlify-authoring-operation-black-box".into(),
+                identity: "intlify-authoring-js-operation-black-box".into(),
                 revision: "0".into(),
                 applicability: "required".into(),
                 input_opacity: "std-hint-black-box-prepared-input".into(),
@@ -171,10 +201,10 @@ impl Method {
 
 /// The execution state one operation's prepared core runs in.
 pub(super) fn execution_state(operation: Operation) -> Execution {
-    let lends_scratch = matches!(
-        operation,
-        Operation::LiteralEncode | Operation::Mf2ParseAndSemanticFacts
-    );
+    // Source discovery borrows the case's workspace, whose arena keeps its
+    // capacity between invocations. Assembly lends nothing. Neither writes
+    // into a caller-owned output buffer: both return owned results.
+    let lends_scratch = matches!(operation, Operation::ParseAndClassify);
     Execution {
         // The harness invokes prepared operations in its existing process. Its
         // compiled core and immutable preparation are retained, not rebuilt
@@ -191,14 +221,7 @@ pub(super) fn execution_state(operation: Operation) -> Execution {
             "not-applicable"
         }
         .into(),
-        output_buffer_state: if lends_scratch {
-            OutputBuffer::Applicable {
-                ownership: "caller-owned".into(),
-                reuse: "reused".into(),
-            }
-        } else {
-            OutputBuffer::NotApplicable {}
-        },
+        output_buffer_state: OutputBuffer::NotApplicable {},
     }
 }
 
@@ -206,10 +229,10 @@ pub(super) fn execution_state(operation: Operation) -> Execution {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Descriptors {
-    pub(super) boundary: Boundary,
-    pub(super) method: Method,
-    pub(super) clock_observation: ClockObservation,
-    pub(super) execution: Execution,
+    boundary: Boundary,
+    method: Method,
+    clock_observation: ClockObservation,
+    execution: Execution,
 }
 
 impl Descriptors {
@@ -259,53 +282,42 @@ mod tests {
     }
 
     #[test]
-    fn the_lent_scratch_is_declared_rather_than_subtracted() {
-        // The harness lends a buffer to two of the operations, and the borrow
-        // happens inside the interval. Hiding it would describe an operation
-        // that is not the one being measured.
-        let method = Method::monotonic_invocation();
-        assert!(method
-            .included_instrumentation
-            .contains(&"lent-scratch-borrow-check".to_owned()));
-        assert!(!method.estimated_overhead_subtraction);
-        assert!(Boundary::for_operation(Operation::LiteralEncode)
-            .included_markers
-            .contains(&"lent-scratch-borrow".to_owned()));
-    }
-
-    #[test]
-    fn only_the_operations_that_are_lent_a_buffer_report_one() {
-        for operation in Operation::ALL {
-            let execution = execution_state(operation);
-            let lends = matches!(
-                operation,
-                Operation::LiteralEncode | Operation::Mf2ParseAndSemanticFacts
-            );
-            assert_eq!(execution.scratch_reuse_state == "reused", lends);
-            assert_eq!(
-                matches!(
-                    execution.output_buffer_state,
-                    OutputBuffer::Applicable { .. }
-                ),
-                lends,
-                "{operation:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_expectation_and_the_warmup_are_outside_the_interval() {
-        let boundary = Boundary::for_operation(Operation::DeclarationFacts);
+    fn source_discovery_excludes_the_phase_1_semantics_it_stops_before() {
+        // The interval ends where declarations reach the shared crate, and
+        // admission's digest check happens before it opens.
+        let boundary = Boundary::for_operation(Operation::ParseAndClassify);
         for excluded in [
+            "phase-1-declaration-resolution",
+            "unit-admission-and-snapshot-digest-check",
             "expectation-establishment",
             "warmup-invocations",
-            "observation-encoding-and-comparison",
-            "logical-work-counting",
         ] {
             assert!(
                 boundary.excluded_markers.contains(&excluded.to_owned()),
                 "{excluded} is not declared excluded"
             );
         }
+        assert!(boundary
+            .included_markers
+            .contains(&"lent-scratch-borrow".to_owned()));
+    }
+
+    #[test]
+    fn assembly_includes_the_bytes_it_hands_over_and_lends_no_scratch() {
+        let boundary = Boundary::for_operation(Operation::InventoryAssembly);
+        assert!(boundary
+            .included_markers
+            .contains(&"artifact-serialization".to_owned()));
+        assert!(boundary
+            .excluded_markers
+            .contains(&"prior-stage-establishment".to_owned()));
+        assert_eq!(
+            execution_state(Operation::InventoryAssembly).scratch_reuse_state,
+            "not-applicable"
+        );
+        assert_eq!(
+            execution_state(Operation::ParseAndClassify).scratch_reuse_state,
+            "reused"
+        );
     }
 }
