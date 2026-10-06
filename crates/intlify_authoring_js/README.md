@@ -42,7 +42,7 @@ A unit's text is its bytes, a byte order mark included. To the language that mar
 
 ## Decoding literals
 
-016 reads a message from the host's cooked value, so `intent('a\nb')` and a `mf2` template with the same escape both hand MF2 a line feed. The parser computes that value but not where each decoded byte came from. The decoder here reads the literal again from its source bytes, recording an `InputSegment` per run as it goes, and requires its text to equal the parser's byte for byte. A disagreement stops the invocation rather than choosing one reading.
+016 reads a message from the host's cooked value, so `intent('a\nb')` and a `mf2` template with the same escape both hand MF2 a line feed. The parser computes that value but not where each decoded byte came from. The decoder here reads the literal again from its source bytes, recording an `InputSegment` per run as it goes, and requires its text to equal the parser's byte for byte. A disagreement stops the invocation rather than choosing one reading. The same map locates what the shared crate reports inside a message: an MF2 syntax error carries the decoded range the parser saw and, as `source_range()`, the bytes of the unit it came from, even when its declaration is blocked.
 
 Runs split wherever a source byte stops answering for exactly one decoded byte. Verbatim text and a lone carriage return a template reads as a line feed are positional; an escape, a CRLF a template reads as one line feed, and a line continuation are each a run of their own.
 

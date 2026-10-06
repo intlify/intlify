@@ -1011,6 +1011,97 @@ fn displayed_text_no_message_can_carry_is_reported_where_an_author_can_fix_it() 
 }
 
 #[test]
+fn a_message_record_says_where_in_source_it_is_even_when_its_declaration_is_blocked() {
+    let range = |start, end| ByteRange::new(start, end).unwrap();
+    let written = |start, end, role| {
+        Occurrence::new(occurrence().source().clone(), range(start, end), role).unwrap()
+    };
+
+    // `intent('Hi {$name')`: the literal at [7, 23), its content at
+    // [8, 22). The escape decodes six bytes to one, so the unclosed
+    // placeholder at decoded [3, 9) is written at [16, 22), not at 8 + 3.
+    let literal = written(7, 23, OccurrenceRole::IntentLiteral);
+    let map = [
+        InputSegment::new(range(0, 1), range(8, 14)),
+        InputSegment::new(range(1, 9), range(14, 22)),
+    ];
+    let mut input = declaration(MessageInput::Mf2("Hi {$name"));
+    input.occurrence = literal.clone();
+    input.input_map = Some(&map);
+    let result = resolve(&context(), &[input]).expect("an invocation that ran");
+    assert_eq!(result.outcome(), Outcome::Blocked);
+    let [record] = result.diagnostics() else {
+        panic!("one parser record: {:?}", result.diagnostics());
+    };
+    assert_eq!(record.occurrence(), Some(&literal));
+    assert_eq!(
+        record.message_range(),
+        Some(MessageRange::Emitted(range(3, 9)))
+    );
+    assert_eq!(record.source_range(), Some(range(16, 22)));
+
+    // `intent('{{a}')`: a range reaching into the escape covers all of
+    // it, because no byte of the six answers for the brace alone.
+    let literal = written(7, 18, OccurrenceRole::IntentLiteral);
+    let map = [
+        InputSegment::new(range(0, 1), range(8, 14)),
+        InputSegment::new(range(1, 4), range(14, 17)),
+    ];
+    let mut input = declaration(MessageInput::Mf2("{{a}"));
+    input.occurrence = literal;
+    input.input_map = Some(&map);
+    let result = resolve(&context(), &[input]).expect("an invocation that ran");
+    let located: Vec<(&str, Option<MessageRange>, Option<ByteRange>)> = result
+        .diagnostics()
+        .iter()
+        .map(|record| {
+            (
+                record.origin().code(),
+                record.message_range(),
+                record.source_range(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        located,
+        [
+            (
+                "unclosed-quoted-pattern",
+                Some(MessageRange::Emitted(range(0, 3))),
+                Some(range(8, 16))
+            ),
+            (
+                "unexpected-token",
+                Some(MessageRange::Emitted(range(3, 4))),
+                Some(range(16, 17))
+            ),
+        ]
+    );
+
+    // `'a\0b'` at [7, 13): the scalar MF2 cannot carry was written as `\0`.
+    let map = [
+        InputSegment::new(range(0, 1), range(8, 9)),
+        InputSegment::new(range(1, 2), range(9, 11)),
+        InputSegment::new(range(2, 3), range(11, 12)),
+    ];
+    let mut input = declaration(MessageInput::Literal("a\u{0}b"));
+    input.occurrence = written(7, 13, OccurrenceRole::UiLiteral);
+    input.input_map = Some(&map);
+    let result = resolve(&context(), &[input]).expect("an invocation that ran");
+    assert_eq!(details(&result), ["unrepresentable-scalar"]);
+    assert_eq!(
+        result.diagnostics()[0].message_range(),
+        Some(MessageRange::Supplied(range(1, 2)))
+    );
+    assert_eq!(result.diagnostics()[0].source_range(), Some(range(9, 11)));
+
+    // Without a host map nothing leads back to source, and nothing is claimed.
+    let plain = resolve(&context(), &[declaration(MessageInput::Mf2("Hi {$name"))])
+        .expect("an invocation that ran");
+    assert_eq!(plain.diagnostics()[0].source_range(), None);
+}
+
+#[test]
 fn a_cancelled_invocation_returns_no_facts_at_all() {
     let inputs = [
         declaration(MessageInput::Literal("first")),

@@ -427,6 +427,7 @@ pub struct Diagnostic {
     severity: Severity,
     location: Location,
     message_range: Option<MessageRange>,
+    source_range: Option<ByteRange>,
     limit: Option<LimitKind>,
     related: Box<[Occurrence]>,
 }
@@ -448,6 +449,7 @@ impl Diagnostic {
             severity,
             location: location.into(),
             message_range: None,
+            source_range: None,
             limit: None,
             related: Box::new([]),
         }
@@ -481,6 +483,15 @@ impl Diagnostic {
     #[must_use]
     pub const fn with_message_range(mut self, range: MessageRange) -> Self {
         self.message_range = Some(range);
+        self
+    }
+
+    /// Record where the message range falls in the source unit.
+    ///
+    /// Only this crate attaches one, after resolving the message range through
+    /// a host map it has already checked against the supplied text.
+    pub(crate) const fn with_source_range(mut self, range: ByteRange) -> Self {
+        self.source_range = Some(range);
         self
     }
 
@@ -548,10 +559,26 @@ impl Diagnostic {
     ///
     /// The range names its own coordinate space. It is never an offset into
     /// the location's source unit: resolving it needs the extraction map, the
-    /// host's input map, or both.
+    /// host's input map, or both. When the host supplied its map,
+    /// [`Self::source_range`] holds the resolved range.
     #[must_use]
     pub const fn message_range(&self) -> Option<MessageRange> {
         self.message_range
+    }
+
+    /// Return where the message range falls in the source unit this record
+    /// points into.
+    ///
+    /// Present exactly when the record has a message range and the host
+    /// supplied the map from its decoded text back to its source, whether or
+    /// not the declaration was established. The range lies inside the
+    /// record's occurrence. Where source bytes decoded to text of another
+    /// length, such as an escape, it covers all of them rather than inventing
+    /// a finer correspondence, so it may be wider than what the record is
+    /// about but never misses any of it.
+    #[must_use]
+    pub const fn source_range(&self) -> Option<ByteRange> {
+        self.source_range
     }
 
     /// Borrow the related occurrences, in the same admitted source domain.
@@ -601,6 +628,7 @@ impl Diagnostic {
                     .cmp(&other.parameter.as_deref().map(str::as_bytes))
             })
             .then_with(|| self.message_range.cmp(&other.message_range))
+            .then_with(|| self.source_range.cmp(&other.source_range))
             .then_with(|| self.severity.cmp(&other.severity))
             .then_with(|| self.limit.cmp(&other.limit))
             .then_with(|| self.related.len().cmp(&other.related.len()))

@@ -20,6 +20,7 @@
 //! declaration about its own decoding, not an inference made here.
 
 use super::literal::ExtractionSegment;
+use crate::diagnostic::MessageRange;
 use crate::limits::{AuthoringLimits, LimitKind};
 use crate::primitives::{ByteRange, Occurrence};
 
@@ -237,6 +238,68 @@ pub fn validate_input_map(
     occurrence: &Occurrence,
 ) -> Result<(), MappingError> {
     validate(input_map, text, occurrence)
+}
+
+/// Resolve one range inside a message into the host source it came from.
+///
+/// A range in emitted MF2 passes through the extraction map into the supplied
+/// text and then through the host's input map; a range in the supplied text
+/// needs only the second. Each step answers the way composition does: a
+/// positional run for exactly the bytes asked about, a replacement for the
+/// whole of itself, and an insertion point for an insertion point. The result
+/// is the smallest span covering every answer, so it never claims a finer
+/// correspondence than the two maps assert.
+///
+/// Resolving one range builds no composed map, so no bound on the composed
+/// map applies to it. That is what lets a blocked declaration, which never
+/// composes its map, still say where in source its message failed.
+pub(crate) fn resolve_message_range(
+    range: MessageRange,
+    extraction: &[ExtractionSegment],
+    emitted_len: u64,
+    input_map: &[InputSegment],
+    text_len: u64,
+) -> Result<ByteRange, MappingError> {
+    let supplied = match range {
+        MessageRange::Supplied(range) => range,
+        MessageRange::Emitted(range) => {
+            // An extraction segment reads like a host run: from emitted MF2
+            // back into the supplied text, positional where its two sides have
+            // equal length, exactly as composition treats it.
+            let runs: Vec<InputSegment> = extraction
+                .iter()
+                .map(|segment| InputSegment::new(segment.extracted(), segment.source()))
+                .collect();
+            resolve(&runs, emitted_len, range)?
+        }
+    };
+    resolve(input_map, text_len, supplied)
+}
+
+/// Resolve one range through runs that cover `0..len` without gaps.
+fn resolve(runs: &[InputSegment], len: u64, wanted: ByteRange) -> Result<ByteRange, MappingError> {
+    if wanted.end() > len {
+        return Err(MappingError::Uncovered);
+    }
+    if wanted.is_empty() {
+        let position = zero_width(runs, wanted.start(), len)?;
+        return range(position, position);
+    }
+    // As in composition, a run that produced no byte is not where any byte of
+    // a nonempty range came from.
+    let mut answers = overlapping(runs, wanted)
+        .iter()
+        .filter(|run| !run.input.is_empty())
+        .map(|run| {
+            let low = run.input.start().max(wanted.start());
+            let high = run.input.end().min(wanted.end());
+            run.span(low, high)
+        });
+    let first = answers.next().ok_or(MappingError::Uncovered)?;
+    let (start, end) = answers.fold((first.start(), first.end()), |(start, end), span| {
+        (start.min(span.start()), end.max(span.end()))
+    });
+    range(start, end)
 }
 
 /// Check that an input map describes exactly the supplied text.
@@ -702,5 +765,111 @@ mod tests {
             Err(MappingError::Limit(LimitKind::ExtractionSegments)),
             "one segment short of what this map needs is a refusal, not a shorter map"
         );
+    }
+
+    /// Resolve `range`, given in the supplied text, through `map`.
+    fn supplied(map: &[InputSegment], text_len: u64, range: (u64, u64)) -> (u64, u64) {
+        let resolved = resolve_message_range(
+            MessageRange::Supplied(ByteRange::new(range.0, range.1).unwrap()),
+            &[],
+            0,
+            map,
+            text_len,
+        )
+        .unwrap();
+        (resolved.start(), resolved.end())
+    }
+
+    #[test]
+    fn one_range_resolves_through_positional_runs_to_exactly_its_bytes() {
+        // `'Pay now'` with its content at [11, 18): `now` is [15, 18).
+        assert_eq!(supplied(&[segment((0, 7), (11, 18))], 7, (4, 7)), (15, 18));
+
+        // Authored MF2 is its own extraction, so a parser's range passes
+        // through the identity segment unchanged before the host map.
+        let identity = [literal::identity_segment(7).unwrap()];
+        let resolved = resolve_message_range(
+            MessageRange::Emitted(ByteRange::new(4, 7).unwrap()),
+            &identity,
+            7,
+            &[segment((0, 7), (11, 18))],
+            7,
+        )
+        .unwrap();
+        assert_eq!((resolved.start(), resolved.end()), (15, 18));
+
+        // Two three-byte scalars: the second is [14, 17).
+        let text = "日本";
+        assert_eq!(text.len(), 6);
+        assert_eq!(supplied(&[segment((0, 6), (11, 17))], 6, (3, 6)), (14, 17));
+    }
+
+    #[test]
+    fn one_range_touching_an_escape_answers_with_the_whole_escape() {
+        // `'a\nb'` with its content at [11, 15): the escape is two source
+        // bytes for one decoded byte, so it has no interior to point into.
+        let map = [
+            segment((0, 1), (11, 12)),
+            segment((1, 2), (12, 14)),
+            segment((2, 3), (14, 15)),
+        ];
+        assert_eq!(supplied(&map, 3, (1, 2)), (12, 14));
+        assert_eq!(supplied(&map, 3, (1, 3)), (12, 15));
+        assert_eq!(
+            supplied(&map, 3, (0, 1)),
+            (11, 12),
+            "a range beside the escape does not grow into it"
+        );
+    }
+
+    #[test]
+    fn an_emitted_range_passes_through_the_extraction_map_before_the_host_map() {
+        // Displayed `a{b` at [11, 14) is emitted as `{{a\{b}}`: the escaped
+        // brace is emitted [3, 5) and came from the one source byte at 12.
+        let mut extraction = Vec::new();
+        literal::encode("a{b", &generous(), &mut extraction).unwrap();
+        let map = [segment((0, 3), (11, 14))];
+        let emitted = |start, end| {
+            let resolved = resolve_message_range(
+                MessageRange::Emitted(ByteRange::new(start, end).unwrap()),
+                &extraction,
+                8,
+                &map,
+                3,
+            )
+            .unwrap();
+            (resolved.start(), resolved.end())
+        };
+        assert_eq!(emitted(3, 5), (12, 13));
+        assert_eq!(
+            emitted(0, 2),
+            (11, 11),
+            "a generated delimiter is where the content begins, not a byte of it"
+        );
+        assert_eq!(emitted(0, 8), (11, 14));
+    }
+
+    #[test]
+    fn an_insertion_point_resolves_to_an_insertion_point() {
+        // A line continuation after `abc` decodes to nothing. The end of the
+        // text is where the content ended, before the continuation.
+        let map = [segment((0, 3), (11, 14)), segment((3, 3), (14, 16))];
+        assert_eq!(supplied(&map, 3, (3, 3)), (14, 14));
+        assert_eq!(supplied(&map, 3, (1, 1)), (12, 12));
+        // A string with no bytes still has a position.
+        assert_eq!(supplied(&[segment((0, 0), (11, 11))], 0, (0, 0)), (11, 11));
+    }
+
+    #[test]
+    fn a_range_the_map_does_not_describe_is_refused() {
+        let map = [segment((0, 3), (11, 14))];
+        let past = resolve_message_range(
+            MessageRange::Supplied(ByteRange::new(2, 5).unwrap()),
+            &[],
+            0,
+            &map,
+            3,
+        );
+        assert_eq!(past, Err(MappingError::Uncovered));
     }
 }

@@ -31,7 +31,7 @@ A host Producer is responsible for everything language-specific, and supplies th
 
 `resolve_declarations` then returns one `AuthoringResult` for the batch.
 
-Two of those are worth stating as facts rather than as fields. Supplying an input map is what moves the returned extraction map into host coordinates; omitting it leaves the map in the coordinates of the supplied text, which is a different fact and not a missing one. Supplying no parameters at all says the declaration has no use site in this batch, which is what a reusable declaration looks like before anything references it; supplying an empty list says a use site supplied nothing, and a message that requires a name then reports it missing.
+Two of those are worth stating as facts rather than as fields. Supplying an input map is what moves the returned extraction map into host coordinates; omitting it leaves the map in the coordinates of the supplied text, which is a different fact and not a missing one. The same map gives every record about a range inside the message, such as an MF2 syntax error, a `source_range()` in the unit, including the records of a declaration that was blocked and so has no extraction map to read. Supplying no parameters at all says the declaration has no use site in this batch, which is what a reusable declaration looks like before anything references it; supplying an empty list says a use site supplied nothing, and a message that requires a name then reports it missing.
 
 ## What this crate never does
 

@@ -9,7 +9,8 @@
 mod support;
 
 use intlify_authoring::{
-    intent_revision, Location, OccurrenceRole, ReasonFamily, Stage, UnitOutcome,
+    intent_revision, ByteRange, Location, MessageRange, OccurrenceRole, ReasonFamily, Stage,
+    UnitOutcome,
 };
 use intlify_authoring_js::{detail, Grammar, UnitAnalysis};
 use support::{analyze, analyze_as, at, diagnostics, expect, nth, occurrence, PRELUDE};
@@ -410,6 +411,36 @@ fn the_mf2_parser_keeps_its_own_codes_through_the_host() {
         .map(|record| record.origin().code())
         .collect();
     assert_eq!(codes, ["duplicate-declaration"]);
+}
+
+#[test]
+fn a_message_error_is_located_where_it_is_written_past_what_the_host_decoded() {
+    // The parser reads decoded MF2, so its range counts decoded bytes. The
+    // record also names the bytes of the unit they came from: here six
+    // source bytes spell the first character, and a template reads CR LF as
+    // one line feed, and either way the placeholder is decoded [3, 9).
+    for body in [
+        "intent('\\u0048i {$name')\n",
+        "const greeting = mf2`Hi\r\n{$name`\n",
+    ] {
+        let text = source(body);
+        let analysis = analyze(&text);
+        assert_eq!(analysis.outcome(), UnitOutcome::Blocked, "{body:?}");
+        let [record] = analysis.diagnostics() else {
+            panic!("one parser record: {:?}", analysis.diagnostics());
+        };
+        assert_eq!(
+            record.message_range(),
+            Some(MessageRange::Emitted(ByteRange::new(3, 9).unwrap())),
+            "{body:?}"
+        );
+        let written = record.source_range().expect("located through the host map");
+        assert_eq!(
+            (written.start(), written.end()),
+            at(&text, "{$name"),
+            "{body:?}"
+        );
+    }
 }
 
 #[test]
