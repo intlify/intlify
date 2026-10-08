@@ -17,14 +17,15 @@
 //! alone.
 
 use intlify_authoring::{
-    AdmittedInventory, AuthoringInventory, Completeness, MessageIntentId, Occurrence, UnitOutcome,
+    AdmittedInventory, AuthoringArtifactReference, AuthoringInventory, Completeness,
+    MessageIntentId, Occurrence, UnitOutcome,
 };
 
 use super::admit::{AdmittedRegistry, AdmittedUpdate};
 use super::snapshot::{
     same_declaration_order, EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure,
 };
-use super::update::IdentityDecision;
+use super::update::{IdentityDecision, IntentRegistryUpdate};
 
 /// What applying an update to its base gives.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,19 +88,48 @@ pub enum TransitionFailure {
 ///
 /// The base, the update and the inventory are admitted artifacts. The update
 /// has to name exactly this base and this inventory, and all three have to
-/// agree on the owner, and the base and the inventory on the scope.
+/// agree on the owner, and the base and the inventory on the scope. The
+/// checks run in a fixed order, so one input always reports the same
+/// failure: the names, then each decision, then coverage, then the links.
 pub fn apply(
     base: &AdmittedRegistry,
     update: &AdmittedUpdate,
     inventory: &AdmittedInventory,
 ) -> Result<Transition, TransitionFailure> {
-    let snapshot = base.snapshot();
     let plan = update.update();
     let current = inventory.inventory();
+    check_names(base, plan, &inventory.reference(), current)?;
+    for decision in plan.decisions() {
+        check_base_state(decision, base.snapshot(), current)?;
+        check_target(decision, base, plan, current)?;
+    }
+    check_coverage(base, plan, current)?;
+    check_links(base.snapshot(), plan)?;
+    if plan.is_empty() {
+        return Ok(Transition::Unchanged);
+    }
+    IntentRegistrySnapshot::successor(
+        base.artifact(),
+        update.artifact(),
+        next_entries(base.snapshot(), plan),
+    )
+    .map(|result| Transition::Applied(Box::new(result)))
+    .map_err(TransitionFailure::Result)
+}
+
+/// Check that an update names this base and this inventory, and that the
+/// three agree on whose identities and which scope they are about.
+fn check_names(
+    base: &AdmittedRegistry,
+    plan: &IntentRegistryUpdate,
+    inventory: &AuthoringArtifactReference,
+    current: &AuthoringInventory,
+) -> Result<(), TransitionFailure> {
+    let snapshot = base.snapshot();
     if plan.base() != &base.reference() {
         return Err(TransitionFailure::BaseMismatch);
     }
-    if plan.inventory() != &inventory.reference() {
+    if plan.inventory() != inventory {
         return Err(TransitionFailure::InventoryMismatch);
     }
     if plan.owner() != snapshot.owner() || current.owner() != snapshot.owner() {
@@ -115,31 +145,52 @@ pub fn apply(
     {
         return Err(TransitionFailure::UncheckedUnit);
     }
+    Ok(())
+}
 
-    // Decisions are in Intent ID order with one per ID, so whether an ID is
-    // decided is one search.
-    let decided = |id: &MessageIntentId| {
-        plan.decisions()
-            .binary_search_by(|decision| decision.intent_id().cmp(id))
-            .is_ok()
+/// Return whether an update decides anything about an ID.
+///
+/// Decisions are in Intent ID order with one per ID, so this is one search.
+fn decides(plan: &IntentRegistryUpdate, id: &MessageIntentId) -> bool {
+    plan.decisions()
+        .binary_search_by(|decision| decision.intent_id().cmp(id))
+        .is_ok()
+}
+
+/// Check that the declaration a decision gives an identity to is one of the
+/// inventory's, and free.
+///
+/// A declaration held by an entry the same update also decides is being
+/// freed, or kept, by that decision. One held by an entry the update leaves
+/// alone is not free.
+fn check_target(
+    decision: &IdentityDecision,
+    base: &AdmittedRegistry,
+    plan: &IntentRegistryUpdate,
+    current: &AuthoringInventory,
+) -> Result<(), TransitionFailure> {
+    let Some(to) = decision.to() else {
+        return Ok(());
     };
-    for decision in plan.decisions() {
-        check_base_state(decision, snapshot, current)?;
-        if let Some(to) = decision.to() {
-            if !declares(current, to) {
-                return Err(TransitionFailure::UnknownDeclaration);
-            }
-            // A declaration held by an entry this update also decides is
-            // being freed or kept by that decision; one held by an entry the
-            // update leaves alone is not free.
-            if let Some(holder) = base.active_entry(to) {
-                if holder.intent_id() != decision.intent_id() && !decided(holder.intent_id()) {
-                    return Err(TransitionFailure::DeclarationTaken);
-                }
-            }
+    if !declares(current, to) {
+        return Err(TransitionFailure::UnknownDeclaration);
+    }
+    if let Some(holder) = base.active_entry(to) {
+        if holder.intent_id() != decision.intent_id() && !decides(plan, holder.intent_id()) {
+            return Err(TransitionFailure::DeclarationTaken);
         }
     }
+    Ok(())
+}
 
+/// Check that every declaration of the inventory ends up with an identity:
+/// an active entry the update leaves alone keeps it, or a decision gives it
+/// one.
+fn check_coverage(
+    base: &AdmittedRegistry,
+    plan: &IntentRegistryUpdate,
+    current: &AuthoringInventory,
+) -> Result<(), TransitionFailure> {
     let mut targets: Vec<&Occurrence> = plan
         .decisions()
         .iter()
@@ -153,15 +204,23 @@ pub fn apply(
             .is_ok();
         let kept = base
             .active_entry(declaration)
-            .is_some_and(|entry| !decided(entry.intent_id()));
+            .is_some_and(|entry| !decides(plan, entry.intent_id()));
         if !given && !kept {
             return Err(TransitionFailure::Uncovered);
         }
     }
+    Ok(())
+}
 
-    // The result holds every base entry and every allocated ID, so a
-    // successor resolves there exactly when the base holds it or a decision
-    // names it.
+/// Check that each lineage link names predecessors the base holds and
+/// successors the result holds.
+///
+/// The result holds every base entry and every allocated ID, so a successor
+/// resolves there exactly when the base holds it or a decision names it.
+fn check_links(
+    snapshot: &IntentRegistrySnapshot,
+    plan: &IntentRegistryUpdate,
+) -> Result<(), TransitionFailure> {
     for link in plan.lineage_links() {
         if link
             .predecessors()
@@ -170,25 +229,27 @@ pub fn apply(
             || link
                 .successors()
                 .iter()
-                .any(|id| snapshot.entry(id).is_none() && !decided(id))
+                .any(|id| snapshot.entry(id).is_none() && !decides(plan, id))
         {
             return Err(TransitionFailure::UnresolvedLink);
         }
     }
+    Ok(())
+}
 
-    if plan.is_empty() {
-        return Ok(Transition::Unchanged);
-    }
-    let mut entries: Vec<RegistryEntry> = snapshot
+/// The entries an update leaves: every base entry it does not decide about,
+/// as it was, and the entry each decision leaves.
+fn next_entries(
+    snapshot: &IntentRegistrySnapshot,
+    plan: &IntentRegistryUpdate,
+) -> Vec<RegistryEntry> {
+    snapshot
         .entries()
         .iter()
-        .filter(|entry| !decided(entry.intent_id()))
+        .filter(|entry| !decides(plan, entry.intent_id()))
         .cloned()
-        .collect();
-    entries.extend(plan.decisions().iter().map(next_entry));
-    IntentRegistrySnapshot::successor(base.artifact(), update.artifact(), entries)
-        .map(|result| Transition::Applied(Box::new(result)))
-        .map_err(TransitionFailure::Result)
+        .chain(plan.decisions().iter().map(next_entry))
+        .collect()
 }
 
 /// Check one decision against the base entry it names.
