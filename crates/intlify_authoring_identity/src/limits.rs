@@ -26,12 +26,15 @@ pub enum IdentityLimitKind {
     Replacements,
     /// Bytes of replacement text across one update.
     ReplacementBytes,
+    /// Updates replayed to verify one chain from its anchor.
+    HistorySteps,
 }
 
 /// Inclusive upper bounds applied to reading one registry artifact.
 ///
-/// Every bound admits zero: a registry with no entries and an update with no
-/// decisions are both meaningful, so no bound is unsatisfiable.
+/// Every bound admits zero: a registry with no entries, an update with no
+/// decisions and a chain verified at its anchor are all meaningful, so no
+/// bound is unsatisfiable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IdentityLimits {
     /// Entries in one registry snapshot.
@@ -48,4 +51,6 @@ pub struct IdentityLimits {
     pub replacements: u64,
     /// Bytes of replacement text across one update.
     pub replacement_bytes: u64,
+    /// Updates replayed to verify one chain from its anchor.
+    pub history_steps: u64,
 }

@@ -14,10 +14,14 @@
 //! a proof that it applies to its base, that its bases hold, or that anyone may
 //! publish it. Replay, continuity checks and the host each answer one of those.
 
-use intlify_authoring::{read_sealed, AuthoringArtifact, AuthoringArtifactReference, ReadFailure};
+use intlify_authoring::{
+    read_sealed, AuthoringArtifact, AuthoringArtifactReference, Occurrence, ReadFailure,
+};
 
 use super::artifact::{RegistryArtifact, RegistryUpdateArtifact};
-use super::snapshot::{IntentRegistrySnapshot, SnapshotFailure};
+use super::snapshot::{
+    same_declaration_order, EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure,
+};
 use super::update::{IntentRegistryUpdate, SourceEdit, UpdateFailure};
 use crate::limits::{IdentityLimitKind, IdentityLimits};
 
@@ -39,6 +43,9 @@ pub enum RegistryAdmissionFailure<F> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedRegistry {
     artifact: RegistryArtifact,
+    // The active entries, by declaration, built once here so that a later
+    // lookup by declaration never scans every entry.
+    active: Box<[usize]>,
 }
 
 impl AdmittedRegistry {
@@ -58,6 +65,17 @@ impl AdmittedRegistry {
     #[must_use]
     pub fn reference(&self) -> AuthoringArtifactReference {
         self.artifact.reference()
+    }
+
+    /// Find the active entry that holds exactly this declaration.
+    pub(crate) fn active_entry(&self, declaration: &Occurrence) -> Option<&RegistryEntry> {
+        let entries = self.snapshot().entries();
+        self.active
+            .binary_search_by(|index| {
+                same_declaration_order(entries[*index].declaration(), declaration)
+            })
+            .ok()
+            .map(|position| &entries[self.active[position]])
     }
 }
 
@@ -102,7 +120,19 @@ pub fn admit_registry(
     snapshot
         .validate()
         .map_err(RegistryAdmissionFailure::Structure)?;
-    Ok(AdmittedRegistry { artifact })
+    let entries = snapshot.entries();
+    let mut active: Vec<usize> = (0..entries.len())
+        .filter(|index| entries[*index].state() == EntryState::Active)
+        .collect();
+    // Validation refused two active entries on one declaration, so the order
+    // is strict and a search finds at most one.
+    active.sort_unstable_by(|left, right| {
+        same_declaration_order(entries[*left].declaration(), entries[*right].declaration())
+    });
+    Ok(AdmittedRegistry {
+        artifact,
+        active: active.into_boxed_slice(),
+    })
 }
 
 /// Admit one `intent-registry-update` artifact.

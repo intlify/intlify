@@ -3,17 +3,16 @@
 
 //! Reading registry snapshots and updates, and what admitting one establishes.
 //!
-//! The committed vectors are one real chain, so every case here starts from an
-//! artifact a second implementation has already checked and changes one thing
-//! about it. A damaged artifact is resealed the way a forger with the
-//! specification would, so each structural rule is reached rather than stopped
-//! at the digest.
+//! Every case starts from an artifact of the committed chain and changes one
+//! thing about it, resealed so that each structural rule is reached rather
+//! than stopped at the digest.
 
-use intlify_authoring::test_context::{admit_inventory, TestContext};
+mod support;
+
+use intlify_authoring::test_context::admit_inventory;
 use intlify_authoring::{
-    AnalysisWorkspace, ArtifactRelation, AuthoringArtifact, AuthoringLimits, ByteRange,
-    MessageIntentId, Occurrence, OccurrenceRole, OwnerIdentity, OwnerKind, ReadFailure,
-    SourceBytes, SourceSnapshot, SurfaceVocabulary, VersionedIdentity, ARTIFACT_INTEGRITY_DOMAIN,
+    AnalysisWorkspace, ArtifactRelation, AuthoringArtifact, ByteRange, MessageIntentId, Occurrence,
+    OccurrenceRole, ReadFailure, SourceBytes, SourceSnapshot, VersionedIdentity,
 };
 use intlify_authoring_identity::{
     admit_registry, admit_update, AllocationBasis, ContinuationBasis, EntryState, IdentityDecision,
@@ -21,88 +20,11 @@ use intlify_authoring_identity::{
     LineageLink, RegistryAdmissionFailure, RegistryArtifact, RegistryEntry, RegistryUpdateArtifact,
     Replacement, SnapshotFailure, SourceEdit, UpdateFailure,
 };
-use intlify_shared_json::encoding::{hash, Domain};
-use intlify_shared_json::token::IntegrityDigest;
 use serde_json::{json, Value};
+use support::{artifact, authoring_limits, bytes, context, document, limits, owner, reseal};
 
-const VECTORS: &str = include_str!("../fixtures/phase3/registry-vectors.json");
 const REGISTRY_SCHEMA: &str = include_str!("../schema/intent-registry-v0.schema.json");
 const UPDATE_SCHEMA: &str = include_str!("../schema/intent-registry-update-v0.schema.json");
-
-fn document() -> Value {
-    serde_json::from_str(VECTORS).expect("committed vectors")
-}
-
-/// One committed artifact, by its vector id.
-fn artifact(id: &str) -> Value {
-    document()["artifacts"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|vector| vector["id"] == id)
-        .unwrap_or_else(|| panic!("no vector {id}"))["artifact"]
-        .clone()
-}
-
-fn limits() -> IdentityLimits {
-    IdentityLimits {
-        entries: 1024,
-        decisions: 1024,
-        lineage_links: 64,
-        lineage_members: 256,
-        source_edits: 256,
-        replacements: 4096,
-        replacement_bytes: 1024 * 1024,
-    }
-}
-
-fn authoring_limits() -> AuthoringLimits {
-    AuthoringLimits {
-        declarations: 1024,
-        message_text_bytes: 64 * 1024,
-        emitted_mf2_bytes: 128 * 1024,
-        extraction_segments: 4096,
-        parameter_names: 64,
-        parameter_name_bytes: 256,
-        metadata_value_bytes: 4096,
-        vocabulary_members: 256,
-        projection_nodes: 4096,
-        projection_depth: 32,
-        diagnostics: 256,
-    }
-    .validate()
-    .expect("satisfiable bounds")
-}
-
-fn owner() -> OwnerIdentity {
-    OwnerIdentity::new(OwnerKind::Application, "storefront").expect("checked project id")
-}
-
-/// The context the vectors' inventories were resolved against.
-fn context() -> TestContext {
-    TestContext::builder(
-        owner(),
-        SurfaceVocabulary::new(["checkout", "nav"]).unwrap(),
-    )
-    .default_source_locale("en")
-    .default_surface_class("checkout")
-    .build()
-    .expect("checked test context")
-}
-
-fn bytes(value: &Value) -> Vec<u8> {
-    serde_json::to_vec(value).expect("serializable")
-}
-
-/// Recompute the digest over an edited value, the way a forger with the
-/// specification in hand would.
-fn reseal(mut value: Value) -> Vec<u8> {
-    let object = value.as_object_mut().expect("an artifact object");
-    object.remove("integrityDigest");
-    let digest = hash(Domain::literal(ARTIFACT_INTEGRITY_DOMAIN), &value).expect("encodable");
-    value["integrityDigest"] = json!(IntegrityDigest::from_hash(digest).as_str());
-    bytes(&value)
-}
 
 /// One labelled edit to an artifact's JSON, for refusal tables.
 type Damage = (&'static str, fn(&mut Value));
@@ -852,7 +774,9 @@ fn every_bound_admits_its_exact_value_and_refuses_one_less() {
                     IdentityLimitKind::SourceEdits => &mut limits.source_edits,
                     IdentityLimitKind::Replacements => &mut limits.replacements,
                     IdentityLimitKind::ReplacementBytes => &mut limits.replacement_bytes,
-                    IdentityLimitKind::Entries => unreachable!("not an update bound"),
+                    IdentityLimitKind::Entries | IdentityLimitKind::HistorySteps => {
+                        unreachable!("not an update bound")
+                    }
                 } = value;
                 limits
             };

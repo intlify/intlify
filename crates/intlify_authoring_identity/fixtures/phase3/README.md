@@ -8,7 +8,7 @@ Design 016's Phase 3 adds persistent identity on top of the inventories Phases 1
 
 | File | Contents | Read by |
 | --- | --- | --- |
-| `registry-vectors.json` | One registry chain: a genesis and three updates, the three inventories they were planned from, and the source texts those inventories name | `tests/registry_admission.rs`, `tools/shared-json-vectors` |
+| `registry-vectors.json` | One registry chain: a genesis and three updates, the three inventories they were planned from, and the source texts those inventories name | `tests/registry_admission.rs`, `tests/registry_transitions.rs`, `tools/shared-json-vectors` |
 
 The chain is one story about two units, `checkout` and `nav`:
 
@@ -18,7 +18,7 @@ The chain is one story about two units, `checkout` and `nav`:
 | 2 | A header goes in above pay, and cancel's line becomes a copy of pay | Pay continues with `verified-edit`, cancel retires with `complete-absence`, the copy gets a new ID, and a `copy` link ties it to pay. Home's unit did not change, so it needs no decision |
 | 3 | Cancel's line comes back at the end | Pay and the copy continue with `verified-edit`, and cancel's old ID is restored with an `explicit` basis |
 
-Every snapshot after the genesis is written out by hand from its base and its update, not produced by applying one. That makes it an expectation for replay to be checked against, rather than a record of what the code currently does.
+Every snapshot after the genesis is written out by hand from its base and its update, not produced by applying one. That makes it an expectation for replay to be checked against, rather than a record of what the code currently does: `tests/registry_transitions.rs` applies each update to its base and requires exactly the hand-written snapshot, and verifies the whole chain from its genesis.
 
 The Intent ID and registry identity values are fixed fixture values. They stand in for what a host draws from operating-system randomness. The edits claim the verifier profile `intlify-continuity-edit-replay` revision `0`, whose rules are the continuity phase's to implement.
 

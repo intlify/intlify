@@ -10,18 +10,27 @@
 //! from. Nothing names its own result, so the history has no cycle and each
 //! artifact's digest can be computed before the next one exists.
 //!
-//! This module represents and admits both kinds. It does not apply an update,
-//! replay a chain, or decide whether a basis holds.
+//! This module represents and admits both kinds, applies an update to its
+//! base under 017's closed transition table, and replays a chain from an
+//! anchor the host names. It does not decide whether a basis holds: a
+//! `verified-edit` or `confirmed-new` that applies and replays is still only
+//! a claim until the continuity checks test it.
 
 mod admit;
+mod apply;
 mod artifact;
+mod history;
 mod snapshot;
 mod update;
 
 pub use admit::{
     admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, RegistryAdmissionFailure,
 };
+pub use apply::{apply, Transition, TransitionFailure};
 pub use artifact::{RegistryArtifact, RegistryUpdateArtifact};
+pub use history::{
+    replay, verify_history, Anchor, HistoryFailure, HistoryOutcome, ReplayFailure, RetainedHistory,
+};
 pub use snapshot::{EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure};
 pub use update::{
     Allocation, AllocationBasis, CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis,

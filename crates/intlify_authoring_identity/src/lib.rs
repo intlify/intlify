@@ -38,10 +38,11 @@ pub mod schema;
 pub use id::RegistryIdentity;
 pub use limits::{IdentityLimitKind, IdentityLimits};
 pub use registry::{
-    admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, Allocation, AllocationBasis,
-    CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis, EntryState, ExplicitBasis,
-    IdentityDecision, IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink,
+    admit_registry, admit_update, apply, replay, verify_history, AdmittedRegistry, AdmittedUpdate,
+    Allocation, AllocationBasis, Anchor, CompleteAbsence, ConfirmedNew, Continuation,
+    ContinuationBasis, EntryState, ExplicitBasis, HistoryFailure, HistoryOutcome, IdentityDecision,
+    IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink,
     RegistryAdmissionFailure, RegistryArtifact, RegistryEntry, RegistryUpdateArtifact, Replacement,
-    Restoration, Retirement, SnapshotFailure, SourceEdit, UnchangedSnapshot, UpdateFailure,
-    VerifiedEdit,
+    ReplayFailure, Restoration, RetainedHistory, Retirement, SnapshotFailure, SourceEdit,
+    Transition, TransitionFailure, UnchangedSnapshot, UpdateFailure, VerifiedEdit,
 };

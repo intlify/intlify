@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity and the representation of registry history. See [Current status](#current-status).
+> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, and its transitions and replay. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -43,6 +43,23 @@ A chain starts with a genesis, which has no history and no entries. Every later 
 
 Admission is deliberately narrow. An admitted snapshot is well formed and unaltered since sealing; that is not proof it is the result of its update, that its chain starts from an accepted anchor, or that it is current. An admitted update is well formed; a `verified-edit` or `confirmed-new` label proves nothing by being well formed.
 
+## Applying and replaying
+
+`apply` applies one admitted update to its exact base under the inventory it was planned from, following 017's closed transition table:
+
+| Decision | Base entry it needs | Result |
+| --- | --- | --- |
+| `continue` | Active, holding exactly `from` | Active at `to`; the ID is unchanged |
+| `allocate` | None, active or retired | A new active entry at `to` |
+| `retire` | Active, holding exactly `from`, with a complete inventory | Retired, keeping its last declaration |
+| `restore` | Retired, holding exactly `from` | The same ID active again at `to` |
+
+The update applies as a whole or not at all, and each refusal has its own `TransitionFailure`. Every unit of the inventory has to be checked. Every declaration of the inventory has to end up with exactly one identity: either an active entry the update leaves alone already holds it, or one decision gives it one. A partial inventory updates what it covers, cannot retire anything, and leaves every entry it cannot see exactly as it was. An update with no decisions and no links is `Transition::Unchanged`: 017 records no new state for it, and reuses the base.
+
+`replay` rebuilds a stored snapshot from its base, update and inventory, and compares the complete result with it, never only its digest. `verify_history` walks a head snapshot back to an `Anchor` the host names, the genesis it initialized or a snapshot it accepted, resolving every base, update and inventory by its exact reference in a `RetainedHistory`, and then replays the chain forward within the caller's bound. A chain that only reaches some other genesis is not anchored, and a missing artifact leaves it blocked with the reference that named nothing; no older snapshot or matching text stands in for it.
+
+What `apply` checks is the transition, not the bases. A `verified-edit` is not replayed against source and a `confirmed-new` is not proven: an update whose bases do not hold can still apply, and its result can still replay exactly.
+
 ## Schemas and vectors
 
 | File | Contents | Checked by |
@@ -55,6 +72,6 @@ See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vect
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, and the representation and structural admission of registry snapshots and updates.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, and replaying a chain from an anchor.
 
-Not yet implemented: applying an update and replaying a chain, continuity verification, newness and absence, reconciliation, and read-only compilation. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Not yet implemented: continuity verification, newness and absence, reconciliation, and read-only compilation. Local persistence and production publication are a later step again, after checked 015 inputs exist.

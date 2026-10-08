@@ -136,6 +136,10 @@ pub enum SnapshotFailure {
     /// this on its own: a decoded snapshot holds references alone, and for one
     /// of those it is replaying the update from its base that finds it.
     UpdateBaseMismatch,
+    /// A successor is built from an update with no decisions and no lineage
+    /// links. 017 records no new state for such an update: the base is
+    /// reused.
+    EmptyUpdate,
 }
 
 impl IntentRegistrySnapshot {
@@ -163,11 +167,11 @@ impl IntentRegistrySnapshot {
 
     /// Record the state an update claims to produce from its base.
     ///
-    /// The update has to be planned against `base` and belong to its owner;
-    /// otherwise the two would not be one link of a chain. The owner, scope
-    /// and registry identity are the base's, because a chain keeps them for
-    /// its whole life. Entries are put into Intent ID order and the result is
-    /// validated; a repeated ID is reported, never dropped.
+    /// The update has to be planned against `base`, belong to its owner, and
+    /// change something; otherwise the two would not be one link of a chain.
+    /// The owner, scope and registry identity are the base's, because a chain
+    /// keeps them for its whole life. Entries are put into Intent ID order and
+    /// the result is validated; a repeated ID is reported, never dropped.
     ///
     /// Nothing here applies the update or compares its result. A snapshot
     /// built this way is a claim, and replaying the update from its base is
@@ -184,6 +188,9 @@ impl IntentRegistrySnapshot {
         }
         if update.body().owner() != &previous.owner {
             return Err(SnapshotFailure::ForeignOwner);
+        }
+        if update.body().is_empty() {
+            return Err(SnapshotFailure::EmptyUpdate);
         }
         entries.sort_by(|left, right| left.intent_id.cmp(&right.intent_id));
         let snapshot = Self {
