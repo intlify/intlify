@@ -31,5 +31,17 @@
 //! ```
 
 mod id;
+mod limits;
+mod registry;
+pub mod schema;
 
 pub use id::RegistryIdentity;
+pub use limits::{IdentityLimitKind, IdentityLimits};
+pub use registry::{
+    admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, Allocation, AllocationBasis,
+    CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis, EntryState, ExplicitBasis,
+    IdentityDecision, IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink,
+    RegistryAdmissionFailure, RegistryArtifact, RegistryEntry, RegistryUpdateArtifact, Replacement,
+    Restoration, Retirement, SnapshotFailure, SourceEdit, UnchangedSnapshot, UpdateFailure,
+    VerifiedEdit,
+};

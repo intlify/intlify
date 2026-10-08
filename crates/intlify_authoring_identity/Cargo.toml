@@ -16,6 +16,15 @@ workspace = true
 intlify_authoring = { path = "../intlify_authoring" }
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
+# The committed schemas are generated as JSON values.
+serde_json = "1.0.106"
 
 [dev-dependencies]
-serde_json = "1.0.106"
+# The vectors are built from real inventories, and the only context this phase
+# admits is the explicitly test-owned one. Enabling it for test targets and
+# examples alone keeps the ordinary build unable to construct it.
+intlify_authoring = { path = "../intlify_authoring", features = ["test-context"] }
+# Fixtures name their bytes by digest, as a caller would.
+intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
+# Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
+jsonschema = { version = "=0.56.0", default-features = false }

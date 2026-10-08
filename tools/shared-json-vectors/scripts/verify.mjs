@@ -6,6 +6,7 @@
  * from the specification, so a disagreement says which of the two is wrong.
  */
 
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +21,10 @@ const vectorsPath = resolve(
 const inventoryPath = resolve(
   here,
   '../../../crates/intlify_authoring/fixtures/phase2/inventory-vectors.json'
+)
+const registryPath = resolve(
+  here,
+  '../../../crates/intlify_authoring_identity/fixtures/phase3/registry-vectors.json'
 )
 
 /** The framing vectors written out in design 017, checked before anything depends on them. */
@@ -179,14 +184,199 @@ function checkSharedRevisions(inventory) {
   return failures
 }
 
+/**
+ * The kind each reference member has to name, by the kind of the artifact
+ * holding it.
+ */
+const referenceMembers = {
+  'intent-registry': { base: 'intent-registry', update: 'intent-registry-update' },
+  'intent-registry-update': { base: 'intent-registry', inventory: 'authoring-inventory' }
+}
+
+/**
+ * Find every source snapshot inside a value.
+ *
+ * @param value - Any part of an artifact.
+ * @param found - Where to collect the snapshots.
+ * @returns The snapshots found, in document order.
+ */
+function snapshotsIn(value, found = []) {
+  if (Array.isArray(value)) {
+    for (const element of value) {
+      snapshotsIn(element, found)
+    }
+  } else if (value !== null && typeof value === 'object') {
+    if (typeof value.utf8Digest === 'string' && typeof value.unit === 'string') {
+      found.push(value)
+    }
+    for (const member of Object.values(value)) {
+      snapshotsIn(member, found)
+    }
+  }
+  return found
+}
+
+/**
+ * Check every snapshot against the retained text it names.
+ *
+ * A snapshot that names no retained text, or names text with another digest
+ * or length, would make every position recorded in it unverifiable.
+ *
+ * @param registry - The registry document.
+ * @param texts - Retained texts by unit and revision.
+ * @returns How many snapshots disagreed.
+ */
+function checkSnapshots(registry, texts) {
+  let failures = 0
+  for (const vector of registry.artifacts) {
+    for (const snapshot of snapshotsIn(vector.artifact.body)) {
+      const text = texts.get(`${snapshot.unit}@${snapshot.revision}`)
+      if (text === undefined) {
+        console.error(`${vector.id}: ${snapshot.unit}@${snapshot.revision} names no retained text`)
+        failures += 1
+        continue
+      }
+      const digest = `sha256:${createHash('sha256').update(text).digest('hex')}`
+      if (digest !== snapshot.utf8Digest || String(text.length) !== snapshot.byteLength) {
+        console.error(`${vector.id}: ${snapshot.unit}@${snapshot.revision} does not name its text`)
+        failures += 1
+      }
+    }
+  }
+  return failures
+}
+
+/**
+ * Check that every reference names exactly one earlier artifact of its kind.
+ *
+ * Earlier, because 017 builds a chain in one direction: an update names its
+ * base and inventory, a snapshot names its base and update, and nothing names
+ * its own result. A snapshot's update also has to be planned against that
+ * snapshot's base, and a chain keeps its owner, scope and registry identity.
+ *
+ * @param registry - The registry document.
+ * @returns How many references or chain links disagreed.
+ */
+function checkReferences(registry) {
+  let failures = 0
+  const seen = []
+  for (const vector of registry.artifacts) {
+    const { kind, body } = vector.artifact
+    const resolved = {}
+    for (const [member, expected] of Object.entries(referenceMembers[kind] ?? {})) {
+      const reference = body[member]
+      if (reference === undefined) {
+        continue
+      }
+      const matches = seen.filter(
+        earlier =>
+          earlier.artifact.kind === reference.kind &&
+          earlier.artifact.schemaRevision === reference.schemaRevision &&
+          earlier.artifact.authoringSpecification.identity ===
+            reference.authoringSpecification.identity &&
+          earlier.artifact.authoringSpecification.revision ===
+            reference.authoringSpecification.revision &&
+          earlier.artifact.integrityDigest === reference.integrityDigest
+      )
+      if (reference.kind !== expected || matches.length !== 1) {
+        console.error(`${vector.id}: ${member} does not name exactly one earlier ${expected}`)
+        failures += 1
+        continue
+      }
+      resolved[member] = matches[0].artifact
+    }
+    if (kind === 'intent-registry' && resolved.base !== undefined) {
+      const base = resolved.base.body
+      if (
+        JSON.stringify(base.owner) !== JSON.stringify(body.owner) ||
+        base.scope !== body.scope ||
+        base.registryIdentity !== body.registryIdentity
+      ) {
+        console.error(`${vector.id}: the chain does not keep its owner, scope and identity`)
+        failures += 1
+      }
+      if (resolved.update?.body.base.integrityDigest !== body.base.integrityDigest) {
+        console.error(`${vector.id}: its update was planned against another base`)
+        failures += 1
+      }
+    }
+    seen.push(vector)
+  }
+  return failures
+}
+
+/**
+ * Replay every source edit over the retained bytes.
+ *
+ * Replacements use the coordinates of the bytes before the edit and apply in
+ * order. An absent side is an empty buffer.
+ *
+ * @param registry - The registry document.
+ * @param texts - Retained texts by unit and revision.
+ * @returns How many edits did not reproduce their after bytes.
+ */
+function checkEdits(registry, texts) {
+  let failures = 0
+  const bytesOf = snapshot =>
+    snapshot === undefined
+      ? Buffer.alloc(0)
+      : (texts.get(`${snapshot.unit}@${snapshot.revision}`) ?? Buffer.alloc(0))
+  for (const vector of registry.artifacts) {
+    if (vector.artifact.kind !== 'intent-registry-update') {
+      continue
+    }
+    for (const decision of vector.artifact.body.decisions) {
+      for (const edit of decision.basis.changes ?? []) {
+        const before = bytesOf(edit.before)
+        const parts = []
+        let position = 0
+        for (const replacement of edit.replacements) {
+          const start = Number(replacement.range.start)
+          parts.push(before.subarray(position, start), Buffer.from(replacement.text, 'utf8'))
+          position = Number(replacement.range.end)
+        }
+        parts.push(before.subarray(position))
+        if (!Buffer.concat(parts).equals(bytesOf(edit.after))) {
+          console.error(`${vector.id}: an edit of ${decision.intentId.value} does not replay`)
+          failures += 1
+        }
+      }
+    }
+  }
+  return failures
+}
+
+/**
+ * Check the registry chain: integrity, references, retained text and edits.
+ *
+ * @param registry - The registry document.
+ * @returns How many checks failed.
+ */
+function checkRegistry(registry) {
+  const texts = new Map(
+    registry.sources.map(source => [
+      `${source.unit}@${source.revision}`,
+      Buffer.from(source.text, 'utf8')
+    ])
+  )
+  return (
+    checkIntegrity(registry.domain, registry.artifacts) +
+    checkSnapshots(registry, texts) +
+    checkReferences(registry) +
+    checkEdits(registry, texts)
+  )
+}
+
 const document = JSON.parse(readFileSync(vectorsPath, 'utf8'))
 const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'))
+const registry = JSON.parse(readFileSync(registryPath, 'utf8'))
 const failures =
   checkFraming() +
   checkRevisions(document.domain, document.vectors) +
   checkDistinctness(document.vectors) +
   checkIntegrity(inventory.domain, inventory.vectors) +
-  checkSharedRevisions(inventory)
+  checkSharedRevisions(inventory) +
+  checkRegistry(registry)
 
 if (failures > 0) {
   console.error(`\n${failures} vector check(s) failed`)
@@ -195,4 +385,7 @@ if (failures > 0) {
 console.log(`${document.vectors.length} revision vectors agree with an independent implementation`)
 console.log(
   `${inventory.vectors.length} sealed inventories agree with an independent implementation`
+)
+console.log(
+  `${registry.artifacts.length} artifacts of one registry chain agree with an independent implementation`
 )
