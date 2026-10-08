@@ -30,6 +30,38 @@ pub(crate) fn artifact(id: &str) -> Value {
         .clone()
 }
 
+/// Every retained source of the committed chain: each unit revision's
+/// snapshot, as the inventories record it, with its text.
+pub(crate) fn sources() -> Vec<(intlify_authoring::SourceSnapshot, String)> {
+    let document: Value = serde_json::from_str(VECTORS).expect("committed vectors");
+    let mut sources: Vec<(intlify_authoring::SourceSnapshot, String)> = Vec::new();
+    for n in 1..=3 {
+        for unit in artifact(&format!("inventory-{n}"))["body"]["units"]
+            .as_array()
+            .expect("units")
+        {
+            let snapshot: intlify_authoring::SourceSnapshot =
+                serde_json::from_value(unit["source"].clone()).expect("a snapshot");
+            if sources.iter().any(|(known, _)| *known == snapshot) {
+                continue;
+            }
+            let text = document["sources"]
+                .as_array()
+                .expect("sources")
+                .iter()
+                .find(|source| {
+                    source["unit"].as_str() == Some(snapshot.unit().as_str())
+                        && source["revision"].as_str() == Some(snapshot.revision().as_str())
+                })
+                .and_then(|source| source["text"].as_str())
+                .expect("retained text for every unit")
+                .to_owned();
+            sources.push((snapshot, text));
+        }
+    }
+    sources
+}
+
 /// Bounds every case stays well inside.
 pub(crate) fn limits() -> IdentityLimits {
     IdentityLimits {
@@ -53,7 +85,8 @@ fn bytes(value: &Value) -> Vec<u8> {
     serde_json::to_vec(value).expect("serializable")
 }
 
-fn admitted_inventory(value: &Value) -> AdmittedInventory {
+/// Admit an inventory of the committed owner, without its bytes.
+pub(crate) fn admitted_inventory(value: &Value) -> AdmittedInventory {
     let context = TestContext::builder(
         owner(),
         SurfaceVocabulary::new(["checkout", "nav"]).expect("a vocabulary"),

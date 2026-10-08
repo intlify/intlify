@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, and its transitions and replay. See [Current status](#current-status).
+> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, and the checks of continuity, newness and absence. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -60,6 +60,21 @@ The update applies as a whole or not at all, and each refusal has its own `Trans
 
 What `apply` checks is the transition, not the bases. A `verified-edit` is not replayed against source and a `confirmed-new` is not proven: an update whose bases do not hold can still apply, and its result can still replay exactly.
 
+## Continuity, newness and absence
+
+`verify_bases` checks why each decision of an applicable update was made, against the evidence a host supplies in `ContinuityInputs`: the bytes of every snapshot in `RetainedSources`, the edits between snapshots, the units of the owning scope, and the update that produced the base. Each decision gets a `BasisVerdict`: `Proven` from the evidence, `Explicit` when it is a choice that needs the host's confirmation, or `Unproven` with the `BasisGap` that is missing. An unproven claim is never resolved by a guess.
+
+| Basis | Shown when |
+| --- | --- |
+| `unchanged-snapshot` | The declaration is exactly where it was |
+| `verified-edit` | The profile is `intlify-continuity-edit-replay` revision `0`; one edit runs from the base declaration's snapshot to the current one's; replaying it over the retained bytes gives exactly the after bytes; it carries the old range onto the current declaration's range and role; and nothing else accounts for either side |
+| `confirmed-new` | The base has no history, or the declaration lies entirely inside text an edit inserted, and no old declaration is carried onto it or still sits there |
+| `complete-absence` | The rest of the plan is resolved, and either the declaration's unit left the scope with no account of where it went, or one edit from its snapshot replaces its whole range |
+
+An edit carries a range only through replacements clear of both its ends: one before it shifts it, one strictly inside moves its end, one after leaves it alone. A replacement that touches or crosses an end leaves the range's fate unreadable, because replacing a literal's quotes and inserting a new message beside one look the same from the edit alone. Two accounts of one base snapshot, two edits from it, or an edit from a snapshot that is still current, mean a copy or a conflict, and neither side is a continuation.
+
+Newness and absence are claimed automatically only when the host's membership is exactly the inventory's units (a superset for a partial inventory) and the inventory was resolved against the same pins as the one that produced the base; a change of binding configuration can make declarations appear or vanish without any edit. They are proven when an update is planned: `confirmed-new` records no evidence, so a later replay does not prove it again.
+
 ## Schemas and vectors
 
 | File | Contents | Checked by |
@@ -72,6 +87,6 @@ See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vect
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, and replaying a chain from an anchor.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, and checking the continuity, newness and absence an update claims.
 
-Not yet implemented: continuity verification, newness and absence, reconciliation, and read-only compilation. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Not yet implemented: reconciliation, which plans an update from the same evidence, and read-only compilation. Local persistence and production publication are a later step again, after checked 015 inputs exist.

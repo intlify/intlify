@@ -306,7 +306,7 @@ fn next_entry(decision: &IdentityDecision) -> RegistryEntry {
 
 /// Return whether an occurrence is exactly one of the inventory's
 /// declarations.
-fn declares(inventory: &AuthoringInventory, occurrence: &Occurrence) -> bool {
+pub(crate) fn declares(inventory: &AuthoringInventory, occurrence: &Occurrence) -> bool {
     let declarations = inventory.declarations();
     // The canonical order leaves out a snapshot's declared length, so the
     // neighbour a search finds has to be compared in full.
