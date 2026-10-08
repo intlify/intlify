@@ -119,7 +119,7 @@ pub enum SnapshotFailure {
     /// this reader implements.
     ReferenceKind,
     /// An entry's ID or declaration belongs to an owner other than the
-    /// registry's.
+    /// registry's, or a successor is built from another owner's update.
     ForeignOwner,
     /// Two entries hold one Intent ID.
     DuplicateEntry,
@@ -131,6 +131,11 @@ pub enum SnapshotFailure {
     RangeOutsideSource,
     /// Two active entries hold one declaration.
     SharedDeclaration,
+    /// A successor is built from an update that was planned against another
+    /// base. Only a snapshot built from the two artifacts can be checked for
+    /// this on its own: a decoded snapshot holds references alone, and for one
+    /// of those it is replaying the update from its base that finds it.
+    UpdateBaseMismatch,
 }
 
 impl IntentRegistrySnapshot {
@@ -158,9 +163,11 @@ impl IntentRegistrySnapshot {
 
     /// Record the state an update claims to produce from its base.
     ///
-    /// The owner, scope and registry identity are the base's, because a chain
-    /// keeps them for its whole life. Entries are put into Intent ID order and
-    /// the result is validated; a repeated ID is reported, never dropped.
+    /// The update has to be planned against `base` and belong to its owner;
+    /// otherwise the two would not be one link of a chain. The owner, scope
+    /// and registry identity are the base's, because a chain keeps them for
+    /// its whole life. Entries are put into Intent ID order and the result is
+    /// validated; a repeated ID is reported, never dropped.
     ///
     /// Nothing here applies the update or compares its result. A snapshot
     /// built this way is a claim, and replaying the update from its base is
@@ -171,12 +178,19 @@ impl IntentRegistrySnapshot {
         mut entries: Vec<RegistryEntry>,
     ) -> Result<Self, SnapshotFailure> {
         let previous = base.body();
+        let base_reference = base.reference();
+        if update.body().base() != &base_reference {
+            return Err(SnapshotFailure::UpdateBaseMismatch);
+        }
+        if update.body().owner() != &previous.owner {
+            return Err(SnapshotFailure::ForeignOwner);
+        }
         entries.sort_by(|left, right| left.intent_id.cmp(&right.intent_id));
         let snapshot = Self {
             owner: previous.owner.clone(),
             scope: previous.scope.clone(),
             registry_identity: previous.registry_identity.clone(),
-            base: Some(base.reference()),
+            base: Some(base_reference),
             update: Some(update.reference()),
             entries: entries.into_boxed_slice(),
         };

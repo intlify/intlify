@@ -917,6 +917,37 @@ fn id(value: &str) -> MessageIntentId {
 }
 
 #[test]
+fn a_successor_pairs_its_base_only_with_an_update_planned_against_it() {
+    // The independent checker refuses a snapshot whose update was planned
+    // against another base, so the builder must not be able to write one.
+    let registry = |id: &str| -> RegistryArtifact { serde_json::from_value(artifact(id)).unwrap() };
+    let update =
+        |bytes: &[u8]| -> RegistryUpdateArtifact { serde_json::from_slice(bytes).unwrap() };
+    let genesis = registry("registry-0");
+    let allocated = registry("registry-1");
+    let allocate = update(&bytes(&artifact("update-1")));
+    let entries = allocated.body().entries().to_vec();
+
+    assert_eq!(
+        IntentRegistrySnapshot::successor(&allocated, &allocate, entries.clone()),
+        Err(SnapshotFailure::UpdateBaseMismatch),
+        "update-1 was planned against the genesis, not against registry-1"
+    );
+    let mut foreign = artifact("update-1");
+    foreign["body"]["owner"]["kind"] = json!("library");
+    assert_eq!(
+        IntentRegistrySnapshot::successor(&genesis, &update(&reseal(foreign)), entries.clone()),
+        Err(SnapshotFailure::ForeignOwner),
+        "an update of another owner is not a link of this chain"
+    );
+    // The right pairing gives back the committed snapshot exactly.
+    assert_eq!(
+        IntentRegistrySnapshot::successor(&genesis, &allocate, entries),
+        Ok(allocated.body().clone())
+    );
+}
+
+#[test]
 fn an_edit_is_recorded_in_order_with_insertions_at_one_position_joined() {
     let edit = SourceEdit::new(
         Some(snapshot("checkout", 10)),
