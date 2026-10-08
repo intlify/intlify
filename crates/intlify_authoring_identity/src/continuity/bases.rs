@@ -864,6 +864,76 @@ mod tests {
     }
 
     #[test]
+    fn an_absence_is_unproven_whenever_its_edit_is_not_evidence() {
+        // With pay's continuation chosen explicitly, the update carries no
+        // edit, and the host's edits are the only account of where cancel
+        // went.
+        let chain = Chain::load();
+        let owned = sources();
+        let all = retained(&owned);
+        let membership = units(&["checkout", "nav"]);
+        let mut body = artifact("update-2")["body"].clone();
+        body["decisions"][0]["basis"] = json!({"kind": "explicit", "reason": "Moved by hand."});
+        let explicit = update(body);
+        let cancel = |sources: &RetainedSources<'_>, edits: &[SourceEdit]| {
+            let inputs = ContinuityInputs {
+                sources,
+                edits,
+                membership: &membership,
+                previous: Some(produced(&chain, 1)),
+            };
+            verdicts(&chain, 2, &explicit, &inputs)[1]
+        };
+        assert_eq!(cancel(&all, &[checkout_edit()]), PROVEN);
+
+        let mut off = serde_json::to_value(checkout_edit()).unwrap();
+        off["replacements"][0]["text"] = json!("// checkout actions \n");
+        let off: SourceEdit = serde_json::from_value(off).unwrap();
+        assert_eq!(
+            cancel(&all, &[off]),
+            gap(BasisGap::ReplayMismatch),
+            "an edit one byte off"
+        );
+
+        let without_revision_2: Vec<(SourceSnapshot, String)> = owned
+            .iter()
+            .filter(|(snapshot, _)| snapshot.revision().as_str() != "2")
+            .cloned()
+            .collect();
+        assert_eq!(
+            cancel(&retained(&without_revision_2), &[checkout_edit()]),
+            gap(BasisGap::SourceUnavailable),
+            "bytes that were not retained"
+        );
+
+        let first = checkout_edit().before().cloned();
+        let unchanged = SourceEdit::new(first.clone(), first, vec![]);
+        assert_eq!(
+            cancel(&all, &[checkout_edit(), unchanged]),
+            gap(BasisGap::Ambiguous),
+            "two accounts of one snapshot"
+        );
+
+        // The same bytes, rewritten across cancel's end: the edit touches
+        // cancel and does not say whether it went.
+        let edit = checkout_edit();
+        let across = SourceEdit::new(
+            edit.before().cloned(),
+            edit.after().cloned(),
+            vec![
+                Replacement::new(at(0, 0), HEADER_LINE),
+                Replacement::new(at(30, 56), &PAY_LATER_LINE[..26]),
+                Replacement::new(at(56, 62), &PAY_LATER_LINE[26..]),
+            ],
+        );
+        assert_eq!(
+            cancel(&all, &[across]),
+            gap(BasisGap::AbsenceUnproven),
+            "an edit across its end"
+        );
+    }
+
+    #[test]
     fn newness_and_absence_wait_for_the_pins_of_the_base() {
         let chain = Chain::load();
         let owned = sources();
@@ -941,6 +1011,19 @@ mod tests {
             Some(ContinuityFailure::PreviousMismatch),
             "an update that did not produce the base"
         );
+        assert_eq!(
+            run(
+                1,
+                Some(PreviousUpdate {
+                    update: chain.update(1),
+                    inventory: chain.inventory(2),
+                }),
+                &[],
+                &limits()
+            ),
+            Some(ContinuityFailure::PreviousMismatch),
+            "an inventory the update was not planned from"
+        );
 
         let mut overlapping = serde_json::to_value(checkout_edit()).unwrap();
         overlapping["replacements"][0]["range"] = json!({"start": "0", "end": "40"});
@@ -959,6 +1042,110 @@ mod tests {
             run(1, Some(produced(&chain, 1)), &[checkout_edit()], &tight),
             Some(ContinuityFailure::Limit(IdentityLimitKind::SourceEdits))
         );
+
+        // Exactly at every bound is within it, and one less is not.
+        let supplied = [checkout_edit()];
+        let count = supplied[0].replacements().len() as u64;
+        let bytes: u64 = supplied[0]
+            .replacements()
+            .iter()
+            .map(|replacement| replacement.text().len() as u64)
+            .sum();
+        let bounded = |replacements, replacement_bytes| IdentityLimits {
+            source_edits: 1,
+            replacements,
+            replacement_bytes,
+            ..limits()
+        };
+        assert_eq!(
+            run(
+                1,
+                Some(produced(&chain, 1)),
+                &supplied,
+                &bounded(count, bytes)
+            ),
+            None
+        );
+        assert_eq!(
+            run(
+                1,
+                Some(produced(&chain, 1)),
+                &supplied,
+                &bounded(count - 1, bytes)
+            ),
+            Some(ContinuityFailure::Limit(IdentityLimitKind::Replacements))
+        );
+        assert_eq!(
+            run(
+                1,
+                Some(produced(&chain, 1)),
+                &supplied,
+                &bounded(count, bytes - 1)
+            ),
+            Some(ContinuityFailure::Limit(
+                IdentityLimitKind::ReplacementBytes
+            ))
+        );
+    }
+
+    #[test]
+    fn a_partial_inventory_needs_only_its_own_units_in_the_membership() {
+        // A partial inventory sees part of the scope: the host's membership
+        // may hold more units than it does, but not fewer.
+        let chain = Chain::load();
+        let owned = sources();
+        let all = retained(&owned);
+        let mut partial = artifact("inventory-2")["body"].clone();
+        partial["completeness"] = json!("partial");
+        let partial: AuthoringInventory = serde_json::from_value(partial).unwrap();
+        let with = |names: &[&str]| {
+            let membership = units(names);
+            automatic(
+                chain.registry(1),
+                &partial,
+                &ContinuityInputs {
+                    sources: &all,
+                    edits: &[],
+                    membership: &membership,
+                    previous: Some(produced(&chain, 1)),
+                },
+            )
+        };
+        assert_eq!(with(&["checkout", "nav", "settings"]), Ok(()));
+        assert_eq!(with(&["checkout", "nav"]), Ok(()));
+        assert_eq!(with(&["checkout"]), Err(BasisGap::MembershipMismatch));
+    }
+
+    #[test]
+    fn a_report_is_proven_only_when_every_basis_is() {
+        let chain = Chain::load();
+        let owned = sources();
+        let all = retained(&owned);
+        let membership = units(&["checkout", "nav"]);
+        let report = |n: usize| {
+            let inputs = ContinuityInputs {
+                sources: &all,
+                edits: &[],
+                membership: &membership,
+                previous: Some(produced(&chain, n - 1)),
+            };
+            verify_bases(
+                chain.registry(n - 1),
+                chain.update(n),
+                chain.inventory(n),
+                &inputs,
+                &limits(),
+            )
+            .unwrap()
+        };
+        assert!(report(2).is_proven());
+        // Cancel's restore in update-3 is a choice, not a proof.
+        let third = report(3);
+        assert!(!third.is_proven());
+        for (id, verdict) in third.verdicts() {
+            assert_eq!(third.verdict(id), Some(*verdict));
+        }
+        assert_eq!(third.verdict(&stranger()), None);
     }
 
     /// Seal and admit an update of the committed owner against registry-1,
@@ -1191,6 +1378,65 @@ mod tests {
                 gap(BasisGap::UnresolvedPlan),
                 gap(BasisGap::NewUnproven)
             ]
+        );
+    }
+
+    #[test]
+    fn a_declaration_where_it_was_needs_no_edit_and_a_choice_is_left_to_the_host() {
+        let chain = Chain::load();
+        // Pay is exactly where it was: there is nothing to show.
+        let pay = &chain.registry(1).snapshot().entries()[0];
+        let stays = against_unchanged(
+            &chain,
+            vec![IdentityDecision::continuation(
+                pay.intent_id().clone(),
+                pay.declaration().clone(),
+                pay.declaration().clone(),
+                ContinuationBasis::unchanged_snapshot(),
+            )],
+        );
+        assert_eq!(unchanged_verdicts(&chain, &stays), [PROVEN]);
+        // The copy given its ID by choice is left to the host to confirm,
+        // though the edit would show it new.
+        let mut body = artifact("update-2")["body"].clone();
+        body["decisions"][2]["basis"] = json!({"kind": "explicit", "reason": "Copied by hand."});
+        assert_eq!(
+            checked(&chain, 1, &update(body), chain.inventory(2), &[]),
+            [PROVEN, PROVEN, BasisVerdict::Explicit]
+        );
+    }
+
+    #[test]
+    fn a_declaration_its_edit_replaces_does_not_continue() {
+        // Update-2's edit replaces cancel's whole line with the copy's. Read
+        // as cancel continuing onto the copy, it carries nothing: cancel was
+        // replaced, not moved.
+        let chain = Chain::load();
+        let base = chain.registry(1);
+        let entries = base.snapshot().entries();
+        let (pay, cancel) = (&entries[0], &entries[2]);
+        let current = chain.inventory(2).inventory().declarations();
+        let plan = planned(
+            base,
+            chain.inventory(2),
+            vec![
+                IdentityDecision::continuation(
+                    pay.intent_id().clone(),
+                    pay.declaration().clone(),
+                    current[0].occurrence().clone(),
+                    edit_replay(vec![checkout_edit()]),
+                ),
+                IdentityDecision::continuation(
+                    cancel.intent_id().clone(),
+                    cancel.declaration().clone(),
+                    current[1].occurrence().clone(),
+                    edit_replay(vec![checkout_edit()]),
+                ),
+            ],
+        );
+        assert_eq!(
+            checked(&chain, 1, &plan, chain.inventory(2), &[]),
+            [PROVEN, gap(BasisGap::DeclarationReplaced)]
         );
     }
 
