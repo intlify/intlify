@@ -19,6 +19,8 @@
 mod admit;
 mod apply;
 mod artifact;
+#[cfg(test)]
+mod fixtures;
 mod history;
 mod snapshot;
 mod update;
