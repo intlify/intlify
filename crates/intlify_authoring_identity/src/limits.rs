@@ -1,7 +1,8 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Explicit finite limits for reading registry history and planning updates.
+//! Explicit finite limits for reading identity artifacts, planning updates
+//! and compiling against a registry.
 //!
 //! Design 017 puts every size and collection count under a caller-supplied
 //! finite limit. The shared decoder already bounds the bytes and the nesting;
@@ -9,7 +10,7 @@
 //! `AuthoringLimits`, the type has no `Default`, so a caller that does not know
 //! a bound decides one rather than inheriting a value from this crate.
 
-/// Which named bound a registry artifact exhausted.
+/// Which named bound an identity artifact or operation exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IdentityLimitKind {
     /// Entries in one registry snapshot.
@@ -30,12 +31,14 @@ pub enum IdentityLimitKind {
     HistorySteps,
     /// Allocation candidates one reconciliation is offered.
     Candidates,
-    /// Diagnostics one reconciliation reports.
+    /// Diagnostics one reconciliation or compilation reports.
     Diagnostics,
+    /// Targets one `message-reference` artifact names.
+    Targets,
 }
 
-/// Inclusive upper bounds applied to reading one registry artifact, and to
-/// planning one update.
+/// Inclusive upper bounds applied to reading one identity artifact, to
+/// planning one update, and to compiling one inventory.
 ///
 /// Every bound admits zero: a registry with no entries, an update with no
 /// decisions and a chain verified at its anchor are all meaningful, so no
@@ -60,6 +63,8 @@ pub struct IdentityLimits {
     pub history_steps: u64,
     /// Allocation candidates one reconciliation is offered.
     pub candidates: u64,
-    /// Diagnostics one reconciliation reports.
+    /// Diagnostics one reconciliation or compilation reports.
     pub diagnostics: u64,
+    /// Targets one `message-reference` artifact names.
+    pub targets: u64,
 }

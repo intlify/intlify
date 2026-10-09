@@ -34,7 +34,7 @@ pub use history::{
     replay, verify_history, Anchor, HistoryFailure, HistoryOutcome, ReplayFailure, RetainedHistory,
 };
 pub use snapshot::{EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure};
-pub(crate) use update::validate_edit;
+pub(crate) use update::{validate_continuation, validate_edit};
 pub use update::{
     Allocation, AllocationBasis, CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis,
     ExplicitBasis, IdentityDecision, IntentRegistryUpdate, LineageKind, LineageLink, Replacement,

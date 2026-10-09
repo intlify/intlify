@@ -33,6 +33,7 @@
 mod admission;
 mod continuity;
 mod id;
+mod intent;
 mod limits;
 mod reconcile;
 mod registry;
@@ -47,6 +48,11 @@ pub use continuity::{
     EDIT_REPLAY_REVISION,
 };
 pub use id::RegistryIdentity;
+pub use intent::{
+    admit_intent, admit_reference, AdmittedIntent, AdmittedReference, IntentContinuity,
+    IntentFailure, MessageIntentArtifact, MessageIntentBody, MessageReferenceArtifact,
+    MessageReferenceBody, ReferenceFailure, ReferenceTarget,
+};
 pub use limits::{IdentityLimitKind, IdentityLimits};
 pub use reconcile::{
     detail, reconcile, reconcile_with_cancellation, CandidateFailure, Classification, Conflict,

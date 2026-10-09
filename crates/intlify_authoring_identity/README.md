@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, and reconciliation. See [Current status](#current-status).
+> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, reconciliation, and the representation of Intent and reference artifacts. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -92,18 +92,33 @@ Newness and absence are claimed automatically only when the host's membership is
 
 The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `IdentityWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
 
+## Intent and reference artifacts
+
+Design 017 hands an inventory's declarations and use sites on with two more kinds, sealed in the same envelope.
+
+| Kind | Type | What it holds |
+| --- | --- | --- |
+| `message-intent` | `MessageIntentBody` | One declaration's Intent ID, the revision its current projection gives, the inventory and registry it was compiled from, and, when the declaration is not the one the registry holds, the continuity that carried the ID onto it |
+| `message-reference` | `MessageReferenceBody` | One use site and, for every declaration it may use, that declaration's Intent ID, revision and `message-intent` artifact, in Intent ID order |
+
+`admit_intent` and `admit_reference` read them in the same order as the registry kinds, and report a broken structural rule as an `IntentFailure` or a `ReferenceFailure`. A continuity is held to the rules of a `continue` decision between the same two declarations. A reference names at least one target, all of the use site's owner, and no ID twice; `IdentityLimits::targets` bounds how many. The parameters a use site supplies stay in the inventory the reference names.
+
+Admission is narrow here too. A well-formed Intent can still name a retired ID, a stale revision or a continuity nothing proves; whether an artifact is what compiling its inventory against its registry gives is a separate question.
+
 ## Schemas and vectors
 
 | File | Contents | Checked by |
 | --- | --- | --- |
 | `schema/intent-registry-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `schema/intent-registry-update-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry-update` | `vp run schema:authoring:check`, `src/schema.rs` |
+| `schema/message-intent-v0.schema.json` | The closed Draft 7 schema of a sealed `message-intent` | `vp run schema:authoring:check`, `src/schema.rs` |
+| `schema/message-reference-v0.schema.json` | The closed Draft 7 schema of a sealed `message-reference` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `fixtures/phase3/registry-vectors.json` | One real chain, a genesis and three updates, with the inventories and source texts behind it | `vp run vectors:authoring:check`, `tests/registry_admission.rs` |
 
 See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vectors hold and what the independent checker verifies.
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, and reconciling an inventory against a base.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, and the representation and structural admission of Intent and reference artifacts.
 
 Not yet implemented: read-only compilation. Confirming explicit decisions and publishing a plan belong to the host and come later. Local persistence and production publication are a later step again, after checked 015 inputs exist.

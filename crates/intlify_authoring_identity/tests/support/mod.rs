@@ -59,6 +59,7 @@ pub fn limits() -> IdentityLimits {
         history_steps: 64,
         candidates: 256,
         diagnostics: 256,
+        targets: 256,
     }
 }
 

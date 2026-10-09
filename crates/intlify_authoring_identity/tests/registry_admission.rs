@@ -777,7 +777,8 @@ fn every_bound_admits_its_exact_value_and_refuses_one_less() {
                     IdentityLimitKind::Entries
                     | IdentityLimitKind::HistorySteps
                     | IdentityLimitKind::Candidates
-                    | IdentityLimitKind::Diagnostics => {
+                    | IdentityLimitKind::Diagnostics
+                    | IdentityLimitKind::Targets => {
                         unreachable!("not an update bound")
                     }
                 } = value;
