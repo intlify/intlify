@@ -35,7 +35,7 @@ use intlify_authoring::{
     VersionedIdentity,
 };
 
-use self::classify::Planner;
+use self::classify::{Associations, Planner};
 pub use self::diagnostic::detail;
 pub use self::explicit::{ExplicitDecision, NotExplicit};
 pub use self::outcome::{
@@ -113,11 +113,13 @@ where
     let evidence = Evidence::gather(&[], inputs.evidence.edits, inputs.evidence.sources, current);
     let claims = evidence.claims(base);
     let planner = Planner {
-        base,
+        associations: Associations {
+            base,
+            current,
+            evidence: &evidence,
+            claims: &claims,
+        },
         inventory: inventory.reference(),
-        current,
-        evidence: &evidence,
-        claims: &claims,
         membership: inputs.evidence.membership,
         automatic: automatic(base, current, &inputs.evidence),
     };
@@ -125,7 +127,7 @@ where
     stop()?;
     let (explicit, moved) = planner.explicit(inputs.explicit, workspace);
     stop()?;
-    let gone = planner.retained(&moved, workspace);
+    let gone = planner.associations.retained(&moved, workspace);
     stop()?;
     let (continued, absent) = planner.carried(gone, workspace);
     stop()?;
