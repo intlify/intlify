@@ -125,14 +125,26 @@ fn check_names(
     inventory: &AuthoringArtifactReference,
     current: &AuthoringInventory,
 ) -> Result<(), TransitionFailure> {
-    let snapshot = base.snapshot();
     if plan.base() != &base.reference() {
         return Err(TransitionFailure::BaseMismatch);
     }
     if plan.inventory() != inventory {
         return Err(TransitionFailure::InventoryMismatch);
     }
-    if plan.owner() != snapshot.owner() || current.owner() != snapshot.owner() {
+    if plan.owner() != base.snapshot().owner() {
+        return Err(TransitionFailure::OwnerMismatch);
+    }
+    check_pairing(base, current)
+}
+
+/// Check that an inventory can be planned from against a base: the same
+/// owner and scope, and every unit checked.
+pub(crate) fn check_pairing(
+    base: &AdmittedRegistry,
+    current: &AuthoringInventory,
+) -> Result<(), TransitionFailure> {
+    let snapshot = base.snapshot();
+    if current.owner() != snapshot.owner() {
         return Err(TransitionFailure::OwnerMismatch);
     }
     if current.scope() != snapshot.scope() {
@@ -253,7 +265,7 @@ fn next_entries(
 }
 
 /// Check one decision against the base entry it names.
-fn check_base_state(
+pub(crate) fn check_base_state(
     decision: &IdentityDecision,
     snapshot: &IntentRegistrySnapshot,
     current: &AuthoringInventory,

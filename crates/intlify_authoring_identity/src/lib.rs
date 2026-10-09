@@ -33,6 +33,7 @@
 mod continuity;
 mod id;
 mod limits;
+mod reconcile;
 mod registry;
 pub mod schema;
 
@@ -44,6 +45,12 @@ pub use continuity::{
 };
 pub use id::RegistryIdentity;
 pub use limits::{IdentityLimitKind, IdentityLimits};
+pub use reconcile::{
+    detail, reconcile, reconcile_with_cancellation, CandidateFailure, Classification, Conflict,
+    DeclarationClass, Eligibility, EntryClass, ExplicitDecision, NotExplicit, Plan,
+    ReconcileCapacities, ReconcileFailure, ReconcileInputs, ReconcileWorkspace, Reconciliation,
+    Unresolved,
+};
 pub use registry::{
     admit_registry, admit_update, apply, replay, verify_history, AdmittedRegistry, AdmittedUpdate,
     Allocation, AllocationBasis, Anchor, CompleteAbsence, ConfirmedNew, Continuation,

@@ -22,5 +22,7 @@ pub use edit::{
     fate, inserted, is_edit_replay_profile, replay, RangeFate, ReplayGap, EDIT_REPLAY_PROFILE,
     EDIT_REPLAY_REVISION,
 };
+pub(crate) use evidence::{Claims, Evidence};
+pub(crate) use inputs::{automatic, check_previous, check_supplied};
 pub use inputs::{ContinuityInputs, EditSetFailure, PreviousUpdate};
 pub use sources::{RetainedSourceFailure, RetainedSources};

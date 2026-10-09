@@ -774,7 +774,10 @@ fn every_bound_admits_its_exact_value_and_refuses_one_less() {
                     IdentityLimitKind::SourceEdits => &mut limits.source_edits,
                     IdentityLimitKind::Replacements => &mut limits.replacements,
                     IdentityLimitKind::ReplacementBytes => &mut limits.replacement_bytes,
-                    IdentityLimitKind::Entries | IdentityLimitKind::HistorySteps => {
+                    IdentityLimitKind::Entries
+                    | IdentityLimitKind::HistorySteps
+                    | IdentityLimitKind::Candidates
+                    | IdentityLimitKind::Diagnostics => {
                         unreachable!("not an update bound")
                     }
                 } = value;

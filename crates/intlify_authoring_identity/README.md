@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, and the checks of continuity, newness and absence. See [Current status](#current-status).
+> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, and reconciliation. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -77,6 +77,21 @@ The edits a host supplies have to read like one change list from the base to the
 
 Newness and absence are claimed automatically only when the host's membership is exactly the inventory's units (a superset for a partial inventory) and the inventory was resolved against the same pins as the one that produced the base; a change of binding configuration can make declarations appear or vanish without any edit. They are proven when an update is planned: `confirmed-new` records no evidence, so a later replay does not prove it again.
 
+## Reconciliation
+
+`reconcile` plans one update from an inventory against an exact base, following design 016's procedure. The host supplies the continuity evidence in `ContinuityInputs`, explicit decisions bound to the base and inventory they were made for (`ExplicitDecision`), lineage links, and fresh candidate IDs it drew itself. Nothing here generates an ID.
+
+| Step | What reconciliation does |
+| --- | --- |
+| Admit | The base and the inventory have to pair (owner, scope, every unit checked), and the evidence and the candidates have to be well formed |
+| Explicit decisions | Applied when bound to this exact base and inventory and fitting the base; otherwise reported as conflicts. They always need the host's confirmation |
+| Unchanged | An active entry that still holds its exact declaration keeps it |
+| Continued | An entry whose declaration is gone continues onto the one declaration a single replaying edit carries it to, if nothing else claims that declaration |
+| New | A declaration left over is new where the base has no history or an edit into its own unit inserted all of its text; it takes the next candidate, in canonical order |
+| Absent | In a complete inventory, an entry is retired where its unit left the scope with no account of it or one edit replaced its declaration; a partial inventory keeps what it cannot settle |
+
+The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `ReconcileWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
+
 ## Schemas and vectors
 
 | File | Contents | Checked by |
@@ -89,6 +104,6 @@ See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vect
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, and checking the continuity, newness and absence an update claims.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, and reconciling an inventory against a base.
 
-Not yet implemented: reconciliation, which plans an update from the same evidence, and read-only compilation. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Not yet implemented: read-only compilation. Confirming explicit decisions and publishing a plan belong to the host and come later. Local persistence and production publication are a later step again, after checked 015 inputs exist.

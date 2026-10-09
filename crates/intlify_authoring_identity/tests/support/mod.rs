@@ -57,6 +57,8 @@ pub fn limits() -> IdentityLimits {
         replacements: 4096,
         replacement_bytes: 1024 * 1024,
         history_steps: 64,
+        candidates: 256,
+        diagnostics: 256,
     }
 }
 

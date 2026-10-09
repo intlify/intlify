@@ -85,6 +85,8 @@ pub(crate) fn limits() -> IdentityLimits {
         replacements: 4096,
         replacement_bytes: 1024 * 1024,
         history_steps: 64,
+        candidates: 256,
+        diagnostics: 256,
     }
 }
 
@@ -245,6 +247,15 @@ fn calls(text: &str) -> Vec<Call> {
 
 /// Build and admit an inventory of checked units, as a Producer would.
 pub(crate) fn inventory_of(units: &[&Unit], completeness: Completeness) -> AdmittedInventory {
+    inventory_with_role(units, completeness, OccurrenceRole::IntentLiteral)
+}
+
+/// Build and admit an inventory whose declarations all have one role.
+pub(crate) fn inventory_with_role(
+    units: &[&Unit],
+    completeness: Completeness,
+    role: OccurrenceRole,
+) -> AdmittedInventory {
     let context = context();
     let mut occurrences = Vec::new();
     let mut maps = Vec::new();
@@ -253,12 +264,8 @@ pub(crate) fn inventory_of(units: &[&Unit], completeness: Completeness) -> Admit
     for unit in units {
         let snapshot = unit.snapshot();
         for call in calls(&unit.text) {
-            let literal = Occurrence::new(
-                snapshot.clone(),
-                call.literal,
-                OccurrenceRole::IntentLiteral,
-            )
-            .expect("inside the unit");
+            let literal =
+                Occurrence::new(snapshot.clone(), call.literal, role).expect("inside the unit");
             let content = &unit.text[call.content.start() as usize..call.content.end() as usize];
             maps.push([InputSegment::new(
                 ByteRange::new(0, content.len() as u64).expect("ordered"),
@@ -333,9 +340,18 @@ pub(crate) fn id(value: &str) -> MessageIntentId {
 
 /// A genesis of the committed owner and scope.
 pub(crate) fn genesis(identity: &str) -> AdmittedRegistry {
+    seal_genesis(identity, "storefront-web")
+}
+
+/// A genesis of the committed owner and another scope.
+pub(crate) fn genesis_of_scope(scope: &str) -> AdmittedRegistry {
+    seal_genesis("fedcba9876543210fedcba9876543210", scope)
+}
+
+fn seal_genesis(identity: &str, scope: &str) -> AdmittedRegistry {
     let snapshot = IntentRegistrySnapshot::genesis(
         owner(),
-        "storefront-web",
+        scope,
         RegistryIdentity::retained(identity).expect("a fixture value"),
     )
     .expect("a checked scope");
