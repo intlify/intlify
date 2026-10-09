@@ -20,7 +20,7 @@ mod admit;
 mod apply;
 mod artifact;
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 mod history;
 mod snapshot;
 mod update;
@@ -28,12 +28,14 @@ mod update;
 pub use admit::{
     admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, RegistryAdmissionFailure,
 };
+pub(crate) use apply::declares;
 pub use apply::{apply, Transition, TransitionFailure};
 pub use artifact::{RegistryArtifact, RegistryUpdateArtifact};
 pub use history::{
     replay, verify_history, Anchor, HistoryFailure, HistoryOutcome, ReplayFailure, RetainedHistory,
 };
 pub use snapshot::{EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure};
+pub(crate) use update::validate_edit;
 pub use update::{
     Allocation, AllocationBasis, CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis,
     ExplicitBasis, IdentityDecision, IntentRegistryUpdate, LineageKind, LineageLink, Replacement,

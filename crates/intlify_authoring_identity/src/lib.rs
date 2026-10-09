@@ -30,11 +30,17 @@
 //! assert!(registry != intent);
 //! ```
 
+mod continuity;
 mod id;
 mod limits;
 mod registry;
 pub mod schema;
 
+pub use continuity::{
+    fate, inserted, is_edit_replay_profile, replay as replay_edit, verify_bases, BasisGap,
+    BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs, PreviousUpdate, RangeFate,
+    ReplayGap, RetainedSourceFailure, RetainedSources, EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION,
+};
 pub use id::RegistryIdentity;
 pub use limits::{IdentityLimitKind, IdentityLimits};
 pub use registry::{

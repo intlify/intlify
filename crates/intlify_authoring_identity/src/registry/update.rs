@@ -841,23 +841,17 @@ impl IntentRegistryUpdate {
         let mut before_units: BTreeSet<&Token> = BTreeSet::new();
         let mut after_units: BTreeSet<&Token> = BTreeSet::new();
         for edit in changes {
-            if edit.before.is_none() && edit.after.is_none() {
-                return Err(UpdateFailure::EmptyEdit);
-            }
+            validate_edit(edit, &self.owner)?;
             for (side, units) in [
                 (&edit.before, &mut before_units),
                 (&edit.after, &mut after_units),
             ] {
                 if let Some(snapshot) = side {
-                    if snapshot.owner() != &self.owner {
-                        return Err(UpdateFailure::ForeignOwner);
-                    }
                     if !units.insert(snapshot.unit()) {
                         return Err(UpdateFailure::DuplicateUnit);
                     }
                 }
             }
-            validate_replacements(edit)?;
         }
         // With no unit repeated on either side, two edits can no longer
         // compare equal, so anything but strictly increasing is out of order.
@@ -904,6 +898,26 @@ impl IntentRegistryUpdate {
         }
         Ok(())
     }
+}
+
+/// Check one edit on its own: a side to start or end at, one owner, and
+/// replacements that can be replayed as recorded.
+///
+/// A change list adds its own rules on top, one unit per side and its order.
+/// An edit a host supplies as evidence is held to these alone.
+pub(crate) fn validate_edit(edit: &SourceEdit, owner: &OwnerIdentity) -> Result<(), UpdateFailure> {
+    if edit.before.is_none() && edit.after.is_none() {
+        return Err(UpdateFailure::EmptyEdit);
+    }
+    if edit
+        .before
+        .iter()
+        .chain(&edit.after)
+        .any(|snapshot| snapshot.owner() != owner)
+    {
+        return Err(UpdateFailure::ForeignOwner);
+    }
+    validate_replacements(edit)
 }
 
 /// Check that an edit's replacements can be replayed as recorded.
