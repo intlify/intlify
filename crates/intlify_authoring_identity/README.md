@@ -67,11 +67,13 @@ What `apply` checks is the transition, not the bases. A `verified-edit` is not r
 | Basis | Shown when |
 | --- | --- |
 | `unchanged-snapshot` | The declaration is exactly where it was |
-| `verified-edit` | The profile is `intlify-continuity-edit-replay` revision `0`; one edit runs from the base declaration's snapshot to the current one's; replaying it over the retained bytes gives exactly the after bytes; it carries the old range onto the current declaration's range and role; and nothing else accounts for either side |
+| `verified-edit` | The profile is `intlify-continuity-edit-replay` revision `0`; the change list is exactly one edit, from the base declaration's snapshot to the current one's; replaying it over the retained bytes gives exactly the after bytes; it carries the old range onto the current declaration's range and role; and nothing else accounts for either side |
 | `confirmed-new` | The base has no history, or the declaration lies entirely inside text an edit inserted, and no old declaration is carried onto it or still sits there |
 | `complete-absence` | The rest of the plan is resolved, and either the declaration's unit left the scope with no account of where it went, or one edit from its snapshot to a snapshot the inventory holds replaces its whole range |
 
 An edit carries a range only through replacements clear of both its ends: one before it shifts it, one strictly inside moves its end, one after leaves it alone. A replacement that touches or crosses an end leaves the range's fate unreadable, because replacing a literal's quotes and inserting a new message beside one look the same from the edit alone. Two accounts of one base snapshot, two edits from it, or an edit from a snapshot that is still current, mean a copy or a conflict, and neither side is a continuation.
+
+The edits a host supplies have to read like one change list from the base to the current inventory, or the bases are not checked at all: each unit at most once on each side, each edit starting from a snapshot the base has (or from nothing, for a unit the base does not have) and ending at a snapshot the inventory holds (or nowhere, for a unit the inventory no longer has). An edit that writes from nothing a unit the base already has, or one that ends at a revision nobody holds, is not an account of the change.
 
 Newness and absence are claimed automatically only when the host's membership is exactly the inventory's units (a superset for a partial inventory) and the inventory was resolved against the same pins as the one that produced the base; a change of binding configuration can make declarations appear or vanish without any edit. They are proven when an update is planned: `confirmed-new` records no evidence, so a later replay does not prove it again.
 

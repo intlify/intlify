@@ -38,8 +38,9 @@ pub mod schema;
 
 pub use continuity::{
     fate, inserted, is_edit_replay_profile, replay as replay_edit, verify_bases, BasisGap,
-    BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs, PreviousUpdate, RangeFate,
-    ReplayGap, RetainedSourceFailure, RetainedSources, EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION,
+    BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs, EditSetFailure, PreviousUpdate,
+    RangeFate, ReplayGap, RetainedSourceFailure, RetainedSources, EDIT_REPLAY_PROFILE,
+    EDIT_REPLAY_REVISION,
 };
 pub use id::RegistryIdentity;
 pub use limits::{IdentityLimitKind, IdentityLimits};
