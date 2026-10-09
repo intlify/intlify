@@ -24,6 +24,9 @@ serde_json = "1.0.106"
 # admits is the explicitly test-owned one. Enabling it for test targets and
 # examples alone keeps the ordinary build unable to construct it.
 intlify_authoring = { path = "../intlify_authoring", features = ["test-context"] }
+# Design 028's module is carried from source to compiled artifacts through
+# the real Producer, which never learns an identity itself.
+intlify_authoring_js = { path = "../intlify_authoring_js" }
 # Fixtures name their bytes by digest, as a caller would.
 intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.

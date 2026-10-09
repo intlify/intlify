@@ -1,0 +1,2534 @@
+{
+  "note": "Design 028's representative module carried from source to compiled Intent and reference artifacts. An independent implementation re-derives each artifact's integrity digest under the domain below and each Intent's revision from its declaration's projection, resolves every reference to the earlier artifact it names, checks each Intent against its registry entry and each continuity's edit against the retained text, and checks each reference's targets against the Intents of the declarations it may use.",
+  "domain": "authoring-artifact-integrity",
+  "revisionDomain": "intent-semantic-revision",
+  "projectionSpecification": {
+    "identity": "intlify-intent-projection",
+    "revision": "0"
+  },
+  "editProfile": {
+    "identity": "intlify-continuity-edit-replay",
+    "revision": "0"
+  },
+  "sources": [
+    {
+      "unit": "app",
+      "revision": "1",
+      "text": "import { intent, mf2, noIntent } from 'fixture-authoring'\n\n/* @intlify { \"description\": \"Greeting addressed to the signed-in user\" } */\nconst greeting = mf2`Hello {$name}!`\n\nexport function render(name) {\n  const save = document.querySelector('#save')\n  const heading = document.querySelector('#heading')\n  const first = document.querySelector('#first')\n  const second = document.querySelector('#second')\n  const brand = document.querySelector('#brand')\n\n  save.textContent = 'Save'\n  heading.textContent = intent('Welcome')\n  first.textContent = intent(greeting, { name })\n  second.textContent = intent(greeting, { name })\n  brand.textContent = noIntent('Intlify', 'Product name')\n}\n"
+    },
+    {
+      "unit": "app",
+      "revision": "2",
+      "text": "import { intent, mf2, noIntent } from 'fixture-authoring'\n\n/* @intlify { \"description\": \"Greeting addressed to the signed-in user\" } */\nconst greeting = mf2`Hello {$name}!`\n\nexport function render(name) {\n  const save = document.querySelector('#save')\n  const heading = document.querySelector('#heading')\n  const first = document.querySelector('#first')\n  const second = document.querySelector('#second')\n  const brand = document.querySelector('#brand')\n\n  save.textContent = 'Save'\n  heading.textContent = intent('Welcome back')\n  first.textContent = intent(greeting, { name })\n  second.textContent = intent(greeting, { name })\n  brand.textContent = noIntent('Intlify', 'Product name')\n}\n"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "inventory-1",
+      "note": "Design 028's representative module, read by the JS Producer: the greeting tag, the 'Save' text and the 'Welcome' literal.",
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-js-dom-authoring",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:051d2be01b639d766101a4351133aeb8f90dbd25e3f3f050fc72a90f7b055956"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "app",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "684",
+                "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "153",
+                  "end": "172"
+                },
+                "role": "mf2-declaration"
+              },
+              "mf2Source": "Hello {$name}!",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Hello "
+                      },
+                      {
+                        "kind": "expression",
+                        "operand": {
+                          "kind": "variable",
+                          "name": "name"
+                        },
+                        "attributes": []
+                      },
+                      {
+                        "kind": "text",
+                        "value": "!"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": ["name"],
+                "description": "Greeting addressed to the signed-in user"
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "14"
+                  },
+                  "source": {
+                    "start": "157",
+                    "end": "171"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "476",
+                  "end": "482"
+                },
+                "role": "ui-literal"
+              },
+              "mf2Source": "{{Save}}",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Save"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": [],
+                "usage": {
+                  "profile": {
+                    "identity": "intlify-web-dom-usage",
+                    "revision": "0"
+                  },
+                  "value": "text-content"
+                }
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "2"
+                  },
+                  "source": {
+                    "start": "477",
+                    "end": "477"
+                  }
+                },
+                {
+                  "extracted": {
+                    "start": "2",
+                    "end": "6"
+                  },
+                  "source": {
+                    "start": "477",
+                    "end": "481"
+                  }
+                },
+                {
+                  "extracted": {
+                    "start": "6",
+                    "end": "8"
+                  },
+                  "source": {
+                    "start": "481",
+                    "end": "481"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "514",
+                  "end": "523"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Welcome",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Welcome"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "7"
+                  },
+                  "source": {
+                    "start": "515",
+                    "end": "522"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "457",
+                  "end": "482"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "range": {
+                    "start": "476",
+                    "end": "482"
+                  },
+                  "role": "ui-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "507",
+                  "end": "524"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "range": {
+                    "start": "514",
+                    "end": "523"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "547",
+                  "end": "573"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "range": {
+                    "start": "153",
+                    "end": "172"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "app",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "684",
+                      "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                    },
+                    "range": {
+                      "start": "566",
+                      "end": "570"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "597",
+                  "end": "623"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "range": {
+                    "start": "153",
+                    "end": "172"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "app",
+                      "revision": "1",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "684",
+                      "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                    },
+                    "range": {
+                      "start": "616",
+                      "end": "620"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            }
+          ],
+          "exclusions": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "646",
+                  "end": "681"
+                },
+                "role": "exclusion"
+              },
+              "reason": "Product name"
+            }
+          ]
+        },
+        "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+      }
+    },
+    {
+      "id": "registry-0",
+      "note": "The genesis: no history and no entries.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "7660c5e984f1816f6c099923d8bcff1b",
+          "entries": []
+        },
+        "integrityDigest": "sha256:9da62b1e45f1b9c4f6752edb1fa588fae4aa12e4ffaab8a33fc670ad23fbeb11"
+      }
+    },
+    {
+      "id": "update-1",
+      "note": "Three allocations against the genesis. The base has no history, so every declaration is new.",
+      "artifact": {
+        "kind": "intent-registry-update",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:9da62b1e45f1b9c4f6752edb1fa588fae4aa12e4ffaab8a33fc670ad23fbeb11"
+          },
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "decisions": [
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "514",
+                  "end": "523"
+                },
+                "role": "intent-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            },
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "153",
+                  "end": "172"
+                },
+                "role": "mf2-declaration"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            },
+            {
+              "kind": "allocate",
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "db06942ac933f751cc4e870d6325e61b"
+              },
+              "to": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "476",
+                  "end": "482"
+                },
+                "role": "ui-literal"
+              },
+              "basis": {
+                "kind": "confirmed-new"
+              }
+            }
+          ],
+          "lineageLinks": []
+        },
+        "integrityDigest": "sha256:46941e58573dd5c620c73d3f85e516451afe326dc5850ae3a3f191056a2015f7"
+      }
+    },
+    {
+      "id": "registry-1",
+      "note": "Three active entries.",
+      "artifact": {
+        "kind": "intent-registry",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "registryIdentity": "7660c5e984f1816f6c099923d8bcff1b",
+          "base": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:9da62b1e45f1b9c4f6752edb1fa588fae4aa12e4ffaab8a33fc670ad23fbeb11"
+          },
+          "update": {
+            "kind": "intent-registry-update",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:46941e58573dd5c620c73d3f85e516451afe326dc5850ae3a3f191056a2015f7"
+          },
+          "entries": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "514",
+                  "end": "523"
+                },
+                "role": "intent-literal"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "153",
+                  "end": "172"
+                },
+                "role": "mf2-declaration"
+              }
+            },
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "db06942ac933f751cc4e870d6325e61b"
+              },
+              "state": "active",
+              "declaration": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "1",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "684",
+                  "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                },
+                "range": {
+                  "start": "476",
+                  "end": "482"
+                },
+                "role": "ui-literal"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+      }
+    },
+    {
+      "id": "intent-1-greeting",
+      "note": "Held exactly by its registry-1 entry, so it carries no continuity.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "d9e281f4b2486236a2c52b774abe863d"
+          },
+          "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "153",
+              "end": "172"
+            },
+            "role": "mf2-declaration"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          }
+        },
+        "integrityDigest": "sha256:391745139830a27b27591c557cbfd509c2d4fe6f8cca02709c90f868d518e763"
+      }
+    },
+    {
+      "id": "intent-1-save",
+      "note": "Held exactly by its registry-1 entry, so it carries no continuity.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "db06942ac933f751cc4e870d6325e61b"
+          },
+          "intentRevision": "sha256:822eed5987c9330f8242d5227881722ffcf79ead674b52a370fb088ff982ff92",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "476",
+              "end": "482"
+            },
+            "role": "ui-literal"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          }
+        },
+        "integrityDigest": "sha256:89f8859b9f3fcf7f9b1880ffe0f7a5466486e940b0ac3b75274b0ac56b68bd6d"
+      }
+    },
+    {
+      "id": "intent-1-welcome",
+      "note": "Held exactly by its registry-1 entry, so it carries no continuity.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+          },
+          "intentRevision": "sha256:9ee114f61ae860ecbc4ce106cdebe29a7b69b06921bd0ce35c9ed388217f8bae",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "514",
+              "end": "523"
+            },
+            "role": "intent-literal"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          }
+        },
+        "integrityDigest": "sha256:0623e29ee78c4f96755c4f8353aba4730dd1b6515844f3f627f62e369fb15c8b"
+      }
+    },
+    {
+      "id": "reference-1-1",
+      "note": "The use site save.textContent = 'Save'.",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "457",
+              "end": "482"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "db06942ac933f751cc4e870d6325e61b"
+              },
+              "intentRevision": "sha256:822eed5987c9330f8242d5227881722ffcf79ead674b52a370fb088ff982ff92",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:89f8859b9f3fcf7f9b1880ffe0f7a5466486e940b0ac3b75274b0ac56b68bd6d"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:b0129927addb620a9fcfc6df1c6206e807f1cbf920786bd6bce517ef07a98f4f"
+      }
+    },
+    {
+      "id": "reference-1-2",
+      "note": "The use site intent('Welcome').",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "507",
+              "end": "524"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+              },
+              "intentRevision": "sha256:9ee114f61ae860ecbc4ce106cdebe29a7b69b06921bd0ce35c9ed388217f8bae",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:0623e29ee78c4f96755c4f8353aba4730dd1b6515844f3f627f62e369fb15c8b"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:e3b6e716d3093f1071dc9b2449c6a206ff55e83ebd305941d37b3a48149fbc54"
+      }
+    },
+    {
+      "id": "reference-1-3",
+      "note": "The use site the first intent(greeting, { name }).",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "547",
+              "end": "573"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:391745139830a27b27591c557cbfd509c2d4fe6f8cca02709c90f868d518e763"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:b27d7a6ef2c95fc0544126d7ae95651097c82ca0518be9be514deb5e76e63343"
+      }
+    },
+    {
+      "id": "reference-1-4",
+      "note": "The use site the second intent(greeting, { name }).",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:6f113e27f9f0c351fda683aad5c0a21c8e4a24237f067ec3f2d28694459c4a0c"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "1",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "684",
+              "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+            },
+            "range": {
+              "start": "597",
+              "end": "623"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:391745139830a27b27591c557cbfd509c2d4fe6f8cca02709c90f868d518e763"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:cec14be81403d4b13b1bd1a4c976248b94d862adfd793a5e13851e75efab795e"
+      }
+    },
+    {
+      "id": "inventory-2",
+      "note": "Revision 2 of the module: 'Welcome' reworded to 'Welcome back' inside its quotes.",
+      "artifact": {
+        "kind": "authoring-inventory",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "owner": {
+            "kind": "application",
+            "identity": "storefront"
+          },
+          "scope": "storefront-web",
+          "basis": {
+            "authoringProfile": {
+              "identity": "intlify-js-dom-authoring",
+              "revision": "0"
+            },
+            "contextKind": "test-context",
+            "context": {
+              "identity": "intlify-authoring-test-context",
+              "revision": "0",
+              "semanticDigest": "sha256:051d2be01b639d766101a4351133aeb8f90dbd25e3f3f050fc72a90f7b055956"
+            },
+            "surfaceVocabulary": {
+              "identity": "intlify-authoring-test-vocabulary",
+              "revision": "0",
+              "semanticDigest": "sha256:60b57348b1fa8a2f6b28d6e8b81d098483e81597937ee859269139a4feace606"
+            },
+            "localeCanonicalization": {
+              "identity": "intlify-authoring-test-canonicalization",
+              "revision": "0"
+            },
+            "localeData": {
+              "identity": "intlify-authoring-test-locale-data",
+              "semanticDigest": "sha256:05c87414ca3de9bd704bf31d95d023d226c496632578a3378b1211fda9f0103b"
+            },
+            "defaultSurfaceClass": "checkout"
+          },
+          "completeness": "complete",
+          "units": [
+            {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "app",
+                "revision": "2",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "689",
+                "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+              },
+              "outcome": "checked"
+            }
+          ],
+          "declarations": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "153",
+                  "end": "172"
+                },
+                "role": "mf2-declaration"
+              },
+              "mf2Source": "Hello {$name}!",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Hello "
+                      },
+                      {
+                        "kind": "expression",
+                        "operand": {
+                          "kind": "variable",
+                          "name": "name"
+                        },
+                        "attributes": []
+                      },
+                      {
+                        "kind": "text",
+                        "value": "!"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": ["name"],
+                "description": "Greeting addressed to the signed-in user"
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "14"
+                  },
+                  "source": {
+                    "start": "157",
+                    "end": "171"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "476",
+                  "end": "482"
+                },
+                "role": "ui-literal"
+              },
+              "mf2Source": "{{Save}}",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Save"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": [],
+                "usage": {
+                  "profile": {
+                    "identity": "intlify-web-dom-usage",
+                    "revision": "0"
+                  },
+                  "value": "text-content"
+                }
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "2"
+                  },
+                  "source": {
+                    "start": "477",
+                    "end": "477"
+                  }
+                },
+                {
+                  "extracted": {
+                    "start": "2",
+                    "end": "6"
+                  },
+                  "source": {
+                    "start": "477",
+                    "end": "481"
+                  }
+                },
+                {
+                  "extracted": {
+                    "start": "6",
+                    "end": "8"
+                  },
+                  "source": {
+                    "start": "481",
+                    "end": "481"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "514",
+                  "end": "528"
+                },
+                "role": "intent-literal"
+              },
+              "mf2Source": "Welcome back",
+              "projection": {
+                "mf2Specification": {
+                  "identity": "intlify-mf2-semantics",
+                  "revision": "0"
+                },
+                "message": {
+                  "declarations": [],
+                  "body": {
+                    "kind": "pattern",
+                    "parts": [
+                      {
+                        "kind": "text",
+                        "value": "Welcome back"
+                      }
+                    ]
+                  }
+                },
+                "sourceLocale": "en",
+                "parameters": []
+              },
+              "sourceLocaleBasis": "context-default",
+              "surfaceClass": "checkout",
+              "extractionMap": [
+                {
+                  "extracted": {
+                    "start": "0",
+                    "end": "12"
+                  },
+                  "source": {
+                    "start": "515",
+                    "end": "527"
+                  }
+                }
+              ]
+            }
+          ],
+          "references": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "457",
+                  "end": "482"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "range": {
+                    "start": "476",
+                    "end": "482"
+                  },
+                  "role": "ui-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "507",
+                  "end": "529"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "range": {
+                    "start": "514",
+                    "end": "528"
+                  },
+                  "role": "intent-literal"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "552",
+                  "end": "578"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "range": {
+                    "start": "153",
+                    "end": "172"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "app",
+                      "revision": "2",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "689",
+                      "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                    },
+                    "range": {
+                      "start": "571",
+                      "end": "575"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            },
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "602",
+                  "end": "628"
+                },
+                "role": "reference"
+              },
+              "declarations": [
+                {
+                  "source": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "range": {
+                    "start": "153",
+                    "end": "172"
+                  },
+                  "role": "mf2-declaration"
+                }
+              ],
+              "parameters": [
+                {
+                  "name": "name",
+                  "expression": {
+                    "source": {
+                      "owner": {
+                        "kind": "application",
+                        "identity": "storefront"
+                      },
+                      "unit": "app",
+                      "revision": "2",
+                      "grammar": {
+                        "identity": "intlify-grammar-js-module",
+                        "revision": "0"
+                      },
+                      "byteLength": "689",
+                      "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                    },
+                    "range": {
+                      "start": "621",
+                      "end": "625"
+                    },
+                    "role": "parameter-expression"
+                  }
+                }
+              ]
+            }
+          ],
+          "exclusions": [
+            {
+              "occurrence": {
+                "source": {
+                  "owner": {
+                    "kind": "application",
+                    "identity": "storefront"
+                  },
+                  "unit": "app",
+                  "revision": "2",
+                  "grammar": {
+                    "identity": "intlify-grammar-js-module",
+                    "revision": "0"
+                  },
+                  "byteLength": "689",
+                  "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                },
+                "range": {
+                  "start": "651",
+                  "end": "686"
+                },
+                "role": "exclusion"
+              },
+              "reason": "Product name"
+            }
+          ]
+        },
+        "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+      }
+    },
+    {
+      "id": "intent-2-greeting",
+      "note": "Carried from its revision 1 declaration by the one edit; registry-1 is unchanged.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "d9e281f4b2486236a2c52b774abe863d"
+          },
+          "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "153",
+              "end": "172"
+            },
+            "role": "mf2-declaration"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          },
+          "continuity": {
+            "from": {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "app",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "684",
+                "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+              },
+              "range": {
+                "start": "153",
+                "end": "172"
+              },
+              "role": "mf2-declaration"
+            },
+            "basis": {
+              "kind": "verified-edit",
+              "profile": {
+                "identity": "intlify-continuity-edit-replay",
+                "revision": "0"
+              },
+              "changes": [
+                {
+                  "before": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "after": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "replacements": [
+                    {
+                      "range": {
+                        "start": "515",
+                        "end": "522"
+                      },
+                      "text": "Welcome back"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "integrityDigest": "sha256:4b46336baada1ccf726a177a35e6848eb9cc39fac1f6df730546c1d559073e45"
+      }
+    },
+    {
+      "id": "intent-2-save",
+      "note": "Carried from its revision 1 declaration by the one edit; registry-1 is unchanged.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "db06942ac933f751cc4e870d6325e61b"
+          },
+          "intentRevision": "sha256:822eed5987c9330f8242d5227881722ffcf79ead674b52a370fb088ff982ff92",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "476",
+              "end": "482"
+            },
+            "role": "ui-literal"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          },
+          "continuity": {
+            "from": {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "app",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "684",
+                "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+              },
+              "range": {
+                "start": "476",
+                "end": "482"
+              },
+              "role": "ui-literal"
+            },
+            "basis": {
+              "kind": "verified-edit",
+              "profile": {
+                "identity": "intlify-continuity-edit-replay",
+                "revision": "0"
+              },
+              "changes": [
+                {
+                  "before": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "after": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "replacements": [
+                    {
+                      "range": {
+                        "start": "515",
+                        "end": "522"
+                      },
+                      "text": "Welcome back"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "integrityDigest": "sha256:eaa74f3ff24e2f839cab67f1db73f8e345d7c0c04cdf3e5391cf2092c0ad18fe"
+      }
+    },
+    {
+      "id": "intent-2-welcome",
+      "note": "Carried from its revision 1 declaration by the one edit; registry-1 is unchanged.",
+      "artifact": {
+        "kind": "message-intent",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "intentId": {
+            "owner": {
+              "kind": "application",
+              "identity": "storefront"
+            },
+            "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+          },
+          "intentRevision": "sha256:5c58d8dfb55afb6a385453a966cc3d4060813b4b16e0b52fdbf1ee556d0ce987",
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "declaration": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "514",
+              "end": "528"
+            },
+            "role": "intent-literal"
+          },
+          "registry": {
+            "kind": "intent-registry",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:3cdcc79249c6e389056bbee5e9ab129b6f0ae997d1f93abcfdacb3c054448fd7"
+          },
+          "continuity": {
+            "from": {
+              "source": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "unit": "app",
+                "revision": "1",
+                "grammar": {
+                  "identity": "intlify-grammar-js-module",
+                  "revision": "0"
+                },
+                "byteLength": "684",
+                "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+              },
+              "range": {
+                "start": "514",
+                "end": "523"
+              },
+              "role": "intent-literal"
+            },
+            "basis": {
+              "kind": "verified-edit",
+              "profile": {
+                "identity": "intlify-continuity-edit-replay",
+                "revision": "0"
+              },
+              "changes": [
+                {
+                  "before": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "1",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "684",
+                    "utf8Digest": "sha256:bbfcea9ce33dc399093ec7f992b28753af2d74cde2845dc5b452835f0d74200b"
+                  },
+                  "after": {
+                    "owner": {
+                      "kind": "application",
+                      "identity": "storefront"
+                    },
+                    "unit": "app",
+                    "revision": "2",
+                    "grammar": {
+                      "identity": "intlify-grammar-js-module",
+                      "revision": "0"
+                    },
+                    "byteLength": "689",
+                    "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+                  },
+                  "replacements": [
+                    {
+                      "range": {
+                        "start": "515",
+                        "end": "522"
+                      },
+                      "text": "Welcome back"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "integrityDigest": "sha256:873752f9a4fe14b6b874dccd134e92d2aaebbe2c59c041fef2be8c55017084e9"
+      }
+    },
+    {
+      "id": "reference-2-1",
+      "note": "The use site save.textContent = 'Save', in revision 2.",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "457",
+              "end": "482"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "db06942ac933f751cc4e870d6325e61b"
+              },
+              "intentRevision": "sha256:822eed5987c9330f8242d5227881722ffcf79ead674b52a370fb088ff982ff92",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:eaa74f3ff24e2f839cab67f1db73f8e345d7c0c04cdf3e5391cf2092c0ad18fe"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:faefc9d257a9e328a15bb10f786d5e9f583c6f48059b4683e2ac97b8517f936e"
+      }
+    },
+    {
+      "id": "reference-2-2",
+      "note": "The use site intent('Welcome'), in revision 2.",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "507",
+              "end": "529"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "26cf116dc8bd8ce09e3894c0e41d9ca6"
+              },
+              "intentRevision": "sha256:5c58d8dfb55afb6a385453a966cc3d4060813b4b16e0b52fdbf1ee556d0ce987",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:873752f9a4fe14b6b874dccd134e92d2aaebbe2c59c041fef2be8c55017084e9"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:9a35f505a1577efc2777525d6d956d7e6af0d00d15d2e391461599a97a402547"
+      }
+    },
+    {
+      "id": "reference-2-3",
+      "note": "The use site the first intent(greeting, { name }), in revision 2.",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "552",
+              "end": "578"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:4b46336baada1ccf726a177a35e6848eb9cc39fac1f6df730546c1d559073e45"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:cc20a1b1982853836709d13c3a14d3c4f4707027bf2da21444686d488a83376b"
+      }
+    },
+    {
+      "id": "reference-2-4",
+      "note": "The use site the second intent(greeting, { name }), in revision 2.",
+      "artifact": {
+        "kind": "message-reference",
+        "schemaRevision": "0",
+        "authoringSpecification": {
+          "identity": "intlify-design-016",
+          "revision": "0"
+        },
+        "body": {
+          "inventory": {
+            "kind": "authoring-inventory",
+            "schemaRevision": "0",
+            "authoringSpecification": {
+              "identity": "intlify-design-016",
+              "revision": "0"
+            },
+            "integrityDigest": "sha256:70921378d5c0d2fe1c9da49990755218fe40b70743d810a514d7e3db658297ce"
+          },
+          "occurrence": {
+            "source": {
+              "owner": {
+                "kind": "application",
+                "identity": "storefront"
+              },
+              "unit": "app",
+              "revision": "2",
+              "grammar": {
+                "identity": "intlify-grammar-js-module",
+                "revision": "0"
+              },
+              "byteLength": "689",
+              "utf8Digest": "sha256:1a932303b7c5c7263e05e2c773f361198917ba050089f041461dd9d5350d94ee"
+            },
+            "range": {
+              "start": "602",
+              "end": "628"
+            },
+            "role": "reference"
+          },
+          "targets": [
+            {
+              "intentId": {
+                "owner": {
+                  "kind": "application",
+                  "identity": "storefront"
+                },
+                "value": "d9e281f4b2486236a2c52b774abe863d"
+              },
+              "intentRevision": "sha256:2b742302f99beb9a1ccf0f4237a0300c1ce6e59b3e63408c41b337b3b893735c",
+              "intentArtifact": {
+                "kind": "message-intent",
+                "schemaRevision": "0",
+                "authoringSpecification": {
+                  "identity": "intlify-design-016",
+                  "revision": "0"
+                },
+                "integrityDigest": "sha256:4b46336baada1ccf726a177a35e6848eb9cc39fac1f6df730546c1d559073e45"
+              }
+            }
+          ]
+        },
+        "integrityDigest": "sha256:8a4521ed08754877b957e05c701871245208175ce8b5a712d6b8b81f235c1949"
+      }
+    }
+  ]
+}

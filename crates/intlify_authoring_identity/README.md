@@ -124,6 +124,7 @@ Any other declaration, new or with a history the evidence does not show, makes t
 | `schema/message-intent-v0.schema.json` | The closed Draft 7 schema of a sealed `message-intent` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `schema/message-reference-v0.schema.json` | The closed Draft 7 schema of a sealed `message-reference` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `fixtures/phase3/registry-vectors.json` | One real chain, a genesis and three updates, with the inventories and source texts behind it | `vp run vectors:authoring:check`, `tests/registry_admission.rs` |
+| `fixtures/phase3/compile-vectors.json` | Design 028's module through the JS Producer, from a genesis to the Intents and references compiled for two revisions | `vp run vectors:authoring:check`, `tests/compilation.rs` |
 
 See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vectors hold and what the independent checker verifies.
 

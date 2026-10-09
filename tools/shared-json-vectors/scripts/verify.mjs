@@ -26,6 +26,10 @@ const registryPath = resolve(
   here,
   '../../../crates/intlify_authoring_identity/fixtures/phase3/registry-vectors.json'
 )
+const compilationPath = resolve(
+  here,
+  '../../../crates/intlify_authoring_identity/fixtures/phase3/compile-vectors.json'
+)
 
 /** The framing vectors written out in design 017, checked before anything depends on them. */
 const framingVectors = [
@@ -190,7 +194,69 @@ function checkSharedRevisions(inventory) {
  */
 const referenceMembers = {
   'intent-registry': { base: 'intent-registry', update: 'intent-registry-update' },
-  'intent-registry-update': { base: 'intent-registry', inventory: 'authoring-inventory' }
+  'intent-registry-update': { base: 'intent-registry', inventory: 'authoring-inventory' },
+  'message-intent': { inventory: 'authoring-inventory', registry: 'intent-registry' },
+  'message-reference': { inventory: 'authoring-inventory' }
+}
+
+/**
+ * Spell a value with every object's members in sorted order, so two equal
+ * values spell the same whatever order their members were written in.
+ *
+ * @param value - Any JSON value.
+ * @returns The canonical spelling.
+ */
+function canonical(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(',')}]`
+  }
+  if (value !== null && typeof value === 'object') {
+    const members = Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${canonical(value[key])}`)
+    return `{${members.join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+/**
+ * Compare two values completely.
+ *
+ * @param left - One value.
+ * @param right - The other.
+ * @returns Whether they are equal.
+ */
+function same(left, right) {
+  return canonical(left) === canonical(right)
+}
+
+/**
+ * Return whether a reference names exactly this artifact.
+ *
+ * @param artifact - A sealed artifact.
+ * @param reference - An artifact reference.
+ * @returns Whether every field of the reference matches the artifact.
+ */
+function names(artifact, reference) {
+  return (
+    artifact.kind === reference.kind &&
+    artifact.schemaRevision === reference.schemaRevision &&
+    artifact.authoringSpecification.identity === reference.authoringSpecification.identity &&
+    artifact.authoringSpecification.revision === reference.authoringSpecification.revision &&
+    artifact.integrityDigest === reference.integrityDigest
+  )
+}
+
+/**
+ * Find the one earlier artifact a reference names.
+ *
+ * @param seen - The artifacts before the one holding the reference.
+ * @param reference - An artifact reference.
+ * @returns The artifact, or undefined when none or several match.
+ */
+function resolveIn(seen, reference) {
+  const matches = seen.filter(earlier => names(earlier.artifact, reference))
+  return matches.length === 1 ? matches[0].artifact : undefined
 }
 
 /**
@@ -268,22 +334,24 @@ function checkReferences(registry) {
       if (reference === undefined) {
         continue
       }
-      const matches = seen.filter(
-        earlier =>
-          earlier.artifact.kind === reference.kind &&
-          earlier.artifact.schemaRevision === reference.schemaRevision &&
-          earlier.artifact.authoringSpecification.identity ===
-            reference.authoringSpecification.identity &&
-          earlier.artifact.authoringSpecification.revision ===
-            reference.authoringSpecification.revision &&
-          earlier.artifact.integrityDigest === reference.integrityDigest
-      )
-      if (reference.kind !== expected || matches.length !== 1) {
+      const artifact = resolveIn(seen, reference)
+      if (reference.kind !== expected || artifact === undefined) {
         console.error(`${vector.id}: ${member} does not name exactly one earlier ${expected}`)
         failures += 1
         continue
       }
-      resolved[member] = matches[0].artifact
+      resolved[member] = artifact
+    }
+    for (const [index, target] of (kind === 'message-reference' ? body.targets : []).entries()) {
+      if (
+        target.intentArtifact.kind !== 'message-intent' ||
+        resolveIn(seen, target.intentArtifact) === undefined
+      ) {
+        console.error(
+          `${vector.id}: target ${index} does not name exactly one earlier message-intent`
+        )
+        failures += 1
+      }
     }
     if (kind === 'intent-registry' && resolved.base !== undefined) {
       const base = resolved.base.body
@@ -322,11 +390,15 @@ function checkEdits(registry, texts) {
       ? Buffer.alloc(0)
       : (texts.get(`${snapshot.unit}@${snapshot.revision}`) ?? Buffer.alloc(0))
   for (const vector of registry.artifacts) {
-    if (vector.artifact.kind !== 'intent-registry-update') {
-      continue
-    }
-    for (const decision of vector.artifact.body.decisions) {
-      for (const edit of decision.basis.changes ?? []) {
+    const { kind, body } = vector.artifact
+    const carried =
+      kind === 'intent-registry-update'
+        ? body.decisions.map(decision => [decision.intentId, decision.basis])
+        : kind === 'message-intent' && body.continuity !== undefined
+          ? [[body.intentId, body.continuity.basis]]
+          : []
+    for (const [intentId, basis] of carried) {
+      for (const edit of basis.changes ?? []) {
         const before = bytesOf(edit.before)
         const parts = []
         let position = 0
@@ -337,10 +409,221 @@ function checkEdits(registry, texts) {
         }
         parts.push(before.subarray(position))
         if (!Buffer.concat(parts).equals(bytesOf(edit.after))) {
-          console.error(`${vector.id}: an edit of ${decision.intentId.value} does not replay`)
+          console.error(`${vector.id}: an edit of ${intentId.value} does not replay`)
           failures += 1
         }
       }
+    }
+  }
+  return failures
+}
+
+/**
+ * Carry a range of an edit's before bytes across its replacements, under the
+ * edit-replay profile's rules: a replacement before the range shifts it, one
+ * after leaves it, one strictly inside moves its end, and one that touches
+ * or crosses an end leaves nothing to carry.
+ *
+ * @param replacements - The edit's replacements, in before order.
+ * @param range - A range of the before bytes.
+ * @returns The carried range, or undefined when it cannot be carried.
+ */
+function carry(replacements, range) {
+  const start = Number(range.start)
+  const end = Number(range.end)
+  let shift = 0
+  let inner = 0
+  for (const replacement of replacements) {
+    const from = Number(replacement.range.start)
+    const to = Number(replacement.range.end)
+    const delta = Buffer.byteLength(replacement.text, 'utf8') - (to - from)
+    if (from === to ? from < start : to < start) {
+      shift += delta
+    } else if (from > end) {
+      continue
+    } else if (start < from && to < end) {
+      inner += delta
+    } else {
+      return undefined
+    }
+  }
+  return { start: String(start + shift), end: String(end + shift + inner) }
+}
+
+/**
+ * Compare two Intent IDs in 017's order: owner kind, owner identity, then
+ * value, each by unsigned UTF-8 bytes.
+ *
+ * @param left - One Intent ID.
+ * @param right - The other.
+ * @returns Negative, zero or positive.
+ */
+function compareIds(left, right) {
+  for (const [a, b] of [
+    [left.owner.kind, right.owner.kind],
+    [left.owner.identity, right.owner.identity],
+    [left.value, right.value]
+  ]) {
+    const order = Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'))
+    if (order !== 0) {
+      return order
+    }
+  }
+  return 0
+}
+
+/**
+ * Check each Intent against the inventory and registry it names.
+ *
+ * Its declaration is one of the inventory's, its revision is recomputed from
+ * that declaration's projection, and its ID is active in the registry. With
+ * no continuity, the entry holds the declaration itself. With one, the entry
+ * holds where it starts, its one edit under the edit-replay profile runs from
+ * that snapshot to the declaration's and carries the range exactly onto the
+ * declaration, and no other active entry is carried onto it too. One
+ * compilation gives each declaration one Intent.
+ *
+ * @param document - The compilation document.
+ * @returns How many Intents disagreed.
+ */
+function checkIntents(document) {
+  let failures = 0
+  const fail = (vector, message) => {
+    console.error(`${vector.id}: ${message}`)
+    failures += 1
+  }
+  const seen = []
+  const compiled = new Map()
+  for (const vector of document.artifacts) {
+    const { kind, body } = vector.artifact
+    const inventory = kind === 'message-intent' && resolveIn(seen, body.inventory)
+    const registry = kind === 'message-intent' && resolveIn(seen, body.registry)
+    seen.push(vector)
+    if (!inventory || !registry) {
+      continue
+    }
+    const facts = inventory.body.declarations.find(candidate =>
+      same(candidate.occurrence, body.declaration)
+    )
+    if (facts === undefined) {
+      fail(vector, "its declaration is not one of the inventory's")
+      continue
+    }
+    const revision = digest(document.revisionDomain, {
+      projectionSpecification: document.projectionSpecification,
+      projection: facts.projection
+    })
+    if (revision !== body.intentRevision) {
+      fail(vector, `its revision is not its declaration's: ${revision}`)
+    }
+    const key = canonical([body.inventory, body.registry, body.declaration])
+    if (compiled.has(key)) {
+      fail(vector, `its declaration already has ${compiled.get(key)}`)
+    }
+    compiled.set(key, vector.id)
+    const active = registry.body.entries.filter(entry => entry.state === 'active')
+    const entry = active.find(candidate => same(candidate.intentId, body.intentId))
+    if (entry === undefined) {
+      fail(vector, 'its ID is not active in the registry')
+      continue
+    }
+    if (body.continuity === undefined) {
+      if (!same(entry.declaration, body.declaration)) {
+        fail(vector, 'its entry holds another declaration')
+      }
+      continue
+    }
+    const { from, basis } = body.continuity
+    const [edit, ...others] = basis.changes ?? []
+    if (
+      !same(entry.declaration, from) ||
+      basis.kind !== 'verified-edit' ||
+      !same(basis.profile, document.editProfile) ||
+      edit === undefined ||
+      others.length > 0 ||
+      !same(edit.before, from.source) ||
+      !same(edit.after, body.declaration.source)
+    ) {
+      fail(vector, 'its continuity is not one verified edit from its entry to it')
+      continue
+    }
+    const carried = carry(edit.replacements, from.range)
+    if (
+      carried === undefined ||
+      !same(carried, body.declaration.range) ||
+      from.role !== body.declaration.role
+    ) {
+      fail(vector, 'its edit does not carry its entry onto it')
+    }
+    const rivals = active.filter(
+      other =>
+        !same(other.intentId, body.intentId) &&
+        (same(other.declaration, body.declaration) ||
+          (same(other.declaration.source, edit.before) &&
+            other.declaration.role === body.declaration.role &&
+            same(carry(edit.replacements, other.declaration.range), body.declaration.range)))
+    )
+    if (rivals.length > 0) {
+      fail(vector, 'another entry is held or carried onto its declaration too')
+    }
+  }
+  return failures
+}
+
+/**
+ * Check each reference against the inventory and the Intents it names.
+ *
+ * Its use site is one of the inventory's references, its targets are in
+ * Intent ID order with no ID twice, each target is the ID and revision of
+ * the Intent it names, and those Intents' declarations are exactly the
+ * declarations the use site may use.
+ *
+ * @param document - The compilation document.
+ * @returns How many references disagreed.
+ */
+function checkReferenceTargets(document) {
+  let failures = 0
+  const fail = (vector, message) => {
+    console.error(`${vector.id}: ${message}`)
+    failures += 1
+  }
+  const seen = []
+  for (const vector of document.artifacts) {
+    const { kind, body } = vector.artifact
+    const inventory = kind === 'message-reference' && resolveIn(seen, body.inventory)
+    seen.push(vector)
+    if (!inventory) {
+      continue
+    }
+    const facts = inventory.body.references.find(candidate =>
+      same(candidate.occurrence, body.occurrence)
+    )
+    if (facts === undefined) {
+      fail(vector, "its use site is not one of the inventory's references")
+      continue
+    }
+    for (let index = 1; index < body.targets.length; index += 1) {
+      if (compareIds(body.targets[index - 1].intentId, body.targets[index].intentId) >= 0) {
+        fail(vector, 'its targets are not in Intent ID order, or repeat an ID')
+      }
+    }
+    const declarations = []
+    for (const target of body.targets) {
+      const intent = resolveIn(seen, target.intentArtifact)
+      if (
+        intent === undefined ||
+        !same(intent.body.intentId, target.intentId) ||
+        intent.body.intentRevision !== target.intentRevision ||
+        !same(intent.body.inventory, body.inventory)
+      ) {
+        fail(vector, `the target ${target.intentId.value} is not the Intent it names`)
+        continue
+      }
+      declarations.push(canonical(intent.body.declaration))
+    }
+    const expected = facts.declarations.map(canonical)
+    if (canonical(declarations.sort()) !== canonical(expected.sort())) {
+      fail(vector, 'its targets are not the declarations its use site may use')
     }
   }
   return failures
@@ -367,16 +650,29 @@ function checkRegistry(registry) {
   )
 }
 
+/**
+ * Check the compilation of design 028's module: the registry chain it
+ * starts with, then every Intent and reference compiled from it.
+ *
+ * @param compilation - The compilation document.
+ * @returns How many checks failed.
+ */
+function checkCompilation(compilation) {
+  return checkRegistry(compilation) + checkIntents(compilation) + checkReferenceTargets(compilation)
+}
+
 const document = JSON.parse(readFileSync(vectorsPath, 'utf8'))
 const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'))
 const registry = JSON.parse(readFileSync(registryPath, 'utf8'))
+const compilation = JSON.parse(readFileSync(compilationPath, 'utf8'))
 const failures =
   checkFraming() +
   checkRevisions(document.domain, document.vectors) +
   checkDistinctness(document.vectors) +
   checkIntegrity(inventory.domain, inventory.vectors) +
   checkSharedRevisions(inventory) +
-  checkRegistry(registry)
+  checkRegistry(registry) +
+  checkCompilation(compilation)
 
 if (failures > 0) {
   console.error(`\n${failures} vector check(s) failed`)
@@ -388,4 +684,7 @@ console.log(
 )
 console.log(
   `${registry.artifacts.length} artifacts of one registry chain agree with an independent implementation`
+)
+console.log(
+  `${compilation.artifacts.length} artifacts compiling design 028's module agree with an independent implementation`
 )
