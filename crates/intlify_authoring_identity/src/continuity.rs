@@ -13,6 +13,7 @@
 
 mod bases;
 mod edit;
+mod evidence;
 mod sources;
 
 pub use bases::{

@@ -25,12 +25,13 @@ use intlify_authoring::{
     AdmittedInventory, AuthoringInventory, Completeness, MessageIntentId, Occurrence, Token,
 };
 
-use super::edit::{fate, inserted, is_edit_replay_profile, replay, RangeFate, ReplayGap};
+use super::edit::{fate, inserted, is_edit_replay_profile, RangeFate, ReplayGap};
+use super::evidence::{Claims, Evidence};
 use super::sources::RetainedSources;
 use crate::limits::{IdentityLimitKind, IdentityLimits};
 use crate::registry::{
-    apply, declares, validate_edit, AdmittedRegistry, AdmittedUpdate, AllocationBasis,
-    ContinuationBasis, EntryState, IdentityDecision, SourceEdit, TransitionFailure, UpdateFailure,
+    apply, validate_edit, AdmittedRegistry, AdmittedUpdate, AllocationBasis, ContinuationBasis,
+    IdentityDecision, SourceEdit, TransitionFailure, UpdateFailure,
 };
 
 /// The update that produced a base, with the inventory it was planned from.
@@ -322,109 +323,6 @@ fn automatic(
     }
 }
 
-/// Every account of where a base snapshot's declarations went.
-///
-/// An edit from the snapshot is one account. The snapshot being still
-/// current is another: its declarations stayed where they were. Two accounts
-/// of one snapshot are a copy or a conflict, and neither is a continuation.
-struct Evidence<'e> {
-    edits: Vec<(&'e SourceEdit, Result<(), ReplayGap>)>,
-    current: &'e AuthoringInventory,
-}
-
-impl<'e> Evidence<'e> {
-    /// Collect every distinct edit the update and the host supply, each
-    /// replayed once.
-    fn gather(
-        decisions: &'e [IdentityDecision],
-        supplied: &'e [SourceEdit],
-        sources: &RetainedSources<'_>,
-        current: &'e AuthoringInventory,
-    ) -> Self {
-        let carried = decisions.iter().flat_map(|decision| match decision {
-            IdentityDecision::Continue(continuation) => match continuation.basis() {
-                ContinuationBasis::VerifiedEdit(edit) => edit.changes(),
-                _ => &[],
-            },
-            _ => &[],
-        });
-        let mut edits: Vec<(&'e SourceEdit, Result<(), ReplayGap>)> = Vec::new();
-        for edit in carried.chain(supplied) {
-            if edits.iter().all(|(known, _)| *known != edit) {
-                edits.push((edit, replay(edit, sources)));
-            }
-        }
-        Self { edits, current }
-    }
-
-    /// Return whether the inventory holds a snapshot as one of its units.
-    fn holds(&self, snapshot: &intlify_authoring::SourceSnapshot) -> bool {
-        self.current
-            .units()
-            .iter()
-            .any(|unit| unit.source() == snapshot)
-    }
-
-    /// Count the accounts of where a snapshot's declarations went.
-    fn accounts(&self, snapshot: &intlify_authoring::SourceSnapshot) -> usize {
-        self.from(snapshot).len() + usize::from(self.holds(snapshot))
-    }
-
-    /// The distinct edits that start from a snapshot.
-    fn from(
-        &self,
-        snapshot: &intlify_authoring::SourceSnapshot,
-    ) -> Vec<&(&'e SourceEdit, Result<(), ReplayGap>)> {
-        self.edits
-            .iter()
-            .filter(|(edit, _)| edit.before() == Some(snapshot))
-            .collect()
-    }
-
-    /// Which active base entries each account carries onto a current
-    /// declaration: their own declaration when it is still there, and where
-    /// each edit from their snapshot puts it.
-    fn claims(&self, base: &AdmittedRegistry) -> Claims {
-        let current = self.current;
-        let mut claims = Vec::new();
-        for entry in base.snapshot().entries() {
-            if entry.state() != EntryState::Active {
-                continue;
-            }
-            let declaration = entry.declaration();
-            if declares(current, declaration) {
-                claims.push((declaration.clone(), entry.intent_id().clone()));
-            }
-            for (edit, replayed) in self.from(declaration.source()) {
-                let (Ok(()), Some(after), RangeFate::Moved(range)) =
-                    (replayed, edit.after(), fate(edit, declaration.range()))
-                else {
-                    continue;
-                };
-                if let Ok(target) = Occurrence::new(after.clone(), range, declaration.role()) {
-                    if declares(current, &target) {
-                        claims.push((target, entry.intent_id().clone()));
-                    }
-                }
-            }
-        }
-        Claims(claims)
-    }
-}
-
-/// Current declarations, and the base entries an edit carries onto each.
-struct Claims(Vec<(Occurrence, MessageIntentId)>);
-
-impl Claims {
-    /// The entries carried onto one current declaration.
-    fn on<'c>(&'c self, declaration: &'c Occurrence) -> impl Iterator<Item = &'c MessageIntentId> {
-        self.0
-            .iter()
-            .filter(move |(target, _)| target == declaration)
-            .map(|(_, id)| id)
-    }
-}
-
 /// Check a `verified-edit` continuation from one declaration to another.
 fn continued(
     id: &MessageIntentId,
@@ -492,7 +390,7 @@ fn new(
     if claims.on(to).next().is_some() {
         return BasisVerdict::Unproven(BasisGap::NewUnproven);
     }
-    let shown = evidence.edits.iter().any(|(edit, replayed)| {
+    let shown = evidence.edits().iter().any(|(edit, replayed)| {
         replayed.is_ok() && edit.after() == Some(to.source()) && inserted(edit, to.range())
     });
     if shown {
