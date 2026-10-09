@@ -69,8 +69,9 @@ pub enum BasisGap {
     UnsupportedProfile,
     /// No edit starts from the snapshot the base declaration is in.
     EditMissing,
-    /// The edit from the base declaration's snapshot does not end at the
-    /// current declaration's snapshot.
+    /// The edit from the base declaration's snapshot does not end where it
+    /// has to: at the current declaration's snapshot for a continuation, or
+    /// at a snapshot the inventory holds for an absence.
     EditDisagrees,
     /// The bytes of a snapshot an edit names were not retained.
     SourceUnavailable,
@@ -356,8 +357,8 @@ impl<'e> Evidence<'e> {
         Self { edits, current }
     }
 
-    /// Return whether a snapshot is still one of the inventory's units.
-    fn unchanged(&self, snapshot: &intlify_authoring::SourceSnapshot) -> bool {
+    /// Return whether the inventory holds a snapshot as one of its units.
+    fn holds(&self, snapshot: &intlify_authoring::SourceSnapshot) -> bool {
         self.current
             .units()
             .iter()
@@ -366,7 +367,7 @@ impl<'e> Evidence<'e> {
 
     /// Count the accounts of where a snapshot's declarations went.
     fn accounts(&self, snapshot: &intlify_authoring::SourceSnapshot) -> usize {
-        self.from(snapshot).len() + usize::from(self.unchanged(snapshot))
+        self.from(snapshot).len() + usize::from(self.holds(snapshot))
     }
 
     /// The distinct edits that start from a snapshot.
@@ -511,8 +512,8 @@ fn absent(
     if let Err(gap) = automatic {
         return BasisVerdict::Unproven(gap);
     }
-    // A snapshot that is still current still holds the declaration.
-    if evidence.unchanged(from.source()) {
+    // A snapshot the inventory still holds still holds the declaration.
+    if evidence.holds(from.source()) {
         return BasisVerdict::Unproven(BasisGap::AbsenceUnproven);
     }
     let unit = from.source().unit();
@@ -530,6 +531,11 @@ fn absent(
         // to agree with.
         [(edit, Ok(()))] if edit.after().is_none() && member => {
             BasisVerdict::Unproven(BasisGap::AbsenceUnproven)
+        }
+        // An edit that ends at a snapshot the inventory does not hold says
+        // nothing about where the declaration is now.
+        [(edit, Ok(()))] if edit.after().is_some_and(|after| !evidence.holds(after)) => {
+            BasisVerdict::Unproven(BasisGap::EditDisagrees)
         }
         [(edit, Ok(()))] => match fate(edit, from.range()) {
             RangeFate::Replaced => BasisVerdict::Proven,
@@ -1497,6 +1503,50 @@ mod tests {
                 gap(BasisGap::AbsenceUnproven),
                 PROVEN,
                 gap(BasisGap::NewUnproven)
+            ]
+        );
+    }
+
+    #[test]
+    fn an_edit_to_a_snapshot_the_inventory_does_not_hold_shows_no_absence() {
+        // Checkout went through revision 2, which replaced cancel's line, to
+        // revision 3, where it is back. The host's edit ends at revision 2,
+        // but the inventory holds revision 3: the edit says nothing about
+        // where cancel is now, and the plan gives cancel's line a new ID by
+        // choice.
+        let chain = Chain::load();
+        let base = chain.registry(1);
+        let entries = base.snapshot().entries();
+        let (pay, cancel) = (&entries[0], &entries[2]);
+        let current = chain.inventory(3).inventory().declarations();
+        let chosen = || AllocationBasis::Explicit(ExplicitBasis::new("Chosen by hand.").unwrap());
+        let copy = artifact("update-2")["body"]["decisions"][2]["intentId"].clone();
+        let copy: intlify_authoring::MessageIntentId = serde_json::from_value(copy).unwrap();
+        let plan = planned(
+            base,
+            chain.inventory(3),
+            vec![
+                IdentityDecision::continuation(
+                    pay.intent_id().clone(),
+                    pay.declaration().clone(),
+                    current[0].occurrence().clone(),
+                    ContinuationBasis::Explicit(ExplicitBasis::new("Moved by hand.").unwrap()),
+                ),
+                IdentityDecision::retirement(
+                    cancel.intent_id().clone(),
+                    cancel.declaration().clone(),
+                ),
+                IdentityDecision::allocation(copy, current[1].occurrence().clone(), chosen()),
+                IdentityDecision::allocation(stranger(), current[2].occurrence().clone(), chosen()),
+            ],
+        );
+        assert_eq!(
+            checked(&chain, 1, &plan, chain.inventory(3), &[checkout_edit()]),
+            [
+                BasisVerdict::Explicit,
+                gap(BasisGap::EditDisagrees),
+                BasisVerdict::Explicit,
+                BasisVerdict::Explicit
             ]
         );
     }

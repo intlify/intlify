@@ -69,7 +69,7 @@ What `apply` checks is the transition, not the bases. A `verified-edit` is not r
 | `unchanged-snapshot` | The declaration is exactly where it was |
 | `verified-edit` | The profile is `intlify-continuity-edit-replay` revision `0`; one edit runs from the base declaration's snapshot to the current one's; replaying it over the retained bytes gives exactly the after bytes; it carries the old range onto the current declaration's range and role; and nothing else accounts for either side |
 | `confirmed-new` | The base has no history, or the declaration lies entirely inside text an edit inserted, and no old declaration is carried onto it or still sits there |
-| `complete-absence` | The rest of the plan is resolved, and either the declaration's unit left the scope with no account of where it went, or one edit from its snapshot replaces its whole range |
+| `complete-absence` | The rest of the plan is resolved, and either the declaration's unit left the scope with no account of where it went, or one edit from its snapshot to a snapshot the inventory holds replaces its whole range |
 
 An edit carries a range only through replacements clear of both its ends: one before it shifts it, one strictly inside moves its end, one after leaves it alone. A replacement that touches or crosses an end leaves the range's fate unreadable, because replacing a literal's quotes and inserting a new message beside one look the same from the edit alone. Two accounts of one base snapshot, two edits from it, or an edit from a snapshot that is still current, mean a copy or a conflict, and neither side is a continuation.
 
