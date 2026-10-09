@@ -460,8 +460,9 @@ mod tests {
         Occurrence::new(occurrence.source().clone(), occurrence.range(), role).unwrap()
     }
 
-    /// A value whose occurrence at `path` ends one byte past its unit.
-    fn past_the_end(mut value: Value, path: &[&str]) -> Value {
+    /// A value whose occurrence at `path` ends `past` bytes after its unit's
+    /// end.
+    fn ending(mut value: Value, path: &[&str], past: u64) -> Value {
         let mut occurrence = &mut value;
         for member in path {
             occurrence = &mut occurrence[*member];
@@ -471,8 +472,13 @@ mod tests {
             .unwrap()
             .parse::<u64>()
             .unwrap();
-        occurrence["range"]["end"] = json!((length + 1).to_string());
+        occurrence["range"]["end"] = json!((length + past).to_string());
         value
+    }
+
+    /// A value whose occurrence at `path` ends one byte past its unit.
+    fn past_the_end(value: Value, path: &[&str]) -> Value {
+        ending(value, path, 1)
     }
 
     #[test]
@@ -578,6 +584,29 @@ mod tests {
                 None,
             ),
             Err(IntentFailure::ForeignOwner)
+        );
+    }
+
+    #[test]
+    fn an_occurrence_may_end_exactly_where_its_unit_ends() {
+        // The end of a unit is a position like any other; only a byte past
+        // it is outside.
+        let scene = scene();
+        let intent = ending(
+            serde_json::to_value(kept(&scene)).unwrap(),
+            &["declaration"],
+            0,
+        );
+        assert_eq!(decoded::<MessageIntentBody>(intent).validate(), Ok(()));
+        let reference = reference_with(&scene, vec![target(&scene, A)]).unwrap();
+        let reference = ending(
+            serde_json::to_value(&reference).unwrap(),
+            &["occurrence"],
+            0,
+        );
+        assert_eq!(
+            decoded::<MessageReferenceBody>(reference).validate(),
+            Ok(())
         );
     }
 
