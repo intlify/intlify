@@ -32,10 +32,11 @@ use std::collections::BTreeSet;
 
 use intlify_authoring::{
     AdmittedInventory, AuthoringArtifact, AuthoringInventory, Diagnostic, MessageIntentId,
-    VersionedIdentity,
 };
 
-use self::classify::{Associations, Planner};
+use self::classify::Planner;
+pub(crate) use self::classify::{position, Account, Associations, Carried};
+pub(crate) use self::diagnostic::association_missing;
 pub use self::diagnostic::detail;
 pub use self::explicit::{ExplicitDecision, NotExplicit};
 pub use self::outcome::{
@@ -44,14 +45,14 @@ pub use self::outcome::{
 };
 use crate::admission::IdentityAdmissionFailure;
 use crate::continuity::{
-    automatic, check_previous, check_supplied, verify_bases, BasisVerdict, ContinuityInputs,
-    Evidence, EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION,
+    automatic, carried_by, check_previous, check_supplied, verify_bases, BasisVerdict,
+    ContinuityInputs, Evidence,
 };
 use crate::limits::{IdentityLimitKind, IdentityLimits};
 use crate::registry::{
     admit_update_artifact, apply, check_pairing, AdmittedRegistry, AllocationBasis,
-    ContinuationBasis, IdentityDecision, IntentRegistryUpdate, LineageLink, RegistryEntry,
-    RegistryUpdateArtifact, SourceEdit, Transition,
+    IdentityDecision, IntentRegistryUpdate, LineageLink, RegistryEntry, RegistryUpdateArtifact,
+    SourceEdit, Transition,
 };
 use crate::workspace::IdentityWorkspace;
 
@@ -287,10 +288,7 @@ fn continuation(
         entry.intent_id().clone(),
         entry.declaration().clone(),
         to,
-        ContinuationBasis::verified_edit(
-            VersionedIdentity::literal(EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION),
-            vec![edit.clone()],
-        ),
+        carried_by(edit),
     )
 }
 
@@ -364,7 +362,9 @@ mod tests {
     use super::*;
     use crate::continuity::{ContinuityFailure, EditSetFailure, PreviousUpdate, RetainedSources};
     use crate::registry::fixtures::{artifact, id, limits, sources, Chain};
-    use crate::registry::{ExplicitBasis, LineageKind, TransitionFailure, UpdateFailure};
+    use crate::registry::{
+        ContinuationBasis, ExplicitBasis, LineageKind, TransitionFailure, UpdateFailure,
+    };
 
     /// The inputs one case varies.
     #[derive(Default)]

@@ -15,9 +15,8 @@
 //! randomness on an authorized update host, and publication to happen through
 //! that host's exact-base check, so both stay outside this crate.
 //!
-//! So far it holds the registry identity. A registry identity names a chain,
-//! not a message lineage, so it is not an Intent ID even where the two spell
-//! the same digits:
+//! A registry identity names a chain, not a message lineage, so it is not an
+//! Intent ID even where the two spell the same digits:
 //!
 //! ```compile_fail
 //! use intlify_authoring::{MessageIntentId, OwnerIdentity, OwnerKind};
@@ -31,6 +30,7 @@
 //! ```
 
 mod admission;
+mod compile;
 mod continuity;
 mod id;
 mod intent;
@@ -41,6 +41,10 @@ pub mod schema;
 mod workspace;
 
 pub use admission::IdentityAdmissionFailure;
+pub use compile::{
+    compile, compile_with_cancellation, Compilation, CompileEvidence, CompileFailure,
+    CompiledScope, IntentMismatch, ReferenceMismatch,
+};
 pub use continuity::{
     fate, inserted, is_edit_replay_profile, replay as replay_edit, verify_bases, BasisGap,
     BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs, EditSetFailure, PreviousUpdate,

@@ -18,7 +18,7 @@
 use intlify_authoring::{ByteRange, VersionedIdentity};
 
 use super::sources::RetainedSources;
-use crate::registry::SourceEdit;
+use crate::registry::{ContinuationBasis, SourceEdit};
 
 /// The identity of the one verifier profile this crate implements.
 pub const EDIT_REPLAY_PROFILE: &str = "intlify-continuity-edit-replay";
@@ -31,6 +31,15 @@ pub const EDIT_REPLAY_REVISION: &str = "0";
 pub fn is_edit_replay_profile(profile: &VersionedIdentity) -> bool {
     profile.identity().as_str() == EDIT_REPLAY_PROFILE
         && profile.revision().as_str() == EDIT_REPLAY_REVISION
+}
+
+/// The basis a continuation one edit carries records: that edit alone, as
+/// the change list this profile checks.
+pub(crate) fn carried_by(edit: &SourceEdit) -> ContinuationBasis {
+    ContinuationBasis::verified_edit(
+        VersionedIdentity::literal(EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION),
+        vec![edit.clone()],
+    )
 }
 
 /// What one edit does to one range of its before bytes.
@@ -181,6 +190,16 @@ mod tests {
 
     /// A labelled edit of the 40-byte unit, and what it does to [10, 20).
     type FateCase = (&'static str, &'static [(u64, u64, &'static str)], RangeFate);
+
+    #[test]
+    fn a_carried_continuation_records_its_one_edit_under_this_profile() {
+        let carried = edit(&[(0, 0, "abc")]);
+        let ContinuationBasis::VerifiedEdit(basis) = carried_by(&carried) else {
+            panic!("a verified edit");
+        };
+        assert!(is_edit_replay_profile(basis.profile()));
+        assert_eq!(basis.changes(), [carried]);
+    }
 
     #[test]
     fn a_range_is_carried_only_by_replacements_clear_of_its_ends() {
