@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Explicit finite limits for reading registry history.
+//! Explicit finite limits for reading registry history and planning updates.
 //!
 //! Design 017 puts every size and collection count under a caller-supplied
 //! finite limit. The shared decoder already bounds the bytes and the nesting;
@@ -28,9 +28,14 @@ pub enum IdentityLimitKind {
     ReplacementBytes,
     /// Updates replayed to verify one chain from its anchor.
     HistorySteps,
+    /// Allocation candidates one reconciliation is offered.
+    Candidates,
+    /// Diagnostics one reconciliation reports.
+    Diagnostics,
 }
 
-/// Inclusive upper bounds applied to reading one registry artifact.
+/// Inclusive upper bounds applied to reading one registry artifact, and to
+/// planning one update.
 ///
 /// Every bound admits zero: a registry with no entries, an update with no
 /// decisions and a chain verified at its anchor are all meaningful, so no
@@ -53,4 +58,8 @@ pub struct IdentityLimits {
     pub replacement_bytes: u64,
     /// Updates replayed to verify one chain from its anchor.
     pub history_steps: u64,
+    /// Allocation candidates one reconciliation is offered.
+    pub candidates: u64,
+    /// Diagnostics one reconciliation reports.
+    pub diagnostics: u64,
 }

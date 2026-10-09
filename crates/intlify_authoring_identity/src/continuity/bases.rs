@@ -19,47 +19,16 @@
 //! not prove them again. A `verified-edit` carries its edits, so it can be
 //! checked whenever its bytes are retained.
 
-use std::collections::BTreeSet;
+use intlify_authoring::{AdmittedInventory, MessageIntentId, Occurrence, Token};
 
-use intlify_authoring::{
-    AdmittedInventory, AuthoringInventory, Completeness, MessageIntentId, Occurrence, Token,
-};
-
-use super::edit::{fate, inserted, is_edit_replay_profile, replay, RangeFate, ReplayGap};
-use super::sources::RetainedSources;
+use super::edit::{fate, inserted, is_edit_replay_profile, RangeFate, ReplayGap};
+use super::evidence::{Claims, Evidence};
+use super::inputs::{automatic, check_previous, check_supplied, ContinuityInputs, EditSetFailure};
 use crate::limits::{IdentityLimitKind, IdentityLimits};
 use crate::registry::{
-    apply, declares, validate_edit, AdmittedRegistry, AdmittedUpdate, AllocationBasis,
-    ContinuationBasis, EntryState, IdentityDecision, SourceEdit, TransitionFailure, UpdateFailure,
+    apply, AdmittedRegistry, AdmittedUpdate, AllocationBasis, ContinuationBasis, IdentityDecision,
+    TransitionFailure, UpdateFailure,
 };
-
-/// The update that produced a base, with the inventory it was planned from.
-///
-/// Newness and absence are only claimed automatically when the current
-/// inventory was resolved against the same pins as this one: a change of
-/// binding configuration can make declarations appear or vanish without any
-/// edit to the source.
-#[derive(Debug, Clone, Copy)]
-pub struct PreviousUpdate<'a> {
-    /// The update the base names as its own.
-    pub update: &'a AdmittedUpdate,
-    /// The inventory that update was planned from.
-    pub inventory: &'a AdmittedInventory,
-}
-
-/// The evidence a host supplies when it plans an update.
-#[derive(Debug, Clone, Copy)]
-pub struct ContinuityInputs<'a> {
-    /// The bytes of every snapshot an edit names.
-    pub sources: &'a RetainedSources<'a>,
-    /// Edits beyond the ones the decisions carry: how each changed unit got
-    /// from its base snapshot to its current one.
-    pub edits: &'a [SourceEdit],
-    /// Every unit of the owning scope, as the host knows it.
-    pub membership: &'a [Token],
-    /// The update that produced the base, absent for a genesis base.
-    pub previous: Option<PreviousUpdate<'a>>,
-}
 
 /// Why a claimed basis is not shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +42,9 @@ pub enum BasisGap {
     /// has to: at the current declaration's snapshot for a continuation, or
     /// at a snapshot the inventory holds for an absence.
     EditDisagrees,
+    /// A `verified-edit` carries edits beyond the one between its own two
+    /// snapshots, so its change list does not agree with its declarations.
+    ExtraEdits,
     /// The bytes of a snapshot an edit names were not retained.
     SourceUnavailable,
     /// Replaying an edit gives other bytes than its after snapshot names.
@@ -156,6 +128,9 @@ pub enum ContinuityFailure {
     PreviousMismatch,
     /// A supplied edit is not well formed.
     InvalidEdit(UpdateFailure),
+    /// The supplied edits are not one account of how the base became the
+    /// current inventory.
+    EditSet(EditSetFailure),
     /// A named bound was exhausted by the supplied edits.
     Limit(IdentityLimitKind),
 }
@@ -177,7 +152,7 @@ pub fn verify_bases(
     let plan = update.update();
     let current = inventory.inventory();
     check_previous(base, inputs.previous)?;
-    check_supplied(inputs.edits, plan.owner(), limits)?;
+    check_supplied(inputs.edits, base, current, inputs.previous, limits)?;
 
     let evidence = Evidence::gather(plan.decisions(), inputs.edits, inputs.sources, current);
     let claims = evidence.claims(base);
@@ -238,193 +213,6 @@ pub fn verify_bases(
     })
 }
 
-/// Check that the previous update is the one the base names, and its
-/// inventory the one it was planned from.
-fn check_previous(
-    base: &AdmittedRegistry,
-    previous: Option<PreviousUpdate<'_>>,
-) -> Result<(), ContinuityFailure> {
-    // A genesis names no update, so no previous update can be its own.
-    let snapshot = base.snapshot();
-    match previous {
-        None => Ok(()),
-        Some(previous) => {
-            if snapshot.update() != Some(&previous.update.reference())
-                || previous.update.update().inventory() != &previous.inventory.reference()
-            {
-                return Err(ContinuityFailure::PreviousMismatch);
-            }
-            Ok(())
-        }
-    }
-}
-
-/// Hold the supplied edits to the rules any edit satisfies, and to the
-/// caller's bounds.
-fn check_supplied(
-    edits: &[SourceEdit],
-    owner: &intlify_authoring::OwnerIdentity,
-    limits: &IdentityLimits,
-) -> Result<(), ContinuityFailure> {
-    if edits.len() as u64 > limits.source_edits {
-        return Err(ContinuityFailure::Limit(IdentityLimitKind::SourceEdits));
-    }
-    let replacements: usize = edits.iter().map(|edit| edit.replacements().len()).sum();
-    if replacements as u64 > limits.replacements {
-        return Err(ContinuityFailure::Limit(IdentityLimitKind::Replacements));
-    }
-    let bytes: usize = edits
-        .iter()
-        .flat_map(SourceEdit::replacements)
-        .map(|replacement| replacement.text().len())
-        .sum();
-    if bytes as u64 > limits.replacement_bytes {
-        return Err(ContinuityFailure::Limit(
-            IdentityLimitKind::ReplacementBytes,
-        ));
-    }
-    for edit in edits {
-        validate_edit(edit, owner).map_err(ContinuityFailure::InvalidEdit)?;
-    }
-    Ok(())
-}
-
-/// Return whether newness and absence may be claimed without an explicit
-/// decision: the host's membership is the inventory's, and the pins are the
-/// base's.
-fn automatic(
-    base: &AdmittedRegistry,
-    current: &AuthoringInventory,
-    inputs: &ContinuityInputs<'_>,
-) -> Result<(), BasisGap> {
-    let units: BTreeSet<&Token> = current
-        .units()
-        .iter()
-        .map(|unit| unit.source().unit())
-        .collect();
-    let members: BTreeSet<&Token> = inputs.membership.iter().collect();
-    let fits = match current.completeness() {
-        Completeness::Complete => units == members,
-        Completeness::Partial => units.is_subset(&members),
-    };
-    if !fits {
-        return Err(BasisGap::MembershipMismatch);
-    }
-    if base.snapshot().is_genesis() {
-        return Ok(());
-    }
-    match inputs.previous {
-        None => Err(BasisGap::BasisUnknown),
-        Some(previous) if previous.inventory.inventory().basis() != current.basis() => {
-            Err(BasisGap::BasisChanged)
-        }
-        Some(_) => Ok(()),
-    }
-}
-
-/// Every account of where a base snapshot's declarations went.
-///
-/// An edit from the snapshot is one account. The snapshot being still
-/// current is another: its declarations stayed where they were. Two accounts
-/// of one snapshot are a copy or a conflict, and neither is a continuation.
-struct Evidence<'e> {
-    edits: Vec<(&'e SourceEdit, Result<(), ReplayGap>)>,
-    current: &'e AuthoringInventory,
-}
-
-impl<'e> Evidence<'e> {
-    /// Collect every distinct edit the update and the host supply, each
-    /// replayed once.
-    fn gather(
-        decisions: &'e [IdentityDecision],
-        supplied: &'e [SourceEdit],
-        sources: &RetainedSources<'_>,
-        current: &'e AuthoringInventory,
-    ) -> Self {
-        let carried = decisions.iter().flat_map(|decision| match decision {
-            IdentityDecision::Continue(continuation) => match continuation.basis() {
-                ContinuationBasis::VerifiedEdit(edit) => edit.changes(),
-                _ => &[],
-            },
-            _ => &[],
-        });
-        let mut edits: Vec<(&'e SourceEdit, Result<(), ReplayGap>)> = Vec::new();
-        for edit in carried.chain(supplied) {
-            if edits.iter().all(|(known, _)| *known != edit) {
-                edits.push((edit, replay(edit, sources)));
-            }
-        }
-        Self { edits, current }
-    }
-
-    /// Return whether the inventory holds a snapshot as one of its units.
-    fn holds(&self, snapshot: &intlify_authoring::SourceSnapshot) -> bool {
-        self.current
-            .units()
-            .iter()
-            .any(|unit| unit.source() == snapshot)
-    }
-
-    /// Count the accounts of where a snapshot's declarations went.
-    fn accounts(&self, snapshot: &intlify_authoring::SourceSnapshot) -> usize {
-        self.from(snapshot).len() + usize::from(self.holds(snapshot))
-    }
-
-    /// The distinct edits that start from a snapshot.
-    fn from(
-        &self,
-        snapshot: &intlify_authoring::SourceSnapshot,
-    ) -> Vec<&(&'e SourceEdit, Result<(), ReplayGap>)> {
-        self.edits
-            .iter()
-            .filter(|(edit, _)| edit.before() == Some(snapshot))
-            .collect()
-    }
-
-    /// Which active base entries each account carries onto a current
-    /// declaration: their own declaration when it is still there, and where
-    /// each edit from their snapshot puts it.
-    fn claims(&self, base: &AdmittedRegistry) -> Claims {
-        let current = self.current;
-        let mut claims = Vec::new();
-        for entry in base.snapshot().entries() {
-            if entry.state() != EntryState::Active {
-                continue;
-            }
-            let declaration = entry.declaration();
-            if declares(current, declaration) {
-                claims.push((declaration.clone(), entry.intent_id().clone()));
-            }
-            for (edit, replayed) in self.from(declaration.source()) {
-                let (Ok(()), Some(after), RangeFate::Moved(range)) =
-                    (replayed, edit.after(), fate(edit, declaration.range()))
-                else {
-                    continue;
-                };
-                if let Ok(target) = Occurrence::new(after.clone(), range, declaration.role()) {
-                    if declares(current, &target) {
-                        claims.push((target, entry.intent_id().clone()));
-                    }
-                }
-            }
-        }
-        Claims(claims)
-    }
-}
-
-/// Current declarations, and the base entries an edit carries onto each.
-struct Claims(Vec<(Occurrence, MessageIntentId)>);
-
-impl Claims {
-    /// The entries carried onto one current declaration.
-    fn on<'c>(&'c self, declaration: &'c Occurrence) -> impl Iterator<Item = &'c MessageIntentId> {
-        self.0
-            .iter()
-            .filter(move |(target, _)| target == declaration)
-            .map(|(_, id)| id)
-    }
-}
-
 /// Check a `verified-edit` continuation from one declaration to another.
 fn continued(
     id: &MessageIntentId,
@@ -447,6 +235,11 @@ fn continued(
     };
     if edit.after() != Some(to.source()) {
         return gap(BasisGap::EditDisagrees);
+    }
+    // The change list has to agree with this decision's pair of
+    // declarations: one edit, from its snapshot to its snapshot.
+    if basis.changes().len() != 1 {
+        return gap(BasisGap::ExtraEdits);
     }
     // A second account of the base snapshot, another edit from it or the
     // snapshot still being current, makes this a copy or a conflict.
@@ -492,7 +285,7 @@ fn new(
     if claims.on(to).next().is_some() {
         return BasisVerdict::Unproven(BasisGap::NewUnproven);
     }
-    let shown = evidence.edits.iter().any(|(edit, replayed)| {
+    let shown = evidence.edits().iter().any(|(edit, replayed)| {
         replayed.is_ok() && edit.after() == Some(to.source()) && inserted(edit, to.range())
     });
     if shown {
@@ -550,15 +343,21 @@ fn absent(
 #[cfg(test)]
 mod tests {
     use intlify_authoring::{
-        AuthoringArtifact, AuthoringInventory, IntegrityDigest, SourceSnapshot, Token,
+        AuthoringArtifact, AuthoringInventory, Completeness, IntegrityDigest, SourceSnapshot, Token,
     };
     use intlify_shared_json::encoding::{hash, Domain};
     use serde_json::{json, Value};
 
+    use super::super::inputs::PreviousUpdate;
+    use super::super::sources::RetainedSources;
     use super::*;
-    use crate::registry::fixtures::{admitted_inventory, artifact, limits, owner, sources, Chain};
+    use crate::registry::fixtures::{
+        admitted_inventory, artifact, declaration, id, inventory_of, limits, owner, sealed,
+        sources, Base, Chain, Unit,
+    };
     use crate::registry::{
         admit_update, ExplicitBasis, IntentRegistryUpdate, RegistryUpdateArtifact, Replacement,
+        SourceEdit,
     };
 
     fn retained(owned: &[(SourceSnapshot, String)]) -> RetainedSources<'_> {
@@ -693,7 +492,7 @@ mod tests {
             change(&mut body["decisions"][0]["basis"]);
             update(body)
         };
-        let cases: [BasisCase; 3] = [
+        let cases: [BasisCase; 4] = [
             (
                 "another verifier profile",
                 |basis| basis["profile"]["identity"] = json!("some-other-diff"),
@@ -711,6 +510,17 @@ mod tests {
                     basis["changes"][0]["after"] = nav;
                 },
                 BasisGap::EditDisagrees,
+            ),
+            (
+                "a change list with an edit of another unit as well",
+                |basis| {
+                    let nav = artifact("inventory-1")["body"]["units"][1]["source"].clone();
+                    basis["changes"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(json!({"before": nav, "after": nav, "replacements": []}));
+                },
+                BasisGap::ExtraEdits,
             ),
         ];
         for (label, change, expected) in cases {
@@ -740,13 +550,15 @@ mod tests {
         );
 
         // A second account of checkout revision 1, which replays too, leaves
-        // no single account of where pay went.
-        let first: SourceSnapshot =
-            serde_json::from_value(artifact("inventory-1")["body"]["units"][0]["source"].clone())
-                .unwrap();
-        let unchanged = SourceEdit::new(Some(first.clone()), Some(first), vec![]);
+        // no single account of where pay went: here, the host says checkout
+        // became the navigation unit.
+        let into_nav = became(
+            &owned,
+            &snapshot_of(&owned, "checkout", "1"),
+            &snapshot_of(&owned, "nav", "1"),
+        );
         assert_eq!(
-            verdicts(&chain, 2, chain.update(2), &inputs(&all, &[unchanged]))[0],
+            verdicts(&chain, 2, chain.update(2), &inputs(&all, &[into_nav]))[0],
             gap(BasisGap::Ambiguous),
             "two accounts of one snapshot"
         );
@@ -912,10 +724,21 @@ mod tests {
             "bytes that were not retained"
         );
 
-        let first = checkout_edit().before().cloned();
-        let unchanged = SourceEdit::new(first.clone(), first, vec![]);
+        // Two accounts of checkout revision 1: update-2's own edit, and the
+        // host's that checkout became the navigation unit.
+        let into_nav = [became(
+            &owned,
+            &snapshot_of(&owned, "checkout", "1"),
+            &snapshot_of(&owned, "nav", "1"),
+        )];
+        let both = ContinuityInputs {
+            sources: &all,
+            edits: &into_nav,
+            membership: &membership,
+            previous: Some(produced(&chain, 1)),
+        };
         assert_eq!(
-            cancel(&all, &[checkout_edit(), unchanged]),
+            verdicts(&chain, 2, chain.update(2), &both)[1],
             gap(BasisGap::Ambiguous),
             "two accounts of one snapshot"
         );
@@ -1092,34 +915,6 @@ mod tests {
                 IdentityLimitKind::ReplacementBytes
             ))
         );
-    }
-
-    #[test]
-    fn a_partial_inventory_needs_only_its_own_units_in_the_membership() {
-        // A partial inventory sees part of the scope: the host's membership
-        // may hold more units than it does, but not fewer.
-        let chain = Chain::load();
-        let owned = sources();
-        let all = retained(&owned);
-        let mut partial = artifact("inventory-2")["body"].clone();
-        partial["completeness"] = json!("partial");
-        let partial: AuthoringInventory = serde_json::from_value(partial).unwrap();
-        let with = |names: &[&str]| {
-            let membership = units(names);
-            automatic(
-                chain.registry(1),
-                &partial,
-                &ContinuityInputs {
-                    sources: &all,
-                    edits: &[],
-                    membership: &membership,
-                    previous: Some(produced(&chain, 1)),
-                },
-            )
-        };
-        assert_eq!(with(&["checkout", "nav", "settings"]), Ok(()));
-        assert_eq!(with(&["checkout", "nav"]), Ok(()));
-        assert_eq!(with(&["checkout"]), Err(BasisGap::MembershipMismatch));
     }
 
     #[test]
@@ -1340,13 +1135,13 @@ mod tests {
 
     /// Check an update against registry `base` with the committed sources,
     /// both units as members, and the update that produced the base.
-    fn checked(
+    fn outcome(
         chain: &Chain,
         base: usize,
         plan: &AdmittedUpdate,
         inventory: &AdmittedInventory,
         edits: &[SourceEdit],
-    ) -> Vec<BasisVerdict> {
+    ) -> Result<Vec<BasisVerdict>, ContinuityFailure> {
         let owned = sources();
         let all = retained(&owned);
         let membership = units(&["checkout", "nav"]);
@@ -1356,12 +1151,24 @@ mod tests {
             membership: &membership,
             previous: (base > 0).then(|| produced(chain, base)),
         };
-        verify_bases(chain.registry(base), plan, inventory, &inputs, &limits())
-            .unwrap()
-            .verdicts()
-            .iter()
-            .map(|(_, verdict)| *verdict)
-            .collect()
+        verify_bases(chain.registry(base), plan, inventory, &inputs, &limits()).map(|report| {
+            report
+                .verdicts()
+                .iter()
+                .map(|(_, verdict)| *verdict)
+                .collect()
+        })
+    }
+
+    /// Check an update whose inputs are all admissible.
+    fn checked(
+        chain: &Chain,
+        base: usize,
+        plan: &AdmittedUpdate,
+        inventory: &AdmittedInventory,
+        edits: &[SourceEdit],
+    ) -> Vec<BasisVerdict> {
+        outcome(chain, base, plan, inventory, edits).unwrap()
     }
 
     fn stranger() -> intlify_authoring::MessageIntentId {
@@ -1510,10 +1317,9 @@ mod tests {
     #[test]
     fn an_edit_to_a_snapshot_the_inventory_does_not_hold_shows_no_absence() {
         // Checkout went through revision 2, which replaced cancel's line, to
-        // revision 3, where it is back. The host's edit ends at revision 2,
-        // but the inventory holds revision 3: the edit says nothing about
-        // where cancel is now, and the plan gives cancel's line a new ID by
-        // choice.
+        // revision 3, where it is back. An edit that ends at revision 2 says
+        // nothing about where cancel is now, and the plan gives cancel's line
+        // a new ID by choice.
         let chain = Chain::load();
         let base = chain.registry(1);
         let entries = base.snapshot().entries();
@@ -1522,28 +1328,60 @@ mod tests {
         let chosen = || AllocationBasis::Explicit(ExplicitBasis::new("Chosen by hand.").unwrap());
         let copy = artifact("update-2")["body"]["decisions"][2]["intentId"].clone();
         let copy: intlify_authoring::MessageIntentId = serde_json::from_value(copy).unwrap();
-        let plan = planned(
-            base,
-            chain.inventory(3),
-            vec![
-                IdentityDecision::continuation(
-                    pay.intent_id().clone(),
-                    pay.declaration().clone(),
-                    current[0].occurrence().clone(),
-                    ContinuationBasis::Explicit(ExplicitBasis::new("Moved by hand.").unwrap()),
-                ),
-                IdentityDecision::retirement(
-                    cancel.intent_id().clone(),
-                    cancel.declaration().clone(),
-                ),
-                IdentityDecision::allocation(copy, current[1].occurrence().clone(), chosen()),
-                IdentityDecision::allocation(stranger(), current[2].occurrence().clone(), chosen()),
-            ],
-        );
+        let plan = |pay_basis| {
+            planned(
+                base,
+                chain.inventory(3),
+                vec![
+                    IdentityDecision::continuation(
+                        pay.intent_id().clone(),
+                        pay.declaration().clone(),
+                        current[0].occurrence().clone(),
+                        pay_basis,
+                    ),
+                    IdentityDecision::retirement(
+                        cancel.intent_id().clone(),
+                        cancel.declaration().clone(),
+                    ),
+                    IdentityDecision::allocation(
+                        copy.clone(),
+                        current[1].occurrence().clone(),
+                        chosen(),
+                    ),
+                    IdentityDecision::allocation(
+                        stranger(),
+                        current[2].occurrence().clone(),
+                        chosen(),
+                    ),
+                ],
+            )
+        };
+        // From the host it is no account of the change at all.
+        let moved = ContinuationBasis::Explicit(ExplicitBasis::new("Moved by hand.").unwrap());
         assert_eq!(
-            checked(&chain, 1, &plan, chain.inventory(3), &[checkout_edit()]),
+            outcome(
+                &chain,
+                1,
+                &plan(moved),
+                chain.inventory(3),
+                &[checkout_edit()]
+            ),
+            Err(ContinuityFailure::EditSet(
+                EditSetFailure::AfterOutsideInventory
+            ))
+        );
+        // Carried by pay's continuation, it shows neither pay's move nor
+        // cancel's absence.
+        assert_eq!(
+            checked(
+                &chain,
+                1,
+                &plan(edit_replay(vec![checkout_edit()])),
+                chain.inventory(3),
+                &[]
+            ),
             [
-                BasisVerdict::Explicit,
+                gap(BasisGap::EditDisagrees),
                 gap(BasisGap::EditDisagrees),
                 BasisVerdict::Explicit,
                 BasisVerdict::Explicit
@@ -1553,38 +1391,31 @@ mod tests {
 
     #[test]
     fn a_declaration_both_carried_and_inserted_is_not_new() {
-        // The host gives two accounts of checkout revision 2: the real edit,
-        // which carries pay there, and one that writes the whole unit from
-        // nothing. Pay's new place is inserted text under the second, and
-        // still pay's place under the first.
+        // Cancel's continuation carries update-2's edit, which carries pay to
+        // its new place. The host's edit says the navigation unit became
+        // checkout revision 2, written whole: pay's new place is inserted
+        // text under it, and still pay's place under the first.
         let chain = Chain::load();
         let owned = sources();
-        let second = snapshot_of(&owned, "checkout", "2");
-        let text = owned
-            .iter()
-            .find(|(snapshot, _)| *snapshot == second)
-            .map(|(_, text)| text.clone())
-            .unwrap();
-        let written = SourceEdit::new(None, Some(second), vec![Replacement::new(at(0, 0), &text)]);
+        let into_checkout = became(
+            &owned,
+            &snapshot_of(&owned, "nav", "1"),
+            &snapshot_of(&owned, "checkout", "2"),
+        );
         let base = chain.registry(1);
         let entries = base.snapshot().entries();
         let (pay, cancel) = (&entries[0], &entries[2]);
         let current = chain.inventory(2).inventory().declarations();
-        let copy = artifact("update-2")["body"]["decisions"][2]["intentId"].clone();
-        let copy: intlify_authoring::MessageIntentId = serde_json::from_value(copy).unwrap();
         let plan = planned(
             base,
             chain.inventory(2),
             vec![
                 IdentityDecision::retirement(pay.intent_id().clone(), pay.declaration().clone()),
-                IdentityDecision::retirement(
+                IdentityDecision::continuation(
                     cancel.intent_id().clone(),
                     cancel.declaration().clone(),
-                ),
-                IdentityDecision::allocation(
-                    copy,
                     current[1].occurrence().clone(),
-                    AllocationBasis::confirmed_new(),
+                    edit_replay(vec![checkout_edit()]),
                 ),
                 IdentityDecision::allocation(
                     stranger(),
@@ -1594,17 +1425,10 @@ mod tests {
             ],
         );
         assert_eq!(
-            checked(
-                &chain,
-                1,
-                &plan,
-                chain.inventory(2),
-                &[checkout_edit(), written]
-            ),
+            checked(&chain, 1, &plan, chain.inventory(2), &[into_checkout]),
             [
                 gap(BasisGap::AbsenceUnproven),
-                gap(BasisGap::UnresolvedPlan),
-                PROVEN,
+                gap(BasisGap::DeclarationReplaced),
                 gap(BasisGap::NewUnproven)
             ]
         );
@@ -1687,6 +1511,22 @@ mod tests {
             .expect("a committed text")
     }
 
+    /// An edit saying one committed snapshot became another, written whole.
+    fn became(
+        owned: &[(SourceSnapshot, String)],
+        before: &SourceSnapshot,
+        after: &SourceSnapshot,
+    ) -> SourceEdit {
+        SourceEdit::new(
+            Some(before.clone()),
+            Some(after.clone()),
+            vec![Replacement::new(
+                at(0, before.byte_length()),
+                &text_of(owned, after),
+            )],
+        )
+    }
+
     /// An edit that writes a snapshot from nothing.
     fn written(owned: &[(SourceSnapshot, String)], snapshot: &SourceSnapshot) -> SourceEdit {
         SourceEdit::new(
@@ -1757,46 +1597,98 @@ mod tests {
 
     #[test]
     fn text_inserted_into_another_snapshot_shows_nothing_new_here() {
-        // Writing checkout revision 3 from nothing inserts text over the
-        // copy's position numbers too, but in another snapshot.
-        let chain = Chain::load();
-        let owned = sources();
-        let third = snapshot_of(&owned, "checkout", "3");
+        // Two new files with the same text: an account of one is no account
+        // of the other, though their declarations sit at the same positions.
+        let app = Unit::new("app.js", "1", "intent('Save')\n");
+        let base = Base::of(&[&app], &[&"a".repeat(32)]);
+        let left = Unit::new("left.js", "1", "intent('Next')\n");
+        let right = Unit::new("right.js", "1", "intent('Next')\n");
+        let current = inventory_of(&[&app, &left, &right], Completeness::Complete);
+        let plan = sealed(
+            IntentRegistryUpdate::new(
+                owner(),
+                base.registry.reference(),
+                current.reference(),
+                vec![
+                    IdentityDecision::allocation(
+                        id(&"b".repeat(32)),
+                        declaration(&current, &left, 0),
+                        AllocationBasis::confirmed_new(),
+                    ),
+                    IdentityDecision::allocation(
+                        id(&"c".repeat(32)),
+                        declaration(&current, &right, 0),
+                        AllocationBasis::confirmed_new(),
+                    ),
+                ],
+                vec![],
+            )
+            .unwrap(),
+        );
+        let created = [SourceEdit::new(
+            None,
+            Some(left.snapshot()),
+            vec![Replacement::new(at(0, 0), &left.text)],
+        )];
+        let sources = RetainedSources::new(
+            [&app, &left, &right]
+                .iter()
+                .map(|unit| (unit.snapshot(), unit.text.as_bytes())),
+        )
+        .unwrap();
+        let membership = units(&["app.js", "left.js", "right.js"]);
+        let inputs = ContinuityInputs {
+            sources: &sources,
+            edits: &created,
+            membership: &membership,
+            previous: Some(base.previous()),
+        };
+        let report = verify_bases(&base.registry, &plan, &current, &inputs, &limits()).unwrap();
         assert_eq!(
-            checked(
-                &chain,
-                1,
-                &update_2_explicit(),
-                chain.inventory(2),
-                &[written(&owned, &third)]
-            ),
-            [
-                BasisVerdict::Explicit,
-                gap(BasisGap::AbsenceUnproven),
-                gap(BasisGap::NewUnproven)
-            ]
+            report
+                .verdicts()
+                .iter()
+                .map(|(_, verdict)| *verdict)
+                .collect::<Vec<_>>(),
+            [PROVEN, gap(BasisGap::NewUnproven)]
         );
     }
 
     #[test]
     fn a_removal_of_a_unit_still_in_the_scope_is_not_an_absence() {
-        // The host says checkout revision 1 was deleted outright, while
-        // checkout is still a member of the scope.
+        // An edit that deletes checkout revision 1 outright, while checkout
+        // is still a unit of the inventory.
         let chain = Chain::load();
         let owned = sources();
         let first = snapshot_of(&owned, "checkout", "1");
         let length = first.byte_length();
-        let removal = SourceEdit::new(Some(first), None, vec![Replacement::new(at(0, length), "")]);
+        let removal = || {
+            SourceEdit::new(
+                Some(first.clone()),
+                None,
+                vec![Replacement::new(at(0, length), "")],
+            )
+        };
+        // From the host it is no account of the change at all.
         assert_eq!(
-            checked(
+            outcome(
                 &chain,
                 1,
                 &update_2_explicit(),
                 chain.inventory(2),
-                &[removal]
+                &[removal()]
             ),
+            Err(ContinuityFailure::EditSet(EditSetFailure::UnitNotRemoved))
+        );
+        // Carried by pay's continuation, it is no account of pay or of
+        // cancel either.
+        let mut body = artifact("update-2")["body"].clone();
+        body["decisions"][0]["basis"]["changes"] =
+            json!([serde_json::to_value(removal()).unwrap()]);
+        assert_eq!(
+            checked(&chain, 1, &update(body), chain.inventory(2), &[]),
             [
-                BasisVerdict::Explicit,
+                gap(BasisGap::EditDisagrees),
                 gap(BasisGap::AbsenceUnproven),
                 gap(BasisGap::NewUnproven)
             ]
@@ -1833,24 +1725,27 @@ mod tests {
                 &text_of(&owned, &second),
             )],
         );
-        // An account that writes the navigation unit from nothing: home's
-        // place is inserted text under it, yet home still sits there.
-        let rewritten = written(&owned, &nav);
-        for (label, edit) in [
-            ("a replacing edit", replaced),
-            ("a writing edit", rewritten),
-        ] {
-            assert_eq!(
-                checked(&chain, 1, &plan, chain.inventory(2), &[edit]),
-                [
-                    PROVEN,
-                    gap(BasisGap::AbsenceUnproven),
-                    gap(BasisGap::UnresolvedPlan),
-                    PROVEN,
-                    gap(BasisGap::NewUnproven)
-                ],
-                "{label}"
-            );
-        }
+        assert_eq!(
+            checked(&chain, 1, &plan, chain.inventory(2), &[replaced]),
+            [
+                PROVEN,
+                gap(BasisGap::AbsenceUnproven),
+                gap(BasisGap::UnresolvedPlan),
+                PROVEN,
+                gap(BasisGap::NewUnproven)
+            ]
+        );
+        // An account that writes the navigation unit from nothing, though
+        // the base has it, is no account of the change at all.
+        assert_eq!(
+            outcome(
+                &chain,
+                1,
+                &plan,
+                chain.inventory(2),
+                &[written(&owned, &nav)]
+            ),
+            Err(ContinuityFailure::EditSet(EditSetFailure::UnitNotNew))
+        );
     }
 }

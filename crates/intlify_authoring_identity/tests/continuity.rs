@@ -17,9 +17,9 @@ use intlify_authoring::{
 };
 use intlify_authoring_identity::{
     verify_bases, AdmittedRegistry, AdmittedUpdate, AllocationBasis, BasisGap, BasisVerdict,
-    ContinuationBasis, ContinuityInputs, IdentityDecision, IntentRegistryUpdate, LineageKind,
-    LineageLink, PreviousUpdate, Replacement, RetainedSources, SourceEdit, EDIT_REPLAY_PROFILE,
-    EDIT_REPLAY_REVISION,
+    ContinuationBasis, ContinuityFailure, ContinuityInputs, EditSetFailure, IdentityDecision,
+    IntentRegistryUpdate, LineageKind, LineageLink, PreviousUpdate, Replacement, RetainedSources,
+    SourceEdit, EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION,
 };
 use support::{
     applied, declaration, genesis, id, inventory_of, inventory_with_role, limits, owner,
@@ -92,7 +92,7 @@ impl Base {
         )
     }
 
-    /// Check the bases of an update against this base.
+    /// Check the bases of an update whose inputs are all admissible.
     fn verdicts(
         &self,
         plan: &AdmittedUpdate,
@@ -101,6 +101,19 @@ impl Base {
         edits: &[SourceEdit],
         membership: &[&str],
     ) -> Vec<BasisVerdict> {
+        self.outcome(plan, inventory, units, edits, membership)
+            .unwrap()
+    }
+
+    /// Check the bases of an update against this base.
+    fn outcome(
+        &self,
+        plan: &AdmittedUpdate,
+        inventory: &AdmittedInventory,
+        units: &[&Unit],
+        edits: &[SourceEdit],
+        membership: &[&str],
+    ) -> Result<Vec<BasisVerdict>, ContinuityFailure> {
         let sources = RetainedSources::new(
             units
                 .iter()
@@ -120,12 +133,13 @@ impl Base {
                 inventory: &self.inventory,
             }),
         };
-        verify_bases(&self.registry, plan, inventory, &inputs, &limits())
-            .unwrap()
-            .verdicts()
-            .iter()
-            .map(|(_, verdict)| *verdict)
-            .collect()
+        verify_bases(&self.registry, plan, inventory, &inputs, &limits()).map(|report| {
+            report
+                .verdicts()
+                .iter()
+                .map(|(_, verdict)| *verdict)
+                .collect()
+        })
     }
 }
 
@@ -563,8 +577,8 @@ fn inserted_text_in_another_file_is_not_evidence() {
 #[test]
 fn a_unit_an_edit_removes_has_to_be_gone_from_the_scope() {
     // The host's edit says nav.js was deleted, yet nav.js is still in the
-    // scope at another revision. The two accounts disagree, so 'Home' is
-    // not shown to be gone.
+    // inventory at another revision. The two accounts disagree, so the edit
+    // is no account of the change at all.
     let app = Unit::new("app.js", "1", "intent('Save')\n");
     let nav = Unit::new("nav.js", "1", "intent('Home')\n");
     let base = Base::of(&[&app, &nav], &[A, B]);
@@ -591,14 +605,14 @@ fn a_unit_an_edit_removes_has_to_be_gone_from_the_scope() {
         vec![],
     );
     assert_eq!(
-        base.verdicts(
+        base.outcome(
             &plan,
             &current,
             &[&app, &nav, &changed],
             &[removal],
             &["app.js", "nav.js"]
         ),
-        [gap(BasisGap::AbsenceUnproven), gap(BasisGap::NewUnproven)]
+        Err(ContinuityFailure::EditSet(EditSetFailure::UnitNotRemoved))
     );
 }
 

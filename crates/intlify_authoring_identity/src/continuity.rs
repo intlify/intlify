@@ -13,14 +13,16 @@
 
 mod bases;
 mod edit;
+mod evidence;
+mod inputs;
 mod sources;
 
-pub use bases::{
-    verify_bases, BasisGap, BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs,
-    PreviousUpdate,
-};
+pub use bases::{verify_bases, BasisGap, BasisReport, BasisVerdict, ContinuityFailure};
 pub use edit::{
     fate, inserted, is_edit_replay_profile, replay, RangeFate, ReplayGap, EDIT_REPLAY_PROFILE,
     EDIT_REPLAY_REVISION,
 };
+pub(crate) use evidence::{Claims, Evidence};
+pub(crate) use inputs::{automatic, check_previous, check_supplied};
+pub use inputs::{ContinuityInputs, EditSetFailure, PreviousUpdate};
 pub use sources::{RetainedSourceFailure, RetainedSources};

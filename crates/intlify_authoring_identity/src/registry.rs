@@ -25,11 +25,12 @@ mod history;
 mod snapshot;
 mod update;
 
+pub(crate) use admit::admit_update_artifact;
 pub use admit::{
     admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, RegistryAdmissionFailure,
 };
-pub(crate) use apply::declares;
 pub use apply::{apply, Transition, TransitionFailure};
+pub(crate) use apply::{check_base_state, check_pairing, declares};
 pub use artifact::{RegistryArtifact, RegistryUpdateArtifact};
 pub use history::{
     replay, verify_history, Anchor, HistoryFailure, HistoryOutcome, ReplayFailure, RetainedHistory,

@@ -142,6 +142,15 @@ pub fn admit_update(
 ) -> Result<AdmittedUpdate, RegistryAdmissionFailure<UpdateFailure>> {
     let artifact: RegistryUpdateArtifact =
         read_sealed(bytes).map_err(RegistryAdmissionFailure::Read)?;
+    admit_update_artifact(artifact, limits)
+}
+
+/// Admit an update artifact this crate already holds, such as a plan it has
+/// just sealed: the same bounds and structural rules as one read from bytes.
+pub(crate) fn admit_update_artifact(
+    artifact: RegistryUpdateArtifact,
+    limits: &IdentityLimits,
+) -> Result<AdmittedUpdate, RegistryAdmissionFailure<UpdateFailure>> {
     let update = artifact.body();
     within(
         update.decisions().len(),
