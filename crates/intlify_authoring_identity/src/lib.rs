@@ -30,13 +30,16 @@
 //! assert!(registry != intent);
 //! ```
 
+mod admission;
 mod continuity;
 mod id;
 mod limits;
 mod reconcile;
 mod registry;
 pub mod schema;
+mod workspace;
 
+pub use admission::IdentityAdmissionFailure;
 pub use continuity::{
     fate, inserted, is_edit_replay_profile, replay as replay_edit, verify_bases, BasisGap,
     BasisReport, BasisVerdict, ContinuityFailure, ContinuityInputs, EditSetFailure, PreviousUpdate,
@@ -48,15 +51,15 @@ pub use limits::{IdentityLimitKind, IdentityLimits};
 pub use reconcile::{
     detail, reconcile, reconcile_with_cancellation, CandidateFailure, Classification, Conflict,
     DeclarationClass, Eligibility, EntryClass, ExplicitDecision, NotExplicit, Plan,
-    ReconcileCapacities, ReconcileFailure, ReconcileInputs, ReconcileWorkspace, Reconciliation,
-    Unresolved,
+    ReconcileFailure, ReconcileInputs, Reconciliation, Unresolved,
 };
 pub use registry::{
     admit_registry, admit_update, apply, replay, verify_history, AdmittedRegistry, AdmittedUpdate,
     Allocation, AllocationBasis, Anchor, CompleteAbsence, ConfirmedNew, Continuation,
     ContinuationBasis, EntryState, ExplicitBasis, HistoryFailure, HistoryOutcome, IdentityDecision,
-    IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink,
-    RegistryAdmissionFailure, RegistryArtifact, RegistryEntry, RegistryUpdateArtifact, Replacement,
-    ReplayFailure, Restoration, RetainedHistory, Retirement, SnapshotFailure, SourceEdit,
-    Transition, TransitionFailure, UnchangedSnapshot, UpdateFailure, VerifiedEdit,
+    IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink, RegistryArtifact,
+    RegistryEntry, RegistryUpdateArtifact, Replacement, ReplayFailure, Restoration,
+    RetainedHistory, Retirement, SnapshotFailure, SourceEdit, Transition, TransitionFailure,
+    UnchangedSnapshot, UpdateFailure, VerifiedEdit,
 };
+pub use workspace::{IdentityCapacities, IdentityWorkspace};

@@ -18,8 +18,8 @@ use intlify_authoring::{
 use intlify_authoring_identity::{
     detail, reconcile, AdmittedRegistry, AdmittedUpdate, CandidateFailure, ContinuationBasis,
     ContinuityInputs, DeclarationClass, Eligibility, EntryClass, EntryState, ExplicitBasis,
-    ExplicitDecision, IdentityDecision, Plan, PreviousUpdate, ReconcileFailure, ReconcileInputs,
-    ReconcileWorkspace, Reconciliation, RegistryArtifact, Replacement, RetainedSources, SourceEdit,
+    ExplicitDecision, IdentityDecision, IdentityWorkspace, Plan, PreviousUpdate, ReconcileFailure,
+    ReconcileInputs, Reconciliation, RegistryArtifact, Replacement, RetainedSources, SourceEdit,
     TransitionFailure,
 };
 use serde_json::json;
@@ -89,7 +89,7 @@ impl State {
             current,
             &inputs,
             &limits(),
-            &mut ReconcileWorkspace::new(),
+            &mut IdentityWorkspace::new(),
         )
     }
 

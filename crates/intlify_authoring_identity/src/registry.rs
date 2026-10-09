@@ -26,9 +26,7 @@ mod snapshot;
 mod update;
 
 pub(crate) use admit::admit_update_artifact;
-pub use admit::{
-    admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, RegistryAdmissionFailure,
-};
+pub use admit::{admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate};
 pub use apply::{apply, Transition, TransitionFailure};
 pub(crate) use apply::{check_base_state, check_pairing, declares};
 pub use artifact::{RegistryArtifact, RegistryUpdateArtifact};

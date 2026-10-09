@@ -23,12 +23,12 @@ use intlify_authoring::{
 use super::diagnostic::{conflict, update_required};
 use super::explicit::ExplicitDecision;
 use super::outcome::{Conflict, DeclarationClass, EntryClass};
-use super::workspace::ReconcileWorkspace;
 use crate::continuity::{fate, inserted, BasisGap, Claims, Evidence, RangeFate, ReplayGap};
 use crate::registry::{
     check_base_state, AdmittedRegistry, EntryState, IdentityDecision, RegistryEntry, SourceEdit,
     TransitionFailure,
 };
+use crate::workspace::IdentityWorkspace;
 
 /// Find a declaration of the inventory, exactly.
 pub(super) fn position(current: &AuthoringInventory, occurrence: &Occurrence) -> Option<usize> {
@@ -61,7 +61,7 @@ impl<'p> Planner<'p> {
     pub(super) fn explicit(
         &self,
         decisions: &'p [ExplicitDecision],
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) -> (Vec<&'p IdentityDecision>, BTreeSet<&'p MessageIntentId>) {
         let mut alone: Vec<&'p IdentityDecision> = Vec::new();
         for explicit in decisions {
@@ -159,7 +159,7 @@ impl<'p> Planner<'p> {
         &self,
         decision: &IdentityDecision,
         kind: Conflict,
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) {
         let to = decision.to().expect("an explicit decision has a target");
         if let Some(index) = position(self.current, to) {
@@ -179,7 +179,7 @@ impl<'p> Planner<'p> {
     pub(super) fn retained(
         &self,
         moved: &BTreeSet<&MessageIntentId>,
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) -> Vec<&'p RegistryEntry> {
         let mut gone = Vec::new();
         for entry in self.base.snapshot().entries() {
@@ -206,7 +206,7 @@ impl<'p> Planner<'p> {
     pub(super) fn carried(
         &self,
         gone: Vec<&'p RegistryEntry>,
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) -> (
         Vec<(&'p RegistryEntry, &'p SourceEdit, usize)>,
         Vec<&'p RegistryEntry>,
@@ -330,7 +330,7 @@ impl<'p> Planner<'p> {
 
     /// Step 5: whether each declaration nothing else gave an identity is
     /// shown to be new.
-    pub(super) fn remaining(&self, workspace: &mut ReconcileWorkspace) {
+    pub(super) fn remaining(&self, workspace: &mut IdentityWorkspace) {
         let snapshot = self.base.snapshot();
         for (index, facts) in self.current.declarations().iter().enumerate() {
             if workspace.classes[index].is_some() {
@@ -381,7 +381,7 @@ fn settle<'p>(
     entry: &'p RegistryEntry,
     class: EntryClass,
     absent: &mut Vec<&'p RegistryEntry>,
-    workspace: &mut ReconcileWorkspace,
+    workspace: &mut IdentityWorkspace,
 ) {
     match &class {
         EntryClass::Absent => absent.push(entry),
@@ -468,7 +468,7 @@ mod tests {
             membership: &membership,
             automatic: automatic(scene.base, current, &inputs),
         };
-        let mut workspace = ReconcileWorkspace::new();
+        let mut workspace = IdentityWorkspace::new();
         workspace.classes.resize(current.declarations().len(), None);
         let (_, moved) = planner.explicit(scene.explicit, &mut workspace);
         let gone = planner.retained(&moved, &mut workspace);

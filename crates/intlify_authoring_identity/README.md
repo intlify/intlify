@@ -90,7 +90,7 @@ Newness and absence are claimed automatically only when the host's membership is
 | New | A declaration left over is new where the base has no history or an edit into its own unit inserted all of its text; it takes the next candidate, in canonical order |
 | Absent | In a complete inventory, an entry is retired where its unit left the scope with no account of it or one edit replaced its declaration; a partial inventory keeps what it cannot settle |
 
-The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `ReconcileWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
+The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `IdentityWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
 
 ## Schemas and vectors
 

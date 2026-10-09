@@ -15,10 +15,10 @@ use intlify_authoring::{
     OccurrenceRole, ReadFailure, SourceBytes, SourceSnapshot, VersionedIdentity,
 };
 use intlify_authoring_identity::{
-    admit_registry, admit_update, AllocationBasis, ContinuationBasis, EntryState, IdentityDecision,
-    IdentityLimitKind, IdentityLimits, IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind,
-    LineageLink, RegistryAdmissionFailure, RegistryArtifact, RegistryEntry, RegistryUpdateArtifact,
-    Replacement, SnapshotFailure, SourceEdit, UpdateFailure,
+    admit_registry, admit_update, AllocationBasis, ContinuationBasis, EntryState,
+    IdentityAdmissionFailure, IdentityDecision, IdentityLimitKind, IdentityLimits,
+    IntentRegistrySnapshot, IntentRegistryUpdate, LineageKind, LineageLink, RegistryArtifact,
+    RegistryEntry, RegistryUpdateArtifact, Replacement, SnapshotFailure, SourceEdit, UpdateFailure,
 };
 use serde_json::{json, Value};
 use support::{artifact, authoring_limits, bytes, context, document, limits, owner, reseal};
@@ -35,8 +35,8 @@ type SnapshotCase = (&'static str, &'static str, fn(&mut Value), SnapshotFailure
 /// A labelled edit to update-2, and the rule it breaks.
 type UpdateCase = (&'static str, fn(&mut Value), UpdateFailure);
 
-fn structure<F>(failure: F) -> RegistryAdmissionFailure<F> {
-    RegistryAdmissionFailure::Structure(failure)
+fn structure<F>(failure: F) -> IdentityAdmissionFailure<F> {
+    IdentityAdmissionFailure::Structure(failure)
 }
 
 #[test]
@@ -136,11 +136,11 @@ fn a_snapshot_and_an_update_are_never_read_as_each_other() {
     let update = bytes(&artifact("update-1"));
     assert_eq!(
         admit_registry(&update, &limits()),
-        Err(RegistryAdmissionFailure::Read(ReadFailure::Unsupported))
+        Err(IdentityAdmissionFailure::Read(ReadFailure::Unsupported))
     );
     assert_eq!(
         admit_update(&snapshot, &limits()),
-        Err(RegistryAdmissionFailure::Read(ReadFailure::Unsupported))
+        Err(IdentityAdmissionFailure::Read(ReadFailure::Unsupported))
     );
 }
 
@@ -162,14 +162,14 @@ fn a_tuple_this_reader_does_not_implement_is_unsupported_not_malformed() {
         damage(&mut registry);
         assert_eq!(
             admit_registry(&reseal(registry), &limits()),
-            Err(RegistryAdmissionFailure::Read(ReadFailure::Unsupported)),
+            Err(IdentityAdmissionFailure::Read(ReadFailure::Unsupported)),
             "{label}"
         );
         let mut update = artifact("update-2");
         damage(&mut update);
         assert_eq!(
             admit_update(&reseal(update), &limits()),
-            Err(RegistryAdmissionFailure::Read(ReadFailure::Unsupported)),
+            Err(IdentityAdmissionFailure::Read(ReadFailure::Unsupported)),
             "{label}"
         );
     }
@@ -181,13 +181,13 @@ fn content_changed_after_sealing_is_refused_before_anything_reads_it() {
     registry["body"]["entries"][2]["state"] = json!("active");
     assert_eq!(
         admit_registry(&bytes(&registry), &limits()),
-        Err(RegistryAdmissionFailure::Read(ReadFailure::Integrity))
+        Err(IdentityAdmissionFailure::Read(ReadFailure::Integrity))
     );
     let mut update = artifact("update-3");
     update["body"]["decisions"][1]["basis"]["reason"] = json!("A different explanation.");
     assert_eq!(
         admit_update(&bytes(&update), &limits()),
-        Err(RegistryAdmissionFailure::Read(ReadFailure::Integrity))
+        Err(IdentityAdmissionFailure::Read(ReadFailure::Integrity))
     );
 }
 
@@ -724,7 +724,7 @@ fn every_bound_admits_its_exact_value_and_refuses_one_less() {
                 ..limits()
             }
         ),
-        Err(RegistryAdmissionFailure::Limit(IdentityLimitKind::Entries))
+        Err(IdentityAdmissionFailure::Limit(IdentityLimitKind::Entries))
     );
 
     for id in ["update-2", "update-3"] {
@@ -791,7 +791,7 @@ fn every_bound_admits_its_exact_value_and_refuses_one_less() {
             if count > 0 {
                 assert_eq!(
                     admit_update(&bytes(&value), &bound(count - 1)),
-                    Err(RegistryAdmissionFailure::Limit(kind)),
+                    Err(IdentityAdmissionFailure::Limit(kind)),
                     "{id}: {kind:?} one past its bound"
                 );
             }
