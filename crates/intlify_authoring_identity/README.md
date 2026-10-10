@@ -128,8 +128,27 @@ What compilation returns stays within the `IdentityLimits` its readers admit it 
 
 See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vectors hold and what the independent checker verifies.
 
+## Measurement
+
+The non-default `benchmark` feature measures two operations as a design 026 owner, through the owner run in `intlify_measurement`. Ordinary builds never include it, nor the JS Producer its fixtures are read with.
+
+| Operation | Inside the interval | Outside it |
+| --- | --- | --- |
+| `identity_reconciliation / association_planning` | `reconcile`: an admitted base and inventory to association decisions and a proposed plan, with fixed allocation candidates and the case's lent workspace | Producing and admitting the inventory, building the base, checking the retained source bytes, and drawing any ID |
+| `identity_reconciliation / registry_replay` | `verify_history`: a retained chain walked from its head back to its genesis and replayed forward | Building the chain, indexing the retained history, and accepting the anchor |
+
+Allocation is not measured: drawing an ID belongs to the host, apart from deterministic reconciliation, so a fixture's candidates are fixed values.
+
+The 16 fixtures are design 016's required workloads for this phase: the first allocation of two units, a catalog of 128 short UI literals allocated from its genesis and then read again unchanged, a second `'Pay now'` that keeps the first's ID apart from its own with the edit that shows it, the same copy without the edit, a deletion seen by a complete and by a partial view, and the exact and first-over sides of the bounds on candidates and diagnostics; and replays of a two-step chain, of the catalog's one step of many entries, of a chain missing an update, and of the bound on history steps.
+
+Every inventory is read from source text by the real JS Producer under the test-owned context, and every base is built by planning and applying the updates that lead to it, all before any interval opens. Each fixture declares the path it takes: complete, blocked, or refused with an operational failure. A bound is taken from the fixture itself, so its exact side is the fixture's own count and its first-over side is one below.
+
+Every measured planning reuses its case's workspace and is compared with an expectation established on a fresh one; the tests also compare it after the workspace served a success, a failure, and a cancellation. The logical work records each count as exact, as unavailable when this harness does not count it, or as not applicable when the path does no such work.
+
+`vp run bench:authoring-identity:smoke` captures one run, writes its records, reads them back, and re-admits them; withholding any one record is refused. The numbers are for presentation only: nothing compares them with a threshold.
+
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, and read-only compilation.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, read-only compilation, and the observational measurement of reconciliation and replay.
 
 Who may confirm an explicit decision or publish a plan is evaluated by [`intlify_local_host`](../intlify_local_host/README.md), and publishing itself belongs to that host. Local persistence and production publication are a later step again, after checked 015 inputs exist.
