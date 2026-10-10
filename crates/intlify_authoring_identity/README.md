@@ -132,4 +132,4 @@ See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vect
 
 This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, and read-only compilation.
 
-Not yet implemented: confirming explicit decisions and publishing a plan, which belong to the host and come later. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Who may confirm an explicit decision or publish a plan is evaluated by [`intlify_local_host`](../intlify_local_host/README.md), and publishing itself belongs to that host. Local persistence and production publication are a later step again, after checked 015 inputs exist.

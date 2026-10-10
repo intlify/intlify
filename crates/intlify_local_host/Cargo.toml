@@ -1,0 +1,34 @@
+[package]
+name = "intlify_local_host"
+version = "0.14.0-alpha.12"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Explicitly test-owned local authority. Ordinary builds cannot establish one,
+# so nothing built from this crate can grant itself registry powers until a
+# later plan supplies checked 015 inputs and a 029 host adapter.
+test-authority = []
+
+[dependencies]
+# What a message is and what one analysis found are decided there.
+intlify_authoring = { path = "../intlify_authoring" }
+# Whether an identity change holds is decided there. This crate decides only
+# who may make it, and never weakens a check made there.
+intlify_authoring_identity = { path = "../intlify_authoring_identity" }
+
+[dev-dependencies]
+# The fixtures admit real inventories, and the only context this phase admits
+# is the explicitly test-owned one.
+intlify_authoring = { path = "../intlify_authoring", features = ["test-context"] }
+# Fixtures name their bytes by digest, as a caller would.
+intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
+# The committed registry chain is read as JSON.
+serde_json = "1.0.106"

@@ -671,6 +671,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_local_host"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "intlify_authoring",
+ "intlify_authoring_identity",
+ "intlify_shared_json",
+ "serde_json",
+]
+
+[[package]]
 name = "intlify_measurement"
 version = "0.14.0-alpha.12"
 dependencies = [
