@@ -46,6 +46,7 @@ The actions are closed, and none implies another.
 | Operation | Needs | Bound to | Gives |
 | --- | --- | --- | --- |
 | `Invocation::authorize_analysis` | `analyze-source`, and `read-registry` with a registry | The inventory, and the registry when given | Nothing to publish with |
+| `Invocation::authorize_read` | `read-registry` | The registry, current or pinned | Nothing to publish with |
 | `Invocation::confirm` | `resolve-identity` | The base, the inventory, and an `ExplicitDecision` bound to both | A `Confirmation` |
 | `Invocation::authorize_update` | `update-registry` | The base, the inventory, the plan made from them, a confirmation for every explicit decision, and the mode | An `UpdatePermit` |
 | `Invocation::authorize_initialization` | `initialize-registry` | An uninitialized destination and an empty genesis of its owner and scope | An `InitializationPermit` |

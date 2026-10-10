@@ -108,6 +108,17 @@ impl Invocation<'_> {
         }
         authority.bind_inventory(inventory)
     }
+
+    /// Authorize reading a registry on its own, the current one or a pinned
+    /// earlier one, without analyzing any source.
+    ///
+    /// Reading needs `read-registry` alone. Whether the registry is current is
+    /// not decided here: a pinned earlier snapshot is read as it is, and
+    /// reading it grants nothing about the current chain.
+    pub fn authorize_read(&self, registry: &AdmittedRegistry) -> Result<(), AuthorizationFailure> {
+        self.require(Action::ReadRegistry)?;
+        self.authority().bind_registry(registry)
+    }
 }
 
 #[cfg(test)]
@@ -161,6 +172,39 @@ mod tests {
 
     fn authority_with(chain: &Chain, actions: &[Action]) -> LocalAuthority {
         authority(establishment(chain, 3, &[("alice", actions)]))
+    }
+
+    #[test]
+    fn a_registry_is_read_with_its_read_grant_alone() {
+        let chain = Chain::load();
+        let reader = authority_with(&chain, &[Action::ReadRegistry]);
+        let read = |authority: &LocalAuthority, n: usize| {
+            authority
+                .invoke(&alice())
+                .unwrap()
+                .authorize_read(chain.registry(n))
+        };
+        // No source is analyzed, so no source grant is needed.
+        assert_eq!(read(&reader, 2), Ok(()));
+        // Every other grant together does not read.
+        let others = authority_with(
+            &chain,
+            &[
+                Action::AnalyzeSource,
+                Action::InitializeRegistry,
+                Action::UpdateRegistry,
+                Action::ResolveIdentity,
+            ],
+        );
+        assert_eq!(
+            read(&others, 2),
+            Err(AuthorizationFailure::Denied(Action::ReadRegistry))
+        );
+        // An earlier snapshot reads only where the host pinned it.
+        assert_eq!(read(&reader, 1), Err(AuthorizationFailure::Unanchored));
+        let mut setup = establishment(&chain, 3, &[("alice", &[Action::ReadRegistry])]);
+        setup.anchors.push(chain.registry(1).reference());
+        assert_eq!(read(&authority(setup), 1), Ok(()));
     }
 
     #[test]
