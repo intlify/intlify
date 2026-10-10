@@ -1143,7 +1143,7 @@ mod tests {
     use super::testing::{plan_case, prepared, reconciled, replay_case};
     use super::*;
     use crate::benchmark::operation::{Count, LogicalWork};
-    use crate::{DeclarationClass, IdentityDecision, ReconcileFailure};
+    use crate::{BasisGap, DeclarationClass, EntryClass, IdentityDecision, ReconcileFailure};
 
     /// What the ambiguous copy reports: its three unresolved declarations
     /// and the two entries it leaves unsettled.
@@ -1324,6 +1324,36 @@ mod tests {
     }
 
     #[test]
+    fn every_plan_is_given_what_a_host_retains() {
+        // A host passes every source revision it retains, whether or not an
+        // edit reads it, and the update that produced the base with the
+        // inventory that update was planned from, unless the base is a
+        // genesis. Nothing reads them on some paths, so only this says so.
+        for fixture in FIXTURES {
+            let Input::Plan { .. } = fixture.input else {
+                continue;
+            };
+            let prepared = prepare(fixture).unwrap();
+            let case = plan_case(&prepared);
+            // The three checkout revisions, nav and the catalog.
+            assert_eq!(case.evidence.sources.len(), 5, "{}", fixture.name);
+            let produced_by = case.base.snapshot().update();
+            match &case.evidence.previous {
+                None => assert_eq!(produced_by, None, "{}", fixture.name),
+                Some((update, inventory)) => {
+                    assert_eq!(produced_by, Some(&update.reference()), "{}", fixture.name);
+                    assert_eq!(
+                        update.update().inventory(),
+                        &inventory.reference(),
+                        "{}",
+                        fixture.name
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn each_bound_is_set_at_the_fixture_count_or_one_below_it() {
         let bound_of = |name: &str| prepared(name).bound.unwrap();
         for (exact, over, limit) in [
@@ -1494,11 +1524,30 @@ mod tests {
         assert_eq!(link.predecessors(), std::slice::from_ref(pay));
         assert_eq!(link.successors(), std::slice::from_ref(allocated[0]));
         // Without the edit, nothing shows which of the two equal texts is
-        // the old one.
-        assert!(matches!(
-            reconciled(&prepared("ambiguous-copy")),
-            Ok(Reconciliation::Unresolved(_))
-        ));
+        // the old one: no checkout declaration is shown new, and neither old
+        // one is shown gone. Home stays.
+        let Ok(Reconciliation::Unresolved(report)) = reconciled(&prepared("ambiguous-copy")) else {
+            panic!("the copy is unresolved");
+        };
+        let classified = report.classification();
+        let unproven = DeclarationClass::Unresolved(BasisGap::NewUnproven);
+        let home = DeclarationClass::Retained(candidates(2, 1).unwrap().remove(0));
+        assert_eq!(
+            classified
+                .declarations()
+                .iter()
+                .map(|(_, class)| class)
+                .collect::<Vec<_>>(),
+            [&unproven, &unproven, &unproven, &home]
+        );
+        assert_eq!(
+            classified
+                .entries()
+                .iter()
+                .map(|(_, class)| class)
+                .collect::<Vec<_>>(),
+            [&EntryClass::Unresolved(BasisGap::AbsenceUnproven); 2]
+        );
     }
 
     #[test]

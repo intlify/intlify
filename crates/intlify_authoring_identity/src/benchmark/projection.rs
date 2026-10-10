@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use super::cases::{Chain, Edge, Input, Limit, Planning, Prepared, CATALOG_DECLARATIONS};
 use super::descriptor::{execution_state, Boundary, Method};
 use super::operation::LogicalWork;
-use super::owner::AuthoringIdentityReconciliation;
+use super::owner::{AuthoringIdentityReconciliation, LABELS};
 
 macro_rules! literal {
     ($name:ident, $value:literal, $doc:literal) => {
@@ -169,9 +169,9 @@ impl CaseProjection {
             },
         };
         Self {
-            owner_identity: Token::literal("intlify-authoring-identity"),
+            owner_identity: Token::literal(LABELS.owner),
             owner_result_schema_revision: Token::literal(RESULT_SCHEMA_REVISION),
-            owner_benchmark_profile_revision: Token::literal("0"),
+            owner_benchmark_profile_revision: Token::literal(LABELS.profile.revision),
             owner_phase: operation.phase().into(),
             owner_cost: operation.cost().into(),
             category: Category::Value,
@@ -193,7 +193,7 @@ impl CaseProjection {
             metric: Metric::Value,
             measurement_method: Method::monotonic_invocation(),
             sample_aggregation: Aggregation::Value,
-            measurement_profile_revision: Token::literal("0"),
+            measurement_profile_revision: Token::literal(LABELS.profile.revision),
         }
     }
 }
@@ -323,6 +323,48 @@ mod tests {
         .unwrap();
         assert_eq!(value["variant"]["expected"], "operational-failure");
         assert_eq!(value["ownerCost"], "registry_replay");
+    }
+
+    #[test]
+    fn a_case_names_its_owner_its_profile_and_what_it_measured() {
+        for name in ["first-allocation", "small-chain"] {
+            let prepared = testing::prepared(name);
+            let operation = prepared.fixture.operation;
+            let projection = CaseProjection::of(&prepared);
+            // The report groups its rows under these two.
+            assert_eq!(CommonProjection::phase(&projection), operation.phase());
+            assert_eq!(CommonProjection::cost(&projection), operation.cost());
+            let value = serde_json::to_value(&projection).unwrap();
+            assert_eq!(value["ownerIdentity"], LABELS.owner);
+            assert_eq!(value["ownerResultSchemaRevision"], RESULT_SCHEMA_REVISION);
+            assert_eq!(
+                value["ownerBenchmarkProfileRevision"],
+                LABELS.profile.revision
+            );
+            assert_eq!(value["measurementProfileRevision"], LABELS.profile.revision);
+            assert_eq!(
+                value["fixture"],
+                serde_json::json!({
+                    "identity": "intlify-authoring-identity-minimum-fixtures",
+                    "revision": "0"
+                })
+            );
+            assert_eq!(
+                value["intervalBoundary"],
+                serde_json::to_value(Boundary::for_operation(operation)).unwrap(),
+                "{name}"
+            );
+            assert_eq!(
+                value["executionState"],
+                serde_json::to_value(execution_state(operation)).unwrap(),
+                "{name}"
+            );
+            assert_eq!(
+                value["workload"],
+                serde_json::to_value(&prepared.expected().work).unwrap(),
+                "{name}"
+            );
+        }
     }
 
     #[test]

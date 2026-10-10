@@ -144,6 +144,8 @@ mod tests {
     use intlify_shared_json::quantity::{Quantity, Repetitions};
 
     use super::super::cases::testing;
+    use super::super::descriptor::{execution_state, Boundary};
+    use super::super::operation::Operation;
     use super::*;
 
     fn capturing<C>(clock: &C, repetitions: u64) -> Capturing<'_, C> {
@@ -189,6 +191,48 @@ mod tests {
     }
 
     #[test]
+    fn a_case_is_described_by_its_own_interval_and_the_clock_it_was_given() {
+        let clock = MonotonicClock::acquire()
+            .unwrap()
+            .description()
+            .observation();
+        for (name, operation) in [
+            ("first-allocation", Operation::AssociationPlanning),
+            ("small-chain", Operation::RegistryReplay),
+        ] {
+            let prepared = testing::prepared(name);
+            let described = serde_json::to_value(AuthoringIdentityReconciliation::descriptors(
+                &prepared,
+                clock.clone(),
+            ))
+            .unwrap();
+            assert_eq!(
+                described["boundary"],
+                serde_json::to_value(Boundary::for_operation(operation)).unwrap(),
+                "{name}"
+            );
+            assert_eq!(
+                described["execution"],
+                serde_json::to_value(execution_state(operation)).unwrap(),
+                "{name}"
+            );
+            assert_eq!(
+                described["clockObservation"],
+                serde_json::to_value(&clock).unwrap()
+            );
+        }
+        // The two operations are told apart by both.
+        assert_ne!(
+            Boundary::for_operation(Operation::AssociationPlanning),
+            Boundary::for_operation(Operation::RegistryReplay)
+        );
+        assert_ne!(
+            execution_state(Operation::AssociationPlanning),
+            execution_state(Operation::RegistryReplay)
+        );
+    }
+
+    #[test]
     fn a_planning_capture_reconciles_in_the_workspace_the_case_lends() {
         let clock = MonotonicClock::acquire().unwrap();
         let prepared = testing::prepared("catalog-allocation");
@@ -196,6 +240,22 @@ mod tests {
         assert_eq!(case.workspace.borrow().capacities().classes, 0);
         AuthoringIdentityReconciliation::capture(&capturing(&clock, 1), &prepared).unwrap();
         assert_ne!(case.workspace.borrow().capacities().classes, 0);
+    }
+
+    #[test]
+    fn the_package_says_whether_its_assertions_run() {
+        // Observed rather than restated: a debug assertion runs exactly when
+        // the build the records describe has them.
+        let mut ran = false;
+        debug_assert!({
+            ran = true;
+            ran
+        });
+        assert_eq!(AuthoringIdentityReconciliation::PACKAGE.assertions, ran);
+        assert_eq!(
+            AuthoringIdentityReconciliation::PACKAGE.name,
+            "intlify_authoring_identity"
+        );
     }
 
     /// A clock whose readings the test writes in advance.
