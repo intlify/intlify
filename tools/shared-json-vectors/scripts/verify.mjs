@@ -481,7 +481,8 @@ function compareIds(left, right) {
  * holds where it starts, its one edit under the edit-replay profile runs from
  * that snapshot to the declaration's and carries the range exactly onto the
  * declaration, and no other active entry is carried onto it too. One
- * compilation gives each declaration one Intent.
+ * compilation, an inventory against a registry, gives every declaration of
+ * the inventory exactly one Intent: none twice, and none left out.
  *
  * @param document - The compilation document.
  * @returns How many Intents disagreed.
@@ -494,6 +495,7 @@ function checkIntents(document) {
   }
   const seen = []
   const compiled = new Map()
+  const compilations = new Map()
   for (const vector of document.artifacts) {
     const { kind, body } = vector.artifact
     const inventory = kind === 'message-intent' && resolveIn(seen, body.inventory)
@@ -521,6 +523,11 @@ function checkIntents(document) {
       fail(vector, `its declaration already has ${compiled.get(key)}`)
     }
     compiled.set(key, vector.id)
+    const compilation = canonical([body.inventory, body.registry])
+    if (!compilations.has(compilation)) {
+      compilations.set(compilation, { vector, inventory, covered: new Set() })
+    }
+    compilations.get(compilation).covered.add(canonical(body.declaration))
     const active = registry.body.entries.filter(entry => entry.state === 'active')
     const entry = active.find(candidate => same(candidate.intentId, body.intentId))
     if (entry === undefined) {
@@ -565,6 +572,17 @@ function checkIntents(document) {
     )
     if (rivals.length > 0) {
       fail(vector, 'another entry is held or carried onto its declaration too')
+    }
+  }
+  // Every Intent counted above is of a declaration of its inventory, so a
+  // compilation covers the inventory exactly when the counts agree.
+  for (const { vector, inventory, covered } of compilations.values()) {
+    const declarations = inventory.body.declarations.length
+    if (covered.size !== declarations) {
+      fail(
+        vector,
+        `its compilation gives an Intent to ${covered.size} of the inventory's ${declarations} declarations`
+      )
     }
   }
   return failures

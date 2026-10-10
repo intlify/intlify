@@ -49,7 +49,7 @@ The Node checker in `tools/shared-json-vectors` shares no code with this crate. 
 
 For the compiled module's Intents and references it also:
 
-- recomputes each Intent's revision from its declaration's projection, and requires one Intent per declaration of each compilation;
+- recomputes each Intent's revision from its declaration's projection, and requires each compilation, an inventory against a registry, to give every declaration of the inventory exactly one Intent;
 - requires each Intent's ID to be active in its registry, held at its declaration, or, with a continuity, held at where the continuity starts;
 - requires a continuity to be one edit under the edit-replay profile, from that snapshot to the declaration's, carrying the old range exactly onto the declaration with no other active entry held or carried there;
 - requires each reference's targets in Intent ID order, each the ID and revision of the Intent it names, and those Intents' declarations to be exactly the ones the use site may use.
