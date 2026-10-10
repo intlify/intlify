@@ -12,10 +12,12 @@ workspace = true
 
 [features]
 default = []
-# Explicitly test-owned local authority. Ordinary builds cannot establish one,
-# so nothing built from this crate can grant itself registry powers until a
-# later plan supplies checked 015 inputs and a 029 host adapter.
-test-authority = []
+# Explicitly test-owned local authority, and the in-memory host that
+# establishes it. Ordinary builds can neither establish an authority nor draw
+# a fresh identity, so nothing built from this crate can grant itself
+# registry powers until a later plan supplies checked 015 inputs and a 029
+# host adapter.
+test-authority = ["dep:getrandom", "dep:serde_json"]
 
 [dependencies]
 # What a message is and what one analysis found are decided there.
@@ -23,6 +25,13 @@ intlify_authoring = { path = "../intlify_authoring" }
 # Whether an identity change holds is decided there. This crate decides only
 # who may make it, and never weakens a check made there.
 intlify_authoring_identity = { path = "../intlify_authoring_identity" }
+# Fresh Intent IDs and registry identities come from operating-system
+# randomness, and only the host draws them. No timestamp, counter or source
+# digest ever stands in.
+getrandom = { version = "=0.4.3", optional = true }
+# A registry the host publishes is sealed and read back as bytes, as a later
+# reader would admit it.
+serde_json = { version = "1.0.106", optional = true }
 
 [dev-dependencies]
 # The fixtures admit real inventories, and the only context this phase admits
@@ -38,4 +47,8 @@ serde_json = "1.0.106"
 # ordinary `--all-targets` build honest instead of gating the file with cfg.
 [[test]]
 name = "authority"
+required-features = ["test-authority"]
+
+[[test]]
+name = "host"
 required-features = ["test-authority"]
