@@ -435,6 +435,64 @@ mod tests {
     }
 
     #[test]
+    fn grants_and_sources_are_found_in_whatever_order_the_host_gives_them() {
+        let chain = Chain::load();
+        let mut setup = establishment(
+            &chain,
+            3,
+            &[
+                ("carol", &[Action::ResolveIdentity]),
+                ("alice", &[Action::UpdateRegistry]),
+                ("bob", &[Action::ReadRegistry]),
+            ],
+        );
+        setup.acquired.reverse();
+        let authority = LocalAuthority::establish(setup, &limits()).unwrap();
+        // Each principal holds its own entry's actions.
+        for (name, action) in [
+            ("alice", Action::UpdateRegistry),
+            ("bob", Action::ReadRegistry),
+            ("carol", Action::ResolveIdentity),
+        ] {
+            let principal = Principal::new(name).unwrap();
+            assert_eq!(principal.as_str(), name);
+            assert_eq!(
+                authority
+                    .actions(&principal)
+                    .unwrap()
+                    .iter()
+                    .collect::<Vec<_>>(),
+                [action],
+                "{name}"
+            );
+        }
+        let units: Vec<&str> = authority
+            .acquired()
+            .iter()
+            .map(|snapshot| snapshot.unit().as_str())
+            .collect();
+        assert_eq!(units, ["checkout", "nav"]);
+        // Entries naming one principal are refused even when others stand
+        // between them.
+        assert_eq!(
+            LocalAuthority::establish(
+                establishment(
+                    &chain,
+                    3,
+                    &[
+                        ("alice", &[Action::ReadRegistry]),
+                        ("bob", &[]),
+                        ("alice", &[Action::AnalyzeSource]),
+                    ],
+                ),
+                &limits(),
+            )
+            .err(),
+            Some(EstablishmentFailure::DuplicatePrincipal)
+        );
+    }
+
+    #[test]
     fn an_invocation_holds_only_its_callers_actions() {
         let chain = Chain::load();
         let authority = LocalAuthority::establish(

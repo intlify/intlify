@@ -10,8 +10,8 @@
 use intlify_authoring::test_context::{admit_inventory, TestContext};
 use intlify_authoring::{
     AdmittedInventory, AnalysisWorkspace, AuthoringBasis, AuthoringContext, AuthoringLimits,
-    MessageIntentId, OwnerIdentity, OwnerKind, SourceSnapshot, SurfaceVocabulary, Token,
-    UnitResult,
+    InventoryArtifact, MessageIntentId, OwnerIdentity, OwnerKind, SourceSnapshot,
+    SurfaceVocabulary, Token, UnitResult,
 };
 use intlify_authoring_identity::{
     admit_registry, admit_update, reconcile, AdmittedRegistry, AdmittedUpdate, ContinuationBasis,
@@ -170,6 +170,23 @@ impl Chain {
     pub(crate) fn inventory(&self, n: usize) -> &AdmittedInventory {
         &self.inventories[n - 1]
     }
+}
+
+/// Committed inventory `n` declaring itself partial, sealed again: the same
+/// acquired sources, but another inventory than the committed one.
+pub(crate) fn partial(n: usize) -> AdmittedInventory {
+    let mut body = artifact(&format!("inventory-{n}"))["body"].clone();
+    body["completeness"] = Value::from("partial");
+    let sealed = InventoryArtifact::seal(serde_json::from_value(body).expect("an inventory body"))
+        .expect("a sealable inventory");
+    admit_inventory(
+        &bytes(&serde_json::to_value(sealed).expect("serializable")),
+        &context(),
+        &[],
+        &authoring_limits(),
+        &mut AnalysisWorkspace::new(),
+    )
+    .expect("an admissible inventory")
 }
 
 /// The k-th decision of a committed update.

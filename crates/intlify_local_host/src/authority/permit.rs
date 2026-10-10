@@ -335,7 +335,7 @@ mod tests {
     use crate::authority::context::{Destination, Establishment};
     use crate::authority::fixtures::{
         allocation_plan, basis, committed, establishment, id_of, identity_limits, limits, owner,
-        plan as planned, restoration_plan, restore, the_edit, Chain,
+        partial, plan as planned, restoration_plan, restore, the_edit, Chain,
     };
 
     const PUBLISHER: &[Action] = &[Action::UpdateRegistry, Action::ResolveIdentity];
@@ -466,6 +466,44 @@ mod tests {
         .unwrap();
         assert_eq!(
             attempt(&[confirm(&authority, &chain, &reworded)]),
+            Err(AuthorizationFailure::ConfirmationMismatch)
+        );
+        // A restoration of another ID confirms nothing here: the restore the
+        // plan holds is still unconfirmed.
+        let another = ExplicitDecision::new(
+            chain.registry(2).reference(),
+            chain.inventory(3).reference(),
+            IdentityDecision::restoration(
+                id_of(3, 0),
+                restored.from().unwrap().clone(),
+                restored.to().unwrap().clone(),
+                ExplicitBasis::new("Another restoration.").unwrap(),
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            attempt(&[confirm(&authority, &chain, &another)]),
+            Err(AuthorizationFailure::ConfirmationMissing(id_of(3, 1)))
+        );
+        // The same choice confirmed from another inventory of the same
+        // acquired sources.
+        let view = partial(3);
+        let from_view = authority
+            .invoke(&alice())
+            .unwrap()
+            .confirm(
+                chain.registry(2),
+                &view,
+                &ExplicitDecision::new(
+                    chain.registry(2).reference(),
+                    view.reference(),
+                    committed(3, 1),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            attempt(std::slice::from_ref(&from_view)),
             Err(AuthorizationFailure::ConfirmationMismatch)
         );
         // The same choice confirmed against another base.
@@ -617,6 +655,17 @@ mod tests {
                     plan: &other_inventory,
                     confirmations: &[],
                     mode: UpdateMode::Manual,
+                },
+                &limits()
+            ),
+            Err(AuthorizationFailure::PlanMismatch)
+        );
+        // The plan made from this inventory, offered on an earlier base.
+        assert_eq!(
+            from_one.invoke(&alice()).unwrap().authorize_update(
+                &UpdateRequest {
+                    base: chain.registry(1),
+                    ..manual(&chain, &plan, &[])
                 },
                 &limits()
             ),

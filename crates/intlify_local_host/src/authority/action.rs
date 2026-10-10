@@ -99,6 +99,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn each_action_has_the_spelling_design_018_gives_it() {
+        assert_eq!(
+            Action::ALL.map(Action::as_str),
+            [
+                "analyze-source",
+                "read-registry",
+                "initialize-registry",
+                "update-registry",
+                "resolve-identity",
+            ]
+        );
+    }
+
+    #[test]
     fn every_action_is_found_only_by_its_exact_spelling() {
         for action in Action::ALL {
             assert_eq!(Action::from_wire(action.as_str()), Some(action));

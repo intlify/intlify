@@ -117,7 +117,7 @@ mod tests {
 
     use super::*;
     use crate::authority::context::{Destination, Establishment, Principal};
-    use crate::authority::fixtures::{establishment, limits, owner, Chain};
+    use crate::authority::fixtures::{establishment, limits, owner, partial, Chain};
 
     const READER: &[Action] = &[Action::AnalyzeSource, Action::ReadRegistry];
 
@@ -251,6 +251,54 @@ mod tests {
                 );
             }),
             Some(AuthorizationFailure::IncompleteScope)
+        );
+    }
+
+    #[test]
+    fn only_a_complete_inventory_has_to_cover_every_acquired_unit() {
+        let chain = Chain::load();
+        let mut setup = establishment(&chain, 3, &[("alice", READER)]);
+        let source = setup.acquired[0].clone();
+        setup.acquired.push(
+            SourceSnapshot::new(
+                source.owner().clone(),
+                "payment",
+                "1",
+                source.grammar().clone(),
+                source.byte_length(),
+                source.utf8_digest().as_str(),
+            )
+            .unwrap(),
+        );
+        let authority = authority(setup);
+        let invocation = authority.invoke(&alice()).unwrap();
+        // A partial view, such as an editor request, covers what it names.
+        assert_eq!(invocation.authorize_analysis(&partial(3), None), Ok(()));
+        assert_eq!(
+            invocation.authorize_analysis(chain.inventory(3), None),
+            Err(AuthorizationFailure::IncompleteScope)
+        );
+    }
+
+    #[test]
+    fn an_analysis_reports_its_registry_before_its_inventory() {
+        let chain = Chain::load();
+        // Accepting registry 1 and inventory 2's sources, the authority
+        // anchors no registry 2 and holds no revision 3 of checkout.
+        let earlier = authority(establishment(&chain, 2, &[("alice", READER)]));
+        assert_eq!(
+            earlier
+                .invoke(&alice())
+                .unwrap()
+                .authorize_analysis(chain.inventory(3), Some(chain.registry(2))),
+            Err(AuthorizationFailure::Unanchored)
+        );
+        assert_eq!(
+            earlier
+                .invoke(&alice())
+                .unwrap()
+                .authorize_analysis(chain.inventory(3), None),
+            Err(AuthorizationFailure::SourceNotAcquired)
         );
     }
 

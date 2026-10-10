@@ -206,5 +206,15 @@ mod tests {
                 .err(),
             Some(AuthorizationFailure::SourceNotAcquired)
         );
+        // With the base outside the authority as well, the base is reported,
+        // as every operation binds its base first.
+        assert_eq!(
+            authority
+                .invoke(&carol())
+                .unwrap()
+                .confirm(chain.registry(1), chain.inventory(2), &decision)
+                .err(),
+            Some(AuthorizationFailure::Unanchored)
+        );
     }
 }

@@ -150,13 +150,22 @@ mod tests {
             .establish(&limits())
             .unwrap()
             .development_session());
-        let uninitialized = TestAuthority::destination(
-            "storefront-registry",
-            chain_destination().owner().clone(),
-            "storefront-web",
-            None,
-        )
-        .unwrap();
+        // A destination keeps the chain it names, or none before
+        // initialization.
+        let destination = |registry| {
+            TestAuthority::destination(
+                "storefront-registry",
+                chain_destination().owner().clone(),
+                "storefront-web",
+                registry,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            destination(chain_destination().registry().cloned()),
+            chain_destination()
+        );
+        let uninitialized = destination(None);
         assert_eq!(uninitialized.registry(), None);
         assert_eq!(uninitialized.binding().as_str(), "storefront-registry");
     }
