@@ -92,7 +92,8 @@ pub enum CompileFailure {
     Pairing(TransitionFailure),
     /// The continuity evidence is not admissible.
     Evidence(ContinuityFailure),
-    /// A named bound was exceeded.
+    /// A named bound was exceeded: the supplied edits, the diagnostics, or
+    /// the targets one reference would name.
     Limit(IdentityLimitKind),
     /// An artifact, or the revision it records, could not be encoded within
     /// the encoder's capacity.
@@ -165,7 +166,7 @@ where
     }
 
     let intents = seal_intents(registry, inventory, identities, &stop)?;
-    let references = seal_references(inventory, &intents, &stop)?;
+    let references = seal_references(inventory, &intents, limits, &stop)?;
     Ok(Compilation::Compiled(Box::new(CompiledScope::new(
         inventory.reference(),
         registry.reference(),
@@ -293,9 +294,14 @@ where
 
 /// Seal one reference artifact per use site, in canonical occurrence order,
 /// each naming the Intent artifacts of the declarations it may use.
+///
+/// A use site names one target per declaration. One that would name more
+/// than a reader admits under the same bounds is refused here, so nothing
+/// compilation returns is an artifact its reader cannot read.
 fn seal_references<S>(
     inventory: &AdmittedInventory,
     intents: &[MessageIntentArtifact],
+    limits: &IdentityLimits,
     stop: &S,
 ) -> Result<Vec<MessageReferenceArtifact>, CompileFailure>
 where
@@ -306,6 +312,9 @@ where
     let mut references = Vec::with_capacity(current.references().len());
     for reference in current.references() {
         stop()?;
+        if reference.declarations().len() as u64 > limits.targets {
+            return Err(CompileFailure::Limit(IdentityLimitKind::Targets));
+        }
         let targets = reference
             .declarations()
             .iter()
@@ -824,6 +833,45 @@ mod tests {
         assert_eq!(
             bounded(1),
             Err(CompileFailure::Limit(IdentityLimitKind::Diagnostics))
+        );
+    }
+
+    #[test]
+    fn every_reference_it_returns_stays_within_the_target_bound() {
+        let app = Unit::new("app.js", "1", "intent('Save')\nintent('Cancel')\n");
+        let base = Base::of(&[&app], &[A, B]);
+        let bounded = |targets| IdentityLimits {
+            targets,
+            ..limits()
+        };
+        let evidence = CompileEvidence {
+            sources: &retained(&[]),
+            edits: &[],
+            previous: None,
+        };
+        // Each use site names one declaration, so one target is exactly the
+        // bound, and what compilation returns its reader admits.
+        let exact = bounded(1);
+        let scope = compiled(compile(
+            &base.registry,
+            &base.inventory,
+            &evidence,
+            &exact,
+            &mut IdentityWorkspace::new(),
+        ));
+        for reference in scope.references() {
+            let bytes = serde_json::to_vec(reference).unwrap();
+            assert!(crate::intent::admit_reference(&bytes, &exact).is_ok());
+        }
+        assert_eq!(
+            compile(
+                &base.registry,
+                &base.inventory,
+                &evidence,
+                &bounded(0),
+                &mut IdentityWorkspace::new()
+            ),
+            Err(CompileFailure::Limit(IdentityLimitKind::Targets))
         );
     }
 
