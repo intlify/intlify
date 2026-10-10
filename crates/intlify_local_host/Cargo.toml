@@ -48,3 +48,7 @@ serde_json = "1.0.106"
 [[test]]
 name = "authority"
 required-features = ["test-authority"]
+
+[[test]]
+name = "host"
+required-features = ["test-authority"]
