@@ -1,10 +1,11 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The diagnostics reconciliation reports.
+//! The diagnostics reconciliation and read-only compilation report.
 //!
 //! Missing evidence is `authoring-identity-update-required`: more evidence
-//! or an explicit decision resolves it. Inputs that cannot both hold are
+//! or an explicit decision resolves it, and for compilation an identity
+//! update does. Inputs that cannot both hold are
 //! `authoring-identity-conflict`: only a different decision resolves them.
 //! Both belong to the `identity-resolution` stage, and each names its cause
 //! with a detail, so a reader can tell "no edit says where this went" from
@@ -17,12 +18,19 @@ use intlify_authoring::{
 use super::outcome::Conflict;
 use crate::continuity::BasisGap;
 
-/// The details reconciliation reports.
+/// The details reconciliation and compilation report.
 ///
 /// Like the authoring crate's details, these are discriminators for this
 /// workspace's tests and tools, not a public code registry.
 pub mod detail {
     use intlify_authoring::Detail;
+
+    /// No active entry holds the declaration and no verified edit carries one
+    /// onto it, so compilation has no identity to give it.
+    #[must_use]
+    pub fn association_missing() -> Detail {
+        Detail::literal("identity-association-missing")
+    }
 
     /// Nothing shows the declaration is new.
     #[must_use]
@@ -148,6 +156,21 @@ pub(super) fn update_required(
     .with_related(related)
 }
 
+/// Report a declaration compilation has no identity for.
+///
+/// The related occurrences are the old declarations that claim it without
+/// carrying an identity onto it, such as the original of a copy.
+pub(crate) fn association_missing(location: Occurrence, related: Vec<Occurrence>) -> Diagnostic {
+    Diagnostic::new(
+        Stage::IdentityResolution,
+        DiagnosticOrigin::Authoring(ReasonFamily::AuthoringIdentityUpdateRequired),
+        Severity::Error,
+        location,
+    )
+    .with_detail(detail::association_missing())
+    .with_related(related)
+}
+
 /// Report inputs that cannot both hold.
 pub(super) fn conflict(
     location: Occurrence,
@@ -191,7 +214,20 @@ mod tests {
             DiagnosticOrigin::Authoring(ReasonFamily::AuthoringIdentityConflict)
         );
         assert_eq!(competing.detail(), Some(detail::competing_claim()));
-        assert_eq!(competing.related(), [pay]);
+        assert_eq!(competing.related(), std::slice::from_ref(&pay));
+
+        // A declaration compilation has no identity for needs an update, not
+        // a different decision.
+        let unassigned = association_missing(pay.clone(), vec![pay.clone()]);
+        assert_eq!(unassigned.stage(), Stage::IdentityResolution);
+        assert_eq!(
+            unassigned.origin(),
+            DiagnosticOrigin::Authoring(ReasonFamily::AuthoringIdentityUpdateRequired)
+        );
+        assert_eq!(unassigned.detail(), Some(detail::association_missing()));
+        assert!(unassigned.is_blocking());
+        assert_eq!(unassigned.occurrence(), Some(&pay));
+        assert_eq!(unassigned.related(), [pay]);
     }
 
     #[test]
@@ -220,5 +256,9 @@ mod tests {
         for (conflict, spelling) in conflicts {
             assert_eq!(conflict_detail(conflict).as_str(), spelling, "{conflict:?}");
         }
+        assert_eq!(
+            detail::association_missing().as_str(),
+            "identity-association-missing"
+        );
     }
 }

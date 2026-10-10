@@ -1,0 +1,294 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ArtifactKind": {
+      "description": "The five authoring artifact kinds design 017 registers.",
+      "enum": [
+        "authoring-inventory",
+        "message-intent",
+        "message-reference",
+        "intent-registry",
+        "intent-registry-update"
+      ],
+      "type": "string"
+    },
+    "AuthoringArtifactReference": {
+      "additionalProperties": false,
+      "description": "The fields another artifact uses to name one authoring artifact.",
+      "properties": {
+        "authoringSpecification": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "integrityDigest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        },
+        "kind": {
+          "$ref": "#/definitions/ArtifactKind"
+        },
+        "schemaRevision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["kind", "schemaRevision", "authoringSpecification", "integrityDigest"],
+      "type": "object"
+    },
+    "AuthoringSpecification": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Design016"
+        },
+        "revision": {
+          "$ref": "#/definitions/RevisionZero"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "ByteRange": {
+      "description": "One half-open UTF-8 byte range.\n\nEmpty insertion ranges and end-of-input positions are representable. A range\naddresses bytes, never Unicode scalar values or UTF-16 code units.",
+      "properties": {
+        "end": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "start": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": ["start", "end"],
+      "type": "object"
+    },
+    "Design016": {
+      "enum": ["intlify-design-016"],
+      "type": "string"
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "MessageIntentId": {
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "value": {
+          "$ref": "#/definitions/Opaque128"
+        }
+      },
+      "required": ["owner", "value"],
+      "type": "object"
+    },
+    "MessageReferenceBody": {
+      "additionalProperties": false,
+      "description": "One use site's exact finite references, resolved to identities.\n\nThe parameters the use site supplies, their expressions and their\nevaluation order stay in the inventory the body names; they are not\ncopied here. Deserializing one reads its shape only.\n[`MessageReferenceBody::validate`] checks the structural rules, and\nneither says the body is what compiling its inventory gives.",
+      "properties": {
+        "inventory": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AuthoringArtifactReference"
+            },
+            {
+              "properties": {
+                "authoringSpecification": {
+                  "properties": {
+                    "identity": {
+                      "enum": ["intlify-design-016"]
+                    },
+                    "revision": {
+                      "enum": ["0"]
+                    }
+                  }
+                },
+                "kind": {
+                  "enum": ["authoring-inventory"]
+                },
+                "schemaRevision": {
+                  "enum": ["0"]
+                }
+              }
+            }
+          ]
+        },
+        "occurrence": {
+          "$ref": "#/definitions/Occurrence"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/definitions/ReferenceTarget"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["inventory", "occurrence", "targets"],
+      "type": "object"
+    },
+    "MessageReferenceKind": {
+      "enum": ["message-reference"],
+      "type": "string"
+    },
+    "Occurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ByteRange"
+        },
+        "role": {
+          "$ref": "#/definitions/OccurrenceRole"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceSnapshot"
+        }
+      },
+      "required": ["source", "range", "role"],
+      "type": "object"
+    },
+    "OccurrenceRole": {
+      "description": "The syntax role an occurrence plays in its source unit.\n\nDeclaration facts admit only the three declaration roles. The remaining\nroles describe use sites, parameter expressions, and explicit exclusions.",
+      "enum": [
+        "ui-literal",
+        "intent-literal",
+        "mf2-declaration",
+        "reference",
+        "parameter-expression",
+        "exclusion"
+      ],
+      "type": "string"
+    },
+    "Opaque128": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "OwnerIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "kind": {
+          "$ref": "#/definitions/OwnerKind"
+        }
+      },
+      "required": ["kind", "identity"],
+      "type": "object"
+    },
+    "OwnerKind": {
+      "description": "Which owner domain an identity belongs to.\n\nThe same identity token under the two kinds denotes different owners.\nSpelling is not proof of publisher identity or authorization.",
+      "enum": ["application", "library"],
+      "type": "string"
+    },
+    "ReferenceTarget": {
+      "additionalProperties": false,
+      "description": "One declaration a use site may use, as an identity: its Intent ID, its\nrevision, and the Intent artifact that records both.",
+      "properties": {
+        "intentArtifact": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AuthoringArtifactReference"
+            },
+            {
+              "properties": {
+                "authoringSpecification": {
+                  "properties": {
+                    "identity": {
+                      "enum": ["intlify-design-016"]
+                    },
+                    "revision": {
+                      "enum": ["0"]
+                    }
+                  }
+                },
+                "kind": {
+                  "enum": ["message-intent"]
+                },
+                "schemaRevision": {
+                  "enum": ["0"]
+                }
+              }
+            }
+          ]
+        },
+        "intentId": {
+          "$ref": "#/definitions/MessageIntentId"
+        },
+        "intentRevision": {
+          "$ref": "#/definitions/IntegrityDigest"
+        }
+      },
+      "required": ["intentId", "intentRevision", "intentArtifact"],
+      "type": "object"
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "SourceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "byteLength": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "grammar": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        },
+        "unit": {
+          "$ref": "#/definitions/Token"
+        },
+        "utf8Digest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        }
+      },
+      "required": ["owner", "unit", "revision", "grammar", "byteLength", "utf8Digest"],
+      "type": "object"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    }
+  },
+  "description": "One sealed `message-reference` artifact.\n\nThis is the `message-reference` case of 017's `AuthoringArtifact<K, B>`.\nDeserializing one does not check its digest; admission does, before\nanything reads the body.",
+  "properties": {
+    "authoringSpecification": {
+      "$ref": "#/definitions/AuthoringSpecification"
+    },
+    "body": {
+      "$ref": "#/definitions/MessageReferenceBody"
+    },
+    "integrityDigest": {
+      "$ref": "#/definitions/IntegrityDigest"
+    },
+    "kind": {
+      "$ref": "#/definitions/MessageReferenceKind"
+    },
+    "schemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    }
+  },
+  "required": ["kind", "schemaRevision", "authoringSpecification", "body", "integrityDigest"],
+  "title": "MessageReferenceArtifact",
+  "type": "object"
+}

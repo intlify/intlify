@@ -14,30 +14,15 @@
 //! a proof that it applies to its base, that its bases hold, or that anyone may
 //! publish it. Replay, continuity checks and the host each answer one of those.
 
-use intlify_authoring::{
-    read_sealed, AuthoringArtifact, AuthoringArtifactReference, Occurrence, ReadFailure,
-};
+use intlify_authoring::{read_sealed, AuthoringArtifact, AuthoringArtifactReference, Occurrence};
 
 use super::artifact::{RegistryArtifact, RegistryUpdateArtifact};
 use super::snapshot::{
     same_declaration_order, EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure,
 };
 use super::update::{IntentRegistryUpdate, SourceEdit, UpdateFailure};
+use crate::admission::{within, IdentityAdmissionFailure};
 use crate::limits::{IdentityLimitKind, IdentityLimits};
-
-/// Why a registry artifact was not admitted.
-///
-/// `F` is the structural failure of the requested kind, so a snapshot's
-/// admission never reports an update's rule or the other way round.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RegistryAdmissionFailure<F> {
-    /// The bytes are not one sealed artifact of the requested kind.
-    Read(ReadFailure),
-    /// A named bound was exhausted before the body was checked.
-    Limit(IdentityLimitKind),
-    /// The body breaks a structural rule of its kind.
-    Structure(F),
-}
 
 /// One `intent-registry` artifact that passed admission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,8 +94,8 @@ impl AdmittedUpdate {
 pub fn admit_registry(
     bytes: &[u8],
     limits: &IdentityLimits,
-) -> Result<AdmittedRegistry, RegistryAdmissionFailure<SnapshotFailure>> {
-    let artifact: RegistryArtifact = read_sealed(bytes).map_err(RegistryAdmissionFailure::Read)?;
+) -> Result<AdmittedRegistry, IdentityAdmissionFailure<SnapshotFailure>> {
+    let artifact: RegistryArtifact = read_sealed(bytes).map_err(IdentityAdmissionFailure::Read)?;
     let snapshot = artifact.body();
     within(
         snapshot.entries().len(),
@@ -119,7 +104,7 @@ pub fn admit_registry(
     )?;
     snapshot
         .validate()
-        .map_err(RegistryAdmissionFailure::Structure)?;
+        .map_err(IdentityAdmissionFailure::Structure)?;
     let entries = snapshot.entries();
     let mut active: Vec<usize> = (0..entries.len())
         .filter(|index| entries[*index].state() == EntryState::Active)
@@ -139,9 +124,9 @@ pub fn admit_registry(
 pub fn admit_update(
     bytes: &[u8],
     limits: &IdentityLimits,
-) -> Result<AdmittedUpdate, RegistryAdmissionFailure<UpdateFailure>> {
+) -> Result<AdmittedUpdate, IdentityAdmissionFailure<UpdateFailure>> {
     let artifact: RegistryUpdateArtifact =
-        read_sealed(bytes).map_err(RegistryAdmissionFailure::Read)?;
+        read_sealed(bytes).map_err(IdentityAdmissionFailure::Read)?;
     admit_update_artifact(artifact, limits)
 }
 
@@ -150,7 +135,7 @@ pub fn admit_update(
 pub(crate) fn admit_update_artifact(
     artifact: RegistryUpdateArtifact,
     limits: &IdentityLimits,
-) -> Result<AdmittedUpdate, RegistryAdmissionFailure<UpdateFailure>> {
+) -> Result<AdmittedUpdate, IdentityAdmissionFailure<UpdateFailure>> {
     let update = artifact.body();
     within(
         update.decisions().len(),
@@ -195,17 +180,6 @@ pub(crate) fn admit_update_artifact(
     )?;
     update
         .validate()
-        .map_err(RegistryAdmissionFailure::Structure)?;
+        .map_err(IdentityAdmissionFailure::Structure)?;
     Ok(AdmittedUpdate { artifact })
-}
-
-fn within<F>(
-    count: usize,
-    bound: u64,
-    kind: IdentityLimitKind,
-) -> Result<(), RegistryAdmissionFailure<F>> {
-    if count as u64 > bound {
-        return Err(RegistryAdmissionFailure::Limit(kind));
-    }
-    Ok(())
 }

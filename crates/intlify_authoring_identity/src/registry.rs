@@ -26,9 +26,7 @@ mod snapshot;
 mod update;
 
 pub(crate) use admit::admit_update_artifact;
-pub use admit::{
-    admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate, RegistryAdmissionFailure,
-};
+pub use admit::{admit_registry, admit_update, AdmittedRegistry, AdmittedUpdate};
 pub use apply::{apply, Transition, TransitionFailure};
 pub(crate) use apply::{check_base_state, check_pairing, declares};
 pub use artifact::{RegistryArtifact, RegistryUpdateArtifact};
@@ -36,7 +34,7 @@ pub use history::{
     replay, verify_history, Anchor, HistoryFailure, HistoryOutcome, ReplayFailure, RetainedHistory,
 };
 pub use snapshot::{EntryState, IntentRegistrySnapshot, RegistryEntry, SnapshotFailure};
-pub(crate) use update::validate_edit;
+pub(crate) use update::{validate_continuation, validate_edit};
 pub use update::{
     Allocation, AllocationBasis, CompleteAbsence, ConfirmedNew, Continuation, ContinuationBasis,
     ExplicitBasis, IdentityDecision, IntentRegistryUpdate, LineageKind, LineageLink, Replacement,

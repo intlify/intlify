@@ -18,6 +18,7 @@ mod inputs;
 mod sources;
 
 pub use bases::{verify_bases, BasisGap, BasisReport, BasisVerdict, ContinuityFailure};
+pub(crate) use edit::carried_by;
 pub use edit::{
     fate, inserted, is_edit_replay_profile, replay, RangeFate, ReplayGap, EDIT_REPLAY_PROFILE,
     EDIT_REPLAY_REVISION,

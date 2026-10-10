@@ -12,6 +12,9 @@
 //! shows that. A declaration left over is new only where the evidence shows
 //! that. Everything else is reported with the reason it is not shown; the
 //! planner never picks an identity to fill a gap.
+//!
+//! Step 4, what the base keeps without any choice, is a part of its own:
+//! read-only compilation resolves declarations by that step alone.
 
 use std::collections::BTreeSet;
 
@@ -23,15 +26,15 @@ use intlify_authoring::{
 use super::diagnostic::{conflict, update_required};
 use super::explicit::ExplicitDecision;
 use super::outcome::{Conflict, DeclarationClass, EntryClass};
-use super::workspace::ReconcileWorkspace;
 use crate::continuity::{fate, inserted, BasisGap, Claims, Evidence, RangeFate, ReplayGap};
 use crate::registry::{
     check_base_state, AdmittedRegistry, EntryState, IdentityDecision, RegistryEntry, SourceEdit,
     TransitionFailure,
 };
+use crate::workspace::IdentityWorkspace;
 
 /// Find a declaration of the inventory, exactly.
-pub(super) fn position(current: &AuthoringInventory, occurrence: &Occurrence) -> Option<usize> {
+pub(crate) fn position(current: &AuthoringInventory, occurrence: &Occurrence) -> Option<usize> {
     let declarations = current.declarations();
     // The canonical order leaves out a snapshot's declared length, so the
     // neighbour a search finds has to be compared in full.
@@ -41,13 +44,149 @@ pub(super) fn position(current: &AuthoringInventory, occurrence: &Occurrence) ->
         .filter(|index| declarations[*index].occurrence() == occurrence)
 }
 
-/// One reconciliation's view of the base, the inventory and the evidence.
+/// One entry an edit carries onto the current declaration at a position.
+pub(crate) type Carried<'a> = (&'a RegistryEntry, &'a SourceEdit, usize);
+
+/// Step 4: the associations the base keeps without any choice.
+///
+/// An active entry that still holds its exact declaration keeps it. One
+/// whose declaration is gone continues only where exactly one account
+/// carries it onto exactly one current declaration that nothing else
+/// claims.
+pub(crate) struct Associations<'a> {
+    pub(crate) base: &'a AdmittedRegistry,
+    pub(crate) current: &'a AuthoringInventory,
+    pub(crate) evidence: &'a Evidence<'a>,
+    pub(crate) claims: &'a Claims,
+}
+
+impl<'a> Associations<'a> {
+    /// Unchanged associations: an active entry that still holds its exact
+    /// declaration keeps it, unless an explicit decision moves it.
+    ///
+    /// Returns the active entries whose declarations are gone.
+    pub(crate) fn retained(
+        &self,
+        moved: &BTreeSet<&MessageIntentId>,
+        workspace: &mut IdentityWorkspace,
+    ) -> Vec<&'a RegistryEntry> {
+        let mut gone = Vec::new();
+        for entry in self.base.snapshot().entries() {
+            if entry.state() != EntryState::Active || moved.contains(entry.intent_id()) {
+                continue;
+            }
+            match position(self.current, entry.declaration()) {
+                Some(index) => {
+                    // An explicit decision competing for it was refused above.
+                    if workspace.classes[index].is_none() {
+                        workspace.classes[index] =
+                            Some(DeclarationClass::Retained(entry.intent_id().clone()));
+                    }
+                }
+                None => gone.push(entry),
+            }
+        }
+        gone
+    }
+
+    /// Read the one account of where an entry's declaration went.
+    pub(crate) fn account(&self, entry: &'a RegistryEntry) -> Account<'a> {
+        let declaration = entry.declaration();
+        let source = declaration.source();
+        // A partial view that leaves the unit out cannot tell.
+        if self.current.completeness() == Completeness::Partial && !self.covers(source.unit()) {
+            return Account::Unseen;
+        }
+        let edits = self.evidence.from(source);
+        let held = self.evidence.holds(source);
+        match (edits.as_slice(), held) {
+            // No edit and a vanished unit: the unit's membership decides.
+            ([], false) => Account::Gone(None),
+            // The unit did not change, yet the declaration is not declared.
+            ([], true) => Account::Unshown(BasisGap::AbsenceUnproven),
+            ([(_, Err(gap))], false) => Account::Unshown(match gap {
+                ReplayGap::SourceUnavailable => BasisGap::SourceUnavailable,
+                ReplayGap::Mismatch => BasisGap::ReplayMismatch,
+            }),
+            ([(edit, Ok(()))], false) => match (edit.after(), fate(edit, declaration.range())) {
+                (None, _) | (Some(_), RangeFate::Replaced) => Account::Gone(Some(*edit)),
+                (Some(_), RangeFate::Touched) => Account::Unshown(BasisGap::EditAtBoundary),
+                (Some(after), RangeFate::Moved(range)) => {
+                    Occurrence::new(after.clone(), range, declaration.role())
+                        .ok()
+                        .and_then(|target| position(self.current, &target))
+                        .map_or(Account::Unshown(BasisGap::MappedElsewhere), |index| {
+                            Account::Carried(edit, index)
+                        })
+                }
+            },
+            // Two accounts of one snapshot: a copy or a conflict.
+            _ => Account::Unshown(BasisGap::Ambiguous),
+        }
+    }
+
+    /// Return whether the inventory covers a unit.
+    fn covers(&self, unit: &Token) -> bool {
+        self.current
+            .units()
+            .binary_search_by(|covered| covered.source().unit().cmp(unit))
+            .is_ok()
+    }
+
+    /// Continued associations: an entry continues only onto a declaration
+    /// nothing else claims. No other entry stays there or is carried there,
+    /// and no explicit decision gave it an identity.
+    ///
+    /// Returns the entries that continue; every other one is reported as a
+    /// competing claim on its declaration.
+    pub(crate) fn compete(
+        &self,
+        proposed: Vec<Carried<'a>>,
+        workspace: &mut IdentityWorkspace,
+    ) -> Vec<Carried<'a>> {
+        let mut continued = Vec::new();
+        for (entry, edit, index) in proposed {
+            let target = self.current.declarations()[index].occurrence();
+            let rivals: Vec<&MessageIntentId> = self
+                .claims
+                .on(target)
+                .filter(|id| *id != entry.intent_id())
+                .collect();
+            if rivals.is_empty() && workspace.classes[index].is_none() {
+                workspace.classes[index] =
+                    Some(DeclarationClass::Continued(entry.intent_id().clone()));
+                workspace.entries.push((
+                    entry.intent_id().clone(),
+                    EntryClass::Continued(target.clone()),
+                ));
+                continued.push((entry, edit, index));
+                continue;
+            }
+            workspace.entries.push((
+                entry.intent_id().clone(),
+                EntryClass::Conflict(Conflict::CompetingClaim),
+            ));
+            workspace.classes[index] = Some(DeclarationClass::Conflict(Conflict::CompetingClaim));
+            let related = self
+                .claims
+                .on(target)
+                .filter_map(|id| self.base.snapshot().entry(id))
+                .map(|claimant| claimant.declaration().clone())
+                .collect();
+            workspace
+                .diagnostics
+                .push(conflict(target.clone(), Conflict::CompetingClaim, related));
+        }
+        continued
+    }
+}
+
+/// One reconciliation's view of the base, the inventory and the evidence:
+/// step 4's associations, and what the choices and proofs of the other
+/// steps add to them.
 pub(super) struct Planner<'p> {
-    pub(super) base: &'p AdmittedRegistry,
+    pub(super) associations: Associations<'p>,
     pub(super) inventory: AuthoringArtifactReference,
-    pub(super) current: &'p AuthoringInventory,
-    pub(super) evidence: &'p Evidence<'p>,
-    pub(super) claims: &'p Claims,
     pub(super) membership: &'p [Token],
     /// Whether newness and absence may be shown without a choice.
     pub(super) automatic: Result<(), BasisGap>,
@@ -61,8 +200,9 @@ impl<'p> Planner<'p> {
     pub(super) fn explicit(
         &self,
         decisions: &'p [ExplicitDecision],
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) -> (Vec<&'p IdentityDecision>, BTreeSet<&'p MessageIntentId>) {
+        let current = self.associations.current;
         let mut alone: Vec<&'p IdentityDecision> = Vec::new();
         for explicit in decisions {
             let decision = explicit.decision();
@@ -70,7 +210,7 @@ impl<'p> Planner<'p> {
             let to = decision.to().expect("an explicit decision has a target");
             match self
                 .fit(explicit)
-                .and_then(|()| position(self.current, to).ok_or(Conflict::BaseMismatch))
+                .and_then(|()| position(current, to).ok_or(Conflict::BaseMismatch))
             {
                 Ok(_) => alone.push(decision),
                 Err(kind) => self.refuse(decision, kind, workspace),
@@ -110,6 +250,7 @@ impl<'p> Planner<'p> {
             // An entry the same decision moves, or another one does, frees
             // the declaration it held.
             let taken = self
+                .associations
                 .base
                 .active_entry(to)
                 .is_some_and(|holder| !moved.contains(holder.intent_id()));
@@ -117,7 +258,7 @@ impl<'p> Planner<'p> {
                 self.refuse(decision, Conflict::CompetingClaim, workspace);
                 continue;
             }
-            let index = position(self.current, to).expect("checked above");
+            let index = position(current, to).expect("checked above");
             workspace.classes[index] =
                 Some(DeclarationClass::Explicit(decision.intent_id().clone()));
             accepted.push(decision);
@@ -133,24 +274,27 @@ impl<'p> Planner<'p> {
     /// Check one explicit decision against the inputs it names and the base
     /// entry it acts on.
     fn fit(&self, explicit: &ExplicitDecision) -> Result<(), Conflict> {
-        let snapshot = self.base.snapshot();
+        let base = self.associations.base;
+        let snapshot = base.snapshot();
         let decision = explicit.decision();
-        if explicit.base() != &self.base.reference() || explicit.inventory() != &self.inventory {
+        if explicit.base() != &base.reference() || explicit.inventory() != &self.inventory {
             return Err(Conflict::BaseMismatch);
         }
         if decision.intent_id().owner() != snapshot.owner() {
             return Err(Conflict::ForeignOwner);
         }
-        check_base_state(decision, snapshot, self.current).map_err(|failure| match failure {
-            TransitionFailure::AlreadyAllocated => Conflict::Collision,
-            TransitionFailure::NotActive
-                if snapshot
-                    .entry(decision.intent_id())
-                    .is_some_and(|entry| entry.state() == EntryState::Retired) =>
-            {
-                Conflict::RetiredReuse
+        check_base_state(decision, snapshot, self.associations.current).map_err(|failure| {
+            match failure {
+                TransitionFailure::AlreadyAllocated => Conflict::Collision,
+                TransitionFailure::NotActive
+                    if snapshot
+                        .entry(decision.intent_id())
+                        .is_some_and(|entry| entry.state() == EntryState::Retired) =>
+                {
+                    Conflict::RetiredReuse
+                }
+                _ => Conflict::BaseMismatch,
             }
-            _ => Conflict::BaseMismatch,
         })
     }
 
@@ -159,10 +303,10 @@ impl<'p> Planner<'p> {
         &self,
         decision: &IdentityDecision,
         kind: Conflict,
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
     ) {
         let to = decision.to().expect("an explicit decision has a target");
-        if let Some(index) = position(self.current, to) {
+        if let Some(index) = position(self.associations.current, to) {
             workspace.classes[index] = Some(DeclarationClass::Conflict(kind));
         }
         workspace.diagnostics.push(conflict(
@@ -172,145 +316,35 @@ impl<'p> Planner<'p> {
         ));
     }
 
-    /// Step 4, unchanged associations: an active entry that still holds its
-    /// exact declaration keeps it.
-    ///
-    /// Returns the active entries whose declarations are gone.
-    pub(super) fn retained(
-        &self,
-        moved: &BTreeSet<&MessageIntentId>,
-        workspace: &mut ReconcileWorkspace,
-    ) -> Vec<&'p RegistryEntry> {
-        let mut gone = Vec::new();
-        for entry in self.base.snapshot().entries() {
-            if entry.state() != EntryState::Active || moved.contains(entry.intent_id()) {
-                continue;
-            }
-            match position(self.current, entry.declaration()) {
-                Some(index) => {
-                    // An explicit decision competing for it was refused above.
-                    if workspace.classes[index].is_none() {
-                        workspace.classes[index] =
-                            Some(DeclarationClass::Retained(entry.intent_id().clone()));
-                    }
-                }
-                None => gone.push(entry),
-            }
-        }
-        gone
-    }
-
     /// Steps 4 and 7 for the entries whose declarations are gone: carried
     /// onto exactly one current declaration, shown to be gone, kept unseen
     /// by a partial inventory, or not shown.
     pub(super) fn carried(
         &self,
         gone: Vec<&'p RegistryEntry>,
-        workspace: &mut ReconcileWorkspace,
-    ) -> (
-        Vec<(&'p RegistryEntry, &'p SourceEdit, usize)>,
-        Vec<&'p RegistryEntry>,
-    ) {
-        let covered: BTreeSet<&Token> = self
-            .current
-            .units()
-            .iter()
-            .map(|unit| unit.source().unit())
-            .collect();
-        let partial = self.current.completeness() == Completeness::Partial;
+        workspace: &mut IdentityWorkspace,
+    ) -> (Vec<Carried<'p>>, Vec<&'p RegistryEntry>) {
         let mut proposed = Vec::new();
         let mut absent = Vec::new();
         for entry in gone {
-            let source = entry.declaration().source();
-            let class = if partial && !covered.contains(source.unit()) {
-                EntryClass::Kept
-            } else {
-                match self.account(entry) {
-                    Account::Carried(edit, index) => {
-                        proposed.push((entry, edit, index));
-                        continue;
-                    }
-                    Account::Gone(edit) => self.absence(entry, edit),
-                    Account::Unshown(gap) => EntryClass::Unresolved(gap),
+            let class = match self.associations.account(entry) {
+                Account::Carried(edit, index) => {
+                    proposed.push((entry, edit, index));
+                    continue;
                 }
+                Account::Unseen => EntryClass::Kept,
+                Account::Gone(edit) => self.absence(entry, edit),
+                Account::Unshown(gap) => EntryClass::Unresolved(gap),
             };
             settle(entry, class, &mut absent, workspace);
         }
-
-        // An entry continues only onto a declaration nothing else claims:
-        // no other entry stays there or is carried there, and no explicit
-        // decision gave it an identity.
-        let mut continued = Vec::new();
-        for (entry, edit, index) in proposed {
-            let target = self.current.declarations()[index].occurrence();
-            let rivals: Vec<&MessageIntentId> = self
-                .claims
-                .on(target)
-                .filter(|id| *id != entry.intent_id())
-                .collect();
-            if rivals.is_empty() && workspace.classes[index].is_none() {
-                workspace.classes[index] =
-                    Some(DeclarationClass::Continued(entry.intent_id().clone()));
-                workspace.entries.push((
-                    entry.intent_id().clone(),
-                    EntryClass::Continued(target.clone()),
-                ));
-                continued.push((entry, edit, index));
-                continue;
-            }
-            workspace.entries.push((
-                entry.intent_id().clone(),
-                EntryClass::Conflict(Conflict::CompetingClaim),
-            ));
-            workspace.classes[index] = Some(DeclarationClass::Conflict(Conflict::CompetingClaim));
-            let related = self
-                .claims
-                .on(target)
-                .filter_map(|id| self.base.snapshot().entry(id))
-                .map(|claimant| claimant.declaration().clone())
-                .collect();
-            workspace
-                .diagnostics
-                .push(conflict(target.clone(), Conflict::CompetingClaim, related));
-        }
+        let continued = self.associations.compete(proposed, workspace);
         (continued, absent)
-    }
-
-    /// Read the one account of where an entry's declaration went.
-    fn account(&self, entry: &'p RegistryEntry) -> Account<'p> {
-        let declaration = entry.declaration();
-        let source = declaration.source();
-        let edits = self.evidence.from(source);
-        let held = self.evidence.holds(source);
-        match (edits.as_slice(), held) {
-            // No edit and a vanished unit: the unit's membership decides.
-            ([], false) => Account::Gone(None),
-            // The unit did not change, yet the declaration is not declared.
-            ([], true) => Account::Unshown(BasisGap::AbsenceUnproven),
-            ([(_, Err(gap))], false) => Account::Unshown(match gap {
-                ReplayGap::SourceUnavailable => BasisGap::SourceUnavailable,
-                ReplayGap::Mismatch => BasisGap::ReplayMismatch,
-            }),
-            ([(edit, Ok(()))], false) => match (edit.after(), fate(edit, declaration.range())) {
-                (None, _) | (Some(_), RangeFate::Replaced) => Account::Gone(Some(*edit)),
-                (Some(_), RangeFate::Touched) => Account::Unshown(BasisGap::EditAtBoundary),
-                (Some(after), RangeFate::Moved(range)) => {
-                    Occurrence::new(after.clone(), range, declaration.role())
-                        .ok()
-                        .and_then(|target| position(self.current, &target))
-                        .map_or(Account::Unshown(BasisGap::MappedElsewhere), |index| {
-                            Account::Carried(edit, index)
-                        })
-                }
-            },
-            // Two accounts of one snapshot: a copy or a conflict.
-            _ => Account::Unshown(BasisGap::Ambiguous),
-        }
     }
 
     /// Step 7: whether an entry the account says is gone is shown to be.
     fn absence(&self, entry: &RegistryEntry, edit: Option<&SourceEdit>) -> EntryClass {
-        if self.current.completeness() == Completeness::Partial {
+        if self.associations.current.completeness() == Completeness::Partial {
             return EntryClass::Kept;
         }
         if let Err(gap) = self.automatic {
@@ -330,15 +364,20 @@ impl<'p> Planner<'p> {
 
     /// Step 5: whether each declaration nothing else gave an identity is
     /// shown to be new.
-    pub(super) fn remaining(&self, workspace: &mut ReconcileWorkspace) {
-        let snapshot = self.base.snapshot();
-        for (index, facts) in self.current.declarations().iter().enumerate() {
+    pub(super) fn remaining(&self, workspace: &mut IdentityWorkspace) {
+        let Associations {
+            base,
+            current,
+            claims,
+            ..
+        } = self.associations;
+        let snapshot = base.snapshot();
+        for (index, facts) in current.declarations().iter().enumerate() {
             if workspace.classes[index].is_some() {
                 continue;
             }
             let declaration = facts.occurrence();
-            let claimants: Vec<&RegistryEntry> = self
-                .claims
+            let claimants: Vec<&RegistryEntry> = claims
                 .on(declaration)
                 .filter_map(|id| snapshot.entry(id))
                 .collect();
@@ -368,11 +407,15 @@ impl<'p> Planner<'p> {
     /// Return whether an edit that ends at the declaration's own snapshot
     /// inserted all of its text.
     fn inserted(&self, declaration: &Occurrence) -> bool {
-        self.evidence.edits().iter().any(|(edit, replayed)| {
-            replayed.is_ok()
-                && edit.after() == Some(declaration.source())
-                && inserted(edit, declaration.range())
-        })
+        self.associations
+            .evidence
+            .edits()
+            .iter()
+            .any(|(edit, replayed)| {
+                replayed.is_ok()
+                    && edit.after() == Some(declaration.source())
+                    && inserted(edit, declaration.range())
+            })
     }
 }
 
@@ -381,7 +424,7 @@ fn settle<'p>(
     entry: &'p RegistryEntry,
     class: EntryClass,
     absent: &mut Vec<&'p RegistryEntry>,
-    workspace: &mut ReconcileWorkspace,
+    workspace: &mut IdentityWorkspace,
 ) {
     match &class {
         EntryClass::Absent => absent.push(entry),
@@ -396,12 +439,15 @@ fn settle<'p>(
 }
 
 /// What the evidence says became of one entry's declaration.
-enum Account<'p> {
+pub(crate) enum Account<'a> {
     /// One edit carries it onto the declaration at this position.
-    Carried(&'p SourceEdit, usize),
+    Carried(&'a SourceEdit, usize),
     /// It may be gone: its unit left with no edit, or one edit removed or
     /// replaced it.
-    Gone(Option<&'p SourceEdit>),
+    Gone(Option<&'a SourceEdit>),
+    /// A partial inventory leaves its unit out, so nothing shows where it
+    /// went.
+    Unseen,
     /// Nothing shows where it went.
     Unshown(BasisGap),
 }
@@ -460,18 +506,20 @@ mod tests {
         let evidence = Evidence::gather(&[], scene.edits, scene.sources, current);
         let claims = evidence.claims(scene.base);
         let planner = Planner {
-            base: scene.base,
+            associations: Associations {
+                base: scene.base,
+                current,
+                evidence: &evidence,
+                claims: &claims,
+            },
             inventory: scene.current.reference(),
-            current,
-            evidence: &evidence,
-            claims: &claims,
             membership: &membership,
             automatic: automatic(scene.base, current, &inputs),
         };
-        let mut workspace = ReconcileWorkspace::new();
+        let mut workspace = IdentityWorkspace::new();
         workspace.classes.resize(current.declarations().len(), None);
         let (_, moved) = planner.explicit(scene.explicit, &mut workspace);
-        let gone = planner.retained(&moved, &mut workspace);
+        let gone = planner.associations.retained(&moved, &mut workspace);
         planner.carried(gone, &mut workspace);
         planner.remaining(&mut workspace);
         workspace.diagnostics.sort_by(Diagnostic::reporting_cmp);

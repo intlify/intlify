@@ -1,0 +1,430 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ArtifactKind": {
+      "description": "The five authoring artifact kinds design 017 registers.",
+      "enum": [
+        "authoring-inventory",
+        "message-intent",
+        "message-reference",
+        "intent-registry",
+        "intent-registry-update"
+      ],
+      "type": "string"
+    },
+    "AuthoringArtifactReference": {
+      "additionalProperties": false,
+      "description": "The fields another artifact uses to name one authoring artifact.",
+      "properties": {
+        "authoringSpecification": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "integrityDigest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        },
+        "kind": {
+          "$ref": "#/definitions/ArtifactKind"
+        },
+        "schemaRevision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["kind", "schemaRevision", "authoringSpecification", "integrityDigest"],
+      "type": "object"
+    },
+    "AuthoringSpecification": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Design016"
+        },
+        "revision": {
+          "$ref": "#/definitions/RevisionZero"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    },
+    "ByteRange": {
+      "description": "One half-open UTF-8 byte range.\n\nEmpty insertion ranges and end-of-input positions are representable. A range\naddresses bytes, never Unicode scalar values or UTF-16 code units.",
+      "properties": {
+        "end": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "start": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": ["start", "end"],
+      "type": "object"
+    },
+    "ContinuationBasis": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/UnchangedSnapshot"
+        },
+        {
+          "$ref": "#/definitions/VerifiedEdit"
+        },
+        {
+          "$ref": "#/definitions/ExplicitBasis"
+        }
+      ],
+      "description": "Why an ID continues from one declaration to another."
+    },
+    "Design016": {
+      "enum": ["intlify-design-016"],
+      "type": "string"
+    },
+    "ExplicitBasis": {
+      "additionalProperties": false,
+      "description": "A choice recorded with its explanation.\n\nThe reason is untrusted, possibly sensitive text. It explains a historical\nchoice; it is not the actor's authorization, which the host establishes\nseparately for this exact base, inventory and action.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ExplicitTag"
+        },
+        "reason": {
+          "$ref": "#/definitions/NonemptyText"
+        }
+      },
+      "required": ["kind", "reason"],
+      "type": "object"
+    },
+    "ExplicitTag": {
+      "description": "Discriminator of an explicit basis.",
+      "enum": ["explicit"],
+      "type": "string"
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "IntentContinuity": {
+      "additionalProperties": false,
+      "description": "How an Intent ID reached a declaration other than the one the registry\nholds for it.",
+      "properties": {
+        "basis": {
+          "$ref": "#/definitions/ContinuationBasis"
+        },
+        "from": {
+          "$ref": "#/definitions/Occurrence"
+        }
+      },
+      "required": ["from", "basis"],
+      "type": "object"
+    },
+    "MessageIntentBody": {
+      "additionalProperties": false,
+      "description": "One declaration's persistent identity under one exact registry.\n\nDeserializing one reads its shape only. [`MessageIntentBody::validate`]\nchecks the structural rules, and neither says the body is what compiling\nits inventory against its registry gives.",
+      "properties": {
+        "continuity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IntentContinuity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declaration": {
+          "$ref": "#/definitions/Occurrence"
+        },
+        "intentId": {
+          "$ref": "#/definitions/MessageIntentId"
+        },
+        "intentRevision": {
+          "$ref": "#/definitions/IntegrityDigest"
+        },
+        "inventory": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AuthoringArtifactReference"
+            },
+            {
+              "properties": {
+                "authoringSpecification": {
+                  "properties": {
+                    "identity": {
+                      "enum": ["intlify-design-016"]
+                    },
+                    "revision": {
+                      "enum": ["0"]
+                    }
+                  }
+                },
+                "kind": {
+                  "enum": ["authoring-inventory"]
+                },
+                "schemaRevision": {
+                  "enum": ["0"]
+                }
+              }
+            }
+          ]
+        },
+        "registry": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AuthoringArtifactReference"
+            },
+            {
+              "properties": {
+                "authoringSpecification": {
+                  "properties": {
+                    "identity": {
+                      "enum": ["intlify-design-016"]
+                    },
+                    "revision": {
+                      "enum": ["0"]
+                    }
+                  }
+                },
+                "kind": {
+                  "enum": ["intent-registry"]
+                },
+                "schemaRevision": {
+                  "enum": ["0"]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": ["intentId", "intentRevision", "inventory", "declaration", "registry"],
+      "type": "object"
+    },
+    "MessageIntentId": {
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "value": {
+          "$ref": "#/definitions/Opaque128"
+        }
+      },
+      "required": ["owner", "value"],
+      "type": "object"
+    },
+    "MessageIntentKind": {
+      "enum": ["message-intent"],
+      "type": "string"
+    },
+    "NonemptyText": {
+      "pattern": "^[\\s\\S]+$",
+      "type": "string"
+    },
+    "Occurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ByteRange"
+        },
+        "role": {
+          "$ref": "#/definitions/OccurrenceRole"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceSnapshot"
+        }
+      },
+      "required": ["source", "range", "role"],
+      "type": "object"
+    },
+    "OccurrenceRole": {
+      "description": "The syntax role an occurrence plays in its source unit.\n\nDeclaration facts admit only the three declaration roles. The remaining\nroles describe use sites, parameter expressions, and explicit exclusions.",
+      "enum": [
+        "ui-literal",
+        "intent-literal",
+        "mf2-declaration",
+        "reference",
+        "parameter-expression",
+        "exclusion"
+      ],
+      "type": "string"
+    },
+    "Opaque128": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "OwnerIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "kind": {
+          "$ref": "#/definitions/OwnerKind"
+        }
+      },
+      "required": ["kind", "identity"],
+      "type": "object"
+    },
+    "OwnerKind": {
+      "description": "Which owner domain an identity belongs to.\n\nThe same identity token under the two kinds denotes different owners.\nSpelling is not proof of publisher identity or authorization.",
+      "enum": ["application", "library"],
+      "type": "string"
+    },
+    "Replacement": {
+      "additionalProperties": false,
+      "description": "One replacement, in the coordinates of the bytes before the edit.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ByteRange"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": ["range", "text"],
+      "type": "object"
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "SourceEdit": {
+      "additionalProperties": false,
+      "description": "One unit's change between two exact snapshots.\n\nAn absent `before` is an empty starting buffer, as for a new unit, and an\nabsent `after` claims the unit is gone. Replaying the replacements in order\nover the `before` bytes has to give exactly the `after` bytes; that, and\nwhich declarations the edit carries across, is the verifier's to check.",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SourceSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SourceSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "replacements": {
+          "items": {
+            "$ref": "#/definitions/Replacement"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["replacements"],
+      "type": "object"
+    },
+    "SourceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "byteLength": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "grammar": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "owner": {
+          "$ref": "#/definitions/OwnerIdentity"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        },
+        "unit": {
+          "$ref": "#/definitions/Token"
+        },
+        "utf8Digest": {
+          "$ref": "#/definitions/IntegrityDigest"
+        }
+      },
+      "required": ["owner", "unit", "revision", "grammar", "byteLength", "utf8Digest"],
+      "type": "object"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "UnchangedSnapshot": {
+      "additionalProperties": false,
+      "description": "The claim that a declaration did not change at all.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/UnchangedSnapshotTag"
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "UnchangedSnapshotTag": {
+      "description": "Discriminator of an unchanged-snapshot basis.",
+      "enum": ["unchanged-snapshot"],
+      "type": "string"
+    },
+    "VerifiedEdit": {
+      "additionalProperties": false,
+      "description": "The claim that a continuity verifier accepts a set of source edits.",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/definitions/SourceEdit"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/definitions/VerifiedEditTag"
+        },
+        "profile": {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      },
+      "required": ["kind", "profile", "changes"],
+      "type": "object"
+    },
+    "VerifiedEditTag": {
+      "description": "Discriminator of a verified-edit basis.",
+      "enum": ["verified-edit"],
+      "type": "string"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    }
+  },
+  "description": "One sealed `message-intent` artifact.\n\nThis is the `message-intent` case of 017's `AuthoringArtifact<K, B>`.\nDeserializing one does not check its digest; admission does, before\nanything reads the body.",
+  "properties": {
+    "authoringSpecification": {
+      "$ref": "#/definitions/AuthoringSpecification"
+    },
+    "body": {
+      "$ref": "#/definitions/MessageIntentBody"
+    },
+    "integrityDigest": {
+      "$ref": "#/definitions/IntegrityDigest"
+    },
+    "kind": {
+      "$ref": "#/definitions/MessageIntentKind"
+    },
+    "schemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    }
+  },
+  "required": ["kind", "schemaRevision", "authoringSpecification", "body", "integrityDigest"],
+  "title": "MessageIntentArtifact",
+  "type": "object"
+}

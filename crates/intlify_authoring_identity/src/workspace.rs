@@ -1,29 +1,30 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Reusable reconciliation scratch.
+//! Reusable scratch for resolving an inventory's identities against a
+//! registry.
 //!
-//! The workspace keeps collection capacity between reconciliations. It never
-//! lends storage to a result: everything returned is drained out of it, and
-//! every reconciliation starts from the same empty state, so a reused
-//! workspace and a fresh one give the same result.
+//! The workspace keeps collection capacity between runs. It never lends
+//! storage to a result: everything returned is drained out of it, and every
+//! run starts from the same empty state, so a reused workspace and a fresh
+//! one give the same result.
 
 use intlify_authoring::{Diagnostic, MessageIntentId};
 
-use super::outcome::{DeclarationClass, EntryClass};
+use crate::reconcile::{DeclarationClass, EntryClass};
 
-/// Per-worker scratch for repeated reconciliation.
+/// Per-worker scratch for repeated identity resolution.
 ///
 /// One workspace belongs to one worker; sharing a mutable one between
 /// workers is not supported.
 #[derive(Debug, Default)]
-pub struct ReconcileWorkspace {
-    pub(super) classes: Vec<Option<DeclarationClass>>,
-    pub(super) entries: Vec<(MessageIntentId, EntryClass)>,
-    pub(super) diagnostics: Vec<Diagnostic>,
+pub struct IdentityWorkspace {
+    pub(crate) classes: Vec<Option<DeclarationClass>>,
+    pub(crate) entries: Vec<(MessageIntentId, EntryClass)>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
 }
 
-impl ReconcileWorkspace {
+impl IdentityWorkspace {
     /// Create an empty workspace.
     #[must_use]
     pub fn new() -> Self {
@@ -32,9 +33,8 @@ impl ReconcileWorkspace {
 
     /// Drop retained state while keeping collection capacity.
     ///
-    /// This runs before every reconciliation, so an earlier failure or
-    /// cancellation cannot leak classes or diagnostics into a later
-    /// result.
+    /// Every run starts here, so an earlier failure or cancellation cannot
+    /// leak classes or diagnostics into a later result.
     pub fn clear(&mut self) {
         self.classes.clear();
         self.entries.clear();
@@ -50,8 +50,8 @@ impl ReconcileWorkspace {
 
     /// Return the retained capacities, for reuse fixtures.
     #[must_use]
-    pub fn capacities(&self) -> ReconcileCapacities {
-        ReconcileCapacities {
+    pub fn capacities(&self) -> IdentityCapacities {
+        IdentityCapacities {
             classes: self.classes.capacity(),
             entries: self.entries.capacity(),
             diagnostics: self.diagnostics.capacity(),
@@ -61,7 +61,7 @@ impl ReconcileWorkspace {
 
 /// Retained capacity of one workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReconcileCapacities {
+pub struct IdentityCapacities {
     /// Retained declaration-class capacity.
     pub classes: usize,
     /// Retained entry-class capacity.
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn clearing_keeps_capacity_and_drops_state() {
-        let mut workspace = ReconcileWorkspace::new();
+        let mut workspace = IdentityWorkspace::new();
         workspace.classes.reserve(8);
         workspace.classes.push(Some(DeclarationClass::New));
         let before = workspace.capacities();

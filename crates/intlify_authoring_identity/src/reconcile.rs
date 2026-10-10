@@ -27,33 +27,34 @@ mod classify;
 mod diagnostic;
 mod explicit;
 mod outcome;
-mod workspace;
 
 use std::collections::BTreeSet;
 
 use intlify_authoring::{
     AdmittedInventory, AuthoringArtifact, AuthoringInventory, Diagnostic, MessageIntentId,
-    VersionedIdentity,
 };
 
 use self::classify::Planner;
+pub(crate) use self::classify::{position, Account, Associations, Carried};
+pub(crate) use self::diagnostic::association_missing;
 pub use self::diagnostic::detail;
 pub use self::explicit::{ExplicitDecision, NotExplicit};
 pub use self::outcome::{
     CandidateFailure, Classification, Conflict, DeclarationClass, Eligibility, EntryClass, Plan,
     ReconcileFailure, Reconciliation, Unresolved,
 };
-pub use self::workspace::{ReconcileCapacities, ReconcileWorkspace};
+use crate::admission::IdentityAdmissionFailure;
 use crate::continuity::{
-    automatic, check_previous, check_supplied, verify_bases, BasisVerdict, ContinuityInputs,
-    Evidence, EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION,
+    automatic, carried_by, check_previous, check_supplied, verify_bases, BasisVerdict,
+    ContinuityInputs, Evidence,
 };
 use crate::limits::{IdentityLimitKind, IdentityLimits};
 use crate::registry::{
     admit_update_artifact, apply, check_pairing, AdmittedRegistry, AllocationBasis,
-    ContinuationBasis, IdentityDecision, IntentRegistryUpdate, LineageLink,
-    RegistryAdmissionFailure, RegistryEntry, RegistryUpdateArtifact, SourceEdit, Transition,
+    IdentityDecision, IntentRegistryUpdate, LineageLink, RegistryEntry, RegistryUpdateArtifact,
+    SourceEdit, Transition,
 };
+use crate::workspace::IdentityWorkspace;
 
 /// What a host supplies to reconcile an inventory against a base.
 #[derive(Debug, Clone, Copy)]
@@ -77,7 +78,7 @@ pub fn reconcile(
     inventory: &AdmittedInventory,
     inputs: &ReconcileInputs<'_>,
     limits: &IdentityLimits,
-    workspace: &mut ReconcileWorkspace,
+    workspace: &mut IdentityWorkspace,
 ) -> Result<Reconciliation, ReconcileFailure> {
     reconcile_with_cancellation(base, inventory, inputs, limits, workspace, &|| false)
 }
@@ -93,7 +94,7 @@ pub fn reconcile_with_cancellation<C>(
     inventory: &AdmittedInventory,
     inputs: &ReconcileInputs<'_>,
     limits: &IdentityLimits,
-    workspace: &mut ReconcileWorkspace,
+    workspace: &mut IdentityWorkspace,
     cancelled: &C,
 ) -> Result<Reconciliation, ReconcileFailure>
 where
@@ -113,11 +114,13 @@ where
     let evidence = Evidence::gather(&[], inputs.evidence.edits, inputs.evidence.sources, current);
     let claims = evidence.claims(base);
     let planner = Planner {
-        base,
+        associations: Associations {
+            base,
+            current,
+            evidence: &evidence,
+            claims: &claims,
+        },
         inventory: inventory.reference(),
-        current,
-        evidence: &evidence,
-        claims: &claims,
         membership: inputs.evidence.membership,
         automatic: automatic(base, current, &inputs.evidence),
     };
@@ -125,7 +128,7 @@ where
     stop()?;
     let (explicit, moved) = planner.explicit(inputs.explicit, workspace);
     stop()?;
-    let gone = planner.retained(&moved, workspace);
+    let gone = planner.associations.retained(&moved, workspace);
     stop()?;
     let (continued, absent) = planner.carried(gone, workspace);
     stop()?;
@@ -202,7 +205,7 @@ fn admit(
 }
 
 /// Take the classes out of the workspace, in their reporting order.
-fn classify(current: &AuthoringInventory, workspace: &mut ReconcileWorkspace) -> Classification {
+fn classify(current: &AuthoringInventory, workspace: &mut IdentityWorkspace) -> Classification {
     let declarations = current
         .declarations()
         .iter()
@@ -285,10 +288,7 @@ fn continuation(
         entry.intent_id().clone(),
         entry.declaration().clone(),
         to,
-        ContinuationBasis::verified_edit(
-            VersionedIdentity::literal(EDIT_REPLAY_PROFILE, EDIT_REPLAY_REVISION),
-            vec![edit.clone()],
-        ),
+        carried_by(edit),
     )
 }
 
@@ -312,9 +312,9 @@ fn plan(
     // An update with no decisions and no links applies as no change.
     let sealed = RegistryUpdateArtifact::seal(update).map_err(|_| ReconcileFailure::Unsealable)?;
     let update = admit_update_artifact(sealed, limits).map_err(|failure| match failure {
-        RegistryAdmissionFailure::Limit(kind) => ReconcileFailure::Limit(kind),
-        RegistryAdmissionFailure::Structure(failure) => ReconcileFailure::Update(failure),
-        RegistryAdmissionFailure::Read(_) => ReconcileFailure::Unsealable,
+        IdentityAdmissionFailure::Limit(kind) => ReconcileFailure::Limit(kind),
+        IdentityAdmissionFailure::Structure(failure) => ReconcileFailure::Update(failure),
+        IdentityAdmissionFailure::Read(_) => ReconcileFailure::Unsealable,
     })?;
     let result = match apply(base, &update, inventory).map_err(ReconcileFailure::Transition)? {
         Transition::Applied(result) => *result,
@@ -362,7 +362,9 @@ mod tests {
     use super::*;
     use crate::continuity::{ContinuityFailure, EditSetFailure, PreviousUpdate, RetainedSources};
     use crate::registry::fixtures::{artifact, id, limits, sources, Chain};
-    use crate::registry::{ExplicitBasis, LineageKind, TransitionFailure, UpdateFailure};
+    use crate::registry::{
+        ContinuationBasis, ExplicitBasis, LineageKind, TransitionFailure, UpdateFailure,
+    };
 
     /// The inputs one case varies.
     #[derive(Default)]
@@ -381,7 +383,7 @@ mod tests {
         (base, current): (usize, usize),
         case: &Case<'_>,
         limits: &IdentityLimits,
-        workspace: &mut ReconcileWorkspace,
+        workspace: &mut IdentityWorkspace,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<Reconciliation, ReconcileFailure> {
         let owned: Vec<(SourceSnapshot, String)> = sources();
@@ -426,7 +428,7 @@ mod tests {
             pair,
             case,
             &limits(),
-            &mut ReconcileWorkspace::new(),
+            &mut IdentityWorkspace::new(),
             &|| false,
         )
     }
@@ -714,7 +716,7 @@ mod tests {
                 chain.inventory(1),
                 &inputs(None),
                 &limits(),
-                &mut ReconcileWorkspace::new()
+                &mut IdentityWorkspace::new()
             ),
             Err(ReconcileFailure::Pairing(TransitionFailure::ScopeMismatch))
         );
@@ -728,7 +730,7 @@ mod tests {
                     inventory: chain.inventory(2),
                 })),
                 &limits(),
-                &mut ReconcileWorkspace::new()
+                &mut IdentityWorkspace::new()
             ),
             Err(ReconcileFailure::Evidence(
                 ContinuityFailure::PreviousMismatch
@@ -797,7 +799,7 @@ mod tests {
             candidates: &[id_of(2, 2)],
             ..Case::default()
         };
-        let mut workspace = ReconcileWorkspace::new();
+        let mut workspace = IdentityWorkspace::new();
         let exact = IdentityLimits {
             candidates: 1,
             diagnostics: 4,
@@ -892,7 +894,7 @@ mod tests {
             candidates: &[id_of(2, 2)],
             ..Case::default()
         };
-        let mut workspace = ReconcileWorkspace::new();
+        let mut workspace = IdentityWorkspace::new();
         let missing = run_with(
             &chain,
             (1, 2),

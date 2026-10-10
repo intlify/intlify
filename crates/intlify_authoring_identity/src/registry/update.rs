@@ -826,40 +826,12 @@ impl IntentRegistryUpdate {
             }
         }
         if let IdentityDecision::Continue(continuation) = decision {
-            match &continuation.basis {
-                ContinuationBasis::UnchangedSnapshot(_) if continuation.from != continuation.to => {
-                    return Err(UpdateFailure::UnchangedSnapshotMoved);
-                }
-                ContinuationBasis::VerifiedEdit(edit) => self.validate_changes(&edit.changes)?,
-                ContinuationBasis::UnchangedSnapshot(_) | ContinuationBasis::Explicit(_) => {}
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_changes(&self, changes: &[SourceEdit]) -> Result<(), UpdateFailure> {
-        let mut before_units: BTreeSet<&Token> = BTreeSet::new();
-        let mut after_units: BTreeSet<&Token> = BTreeSet::new();
-        for edit in changes {
-            validate_edit(edit, &self.owner)?;
-            for (side, units) in [
-                (&edit.before, &mut before_units),
-                (&edit.after, &mut after_units),
-            ] {
-                if let Some(snapshot) = side {
-                    if !units.insert(snapshot.unit()) {
-                        return Err(UpdateFailure::DuplicateUnit);
-                    }
-                }
-            }
-        }
-        // With no unit repeated on either side, two edits can no longer
-        // compare equal, so anything but strictly increasing is out of order.
-        if changes
-            .windows(2)
-            .any(|pair| pair[0].canonical_cmp(&pair[1]) != Ordering::Less)
-        {
-            return Err(UpdateFailure::ChangesUnordered);
+            validate_continuation(
+                &continuation.from,
+                &continuation.to,
+                &continuation.basis,
+                &self.owner,
+            )?;
         }
         Ok(())
     }
@@ -898,6 +870,55 @@ impl IntentRegistryUpdate {
         }
         Ok(())
     }
+}
+
+/// Check a continuation's basis against the two declarations it joins: an
+/// unchanged snapshot joins a declaration to itself, and a verified edit
+/// carries a change list of well-formed edits in 017's order, each unit at
+/// most once on each side.
+///
+/// A continuation recorded anywhere, in an update or beside a compiled
+/// Intent, is held to these.
+pub(crate) fn validate_continuation(
+    from: &Occurrence,
+    to: &Occurrence,
+    basis: &ContinuationBasis,
+    owner: &OwnerIdentity,
+) -> Result<(), UpdateFailure> {
+    match basis {
+        ContinuationBasis::UnchangedSnapshot(_) if from != to => {
+            Err(UpdateFailure::UnchangedSnapshotMoved)
+        }
+        ContinuationBasis::VerifiedEdit(edit) => validate_changes(&edit.changes, owner),
+        ContinuationBasis::UnchangedSnapshot(_) | ContinuationBasis::Explicit(_) => Ok(()),
+    }
+}
+
+fn validate_changes(changes: &[SourceEdit], owner: &OwnerIdentity) -> Result<(), UpdateFailure> {
+    let mut before_units: BTreeSet<&Token> = BTreeSet::new();
+    let mut after_units: BTreeSet<&Token> = BTreeSet::new();
+    for edit in changes {
+        validate_edit(edit, owner)?;
+        for (side, units) in [
+            (&edit.before, &mut before_units),
+            (&edit.after, &mut after_units),
+        ] {
+            if let Some(snapshot) = side {
+                if !units.insert(snapshot.unit()) {
+                    return Err(UpdateFailure::DuplicateUnit);
+                }
+            }
+        }
+    }
+    // With no unit repeated on either side, two edits can no longer compare
+    // equal, so anything but strictly increasing is out of order.
+    if changes
+        .windows(2)
+        .any(|pair| pair[0].canonical_cmp(&pair[1]) != Ordering::Less)
+    {
+        return Err(UpdateFailure::ChangesUnordered);
+    }
+    Ok(())
 }
 
 /// Check one edit on its own: a side to start or end at, one owner, and

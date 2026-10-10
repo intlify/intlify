@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, and reconciliation. See [Current status](#current-status).
+> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, reconciliation, and read-only compilation into Intent and reference artifacts. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -90,7 +90,30 @@ Newness and absence are claimed automatically only when the host's membership is
 | New | A declaration left over is new where the base has no history or an edit into its own unit inserted all of its text; it takes the next candidate, in canonical order |
 | Absent | In a complete inventory, an entry is retired where its unit left the scope with no account of it or one edit replaced its declaration; a partial inventory keeps what it cannot settle |
 
-The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `ReconcileWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
+The result is `Unchanged`, `Planned` (the sealed and admitted update, the unsealed result, and each decision's `Eligibility`), or `Unresolved` (diagnostics in 016's reporting order, with the classification behind them). A planned update is applied to its base and its bases are checked with `verify_bases` before it is returned, so planning and checking share one set of rules. A candidate that collides with an ID the base holds, active or retired, is refused rather than skipped. `IdentityWorkspace` keeps capacity between runs, and `reconcile_with_cancellation` stops between steps without a partial result.
+
+## Intent and reference artifacts
+
+Design 017 hands an inventory's declarations and use sites on with two more kinds, sealed in the same envelope.
+
+| Kind | Type | What it holds |
+| --- | --- | --- |
+| `message-intent` | `MessageIntentBody` | One declaration's Intent ID, the revision its current projection gives, the inventory and registry it was compiled from, and, when the declaration is not the one the registry holds, the continuity that carried the ID onto it |
+| `message-reference` | `MessageReferenceBody` | One use site and, for every declaration it may use, that declaration's Intent ID, revision and `message-intent` artifact, in Intent ID order |
+
+`admit_intent` and `admit_reference` read them in the same order as the registry kinds, and report a broken structural rule as an `IntentFailure` or a `ReferenceFailure`. A continuity is held to the rules of a `continue` decision between the same two declarations. A reference names at least one target, all of the use site's owner, and no ID twice; `IdentityLimits::targets` bounds how many. The parameters a use site supplies stay in the inventory the reference names.
+
+Admission is narrow here too. A well-formed Intent can still name a retired ID, a stale revision or a continuity nothing proves; whether an artifact is what compiling its inventory against its registry gives is checked against a compilation, below.
+
+## Read-only compilation
+
+`compile` resolves an inventory against one exact registry, and gives one `message-intent` per declaration and one `message-reference` per use site. It reads identities and never makes one: it takes no candidate IDs and no way to write a registry, and it leaves both inputs as they were.
+
+A declaration takes the ID of the active entry that holds it exactly, or of the one entry a single verified edit carries onto it while nothing else claims it. That is step 4 of reconciliation, decided by the same code. Only in the second case does the Intent carry a continuity, the entry's declaration and that one edit, so a build can use a checked edit or move before the update that records it is published. The revision is always computed from the current declaration.
+
+Any other declaration, new or with a history the evidence does not show, makes the result `Unresolved`: an `authoring-identity-update-required` diagnostic (`identity-association-missing`) for each such declaration, and an `authoring-identity-conflict` where entries compete for one. No artifact is returned then, so a subset of a scope never reads as the whole of it. An entry whose declaration is gone does not stop compilation; retiring it is an update's question. A partial inventory compiles to the artifacts of its smaller scope, and `CompiledScope::completeness` says so.
+
+What compilation returns stays within the `IdentityLimits` its readers admit it under: a use site that would name more targets than `IdentityLimits::targets` is a `Limit` failure, not an artifact nobody can read back. `CompileEvidence` is reconciliation's evidence less the membership, held to the same rules. A reader checks a supplied artifact with `CompiledScope::check_intent` or `check_reference`: it compiles the same scope with the same evidence, and the artifact has to be exactly the one compiled for its declaration or use site, field by field. An `unchanged-snapshot` continuity is refused because a declaration the registry holds needs none, and an `explicit` one because the confirmation it needs cannot travel with an artifact. `IdentityWorkspace` is shared with reconciliation, and `compile_with_cancellation` stops between steps and before each artifact without a partial result.
 
 ## Schemas and vectors
 
@@ -98,12 +121,15 @@ The result is `Unchanged`, `Planned` (the sealed and admitted update, the unseal
 | --- | --- | --- |
 | `schema/intent-registry-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `schema/intent-registry-update-v0.schema.json` | The closed Draft 7 schema of a sealed `intent-registry-update` | `vp run schema:authoring:check`, `src/schema.rs` |
+| `schema/message-intent-v0.schema.json` | The closed Draft 7 schema of a sealed `message-intent` | `vp run schema:authoring:check`, `src/schema.rs` |
+| `schema/message-reference-v0.schema.json` | The closed Draft 7 schema of a sealed `message-reference` | `vp run schema:authoring:check`, `src/schema.rs` |
 | `fixtures/phase3/registry-vectors.json` | One real chain, a genesis and three updates, with the inventories and source texts behind it | `vp run vectors:authoring:check`, `tests/registry_admission.rs` |
+| `fixtures/phase3/compile-vectors.json` | Design 028's module through the JS Producer, from a genesis to the Intents and references compiled for two revisions | `vp run vectors:authoring:check`, `tests/compilation.rs` |
 
 See [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) for what the vectors hold and what the independent checker verifies.
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, and reconciling an inventory against a base.
+This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, and read-only compilation.
 
-Not yet implemented: read-only compilation. Confirming explicit decisions and publishing a plan belong to the host and come later. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Not yet implemented: confirming explicit decisions and publishing a plan, which belong to the host and come later. Local persistence and production publication are a later step again, after checked 015 inputs exist.
