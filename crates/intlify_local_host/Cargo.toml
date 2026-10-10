@@ -32,3 +32,10 @@ intlify_authoring = { path = "../intlify_authoring", features = ["test-context"]
 intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
 # The committed registry chain is read as JSON.
 serde_json = "1.0.106"
+
+# Establishing an authority needs the test-owned entry, so the conformance
+# tests are compiled only where it exists. Declaring that here keeps an
+# ordinary `--all-targets` build honest instead of gating the file with cfg.
+[[test]]
+name = "authority"
+required-features = ["test-authority"]
