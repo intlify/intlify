@@ -13,8 +13,8 @@
 use intlify_authoring::test_context::{admit_inventory, TestContext};
 use intlify_authoring::{
     AdmittedInventory, AnalysisWorkspace, AuthoringBasis, AuthoringContext, AuthoringLimits,
-    MessageIntentId, OwnerIdentity, OwnerKind, SourceSnapshot, SurfaceVocabulary, Token,
-    UnitResult,
+    InventoryArtifact, MessageIntentId, OwnerIdentity, OwnerKind, SourceSnapshot,
+    SurfaceVocabulary, Token, UnitResult,
 };
 use intlify_authoring_identity::{
     admit_registry, admit_update, reconcile, AdmittedRegistry, AdmittedUpdate, ContinuationBasis,
@@ -236,6 +236,17 @@ pub fn reconciled(
     (base, current): (usize, usize),
     case: &Case<'_>,
 ) -> Result<Reconciliation, ReconcileFailure> {
+    reconciled_from(chain, base, chain.inventory(current), case)
+}
+
+/// Reconcile any inventory against registry `base`, with the same evidence
+/// as [`reconciled`].
+pub fn reconciled_from(
+    chain: &Chain,
+    base: usize,
+    current: &AdmittedInventory,
+    case: &Case<'_>,
+) -> Result<Reconciliation, ReconcileFailure> {
     let owned = sources();
     let retained = RetainedSources::new(
         owned
@@ -260,11 +271,39 @@ pub fn reconciled(
     };
     reconcile(
         chain.registry(base),
-        chain.inventory(current),
+        current,
         &inputs,
         &identity_limits(),
         &mut IdentityWorkspace::new(),
     )
+}
+
+/// Committed inventory `n` as a partial view of the named units, sealed
+/// again: every other unit, with its declarations and use sites, is left out,
+/// as an editor request would leave it out.
+pub fn partial_view(n: usize, units: &[&str]) -> AdmittedInventory {
+    let mut body = artifact(&format!("inventory-{n}"))["body"].clone();
+    let kept = |source: &Value| units.contains(&source["unit"].as_str().unwrap());
+    body["completeness"] = Value::from("partial");
+    body["units"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|unit| kept(&unit["source"]));
+    for found in ["declarations", "references"] {
+        body[found]
+            .as_array_mut()
+            .unwrap()
+            .retain(|fact| kept(&fact["occurrence"]["source"]));
+    }
+    let sealed = InventoryArtifact::seal(serde_json::from_value(body).unwrap()).unwrap();
+    admit_inventory(
+        &bytes(&serde_json::to_value(sealed).unwrap()),
+        &context(),
+        &[],
+        &authoring_limits(),
+        &mut AnalysisWorkspace::new(),
+    )
+    .unwrap()
 }
 
 /// The explicit restore of update 3, bound to registry-2 and inventory-3.

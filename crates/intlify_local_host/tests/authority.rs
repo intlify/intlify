@@ -22,7 +22,8 @@ use intlify_authoring::{
     AnalysisWorkspace, AuthoringLimits, InventoryArtifact, OwnerIdentity, OwnerKind,
 };
 use intlify_authoring_identity::{
-    CandidateFailure, Plan, ReconcileFailure, Reconciliation, TransitionFailure,
+    detail, CandidateFailure, EntryState, ExplicitBasis, ExplicitDecision, IdentityDecision, Plan,
+    ReconcileFailure, Reconciliation, TransitionFailure,
 };
 use intlify_local_host::test_authority::TestAuthority;
 use intlify_local_host::{
@@ -31,8 +32,8 @@ use intlify_local_host::{
 };
 use serde_json::json;
 use support::{
-    artifact, authority_over, basis, bytes, chain_destination, id_of, limits, owner, principal,
-    reconciled, restore, the_edit, Case, Chain,
+    artifact, authority_over, basis, bytes, chain_destination, committed, id_of, limits, owner,
+    partial_view, principal, reconciled, reconciled_from, restore, the_edit, Case, Chain,
 };
 
 const ALL: &[Action] = &Action::ALL;
@@ -386,10 +387,10 @@ fn confirmations_bind_the_exact_choice_actor_and_authority() {
         Some(AuthorizationFailure::ConfirmationStale)
     );
     // A decision made for another base or inventory is not confirmed.
-    let elsewhere = intlify_authoring_identity::ExplicitDecision::new(
+    let elsewhere = ExplicitDecision::new(
         chain.registry(1).reference(),
         chain.inventory(3).reference(),
-        support::committed(3, 1),
+        committed(3, 1),
     )
     .unwrap();
     assert_eq!(
@@ -468,6 +469,49 @@ fn automatic_updates_need_the_session_and_proven_decisions() {
         reconciled(&chain, (1, 2), &Case::default()),
         Ok(Reconciliation::Unresolved(_))
     ));
+    // A partial view retires nothing, in a session or not. Here the view
+    // holds checkout alone: cancel is gone from it, yet keeps its ID, and
+    // home, in the unit the view leaves out, stays as it was.
+    let view = partial_view(2, &["checkout"]);
+    let viewed = planned(reconciled_from(
+        &chain,
+        1,
+        &view,
+        &Case {
+            edits: &[the_edit(2)],
+            candidates: &[id_of(2, 2)],
+            ..Case::default()
+        },
+    ));
+    assert!(viewed
+        .update()
+        .update()
+        .decisions()
+        .iter()
+        .all(|decision| !matches!(decision, IdentityDecision::Retire(_))));
+    let permit = session
+        .invoke(&principal("alice"))
+        .unwrap()
+        .authorize_update(
+            &UpdateRequest {
+                base: chain.registry(1),
+                inventory: &view,
+                plan: &viewed,
+                confirmations: &[],
+                mode: UpdateMode::Development,
+            },
+            &limits(),
+        )
+        .unwrap();
+    for (cancel_or_home, n, k) in [("cancel", 2, 1), ("home", 1, 1)] {
+        let entry = permit.result().entry(&id_of(n, k)).unwrap();
+        assert_eq!(entry.state(), EntryState::Active, "{cancel_or_home}");
+        assert_eq!(
+            Some(entry),
+            chain.registry(1).snapshot().entry(&id_of(n, k)),
+            "{cancel_or_home}"
+        );
+    }
     // An update cannot initialize: a binding with no chain has no base.
     let new_owner = TestAuthority::new(
         TestAuthority::destination("storefront-registry", owner(), "storefront-web", None).unwrap(),
@@ -528,8 +572,8 @@ fn owner_semantics_cannot_be_overridden_by_authority() {
     let chain = Chain::load();
     // A caller holding every grant still has nothing to authorize where
     // design 016 refuses the change: a candidate colliding with an ID the
-    // base holds, a unit that was not checked, and history the evidence
-    // does not show.
+    // base holds, a unit that was not checked, history the evidence does not
+    // show, and one entry carried to two declarations.
     assert_eq!(
         reconciled(
             &chain,
@@ -572,6 +616,35 @@ fn owner_semantics_cannot_be_overridden_by_authority() {
         reconciled(&chain, (1, 2), &Case::default()),
         Ok(Reconciliation::Unresolved(_))
     ));
+    // Cancel restored as update 3 restores it, and again onto the
+    // declaration a proven continuation already holds.
+    let cancel = committed(3, 1);
+    let twice = ExplicitDecision::new(
+        chain.registry(2).reference(),
+        chain.inventory(3).reference(),
+        IdentityDecision::restoration(
+            cancel.intent_id().clone(),
+            cancel.from().unwrap().clone(),
+            committed(3, 2).to().unwrap().clone(),
+            ExplicitBasis::new("The same message, moved.").unwrap(),
+        ),
+    )
+    .unwrap();
+    let Ok(Reconciliation::Unresolved(report)) = reconciled(
+        &chain,
+        (2, 3),
+        &Case {
+            edits: &[the_edit(3)],
+            explicit: &[restore(&chain), twice],
+            ..Case::default()
+        },
+    ) else {
+        panic!("one entry carried to two declarations is no plan");
+    };
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(|diagnostic| diagnostic.detail() == Some(detail::competing_claim())));
 
     // And a plan is authorized only for the inputs it was made from.
     let authority = authority_over(&chain, 3, &[("alice", ALL)], false);
