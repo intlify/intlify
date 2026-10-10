@@ -643,7 +643,11 @@ mod tests {
         let host = enrolled(committed_randomness(), ALL);
         advance(&host, &chain, 0);
         host.start_development_session().unwrap();
+        let during = host.open(&alice(), Acquisition::default()).unwrap();
+        assert!(during.authority().development_session());
         host.end_development_session().unwrap();
+        let after = host.open(&alice(), Acquisition::default()).unwrap();
+        assert!(!after.authority().development_session());
         advance_one(&host, &chain);
         let records = host.records().unwrap();
         assert_eq!(records[1].generation(), records[0].generation() + 1);
@@ -689,5 +693,75 @@ mod tests {
             host.records(),
             Err(HostFailure::Blocked(Blocked::Unavailable))
         );
+    }
+
+    #[test]
+    fn a_pin_names_a_snapshot_the_host_published() {
+        let chain = Chain::load();
+        let host = enrolled(committed_randomness(), ALL);
+        advance(&host, &chain, 1);
+        // Registry 2 is a real snapshot of this chain, but not one this host
+        // has published.
+        assert_eq!(
+            host.open(
+                &alice(),
+                Acquisition {
+                    sources: vec![],
+                    pins: vec![chain.registry(2).reference()],
+                }
+            )
+            .err(),
+            Some(HostFailure::Blocked(Blocked::UnknownSnapshot))
+        );
+    }
+
+    #[test]
+    fn each_generation_keeps_the_update_that_produced_it() {
+        let chain = Chain::load();
+        let host = enrolled(committed_randomness(), ALL);
+        advance(&host, &chain, 0);
+        let genesis = host.open(&alice(), Acquisition::default()).unwrap();
+        assert!(genesis.current.as_ref().unwrap().previous().is_none());
+        advance_one(&host, &chain);
+        let session = host.open(&alice(), Acquisition::default()).unwrap();
+        let previous = session.current.as_ref().unwrap().previous().unwrap();
+        assert_eq!(previous.update.reference(), chain.update(1).reference());
+        assert_eq!(
+            previous.inventory.reference(),
+            chain.inventory(1).reference()
+        );
+    }
+
+    #[test]
+    fn an_initialization_checks_the_binding_and_the_authority_at_the_commit() {
+        // The control state is lost after the session opened.
+        let host = enrolled(committed_randomness(), ALL);
+        let session = host.open(&alice(), Acquisition::default()).unwrap();
+        host.lose_control_state();
+        assert_eq!(
+            session.initialize(),
+            Err(HostFailure::Blocked(Blocked::Unavailable))
+        );
+        // The grants change after the session opened.
+        let host = enrolled(committed_randomness(), ALL);
+        let session = host.open(&alice(), Acquisition::default()).unwrap();
+        host.set_grants(vec![(alice(), ALL.to_vec())]).unwrap();
+        assert_eq!(
+            session.initialize(),
+            Err(HostFailure::Conflict(Conflict::AuthorityChanged))
+        );
+        // No room for even the genesis.
+        let host = host_with(
+            committed_randomness(),
+            HostLimits {
+                generations: 0,
+                ..host_limits()
+            },
+        );
+        host.enroll().unwrap();
+        host.set_grants(vec![(alice(), ALL.to_vec())]).unwrap();
+        let session = host.open(&alice(), Acquisition::default()).unwrap();
+        assert_eq!(session.initialize(), Err(HostFailure::HistoryFull));
+        assert_eq!(host.binding_state(), BindingState::Uninitialized);
     }
 }

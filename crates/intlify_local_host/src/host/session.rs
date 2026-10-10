@@ -725,4 +725,77 @@ mod tests {
         );
         assert_eq!(host.records().unwrap().len(), 1);
     }
+
+    #[test]
+    fn a_plan_prepared_on_an_earlier_base_is_stale_in_any_session() {
+        let chain = Chain::load();
+        let mut values = vec![
+            bytes(REGISTRY),
+            bytes_of(&id_of(1, 0)),
+            bytes_of(&id_of(1, 2)),
+            bytes_of(&id_of(1, 1)),
+            bytes_of(&id_of(2, 2)),
+        ];
+        values.push([0x5a; 16]);
+        let host = enrolled(Scripted::new(values), ALL);
+        advance(&host, &chain, 1);
+        let (session, update) = prepare_step(&host, &chain, 2);
+        let update = prepared(update);
+        // A second plan on registry 1, drawing its own ID and no link.
+        let earlier = host.open(&alice(), acquisition(&chain, 2)).unwrap();
+        let owned = sources();
+        let retained = retained(&owned);
+        let membership = membership();
+        let edits = [the_edit(2)];
+        let old = prepared(earlier.prepare(
+            chain.inventory(2),
+            &inputs(&retained, &membership, &edits, &[]),
+        ));
+        session.publish(&update, &[], UpdateMode::Manual).unwrap();
+        // A session opened after sees registry 2 as current, and the plan's
+        // base is still not it.
+        let fresh = host.open(&alice(), acquisition(&chain, 2)).unwrap();
+        assert_eq!(
+            fresh.publish(&old, &[], UpdateMode::Manual),
+            Err(HostFailure::Conflict(Conflict::StaleBase))
+        );
+    }
+
+    #[test]
+    fn preparing_needs_the_analysis_grants() {
+        let chain = Chain::load();
+        let host = enrolled(committed_randomness(), ALL);
+        advance(&host, &chain, 0);
+        host.set_grants(vec![(
+            alice(),
+            vec![Action::ReadRegistry, Action::UpdateRegistry],
+        )])
+        .unwrap();
+        let (_, refused) = prepare_step(&host, &chain, 1);
+        assert_eq!(
+            refused,
+            Err(HostFailure::Denied(AuthorizationFailure::Denied(
+                Action::AnalyzeSource
+            )))
+        );
+    }
+
+    #[test]
+    fn the_candidate_bound_admits_its_exact_value() {
+        let chain = Chain::load();
+        let mut limits = host_limits();
+        limits.identity = IdentityLimits {
+            candidates: 3,
+            ..limits.identity
+        };
+        let host = host_with(committed_randomness(), limits);
+        host.enroll().unwrap();
+        host.set_grants(vec![(alice(), ALL.to_vec())]).unwrap();
+        advance(&host, &chain, 0);
+        let (_, planned) = prepare_step(&host, &chain, 1);
+        assert_eq!(
+            prepared(planned).plan().update().reference(),
+            chain.update(1).reference()
+        );
+    }
 }
