@@ -546,11 +546,13 @@ version = "0.14.0-alpha.12"
 dependencies = [
  "intlify_authoring",
  "intlify_authoring_js",
+ "intlify_measurement",
  "intlify_shared_json",
  "jsonschema",
  "schemars",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

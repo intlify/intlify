@@ -35,6 +35,7 @@
     "bench:config:smoke": "cargo bench -p intlify_config --bench profile_resolver --features benchmark -- --profile smoke --validate",
     "bench:authoring:smoke": "cargo bench -p intlify_authoring --bench authoring_semantics --features benchmark -- --profile smoke --validate",
     "bench:authoring-js:smoke": "cargo bench -p intlify_authoring_js --bench authoring_js_discovery --features benchmark -- --profile smoke --validate",
+    "bench:authoring-identity:smoke": "cargo bench -p intlify_authoring_identity --bench authoring_identity_reconciliation --features benchmark -- --profile smoke --validate",
     "pack:bindings:smoke": "node scripts/pack-bindings-smoke.mjs",
     "build:cli": "vp run cli#build",
     "schema:cli": "vp run cli#schema",

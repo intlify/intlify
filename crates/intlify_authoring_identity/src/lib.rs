@@ -30,6 +30,8 @@
 //! ```
 
 mod admission;
+#[cfg(feature = "benchmark")]
+pub mod benchmark;
 mod compile;
 mod continuity;
 mod id;
