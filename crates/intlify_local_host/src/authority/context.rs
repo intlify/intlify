@@ -114,6 +114,13 @@ impl Destination {
     pub const fn registry(&self) -> Option<&RegistryIdentity> {
         self.registry.as_ref()
     }
+
+    /// The same binding once its chain exists under this registry identity.
+    #[cfg(feature = "test-authority")]
+    pub(crate) fn with_registry(mut self, registry: RegistryIdentity) -> Self {
+        self.registry = Some(registry);
+        self
+    }
 }
 
 /// Which named bound an authority or an authorization exhausted.

@@ -27,7 +27,7 @@ const VECTORS: &str =
     include_str!("../../../intlify_authoring_identity/fixtures/phase3/registry-vectors.json");
 
 /// The registry identity of the committed chain.
-const REGISTRY: &str = "f55ca0b3224c28776d729daf805177d7";
+pub(crate) const REGISTRY: &str = "f55ca0b3224c28776d729daf805177d7";
 
 fn document() -> Value {
     serde_json::from_str(VECTORS).expect("committed vectors")

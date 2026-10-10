@@ -674,6 +674,7 @@ dependencies = [
 name = "intlify_local_host"
 version = "0.14.0-alpha.12"
 dependencies = [
+ "getrandom 0.4.3",
  "intlify_authoring",
  "intlify_authoring_identity",
  "intlify_shared_json",
