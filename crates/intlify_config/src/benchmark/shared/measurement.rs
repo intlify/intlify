@@ -38,7 +38,7 @@ pub(in crate::benchmark) type CaseEvidence =
 pub(in crate::benchmark) type Evaluation = common::Evaluation;
 pub(in crate::benchmark) type Report = common::Report;
 
-const RESULT_SCHEMA: &str = "intlify-config-owner-run-result/1";
+const RESULT_SCHEMA: &str = "intlify-config-owner-run-result/0";
 
 pub(in crate::benchmark) fn evidence_schema() -> Result<serde_json::Value, serde_json::Error> {
     common::evidence_schema::<CaseProjection, Descriptors, Observation>()

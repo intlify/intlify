@@ -18,10 +18,10 @@ mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
 
-// Revision 1 adopts the formal 015/017 configuration references across the
-// complete fixed inventory. Locale-only spellings and result/work codecs retain
-// their meaning; no old synthetic row may be silently reused as this revision.
-const FIXTURE_REVISION: &str = "1";
+// The fixed inventory uses the formal 015/017 configuration references. Until
+// Intlify is released, a changed recipe rewrites its expectations in place at
+// this revision rather than starting a new one.
+const FIXTURE_REVISION: &str = "0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]

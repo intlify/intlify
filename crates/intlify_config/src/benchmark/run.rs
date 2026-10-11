@@ -29,8 +29,8 @@ use super::shared::identity::{OwnerRecordIdentity, RecordIdentity, OWNER_RESULT_
 use super::shared::plan::{self, IssuedRunPlan, PlanFailure, RunPlanRecord};
 use super::work::WorkFailure;
 
-const PLAN_CODEC: &str = "intlify-config-owner-run-plan/1";
-const RESULT_CODEC: &str = "intlify-config-owner-run-result/1";
+const PLAN_CODEC: &str = "intlify-config-owner-run-plan/0";
+const RESULT_CODEC: &str = "intlify-config-owner-run-result/0";
 // Private, bounded developer input; not a project Resource Limit Policy default.
 const MAX_RECORD_BYTES: usize = 16 * 1024 * 1024;
 

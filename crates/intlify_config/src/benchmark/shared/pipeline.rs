@@ -41,7 +41,7 @@ use crate::benchmark::work::WorkFailure;
 use intlify_measurement::reason::InvocationFailure as Invocation;
 use intlify_measurement::record::Reference;
 
-const RESULT_CODEC: &str = "intlify-config-owner-run-result/1";
+const RESULT_CODEC: &str = "intlify-config-owner-run-result/0";
 
 impl ObservedDescriptors for Descriptors {
     fn execution(&self) -> &intlify_measurement::execution::Execution {
