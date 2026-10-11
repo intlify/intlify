@@ -43,7 +43,7 @@ oxc_diagnostics = "=0.141.0"
 # errors are early errors a conforming host rejects.
 oxc_parser = "=0.141.0"
 oxc_semantic = "=0.141.0"
-oxc_span = "=0.141.0"
+oxc_span = "=0.152.0"
 # The owner-neutral 026 records and the owner run that captures and seals them,
 # with the derives this owner's own record fragments need. Ordinary consumers
 # never build any of them.
