@@ -4,7 +4,7 @@ Persistent Intent identity for [Intlify](../../design/000-intlify-overview-desig
 
 > [!IMPORTANT]
 >
-> This crate is the start of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md). So far it holds the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, reconciliation, and read-only compilation into Intent and reference artifacts. See [Current status](#current-status).
+> This crate is the pure core of Phase 3 of [design 016](../../design/016-intlify-source-authoring-and-intent-identity-design.md): the registry identity, the representation of registry history, its transitions and replay, the checks of continuity, newness and absence, reconciliation, and read-only compilation into Intent and reference artifacts. Nothing here persists or publishes a registry. See [Current status](#current-status).
 
 [`intlify_authoring`](../intlify_authoring/README.md) decides what a message is and records what one analysis found as an `authoring-inventory`. It assigns no identity, and a Producer such as [`intlify_authoring_js`](../intlify_authoring_js/README.md) never learns one. This crate adds persistent identity on top of that record:
 
@@ -149,6 +149,19 @@ Every measured planning reuses its case's workspace and is compared with an expe
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, read-only compilation, and the observational measurement of reconciliation and replay.
+This is an unpublished, workspace-internal crate. It completes the pure core of Phase 3: the registry identity, the representation and structural admission of registry snapshots and updates, applying an update to its base, replaying a chain from an anchor, checking the continuity, newness and absence an update claims, reconciling an inventory against a base, the representation and structural admission of Intent and reference artifacts, read-only compilation, and the observational measurement of reconciliation and replay. [`fixtures/phase3/README.md`](./fixtures/phase3/README.md) maps each of the phase's fixture families to the tests that check it, and names what is left to later work.
 
-Who may confirm an explicit decision or publish a plan is evaluated by [`intlify_local_host`](../intlify_local_host/README.md), and publishing itself belongs to that host. Local persistence and production publication are a later step again, after checked 015 inputs exist.
+Who may confirm an explicit decision or publish a plan is evaluated by [`intlify_local_host`](../intlify_local_host/README.md), and publishing itself belongs to that host.
+
+## What comes next
+
+Local persistence and production publication come with a later plan. Its starting point is what this crate already gives: a plan or an unresolved report from an admitted base and inventory, which the local host authorizes and publishes in memory. It needs, before it starts:
+
+- checked design 015 inputs and policy bodies, in place of the test-owned context this phase admits;
+- a bootstrap format, which design 029 still lists as a prerequisite;
+- a 029 host adapter that writes generations and one current pointer, resolves an interrupted transaction, and holds a lock.
+
+Two questions to the design 017 and 019 owners are open, and their answers may change the representation:
+
+- An update does not record the host's membership it was planned against. A reader replaying it sees that the inventory it names claimed to be complete, but cannot check that it covered every unit, which is what a retirement relied on. Reconciliation takes the membership from the host and requires a complete inventory to match it exactly.
+- An inventory's basis does not include the binding configuration it was read under. A configuration that stops recognizing some declarations is seen here only where it also changes the basis; until the basis carries it, any change of basis stops automatic newness and absence, and the host has to treat a configuration change as one.

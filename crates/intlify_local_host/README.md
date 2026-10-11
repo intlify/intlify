@@ -84,6 +84,10 @@ Fresh values come only from the `Randomness` the host was set up with, `OsRandom
 
 ## Current status
 
-This is an unpublished, workspace-internal crate. Implemented so far: design 018's authority evaluator against explicitly test-owned authority, and design 029's registry operations against an in-memory, test-owned host: enrollment, initialization, reads, analysis, preparation with fresh IDs from operating-system randomness, confirmation, conditional publication and development sessions.
+This is an unpublished, workspace-internal crate. It completes its part of the pure core of Phase 3: design 018's authority evaluator against explicitly test-owned authority, and design 029's registry operations against an in-memory, test-owned host: enrollment, initialization, reads, analysis, preparation with fresh IDs from operating-system randomness, confirmation, conditional publication and development sessions. The phase's fixture matrix, in [`intlify_authoring_identity/fixtures/phase3/README.md`](../intlify_authoring_identity/fixtures/phase3/README.md), maps design 018's and 029's rows to the tests here.
 
-Not yet implemented: local persistence (generations on disk, pending transactions, outcome resolution, locks and fault injection) and production publication, which come with a later plan once checked 015 inputs and a 029 host adapter exist. A lineage link names Intent IDs as given, so a link to an ID the same preparation draws cannot be supplied before the draw.
+## What comes next
+
+Local persistence and production publication come with a later plan, which keeps the in-memory host's order of checks and puts it on disk: generations with one current pointer, pending markers and the outcome of an interrupted transaction, locks, fault injection, and reopen, restart and multi-process tests (design 029), with retained provenance (design 018). Before it starts it needs checked design 015 inputs and policy bodies, from which a production authority is established in place of the test-owned one, and a bootstrap format.
+
+A lineage link names Intent IDs as given, so a link to an ID the same preparation draws cannot be supplied before the draw; how a host builds such a link is decided with that plan. The questions open to the design 017 and 019 owners are listed in [`intlify_authoring_identity`](../intlify_authoring_identity/README.md#what-comes-next).
