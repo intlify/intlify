@@ -90,7 +90,7 @@ A vector is regenerated only when the representation or the inventories it is bu
 
 ## Completion conditions
 
-016 completes Phase 3 when the adopted 017 minimum identity and registry representations and their admission checks are implemented, independent history fixtures pass, and production publication adopts the applicable 018 authorization slice and 029 host exact-base and atomicity checks. Plan 021 delivers the pure core of that. Production publication needs checked 015 inputs and a 029 host adapter, and is plan 022's.
+016 completes Phase 3 when the adopted 017 minimum identity and registry representations and their admission checks are implemented, independent history fixtures pass, and production publication adopts the applicable 018 authorization slice and 029 host exact-base and atomicity checks. Plan 021 delivers the pure core of that. Production publication needs checked 015 inputs and a 029 host adapter, and comes with a later plan for local persistence.
 
 | Condition | Checked by |
 | --- | --- |
@@ -99,7 +99,7 @@ A vector is regenerated only when the representation or the inventories it is bu
 | Independent history fixtures pass | `every_committed_update_reproduces_the_snapshot_written_by_hand`, `the_committed_chain_is_planned_again_from_its_own_evidence`, `the_committed_chain_proves_every_basis_it_claims`, `compilation_gives_exactly_the_committed_artifacts_and_one_target_per_declaration`, and `vp run vectors:authoring:check` |
 | 018's authorization slice is evaluated | `establishment_is_explicit_and_refuses_what_it_cannot_trust` _(local host)_, `least_authority_denies_each_missing_grant_on_its_own` _(local host)_, `input_binding_admits_the_exact_acquired_inputs_only` _(local host)_, `confirmations_bind_the_exact_choice_actor_and_authority` _(local host)_, `automatic_updates_need_the_session_and_proven_decisions` _(local host)_, `owner_semantics_cannot_be_overridden_by_authority` _(local host)_, `a_permit_is_local_to_its_request_and_its_authority` _(local host)_ |
 | 029's exact-base and atomicity checks run, against in-memory state | `of_two_updates_prepared_from_one_base_at_most_one_is_published` _(local host)_, `of_two_initializations_exactly_one_succeeds` _(local host)_, `a_change_of_authority_or_session_before_the_commit_refuses_the_write` _(local host)_, `a_publication_is_refused_once_its_base_or_authority_moved` _(local host)_ |
-| Production publication | **Plan 022.** Nothing here writes a registry anywhere. A publication says it lives in memory (`Durability::InMemory`), and the only authority established is test-owned (`only_a_test_owned_context_establishes_authority_in_this_phase` _(local host)_). |
+| Production publication | **The local persistence plan.** Nothing here writes a registry anywhere. A publication says it lives in memory (`Durability::InMemory`), and the only authority established is test-owned (`only_a_test_owned_context_establishes_authority_in_this_phase` _(local host)_). |
 
 ## The matrix
 
@@ -296,9 +296,9 @@ The owner run is shared, so a rejection pinned on the minimal test owner in `int
 
 These are named so that their absence is a decision rather than an oversight.
 
-- **Local persistence and production publication** — generations on disk, one current pointer, pending markers, the outcome of an interrupted transaction, locks, fault injection, and reopen, restart and multi-process tests (design 029), with retained provenance (design 018). They are plan 022's, once checked 015 inputs, policy bodies and a bootstrap format exist.
+- **Local persistence and production publication** — generations on disk, one current pointer, pending markers, the outcome of an interrupted transaction, locks, fault injection, and reopen, restart and multi-process tests (design 029), with retained provenance (design 018). They come with a later plan, once checked 015 inputs, policy bodies and a bootstrap format exist.
 - **Production authority** — only the explicitly test-owned context establishes authority. A production `LocalizationProjectProfile` and its checked inputs are design 015's.
 - **Target handles and the consumer handoff** — Phases 4 and 5, through designs 017, 019, 020, 024 and 028.
 - **Conditional selection** — 016-010 is accepted but not implemented, as in Phase 2.
-- **Allocation as a measured operation** — drawing an ID is the host's, and is measured with plan 022's host. The measurement reports candidate comparisons as unavailable rather than counting them.
+- **Allocation as a measured operation** — drawing an ID is the host's, and is measured with the host that persists. The measurement reports candidate comparisons as unavailable rather than counting them.
 - **Two questions to the 017 and 019 owners** — an update does not record the membership it was planned against, so a reader replaying it cannot check that an inventory claiming to be complete covered every unit (plan 021, interpretation #11); and an inventory's basis does not include the binding configuration, so a configuration change is seen only where it changes the basis, which stops automatic newness and absence (interpretation #12).
