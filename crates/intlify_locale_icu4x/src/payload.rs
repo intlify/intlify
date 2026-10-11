@@ -35,8 +35,9 @@ pub struct LogicalPayload {
 }
 
 impl LogicalPayload {
-    /// A payload only 017's framing can carry unchanged.
-    fn new(marker: Marker, value: Value) -> Result<Self, PayloadFailure> {
+    /// A payload only 017's framing can carry unchanged: strings, arrays, and
+    /// objects. A number, boolean, or null is refused rather than converted.
+    pub fn new(marker: Marker, value: Value) -> Result<Self, PayloadFailure> {
         if !representable(&value) {
             return Err(PayloadFailure::Unrepresentable(marker));
         }

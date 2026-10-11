@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node scripts/verify.mjs"
+    "check": "node scripts/verify.mjs",
+    "check:locale": "node scripts/verify-locale.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:"

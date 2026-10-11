@@ -28,10 +28,18 @@ icu_provider = { version = "=2.2.0", features = ["serde", "deserialize_postcard_
 icu_provider_blob = { version = "=2.2.0", features = ["alloc"] }
 # The generator's only source: ICU4X's data generated from CLDR 48.2.0.
 icu_locale_data = { version = "=2.2.0", optional = true }
+# 017's primitives, value framing, canonical JSON text, and the
+# domain-separated digest. Hashing lives here, not in `intlify_config`.
+intlify_shared_json = { path = "../intlify_shared_json", features = ["digest"] }
 # Reads the blob's marker index, which ICU4X keeps in private types.
 postcard = { version = "1", default-features = false }
+schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1.0.106"
+serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+
+[dev-dependencies]
+# Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
+jsonschema = { version = "=0.56.0", default-features = false }
 
 [[example]]
 name = "generate_locale_data"

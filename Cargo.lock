@@ -847,7 +847,10 @@ dependencies = [
  "icu_locale_data",
  "icu_provider",
  "icu_provider_blob",
+ "intlify_shared_json",
+ "jsonschema",
  "postcard",
+ "schemars",
  "serde",
  "serde_json",
 ]
