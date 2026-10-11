@@ -24,16 +24,16 @@ use super::projection::CaseProjection;
 pub(super) const LABELS: Labels = Labels {
     owner: "intlify-authoring",
     framing: Framing::new("intlify-authoring-minimum-observation/0"),
-    plan_codec: "intlify-authoring-owner-run-plan/1",
-    // Revision 2 records the host and toolchain views in the run context.
-    result_codec: "intlify-authoring-owner-run-result/2",
-    result_domain: "intlify-authoring-owner-result-v1",
+    plan_codec: "intlify-authoring-owner-run-plan/0",
+    // The run context records the host and toolchain views.
+    result_codec: "intlify-authoring-owner-run-result/0",
+    result_domain: "intlify-authoring-owner-result-v0",
     runner_domain: "intlify-authoring-local-runner-instance-v0",
     build_schema: "intlify-authoring-build-observation/0",
     subject: "intlify-authoring-phase1-semantics",
     profile: Versioned::new("intlify-authoring-minimum-smoke", "0"),
-    harness: Versioned::new("intlify-authoring-owner-run-harness", "2"),
-    projection: Versioned::new("intlify-authoring-minimum-to-026", "1"),
+    harness: Versioned::new("intlify-authoring-owner-run-harness", "0"),
+    projection: Versioned::new("intlify-authoring-minimum-to-026", "0"),
     native_rule: Versioned::new("intlify-authoring-native-unmanaged-component-context", "0"),
     memory_rule: Versioned::new("intlify-authoring-duration-only-no-memory-observer", "0"),
     instrumentation: Versioned::new("intlify-authoring-owner-run-instrumentation", "0"),
