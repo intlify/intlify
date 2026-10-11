@@ -57,7 +57,7 @@ literal!(
 ///
 /// It is the revision the result codec names, so a case recorded in another
 /// result schema is a different case.
-pub(super) const RESULT_SCHEMA_REVISION: &str = "1";
+pub(super) const RESULT_SCHEMA_REVISION: &str = "0";
 
 /// A bound a fixture is measured at, as the case names it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
