@@ -6,18 +6,19 @@
 
 This design fixes the minimum shared representations needed by [015](./015-intlify-project-profile-and-locale-policy-design.md)'s configuration/locale foundation, its initial [026](./026-intlify-conformance-and-measurement-design.md) measurement path, and [016](./016-intlify-source-authoring-and-intent-identity-design.md)'s source-authoring and persistent-identity implementation.
 
-There are four independently adopted uses:
+There are five independently adopted uses:
 
 - **Configuration:** encode an exact Policy or Target Profile reference so `intlify_config` can generate and validate the complete `intlify.config.json` schema without test-only reference placeholders.
 - **Measurement:** retain an owner result, identify and validate common records, and follow exact references from a planned run through observations and evaluations to a structured report.
 - **Source authoring:** encode an owner-qualified Intent ID, a reproducible semantic revision, source/declaration/reference facts, and exact-base registry updates. This supplies 016's Phase 1–3 foundation and a minimal Intent/reference handoff, not the complete downstream artifact system.
 - **Web localization:** encode the message, policy, supply, governance, planning, target, and Release artifacts that [020](./020-intlify-requirement-planning-and-linking-design.md) through [025](./025-intlify-release-assembly-and-deployment-design.md) require for 016 Phase 4–5 and the [028](./028-intlify-javascript-web-vertical-slice-design.md) Web integration. This supplies their minimum shared representations, not their semantics, authority, or host workflows.
+- **Locale canonicalization data:** encode the Locale Canonicalization Data Artifact that 015 Phase 2 admits: its manifest, the representation-independent dataset and semantic digest, and the integrity of its payloads.
 
-The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. The authoring path encodes 016's facts and identity decisions; it does not prove source approval, authorize registry publication, or establish executable target compatibility. Those decisions remain with the owning specifications. The Web localization path encodes what those owners decided; it does not select, approve, publish, activate, or execute anything.
+The configuration path establishes the shape of a reference, not the validity of its referenced artifact. The measurement path establishes the representation and integrity of a record, not whether its result is successful or its runner is trusted. The authoring path encodes 016's facts and identity decisions; it does not prove source approval, authorize registry publication, or establish executable target compatibility. Those decisions remain with the owning specifications. The Web localization path encodes what those owners decided; it does not select, approve, publish, activate, or execute anything. The locale canonicalization data path establishes which dataset an artifact realizes and that its bytes are intact; it does not define canonicalization, admit a specification, or prove who published the data.
 
 This revision specifies only these explicitly scoped shared subsets. It does not complete every artifact family assigned to 017 by [000](./000-intlify-overview-design.md), nor does adopting it establish complete 015 Profile Specification revision-`"0"` support.
 
-The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice. The additive 016 scope has its own artifact-kind/schema tuples; it changes neither the existing configuration references nor the four measurement record schemas or their digests. The additive Web localization scope below likewise adds tuples without changing existing ones. It adds semantic body admission for four Policy kinds and the Target Profile kind, which the existing structural configuration admission never performed.
+The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned canonicalization and private locale-core slices of Phases 2 and 3. Defining the complete configuration structure does not require resolving every referenced Policy or Target Profile body in that minimum slice. The additive 016 scope has its own artifact-kind/schema tuples; it changes neither the existing configuration references nor the four measurement record schemas or their digests. The additive Web localization scope below likewise adds tuples without changing existing ones. It adds semantic body admission for four Policy kinds and the Target Profile kind, which the existing structural configuration admission never performed. The additive locale canonicalization data scope adds the artifact that 015 Phase 2 admits, again without changing an existing tuple.
 
 ## Goals
 
@@ -30,11 +31,13 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 - Retain exact source, input, base, decision, and result bindings while keeping decoding, semantic validation, and publication authorization separate.
 - Fix the minimum message, policy, supply, governance, planning, target, and Release representations required by 020–025 for 028, with exact identities, canonical orders, and non-circular references.
 - Keep message content identity, complete artifact identity, file-byte integrity, and record instance identity distinct.
+- Fix the Locale Canonicalization Data Artifact manifest, a dataset semantic digest that every conforming payload encoding shares, and the integrity of each payload.
 
 ## Non-Goals
 
 - Defining Trust Policy, Resource Limit Policy, or Glossary Set bodies, artifact acquisition, bootstrap trust, signatures, or authorization.
-- Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, Finding/Evidence model, or canonicalization-data artifacts.
+- Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, or Finding/Evidence model.
+- Defining locale canonicalization semantics, the conformance layer, or the rules for generating canonicalization data, which remain with 015.
 - Redefining 016's recognition, semantic-revision, identity-continuity, or automatic-update rules.
 - Completing `LibraryManifest`, cross-owner references, Locale Capsules, Runtime Manifests, multi-unit or hydration-coupled target output, remote publication records, or Runtime ABI.
 - Defining a general authoring-result/diagnostic protocol, project graph, module acquisition, host lowering, or registry update commands.
@@ -48,7 +51,7 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 | --- | --- |
 | 015 | Configuration members and presence, field-role expectations, structural versus semantic admission, selection, locale behavior, resource limits, and the active owner measurement boundaries |
 | 016 | Source recognition and extraction, MF2/context projection meaning, parameter requirements, continuity/newness/absence checks, and valid identity decisions |
-| 017 | Shared reference JSON, verification and authoring representations, identity domains, canonical framing, integrity coverage, and exact-version selection |
+| 017 | Shared reference JSON, verification, authoring, Web localization, and locale canonicalization data representations, identity domains, canonical framing, integrity coverage, and exact-version selection |
 | 018 | Artifact authentication, provenance, trust, and authorized evidence use; an integrity digest never supplies these decisions |
 | 019 | Complete project queries, shared diagnostic reporting, dependency storage, and incremental orchestration; the minimum authoring inventory below is not a project graph |
 | 020/021/022 | Planning, Store/governance, and supply semantics; 017 encodes their minimum records without deciding demand, eligibility, or selection |
@@ -76,6 +79,7 @@ The implementation may colocate small reusable types with their first consumer. 
 | `ContentDigest` / `ArtifactDigest` | Identity of one message's canonical content projection versus the integrity identity of its complete immutable artifact envelope; neither is an Intent revision |
 | Logical address | Deployment-relative safe path of one generated file inside a target output set or destination; it locates bytes and carries no semantic identity |
 | File digest | Domain-less SHA-256 of exact file bytes; distinct from canonical record integrity |
+| Locale canonicalization dataset | The representation-independent logical value whose semantic digest identifies the data that a Locale Canonicalization Data Artifact realizes; distinct from the artifact's integrity and its payloads' file digests |
 
 ## Design Overview
 
@@ -88,6 +92,7 @@ The implementation may colocate small reusable types with their first consumer. 
 | Registry snapshot and update plan | Bind exact base, inventory, decisions, and immutable result | 016 association checks, 018 authorization, and 029 atomic publication |
 | Message, plan, Store, and supply records | Encode exact message content and artifacts, plans, Store membership and transitions, and acquisition provenance | 020/021/022 admission, eligibility, selection, and publication |
 | Target and Release records | Encode Target Profile bodies, binding tables, locale payloads, output descriptors, Release snapshots, publication records, and admission evidence | 024 generation and validation, 025 publication/activation, 027 execution admission |
+| Locale canonicalization data | Decode the manifest, verify its integrity and payload bytes, rebuild the dataset, and check its semantic digest | 015 specification admission and its provider boundary |
 
 017 does not add an executable compiler phase. Its representations are adopted by the relevant 015/016 operations and by measurement alongside each active measured boundary.
 
@@ -973,6 +978,107 @@ The adopting implementation materializes closed Draft 7 schemas for every kind a
 
 Schema round trips and encoder-generated expectations do not satisfy these fixtures. Digest, file-byte, and canonical-JSON expectations come from an independent implementation.
 
+## Locale Canonicalization Data Representation
+
+This additive subset encodes the [Locale Canonicalization Data Artifact](./015-intlify-project-profile-and-locale-policy-design.md#locale-identity-and-canonicalization) that 015 Implementation Phase 2 admits through its provider boundary. 015 owns the Locale Canonicalization Specification, the admitted locale domain, the conformance layer, the generation rules, and every resulting Finding. 017 owns the artifact manifest, the representation-independent logical dataset, its framing and digests, and the reader's order and limits. Acquiring, installing, caching, and lockfile-pinning an artifact remain with 029; authenticity and trust remain with 018. A digest establishes content identity, not who published the content.
+
+The notation follows the authoring subset. `FileDigest` and `LogicalAddress` are the Target output definitions above. Every collection is subject to explicit caller-supplied finite limits.
+
+### Logical dataset and semantic digest
+
+```text
+LocaleCanonicalizationDataset {
+  datasetSchema: VersionedIdentity
+  markers: { marker: NonemptyText, payload: MarkerPayload }[]
+  conformance: LocaleConformanceData
+}
+LocaleConformanceData {
+  validity: { field: ValidityField, status: ValidityStatus, codes: NonemptyText[] }[]
+  extensionKeys: {
+    extension: "t" | "u"
+    key: NonemptyText
+    deprecated: boolean
+    valueType: "any" | "incremental" | "multiple" | "single"
+    types: ExtensionType[]
+  }[]
+  corrections: { extension: "t" | "u", key: NonemptyText, from: NonemptyText, to: NonemptyText }[]
+}
+ValidityField = "language" | "region" | "script" | "subdivision" | "variant"
+ValidityStatus = "deprecated" | "macroregion" | "private-use" | "regular" | "reserved" | "special" | "unknown"
+ExtensionType =
+  | { kind: "class", class: "codepoints" | "private-use" | "reorder-code" | "rg-key-value" | "script-code" | "subdivision-code" }
+  | { kind: "literal", type: NonemptyText, deprecated: boolean }
+MarkerPayload = a JSON value made only of objects, arrays, and strings
+```
+
+`datasetSchema` is `intlify-locale-canonicalization-dataset` / `"0"`. It fixes this closed structure and the marker set below; a Locale Canonicalization Specification revision states which dataset schema it admits.
+
+`markers` contains exactly the four ICU4X singleton markers that 015 requires, sorted by name: `LocaleAliasesV1`, `LocaleLikelySubtagsExtendedV1`, `LocaleLikelySubtagsLanguageV1`, and `LocaleLikelySubtagsScriptRegionV1`. Each `payload` is the value produced by ICU4X `2.2.0`'s human-readable serde serialization of that marker's data struct, which ICU4X documents as the stable representation of its data, read as a JSON value. A map whose keys are not strings is therefore the ordered array of key/value pairs that ICU4X emits; this design neither re-sorts nor restructures a payload. A payload containing a number, boolean, or `null` is unrepresentable: generation fails and admission rejects it rather than converting the value.
+
+`validity` holds the pinned CLDR validity records that the conformance layer uses. It has one group per field and status, sorted by field and then status. Each group's codes are sorted, duplicate-free, and expanded from CLDR range notation, and a code appears in at most one group of its field. Codes keep their CLDR spelling and case, and `private-use` is the CLDR status `private_use`.
+
+`extensionKeys` holds every `u` and `t` key in the pinned CLDR `common/bcp47` records, sorted by extension and then key. A key's `types` are sorted by kind and then by class or type, and are duplicate-free. A `class` entry stands for one of the CLDR special type names `CODEPOINTS`, `PRIVATE_USE`, `REORDER_CODE`, `RG_KEY_VALUE`, `SCRIPT_CODE`, and `SUBDIVISION_CODE`, spelled in lowercase with `-` in place of `_`; 015's conformance layer defines each class's value grammar, and a source special type outside this list makes generation fail. `valueType` is `single` when the source omits it. Legacy names such as a key's `alias="calendar"` are not recorded, because 015 leaves legacy-only forms to its compatibility adapter.
+
+`corrections` is the flattened correction set that 015 derives: each `from` maps directly to its final `to`, mappings that ICU4X already realizes are absent, entries are sorted by extension, key, and then `from`, and each `(extension, key, from)` occurs once.
+
+The dataset's semantic digest is `H("locale-canonicalization-dataset", dataset)`. It identifies the logical dataset independently of how a payload encodes it: a baked, blob, or other conforming export of the same dataset has the same semantic digest and a different file digest. Generation provenance and a payload's format, address, length, and bytes are not part of the preimage.
+
+### Artifact manifest and payloads
+
+```text
+LocaleCanonicalizationDataArtifact {
+  kind: "locale-canonicalization-data"
+  schemaRevision: "0"
+  specification: VersionedIdentity
+  dataset: { identity: IdentityToken, schema: VersionedIdentity, semanticDigest: SemanticDigest }
+  generation: {
+    markerData: { package: IdentityToken, version: RevisionToken, checksum: FileDigest }
+    cldr: { revision: RevisionToken, sources: { address: LogicalAddress, digest: FileDigest }[] }
+    markers: NonemptyText[]
+  }
+  payloads: {
+    role: "conformance" | "markers"
+    format: VersionedIdentity
+    address: LogicalAddress
+    byteLength: UInt64
+    digest: FileDigest
+  }[]
+  integrityDigest: IntegrityDigest
+}
+```
+
+`specification` is the Locale Canonicalization Specification identity and revision, and `dataset.schema` equals the dataset's `datasetSchema`. Integrity is `H("locale-canonicalization-data-integrity", artifact-with-only-top-level-integrityDigest-omitted)`. 016's `AuthoringBasis` pins this artifact as `localeCanonicalization`, equal to `specification`, and `localeData`, equal to `dataset.identity` and `dataset.semanticDigest`.
+
+`generation` records the provenance that 015 requires the manifest to carry: the upstream marker-data package (`icu_locale_data`), its release, and the checksum of its published package; the CLDR revision with the file digest of every CLDR source file read during generation, addressed relative to the CLDR distribution root and sorted by address with unique addresses; and the marker set, sorted. Integrity covers it, but the semantic digest does not. Changing only provenance, such as vendoring identical CLDR bytes under another address, changes the artifact's integrity without changing the dataset it realizes.
+
+`payloads` contains exactly one `conformance` entry and one `markers` entry, sorted by role. A `markers` payload's `format` is the ICU4X provider schema. Revision `"0"` admits only `icu4x-blob` / `"2.2"`: an ICU4X `2.2.0` `BlobDataProvider` blob whose singleton payloads use ICU4X 2.2's serialized data-struct representation. A `conformance` payload's `format` is `intlify-canonical-json-text` / `"0"`: the `LocaleConformanceData` value written as canonical JSON text revision `"0"`. `address` is relative to the manifest's location, and `byteLength` and `digest` are the transport integrity of the exact payload bytes. A payload format, address, length, and file digest are admission facts and never profile semantics.
+
+### Locale canonicalization data admission and fixtures
+
+The reader follows the common order and fetches nothing. The caller supplies the manifest bytes and the exact bytes of every payload.
+
+1. Apply the caller's finite limits before allocation: manifest bytes and depth, payload count, bytes per payload, decoded marker allocation, the counts of validity groups, codes, keys, types, and corrections, and validation work. A limit failure never yields a truncated dataset.
+2. Strictly decode the manifest, select the exact `kind` and `schemaRevision`, and validate the closed manifest.
+3. Verify `integrityDigest`.
+4. Check each payload's byte length and file digest against the supplied bytes. A missing, truncated, or altered payload fails here.
+5. Decode each payload under an admitted `format`. An unsupported provider schema, a missing or additional marker, and a conformance value that is not exactly the closed, ordered structure above fail here.
+6. Rebuild the logical dataset from the decoded payloads, recompute its semantic digest, and compare all bits with `dataset.semanticDigest`.
+
+Step 2 and the manifest limits of step 1 are the formal envelope checks behind 015's `locale-canonicalization-data-artifact` pre-invocation boundary. The remaining limits and steps 3 through 6 produce distinct typed failures, which 015 reports as resolver Findings during specification admission. The owner checks follow: whether the specification is supported and equals the invocation's `locale-canonicalization` assertion, and whether the dataset identity and digest are the ones that specification admits. Reading a manifest never selects a provider, falls back to host locale data, or turns a successful decode into an admitted specification.
+
+The adopting implementation materializes closed Draft 7 schemas for the manifest and the conformance value, together with independent fixtures:
+
+| Area | Required independent expectations |
+| --- | --- |
+| Dataset framing | Frozen preimage and semantic digest of a small dataset; marker, group, code, key, type, and correction order; a map with non-string keys kept as ICU4X's ordered pairs; a number, boolean, or `null` in a marker payload rejected |
+| Representation independence | The same dataset in two payload encodings, such as two blob index widths, keeps one semantic digest with different file digests; changing one validity code, type, or correction changes the semantic digest |
+| Manifest | Exactly one excluded integrity member; provenance changes integrity but not the semantic digest; unknown and duplicate members; unsupported `kind`, `schemaRevision`, dataset schema, or payload `format` |
+| Payload integrity | Missing, truncated, extended, and altered payloads; a byte length or file digest that disagrees with the bytes |
+| Marker and conformance shape | Each of the four markers missing, an additional marker, unsorted or duplicate groups, codes, keys, types, or corrections, an unknown class or status, a code in two groups of one field, and a correction listed twice |
+| Limits | Exact-bound and first-over cases for each reader limit |
+
+Digest and framing expectations come from an independent implementation rather than the encoder under test.
+
 ## Verification Record Representation
 
 ### Initial record family
@@ -1140,7 +1246,7 @@ These orders refine 026's stage/code/affected/related/detail priority; counts co
 
 ### Scope of canonical encoding
 
-Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this encoding. The existing verification-record domains and the explicitly added authoring domains use the same unchanged value framing.
+Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this encoding. The existing verification-record domains and the explicitly added authoring, Web localization, and locale canonicalization data domains use the same unchanged value framing.
 
 This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's existing Resolver Construction Identity, Snapshot, disclosure, and ResourceBoundValue framing are unchanged. A Policy/Target `semanticDigest` is computed from the body only for the four Policy kinds and the Target Profile kind defined under Minimum Web Localization Representation; for the remaining kinds it stays an opaque exact pin whose computation is deferred with that body's schema and semantic projection.
 
@@ -1206,6 +1312,8 @@ This minimum registers these uses:
 | `message-content-digest` | `{ contentSpecification, mf2Specification, message, parameters }` with exactly the content specification and `MessageContent` projection defined in Minimum Web Localization Representation |
 | `policy-semantic-digest` | `{ kind, specificationRevision, content }` for the four Policy kinds whose bodies are defined there |
 | `target-profile-semantic-digest` | `{ kind, specificationRevision, content }` for the Target Profile body defined there |
+| `locale-canonicalization-data-integrity` | The complete `LocaleCanonicalizationDataArtifact` manifest with only its top-level `integrityDigest` omitted |
+| `locale-canonicalization-dataset` | The complete `LocaleCanonicalizationDataset` defined under Locale Canonicalization Data Representation |
 
 A Measurement Case identity is presented as `mc0_` followed by the 64 lowercase hexadecimal digits of the second digest. Its projection is a closed type fixed by the adopted measurement schema. It excludes sample values, creation time, record/run instance identities, branch/path/worker identities, and the implementation revision being compared. Expected semantic observations and native owner case bindings are retained separately rather than substituted for that projection.
 
@@ -1238,6 +1346,10 @@ The following version domains remain independent even when their initial value i
 | Localization `kind` + `schemaRevision` + `specification` | One complete registered Web localization body/codec and its governing 020–025 semantics; independent of authoring and measurement support |
 | Policy/Target Profile body schema + `specificationRevision` | The closed body admitted for one configuration reference kind and the semantic digest it pins |
 | Intent projection and MF2 specification revisions | The exact semantic projection and parser-owned meaning used to compute an Intent revision |
+| Locale canonicalization data `kind` + `schemaRevision` | The manifest schema and codec |
+| Locale canonicalization dataset `schema` | The closed logical dataset structure and marker set that the semantic digest covers |
+| Locale canonicalization payload `format` | Physical payload decoding only; never profile semantics |
+| Locale Canonicalization Specification identity + revision | 015 canonicalization semantics and the dataset that revision admits |
 | Package/tool version | Producer implementation identity, not schema compatibility |
 
 The initial common-record vocabulary contains exactly the four kind/schema/specification tuples listed above. A reader admits only the tuples for which it implements the complete registered schema and validator; an unimplemented tuple remains unsupported even if its envelope is recognized. Unknown kinds or revisions are unsupported, never interpreted as the newest known revision, accepted by dropping fields, or repaired by filling defaults. A syntactically valid reference to a future Policy revision may remain structurally representable; that does not authorize later artifact resolution to accept unsupported semantics.
@@ -1290,7 +1402,7 @@ Implementations must materialize machine-readable schemas and fixtures for the a
 | Owner provenance | Native checksum algorithm/framing and complete result retained unchanged; unsupported/lossy owner projection rejected; a rehashed altered result still fails against independent owner/fixture inputs |
 | Integrated measurement | Planned run to retained owner result to common evidence/evaluation to structured report and revalidation, including measured, incomplete, invalid, missing, unsupported, and partial-observation cases required by 026 |
 
-Byte-framing tests must not compute their expected bytes with the same encoder under test. The same rule applies to digest and schema expectations. Owner-only round trips and envelope-only validation are not substitutes for the integrated 026 path. The Web localization families add the fixture groups listed under [Web localization admission and fixtures](#web-localization-admission-and-fixtures).
+Byte-framing tests must not compute their expected bytes with the same encoder under test. The same rule applies to digest and schema expectations. Owner-only round trips and envelope-only validation are not substitutes for the integrated 026 path. The Web localization families add the fixture groups listed under [Web localization admission and fixtures](#web-localization-admission-and-fixtures), and the locale canonicalization data adds those under [Locale canonicalization data admission and fixtures](#locale-canonicalization-data-admission-and-fixtures).
 
 ## Adoption in the 015 Minimum Implementation
 
@@ -1301,8 +1413,9 @@ This document introduces no new implementation Phase or separate prerequisite to
 | 015 Phase 1 — Configuration Foundation | Replace test-only reference type instantiations with the formal closed types; generate the complete configuration schema and validate freshness/structural equivalence |
 | Initial measurement for Phase 1 | Materialize the four adopted common record schemas, the registered native-result adapter and projection, exact quantities, identities, canonical framing, and end-to-end admission/report fixtures |
 | Limited Phase 2/3 canonicalization and locale core | Reuse that same measurement path with the active owner dimensions and finite provider/data bindings; do not introduce a second record format |
+| 015 Phase 2 — Locale Canonicalization Boundary | Implement the manifest, dataset, and payload codecs and the reader order of [Locale Canonicalization Data Representation](#locale-canonicalization-data-representation); generate the artifact from the pinned inputs and check its semantic digest against an independent implementation |
 
-The reference-schema definition and record framing remove those specific design dependencies. They do not by themselves finish schema generation, owner projection, harness/CI integration, or any 015 Phase. Complete checked-profile artifacts, Policy/Target body admission, and full revision-`"0"` resolver conformance remain outside the minimum implementation claim.
+The reference-schema definition and record framing remove those specific design dependencies. They do not by themselves finish schema generation, owner projection, harness/CI integration, or any 015 Phase. Complete checked-profile artifacts, Policy/Target body admission, and full revision-`"0"` resolver conformance remain outside the minimum implementation claim. The locale canonicalization data representation likewise removes Phase 2's encoding dependency without completing Phase 2 by itself.
 
 ## Adoption in the 016 Implementation
 
@@ -1353,13 +1466,17 @@ Existing configuration, measurement, and authoring implementations need not adop
 | 017-016 | Keep plans, binding tables, payloads, descriptors, and Releases as references to immutable artifacts and files, with domain-less file digests and a canonical JSON file codec | Lets output sets and destinations verify exact bytes while records keep framed canonical integrity |
 | 017-017 | Use fresh random instance identities only for acquisition attempts, Store lineage, and publication records | Distinguishes events and lineages from deterministic content identities |
 | 017-018 | Fix an acyclic construction order from source artifacts through admission evidence | Prevents self-referential digests and forward references across the Web path |
+| 017-019 | Encode the Locale Canonicalization Data Artifact as one closed manifest whose integrity covers its provenance and whose payloads carry file digests | Lets a host supply exact bytes without fetching, and keeps transport integrity separate from the dataset's identity |
+| 017-020 | Define the dataset semantic digest over a representation-independent logical value: the four ICU4X marker payloads in ICU4X 2.2's stable human-readable serde form plus closed, ordered Intlify conformance records | Baked, blob, and other exports of the same data then share one identity, while blob layout, index width, and transport bytes stay admission facts |
+| 017-021 | Record generation provenance in the manifest but not in the semantic digest | 015 makes upstream source digests evidence rather than identity unless the admitted data changes |
 
 ## Deferred Follow-Up Notes
 
 These subjects remain assigned to 017 but are not prerequisites for the scoped configuration, observational measurement, or initial local authoring/identity paths:
 
 - cross-owner/library reference, candidate ranking, dependency, library, Locale Capsule, Runtime Manifest, multi-unit, hydration-coupled, and remote publication schemas beyond the Web localization minimum;
-- full Profile, construction-authority, Snapshot, canonicalization-data, binding, and Finding/Evidence representations;
+- full Profile, construction-authority, Snapshot, binding, and Finding/Evidence representations;
+- locale canonicalization payload formats other than the ICU4X 2.2 blob, such as baked data;
 - Trust Policy, Resource Limit Policy, and Glossary Set bodies, their semantic digest projections, and their trust/admission integration;
 - measurement capabilities not adopted by the minimum, including comparison/budget, qualification, profiling, campaigns, and cross-platform reports;
 - extended semantic-context/constraint projections, general semantic-result identity, alternate physical encodings, transport containers, registry distribution/compaction, and cross-version migrations.
@@ -1371,7 +1488,7 @@ Any future extension must state its owning semantics and schema-version impact. 
 | Document | Relationship |
 | --- | --- |
 | [000 — Intlify overview](./000-intlify-overview-design.md) | Assigns 017's wider artifact and version-admission responsibilities; only the minimum subset is specified here |
-| [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, and resolver semantics implemented using these encodings |
+| [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, resolver semantics, and the Locale Canonicalization Specification and conformance layer, implemented using these encodings |
 | [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns recognition, message/revision meaning, source facts, continuity, and registry-transition validity; this document fixes the minimum shared representations without completing its later integrations |
 | [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication; digest and schema success supply neither |
 | [020 — Requirement planning and linking](./020-intlify-requirement-planning-and-linking-design.md) | Owns demand, reachability, and selection semantics for the plan and bundle records encoded here |
