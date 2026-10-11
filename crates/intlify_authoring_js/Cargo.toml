@@ -41,7 +41,7 @@ oxc_ast_visit = "=0.141.0"
 oxc_diagnostics = "=0.141.0"
 # The default feature validates regular expression literals, whose syntax
 # errors are early errors a conforming host rejects.
-oxc_parser = "=0.141.0"
+oxc_parser = "=0.152.0"
 oxc_semantic = "=0.141.0"
 oxc_span = "=0.141.0"
 # The owner-neutral 026 records and the owner run that captures and seals them,
