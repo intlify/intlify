@@ -70,7 +70,7 @@ pub(super) struct Variant {
 ///
 /// It is the revision the result codec names, so a case recorded in another
 /// result schema is a different case.
-const RESULT_SCHEMA_REVISION: &str = "2";
+const RESULT_SCHEMA_REVISION: &str = "0";
 
 /// The complete projection of one measured case.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

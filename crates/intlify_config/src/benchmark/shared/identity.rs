@@ -15,7 +15,7 @@ pub(in crate::benchmark) use intlify_measurement::identity::{
 
 /// Native schema v1 explicitly gives one fresh immutable ID to the one-shot
 /// owner result. The native content checksum remains independently retained.
-pub(in crate::benchmark) const OWNER_RESULT_DOMAIN: &str = "intlify-config-owner-result-v1";
+pub(in crate::benchmark) const OWNER_RESULT_DOMAIN: &str = "intlify-config-owner-result-v0";
 
 /// Per-run local harness instance, not a machine identity or qualification.
 pub(in crate::benchmark) const LOCAL_RUNNER_DOMAIN: &str =

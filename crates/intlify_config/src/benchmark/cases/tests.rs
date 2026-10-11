@@ -32,7 +32,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         assert!(identities.insert(encoded.clone()));
         let decoded: Declaration = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, *case);
-        assert_eq!(case.fixture_revision, "1");
+        assert_eq!(case.fixture_revision, "0");
         assert_eq!(case.fixture.source(), case.fixture.source());
         assert!(case.fixture.source().len() < 100_000);
         if !matches!(

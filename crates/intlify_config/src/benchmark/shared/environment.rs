@@ -24,7 +24,7 @@ use crate::benchmark::quantity::{Quantity, Repetitions};
 use crate::benchmark::run::ProjectionSource;
 
 pub(super) fn harness_identity() -> VersionedIdentity {
-    VersionedIdentity::new("intlify-config-owner-run-harness", "1").expect("registered harness")
+    VersionedIdentity::new("intlify-config-owner-run-harness", "0").expect("registered harness")
 }
 pub(super) fn projection_identity() -> VersionedIdentity {
     VersionedIdentity::new("intlify-config-minimum-to-026", "0").expect("registered projection")

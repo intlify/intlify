@@ -134,7 +134,7 @@ impl CaseProjection {
                 let operation = declaration.operation;
                 Ok(Self {
                     owner_identity: Token::literal("intlify-config"),
-                    owner_result_schema_revision: Token::literal("1"),
+                    owner_result_schema_revision: Token::literal("0"),
                     owner_benchmark_profile_revision: Token::new(profile_revision)?,
                     owner_phase: operation.phase().into(),
                     owner_cost: operation.cost().into(),

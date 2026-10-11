@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn an_owner_label_keeps_a_versioned_codec_spelling_that_a_token_would_reject() {
         for label in [
-            "intlify-config-owner-run-result/1",
+            "intlify-config-owner-run-result/0",
             "intlify-config-minimum-observation/0",
             "blake3-256",
             "owner-run-result",
@@ -379,7 +379,7 @@ mod tests {
         }
         // The token grammar would reject the very spelling owners register, so
         // the two types are not interchangeable in either direction.
-        assert!(Token::new("intlify-config-owner-run-result/1").is_err());
+        assert!(Token::new("intlify-config-owner-run-result/0").is_err());
     }
 
     #[test]
@@ -416,9 +416,9 @@ mod tests {
 
     #[test]
     fn an_owner_domain_is_checked_but_can_never_be_a_common_one() {
-        let owner = json!({"domain": "intlify-config-owner-result-v1", "value": "0".repeat(64)});
+        let owner = json!({"domain": "intlify-config-owner-result-v0", "value": "0".repeat(64)});
         let decoded: OwnerRecordIdentity = serde_json::from_value(owner.clone()).unwrap();
-        assert_eq!(decoded.domain(), "intlify-config-owner-result-v1");
+        assert_eq!(decoded.domain(), "intlify-config-owner-result-v0");
         for domain in [
             "intlify-verification-record-v0",
             "intlify-measurement-run-v0",
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn a_reference_target_keeps_the_two_identity_kinds_apart() {
         let common = json!({"domain": "intlify-verification-record-v0", "value": "0".repeat(64)});
-        let owner = json!({"domain": "intlify-config-owner-result-v1", "value": "0".repeat(64)});
+        let owner = json!({"domain": "intlify-config-owner-result-v0", "value": "0".repeat(64)});
         // A common domain resolves to the common identity, never to an owner
         // look-alike whose domain merely satisfies the token grammar.
         assert!(matches!(
@@ -470,8 +470,8 @@ mod tests {
         let schema = crate::schema::draft7_schema::<OwnerRecordIdentity>().unwrap();
         let validator = jsonschema::draft7::new(&schema).unwrap();
         for (domain, admitted) in [
-            ("intlify-config-owner-result-v1", true),
-            ("intlify-authoring-owner-result-v1", true),
+            ("intlify-config-owner-result-v0", true),
+            ("intlify-authoring-owner-result-v0", true),
             ("intlify-verification-record-v0", false),
             ("intlify-measurement-run-v0", false),
             ("Owner-Domain", false),
@@ -497,10 +497,10 @@ mod tests {
             RecordIdentity::fresh(CommonDomain::Run).unwrap().domain(),
             CommonDomain::Run
         );
-        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v1").unwrap();
+        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v0").unwrap();
         assert_ne!(
             owner,
-            OwnerRecordIdentity::fresh("intlify-config-owner-result-v1").unwrap()
+            OwnerRecordIdentity::fresh("intlify-config-owner-result-v0").unwrap()
         );
         assert_eq!(
             OwnerRecordIdentity::fresh("intlify-verification-record-v0"),

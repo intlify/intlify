@@ -23,14 +23,14 @@ use crate::plan::CaseProjection;
 pub(super) const LABELS: Labels = Labels {
     owner: "intlify-measurement-test",
     framing: Framing::new("intlify-measurement-test-observation/0"),
-    plan_codec: "intlify-measurement-test-owner-run-plan/1",
-    result_codec: "intlify-measurement-test-owner-run-result/1",
-    result_domain: "intlify-measurement-test-result-v1",
+    plan_codec: "intlify-measurement-test-owner-run-plan/0",
+    result_codec: "intlify-measurement-test-owner-run-result/0",
+    result_domain: "intlify-measurement-test-result-v0",
     runner_domain: "intlify-measurement-test-runner-instance-v0",
     build_schema: "intlify-measurement-test-build-observation/0",
     subject: "intlify-measurement-test-subject",
     profile: Versioned::new("intlify-measurement-test-smoke", "0"),
-    harness: Versioned::new("intlify-measurement-test-owner-run-harness", "1"),
+    harness: Versioned::new("intlify-measurement-test-owner-run-harness", "0"),
     projection: Versioned::new("intlify-measurement-test-to-026", "0"),
     native_rule: Versioned::new("intlify-measurement-test-native-component-context", "0"),
     memory_rule: Versioned::new("intlify-measurement-test-duration-only", "0"),
@@ -501,7 +501,7 @@ mod tests {
         let run = recorded::<Sound>();
         let mut value: serde_json::Value = serde_json::from_slice(&run.encode().unwrap()).unwrap();
         value["result"]["codec"] =
-            serde_json::json!("intlify-measurement-other-owner-run-result/1");
+            serde_json::json!("intlify-measurement-other-owner-run-result/0");
         let bytes = serde_json::to_vec(&value).unwrap();
         assert!(matches!(
             OwnerRun::admit(&run, &bytes),

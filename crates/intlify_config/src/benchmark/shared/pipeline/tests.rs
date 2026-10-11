@@ -55,7 +55,7 @@ fn actual_owner_run_projects_all_six_pairs_and_raw_samples_through_report_admiss
     );
     assert_eq!(
         evidence["body"]["ownerResult"]["resultSchema"],
-        "intlify-config-owner-run-result/1"
+        "intlify-config-owner-run-result/0"
     );
     assert_eq!(
         evaluation["body"]["ownerResultInput"]["result"]["kind"],

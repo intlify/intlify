@@ -156,7 +156,7 @@ mod tests {
     fn a_rejection_keeps_unreadable_apart_from_read_and_rejected() {
         // These become different common causes, so collapsing them would
         // report a corrupt document as one that describes another run.
-        let identity = OwnerRecordIdentity::fresh("intlify-measurement-test-result-v1").unwrap();
+        let identity = OwnerRecordIdentity::fresh("intlify-measurement-test-result-v0").unwrap();
         assert_ne!(Rejection::Unreadable, Rejection::UnsupportedCodec);
         assert_ne!(
             Rejection::Integrity(identity.clone()),

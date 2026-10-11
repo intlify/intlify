@@ -127,11 +127,11 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
     let value = serde_json::to_value(native.document()).unwrap();
     assert_eq!(
         value["result"]["codec"],
-        "intlify-config-owner-run-result/1"
+        "intlify-config-owner-run-result/0"
     );
     assert_eq!(
         value["result"]["recordIdentity"]["domain"],
-        "intlify-config-owner-result-v1"
+        "intlify-config-owner-result-v0"
     );
     assert_eq!(
         value["result"]["recordIdentity"],
