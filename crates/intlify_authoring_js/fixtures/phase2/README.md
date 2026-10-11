@@ -367,7 +367,7 @@ The owner run is shared, so the rejections below are pinned twice: on this owner
 
 | Family | Owner |
 | --- | --- |
-| Identity ownership, continuity evidence, reconciliation, registry update history, automatic continuation updates, automatic allocation and retirement, registry recovery | Phase 3, which allocates and reconciles persistent identity |
+| Identity ownership, continuity evidence, reconciliation, registry update history, automatic continuation updates, automatic allocation and retirement, registry recovery | Phase 3, which allocates and reconciles persistent identity. Its matrix is in [`intlify_authoring_identity/fixtures/phase3/README.md`](../../../intlify_authoring_identity/fixtures/phase3/README.md) |
 | Module references | A Phase 4 extension. A module reference is reported as unsupported (`only_a_const_bound_to_the_tag_itself_names_a_declaration`). |
 
 ## Deliberately not covered in Phase 2

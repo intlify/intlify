@@ -840,6 +840,26 @@ mod tests {
             Ok(()),
             "a successor this update allocates"
         );
+
+        // A merge resolves the same way: every predecessor in the base and
+        // every successor in the result.
+        let merge = |predecessors: Value, successors: Value| -> IntentRegistryUpdate {
+            let mut body = artifact("update-2")["body"].clone();
+            body["lineageLinks"] =
+                json!([{"kind": "merge", "predecessors": predecessors, "successors": successors}]);
+            read(body)
+        };
+        let other = id(snapshot.entries()[2].intent_id());
+        assert_eq!(
+            check_links(snapshot, &merge(json!([pay, other]), json!([copy]))),
+            Ok(()),
+            "two entries of the base merged into one this update allocates"
+        );
+        assert_eq!(
+            check_links(snapshot, &merge(json!([pay, unknown]), json!([copy]))),
+            Err(TransitionFailure::UnresolvedLink),
+            "a merged entry the base does not hold"
+        );
     }
 
     #[test]
