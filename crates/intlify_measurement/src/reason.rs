@@ -514,7 +514,7 @@ mod tests {
         assert!(BuildField::BuildConfiguration < BuildField::SourceContent);
         // Instance identities and local identifiers compare by wire bytes, so an
         // owner's domain does not sort after every common one by construction.
-        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v1").unwrap();
+        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v0").unwrap();
         assert!(Reference::top(&owner) < Reference::top(&id));
         assert!(
             Reference::nested(&id, Token::literal("sample-10"))

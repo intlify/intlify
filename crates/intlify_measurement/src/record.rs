@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn a_reference_targets_a_common_or_an_owner_instance_without_renaming_it() {
         let common = RecordIdentity::fresh(CommonDomain::Record).unwrap();
-        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v1").unwrap();
+        let owner = OwnerRecordIdentity::fresh("intlify-config-owner-result-v0").unwrap();
         assert_eq!(
             serde_json::to_value(Reference::top(&common)).unwrap(),
             json!({"kind": "top-level", "recordIdentity": serde_json::to_value(&common).unwrap()})
