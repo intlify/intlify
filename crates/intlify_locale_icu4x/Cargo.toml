@@ -1,0 +1,38 @@
+[package]
+name = "intlify_locale_icu4x"
+version = "0.14.0-alpha.12"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Writes the marker blob from ICU4X's compiled data. Only the generator and the
+# tests that build blobs link that data; the adapter itself reads nothing but
+# the blob it is given.
+generate = ["icu_locale/compiled_data", "dep:icu_locale_data", "icu_provider_blob/export"]
+
+[dependencies]
+# ICU4X 2.2.0 exactly, as design 015 pins it, without compiled data: the four
+# marker families reach the adapter only through a blob. `datagen` gives the
+# data structs the serde serialization that defines their logical payloads.
+icu_locale = { version = "=2.2.0", default-features = false, features = ["serde", "datagen"] }
+# Pinned as well, since `icu_locale` alone resolves it to a later release.
+icu_locale_core = "=2.2.0"
+icu_provider = { version = "=2.2.0", features = ["serde", "deserialize_postcard_1"] }
+icu_provider_blob = { version = "=2.2.0", features = ["alloc"] }
+# The generator's only source: ICU4X's data generated from CLDR 48.2.0.
+icu_locale_data = { version = "=2.2.0", optional = true }
+# Reads the blob's marker index, which ICU4X keeps in private types.
+postcard = { version = "1", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.106"
+
+[[example]]
+name = "generate_locale_data"
+required-features = ["generate"]
