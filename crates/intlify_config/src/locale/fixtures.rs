@@ -3,36 +3,45 @@
 
 //! Finite test-owned provider, also used by the opt-in developer example and
 //! absent from ordinary library builds. These symbolic pins exercise exact
-//! binding equality; they are NOT artifact digests,
-//! an admitted 017 data representation, or a production canonicalization corpus.
+//! binding equality; they are NOT digests, a 017 Locale Canonicalization Data
+//! Artifact, or a production canonicalization corpus.
 //! Every answer is declared below. Unlisted input is unsupported, not invalid.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::{ArtifactReference, Provider, ProviderBinding, ProviderFailure, VersionedIdentity};
+use super::{
+    AdmissionFacts, DatasetPin, Provider, ProviderBinding, ProviderFailure, SemanticPins,
+    VersionedIdentity,
+};
+
+pub(crate) fn fixture_pins() -> SemanticPins<&'static str> {
+    SemanticPins {
+        specification: VersionedIdentity {
+            identity: "test-only-locale-specification",
+            revision: "0",
+        },
+        dataset: DatasetPin {
+            identity: "test-only-finite-locale-data",
+            semantic_digest: "test-only-dataset-content-pin",
+        },
+    }
+}
 
 pub(crate) fn fixture_binding() -> ProviderBinding<&'static str> {
     ProviderBinding {
-        specification: ArtifactReference {
-            identity: "test-only-locale-specification",
-            revision: "0",
-            digest: "test-only-specification-content-pin",
+        pins: fixture_pins(),
+        admission: AdmissionFacts {
+            provider: VersionedIdentity {
+                identity: "test-only-finite-map-provider",
+                revision: "0",
+            },
+            provider_schema: VersionedIdentity {
+                identity: "test-only-rust-fixture-table",
+                revision: "0",
+            },
+            artifact: "test-only-in-memory-representation-pin",
         },
-        dataset: ArtifactReference {
-            identity: "test-only-finite-locale-data",
-            revision: "0",
-            digest: "test-only-dataset-content-pin",
-        },
-        provider: VersionedIdentity {
-            identity: "test-only-finite-map-provider",
-            revision: "0",
-        },
-        provider_schema: VersionedIdentity {
-            identity: "test-only-rust-fixture-table",
-            revision: "0",
-        },
-        transport_digest: "test-only-in-memory-representation-pin",
     }
 }
 

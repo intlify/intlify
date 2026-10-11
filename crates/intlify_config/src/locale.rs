@@ -2,34 +2,54 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Data-free, crate-private canonicalization over one explicitly bound provider.
-//! The enclosing owner supplies admitted immutable data and identities. Comparing
-//! these non-serialized bindings is not artifact integrity or conformance admission.
+//! The enclosing owner supplies admitted immutable data and identities; reading
+//! 017's Locale Canonicalization Data Artifact is the adapter's job, not this
+//! module's. A binding keeps what a checked profile would retain (the
+//! specification and the dataset it admits) apart from facts about the admitted
+//! artifact, which make a binding reproducible but never enter profile semantics.
 
 use std::sync::Arc;
 
 use crate::input_limits::Bound;
 
-/// Opaque identity values deliberately do not reserve the 017 wire encoding.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ArtifactReference<Id> {
-    pub(crate) identity: Id,
-    pub(crate) revision: Id,
-    pub(crate) digest: Id,
-}
-
+/// Identity values stay opaque here; their 017 spelling is checked where the
+/// artifact is read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VersionedIdentity<Id> {
     pub(crate) identity: Id,
     pub(crate) revision: Id,
 }
 
+/// One dataset as 017 names it. There is no dataset revision: the semantic
+/// digest identifies the content whatever payload format carried it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProviderBinding<Id> {
-    pub(crate) specification: ArtifactReference<Id>,
-    pub(crate) dataset: ArtifactReference<Id>,
+pub(crate) struct DatasetPin<Id> {
+    pub(crate) identity: Id,
+    pub(crate) semantic_digest: Id,
+}
+
+/// What a checked profile retains about canonicalization: 015's Locale
+/// canonicalization semantic group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SemanticPins<Id> {
+    pub(crate) specification: VersionedIdentity<Id>,
+    pub(crate) dataset: DatasetPin<Id>,
+}
+
+/// What a provider reports about the artifact it admitted: its own identity, the
+/// payload format it read, and the manifest's integrity digest. Admission facts,
+/// never profile semantics, so only their stability is ever checked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AdmissionFacts<Id> {
     pub(crate) provider: VersionedIdentity<Id>,
     pub(crate) provider_schema: VersionedIdentity<Id>,
-    pub(crate) transport_digest: Id,
+    pub(crate) artifact: Id,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProviderBinding<Id> {
+    pub(crate) pins: SemanticPins<Id>,
+    pub(crate) admission: AdmissionFacts<Id>,
 }
 
 /// Only internal, read-only providers implement this interface. The provider
@@ -51,19 +71,13 @@ pub(crate) enum ProviderFailure {
     Unavailable,
 }
 
+/// The semantic pins a binding compares. Admission facts are not among them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum BindingPart {
     SpecificationIdentity,
     SpecificationRevision,
-    SpecificationDigest,
     DatasetIdentity,
-    DatasetRevision,
     DatasetDigest,
-    ProviderIdentity,
-    ProviderRevision,
-    ProviderSchemaIdentity,
-    ProviderSchemaRevision,
-    TransportDigest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,19 +144,22 @@ pub(crate) struct Canonicalizer<P: Provider> {
 }
 
 impl<P: Provider> Canonicalizer<P> {
+    /// Binds a provider whose semantic pins equal `expected`. The provider's
+    /// admission facts are kept as reported; later calls check that the whole
+    /// binding stays the same.
     pub(crate) fn bind(
-        expected: &ProviderBinding<P::Identity>,
+        expected: &SemanticPins<P::Identity>,
         provider: Option<P>,
         max_identifier_bytes: Bound,
     ) -> Result<Self, BindingFailure> {
         let provider = provider.ok_or(BindingFailure::MissingProviderData)?;
-        let differences = binding_differences(expected, provider.binding());
+        let differences = pin_differences(expected, &provider.binding().pins);
         if !differences.is_empty() {
             return Err(BindingFailure::Mismatch(differences));
         }
         Ok(Self {
+            binding: provider.binding().clone(),
             provider,
-            binding: expected.clone(),
             max_identifier_bytes,
         })
     }
@@ -199,9 +216,9 @@ impl<P: Provider> Canonicalizer<P> {
     }
 }
 
-fn binding_differences<Id: Eq>(
-    expected: &ProviderBinding<Id>,
-    actual: &ProviderBinding<Id>,
+fn pin_differences<Id: Eq>(
+    expected: &SemanticPins<Id>,
+    actual: &SemanticPins<Id>,
 ) -> Vec<BindingPart> {
     use BindingPart as Part;
     [
@@ -216,49 +233,14 @@ fn binding_differences<Id: Eq>(
             &actual.specification.revision,
         ),
         (
-            Part::SpecificationDigest,
-            &expected.specification.digest,
-            &actual.specification.digest,
-        ),
-        (
             Part::DatasetIdentity,
             &expected.dataset.identity,
             &actual.dataset.identity,
         ),
         (
-            Part::DatasetRevision,
-            &expected.dataset.revision,
-            &actual.dataset.revision,
-        ),
-        (
             Part::DatasetDigest,
-            &expected.dataset.digest,
-            &actual.dataset.digest,
-        ),
-        (
-            Part::ProviderIdentity,
-            &expected.provider.identity,
-            &actual.provider.identity,
-        ),
-        (
-            Part::ProviderRevision,
-            &expected.provider.revision,
-            &actual.provider.revision,
-        ),
-        (
-            Part::ProviderSchemaIdentity,
-            &expected.provider_schema.identity,
-            &actual.provider_schema.identity,
-        ),
-        (
-            Part::ProviderSchemaRevision,
-            &expected.provider_schema.revision,
-            &actual.provider_schema.revision,
-        ),
-        (
-            Part::TransportDigest,
-            &expected.transport_digest,
-            &actual.transport_digest,
+            &expected.dataset.semantic_digest,
+            &actual.dataset.semantic_digest,
         ),
     ]
     .into_iter()

@@ -60,7 +60,7 @@ pub(crate) fn operations() -> [Prepared; 6] {
         Prepared::Locale {
             core: Arc::new(
                 crate::locale::Canonicalizer::bind(
-                    &crate::locale::fixtures::fixture_binding(),
+                    &crate::locale::fixtures::fixture_pins(),
                     Some(crate::locale::fixtures::FixtureProvider::new()),
                     Bound::new(128).unwrap(),
                 )
@@ -81,7 +81,7 @@ pub(crate) fn core_operation(value: &Value) -> Prepared {
         selected: serde_json::from_value(json!("app")).unwrap(),
         provider: Arc::new(
             crate::locale::Canonicalizer::bind(
-                &crate::locale::fixtures::fixture_binding(),
+                &crate::locale::fixtures::fixture_pins(),
                 Some(crate::locale::fixtures::FixtureProvider::new()),
                 Bound::new(128).unwrap(),
             )

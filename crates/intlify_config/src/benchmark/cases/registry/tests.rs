@@ -354,7 +354,7 @@ fn cached_candidate_summaries_cannot_replace_reobservation_of_actual_output() {
 #[test]
 fn locale_core_preparation_and_bounds_are_bound_even_when_result_and_work_are_equal() {
     use crate::benchmark::cases::LocaleCoreRecipe as R;
-    use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+    use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
 
     let declaration = case(
@@ -379,7 +379,7 @@ fn locale_core_preparation_and_bounds_are_bound_even_when_result_and_work_are_eq
             2 => {
                 core.provider = Arc::new(
                     Canonicalizer::bind(
-                        &fixture_binding(),
+                        &fixture_pins(),
                         Some(FixtureProvider::new()),
                         Bound::new(127).unwrap(),
                     )
