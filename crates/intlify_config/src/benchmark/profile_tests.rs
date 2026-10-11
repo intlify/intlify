@@ -33,7 +33,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     assert_eq!(value["sampling"]["repetitionsPerSample"], "1");
     assert_eq!(value["sampling"]["aggregation"], "batch_total");
     assert_eq!(value["numericDecisions"], "prohibited-advisory-and-gating");
-    assert_eq!(value["fixtureRegistry"]["revision"], "4");
+    assert_eq!(value["fixtureRegistry"]["revision"], "0");
     assert_eq!(value["ordering"], "fixture-registry-order-no-interleaving");
     assert_eq!(
         value["rawSamples"],

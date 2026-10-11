@@ -459,7 +459,7 @@ fn formal_schema_work_remains_bounded_before_root_construction() {
 #[test]
 fn formal_references_reach_the_same_private_locale_core_without_body_resolution() {
     use crate::locale::core::{Input, Limits};
-    use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+    use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
     use crate::model::Presence;
     use crate::structural::selection::{Selection, SelectorInput};
@@ -489,7 +489,7 @@ fn formal_references_reach_the_same_private_locale_core_without_body_resolution(
         Presence::Absent
     ));
     let provider = Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(FixtureProvider::new()),
         Bound::new(128).unwrap(),
     )

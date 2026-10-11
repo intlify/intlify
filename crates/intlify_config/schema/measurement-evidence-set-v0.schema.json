@@ -637,22 +637,6 @@
         }
       ]
     },
-    "ContentBinding": {
-      "additionalProperties": false,
-      "properties": {
-        "declaredContentPin": {
-          "type": "string"
-        },
-        "identity": {
-          "type": "string"
-        },
-        "revision": {
-          "type": "string"
-        }
-      },
-      "required": ["identity", "revision", "declaredContentPin"],
-      "type": "object"
-    },
     "CreationContext": {
       "additionalProperties": false,
       "properties": {
@@ -661,6 +645,19 @@
         }
       },
       "required": ["createdAtUnixNanoseconds"],
+      "type": "object"
+    },
+    "DatasetPin": {
+      "additionalProperties": false,
+      "properties": {
+        "declaredSemanticPin": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        }
+      },
+      "required": ["identity", "declaredSemanticPin"],
       "type": "object"
     },
     "Datum": {
@@ -2047,9 +2044,9 @@
           "type": "string"
         },
         "dataset": {
-          "$ref": "#/definitions/ContentBinding"
+          "$ref": "#/definitions/DatasetPin"
         },
-        "declaredTransportPin": {
+        "declaredArtifactPin": {
           "type": "string"
         },
         "fixtureContentsObservation": {
@@ -2074,7 +2071,7 @@
           "type": "string"
         },
         "specification": {
-          "$ref": "#/definitions/ContentBinding"
+          "$ref": "#/definitions/VersionedPin"
         }
       },
       "required": [
@@ -2083,7 +2080,7 @@
         "dataset",
         "provider",
         "providerSchema",
-        "declaredTransportPin",
+        "declaredArtifactPin",
         "fixtureContentsObservation",
         "identifierByteLimit",
         "identifierByteUnit",

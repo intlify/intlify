@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
-use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
@@ -257,7 +257,7 @@ fn prepare_locale(declaration: &Declaration) -> Result<Candidate, PreparationFai
         Bound::new(128).expect("explicit finite locale fixture capacity")
     };
     let core = Arc::new(
-        Canonicalizer::bind(&fixture_binding(), Some(FixtureProvider::new()), limit)
+        Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), limit)
             .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
     );
     let input: Arc<str> = Arc::from(recipe.spelling());
@@ -345,7 +345,7 @@ fn prepare_core(declaration: &Declaration) -> Result<Candidate, PreparationFailu
         }
     }
     let provider = Arc::new(
-        Canonicalizer::bind(&fixture_binding(), Some(FixtureProvider::new()), byte_limit)
+        Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), byte_limit)
             .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
     );
     let core = PreparedCore {

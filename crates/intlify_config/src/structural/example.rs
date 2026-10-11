@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::core::{Failure, Input, Issue, Limits, Location};
-use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, Canonicalizer, ProviderFailure};
 use crate::materialize::{
     materialize_file, ByteSpan, InputFailure, MaterializedDocument, NodeKind,
@@ -266,9 +266,8 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
     let id = selected.id().as_str();
     output["selectedProfile"] = json!(id);
     output["stage"] = json!("locale");
-    let provider =
-        Canonicalizer::bind(&fixture_binding(), Some(FixtureProvider::new()), bound(128))
-            .map_err(|e| format!("Example provider invariant: {e:?}"))?;
+    let provider = Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), bound(128))
+        .map_err(|e| format!("Example provider invariant: {e:?}"))?;
     let input = Input::from_selected(&config, selected.id())
         .ok_or("Selected example profile is missing")?;
     let resolution = input.resolve(

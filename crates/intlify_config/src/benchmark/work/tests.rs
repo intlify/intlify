@@ -115,7 +115,7 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
 
 #[test]
 fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_values() {
-    use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+    use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
 
     // Independent expected lengths include an alias whose canonical form grows.
@@ -128,7 +128,7 @@ fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_va
         ("en_US", 128, None, 0, 0),
     ] {
         let core = Canonicalizer::bind(
-            &fixture_binding(),
+            &fixture_pins(),
             Some(FixtureProvider::new()),
             Bound::new(bound).unwrap(),
         )

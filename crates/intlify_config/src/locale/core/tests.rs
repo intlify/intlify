@@ -9,7 +9,7 @@ use crate::fixtures::{
     minimal_config, FixtureConfig, FixturePolicyReference, FixtureTargetReference,
 };
 use crate::input_limits::Bound;
-use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
 use crate::model::ProfileId;
@@ -45,7 +45,7 @@ fn config(value: &Value) -> FixtureConfig {
 
 fn provider() -> Canonicalizer<FixtureProvider> {
     Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(FixtureProvider::new()),
         Bound::new(128).unwrap(),
     )
@@ -214,7 +214,7 @@ fn occurrence_admission_counts_all_active_roles_before_any_provider_work() {
     }
     let calls = Rc::new(Cell::new(0));
     let provider = Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(CountingProvider {
             inner: FixtureProvider::new(),
             calls: Rc::clone(&calls),
@@ -424,7 +424,7 @@ fn expanded_identifier_limits_apply_independently_to_requested_and_default_occur
     let config = config(&value);
     let id = serde_json::from_value(json!("app")).unwrap();
     let canonicalizer = Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(FixtureProvider::new()),
         Bound::new(21).unwrap(),
     )

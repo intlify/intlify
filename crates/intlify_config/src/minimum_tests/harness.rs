@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::input_limits::{Bound, InputLimits};
 use crate::locale::core::{Input, Limits, Resolution};
-use crate::locale::fixtures::{fixture_binding, FixtureProvider};
+use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::{materialize_file, MaterializationError};
 use crate::model::ProfileId;
@@ -90,7 +90,7 @@ impl FixtureRunner {
             limits,
             schema: Schema::for_model().expect("formal 015/017 configuration schema"),
             provider: Canonicalizer::bind(
-                &fixture_binding(),
+                &fixture_pins(),
                 Some(FixtureProvider::new()),
                 limits.identifier_bytes,
             )

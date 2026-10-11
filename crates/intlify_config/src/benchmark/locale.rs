@@ -26,21 +26,20 @@ struct VersionedPin {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ContentBinding {
+struct DatasetPin {
     identity: String,
-    revision: String,
-    declared_content_pin: String,
+    declared_semantic_pin: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InputFacts {
     scope: String,
-    specification: ContentBinding,
-    dataset: ContentBinding,
+    specification: VersionedPin,
+    dataset: DatasetPin,
     provider: VersionedPin,
     provider_schema: VersionedPin,
-    declared_transport_pin: String,
+    declared_artifact_pin: String,
     fixture_contents_observation: Digest,
     identifier_byte_limit: Quantity,
     identifier_byte_unit: String,
@@ -51,11 +50,6 @@ pub(super) struct InputFacts {
 impl InputFacts {
     pub(super) fn observe(core: &Core) -> Self {
         let binding = core.binding();
-        let content = |reference: &crate::locale::ArtifactReference<&str>| ContentBinding {
-            identity: reference.identity.into(),
-            revision: reference.revision.into(),
-            declared_content_pin: reference.digest.into(),
-        };
         let versioned = |reference: &crate::locale::VersionedIdentity<&str>| VersionedPin {
             identity: reference.identity.into(),
             revision: reference.revision.into(),
@@ -74,11 +68,14 @@ impl InputFacts {
         }
         Self {
             scope: "finite-test-owned-provider-not-production-data".into(),
-            specification: content(&binding.specification),
-            dataset: content(&binding.dataset),
-            provider: versioned(&binding.provider),
-            provider_schema: versioned(&binding.provider_schema),
-            declared_transport_pin: binding.transport_digest.into(),
+            specification: versioned(&binding.pins.specification),
+            dataset: DatasetPin {
+                identity: binding.pins.dataset.identity.into(),
+                declared_semantic_pin: binding.pins.dataset.semantic_digest.into(),
+            },
+            provider: versioned(&binding.admission.provider),
+            provider_schema: versioned(&binding.admission.provider_schema),
+            declared_artifact_pin: binding.admission.artifact.into(),
             fixture_contents_observation: frame.finish(),
             identifier_byte_limit: Quantity::new(core.max_identifier_bytes().get()),
             identifier_byte_unit: "utf8-octet".into(),

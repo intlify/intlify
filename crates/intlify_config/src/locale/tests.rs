@@ -1,16 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use super::fixtures::{fixture_binding, FixtureProvider};
+use super::fixtures::{fixture_binding, fixture_pins, FixtureProvider};
 use super::*;
 use crate::input_limits::Bound;
 use std::cell::Cell;
 
-type BindingMutation = fn(&mut ProviderBinding<&'static str>);
+type PinMutation = fn(&mut SemanticPins<&'static str>);
 
 fn canonicalizer() -> Canonicalizer<FixtureProvider> {
     Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(FixtureProvider::new()),
         Bound::new(128).unwrap(),
     )
@@ -78,51 +78,29 @@ fn invalid_inputs_and_inputs_outside_fixture_coverage_are_different() {
 }
 
 #[test]
-fn provider_data_is_required_and_every_binding_part_is_pinned() {
+fn provider_data_is_required_and_every_semantic_pin_is_compared() {
     assert_eq!(
-        Canonicalizer::<FixtureProvider>::bind(&fixture_binding(), None, Bound::new(128).unwrap())
+        Canonicalizer::<FixtureProvider>::bind(&fixture_pins(), None, Bound::new(128).unwrap())
             .err()
             .unwrap(),
         BindingFailure::MissingProviderData
     );
-    let original = fixture_binding();
-    let cases: &[(BindingPart, BindingMutation)] = &[
-        (BindingPart::SpecificationIdentity, |binding| {
-            binding.specification.identity = "other";
+    let cases: &[(BindingPart, PinMutation)] = &[
+        (BindingPart::SpecificationIdentity, |pins| {
+            pins.specification.identity = "other";
         }),
-        (BindingPart::SpecificationRevision, |binding| {
-            binding.specification.revision = "other";
+        (BindingPart::SpecificationRevision, |pins| {
+            pins.specification.revision = "other";
         }),
-        (BindingPart::SpecificationDigest, |binding| {
-            binding.specification.digest = "other";
+        (BindingPart::DatasetIdentity, |pins| {
+            pins.dataset.identity = "other";
         }),
-        (BindingPart::DatasetIdentity, |binding| {
-            binding.dataset.identity = "other";
-        }),
-        (BindingPart::DatasetRevision, |binding| {
-            binding.dataset.revision = "other";
-        }),
-        (BindingPart::DatasetDigest, |binding| {
-            binding.dataset.digest = "other";
-        }),
-        (BindingPart::ProviderIdentity, |binding| {
-            binding.provider.identity = "other";
-        }),
-        (BindingPart::ProviderRevision, |binding| {
-            binding.provider.revision = "other";
-        }),
-        (BindingPart::ProviderSchemaIdentity, |binding| {
-            binding.provider_schema.identity = "other";
-        }),
-        (BindingPart::ProviderSchemaRevision, |binding| {
-            binding.provider_schema.revision = "other";
-        }),
-        (BindingPart::TransportDigest, |binding| {
-            binding.transport_digest = "other";
+        (BindingPart::DatasetDigest, |pins| {
+            pins.dataset.semantic_digest = "other";
         }),
     ];
     for (part, change) in cases {
-        let mut expected = original.clone();
+        let mut expected = fixture_pins();
         change(&mut expected);
         assert_eq!(
             Canonicalizer::bind(
@@ -135,6 +113,161 @@ fn provider_data_is_required_and_every_binding_part_is_pinned() {
             BindingFailure::Mismatch(vec![*part])
         );
     }
+}
+
+#[test]
+fn admission_facts_are_kept_as_reported_and_never_compared() {
+    let mut reported = fixture_binding();
+    reported.admission.provider.revision = "1";
+    reported.admission.provider_schema.identity = "another-format";
+    reported.admission.artifact = "another-artifact-pin";
+    let core = Canonicalizer::bind(
+        &fixture_pins(),
+        Some(ProbeProvider {
+            binding: reported.clone(),
+            calls: Cell::new(0),
+            answer: Ok(Arc::from("en")),
+        }),
+        Bound::new(128).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(core.binding(), &reported);
+    assert_eq!(core.canonicalize("en").unwrap().locale().as_str(), "en");
+}
+
+#[test]
+fn binding_failures_are_classified_where_015_reports_them() {
+    use BindingPart as Part;
+    assert_eq!(
+        BindingFailure::MissingProviderData.admission(),
+        Admission::PreInvocation(EnvelopeReason::MissingInput)
+    );
+    for parts in [
+        vec![Part::SpecificationIdentity],
+        vec![Part::SpecificationRevision],
+        vec![Part::SpecificationRevision, Part::DatasetDigest],
+        vec![Part::DatasetIdentity, Part::SpecificationIdentity],
+    ] {
+        assert_eq!(
+            BindingFailure::Mismatch(parts).admission(),
+            Admission::Specification
+        );
+    }
+    for parts in [
+        vec![Part::DatasetIdentity],
+        vec![Part::DatasetDigest],
+        vec![Part::DatasetIdentity, Part::DatasetDigest],
+    ] {
+        assert_eq!(BindingFailure::Mismatch(parts).admission(), Admission::Data);
+    }
+    assert_eq!(
+        Admission::from(SpecificationUnsupported),
+        Admission::Specification
+    );
+}
+
+fn pins(specification: &'static str, digest: &'static str) -> SemanticPins<&'static str> {
+    SemanticPins {
+        specification: VersionedIdentity {
+            identity: specification,
+            revision: "0",
+        },
+        dataset: DatasetPin {
+            identity: "dataset",
+            semantic_digest: digest,
+        },
+    }
+}
+
+#[test]
+fn a_supported_specification_names_the_one_dataset_it_admits() {
+    let supported = Supported::new(vec![pins("first", "a"), pins("second", "b")]).unwrap();
+    for (asserted, digest) in [("first", "a"), ("second", "b")] {
+        let expected = supported
+            .expected(&VersionedIdentity {
+                identity: asserted,
+                revision: "0",
+            })
+            .unwrap();
+        assert_eq!(expected, &pins(asserted, digest));
+    }
+    for asserted in [
+        VersionedIdentity {
+            identity: "third",
+            revision: "0",
+        },
+        VersionedIdentity {
+            identity: "first",
+            revision: "1",
+        },
+    ] {
+        assert_eq!(
+            supported.expected(&asserted).err(),
+            Some(SpecificationUnsupported)
+        );
+    }
+    assert!(Supported::<&str>::new(Vec::new())
+        .unwrap()
+        .expected(&fixture_pins().specification)
+        .is_err());
+    for duplicate in [
+        vec![pins("first", "a"), pins("first", "a")],
+        vec![pins("first", "a"), pins("second", "b"), pins("first", "c")],
+    ] {
+        assert_eq!(
+            Supported::new(duplicate).err(),
+            Some(DuplicateSpecification)
+        );
+    }
+}
+
+#[test]
+fn the_asserted_specification_decides_which_dataset_a_provider_must_carry() {
+    let supported = Supported::new(vec![pins("other", "other-digest"), fixture_pins()]).unwrap();
+    let bind = |asserted: &VersionedIdentity<&'static str>| {
+        let expected = supported.expected(asserted).map_err(Admission::from)?;
+        Canonicalizer::bind(
+            expected,
+            Some(FixtureProvider::new()),
+            Bound::new(128).unwrap(),
+        )
+        .map_err(|failure| failure.admission())
+    };
+    assert!(bind(&fixture_pins().specification).is_ok());
+    assert_eq!(
+        bind(&VersionedIdentity {
+            identity: "other",
+            revision: "0"
+        })
+        .err(),
+        Some(Admission::Specification)
+    );
+    assert_eq!(
+        bind(&VersionedIdentity {
+            identity: "unsupported",
+            revision: "0"
+        })
+        .err(),
+        Some(Admission::Specification)
+    );
+    let mut stale = fixture_pins();
+    stale.dataset.semantic_digest = "stale-digest";
+    let stale_supported = Supported::new(vec![stale]).unwrap();
+    let expected = stale_supported
+        .expected(&fixture_pins().specification)
+        .unwrap();
+    let failure = Canonicalizer::bind(
+        expected,
+        Some(FixtureProvider::new()),
+        Bound::new(128).unwrap(),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        failure,
+        BindingFailure::Mismatch(vec![BindingPart::DatasetDigest])
+    );
+    assert_eq!(failure.admission(), Admission::Data);
 }
 
 struct ProbeProvider {
@@ -158,7 +291,7 @@ impl Provider for ProbeProvider {
 
 fn probe(answer: Result<Arc<str>, ProviderFailure>, limit: u64) -> Canonicalizer<ProbeProvider> {
     Canonicalizer::bind(
-        &fixture_binding(),
+        &fixture_pins(),
         Some(ProbeProvider {
             binding: fixture_binding(),
             calls: Cell::new(0),
@@ -200,7 +333,7 @@ fn expanding_aliases_recheck_the_complete_canonical_spelling_before_retention() 
     let exact = expected.len() as u64;
     for limit in [input.len() as u64, exact - 1, exact] {
         let core = Canonicalizer::bind(
-            &fixture_binding(),
+            &fixture_pins(),
             Some(FixtureProvider::new()),
             Bound::new(limit).unwrap(),
         )
@@ -226,7 +359,7 @@ fn expanding_aliases_recheck_the_complete_canonical_spelling_before_retention() 
 fn provider_binding_changes_fail_before_any_new_locale_work() {
     let mut core = probe(Ok(Arc::from("en")), 128);
     let retained = core.canonicalize("en").unwrap();
-    core.provider.binding.dataset.digest = "changed-test-pin";
+    core.provider.binding.pins.dataset.semantic_digest = "changed-test-pin";
     assert_eq!(
         core.canonicalize("en").unwrap_err(),
         CanonicalizationFailure::ProviderBindingChanged
@@ -234,6 +367,15 @@ fn provider_binding_changes_fail_before_any_new_locale_work() {
     assert_eq!(core.provider.calls.get(), 1);
     assert_eq!(core.binding(), &fixture_binding());
     assert_eq!(retained.locale().as_str(), "en");
+    // Admission facts never enter semantics, but a provider must not swap the
+    // artifact it was admitted with either.
+    let mut swapped = probe(Ok(Arc::from("en")), 128);
+    swapped.provider.binding.admission.artifact = "another-artifact-pin";
+    assert_eq!(
+        swapped.canonicalize("en").unwrap_err(),
+        CanonicalizationFailure::ProviderBindingChanged
+    );
+    assert_eq!(swapped.provider.calls.get(), 0);
 }
 
 #[test]
@@ -264,10 +406,9 @@ fn failures_do_not_retain_rejected_authoring_or_mismatching_metadata() {
         assert!(!format!("{:?}", core.canonicalize(input).unwrap_err()).contains(input));
     }
     let secret = "PRIVATE-MISMATCHING-METADATA";
-    let mut expected = fixture_binding();
-    expected.specification.digest = secret;
-    expected.dataset.revision = secret;
-    expected.transport_digest = secret;
+    let mut expected = fixture_pins();
+    expected.specification.revision = secret;
+    expected.dataset.semantic_digest = secret;
     let failure = Canonicalizer::bind(
         &expected,
         Some(FixtureProvider::new()),
@@ -278,9 +419,8 @@ fn failures_do_not_retain_rejected_authoring_or_mismatching_metadata() {
     assert_eq!(
         failure,
         BindingFailure::Mismatch(vec![
-            BindingPart::SpecificationDigest,
-            BindingPart::DatasetRevision,
-            BindingPart::TransportDigest,
+            BindingPart::SpecificationRevision,
+            BindingPart::DatasetDigest,
         ])
     );
     assert!(!format!("{failure:?}").contains(secret));
