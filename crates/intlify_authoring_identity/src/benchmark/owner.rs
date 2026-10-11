@@ -24,14 +24,14 @@ use super::projection::CaseProjection;
 pub(super) const LABELS: Labels = Labels {
     owner: "intlify-authoring-identity",
     framing: Framing::new("intlify-authoring-identity-minimum-observation/0"),
-    plan_codec: "intlify-authoring-identity-owner-run-plan/1",
-    result_codec: "intlify-authoring-identity-owner-run-result/1",
-    result_domain: "intlify-authoring-identity-owner-result-v1",
+    plan_codec: "intlify-authoring-identity-owner-run-plan/0",
+    result_codec: "intlify-authoring-identity-owner-run-result/0",
+    result_domain: "intlify-authoring-identity-owner-result-v0",
     runner_domain: "intlify-authoring-identity-local-runner-instance-v0",
     build_schema: "intlify-authoring-identity-build-observation/0",
     subject: "intlify-authoring-identity-phase3-reconciliation",
     profile: Versioned::new("intlify-authoring-identity-minimum-smoke", "0"),
-    harness: Versioned::new("intlify-authoring-identity-owner-run-harness", "1"),
+    harness: Versioned::new("intlify-authoring-identity-owner-run-harness", "0"),
     projection: Versioned::new("intlify-authoring-identity-minimum-to-026", "0"),
     native_rule: Versioned::new(
         "intlify-authoring-identity-native-unmanaged-component-context",
