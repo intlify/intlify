@@ -52,6 +52,53 @@ pub(crate) struct ProviderBinding<Id> {
     pub(crate) admission: AdmissionFacts<Id>,
 }
 
+/// The specifications a resolver supports, each with the one dataset it admits.
+/// Construction authority supplies them in 015 Phase 5; until then only tests
+/// and fixtures do.
+pub(crate) struct Supported<Id> {
+    entries: Vec<SemanticPins<Id>>,
+}
+
+/// A specification listed twice cannot say which dataset it admits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DuplicateSpecification;
+
+/// The invocation asserts a specification this resolver does not support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SpecificationUnsupported;
+
+impl From<SpecificationUnsupported> for Admission {
+    fn from(_: SpecificationUnsupported) -> Self {
+        Self::Specification
+    }
+}
+
+impl<Id: Eq> Supported<Id> {
+    pub(crate) fn new(entries: Vec<SemanticPins<Id>>) -> Result<Self, DuplicateSpecification> {
+        for (index, entry) in entries.iter().enumerate() {
+            if entries[..index]
+                .iter()
+                .any(|earlier| earlier.specification == entry.specification)
+            {
+                return Err(DuplicateSpecification);
+            }
+        }
+        Ok(Self { entries })
+    }
+
+    /// The pins a provider must carry when the invocation's
+    /// `locale-canonicalization` slot asserts `asserted`.
+    pub(crate) fn expected(
+        &self,
+        asserted: &VersionedIdentity<Id>,
+    ) -> Result<&SemanticPins<Id>, SpecificationUnsupported> {
+        self.entries
+            .iter()
+            .find(|entry| &entry.specification == asserted)
+            .ok_or(SpecificationUnsupported)
+    }
+}
+
 /// Only internal, read-only providers implement this interface. The provider
 /// owns the validity/canonicalization semantics proved by its conformance suite;
 /// the boundary does not equate successful syntax parsing with locale validity.
@@ -80,10 +127,56 @@ pub(crate) enum BindingPart {
     DatasetDigest,
 }
 
+impl BindingPart {
+    const fn is_specification(self) -> bool {
+        matches!(
+            self,
+            Self::SpecificationIdentity | Self::SpecificationRevision
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BindingFailure {
     MissingProviderData,
     Mismatch(Vec<BindingPart>),
+}
+
+impl BindingFailure {
+    pub(crate) fn admission(&self) -> Admission {
+        match self {
+            Self::MissingProviderData => Admission::PreInvocation(EnvelopeReason::MissingInput),
+            // A specification admits its dataset, so a specification that
+            // disagrees decides the class even when the dataset differs too.
+            Self::Mismatch(parts) if parts.iter().any(|part| part.is_specification()) => {
+                Admission::Specification
+            }
+            Self::Mismatch(_) => Admission::Data,
+        }
+    }
+}
+
+/// 015's closed reasons at the `locale-canonicalization-data-artifact`
+/// pre-invocation boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EnvelopeReason {
+    MissingInput,
+    MalformedEnvelope,
+    DuplicateMember,
+    UnknownMember,
+    OverBoundEnvelope,
+}
+
+/// Where 015 reports a failure to admit canonicalization data. These are private
+/// classes, not Findings: the Finding Registry belongs to 015 Phase 5.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Admission {
+    /// The pre-invocation boundary; the resolver is not invoked.
+    PreInvocation(EnvelopeReason),
+    /// `project-profile-locale-specification-not-admitted`.
+    Specification,
+    /// `project-profile-locale-data-not-admitted`.
+    Data,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -135,6 +135,141 @@ fn admission_facts_are_kept_as_reported_and_never_compared() {
     assert_eq!(core.canonicalize("en").unwrap().locale().as_str(), "en");
 }
 
+#[test]
+fn binding_failures_are_classified_where_015_reports_them() {
+    use BindingPart as Part;
+    assert_eq!(
+        BindingFailure::MissingProviderData.admission(),
+        Admission::PreInvocation(EnvelopeReason::MissingInput)
+    );
+    for parts in [
+        vec![Part::SpecificationIdentity],
+        vec![Part::SpecificationRevision],
+        vec![Part::SpecificationRevision, Part::DatasetDigest],
+        vec![Part::DatasetIdentity, Part::SpecificationIdentity],
+    ] {
+        assert_eq!(
+            BindingFailure::Mismatch(parts).admission(),
+            Admission::Specification
+        );
+    }
+    for parts in [
+        vec![Part::DatasetIdentity],
+        vec![Part::DatasetDigest],
+        vec![Part::DatasetIdentity, Part::DatasetDigest],
+    ] {
+        assert_eq!(BindingFailure::Mismatch(parts).admission(), Admission::Data);
+    }
+    assert_eq!(
+        Admission::from(SpecificationUnsupported),
+        Admission::Specification
+    );
+}
+
+fn pins(specification: &'static str, digest: &'static str) -> SemanticPins<&'static str> {
+    SemanticPins {
+        specification: VersionedIdentity {
+            identity: specification,
+            revision: "0",
+        },
+        dataset: DatasetPin {
+            identity: "dataset",
+            semantic_digest: digest,
+        },
+    }
+}
+
+#[test]
+fn a_supported_specification_names_the_one_dataset_it_admits() {
+    let supported = Supported::new(vec![pins("first", "a"), pins("second", "b")]).unwrap();
+    for (asserted, digest) in [("first", "a"), ("second", "b")] {
+        let expected = supported
+            .expected(&VersionedIdentity {
+                identity: asserted,
+                revision: "0",
+            })
+            .unwrap();
+        assert_eq!(expected, &pins(asserted, digest));
+    }
+    for asserted in [
+        VersionedIdentity {
+            identity: "third",
+            revision: "0",
+        },
+        VersionedIdentity {
+            identity: "first",
+            revision: "1",
+        },
+    ] {
+        assert_eq!(
+            supported.expected(&asserted).err(),
+            Some(SpecificationUnsupported)
+        );
+    }
+    assert!(Supported::<&str>::new(Vec::new())
+        .unwrap()
+        .expected(&fixture_pins().specification)
+        .is_err());
+    for duplicate in [
+        vec![pins("first", "a"), pins("first", "a")],
+        vec![pins("first", "a"), pins("second", "b"), pins("first", "c")],
+    ] {
+        assert_eq!(
+            Supported::new(duplicate).err(),
+            Some(DuplicateSpecification)
+        );
+    }
+}
+
+#[test]
+fn the_asserted_specification_decides_which_dataset_a_provider_must_carry() {
+    let supported = Supported::new(vec![pins("other", "other-digest"), fixture_pins()]).unwrap();
+    let bind = |asserted: &VersionedIdentity<&'static str>| {
+        let expected = supported.expected(asserted).map_err(Admission::from)?;
+        Canonicalizer::bind(
+            expected,
+            Some(FixtureProvider::new()),
+            Bound::new(128).unwrap(),
+        )
+        .map_err(|failure| failure.admission())
+    };
+    assert!(bind(&fixture_pins().specification).is_ok());
+    assert_eq!(
+        bind(&VersionedIdentity {
+            identity: "other",
+            revision: "0"
+        })
+        .err(),
+        Some(Admission::Specification)
+    );
+    assert_eq!(
+        bind(&VersionedIdentity {
+            identity: "unsupported",
+            revision: "0"
+        })
+        .err(),
+        Some(Admission::Specification)
+    );
+    let mut stale = fixture_pins();
+    stale.dataset.semantic_digest = "stale-digest";
+    let stale_supported = Supported::new(vec![stale]).unwrap();
+    let expected = stale_supported
+        .expected(&fixture_pins().specification)
+        .unwrap();
+    let failure = Canonicalizer::bind(
+        expected,
+        Some(FixtureProvider::new()),
+        Bound::new(128).unwrap(),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        failure,
+        BindingFailure::Mismatch(vec![BindingPart::DatasetDigest])
+    );
+    assert_eq!(failure.admission(), Admission::Data);
+}
+
 struct ProbeProvider {
     binding: ProviderBinding<&'static str>,
     calls: Cell<usize>,
