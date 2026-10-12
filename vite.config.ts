@@ -24,7 +24,8 @@ export default defineConfig({
       'crates/intlify_producer_js/fixtures/**',
       'crates/intlify_authoring_js/fixtures/**',
       // Locale canonicalization artifacts pin their payloads' exact bytes by digest.
-      'crates/intlify_locale_icu4x/fixtures/artifact/**'
+      'crates/intlify_locale_icu4x/fixtures/artifact/**',
+      'crates/intlify_locale_icu4x/data/**'
     ]
   }),
   lint: defineLintConfig({
