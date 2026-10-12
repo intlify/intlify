@@ -8,21 +8,36 @@
 //! the caller supplies, checks that the blob holds exactly them, projects each
 //! into the logical payload that design 017 frames into the dataset's
 //! semantic digest, and builds ICU4X's extended `LocaleCanonicalizer` from
-//! them.
+//! them. It reads the conformance data payload and builds 017's logical
+//! dataset and its semantic digest.
 //!
-//! It is not yet the Intlify conformance layer (validity data and
-//! corrections), the reader of 017's Locale Canonicalization Data Artifact
-//! manifest, or a provider for `intlify_config`. Its canonicalization is
-//! ICU4X's raw behavior, which accepts identifiers revision "0" rejects.
+//! It is not yet the Intlify conformance layer that applies that data, the
+//! reader of 017's Locale Canonicalization Data Artifact manifest, or a
+//! provider for `intlify_config`. Its canonicalization is ICU4X's raw
+//! behavior, which accepts identifiers revision "0" rejects.
 //! Without the `generate` feature it links no compiled data, so nothing
 //! reaches it but the blob it is given.
 
 mod canonicalize;
+mod conformance;
+mod dataset;
 #[cfg(feature = "generate")]
 pub mod generate;
 mod markers;
 mod payload;
+mod primitives;
+pub mod schema;
 
 pub use canonicalize::RawFailure;
+pub use conformance::{
+    Collection, ConformanceFailure, ConformanceLimits, Correction, Extension, ExtensionKey,
+    ExtensionType, Limited, LocaleConformanceData, TypeClass, ValidityField, ValidityGroup,
+    ValidityStatus, ValueType,
+};
+pub use dataset::{
+    DatasetFailure, LocaleCanonicalizationDataset, DATASET_DOMAIN, DATASET_SCHEMA_IDENTITY,
+    DATASET_SCHEMA_REVISION,
+};
 pub use markers::{BlobFailure, Layout, Marker, MarkerBlob};
 pub use payload::{LogicalPayload, PayloadFailure};
+pub use primitives::{NonemptyText, SemanticDigest};

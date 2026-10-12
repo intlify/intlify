@@ -1,0 +1,320 @@
+{
+  "note": "A small dataset, its conformance payload as canonical JSON text, and its semantic digest. An independent implementation rebuilds the preimage from datasetSchema, markers, and conformance, re-frames and re-hashes it, applies each edit and does the same, and checks that every refused payload holds a value the framing does not carry. The marker payloads are ICU4X's data cut down to two entries per map and list; none of this is the dataset revision \"0\" admits.",
+  "domain": "locale-canonicalization-dataset",
+  "datasetSchema": {
+    "identity": "intlify-locale-canonicalization-dataset",
+    "revision": "0"
+  },
+  "markers": [
+    {
+      "marker": "LocaleAliasesV1",
+      "payload": {
+        "complex_region": {
+          "062": ["034", "143"],
+          "172": ["RU", "AM", "AZ", "BY", "GE", "KG", "KZ", "MD", "TJ", "TM", "UA", "UZ"]
+        },
+        "language": [],
+        "language_len2": {
+          "in": "id",
+          "iw": "he"
+        },
+        "language_len3": {
+          "aar": "aa",
+          "abk": "ab"
+        },
+        "language_variants": [
+          ["aa", "saaho", "ssy"],
+          ["art", "lojban", "jbo"]
+        ],
+        "region_alpha": {
+          "BU": "MM",
+          "CT": "KI"
+        },
+        "region_num": {
+          "004": "AF",
+          "008": "AL"
+        },
+        "script": {
+          "Qaai": "Zinh"
+        },
+        "sgn_region": {
+          "BR": "bzs",
+          "CO": "csn"
+        },
+        "subdivision": {
+          "cn11": "cnbj",
+          "cn12": "cntj"
+        },
+        "variant": {
+          "heploc": "alalc97",
+          "polytoni": "polyton"
+        }
+      }
+    },
+    {
+      "marker": "LocaleLikelySubtagsExtendedV1",
+      "payload": {
+        "language": {
+          "aa": ["Latn", "ET"],
+          "aaa": ["Latn", "NG"]
+        },
+        "language_region": [
+          [["abq", "TR"], "Latn"],
+          [["hak", "TW"], "Hant"]
+        ],
+        "language_script": [
+          [["abq", "Latn"], "TR"],
+          [["arc", "Hatr"], "IQ"]
+        ],
+        "region": {
+          "AS": ["sm", "Latn"],
+          "BI": ["rn", "Latn"]
+        },
+        "script": {
+          "Aghb": ["xag", "AZ"],
+          "Ahom": ["aho", "IN"]
+        },
+        "script_region": [
+          [["Arab", "KH"], "cja"],
+          [["Arab", "MM"], "rhg"]
+        ]
+      }
+    },
+    {
+      "marker": "LocaleLikelySubtagsLanguageV1",
+      "payload": {
+        "language": {
+          "af": ["Latn", "ZA"],
+          "ak": ["Latn", "GH"]
+        },
+        "language_region": [
+          [["az", "IQ"], "Arab"],
+          [["az", "IR"], "Arab"]
+        ],
+        "language_script": [
+          [["az", "Arab"], "IR"],
+          [["en", "Shaw"], "GB"]
+        ],
+        "und": ["en", "Latn", "US"]
+      }
+    },
+    {
+      "marker": "LocaleLikelySubtagsScriptRegionV1",
+      "payload": {
+        "region": {
+          "419": ["es", "Latn"],
+          "AD": ["ca", "Latn"]
+        },
+        "script": {
+          "Adlm": ["ff", "GN"],
+          "Arab": ["ar", "EG"]
+        },
+        "script_region": [
+          [["Arab", "AF"], "fa"],
+          [["Arab", "AZ"], "az"]
+        ]
+      }
+    }
+  ],
+  "conformance": {
+    "validity": [
+      {
+        "field": "language",
+        "status": "regular",
+        "codes": ["en", "fr", "he", "ja"]
+      },
+      {
+        "field": "language",
+        "status": "reserved",
+        "codes": ["qaa", "qfz"]
+      },
+      {
+        "field": "region",
+        "status": "macroregion",
+        "codes": ["001", "419"]
+      },
+      {
+        "field": "region",
+        "status": "private-use",
+        "codes": ["XC", "XZ"]
+      },
+      {
+        "field": "region",
+        "status": "regular",
+        "codes": ["FR", "IL", "JP", "US"]
+      },
+      {
+        "field": "region",
+        "status": "special",
+        "codes": ["XA", "XB"]
+      },
+      {
+        "field": "region",
+        "status": "unknown",
+        "codes": ["ZZ"]
+      },
+      {
+        "field": "script",
+        "status": "private-use",
+        "codes": ["Qaaq"]
+      },
+      {
+        "field": "script",
+        "status": "regular",
+        "codes": ["Hant", "Latn"]
+      }
+    ],
+    "extensionKeys": [
+      {
+        "extension": "t",
+        "key": "x0",
+        "deprecated": false,
+        "valueType": "single",
+        "types": [
+          {
+            "kind": "class",
+            "class": "private-use"
+          }
+        ]
+      },
+      {
+        "extension": "u",
+        "key": "ca",
+        "deprecated": false,
+        "valueType": "incremental",
+        "types": [
+          {
+            "kind": "literal",
+            "type": "ethioaa",
+            "deprecated": false
+          },
+          {
+            "kind": "literal",
+            "type": "gregory",
+            "deprecated": false
+          },
+          {
+            "kind": "literal",
+            "type": "islamic-civil",
+            "deprecated": false
+          },
+          {
+            "kind": "literal",
+            "type": "islamicc",
+            "deprecated": true
+          }
+        ]
+      },
+      {
+        "extension": "u",
+        "key": "kr",
+        "deprecated": false,
+        "valueType": "multiple",
+        "types": [
+          {
+            "kind": "class",
+            "class": "reorder-code"
+          },
+          {
+            "kind": "literal",
+            "type": "digit",
+            "deprecated": false
+          },
+          {
+            "kind": "literal",
+            "type": "space",
+            "deprecated": false
+          }
+        ]
+      },
+      {
+        "extension": "u",
+        "key": "vt",
+        "deprecated": true,
+        "valueType": "multiple",
+        "types": [
+          {
+            "kind": "class",
+            "class": "codepoints"
+          }
+        ]
+      }
+    ],
+    "corrections": [
+      {
+        "extension": "u",
+        "key": "ca",
+        "from": "ethiopic-amete-alem",
+        "to": "ethioaa"
+      },
+      {
+        "extension": "u",
+        "key": "ca",
+        "from": "islamicc",
+        "to": "islamic-civil"
+      }
+    ]
+  },
+  "conformanceText": "{\"corrections\":[{\"extension\":\"u\",\"from\":\"ethiopic-amete-alem\",\"key\":\"ca\",\"to\":\"ethioaa\"},{\"extension\":\"u\",\"from\":\"islamicc\",\"key\":\"ca\",\"to\":\"islamic-civil\"}],\"extensionKeys\":[{\"deprecated\":false,\"extension\":\"t\",\"key\":\"x0\",\"types\":[{\"class\":\"private-use\",\"kind\":\"class\"}],\"valueType\":\"single\"},{\"deprecated\":false,\"extension\":\"u\",\"key\":\"ca\",\"types\":[{\"deprecated\":false,\"kind\":\"literal\",\"type\":\"ethioaa\"},{\"deprecated\":false,\"kind\":\"literal\",\"type\":\"gregory\"},{\"deprecated\":false,\"kind\":\"literal\",\"type\":\"islamic-civil\"},{\"deprecated\":true,\"kind\":\"literal\",\"type\":\"islamicc\"}],\"valueType\":\"incremental\"},{\"deprecated\":false,\"extension\":\"u\",\"key\":\"kr\",\"types\":[{\"class\":\"reorder-code\",\"kind\":\"class\"},{\"deprecated\":false,\"kind\":\"literal\",\"type\":\"digit\"},{\"deprecated\":false,\"kind\":\"literal\",\"type\":\"space\"}],\"valueType\":\"multiple\"},{\"deprecated\":true,\"extension\":\"u\",\"key\":\"vt\",\"types\":[{\"class\":\"codepoints\",\"kind\":\"class\"}],\"valueType\":\"multiple\"}],\"validity\":[{\"codes\":[\"en\",\"fr\",\"he\",\"ja\"],\"field\":\"language\",\"status\":\"regular\"},{\"codes\":[\"qaa\",\"qfz\"],\"field\":\"language\",\"status\":\"reserved\"},{\"codes\":[\"001\",\"419\"],\"field\":\"region\",\"status\":\"macroregion\"},{\"codes\":[\"XC\",\"XZ\"],\"field\":\"region\",\"status\":\"private-use\"},{\"codes\":[\"FR\",\"IL\",\"JP\",\"US\"],\"field\":\"region\",\"status\":\"regular\"},{\"codes\":[\"XA\",\"XB\"],\"field\":\"region\",\"status\":\"special\"},{\"codes\":[\"ZZ\"],\"field\":\"region\",\"status\":\"unknown\"},{\"codes\":[\"Qaaq\"],\"field\":\"script\",\"status\":\"private-use\"},{\"codes\":[\"Hant\",\"Latn\"],\"field\":\"script\",\"status\":\"regular\"}]}",
+  "semanticDigest": "sha256:555271894016e7cbebf034ad23fecacd2e9453c5a1feb79dd8266f9d5ff57a29",
+  "edits": [
+    {
+      "id": "validity-code",
+      "pointer": "/conformance/validity/0/codes/0",
+      "value": "eo",
+      "semanticDigest": "sha256:3ecfbc753ed1347f64b4f13436c68e8a4899df00647978b51b5b9d3a3716d3d5"
+    },
+    {
+      "id": "extension-type",
+      "pointer": "/conformance/extensionKeys/2/types/1/type",
+      "value": "digits",
+      "semanticDigest": "sha256:6efdabc9b9552046f24c2aa0b27596c6b119e270e584067f8f83e5dd14d550d3"
+    },
+    {
+      "id": "extension-type-deprecation",
+      "pointer": "/conformance/extensionKeys/1/types/1/deprecated",
+      "value": true,
+      "semanticDigest": "sha256:de41c3461a4292e105a7fea59ad69c54dc0f1219ca6953abb5b52d8fc09a6cb0"
+    },
+    {
+      "id": "correction",
+      "pointer": "/conformance/corrections/1/to",
+      "value": "islamic-tbla",
+      "semanticDigest": "sha256:d0c1f8c7758a61994bd504e5420a25cc2a9653edab8894337b439000faead33f"
+    },
+    {
+      "id": "marker-pairs-swapped",
+      "pointer": "/markers/2/payload/language_script",
+      "value": [
+        [["en", "Shaw"], "GB"],
+        [["az", "Arab"], "IR"]
+      ],
+      "semanticDigest": "sha256:e819b05367df4aec35e8e9b821b8fde6ccaa81f38aa34e5e8a722bf6669bf6a9"
+    }
+  ],
+  "refused": [
+    {
+      "id": "number",
+      "marker": "LocaleLikelySubtagsLanguageV1",
+      "payload": {
+        "und": ["en", "Latn", 1]
+      }
+    },
+    {
+      "id": "boolean",
+      "marker": "LocaleAliasesV1",
+      "payload": {
+        "script": {
+          "Qaai": true
+        }
+      }
+    },
+    {
+      "id": "null",
+      "marker": "LocaleLikelySubtagsScriptRegionV1",
+      "payload": {
+        "script_region": [[["Arab", "AF"], null]]
+      }
+    }
+  ]
+}

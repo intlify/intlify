@@ -22,4 +22,5 @@ pub mod encoding;
 pub mod json;
 pub mod location;
 pub mod quantity;
+pub mod text;
 pub mod token;

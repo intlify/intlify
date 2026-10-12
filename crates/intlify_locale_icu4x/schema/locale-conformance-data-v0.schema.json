@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "Correction": {
+      "additionalProperties": false,
+      "description": "A deprecated value mapped directly to its final replacement, where ICU4X\ndoes not already realize the mapping.",
+      "properties": {
+        "extension": {
+          "$ref": "#/definitions/Extension"
+        },
+        "from": {
+          "$ref": "#/definitions/NonemptyText"
+        },
+        "key": {
+          "$ref": "#/definitions/NonemptyText"
+        },
+        "to": {
+          "$ref": "#/definitions/NonemptyText"
+        }
+      },
+      "required": ["extension", "key", "from", "to"],
+      "type": "object"
+    },
+    "Extension": {
+      "description": "The extension a key belongs to.",
+      "enum": ["t", "u"],
+      "type": "string"
+    },
+    "ExtensionKey": {
+      "additionalProperties": false,
+      "description": "One `u` or `t` key from the pinned CLDR `common/bcp47` records.",
+      "properties": {
+        "deprecated": {
+          "type": "boolean"
+        },
+        "extension": {
+          "$ref": "#/definitions/Extension"
+        },
+        "key": {
+          "$ref": "#/definitions/NonemptyText"
+        },
+        "types": {
+          "description": "Sorted by kind and then by class or type, without duplicates.",
+          "items": {
+            "$ref": "#/definitions/ExtensionType"
+          },
+          "type": "array"
+        },
+        "valueType": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/ValueType"
+            }
+          ],
+          "description": "`single` when the source omits it."
+        }
+      },
+      "required": ["extension", "key", "deprecated", "valueType", "types"],
+      "type": "object"
+    },
+    "ExtensionType": {
+      "description": "One type a key admits: a class whose value grammar design 015 defines, or\none literal type.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "$ref": "#/definitions/TypeClass"
+            },
+            "kind": {
+              "const": "class",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "class"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "deprecated": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "literal",
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/NonemptyText"
+            }
+          },
+          "required": ["kind", "type", "deprecated"],
+          "type": "object"
+        }
+      ]
+    },
+    "NonemptyText": {
+      "pattern": "^[\\s\\S]+$",
+      "type": "string"
+    },
+    "TypeClass": {
+      "description": "A CLDR special type name, in lowercase with `-` in place of `_`.",
+      "enum": [
+        "codepoints",
+        "private-use",
+        "reorder-code",
+        "rg-key-value",
+        "script-code",
+        "subdivision-code"
+      ],
+      "type": "string"
+    },
+    "ValidityField": {
+      "description": "A locale identifier field that CLDR validity data covers.",
+      "enum": ["language", "region", "script", "subdivision", "variant"],
+      "type": "string"
+    },
+    "ValidityGroup": {
+      "additionalProperties": false,
+      "description": "The codes CLDR gives one status for one field.",
+      "properties": {
+        "codes": {
+          "description": "Expanded from CLDR range notation, in CLDR spelling and case, sorted by\nunsigned UTF-8 bytes without duplicates. A code is in at most one group\nof its field.",
+          "items": {
+            "$ref": "#/definitions/NonemptyText"
+          },
+          "type": "array"
+        },
+        "field": {
+          "$ref": "#/definitions/ValidityField"
+        },
+        "status": {
+          "$ref": "#/definitions/ValidityStatus"
+        }
+      },
+      "required": ["field", "status", "codes"],
+      "type": "object"
+    },
+    "ValidityStatus": {
+      "description": "A CLDR validity status; `private-use` is CLDR's `private_use`.",
+      "enum": [
+        "deprecated",
+        "macroregion",
+        "private-use",
+        "regular",
+        "reserved",
+        "special",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "ValueType": {
+      "description": "CLDR's `valueType`: how a key's value is made of its types.",
+      "enum": ["any", "incremental", "multiple", "single"],
+      "type": "string"
+    }
+  },
+  "description": "The validity records, extension keys and types, and corrections that the\nconformance layer of a Locale Canonicalization Specification uses.",
+  "properties": {
+    "corrections": {
+      "description": "The flattened corrections, sorted by extension, key, and then `from`.",
+      "items": {
+        "$ref": "#/definitions/Correction"
+      },
+      "type": "array"
+    },
+    "extensionKeys": {
+      "description": "Every `u` and `t` key, sorted by extension and then key.",
+      "items": {
+        "$ref": "#/definitions/ExtensionKey"
+      },
+      "type": "array"
+    },
+    "validity": {
+      "description": "One group per field and status, sorted by field and then status.",
+      "items": {
+        "$ref": "#/definitions/ValidityGroup"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["validity", "extensionKeys", "corrections"],
+  "title": "LocaleConformanceData",
+  "type": "object"
+}
