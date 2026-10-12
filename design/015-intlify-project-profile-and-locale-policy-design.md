@@ -1079,7 +1079,7 @@ Before exporting any baked, blob, or other provider representation, the artifact
 
 The semantic digest identifies the canonical logical dataset independently of provider representation. Each physical artifact also carries its own transport digest for byte-level integrity, but changing only between conforming baked and blob exports does not change profile semantics. A digest proves content identity, not publisher authenticity; trust, signatures, and provenance remain owned by 018.
 
-The valid Unicode BCP 47 locale domain from Decision 015-011 remains normative rather than being weakened to syntax-only well-formed input. The initial adapter therefore wraps ICU4X with a thin, Intlify-owned conformance layer. Before ICU4X canonicalization, that layer validates language, script, region, variant, Unicode extension key/type, and transformed-extension key/type membership against the pinned validity data. It delegates conforming canonicalization behavior to ICU4X and applies explicit override mappings where ICU4X `2.2.0` cannot realize revision `"0"` semantics. One known example is the missing `islamicc` to `islamic-civil` Unicode calendar-type alias documented by ICU4X.
+The valid Unicode BCP 47 locale domain from Decision 015-011 remains normative rather than being weakened to syntax-only well-formed input. The initial adapter therefore wraps ICU4X with a thin, Intlify-owned conformance layer. Before ICU4X canonicalization, that layer validates language, script, region, variant, Unicode extension key/type, and transformed-extension key/type membership against the pinned validity data. It delegates conforming canonicalization behavior to ICU4X and applies explicit override mappings where ICU4X `2.2.0` cannot realize revision `"0"` semantics. One known example is the missing `islamicc` to `islamic-civil` Unicode calendar-type alias documented by ICU4X. [Revision `"0"` conformance layer](#revision-0-conformance-layer) gives the complete rules.
 
 A merely well-formed value is not admitted solely because ICU4X can parse it. Inputs such as `zz`, `en-u-ca-madeup`, and `en-u-zz-abc` receive a blocking configuration Finding when their components are not valid under revision `"0"`. A deprecated value is admitted only when the pinned specification provides a deterministic canonical replacement.
 
@@ -1118,6 +1118,51 @@ Adopting new UTS #35 or CLDR data creates a new Intlify canonicalization-specifi
 The opaque, exact-byte `Locale` currently defined by 014 is an existing resource-first artifact type, not the semantic locale model for this source-first profile. It cannot be reused unchanged across this boundary. Any migration or adapter between existing 014 artifacts and the normative profile locale domain must be made explicit by 017, 020, and 029 rather than silently accepting opaque values here.
 
 Invalid authoring spelling uses the configuration source evidence and Finding registry defined in this document; no additional locale-specific evidence form is introduced.
+
+### Revision `"0"` conformance layer
+
+This subsection completes the conformance layer of Locale Canonicalization Specification revision `"0"`. Every rule reads the admitted dataset, that is, the conformance data and the four marker families that 017's [Locale Canonicalization Data Representation](./017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation) defines, and nothing from the host. The key, type, and class rules follow the Key And Type Definitions of [UTS #35 for CLDR `48.2.0`](https://www.unicode.org/reports/tr35/tr35-76/tr35.html).
+
+The layer takes one direct-input identifier through five steps and returns either one canonical identifier or a rejection of the complete identifier:
+
+1. **Structure.** The input is a hyphen-separated Unicode BCP 47 Locale Identifier with at most one `u` extension, at most one `t` extension, no other extension singleton, and no private-use sequence. A `u` extension has no attribute, because the pinned data registers none, and no key twice. A `t` extension has no field key twice. ICU4X `2.2.0` keeps the first of two equal keys and drops the second, so these checks read the input before ICU4X does.
+2. **Validity.** Every component, key, and type passes the rules below.
+3. **Canonicalization.** ICU4X `2.2.0` canonicalizes the identifier.
+4. **Correction.** Each `u` or `t` type that is the `from` of a correction for its extension and key becomes that correction's `to`. ICU4X then canonicalizes the result again, which restores canonical syntax and ordering and removes a type `true`.
+5. **Result.** Every component of the result has an admitted status other than `deprecated`, and every type is a literal type or class value of its key that is not deprecated. A deprecated value that is still present has no deterministic replacement in the pinned data, so the input is rejected. The layer then repeats steps 3 and 4 on its own result, which must not change.
+
+A failure in step 1, 2, or 5 rejects the input with a blocking configuration Finding, and the layer never strips a rejected part. A result that changes when steps 3 and 4 are repeated is an adapter conformance failure that blocks adapter admission; it is never reported as a user-input Finding.
+
+**Components.** A language, script, region, or variant subtag, and each such subtag of a `t` extension's transformed-language field, is looked up, in canonical case, in the validity groups of its field. `regular`, `special`, `macroregion`, and `unknown` are admitted. `deprecated` is admitted for step 5 to decide. `reserved`, `private-use`, and a code in no group are rejected.
+
+**Keys.** A key must be listed for its extension and must not be deprecated: the pinned data gives no replacement for a deprecated key such as `kh` or `vt`.
+
+**Types.** A value is admitted for a key when it is a listed literal type that is not deprecated, the `from` of a correction for the key, or a value of a class the key lists. A deprecated literal type is therefore admitted exactly when a correction replaces it, so `ca-islamicc` is admitted while `co-big5han` and `hc-c12` are rejected. The key's `valueType` decides how a type is made of values:
+
+| `valueType` | Admitted type |
+| --- | --- |
+| `single` | One admitted value, or no type when `true` is a listed type of the key, as in `en-u-kn`; `en-u-ca` is rejected |
+| `incremental` | One admitted value, whose subtags form a listed sequence, as in `ca-islamic-umalqura`; `ca-gregory-japanese` is rejected |
+| `multiple` | One or more subtags, each an admitted value and none repeated, as in `kr-latn-digit` |
+| `any` | One or more subtags, each an admitted value |
+
+**Classes.** A class stands for the following values, looked up in canonical case in the validity groups where the class names a code:
+
+| Class | A value matches when it is |
+| --- | --- |
+| `codepoints` | Four to six hexadecimal digits naming a code point no greater than `10FFFF`. Only the deprecated key `vt` lists this class, so revision `"0"` admits no such value |
+| `private-use` | Three to eight ASCII alphanumerics |
+| `reorder-code` | `others`, or a script code whose status is `regular`. The root collation's reordering block names are not part of the dataset, and revision `"0"` stands for them with these values |
+| `rg-key-value` | A subdivision code whose status is `regular` or `unknown`, or `deprecated` for step 5 to decide, such as `uszzzz` or `gbsct` |
+| `script-code` | A script code whose status is `regular`, `special`, or `unknown`, or `deprecated` for step 5 to decide |
+| `subdivision-code` | A subdivision code whose status is `regular`, or `deprecated` for step 5 to decide; `unknown` codes such as `uszzzz` are rejected |
+
+**Corrections.** The generator derives the correction set from the literal types of every listed key that is not deprecated, and each mapping's source must itself be a direct-input value:
+
+- A deprecated type with a `preferred` value maps to that value.
+- Each space-separated name in a type's `alias` attribute maps to the type when the name, in lowercase, is one or more subtags of three to eight ASCII alphanumerics and is not itself a listed type of the key. The last condition matters for `islamicc`, whose alias `islamic-civil` names another type rather than a spelling of `islamicc`.
+
+A chain is followed to its final value, which must be a listed type that is not deprecated. A cycle, a source with two final values, or any other final value fails generation. A mapping that ICU4X `2.2.0` already realizes would be absent from the correction set, and the dataset would then record no admitted spelling for its source, so generation also fails if ICU4X realizes one. ICU4X `2.2.0` realizes none: apart from subdivision codes in `rg` and `sd` and the subtags of a transformed-language field, which the class and component rules cover, it does not canonicalize `u` or `t` types. For CLDR `48.2.0` the set includes `islamicc` to `islamic-civil`, `ethiopic-amete-alem` to `ethioaa`, `imperial` to `uksystem`, `yes` to `true` for each admitted key that lists `true`, the deprecated time-zone types with a preferred zone, and time-zone aliases that are well-formed types, such as `japan` to `jptyo`.
 
 ## Source Locale Defaults
 
@@ -3100,6 +3145,13 @@ Revision `"0"` includes at least the following combined coverage inventory. The 
 - `und-u-ca-islamicc` canonicalized to `und-u-ca-islamic-civil` by generated correction data;
 - generated coverage for every valid-direct-input CLDR BCP 47 key/type alias, separating ICU4X-delegated mappings from Intlify-corrected mappings without a handwritten exception list;
 - legacy-only key/type aliases excluded from the direct correction set and left to explicit compatibility conversion;
+- `u` attributes and repeated `u` or `t` keys, such as `en-u-attr-ca-gregory` and `en-u-ca-gregory-ca-buddhist`, rejected as complete identifiers rather than reduced to their first key;
+- every `valueType` boundary: `en-u-kn` admitted and `en-u-ca` rejected, `ca-islamic-umalqura` admitted and `ca-gregory-japanese` rejected, `kr-latn-digit` admitted and a repeated `kr` value rejected, and several `t-x0` private-use subtags admitted;
+- every class boundary, including `rg-uszzzz` admitted and `sd-uszzzz` rejected, `dx-thai` admitted, `kr-others` admitted, and the deprecated keys `kh` and `vt` rejected;
+- deprecated literal types without a preferred value, such as `co-big5han` and `hc-c12`, rejected while `ca-islamicc` is corrected;
+- generated alias corrections such as `ms-imperial` to `ms-uksystem`, `ca-ethiopic-amete-alem` to `ca-ethioaa`, and `kn-yes` to `kn`, with an alias that names another listed type, such as `islamicc`'s `islamic-civil`, never producing a mapping;
+- a deprecated subdivision code in `rg` or `sd` admitted only when ICU4X `2.2.0` replaces it, and any deprecated component or type left in a result rejecting the complete identifier;
+- generation failing when ICU4X `2.2.0` realizes a direct-input type alias, rather than leaving the alias's spelling unrecorded;
 - every generated alias chain flattened to its final preferred value and every corrected result remaining byte-identical after a second canonicalization pass;
 - artifact or adapter admission rejected for a cyclic, unrepresentable, or otherwise non-deterministic correction mapping;
 - non-canonical casing, deprecated aliases, and extension ordering converted to one canonical identifier;
@@ -3439,6 +3491,7 @@ This table records the accepted decisions fixed by this design.
 | 015-131 | Define phase-separated local-first profile-resolver benchmarks with 015-owned phase/cost boundaries, workload vectors, semantic checksums, duration and peak-memory observations; keep resource admission separate from physical performance; gate benchmark integrity and determinism rather than revision-`"0"` numeric values; and delegate common comparison and numeric regression policy to 026 | Accepted | Resolver performance must be attributable and observable from the first implementation slice without making machine-dependent measurements semantic, confusing logical safety limits with speed, or waiting for the cross-target measurement specification | Ownership and Dependencies; Performance and Measurement; Conformance and Fixtures; Implementation Phasing; Relationship to Other Documents |
 | 015-132 | Apply 026 revision-`"0"` observational measurement, storage/reuse constraints, projection-ready records, conditional profiling verification, and owner-phase verification requirements without changing resolver semantics or the seven-phase structure | Accepted | Initial implementations retain reusable measurement data and safe ownership while shared evaluators, optional diagnostics, and later numeric policy do not become unrelated prerequisites | Ownership and Dependencies; Performance and Measurement; Implementation Phasing; Relationship to Other Documents |
 | 015-133 | Name the initial Locale Canonicalization Specification `intlify-locale-canonicalization` revision `"0"`, admit exactly one dataset `intlify-locale-canonicalization-cldr-48.2.0`, and adopt 017's Locale Canonicalization Data Representation for the artifact manifest, dataset semantic digest, and payload integrity | Accepted | Phase 2 cannot reproduce or admit a provider binding until the specification and its dataset have exact names and one encoding fixes how their digests are computed | Locale Identity and Canonicalization |
+| 015-134 | Complete the revision-`"0"` conformance layer: a five-step pipeline of structure, validity, ICU4X canonicalization, generated correction, and a result check with idempotence; component statuses from the pinned validity data; key and type validity by `valueType` and the six class grammars of UTS #35 for CLDR `48.2.0`; no `u` attribute and no repeated key; and corrections derived from deprecated types' preferred values and from well-formed aliases that do not name another listed type | Accepted | 017 delegates each class's value grammar to this design, and ICU4X `2.2.0` silently keeps the first of two equal keys, so the layer needs exact rules before Phase 2 can generate its data or apply it | Locale Identity and Canonicalization; Conformance and Fixtures |
 
 ## Deferred Follow-Up Notes
 
