@@ -63,6 +63,40 @@ pub enum PayloadFailure {
     Unrepresentable(Marker),
 }
 
+/// Writes ICU4X's human-readable serialization of one marker family's data
+/// struct into `$writer`, keeping nothing else.
+macro_rules! measure {
+    ($provider:expr, $marker:ty, $writer:expr) => {{
+        DataProvider::<$marker>::load(&$provider, DataRequest::default())
+            .ok()
+            .and_then(|response| serde_json::to_writer(&mut $writer, response.payload.get()).ok())
+    }};
+}
+
+/// Why the logical payloads were not taken within a limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Within {
+    /// Written as compact JSON text, they are over the limit.
+    Over,
+    Failed(PayloadFailure),
+}
+
+/// Counts the bytes a serializer writes and keeps none of them.
+struct Counter(u64);
+
+impl std::io::Write for Counter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 = self
+            .0
+            .saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 impl MarkerBlob {
     /// The four logical payloads, in 017's order.
     pub fn payloads(&self) -> Result<Vec<LogicalPayload>, PayloadFailure> {
@@ -70,6 +104,38 @@ impl MarkerBlob {
             .into_iter()
             .map(|marker| self.payload(marker))
             .collect()
+    }
+
+    /// The four logical payloads, if they are within `limit` bytes as compact
+    /// JSON text. The bytes are counted before any payload is built, so a
+    /// blob over the limit never has its payloads allocated.
+    pub(crate) fn payloads_within(&self, limit: u64) -> Result<Vec<LogicalPayload>, Within> {
+        if self.written_bytes().map_err(Within::Failed)? > limit {
+            return Err(Within::Over);
+        }
+        self.payloads().map_err(Within::Failed)
+    }
+
+    /// The bytes of the four logical payloads as compact JSON text.
+    pub(crate) fn written_bytes(&self) -> Result<u64, PayloadFailure> {
+        let provider = self.provider().as_deserializing();
+        let mut counter = Counter(0);
+        for marker in Marker::ALL {
+            match marker {
+                Marker::LocaleAliasesV1 => measure!(provider, LocaleAliasesV1, counter),
+                Marker::LocaleLikelySubtagsExtendedV1 => {
+                    measure!(provider, LocaleLikelySubtagsExtendedV1, counter)
+                }
+                Marker::LocaleLikelySubtagsLanguageV1 => {
+                    measure!(provider, LocaleLikelySubtagsLanguageV1, counter)
+                }
+                Marker::LocaleLikelySubtagsScriptRegionV1 => {
+                    measure!(provider, LocaleLikelySubtagsScriptRegionV1, counter)
+                }
+            }
+            .ok_or(PayloadFailure::Undecodable(marker))?;
+        }
+        Ok(counter.0)
     }
 
     fn payload(&self, marker: Marker) -> Result<LogicalPayload, PayloadFailure> {
@@ -265,5 +331,37 @@ mod tests {
             .map(|payload| payload.value().clone())
             .collect();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn the_written_bytes_are_the_payloads_as_compact_json_text() {
+        let fixture = MarkerBlob::read(
+            include_bytes!("../fixtures/artifact/markers-narrow.postcard")
+                .as_slice()
+                .into(),
+        )
+        .unwrap();
+        for blob in [committed(), fixture] {
+            let expected: usize = blob
+                .payloads()
+                .unwrap()
+                .iter()
+                .map(|payload| serde_json::to_string(payload.value()).unwrap().len())
+                .sum();
+            let expected = u64::try_from(expected).unwrap();
+            assert_eq!(blob.written_bytes(), Ok(expected));
+            assert_eq!(blob.payloads_within(expected), Ok(blob.payloads().unwrap()));
+            assert_eq!(blob.payloads_within(expected - 1), Err(Within::Over));
+        }
+    }
+
+    #[test]
+    fn the_counter_saturates_rather_than_wrapping() {
+        use std::io::Write;
+
+        let mut counter = Counter(u64::MAX - 1);
+        assert_eq!(counter.write(b"abc").unwrap(), 3);
+        assert_eq!(counter.0, u64::MAX);
+        counter.flush().unwrap();
     }
 }

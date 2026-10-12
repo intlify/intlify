@@ -4,7 +4,7 @@ The ICU4X 2.2.0 reference adapter for [Intlify](../../design/000-intlify-overvie
 
 > [!IMPORTANT]
 >
-> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads the four ICU4X marker families that the Locale Canonicalization Specification revision `"0"` admits and builds ICU4X's canonicalizer from them, and it builds [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s logical dataset and its semantic digest. It does not yet apply the Intlify conformance layer, read the 017 artifact manifest, or serve as `intlify_config`'s provider. See [Current status](#current-status).
+> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s Locale Canonicalization Data Artifact in 017's six steps, rebuilds its logical dataset to check the semantic digest, and builds ICU4X's canonicalizer from the four marker families that the Locale Canonicalization Specification revision `"0"` admits. It does not yet apply the Intlify conformance layer or serve as `intlify_config`'s provider. See [Current status](#current-status).
 
 Design 015 keeps canonicalization semantics in an Intlify-owned specification and treats ICU4X as one physical engine behind a provider boundary. `intlify_config` holds no locale data and links no ICU4X. This crate is where the engine lives: it receives the data as a blob, checks that the blob carries exactly what revision `"0"` admits, and answers what ICU4X 2.2.0 does with it.
 
@@ -42,16 +42,36 @@ The conformance data is its own payload, written as canonical JSON text revision
 
 The caller's limits on groups, codes, keys, types, corrections, and their total are checked on the decoded value before any of it is projected. Whether these are the records a specification revision admits is for the semantic digest to decide, not the reader.
 
-## Committed schema and vectors
+## Committed schemas, vectors, and fixture artifacts
 
-`schema/locale-conformance-data-v0.schema.json` is the closed Draft 7 schema of the conformance value. Draft 7 cannot say "sorted", so the order above is the reader's alone. `fixtures/dataset/vectors.json` holds a small dataset, its conformance payload as canonical JSON text, its semantic digest, edits that must each change the digest, and payloads that must be refused. Its marker payloads are ICU4X's data cut down to two entries per map and list, and its conformance data is modelled on CLDR's records; neither is the dataset revision `"0"` admits. `tools/shared-json-vectors` checks the vectors with an implementation that shares no code with this crate.
+`schema/locale-canonicalization-data-v0.schema.json` and `schema/locale-conformance-data-v0.schema.json` are the closed Draft 7 schemas of the manifest and the conformance value. Draft 7 cannot say "sorted", so the orders above are the reader's alone. `fixtures/dataset/vectors.json` holds a small dataset, its conformance payload as canonical JSON text, its semantic digest, edits that must each change the digest, and payloads that must be refused. Its marker payloads are ICU4X's data cut down to two entries per map and list, and its conformance data is modelled on CLDR's records; neither is the dataset revision `"0"` admits. `tools/shared-json-vectors` checks the vectors with an implementation that shares no code with this crate.
+
+`fixtures/artifact` realizes that dataset as artifacts: its conformance payload, its marker payloads as a blob in each index layout, and three sealed manifests, two that differ only in the blob they name and one that differs only in where its CLDR sources were read from. The same tools check each manifest's integrity and each payload file. [`fixtures/README.md`](fixtures/README.md) maps each area of 017's fixtures to where it is checked.
 
 ```sh
 cargo run -p intlify_locale_icu4x --example generate_locale_schema -- --write
 cargo run -p intlify_locale_icu4x --example generate_dataset_vectors -- --write
+cargo run -p intlify_locale_icu4x --features generate --example generate_artifact_fixtures -- --write
 vp run schema:locale:check
 vp run vectors:locale:check
 ```
+
+## Reading an artifact
+
+An artifact is a manifest beside two payloads: the conformance data as canonical JSON text, and the four marker families as an ICU4X 2.2 blob. The reader fetches nothing. The caller reads the manifest, learns from it where each payload is, and hands over the exact bytes:
+
+```rust
+let manifest = VerifiedManifest::read(&manifest_bytes, &limits)?; // 017 steps 1 to 3
+let conformance = read(manifest.address(Role::Conformance))?;
+let markers = read(manifest.address(Role::Markers))?;
+let data = manifest.admit(Some(&conformance), Some(markers.into()), &limits)?; // steps 4 to 6
+```
+
+`VerifiedManifest::read` is design 015's `locale-canonicalization-data-artifact` pre-invocation boundary: the manifest's byte and depth limits, then its strict, closed decoding. A failure there is a `ReadFailure::Envelope`, and `EnvelopeFailure::reason` names its closed 015 reason. The byte and depth limits come first, because 017 checks limits before anything is decoded; after them the reasons follow 015's order (malformed, duplicate member, unknown member). Then the limits the manifest decides (the payload count and each payload's declared length, before the caller fetches anything) and its integrity digest.
+
+`admit` checks each payload's length and file digest, decodes each under the one format its role admits, and rebuilds the dataset to compare its semantic digest. Every failure after the boundary is a `ReadFailure::Data`, which 015 reports as `project-profile-locale-data-not-admitted`. Admitting data is not admitting a specification: whether the specification is supported and the dataset is the one it admits are the owner's checks, which come after.
+
+Every limit is the caller's, with no defaults: the manifest's bytes and depth, the payload count, each payload's declared length, the four logical marker payloads as compact JSON text (counted before any is built), and the conformance counts.
 
 ## The committed blob
 
@@ -66,9 +86,8 @@ The test suite checks the same freshness under `--all-features`.
 
 ## Current status
 
-This crate reads the marker blob, gives ICU4X's raw behavior, and builds the logical dataset with its semantic digest. Still to come in Phase 2:
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, and gives ICU4X's raw behavior. Still to come in Phase 2:
 
-- the reader of 017's Locale Canonicalization Data Artifact: the manifest and its integrity, payload byte lengths and file digests, the comparison with the dataset's semantic digest, and the remaining limits;
 - the conformance data generated from CLDR 48.2.0 (validity and corrections), the conformance layer, and the complete artifact;
 - the provider for `intlify_config`, behind a non-default feature there;
 - the gate against CLDR's canonicalization corpus.

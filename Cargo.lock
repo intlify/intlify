@@ -853,6 +853,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "zerovec",
 ]
 
 [[package]]

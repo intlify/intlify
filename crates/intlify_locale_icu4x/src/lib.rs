@@ -4,17 +4,16 @@
 //! The ICU4X 2.2.0 reference adapter for design 015's Locale
 //! Canonicalization Specification revision "0".
 //!
-//! It reads the four ICU4X marker families that revision admits from a blob
-//! the caller supplies, checks that the blob holds exactly them, projects each
-//! into the logical payload that design 017 frames into the dataset's
-//! semantic digest, and builds ICU4X's extended `LocaleCanonicalizer` from
-//! them. It reads the conformance data payload and builds 017's logical
-//! dataset and its semantic digest.
+//! It reads design 017's Locale Canonicalization Data Artifact in 017's six
+//! steps: the manifest at design 015's pre-invocation boundary, its
+//! integrity, each payload's length and file digest, the conformance data and
+//! the blob of the four ICU4X marker families that revision admits, and the
+//! logical dataset rebuilt to compare its semantic digest. From the blob it
+//! builds ICU4X's extended `LocaleCanonicalizer`.
 //!
-//! It is not yet the Intlify conformance layer that applies that data, the
-//! reader of 017's Locale Canonicalization Data Artifact manifest, or a
-//! provider for `intlify_config`. Its canonicalization is ICU4X's raw
-//! behavior, which accepts identifiers revision "0" rejects.
+//! It is not yet the Intlify conformance layer that applies the conformance
+//! data, or a provider for `intlify_config`. Its canonicalization is ICU4X's
+//! raw behavior, which accepts identifiers revision "0" rejects.
 //! Without the `generate` feature it links no compiled data, so nothing
 //! reaches it but the blob it is given.
 
@@ -23,9 +22,11 @@ mod conformance;
 mod dataset;
 #[cfg(feature = "generate")]
 pub mod generate;
+mod manifest;
 mod markers;
 mod payload;
 mod primitives;
+mod reader;
 pub mod schema;
 
 pub use canonicalize::RawFailure;
@@ -38,6 +39,15 @@ pub use dataset::{
     DatasetFailure, LocaleCanonicalizationDataset, DATASET_DOMAIN, DATASET_SCHEMA_IDENTITY,
     DATASET_SCHEMA_REVISION,
 };
+pub use manifest::{
+    ArtifactKind, Cldr, CldrSource, DatasetDescriptor, EnvelopeFailure, EnvelopeLimit, Generation,
+    LocaleCanonicalizationDataArtifact, MarkerData, Payload, RevisionZero, Role, ARTIFACT_KIND,
+    ARTIFACT_SCHEMA_REVISION, INTEGRITY_DOMAIN,
+};
 pub use markers::{BlobFailure, Layout, Marker, MarkerBlob};
 pub use payload::{LogicalPayload, PayloadFailure};
-pub use primitives::{NonemptyText, SemanticDigest};
+pub use primitives::{FileDigest, LogicalAddress, NonemptyText, SemanticDigest};
+pub use reader::{
+    AdmittedData, ArtifactLimit, DataFailure, PayloadCheck, ReadFailure, ReadLimits,
+    VerifiedManifest, CONFORMANCE_FORMAT, MARKERS_FORMAT,
+};
