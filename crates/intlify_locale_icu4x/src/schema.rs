@@ -13,6 +13,7 @@ use schemars::{generate::SchemaSettings, JsonSchema};
 use serde_json::Value;
 
 use crate::conformance::LocaleConformanceData;
+use crate::manifest::LocaleCanonicalizationDataArtifact;
 
 /// One committed schema: its generator and where it lives in this crate.
 pub struct CommittedSchema {
@@ -23,10 +24,21 @@ pub struct CommittedSchema {
 }
 
 /// Every schema this crate commits, in the order they are checked.
-pub const COMMITTED_SCHEMAS: [CommittedSchema; 1] = [CommittedSchema {
-    path: "schema/locale-conformance-data-v0.schema.json",
-    generate: conformance_schema,
-}];
+pub const COMMITTED_SCHEMAS: [CommittedSchema; 2] = [
+    CommittedSchema {
+        path: "schema/locale-canonicalization-data-v0.schema.json",
+        generate: manifest_schema,
+    },
+    CommittedSchema {
+        path: "schema/locale-conformance-data-v0.schema.json",
+        generate: conformance_schema,
+    },
+];
+
+/// Generate the complete closed schema of the artifact manifest.
+pub fn manifest_schema() -> Result<Value, serde_json::Error> {
+    draft7_schema::<LocaleCanonicalizationDataArtifact>()
+}
 
 /// Generate the complete closed schema of the conformance value.
 pub fn conformance_schema() -> Result<Value, serde_json::Error> {
@@ -85,6 +97,8 @@ mod tests {
 
     const COMMITTED_CONFORMANCE: &str =
         include_str!("../schema/locale-conformance-data-v0.schema.json");
+    const COMMITTED_MANIFEST: &str =
+        include_str!("../schema/locale-canonicalization-data-v0.schema.json");
 
     /// Every object schema in `schema`, wherever it is defined.
     fn objects(schema: &Value) -> Vec<&Value> {
@@ -112,6 +126,9 @@ mod tests {
                 "schema/locale-conformance-data-v0.schema.json" => {
                     serde_json::from_str(COMMITTED_CONFORMANCE).unwrap()
                 }
+                "schema/locale-canonicalization-data-v0.schema.json" => {
+                    serde_json::from_str(COMMITTED_MANIFEST).unwrap()
+                }
                 other => panic!("{other} is not read by this test"),
             };
             assert_eq!(
@@ -125,10 +142,21 @@ mod tests {
 
     #[test]
     fn every_object_is_closed_and_requires_every_member() {
-        let schema = conformance_schema().unwrap();
-        let objects = objects(&schema);
-        // The root, the group, the key, the correction, and both kinds of type.
-        assert_eq!(objects.len(), 6);
+        // The conformance value: the root, the group, the key, the
+        // correction, and both kinds of type. The manifest: the root, the
+        // dataset, the generation, the marker data, CLDR, a source, a
+        // payload, and a versioned identity.
+        for (schema, count) in [
+            (conformance_schema().unwrap(), 6),
+            (manifest_schema().unwrap(), 8),
+        ] {
+            let objects = objects(&schema);
+            assert_eq!(objects.len(), count, "{}", schema["title"]);
+            closed(objects);
+        }
+    }
+
+    fn closed(objects: Vec<&Value>) {
         for object in objects {
             assert_eq!(object["additionalProperties"], json!(false), "{object}");
             let mut properties: Vec<_> = object["properties"].as_object().unwrap().keys().collect();
@@ -177,5 +205,48 @@ mod tests {
             rendered,
             "{\n  \"a\": 4,\n  \"b\": {\n    \"c\": [\n      {\n        \"e\": 3,\n        \"f\": 2\n      }\n    ],\n    \"d\": 1\n  }\n}\n"
         );
+    }
+
+    #[test]
+    fn the_manifest_schema_admits_the_fixtures_and_pins_one_kind_and_revision() {
+        let schema = manifest_schema().unwrap();
+        let validator = jsonschema::draft7::new(&schema).unwrap();
+        for bytes in [
+            include_bytes!("../fixtures/artifact/manifest-narrow.json").as_slice(),
+            include_bytes!("../fixtures/artifact/manifest-wide.json"),
+            include_bytes!("../fixtures/artifact/manifest-vendored.json"),
+        ] {
+            assert!(validator.is_valid(&serde_json::from_slice(bytes).unwrap()));
+        }
+        let definitions = &schema["definitions"];
+        assert_eq!(
+            definitions["ArtifactKind"]["enum"],
+            json!(["locale-canonicalization-data"])
+        );
+        assert_eq!(definitions["RevisionZero"]["enum"], json!(["0"]));
+
+        let sample = crate::manifest::tests::sample();
+        for (pointer, value) in [
+            ("/kind", json!("locale-canonicalization-dataset")),
+            ("/schemaRevision", json!("1")),
+            ("/payloads/0/byteLength", json!(1521)),
+            ("/payloads/0/byteLength", json!("01521")),
+            ("/payloads/0/address", json!("../conformance.json")),
+            ("/payloads/0/role", json!("dataset")),
+            ("/specification/identity", json!("Intlify")),
+            ("/dataset/semanticDigest", json!("sha256:00")),
+            ("/generation/markers/0", json!("")),
+        ] {
+            let mut edited = sample.clone();
+            *edited.pointer_mut(pointer).unwrap() = value;
+            assert!(!validator.is_valid(&edited), "{pointer}");
+        }
+        let mut unknown = sample.clone();
+        unknown["generation"]["cldr"]["comment"] = json!("x");
+        assert!(!validator.is_valid(&unknown));
+        // The roles' order and the sorted lists are the reader's alone.
+        let mut reversed = sample;
+        reversed["payloads"].as_array_mut().unwrap().reverse();
+        assert!(validator.is_valid(&reversed));
     }
 }

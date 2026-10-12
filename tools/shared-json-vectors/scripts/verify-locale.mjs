@@ -1,14 +1,17 @@
 /**
- * Check the committed locale canonicalization dataset vectors against this
- * implementation.
+ * Check the committed locale canonicalization dataset vectors and fixture
+ * artifacts against this implementation.
  *
  * The Rust crate writes a small dataset's parts, its conformance payload as
  * canonical JSON text, and its semantic digest, with edits and refused
- * payloads. This script shares no code with it: it writes the canonical text
- * itself, checks the order design 017 fixes, rebuilds the preimage from the
- * parts, and re-frames and re-hashes it.
+ * payloads, and then artifacts that realize the dataset: payload files and
+ * sealed manifests. This script shares no code with it: it writes the
+ * canonical text itself, checks the order design 017 fixes, rebuilds the
+ * preimage from the parts, re-frames and re-hashes it, recomputes each
+ * manifest's integrity, and hashes each payload file.
  */
 
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,10 +19,12 @@ import { fileURLToPath } from 'node:url'
 import { digest } from './framing.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const datasetPath = resolve(
-  here,
-  '../../../crates/intlify_locale_icu4x/fixtures/dataset/vectors.json'
-)
+const fixtures = resolve(here, '../../../crates/intlify_locale_icu4x/fixtures')
+const datasetPath = resolve(fixtures, 'dataset/vectors.json')
+const artifactDirectory = resolve(fixtures, 'artifact')
+
+/** The fixture manifests, each beside the payload files it names. */
+const MANIFESTS = ['manifest-narrow.json', 'manifest-wide.json', 'manifest-vendored.json']
 
 /** The four marker families of dataset schema revision "0", sorted by name. */
 const MARKERS = [
@@ -313,8 +318,106 @@ function checkDataset(vectors) {
   return failures
 }
 
+/**
+ * Whether a list of strings is strictly ascending by UTF-8 bytes.
+ *
+ * @param texts - The strings, in list order.
+ * @returns Whether each is after the one before it.
+ */
+function strictlyAscending(texts) {
+  return texts.every((text, index) => index === 0 || compareText(texts[index - 1], text) < 0)
+}
+
+/**
+ * Check one manifest on its own: its fixed members, its closed lists, its
+ * integrity, and each payload file it names.
+ *
+ * @param name - The manifest's file name, for messages.
+ * @param manifest - The manifest.
+ * @param vectors - The dataset vectors it must realize.
+ * @param fail - Reports one problem.
+ */
+function checkManifest(name, manifest, vectors, fail) {
+  if (manifest.kind !== 'locale-canonicalization-data' || manifest.schemaRevision !== '0') {
+    fail(`${name} is not a locale-canonicalization-data manifest revision "0"`)
+  }
+  if (manifest.payloads.map(payload => payload.role).join() !== 'conformance,markers') {
+    fail(`${name} does not have one conformance and one markers payload, in that order`)
+  }
+  if (!strictlyAscending(manifest.generation.cldr.sources.map(source => source.address))) {
+    fail(`${name} does not list its CLDR sources sorted by address, each once`)
+  }
+  if (!strictlyAscending(manifest.generation.markers)) {
+    fail(`${name} does not list its markers sorted, each once`)
+  }
+  const { integrityDigest, ...rest } = manifest
+  const integrity = digest('locale-canonicalization-data-integrity', rest)
+  if (integrity !== integrityDigest) {
+    fail(`${name}:\n  committed ${integrityDigest}\n  produced  ${integrity}`)
+  }
+  if (manifest.dataset.semanticDigest !== vectors.semanticDigest) {
+    fail(`${name} does not name the dataset vectors' semantic digest`)
+  }
+  for (const payload of manifest.payloads) {
+    const bytes = readFileSync(resolve(artifactDirectory, payload.address))
+    if (String(bytes.length) !== payload.byteLength) {
+      fail(`${name}: ${payload.address} is ${bytes.length} bytes, not ${payload.byteLength}`)
+    }
+    const file = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
+    if (file !== payload.digest) {
+      fail(`${name}: ${payload.address}\n  committed ${payload.digest}\n  produced  ${file}`)
+    }
+  }
+}
+
+/**
+ * Check the fixture artifacts: each manifest on its own, the conformance
+ * payload as the canonical text of the dataset's conformance data, and what
+ * the three manifests share and do not.
+ *
+ * @param vectors - The dataset vectors the artifacts realize.
+ * @returns How many checks failed.
+ */
+function checkArtifacts(vectors) {
+  let failures = 0
+  const fail = message => {
+    console.error(`artifact: ${message}`)
+    failures += 1
+  }
+  const [narrow, wide, vendored] = MANIFESTS.map(name =>
+    JSON.parse(readFileSync(resolve(artifactDirectory, name), 'utf8'))
+  )
+  for (const [index, manifest] of [narrow, wide, vendored].entries()) {
+    checkManifest(MANIFESTS[index], manifest, vectors, fail)
+  }
+  const conformance = readFileSync(resolve(artifactDirectory, 'conformance.json'), 'utf8')
+  if (conformance !== canonicalText(vectors.conformance)) {
+    fail("conformance.json is not the canonical text of the dataset's conformance data")
+  }
+  const same = (left, right) => canonicalText(left) === canonicalText(right)
+  // Two blob layouts: one dataset, one conformance payload, two markers payloads.
+  if (!same(narrow.dataset, wide.dataset) || !same(narrow.payloads[0], wide.payloads[0])) {
+    fail('the narrow and wide artifacts do not share their dataset and conformance payload')
+  }
+  if (narrow.payloads[1].digest === wide.payloads[1].digest) {
+    fail('the narrow and wide markers payloads have one file digest')
+  }
+  // Moved CLDR sources: the same data and payloads, another artifact.
+  if (!same(narrow.dataset, vendored.dataset) || !same(narrow.payloads, vendored.payloads)) {
+    fail('the vendored artifact does not keep the dataset and payloads')
+  }
+  if (same(narrow.generation, vendored.generation)) {
+    fail('the vendored artifact does not change its provenance')
+  }
+  const integrities = new Set([narrow, wide, vendored].map(manifest => manifest.integrityDigest))
+  if (integrities.size !== 3) {
+    fail('two artifacts share an integrity digest')
+  }
+  return failures
+}
+
 const dataset = JSON.parse(readFileSync(datasetPath, 'utf8'))
-const failures = checkDataset(dataset)
+const failures = checkDataset(dataset) + checkArtifacts(dataset)
 
 if (failures > 0) {
   console.error(`\n${failures} locale vector check(s) failed`)
@@ -323,3 +426,4 @@ if (failures > 0) {
 console.log(
   `a dataset and ${dataset.edits.length} edits of it agree with an independent implementation`
 )
+console.log(`${MANIFESTS.length} artifacts realizing it agree with an independent implementation`)

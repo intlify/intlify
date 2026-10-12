@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ArtifactKind": {
+      "enum": ["locale-canonicalization-data"],
+      "type": "string"
+    },
+    "Cldr": {
+      "additionalProperties": false,
+      "description": "The CLDR revision and every source file read during generation.",
+      "properties": {
+        "revision": {
+          "$ref": "#/definitions/Token"
+        },
+        "sources": {
+          "description": "Addressed relative to the CLDR distribution root, sorted by address\nwith unique addresses.",
+          "items": {
+            "$ref": "#/definitions/CldrSource"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["revision", "sources"],
+      "type": "object"
+    },
+    "CldrSource": {
+      "additionalProperties": false,
+      "description": "One CLDR source file.",
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/LogicalAddress"
+        },
+        "digest": {
+          "$ref": "#/definitions/FileDigest"
+        }
+      },
+      "required": ["address", "digest"],
+      "type": "object"
+    },
+    "DatasetDescriptor": {
+      "additionalProperties": false,
+      "description": "The logical dataset the payloads realize.",
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "schema": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "semanticDigest": {
+          "$ref": "#/definitions/SemanticDigest"
+        }
+      },
+      "required": ["identity", "schema", "semanticDigest"],
+      "type": "object"
+    },
+    "FileDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Generation": {
+      "additionalProperties": false,
+      "description": "The provenance design 015 requires the manifest to carry.",
+      "properties": {
+        "cldr": {
+          "$ref": "#/definitions/Cldr"
+        },
+        "markerData": {
+          "$ref": "#/definitions/MarkerData"
+        },
+        "markers": {
+          "description": "The marker set, sorted.",
+          "items": {
+            "$ref": "#/definitions/NonemptyText"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["markerData", "cldr", "markers"],
+      "type": "object"
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "LogicalAddress": {
+      "maxLength": 4096,
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,254}(?:/[a-z0-9][a-z0-9._-]{0,254}){0,63}$",
+      "type": "string"
+    },
+    "MarkerData": {
+      "additionalProperties": false,
+      "description": "The upstream marker-data package and the checksum of its published package.",
+      "properties": {
+        "checksum": {
+          "$ref": "#/definitions/FileDigest"
+        },
+        "package": {
+          "$ref": "#/definitions/Token"
+        },
+        "version": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["package", "version", "checksum"],
+      "type": "object"
+    },
+    "NonemptyText": {
+      "pattern": "^[\\s\\S]+$",
+      "type": "string"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "description": "One payload: its role, its format, and the transport integrity of its\nexact bytes, which are admission facts and never profile semantics.",
+      "properties": {
+        "address": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/LogicalAddress"
+            }
+          ],
+          "description": "Relative to the manifest's location."
+        },
+        "byteLength": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "digest": {
+          "$ref": "#/definitions/FileDigest"
+        },
+        "format": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "role": {
+          "$ref": "#/definitions/Role"
+        }
+      },
+      "required": ["role", "format", "address", "byteLength", "digest"],
+      "type": "object"
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "Role": {
+      "description": "What a payload holds.",
+      "enum": ["conformance", "markers"],
+      "type": "string"
+    },
+    "SemanticDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "UInt64": {
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "type": "string"
+    },
+    "VersionedIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/Token"
+        },
+        "revision": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["identity", "revision"],
+      "type": "object"
+    }
+  },
+  "description": "The manifest of one Locale Canonicalization Data Artifact.",
+  "properties": {
+    "dataset": {
+      "$ref": "#/definitions/DatasetDescriptor"
+    },
+    "generation": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/Generation"
+        }
+      ],
+      "description": "Where the data came from. Integrity covers it; the semantic digest\ndoes not."
+    },
+    "integrityDigest": {
+      "$ref": "#/definitions/IntegrityDigest"
+    },
+    "kind": {
+      "$ref": "#/definitions/ArtifactKind"
+    },
+    "payloads": {
+      "description": "Exactly one `conformance` and one `markers` entry, sorted by role.",
+      "items": {
+        "$ref": "#/definitions/Payload"
+      },
+      "type": "array"
+    },
+    "schemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    },
+    "specification": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/VersionedIdentity"
+        }
+      ],
+      "description": "The Locale Canonicalization Specification this data realizes."
+    }
+  },
+  "required": [
+    "kind",
+    "schemaRevision",
+    "specification",
+    "dataset",
+    "generation",
+    "payloads",
+    "integrityDigest"
+  ],
+  "title": "LocaleCanonicalizationDataArtifact",
+  "type": "object"
+}

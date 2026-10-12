@@ -65,28 +65,48 @@ impl LocaleCanonicalizationDataset {
 
     /// `H("locale-canonicalization-dataset", dataset)`.
     pub fn semantic_digest(&self) -> Result<SemanticDigest, EncodingFailure> {
-        hash(Domain::literal(DATASET_DOMAIN), &self.preimage()?).map(SemanticDigest::from_hash)
+        digest_of(&self.markers, &self.conformance)
     }
 
     /// The complete dataset value that the digest frames.
+    #[cfg(test)]
     pub(crate) fn preimage(&self) -> Result<Value, EncodingFailure> {
-        serde_json::to_value(Preimage {
-            dataset_schema: VersionedIdentity::literal(
-                DATASET_SCHEMA_IDENTITY,
-                DATASET_SCHEMA_REVISION,
-            ),
-            markers: self
-                .markers
-                .iter()
-                .map(|payload| MarkerEntry {
-                    marker: payload.marker().name(),
-                    payload: payload.value(),
-                })
-                .collect(),
-            conformance: &self.conformance,
-        })
-        .map_err(|_| EncodingFailure::Serialization)
+        preimage_of(&self.markers, &self.conformance)
     }
+}
+
+/// The semantic digest of parts already known to be in 017's order, as the
+/// reader's are once each payload has been read.
+pub(crate) fn digest_of(
+    markers: &[LogicalPayload],
+    conformance: &LocaleConformanceData,
+) -> Result<SemanticDigest, EncodingFailure> {
+    hash(
+        Domain::literal(DATASET_DOMAIN),
+        &preimage_of(markers, conformance)?,
+    )
+    .map(SemanticDigest::from_hash)
+}
+
+fn preimage_of(
+    markers: &[LogicalPayload],
+    conformance: &LocaleConformanceData,
+) -> Result<Value, EncodingFailure> {
+    serde_json::to_value(Preimage {
+        dataset_schema: VersionedIdentity::literal(
+            DATASET_SCHEMA_IDENTITY,
+            DATASET_SCHEMA_REVISION,
+        ),
+        markers: markers
+            .iter()
+            .map(|payload| MarkerEntry {
+                marker: payload.marker().name(),
+                payload: payload.value(),
+            })
+            .collect(),
+        conformance,
+    })
+    .map_err(|_| EncodingFailure::Serialization)
 }
 
 #[derive(Serialize)]

@@ -12,10 +12,15 @@ workspace = true
 
 [features]
 default = []
-# Writes the marker blob from ICU4X's compiled data. Only the generator and the
-# tests that build blobs link that data; the adapter itself reads nothing but
-# the blob it is given.
-generate = ["icu_locale/compiled_data", "dep:icu_locale_data", "icu_provider_blob/export"]
+# Writes the marker blob from ICU4X's compiled data, and the reader's fixture
+# blobs. Only the generators and the tests that build blobs link that data; the
+# adapter itself reads nothing but the blob it is given.
+generate = [
+  "icu_locale/compiled_data",
+  "dep:icu_locale_data",
+  "icu_provider_blob/export",
+  "dep:zerovec"
+]
 
 [dependencies]
 # ICU4X 2.2.0 exactly, as design 015 pins it, without compiled data: the four
@@ -36,6 +41,9 @@ postcard = { version = "1", default-features = false }
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+# Rewrites a fixture blob's locale index in the wide layout, which ICU4X's
+# exporter chooses only for large data.
+zerovec = { version = "0.11", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
@@ -43,4 +51,8 @@ jsonschema = { version = "=0.56.0", default-features = false }
 
 [[example]]
 name = "generate_locale_data"
+required-features = ["generate"]
+
+[[example]]
+name = "generate_artifact_fixtures"
 required-features = ["generate"]
