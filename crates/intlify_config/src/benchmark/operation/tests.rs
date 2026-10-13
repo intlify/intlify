@@ -147,6 +147,59 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
     }
 }
 
+fn icu4x_operation(engine: Engine, input: &str) -> Prepared {
+    Prepared::Icu4xLocale {
+        engine: locale_icu4x::PreparedEngine::prepare(engine, Bound::new(128).unwrap()).unwrap(),
+        input: Arc::from(input),
+    }
+}
+
+#[test]
+fn both_icu4x_engines_run_the_canonicalization_boundary_between_the_same_markers() {
+    for engine in [Engine::Reused, Engine::Fresh] {
+        let prepared = icu4x_operation(engine, "iw-IL");
+        assert_eq!(prepared.operation(), Operation::LocaleCanonicalization);
+        assert_eq!(prepared.icu4x_engine(), Some(engine));
+        assert!(prepared.prerequisites_admitted());
+        // A fresh engine is admitted before the start read, so the two reads
+        // still enclose only the canonicalization.
+        let clock = ScriptedClock::nanos([100, 137]);
+        let measured = prepared.once(&clock).unwrap();
+        assert_eq!(measured.duration, Quantity::new(37));
+        assert_eq!(clock.remaining(), 0);
+        let Output::Locale(Ok(result)) = &measured.output else {
+            panic!("unexpected canonicalization result")
+        };
+        assert_eq!(result.locale().as_str(), "he-IL");
+        assert_eq!(result.suggested_replacement(), Some("he-IL"));
+    }
+    assert!(operations()
+        .iter()
+        .all(|prepared| prepared.icu4x_engine().is_none()));
+}
+
+#[test]
+fn a_fresh_engine_that_binds_otherwise_fails_before_the_start_read() {
+    let Prepared::Icu4xLocale {
+        engine: locale_icu4x::PreparedEngine::Fresh { mut binding, limit },
+        input,
+    } = icu4x_operation(Engine::Fresh, "en-US")
+    else {
+        unreachable!()
+    };
+    binding.pins.dataset.semantic_digest = format!("sha256:{}", "0".repeat(64));
+    let prepared = Prepared::Icu4xLocale {
+        engine: locale_icu4x::PreparedEngine::Fresh { binding, limit },
+        input,
+    };
+    let clock = ScriptedClock::nanos([0, 1]);
+    assert!(matches!(
+        prepared.once(&clock),
+        Err(MeasurementFailure::PrerequisiteUnavailable)
+    ));
+    assert_eq!(clock.remaining(), 2);
+}
+
 #[test]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn real_clock_runs_all_active_pairs_without_numeric_performance_gates() {

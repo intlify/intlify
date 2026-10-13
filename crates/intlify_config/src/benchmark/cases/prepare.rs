@@ -14,10 +14,14 @@ use crate::materialize::materialize_file;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 
+use super::super::locale_icu4x::PreparedEngine;
 use super::super::observation::Observation;
 use super::super::operation::{Operation, Output, Prepared, Schema};
 use super::super::work::LogicalWork;
-use super::{declarations, Declaration, ExpectedKind, LimitEdge, LimitKind, Recipe, Selector};
+use super::{
+    declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind, Recipe,
+    Selector,
+};
 
 pub(in crate::benchmark) struct Candidate {
     pub(in crate::benchmark) declaration: Declaration,
@@ -72,6 +76,9 @@ pub(in crate::benchmark) fn prepare(
         return Err(PreparationFailure::UndeclaredCase);
     }
     if declaration.operation == Operation::LocaleCanonicalization {
+        if let Recipe::Icu4xLocale { input, engine } = declaration.fixture {
+            return prepare_icu4x(declaration, input, engine);
+        }
         return prepare_locale(declaration);
     }
     if declaration.operation == Operation::LocaleCoreResolution {
@@ -194,7 +201,9 @@ pub(in crate::benchmark) fn prepare(
         } => Output::Structural(schema.analyze(Arc::clone(doc), *limits)),
         Prepared::Authoring(analysis) => Output::Authoring(analysis.construct()),
         Prepared::Select { analysis, selector } => Output::Select(analysis.select(selector)),
-        Prepared::Locale { .. } => unreachable!("locale preparation has no file stages"),
+        Prepared::Locale { .. } | Prepared::Icu4xLocale { .. } => {
+            unreachable!("locale preparation has no file stages")
+        }
         Prepared::LocaleCore(_) => unreachable!("core has complete-root preparation"),
     };
     let kind = match &output {
@@ -273,6 +282,47 @@ fn prepare_locale(declaration: &Declaration) -> Result<Candidate, PreparationFai
     let prepared = Prepared::Locale { core, input };
     // Unsupported coverage or provider malfunction cannot yield an expected
     // successful capture, even if a caller supplies a matching failure value.
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// Canonicalization through the ICU4X provider. The reference output comes
+/// from the engine the case measures: the resident one, or a fresh one.
+fn prepare_icu4x(
+    declaration: &Declaration,
+    recipe: Icu4xRecipe,
+    engine: Engine,
+) -> Result<Candidate, PreparationFailure> {
+    // The finite cases' capacity. No ICU4X case declares a limit edge.
+    let limit = Bound::new(128).expect("explicit finite locale fixture capacity");
+    let engine = PreparedEngine::prepare(engine, limit)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let input: Arc<str> = Arc::from(recipe.spelling());
+    let output = Output::Locale(
+        engine
+            .with_engine(|core| core.canonicalize(&input))
+            .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+    );
+    let kind = match &output {
+        Output::Locale(Ok(_)) => ExpectedKind::LocaleCanonicalized,
+        Output::Locale(Err(_)) => ExpectedKind::LocaleRejected,
+        _ => unreachable!(),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let prepared = Prepared::Icu4xLocale { engine, input };
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

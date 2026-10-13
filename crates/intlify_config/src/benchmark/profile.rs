@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::cases::registry::{AdmittedFixture, Registry, RegistryBinding};
-use super::cases::Declaration;
+use super::cases::{Declaration, Engine};
 use super::clock::{ClockDescription, MonotonicClock};
 use super::collect::{collect_operation, CollectedOperation, CollectionFailure, CollectionIssue};
 use super::descriptor::Execution;
@@ -111,7 +111,8 @@ impl MeasurementProfile {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
             },
-            scope: "internal-configuration-and-three-project-locale-roles".into(),
+            scope: "internal-configuration-three-project-locale-roles-and-icu4x-canonicalization"
+                .into(),
             fixture_registry: registry.binding().clone(),
             cases: registry.declarations().cloned().collect(),
             case_requirement: "all-required-unconditional".into(),
@@ -135,11 +136,18 @@ impl MeasurementProfile {
                 cancellation: "external-process-termination-no-complete-result".into(),
                 failed_capture: "stop-case-retain-diagnostic-prefix-only".into(),
             },
+            // Every state a case runs in: each operation's own, and both
+            // engine states of canonicalization through the ICU4X provider.
             operation_states: Operation::ALL
                 .into_iter()
-                .map(|operation| OperationState {
+                .map(|operation| (operation, None))
+                .chain(
+                    [Engine::Reused, Engine::Fresh]
+                        .map(|engine| (Operation::LocaleCanonicalization, Some(engine))),
+                )
+                .map(|(operation, icu4x)| OperationState {
                     operation,
-                    execution: crate::benchmark::descriptor::prepared_core(operation),
+                    execution: crate::benchmark::descriptor::prepared_core(operation, icu4x),
                 })
                 .collect(),
             ordering: "fixture-registry-order-no-interleaving".into(),

@@ -31,9 +31,9 @@ The current implementation includes:
 - A generated [JSON Schema for project-profile configuration](./schema/project-profile-config-v0.schema.json).
 - Internal configuration validation, named-profile selection, and normalization of the source, requested, and default locales.
 - An optional locale provider over the ICU4X 2.2.0 reference adapter, [`intlify_locale_icu4x`](../intlify_locale_icu4x/README.md), behind the non-default `icu4x` feature. It admits a locale canonicalization data artifact from bytes its caller supplies, and the boundary binds it only when it carries the one supported specification, revision `"0"`, with its CLDR 48.2.0 dataset.
-- Optional developer measurements for the implemented configuration operations.
+- Optional developer measurements for the implemented configuration operations. Locale canonicalization is measured through both the finite test provider and the ICU4X provider, which runs once with an engine reused across calls and once with a new engine for each call.
 
-The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. No configuration path uses the ICU4X provider yet: locale normalization in the example and the measurements still uses a finite test provider. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
+The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. No configuration path uses the ICU4X provider yet: locale normalization in the example still uses a finite test provider, and only the measurements run the ICU4X provider. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
 
 ## Try it from the terminal
 
@@ -70,7 +70,7 @@ On Linux or macOS, run the measurement smoke check:
 vp run bench:config:smoke
 ```
 
-The smoke check exercises the implemented operations, saves measurement records to a new temporary directory, and validates the saved records. It prints the output location. It checks the measurement workflow, not whether the crate meets a performance budget. Measurement support is disabled in normal library builds.
+The smoke check exercises the implemented operations, saves measurement records to a new temporary directory, and validates the saved records. It prints the output location. It checks the measurement workflow, not whether the crate meets a performance budget. Measurement support is disabled in normal library builds. When enabled, it also enables the `icu4x` feature and compiles in the adapter's committed locale canonicalization data as measurement input.
 
 For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md).
 

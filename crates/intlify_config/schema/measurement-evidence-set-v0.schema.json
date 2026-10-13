@@ -17,6 +17,126 @@
         }
       ]
     },
+    "AdmissionLimits": {
+      "additionalProperties": false,
+      "description": "The read limits the artifact was admitted within.",
+      "properties": {
+        "codes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "conformanceWork": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "corrections": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "extensionKeys": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "manifestBytes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "manifestDepth": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "markerBytes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "payloadBytes": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "payloads": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "types": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "validityGroups": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": [
+        "manifestBytes",
+        "manifestDepth",
+        "payloads",
+        "payloadBytes",
+        "markerBytes",
+        "validityGroups",
+        "codes",
+        "extensionKeys",
+        "types",
+        "corrections",
+        "conformanceWork"
+      ],
+      "type": "object"
+    },
+    "AdmittedDataset": {
+      "additionalProperties": false,
+      "description": "The dataset as the reader admitted it: the digest is the one it recomputed,\nnot a declared pin.",
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "semanticDigest": {
+          "type": "string"
+        }
+      },
+      "required": ["identity", "semanticDigest"],
+      "type": "object"
+    },
+    "AdmittedInputFacts": {
+      "additionalProperties": false,
+      "description": "What one case canonicalizes against: the admitted specification, dataset,\nprovider, and artifact, the limits of their admission and of the boundary,\nand the engine state.",
+      "properties": {
+        "admissionLimits": {
+          "$ref": "#/definitions/AdmissionLimits"
+        },
+        "artifactIntegrity": {
+          "type": "string"
+        },
+        "canonicalValueStorage": {
+          "type": "string"
+        },
+        "dataset": {
+          "$ref": "#/definitions/AdmittedDataset"
+        },
+        "identifierByteLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "identifierByteUnit": {
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/definitions/VersionedPin"
+        },
+        "providerReuse": {
+          "type": "string"
+        },
+        "providerSchema": {
+          "$ref": "#/definitions/VersionedPin"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "specification": {
+          "$ref": "#/definitions/VersionedPin"
+        }
+      },
+      "required": [
+        "scope",
+        "specification",
+        "dataset",
+        "provider",
+        "providerSchema",
+        "artifactIntegrity",
+        "admissionLimits",
+        "identifierByteLimit",
+        "identifierByteUnit",
+        "providerReuse",
+        "canonicalValueStorage"
+      ],
+      "type": "object"
+    },
     "Aggregation": {
       "enum": ["batch_total"],
       "type": "string"
@@ -1045,6 +1165,16 @@
     "Descriptors": {
       "additionalProperties": false,
       "properties": {
+        "admittedLocaleInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AdmittedInputFacts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "boundary": {
           "$ref": "#/definitions/Boundary"
         },
@@ -1264,6 +1394,11 @@
           "type": "object"
         }
       ]
+    },
+    "Engine": {
+      "description": "026's engine state of a canonicalization case: one admitted engine reused\nby every invocation, or a fresh engine admitted before each.",
+      "enum": ["reused", "fresh"],
+      "type": "string"
     },
     "Entry": {
       "additionalProperties": false,
@@ -2035,6 +2170,19 @@
     },
     "Hex256": {
       "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Icu4xRecipe": {
+      "description": "Inputs canonicalized through the ICU4X provider over revision \"0\"'s\nartifact: small, scaled to a long identifier, and invalid at its first and\nits last subtag.",
+      "enum": [
+        "small",
+        "alias",
+        "correction",
+        "scaled",
+        "invalid-syntax",
+        "invalid-validity",
+        "scaled-invalid"
+      ],
       "type": "string"
     },
     "InputFacts": {
@@ -3120,6 +3268,26 @@
             }
           },
           "required": ["locale-core"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "icu4x-locale": {
+              "additionalProperties": false,
+              "properties": {
+                "engine": {
+                  "$ref": "#/definitions/Engine"
+                },
+                "input": {
+                  "$ref": "#/definitions/Icu4xRecipe"
+                }
+              },
+              "required": ["input", "engine"],
+              "type": "object"
+            }
+          },
+          "required": ["icu4x-locale"],
           "type": "object"
         }
       ]

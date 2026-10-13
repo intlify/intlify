@@ -161,6 +161,81 @@ impl LocaleRecipe {
     }
 }
 
+/// Inputs canonicalized through the ICU4X provider over revision "0"'s
+/// artifact: small, scaled to a long identifier, and invalid at its first and
+/// its last subtag.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum Icu4xRecipe {
+    Small,
+    Alias,
+    Correction,
+    Scaled,
+    InvalidSyntax,
+    InvalidValidity,
+    ScaledInvalid,
+}
+
+impl Icu4xRecipe {
+    const ALL: [Self; 7] = [
+        Self::Small,
+        Self::Alias,
+        Self::Correction,
+        Self::Scaled,
+        Self::InvalidSyntax,
+        Self::InvalidValidity,
+        Self::ScaledInvalid,
+    ];
+
+    pub(super) const fn spelling(self) -> &'static str {
+        match self {
+            Self::Small => "en-US",
+            Self::Alias => "iw-IL",
+            Self::Correction => "und-u-ca-islamicc",
+            Self::Scaled => concat!(
+                "EN-latn-us-scotland-fonipa-u-nu-latn-ms-metric-hc-h23-fw-mon-",
+                "cu-usd-co-phonebk-ca-gregory-t-ja-m0-ungegn"
+            ),
+            Self::InvalidSyntax => "en_US",
+            Self::InvalidValidity => "zz",
+            // The scaled input, except that its last subtag is no `m0` type.
+            Self::ScaledInvalid => concat!(
+                "EN-latn-us-scotland-fonipa-u-nu-latn-ms-metric-hc-h23-fw-mon-",
+                "cu-usd-co-phonebk-ca-gregory-t-ja-m0-ungegx"
+            ),
+        }
+    }
+
+    /// Owner-declared expected result, not learned from a provider invocation:
+    /// ICU4X replaces the alias, revision "0"'s layer corrects the calendar
+    /// type, and the scaled input is reordered and recased at its full length.
+    pub(super) const fn canonical(self) -> Option<&'static str> {
+        match self {
+            Self::Small => Some("en-US"),
+            Self::Alias => Some("he-IL"),
+            Self::Correction => Some("und-u-ca-islamic-civil"),
+            Self::Scaled => Some(concat!(
+                "en-Latn-US-fonipa-scotland-t-ja-m0-ungegn-u-ca-gregory-",
+                "co-phonebk-cu-usd-fw-mon-hc-h23-ms-metric-nu-latn"
+            )),
+            Self::InvalidSyntax | Self::InvalidValidity | Self::ScaledInvalid => None,
+        }
+    }
+}
+
+/// 026's engine state of a canonicalization case: one admitted engine reused
+/// by every invocation, or a fresh engine admitted before each.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum Engine {
+    Reused,
+    Fresh,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Declaration {
@@ -434,6 +509,23 @@ pub(super) fn declarations() -> Vec<Declaration> {
             );
             case.limit = Some((limit, edge));
             cases.push(case);
+        }
+    }
+    // Append canonicalization through the ICU4X provider without changing any
+    // of the 127 rows. Each input runs once reused and once fresh, so the two
+    // engine states can be compared on the same input.
+    for input in Icu4xRecipe::ALL {
+        for engine in [Engine::Reused, Engine::Fresh] {
+            cases.push(declaration(
+                Operation::LocaleCanonicalization,
+                Recipe::Icu4xLocale { input, engine },
+                Selector::Absent,
+                if input.canonical().is_some() {
+                    ExpectedKind::LocaleCanonicalized
+                } else {
+                    ExpectedKind::LocaleRejected
+                },
+            ));
         }
     }
     cases

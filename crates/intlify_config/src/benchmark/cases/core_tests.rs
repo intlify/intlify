@@ -14,21 +14,21 @@ fn case(recipe: LocaleCoreRecipe) -> Declaration {
 #[test]
 fn core_cases_extend_the_existing_94_cases_without_replacing_their_operations() {
     let cases = declarations();
-    assert_eq!(cases.len(), 127);
+    assert_eq!(cases.len(), 141);
     assert!(cases[..94]
         .iter()
         .all(|case| case.operation != Operation::LocaleCoreResolution));
-    assert!(cases[94..]
+    assert!(cases[94..127]
         .iter()
         .all(|case| case.operation == Operation::LocaleCoreResolution));
     assert_eq!(
-        cases[94..]
+        cases[94..127]
             .iter()
             .filter(|case| case.limit.is_some())
             .count(),
         8
     );
-    for declaration in &cases[94..] {
+    for declaration in &cases[94..127] {
         let candidate = prepare(declaration).unwrap();
         assert!(
             candidate.input_limits.is_some(),

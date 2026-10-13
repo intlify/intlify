@@ -203,7 +203,7 @@ The owner run — capture, the sealed owner record, its admission, and the smoke
 | Warmup is counted, never sampled | `every_fixture_captures_and_repeats_the_same_observation`, `warmups_are_counted_and_every_sample_aggregates_its_repetitions` _(shared)_; the boundary declares it excluded in `the_expectation_and_the_warmup_are_outside_the_interval` |
 | The case projection carries no run dimension | `a_projection_carries_no_run_clock_or_sample_dimension`, `a_case_identity_does_not_change_between_two_preparations` |
 | Every unobserved environment field states its reason | `every_unobserved_field_carries_its_reason_and_names_this_record` _(shared)_ |
-| The existing 015 path is unchanged | `vp run bench:config:smoke`: 127 planned, 127 measured, complete |
+| The existing 015 path is unchanged | `vp run bench:config:smoke`: every planned case measured, complete |
 
 ## Deliberately not covered in Phase 1
 

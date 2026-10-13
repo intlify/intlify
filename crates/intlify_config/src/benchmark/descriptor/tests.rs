@@ -288,6 +288,82 @@ fn locale_data_is_resident_but_has_no_mutable_scratch_or_output_buffer() {
 }
 
 #[test]
+fn icu4x_descriptors_record_the_engine_state_and_the_admitted_binding() {
+    use crate::benchmark::cases::Engine;
+    use crate::benchmark::locale_icu4x::PreparedEngine;
+
+    let prepare = |engine| Prepared::Icu4xLocale {
+        engine: PreparedEngine::prepare(engine, crate::input_limits::Bound::new(128).unwrap())
+            .unwrap(),
+        input: std::sync::Arc::from("en-US"),
+    };
+    let reused = prepare(Engine::Reused);
+    let fresh = prepare(Engine::Fresh);
+    let descriptors = Descriptors::for_acquisition(&reused, clock(1));
+    assert!(descriptors.validate(&reused, clock(1)).is_empty());
+    assert_eq!(
+        descriptors.boundary,
+        Boundary::for_operation(Operation::LocaleCanonicalization)
+    );
+    // Unlike the finite provider, each call works in and returns new storage.
+    assert_eq!(
+        descriptors.execution,
+        Execution {
+            process_state: "reused-process".into(),
+            engine_state: "reused".into(),
+            initial_preparation_state: "resident".into(),
+            cache_state: "disabled".into(),
+            runtime_compilation_state: "ahead-of-time".into(),
+            managed_heap_state: "not-applicable".into(),
+            scratch_reuse_state: "fresh".into(),
+            output_buffer_state: OutputBuffer::Applicable {
+                ownership: "caller-owned".into(),
+                reuse: "fresh".into()
+            },
+        }
+    );
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    assert_eq!(encoded["localeInput"], Value::Null);
+    assert_eq!(encoded["localeCoreInput"], Value::Null);
+    assert_eq!(
+        encoded["admittedLocaleInput"]["providerReuse"],
+        "resident-admitted-provider-reused-between-invocations"
+    );
+    let other = Descriptors::for_acquisition(&fresh, clock(1));
+    assert!(other.validate(&fresh, clock(1)).is_empty());
+    assert_eq!(
+        Execution {
+            engine_state: "reused".into(),
+            ..other.execution.clone()
+        },
+        descriptors.execution
+    );
+    assert_eq!(other.execution.engine_state, "fresh");
+    // Neither engine's record passes for the other.
+    assert_eq!(
+        other.validate(&reused, clock(1)),
+        vec![
+            DescriptorIssue::ExecutionMismatch,
+            DescriptorIssue::LocaleInputBindingMismatch
+        ]
+    );
+    // Required-nullable: the admitted facts cannot be dropped.
+    let mut changed = encoded;
+    changed["admittedLocaleInput"] = Value::Null;
+    let changed: Descriptors = serde_json::from_value(changed).unwrap();
+    assert_eq!(
+        changed.validate(&reused, clock(1)),
+        vec![DescriptorIssue::LocaleInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1)).admitted_locale_input,
+            None
+        );
+    }
+}
+
+#[test]
 fn locale_core_descriptor_binds_its_subset_bounds_and_actual_reuse() {
     let mut operation = prepared(Operation::LocaleCoreResolution);
     let descriptors = Descriptors::for_acquisition(&operation, clock(1));

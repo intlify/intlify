@@ -179,6 +179,11 @@
       "enum": ["sequential-cases-calling-thread-no-workers"],
       "type": "string"
     },
+    "Engine": {
+      "description": "026's engine state of a canonicalization case: one admitted engine reused\nby every invocation, or a fresh engine admitted before each.",
+      "enum": ["reused", "fresh"],
+      "type": "string"
+    },
     "Execution": {
       "additionalProperties": false,
       "description": "The complete execution state of one measured case.",
@@ -222,6 +227,19 @@
     },
     "ExecutionModel": {
       "enum": ["same-process-synchronous-ordinary-core"],
+      "type": "string"
+    },
+    "Icu4xRecipe": {
+      "description": "Inputs canonicalized through the ICU4X provider over revision \"0\"'s\nartifact: small, scaled to a long identifier, and invalid at its first and\nits last subtag.",
+      "enum": [
+        "small",
+        "alias",
+        "correction",
+        "scaled",
+        "invalid-syntax",
+        "invalid-validity",
+        "scaled-invalid"
+      ],
       "type": "string"
     },
     "LimitEdge": {
@@ -568,6 +586,26 @@
             }
           },
           "required": ["locale-core"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "icu4x-locale": {
+              "additionalProperties": false,
+              "properties": {
+                "engine": {
+                  "$ref": "#/definitions/Engine"
+                },
+                "input": {
+                  "$ref": "#/definitions/Icu4xRecipe"
+                }
+              },
+              "required": ["input", "engine"],
+              "type": "object"
+            }
+          },
+          "required": ["icu4x-locale"],
           "type": "object"
         }
       ]

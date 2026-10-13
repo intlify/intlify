@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::input_limits::ValueCounts;
-use crate::locale::{CanonicalizationFailure, ProviderFailure, Spelling};
+use crate::locale::{CanonicalizationFailure, Canonicalized, ProviderFailure, Spelling};
 use crate::materialize::{InputCounts, MaterializationError};
 use crate::structural::selection::SelectorByteObservation;
 
@@ -267,67 +267,77 @@ impl LogicalWork {
             | (Prepared::Select { .. }, Output::Select(Err(_))) => {
                 return Err(WorkFailure::InvalidOrdinaryResult);
             }
-            (Prepared::Locale { input, .. }, Output::Locale(result)) => {
-                work.set(
-                    WorkKind::LocaleOccurrences,
-                    WorkStage::PreparedInput,
-                    WorkValue::exact(1),
-                );
-                work.set(
-                    WorkKind::RawLocaleIdentifierBytes,
-                    WorkStage::PreparedInput,
-                    WorkValue::exact(
-                        u64::try_from(input.len())
-                            .map_err(|_| WorkFailure::UnrepresentableCounter)?,
-                    ),
-                );
-                let bytes = match result {
-                    Ok(value) => WorkValue::exact(
-                        u64::try_from(value.locale().as_str().len())
-                            .map_err(|_| WorkFailure::UnrepresentableCounter)?,
-                    ),
-                    Err(CanonicalizationFailure::ByteLimit {
-                        spelling: Spelling::Canonical,
-                        actual,
-                        ..
-                    }) => WorkValue::exact(*actual),
-                    Err(
-                        CanonicalizationFailure::ByteLimit {
-                            spelling: Spelling::Raw,
-                            ..
-                        }
-                        | CanonicalizationFailure::Provider(ProviderFailure::InvalidIdentifier),
-                    ) => WorkValue::Unavailable {
-                        reason: UnavailableWork::LocaleNotCanonicalized,
-                    },
-                    _ => return Err(WorkFailure::InvalidOrdinaryResult),
-                };
-                work.set(
-                    WorkKind::CanonicalLocaleIdentifierBytes,
-                    WorkStage::OperationResult,
-                    bytes,
-                );
-                work.set(
-                    WorkKind::RetainedCanonicalLocaleValues,
-                    WorkStage::OperationResult,
-                    WorkValue::exact(u64::from(result.is_ok())),
-                );
-                work.set(
-                    WorkKind::LocaleCorrectionSuggestions,
-                    WorkStage::OperationResult,
-                    WorkValue::exact(u64::from(
-                        result
-                            .as_ref()
-                            .is_ok_and(|value| value.suggested_replacement().is_some()),
-                    )),
-                );
-            }
+            (
+                Prepared::Locale { input, .. } | Prepared::Icu4xLocale { input, .. },
+                Output::Locale(result),
+            ) => work.single_locale(input, result)?,
             (Prepared::LocaleCore(prepared), Output::LocaleCore(result)) => {
                 work.core(prepared, result)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }
         Ok(work)
+    }
+
+    /// One identifier, whichever provider canonicalized it.
+    fn single_locale(
+        &mut self,
+        input: &str,
+        result: &Result<Canonicalized, CanonicalizationFailure>,
+    ) -> Result<(), WorkFailure> {
+        self.set(
+            WorkKind::LocaleOccurrences,
+            WorkStage::PreparedInput,
+            WorkValue::exact(1),
+        );
+        self.set(
+            WorkKind::RawLocaleIdentifierBytes,
+            WorkStage::PreparedInput,
+            WorkValue::exact(
+                u64::try_from(input.len()).map_err(|_| WorkFailure::UnrepresentableCounter)?,
+            ),
+        );
+        let bytes = match result {
+            Ok(value) => WorkValue::exact(
+                u64::try_from(value.locale().as_str().len())
+                    .map_err(|_| WorkFailure::UnrepresentableCounter)?,
+            ),
+            Err(CanonicalizationFailure::ByteLimit {
+                spelling: Spelling::Canonical,
+                actual,
+                ..
+            }) => WorkValue::exact(*actual),
+            Err(
+                CanonicalizationFailure::ByteLimit {
+                    spelling: Spelling::Raw,
+                    ..
+                }
+                | CanonicalizationFailure::Provider(ProviderFailure::InvalidIdentifier),
+            ) => WorkValue::Unavailable {
+                reason: UnavailableWork::LocaleNotCanonicalized,
+            },
+            _ => return Err(WorkFailure::InvalidOrdinaryResult),
+        };
+        self.set(
+            WorkKind::CanonicalLocaleIdentifierBytes,
+            WorkStage::OperationResult,
+            bytes,
+        );
+        self.set(
+            WorkKind::RetainedCanonicalLocaleValues,
+            WorkStage::OperationResult,
+            WorkValue::exact(u64::from(result.is_ok())),
+        );
+        self.set(
+            WorkKind::LocaleCorrectionSuggestions,
+            WorkStage::OperationResult,
+            WorkValue::exact(u64::from(
+                result
+                    .as_ref()
+                    .is_ok_and(|value| value.suggested_replacement().is_some()),
+            )),
+        );
+        Ok(())
     }
 
     fn set(&mut self, kind: WorkKind, stage: WorkStage, observation: WorkValue) {

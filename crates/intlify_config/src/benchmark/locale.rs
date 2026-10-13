@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::locale::fixtures::FixtureProvider;
 use crate::locale::{
     CanonicalizationFailure, Canonicalized, Canonicalizer, ProviderFailure, Spelling,
+    VersionedIdentity,
 };
 
 use super::observation::{Digest, Frame, Observation};
@@ -19,9 +20,18 @@ pub(super) type Core = Canonicalizer<FixtureProvider>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct VersionedPin {
+pub(super) struct VersionedPin {
     identity: String,
     revision: String,
+}
+
+impl VersionedPin {
+    pub(super) fn of<Id: AsRef<str>>(reference: &VersionedIdentity<Id>) -> Self {
+        Self {
+            identity: reference.identity.as_ref().into(),
+            revision: reference.revision.as_ref().into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -50,10 +60,6 @@ pub(super) struct InputFacts {
 impl InputFacts {
     pub(super) fn observe(core: &Core) -> Self {
         let binding = core.binding();
-        let versioned = |reference: &crate::locale::VersionedIdentity<&str>| VersionedPin {
-            identity: reference.identity.into(),
-            revision: reference.revision.into(),
-        };
         let rows = core.fixture_rows();
         let mut frame = Frame::new("finite-locale-provider-content");
         frame.uint(u64::try_from(rows.len()).expect("fixed finite provider table length"));
@@ -68,13 +74,13 @@ impl InputFacts {
         }
         Self {
             scope: "finite-test-owned-provider-not-production-data".into(),
-            specification: versioned(&binding.pins.specification),
+            specification: VersionedPin::of(&binding.pins.specification),
             dataset: DatasetPin {
                 identity: binding.pins.dataset.identity.into(),
                 declared_semantic_pin: binding.pins.dataset.semantic_digest.into(),
             },
-            provider: versioned(&binding.admission.provider),
-            provider_schema: versioned(&binding.admission.provider_schema),
+            provider: VersionedPin::of(&binding.admission.provider),
+            provider_schema: VersionedPin::of(&binding.admission.provider_schema),
             declared_artifact_pin: binding.admission.artifact.into(),
             fixture_contents_observation: frame.finish(),
             identifier_byte_limit: Quantity::new(core.max_identifier_bytes().get()),
