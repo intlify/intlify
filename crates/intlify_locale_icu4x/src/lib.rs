@@ -13,9 +13,10 @@
 //! revision "0" conformance layer, which checks an identifier against the
 //! dataset before ICU4X canonicalizes it and corrects it after.
 //!
-//! It is not yet a provider for `intlify_config`. Without the `generate`
-//! feature it links no compiled data, so nothing reaches it but the blob it
-//! is given.
+//! `intlify_config` wraps it as its locale provider behind a non-default
+//! feature; this crate knows nothing of `intlify_config`. Without the
+//! `generate` feature it links no compiled data, so nothing reaches it but
+//! the blob it is given.
 
 mod canonicalize;
 #[cfg(feature = "generate")]
@@ -33,7 +34,7 @@ mod primitives;
 mod reader;
 pub mod schema;
 
-pub use canonicalize::RawFailure;
+pub use canonicalize::{RawFailure, ENGINE};
 pub use conformance::{
     Collection, ConformanceFailure, ConformanceLimits, Correction, Extension, ExtensionKey,
     ExtensionType, Limited, LocaleConformanceData, TypeClass, ValidityField, ValidityGroup,
