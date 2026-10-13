@@ -370,6 +370,80 @@ impl Correction {
     }
 }
 
+// The conformance layer looks values up by binary search, which 017's
+// canonical order allows: `read` and `new` both refuse data out of it.
+impl LocaleConformanceData {
+    /// The status of `code`, in its CLDR spelling and case, in the validity
+    /// groups of `field`, if one of them lists it.
+    pub(crate) fn status(&self, field: ValidityField, code: &str) -> Option<ValidityStatus> {
+        let start = self
+            .validity
+            .partition_point(|group| group.field.as_str() < field.as_str());
+        self.validity[start..]
+            .iter()
+            .take_while(|group| group.field == field)
+            .find(|group| {
+                group
+                    .codes
+                    .binary_search_by(|listed| listed.as_str().cmp(code))
+                    .is_ok()
+            })
+            .map(|group| group.status)
+    }
+
+    /// The key `key` of `extension`, if the data lists it.
+    pub(crate) fn key(&self, extension: Extension, key: &str) -> Option<&ExtensionKey> {
+        self.extension_keys
+            .binary_search_by(|listed| {
+                (listed.extension.as_str(), listed.key.as_str()).cmp(&(extension.as_str(), key))
+            })
+            .ok()
+            .map(|index| &self.extension_keys[index])
+    }
+
+    /// The value a correction of `key` of `extension` maps `from` to, if one
+    /// does.
+    pub(crate) fn correction(&self, extension: Extension, key: &str, from: &str) -> Option<&str> {
+        self.corrections
+            .binary_search_by(|listed| {
+                (
+                    listed.extension.as_str(),
+                    listed.key.as_str(),
+                    listed.from.as_str(),
+                )
+                    .cmp(&(extension.as_str(), key, from))
+            })
+            .ok()
+            .map(|index| self.corrections[index].to.as_str())
+    }
+}
+
+impl ExtensionKey {
+    pub(crate) const fn deprecated(&self) -> bool {
+        self.deprecated
+    }
+
+    pub(crate) const fn value_type(&self) -> ValueType {
+        self.value_type
+    }
+
+    /// The literal type `name`, if the key lists it.
+    pub(crate) fn literal(&self, name: &str) -> Option<&ExtensionType> {
+        self.types
+            .binary_search_by(|listed| listed.key().cmp(&("literal", name)))
+            .ok()
+            .map(|index| &self.types[index])
+    }
+
+    /// The classes the key lists.
+    pub(crate) fn classes(&self) -> impl Iterator<Item = TypeClass> + '_ {
+        self.types.iter().filter_map(|listed| match listed {
+            ExtensionType::Class { class } => Some(*class),
+            ExtensionType::Literal { .. } => None,
+        })
+    }
+}
+
 // Every order here compares spellings by unsigned UTF-8 bytes, which is how
 // `str` orders.
 

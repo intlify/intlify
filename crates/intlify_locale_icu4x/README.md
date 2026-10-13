@@ -4,14 +4,14 @@ The ICU4X 2.2.0 reference adapter for [Intlify](../../design/000-intlify-overvie
 
 > [!IMPORTANT]
 >
-> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s Locale Canonicalization Data Artifact in 017's six steps, rebuilds its logical dataset to check the semantic digest, and builds ICU4X's canonicalizer from the four marker families that the Locale Canonicalization Specification revision `"0"` admits. It does not yet apply the Intlify conformance layer or serve as `intlify_config`'s provider. See [Current status](#current-status).
+> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s Locale Canonicalization Data Artifact in 017's six steps, rebuilds its logical dataset to check the semantic digest, and builds ICU4X's canonicalizer from the four marker families that the Locale Canonicalization Specification revision `"0"` admits, and applies 015's revision `"0"` conformance layer around it. It does not yet serve as `intlify_config`'s provider. See [Current status](#current-status).
 
 Design 015 keeps canonicalization semantics in an Intlify-owned specification and treats ICU4X as one physical engine behind a provider boundary. `intlify_config` holds no locale data and links no ICU4X. This crate is where the engine lives: it receives the data as a blob, checks that the blob carries exactly what revision `"0"` admits, and answers what ICU4X 2.2.0 does with it.
 
 ## What this crate never does
 
 - It links no compiled locale data in an ordinary build. The four marker families reach it only through the blob a caller supplies. The `generate` feature turns on ICU4X's compiled data for the generator alone.
-- It does not decide whether a locale identifier is valid. ICU4X's raw canonicalization accepts identifiers revision `"0"` rejects, such as `zz`, `qfz`, `en-x-brand`, and `en-u-ca-madeup`, and leaves `und-u-ca-islamicc` uncorrected. The conformance layer of design 015 makes those decisions, not ICU4X.
+- It never lets ICU4X decide whether a locale identifier is valid. ICU4X's raw canonicalization, `MarkerBlob::canonicalize_raw`, accepts identifiers revision `"0"` rejects, such as `zz`, `qfz`, `en-x-brand`, and `en-u-ca-madeup`, and leaves `und-u-ca-islamicc` uncorrected. The conformance layer decides those from the admitted dataset.
 - It never adds likely subtags: `en` stays `en` and is a different locale from `en-US`.
 - It does not prove a blob's integrity. ICU4X decodes damaged but well-formed data as other data, so the 017 reader checks a payload's file digest before this crate reads it and the dataset's semantic digest after.
 
@@ -73,6 +73,33 @@ let data = manifest.admit(Some(&conformance), Some(markers.into()), &limits)?; /
 
 Every limit is the caller's, with no defaults: the manifest's bytes and depth, the payload count, each payload's declared length, the four logical marker payloads as compact JSON text (counted before any is built), and the conformance counts.
 
+## The conformance layer
+
+`AdmittedData::canonicalize` is design 015's [revision `"0"` conformance layer](../../design/015-intlify-project-profile-and-locale-policy-design.md#revision-0-conformance-layer). It takes one direct-input identifier through 015's five steps and reads nothing but the admitted dataset:
+
+1. **Structure.** The identifier is read by UTS #35's grammar for a Unicode BCP 47 Locale Identifier with its well-formedness constraints, before ICU4X reads it, and has at most one `u` and one `t` extension, no other singleton, no private use, no `u` attribute, and no key twice.
+2. **Validity.** Every language, script, region, and variant subtag, also in a `t` extension's transformed language, has an admitted status, and every key and type is one its listing admits, by the key's `valueType` and class.
+3. **Canonicalization** by ICU4X 2.2.0.
+4. **Correction.** A type that is a correction's `from` becomes its `to`, and ICU4X canonicalizes again.
+5. **Result.** No deprecated component or type remains, and steps 3 and 4 do not change the result.
+
+```rust
+assert_eq!(data.canonicalize("iw-IL")?, "he-IL");
+assert_eq!(data.canonicalize("und-u-ca-islamicc")?, "und-u-ca-islamic-civil");
+assert_eq!(data.canonicalize("zz"), Err(LayerFailure::Rejected(Rejection::Component(Component::Language))));
+```
+
+A `LayerFailure::Rejected` names the rule that rejects the whole identifier, which 015 reports as a blocking configuration Finding; nothing is stripped. `Engine` (ICU4X cannot parse an identifier steps 1 and 2 admit) and `NotIdempotent` are adapter failures that block adapter admission and are never a user-input Finding.
+
+Some consequences of 015's rules with ICU4X 2.2.0, each pinned by a test:
+
+- A primary language subtag of five to eight letters is well-formed, but no such code is valid in CLDR 48.2.0, so step 2 rejects it before ICU4X, which cannot parse it.
+- ICU4X replaces the language of a `t` extension's transformed language (`und-t-iw` gives `und-t-he`) but not a deprecated variant there, so `und-t-hy-arevela` is rejected in step 5.
+- ICU4X replaces some deprecated subdivisions with a code `sd` does not admit, such as `fi01` with the unknown `axzzzz`, or with one CLDR's validity does not list, such as `cn15` with `cnmn`; step 5 rejects those.
+- `posix`, `aaland`, and `polytoni` are not in CLDR 48.2.0's variant validity data, so step 2 rejects `en-US-posix` and `el-polytoni`, although ICU4X alone would replace `polytoni` with `polyton`.
+
+`fixtures/layer/cases.json` holds 015's handwritten cases, checked against the committed artifact. The tests also run every code of every validity group, every literal type of every key, and every correction through the layer.
+
 ## The committed artifact
 
 `data/` is the complete artifact of Locale Canonicalization Specification revision `"0"`, the dataset `intlify-locale-canonicalization-cldr-48.2.0`:
@@ -94,8 +121,7 @@ The test suite checks the same freshness under `--all-features`, reads the commi
 
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, and gives ICU4X's raw behavior, and it carries the complete artifact of revision `"0"`. Still to come in Phase 2:
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, and applies the conformance layer around ICU4X 2.2.0. Still to come in Phase 2:
 
-- the conformance layer that applies the conformance data before and after ICU4X;
 - the provider for `intlify_config`, behind a non-default feature there;
 - the gate against CLDR's canonicalization corpus.

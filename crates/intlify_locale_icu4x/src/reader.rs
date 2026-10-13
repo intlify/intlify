@@ -296,7 +296,7 @@ fn count(length: usize) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use intlify_shared_json::text;
     use serde_json::{json, Value};
 
@@ -319,6 +319,15 @@ mod tests {
         marker_bytes: u64::MAX,
         conformance: crate::conformance::tests::GENEROUS,
     };
+
+    const DATA_MANIFEST: &[u8] = include_bytes!("../data/manifest.json");
+    const DATA_CONFORMANCE: &[u8] = include_bytes!("../data/conformance.json");
+    const DATA_MARKERS: &[u8] = include_bytes!("../data/markers.postcard");
+
+    /// The committed artifact of revision "0", admitted.
+    pub(crate) fn committed() -> AdmittedData {
+        admit(DATA_MANIFEST, Some(DATA_CONFORMANCE), Some(DATA_MARKERS)).unwrap()
+    }
 
     fn admit_within(
         manifest: &[u8],
@@ -737,10 +746,7 @@ mod tests {
 
     #[test]
     fn the_committed_artifact_of_revision_0_is_admitted() {
-        const MANIFEST: &[u8] = include_bytes!("../data/manifest.json");
-        const DATA_CONFORMANCE: &[u8] = include_bytes!("../data/conformance.json");
-        const DATA_MARKERS: &[u8] = include_bytes!("../data/markers.postcard");
-        let manifest = VerifiedManifest::read(MANIFEST, &GENEROUS).unwrap();
+        let manifest = VerifiedManifest::read(DATA_MANIFEST, &GENEROUS).unwrap();
         assert_eq!(
             manifest.address(Role::Conformance).as_str(),
             "conformance.json"
