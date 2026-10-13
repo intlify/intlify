@@ -299,6 +299,77 @@ fn ascending<T>(
     Ok(())
 }
 
+// The generator builds conformance data from CLDR's records. It establishes
+// 017's order itself; `new` only checks it.
+#[cfg(feature = "generate")]
+impl LocaleConformanceData {
+    /// Conformance data from parts already in 017's order.
+    pub(crate) fn new(
+        validity: Vec<ValidityGroup>,
+        extension_keys: Vec<ExtensionKey>,
+        corrections: Vec<Correction>,
+    ) -> Result<Self, ConformanceFailure> {
+        let data = Self {
+            validity,
+            extension_keys,
+            corrections,
+        };
+        data.check()?;
+        Ok(data)
+    }
+}
+
+#[cfg(feature = "generate")]
+impl ValidityGroup {
+    pub(crate) const fn new(
+        field: ValidityField,
+        status: ValidityStatus,
+        codes: Vec<NonemptyText>,
+    ) -> Self {
+        Self {
+            field,
+            status,
+            codes,
+        }
+    }
+}
+
+#[cfg(feature = "generate")]
+impl ExtensionKey {
+    pub(crate) const fn new(
+        extension: Extension,
+        key: NonemptyText,
+        deprecated: bool,
+        value_type: ValueType,
+        types: Vec<ExtensionType>,
+    ) -> Self {
+        Self {
+            extension,
+            key,
+            deprecated,
+            value_type,
+            types,
+        }
+    }
+}
+
+#[cfg(feature = "generate")]
+impl Correction {
+    pub(crate) const fn new(
+        extension: Extension,
+        key: NonemptyText,
+        from: NonemptyText,
+        to: NonemptyText,
+    ) -> Self {
+        Self {
+            extension,
+            key,
+            from,
+            to,
+        }
+    }
+}
+
 // Every order here compares spellings by unsigned UTF-8 bytes, which is how
 // `str` orders.
 
@@ -386,7 +457,7 @@ impl Extension {
 }
 
 impl TypeClass {
-    const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Codepoints => "codepoints",
             Self::PrivateUse => "private-use",
@@ -914,5 +985,28 @@ pub(crate) mod tests {
                 "{value}"
             );
         }
+    }
+
+    #[cfg(feature = "generate")]
+    #[test]
+    fn new_checks_the_parts_are_in_017s_order() {
+        let group = |codes: &[&str]| {
+            let codes = codes
+                .iter()
+                .map(|code| NonemptyText::from_validated(code).unwrap())
+                .collect();
+            ValidityGroup::new(ValidityField::Region, ValidityStatus::Regular, codes)
+        };
+        assert_eq!(
+            LocaleConformanceData::new(vec![group(&["US", "AC"])], Vec::new(), Vec::new()),
+            Err(ConformanceFailure::Unsorted(Collection::Codes))
+        );
+        let data = LocaleConformanceData::new(vec![group(&["AC", "US"])], Vec::new(), Vec::new());
+        assert_eq!(
+            data.map(|data| data.to_text()).as_deref(),
+            Ok(
+                r#"{"corrections":[],"extensionKeys":[],"validity":[{"codes":["AC","US"],"field":"region","status":"regular"}]}"#
+            )
+        );
     }
 }

@@ -12,13 +12,15 @@ workspace = true
 
 [features]
 default = []
-# Writes the marker blob from ICU4X's compiled data, and the reader's fixture
-# blobs. Only the generators and the tests that build blobs link that data; the
-# adapter itself reads nothing but the blob it is given.
+# Writes the complete artifact, from ICU4X's compiled data and the vendored
+# CLDR records, and the reader's fixture blobs. Only the generators and the
+# tests that build them link that data; the adapter itself reads nothing but
+# the bytes it is given.
 generate = [
   "icu_locale/compiled_data",
   "dep:icu_locale_data",
   "icu_provider_blob/export",
+  "dep:roxmltree",
   "dep:zerovec"
 ]
 
@@ -41,6 +43,8 @@ postcard = { version = "1", default-features = false }
 schemars = { version = "1.0", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.106", features = ["arbitrary_precision", "preserve_order"] }
+# Reads the vendored CLDR records for the generator. It fetches no DTD.
+roxmltree = { version = "0.21", optional = true }
 # Rewrites a fixture blob's locale index in the wide layout, which ICU4X's
 # exporter chooses only for large data.
 zerovec = { version = "0.11", default-features = false, features = ["alloc"], optional = true }

@@ -18,6 +18,8 @@
 //! reaches it but the blob it is given.
 
 mod canonicalize;
+#[cfg(feature = "generate")]
+pub mod cldr;
 mod conformance;
 mod dataset;
 #[cfg(feature = "generate")]

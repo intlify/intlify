@@ -735,6 +735,34 @@ mod tests {
         assert_eq!(framed(Ok(7)), Ok(7));
     }
 
+    #[test]
+    fn the_committed_artifact_of_revision_0_is_admitted() {
+        const MANIFEST: &[u8] = include_bytes!("../data/manifest.json");
+        const DATA_CONFORMANCE: &[u8] = include_bytes!("../data/conformance.json");
+        const DATA_MARKERS: &[u8] = include_bytes!("../data/markers.postcard");
+        let manifest = VerifiedManifest::read(MANIFEST, &GENEROUS).unwrap();
+        assert_eq!(
+            manifest.address(Role::Conformance).as_str(),
+            "conformance.json"
+        );
+        assert_eq!(manifest.address(Role::Markers).as_str(), "markers.postcard");
+        let admitted = manifest
+            .admit(Some(DATA_CONFORMANCE), Some(DATA_MARKERS.into()), &GENEROUS)
+            .unwrap();
+        assert_eq!(
+            admitted.manifest().specification(),
+            &VersionedIdentity::literal("intlify-locale-canonicalization", "0")
+        );
+        assert_eq!(
+            admitted.manifest().dataset().identity().as_str(),
+            "intlify-locale-canonicalization-cldr-48.2.0"
+        );
+        assert_eq!(
+            admitted.markers().canonicalize_raw("iw-IL").as_deref(),
+            Ok("he-IL")
+        );
+    }
+
     #[cfg(feature = "generate")]
     #[test]
     fn a_blob_with_a_family_missing_or_added_is_refused_by_name() {

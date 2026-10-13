@@ -73,21 +73,29 @@ let data = manifest.admit(Some(&conformance), Some(markers.into()), &limits)?; /
 
 Every limit is the caller's, with no defaults: the manifest's bytes and depth, the payload count, each payload's declared length, the four logical marker payloads as compact JSON text (counted before any is built), and the conformance counts.
 
-## The committed blob
+## The committed artifact
 
-`data/markers.postcard` is the four families from `icu_locale_data` 2.2.0, ICU4X's data generated from CLDR 48.2.0, in ICU4X 2.2's blob schema. ICU4X's exporter orders everything it writes, so the same data always gives the same bytes. To regenerate it, or to check that it is current:
+`data/` is the complete artifact of Locale Canonicalization Specification revision `"0"`, the dataset `intlify-locale-canonicalization-cldr-48.2.0`:
+
+| File | Contents |
+| --- | --- |
+| `markers.postcard` | The four families from `icu_locale_data` 2.2.0, ICU4X's data generated from CLDR 48.2.0, in ICU4X 2.2's blob schema |
+| `conformance.json` | The conformance data generated from the vendored CLDR 48.2.0 records in [`cldr/`](cldr/README.md), as canonical JSON text |
+| `manifest.json` | The manifest naming both payloads and the dataset's semantic digest, with the package checksum and the SHA-256 of every CLDR file read |
+
+The conformance data follows design 015's [revision `"0"` conformance layer](../../design/015-intlify-project-profile-and-locale-policy-design.md#revision-0-conformance-layer): every validity group with its ranges expanded, every `u` and `t` key with its types, and the corrections derived from deprecated types' preferred values and from aliases that are well-formed types and do not name another listed type. Generation fails rather than guess: on an unknown status, class, or `valueType`, a repeated code or key, a cycle, a source with two values, or a mapping ICU4X 2.2.0 already realizes. ICU4X's exporter orders everything it writes, and the conformance data is written in 017's order, so the same inputs always give the same bytes. To regenerate the artifact, or to check that it is current:
 
 ```sh
 cargo run -p intlify_locale_icu4x --features generate --example generate_locale_data -- --write
 cargo run -p intlify_locale_icu4x --features generate --example generate_locale_data -- --check
 ```
 
-The test suite checks the same freshness under `--all-features`.
+The test suite checks the same freshness under `--all-features`, reads the committed artifact through the reader in every build, and `vp run vectors:locale:check` checks its manifest, payloads, and CLDR sources with the independent Node implementation.
 
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, and gives ICU4X's raw behavior. Still to come in Phase 2:
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, and gives ICU4X's raw behavior, and it carries the complete artifact of revision `"0"`. Still to come in Phase 2:
 
-- the conformance data generated from CLDR 48.2.0 (validity and corrections), the conformance layer, and the complete artifact;
+- the conformance layer that applies the conformance data before and after ICU4X;
 - the provider for `intlify_config`, behind a non-default feature there;
 - the gate against CLDR's canonicalization corpus.

@@ -14,7 +14,11 @@
 extend-exclude = [
   "tools/mf-parser-bench/cases/**",
   "tools/mf-parser-bench/results/**",
-  "crates/ox_mf2_parser/fixtures/**"
+  "crates/ox_mf2_parser/fixtures/**",
+  # Vendored CLDR records and the data generated from them: language, region,
+  # and subdivision codes rather than words.
+  "crates/intlify_locale_icu4x/cldr/**",
+  "crates/intlify_locale_icu4x/data/**"
 ]
 
 [default]
