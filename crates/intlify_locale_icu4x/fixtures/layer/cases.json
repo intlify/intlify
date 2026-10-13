@@ -1,0 +1,185 @@
+{
+  "dataset": "intlify-locale-canonicalization-cldr-48.2.0",
+  "groups": [
+    {
+      "rule": "valid Unicode BCP 47 Locale Identifiers covering language, script, region, and Unicode locale extensions",
+      "cases": [
+        { "input": "en", "canonical": "en" },
+        { "input": "en-US", "canonical": "en-US" },
+        { "input": "zh-Hant-TW", "canonical": "zh-Hant-TW" },
+        { "input": "ar-EG-u-nu-latn", "canonical": "ar-EG-u-nu-latn" },
+        { "input": "und-Latn-t-und-cyrl", "canonical": "und-Latn-t-und-cyrl" }
+      ]
+    },
+    {
+      "rule": "non-canonical casing, deprecated aliases, and extension ordering converted to one canonical identifier",
+      "cases": [
+        { "input": "EN-us", "canonical": "en-US" },
+        { "input": "iw-IL", "canonical": "he-IL" },
+        { "input": "en-u-nu-latn-ca-gregory", "canonical": "en-u-ca-gregory-nu-latn" },
+        { "input": "en-u-kn-true", "canonical": "en-u-kn" },
+        { "input": "EN-T-IW-M0-BETA-METSEHAF", "canonical": "en-t-he-m0-betamets" }
+      ]
+    },
+    {
+      "rule": "arbitrary opaque and platform-specific identifiers plus en_US, root, script-leading, POSIX, and legacy ICU forms rejected",
+      "cases": [
+        { "input": "", "rejected": "syntax" },
+        { "input": "my locale", "rejected": "syntax" },
+        { "input": "en_US", "rejected": "syntax" },
+        { "input": "root", "rejected": "syntax" },
+        { "input": "Latn", "rejected": "syntax" },
+        { "input": "en_US.UTF-8", "rejected": "syntax" },
+        { "input": "en_US@calendar=gregorian", "rejected": "syntax" }
+      ]
+    },
+    {
+      "rule": "a well-formed primary language subtag longer than three characters rejected by the validity data before ICU4X parsing",
+      "cases": [
+        { "input": "abcdefgh", "rejected": "language" },
+        { "input": "abcde-US", "rejected": "language" }
+      ]
+    },
+    {
+      "rule": "well-formed but invalid identifiers such as zz, en-u-ca-madeup, and en-u-zz-abc rejected before ICU4X canonicalization",
+      "cases": [
+        { "input": "zz", "rejected": "language" },
+        { "input": "en-u-ca-madeup", "rejected": "type" },
+        { "input": "en-u-zz-abc", "rejected": "key" }
+      ]
+    },
+    {
+      "rule": "regular, special, macroregion, and unknown components admitted, including en-XA, ar-XB, en-XK, und, and en-ZZ",
+      "cases": [
+        { "input": "en-XA", "canonical": "en-XA" },
+        { "input": "ar-XB", "canonical": "ar-XB" },
+        { "input": "en-XK", "canonical": "en-XK" },
+        { "input": "und", "canonical": "und" },
+        { "input": "en-ZZ", "canonical": "en-ZZ" },
+        { "input": "es-419", "canonical": "es-419" },
+        { "input": "und-Zyyy", "canonical": "und-Zyyy" }
+      ]
+    },
+    {
+      "rule": "reserved and private-use components rejected, including qfz, Qaaq, and XC in the identifier and in a t extension's transformed language",
+      "cases": [
+        { "input": "qfz", "rejected": "language" },
+        { "input": "und-Qaaq", "rejected": "script" },
+        { "input": "en-XC", "rejected": "region" },
+        { "input": "en-AA", "rejected": "region" },
+        { "input": "en-t-qfz", "rejected": "language" },
+        { "input": "en-t-und-qaaq", "rejected": "script" },
+        { "input": "en-t-und-xc", "rejected": "region" }
+      ]
+    },
+    {
+      "rule": "registered and valid u and t fields admitted, including a publicly registered private-use function",
+      "cases": [
+        { "input": "en-u-ca-buddhist", "canonical": "en-u-ca-buddhist" },
+        { "input": "und-t-m0-bgn", "canonical": "und-t-m0-bgn" },
+        { "input": "und-t-x0-abcdef", "canonical": "und-t-x0-abcdef" }
+      ]
+    },
+    {
+      "rule": "private-use and non-u/t extension inputs rejected as complete identifiers without stripping the rejected suffix",
+      "cases": [
+        { "input": "en-x-brand", "rejected": "private-use" },
+        { "input": "en-US-u-ca-gregory-x-brand", "rejected": "private-use" },
+        { "input": "en-a-foo", "rejected": "other-extension" },
+        { "input": "en-a-foo-u-ca-gregory", "rejected": "other-extension" }
+      ]
+    },
+    {
+      "rule": "generated alias corrections, with an alias that names another listed type never producing a mapping",
+      "cases": [
+        { "input": "und-u-ca-islamicc", "canonical": "und-u-ca-islamic-civil" },
+        { "input": "en-u-ms-imperial", "canonical": "en-u-ms-uksystem" },
+        { "input": "en-u-ca-ethiopic-amete-alem", "canonical": "en-u-ca-ethioaa" },
+        { "input": "en-u-kn-yes", "canonical": "en-u-kn" },
+        { "input": "ja-u-tz-japan", "canonical": "ja-u-tz-jptyo" },
+        { "input": "en-u-tz-est5edt", "canonical": "en-u-tz-usnyc" },
+        { "input": "und-t-m0-beta-metsehaf", "canonical": "und-t-m0-betamets" },
+        { "input": "en-u-ca-islamic-civil", "canonical": "en-u-ca-islamic-civil" }
+      ]
+    },
+    {
+      "rule": "legacy-only key/type aliases left to explicit compatibility conversion",
+      "cases": [
+        { "input": "en-u-ca-gregorian", "rejected": "syntax" },
+        { "input": "en-u-tz-Asia/Tokyo", "rejected": "syntax" }
+      ]
+    },
+    {
+      "rule": "u attributes and repeated u or t extensions or keys rejected rather than reduced to their first",
+      "cases": [
+        { "input": "en-u-attr-ca-gregory", "rejected": "attribute" },
+        { "input": "en-u-ca-gregory-ca-buddhist", "rejected": "repeated-key" },
+        { "input": "und-t-m0-bgn-M0-din", "rejected": "repeated-key" },
+        { "input": "en-u-ca-gregory-u-nu-latn", "rejected": "repeated-extension" },
+        { "input": "en-t-ja-t-it", "rejected": "repeated-extension" }
+      ]
+    },
+    {
+      "rule": "every valueType boundary",
+      "cases": [
+        { "input": "en-u-kn", "canonical": "en-u-kn" },
+        { "input": "en-u-ca", "rejected": "type" },
+        { "input": "en-u-nu", "rejected": "type" },
+        { "input": "en-u-ca-islamic-umalqura", "canonical": "en-u-ca-islamic-umalqura" },
+        { "input": "en-u-ca-gregory-japanese", "rejected": "type" },
+        { "input": "en-u-kr-latn-digit", "canonical": "en-u-kr-latn-digit" },
+        { "input": "en-u-kr-latn-latn", "rejected": "type" },
+        { "input": "en-u-kr", "rejected": "type" },
+        { "input": "und-t-x0-abc-defgh", "canonical": "und-t-x0-abc-defgh" },
+        { "input": "und-t-x0-abc-abc", "canonical": "und-t-x0-abc-abc" }
+      ]
+    },
+    {
+      "rule": "every class boundary, and the deprecated keys kh and vt",
+      "cases": [
+        { "input": "en-u-rg-uszzzz", "canonical": "en-u-rg-uszzzz" },
+        { "input": "en-u-rg-gbsct", "canonical": "en-u-rg-gbsct" },
+        { "input": "en-u-sd-gbsct", "canonical": "en-u-sd-gbsct" },
+        { "input": "en-u-sd-uszzzz", "rejected": "type" },
+        { "input": "en-u-dx-thai", "canonical": "en-u-dx-thai" },
+        { "input": "en-u-dx-zyyy", "canonical": "en-u-dx-zyyy" },
+        { "input": "en-u-kr-others", "canonical": "en-u-kr-others" },
+        { "input": "en-u-kr-zyyy", "rejected": "type" },
+        { "input": "en-u-kh", "rejected": "key" },
+        { "input": "en-u-vt-0041", "rejected": "key" }
+      ]
+    },
+    {
+      "rule": "deprecated literal types without a preferred value rejected while ca-islamicc is corrected",
+      "cases": [
+        { "input": "en-u-co-big5han", "rejected": "type" },
+        { "input": "en-u-hc-c12", "rejected": "type" },
+        { "input": "en-u-ca-islamicc", "canonical": "en-u-ca-islamic-civil" }
+      ]
+    },
+    {
+      "rule": "a deprecated value admitted only when the pinned data replaces it, and any deprecated component or type left in a result rejecting the complete identifier",
+      "cases": [
+        { "input": "en-SU", "canonical": "en-RU" },
+        { "input": "und-Qaai", "canonical": "und-Zinh" },
+        { "input": "en-heploc", "canonical": "en-alalc97" },
+        { "input": "en-u-sd-no23", "canonical": "en-u-sd-no50" },
+        { "input": "en-u-rg-no23", "canonical": "en-u-rg-no50" },
+        { "input": "aoh", "rejected": "deprecated" },
+        { "input": "und-u-dx-qaai", "rejected": "deprecated" },
+        { "input": "und-t-hy-arevela", "rejected": "deprecated" },
+        { "input": "und-u-sd-fi01", "rejected": "type" }
+      ]
+    },
+    {
+      "rule": "UTS #35's well-formedness constraints",
+      "cases": [
+        { "input": "de-1996-fonipa-1996", "rejected": "syntax" },
+        { "input": "en-t-de-1996-fonipa-1996", "rejected": "syntax" },
+        { "input": "en-x", "rejected": "syntax" },
+        { "input": "en-u-a0-abc", "rejected": "syntax" },
+        { "input": "en-a-bb-a-cc", "rejected": "other-extension" }
+      ]
+    }
+  ]
+}

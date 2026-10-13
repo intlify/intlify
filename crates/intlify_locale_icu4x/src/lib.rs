@@ -9,13 +9,13 @@
 //! integrity, each payload's length and file digest, the conformance data and
 //! the blob of the four ICU4X marker families that revision admits, and the
 //! logical dataset rebuilt to compare its semantic digest. From the blob it
-//! builds ICU4X's extended `LocaleCanonicalizer`.
+//! builds ICU4X's extended `LocaleCanonicalizer`, and around it design 015's
+//! revision "0" conformance layer, which checks an identifier against the
+//! dataset before ICU4X canonicalizes it and corrects it after.
 //!
-//! It is not yet the Intlify conformance layer that applies the conformance
-//! data, or a provider for `intlify_config`. Its canonicalization is ICU4X's
-//! raw behavior, which accepts identifiers revision "0" rejects.
-//! Without the `generate` feature it links no compiled data, so nothing
-//! reaches it but the blob it is given.
+//! It is not yet a provider for `intlify_config`. Without the `generate`
+//! feature it links no compiled data, so nothing reaches it but the blob it
+//! is given.
 
 mod canonicalize;
 #[cfg(feature = "generate")]
@@ -24,6 +24,8 @@ mod conformance;
 mod dataset;
 #[cfg(feature = "generate")]
 pub mod generate;
+mod identifier;
+mod layer;
 mod manifest;
 mod markers;
 mod payload;
@@ -41,6 +43,7 @@ pub use dataset::{
     DatasetFailure, LocaleCanonicalizationDataset, DATASET_DOMAIN, DATASET_SCHEMA_IDENTITY,
     DATASET_SCHEMA_REVISION,
 };
+pub use layer::{Component, LayerFailure, Rejection};
 pub use manifest::{
     ArtifactKind, Cldr, CldrSource, DatasetDescriptor, EnvelopeFailure, EnvelopeLimit, Generation,
     LocaleCanonicalizationDataArtifact, MarkerData, Payload, RevisionZero, Role, ARTIFACT_KIND,

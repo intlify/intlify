@@ -4,7 +4,7 @@
 
 Design 017's [Locale canonicalization data admission and fixtures](../../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-admission-and-fixtures) names six areas of independent expectations. This file maps each one to where it is checked, so a reader can go from a requirement to the code that pins it.
 
-Every value here is a test value. The marker payloads are ICU4X's data cut down to two entries per map and list, and the conformance data is modelled on CLDR's records. None of it is the dataset revision `"0"` admits, which PR 4 of plan 022 generates from CLDR 48.2.0.
+The dataset and artifact files are test values. Their marker payloads are ICU4X's data cut down to two entries per map and list, and their conformance data is modelled on CLDR's records. None of it is the dataset revision `"0"` admits, which is the committed artifact in [`data/`](../data). The conformance layer's cases in `layer/` are the exception: they hold against that committed artifact.
 
 ## Running them
 
@@ -25,6 +25,7 @@ vp run vectors:locale:check
 | `artifact/conformance.json` | The dataset's conformance payload, exact bytes | `src/reader.rs` tests; `tools/shared-json-vectors` |
 | `artifact/markers-narrow.postcard`, `artifact/markers-wide.postcard` | The dataset's marker payloads as a blob in each index layout | `src/generate.rs`, `src/payload.rs`, `src/reader.rs` tests; `tools/shared-json-vectors` |
 | `artifact/manifest-narrow.json`, `artifact/manifest-wide.json`, `artifact/manifest-vendored.json` | Sealed manifests naming the narrow blob, the wide blob, and the narrow blob with CLDR sources read from another place | `src/manifest.rs`, `src/reader.rs`, `src/schema.rs` tests; `tools/shared-json-vectors` |
+| `layer/cases.json` | Design 015's handwritten conformance-layer cases, grouped by the fixture requirement each one shows, each with its canonical identifier or the rule that rejects it | `src/layer.rs` tests |
 
 The artifact files are exact bytes, since their digests are in the manifests, so the repository formatter leaves them alone. The Node checker shares no code with this crate: it writes canonical text itself, checks the order rules itself, frames and hashes with its own implementation, recomputes each manifest's integrity, and hashes each payload file.
 
@@ -40,3 +41,15 @@ The unit tests are at the end of each source file, named here by their function.
 | Payload integrity | `reader.rs`: `a_payload_must_be_supplied_with_its_declared_length_and_digest`, `a_declared_length_or_digest_that_disagrees_with_the_bytes_is_refused`, `the_steps_fail_in_017s_order`. Node: each payload file's byte length and SHA-256 |
 | Marker and conformance shape | `reader.rs`: `a_blob_with_a_family_missing_or_added_is_refused_by_name` (with `generate`), `a_payload_that_does_not_decode_under_its_format_is_refused_with_the_reason`. `markers.rs`: the index checks for each family missing, an additional family, and the order. `conformance.rs`: `a_value_outside_the_closed_structure_is_refused_as_a_shape` (unknown classes and statuses), `a_collection_out_of_order_is_unsorted_and_a_repeat_is_repeated` (a correction listed twice), `a_code_may_be_in_one_group_of_its_field_only`, `a_correction_maps_straight_to_a_value_nothing_corrects_further` |
 | Limits | `manifest.rs`: `the_byte_and_depth_limits_admit_their_exact_values`, `limits_come_before_anything_is_decoded`. `reader.rs`: `the_payload_count_and_declared_lengths_are_limited_before_anything_is_fetched`, `the_logical_marker_payloads_are_limited_before_they_are_built`. `conformance.rs`: `each_limit_admits_its_exact_count_and_refuses_the_next`, `limits_are_checked_before_the_value_is_projected` |
+
+## The conformance layer
+
+Design 015's [Conformance and Fixtures](../../../design/015-intlify-project-profile-and-locale-policy-design.md#conformance-and-fixtures) lists what the layer's fixtures show. Each group of `layer/cases.json` names one of those requirements; `layer.rs`'s `the_handwritten_015_cases_hold` runs them all through the layer over the committed artifact. The requirements the handwritten cases cannot cover alone are generated from the committed data:
+
+| 015 requirement | Checked by |
+| --- | --- |
+| Generated positive and negative validity boundaries | `layer.rs`: `every_listed_code_fares_as_its_status_says`, every code of every validity group in an identifier built for it, with the count of each outcome pinned |
+| Generated coverage for every key/type and alias | `layer.rs`: `every_key_and_literal_type_fares_as_its_listing_says`, `every_correction_is_applied_and_its_result_is_stable` |
+| A later specification admitting a longer language subtag blocking the ICU4X 2.2.0 adapter | `layer.rs`: `an_identifier_icu4x_cannot_parse_blocks_the_adapter`, with conformance data that admits one |
+| A result that a second pass changes blocking the adapter | `layer.rs`: `a_result_steps_3_and_4_change_blocks_the_adapter`, with conformance data built for it |
+| The structure rules in 015's order, and UTS #35's grammar | `layer.rs`: `step_1_names_015s_rules_in_order`. `identifier.rs`: `what_uts_35_does_not_call_well_formed_is_malformed` and the tests beside it |
