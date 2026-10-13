@@ -45,7 +45,7 @@ pub(crate) fn fixture_binding() -> ProviderBinding<&'static str> {
     }
 }
 
-const CANONICAL: &[&str] = &[
+pub(super) const CANONICAL: &[&str] = &[
     "ar-EG-u-nu-latn",
     "de",
     "de-DE",
@@ -61,7 +61,7 @@ const CANONICAL: &[&str] = &[
     "zh-Hant-TW",
 ];
 
-const ALIASES: &[(&str, &str)] = &[
+pub(super) const ALIASES: &[(&str, &str)] = &[
     ("EN", "en"),
     ("EN-us", "en-US"),
     ("en-u-nu-latn-ca-gregory", "en-u-ca-gregory-nu-latn"),
@@ -69,7 +69,7 @@ const ALIASES: &[(&str, &str)] = &[
     ("und-u-ca-islamicc", "und-u-ca-islamic-civil"),
 ];
 
-const INVALID: &[&str] = &[
+pub(super) const INVALID: &[&str] = &[
     "Latn",
     "en-a-foo",
     "en-u-ca-madeup",

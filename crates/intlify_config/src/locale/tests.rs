@@ -222,6 +222,36 @@ fn a_supported_specification_names_the_one_dataset_it_admits() {
 }
 
 #[test]
+fn revision_0_is_the_one_supported_specification_and_admits_cldr_48_2_0() {
+    let supported = Supported::<&str>::revision_zero();
+    let revision_zero = VersionedIdentity {
+        identity: "intlify-locale-canonicalization",
+        revision: "0",
+    };
+    let expected = supported.expected(&revision_zero).unwrap();
+    assert_eq!(expected.specification, revision_zero);
+    assert_eq!(
+        expected.dataset.identity,
+        "intlify-locale-canonicalization-cldr-48.2.0"
+    );
+    // The digest is the generated artifact's; the icu4x feature's tests admit
+    // that artifact and bind it to this entry.
+    assert!(expected.dataset.semantic_digest.starts_with("sha256:"));
+    for asserted in [
+        VersionedIdentity {
+            identity: "intlify-locale-canonicalization",
+            revision: "1",
+        },
+        fixture_pins().specification,
+    ] {
+        assert_eq!(
+            supported.expected(&asserted).err(),
+            Some(SpecificationUnsupported)
+        );
+    }
+}
+
+#[test]
 fn the_asserted_specification_decides_which_dataset_a_provider_must_carry() {
     let supported = Supported::new(vec![pins("other", "other-digest"), fixture_pins()]).unwrap();
     let bind = |asserted: &VersionedIdentity<&'static str>| {

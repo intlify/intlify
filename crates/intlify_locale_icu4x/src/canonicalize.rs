@@ -11,6 +11,11 @@ use icu_locale_core::Locale;
 
 use crate::markers::MarkerBlob;
 
+/// The engine and its release: ICU4X 2.2.0, as design 015 pins it. A provider
+/// reports it among the facts of what it admitted, never as profile
+/// semantics.
+pub const ENGINE: (&str, &str) = ("icu4x", "2.2.0");
+
 /// Why ICU4X gives no canonical spelling. It keeps no part of the input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RawFailure {
@@ -32,7 +37,34 @@ impl MarkerBlob {
 #[cfg(test)]
 mod tests {
     use crate::markers::tests::committed;
-    use crate::RawFailure;
+    use crate::{RawFailure, ENGINE};
+
+    #[test]
+    fn the_engine_is_the_icu4x_release_cargo_locked() {
+        let lock = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock"),
+        )
+        .unwrap();
+        for package in [
+            "icu_locale",
+            "icu_locale_core",
+            "icu_provider",
+            "icu_provider_blob",
+        ] {
+            let name = format!("name = \"{package}\"\n");
+            let versions: Vec<_> = lock
+                .split("[[package]]")
+                .filter(|entry| entry.contains(&name))
+                .filter_map(|entry| {
+                    entry
+                        .lines()
+                        .find_map(|line| line.strip_prefix("version = "))
+                })
+                .collect();
+            assert_eq!(versions, [format!("\"{}\"", ENGINE.1)], "{package}");
+        }
+        assert_eq!(ENGINE.0, "icu4x");
+    }
 
     #[test]
     fn icu4x_canonicalizes_case_aliases_and_order_without_adding_subtags() {

@@ -4,9 +4,9 @@ The ICU4X 2.2.0 reference adapter for [Intlify](../../design/000-intlify-overvie
 
 > [!IMPORTANT]
 >
-> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s Locale Canonicalization Data Artifact in 017's six steps, rebuilds its logical dataset to check the semantic digest, and builds ICU4X's canonicalizer from the four marker families that the Locale Canonicalization Specification revision `"0"` admits, and applies 015's revision `"0"` conformance layer around it. It does not yet serve as `intlify_config`'s provider. See [Current status](#current-status).
+> This crate is part of Phase 2 of [design 015](../../design/015-intlify-project-profile-and-locale-policy-design.md), the Locale Canonicalization Boundary. It reads [design 017](../../design/017-intlify-shared-artifact-and-version-admission-design.md#locale-canonicalization-data-representation)'s Locale Canonicalization Data Artifact in 017's six steps, rebuilds its logical dataset to check the semantic digest, and builds ICU4X's canonicalizer from the four marker families that the Locale Canonicalization Specification revision `"0"` admits, and applies 015's revision `"0"` conformance layer around it. `intlify_config` uses it as its locale provider behind that crate's non-default `icu4x` feature. See [Current status](#current-status).
 
-Design 015 keeps canonicalization semantics in an Intlify-owned specification and treats ICU4X as one physical engine behind a provider boundary. `intlify_config` holds no locale data and links no ICU4X. This crate is where the engine lives: it receives the data as a blob, checks that the blob carries exactly what revision `"0"` admits, and answers what ICU4X 2.2.0 does with it.
+Design 015 keeps canonicalization semantics in an Intlify-owned specification and treats ICU4X as one physical engine behind a provider boundary. In its default build, `intlify_config` holds no locale data and links no ICU4X. This crate is where the engine lives: it receives the data as a blob, checks that the blob carries exactly what revision `"0"` admits, and answers what ICU4X 2.2.0 does with it.
 
 ## What this crate never does
 
@@ -121,7 +121,4 @@ The test suite checks the same freshness under `--all-features`, reads the commi
 
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, and applies the conformance layer around ICU4X 2.2.0. Still to come in Phase 2:
-
-- the provider for `intlify_config`, behind a non-default feature there;
-- the gate against CLDR's canonicalization corpus.
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. Still to come in Phase 2 is the gate against CLDR's canonicalization corpus.

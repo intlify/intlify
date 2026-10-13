@@ -7,6 +7,8 @@
 //! module's. A binding keeps what a checked profile would retain (the
 //! specification and the dataset it admits) apart from facts about the admitted
 //! artifact, which make a binding reproducible but never enter profile semantics.
+//! Behind the non-default `icu4x` feature, `icu4x` makes the ICU4X 2.2.0
+//! reference adapter one such provider.
 
 use std::sync::Arc;
 
@@ -96,6 +98,29 @@ impl<Id: Eq> Supported<Id> {
             .iter()
             .find(|entry| &entry.specification == asserted)
             .ok_or(SpecificationUnsupported)
+    }
+}
+
+impl<Id: Eq + From<&'static str>> Supported<Id> {
+    /// Revision "0" of 015's Locale Canonicalization Specification, which
+    /// admits one dataset: CLDR 48.2.0's, at the semantic digest the reference
+    /// adapter's generated artifact records. That artifact is the authority for
+    /// the digest; a test admits it and binds it to this entry.
+    pub(crate) fn revision_zero() -> Self {
+        Self {
+            entries: vec![SemanticPins {
+                specification: VersionedIdentity {
+                    identity: "intlify-locale-canonicalization".into(),
+                    revision: "0".into(),
+                },
+                dataset: DatasetPin {
+                    identity: "intlify-locale-canonicalization-cldr-48.2.0".into(),
+                    semantic_digest:
+                        "sha256:6182421172339b8c416890e20b3121ab40e412a896df6316d8e991c756505e16"
+                            .into(),
+                },
+            }],
+        }
     }
 }
 
@@ -345,6 +370,9 @@ pub(crate) mod core;
 
 #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
 pub(crate) mod fixtures;
+
+#[cfg(feature = "icu4x")]
+pub(crate) mod icu4x;
 
 #[cfg(test)]
 mod tests;

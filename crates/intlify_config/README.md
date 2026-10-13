@@ -30,9 +30,10 @@ The current implementation includes:
 - Shared JSON decoding, error locations, and JSON Schema utilities already used by the existing Intlify CLI.
 - A generated [JSON Schema for project-profile configuration](./schema/project-profile-config-v0.schema.json).
 - Internal configuration validation, named-profile selection, and normalization of the source, requested, and default locales.
+- An optional locale provider over the ICU4X 2.2.0 reference adapter, [`intlify_locale_icu4x`](../intlify_locale_icu4x/README.md), behind the non-default `icu4x` feature. It admits a locale canonicalization data artifact from bytes its caller supplies, and the boundary binds it only when it carries the one supported specification, revision `"0"`, with its CLDR 48.2.0 dataset.
 - Optional developer measurements for the implemented configuration operations.
 
-The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. Locale normalization currently uses a finite test provider, not a production locale-data implementation. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
+The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. No configuration path uses the ICU4X provider yet: locale normalization in the example and the measurements still uses a finite test provider. Full policy resolution, fallback and negotiation, and output-target settings remain follow-up work.
 
 ## Try it from the terminal
 
@@ -51,7 +52,7 @@ See [the example guide](./examples/resolve_config/README.md) for changes to try,
 
 For contributors, run these commands from the repository root.
 
-Run the crate's tests, including its optional measurement support:
+Run the crate's tests, including its optional ICU4X provider and measurement support:
 
 ```sh
 cargo test -p intlify_config --all-targets --all-features
