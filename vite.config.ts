@@ -25,7 +25,9 @@ export default defineConfig({
       'crates/intlify_authoring_js/fixtures/**',
       // Locale canonicalization artifacts pin their payloads' exact bytes by digest.
       'crates/intlify_locale_icu4x/fixtures/artifact/**',
-      'crates/intlify_locale_icu4x/data/**'
+      'crates/intlify_locale_icu4x/data/**',
+      // The corpus gate's registry is compared byte for byte with a fresh run.
+      'crates/intlify_locale_icu4x/evidence/**'
     ]
   }),
   lint: defineLintConfig({

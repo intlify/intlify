@@ -15,6 +15,9 @@ cargo test -p intlify_locale_icu4x --all-targets --all-features
 # the committed schemas, vectors, and fixture artifacts, and the independent Node checks
 vp run schema:locale:check
 vp run vectors:locale:check
+
+# the corpus gate and its registry, and the independent Node check of it
+vp run corpus:locale:check
 ```
 
 ## Data files
@@ -53,3 +56,16 @@ Design 015's [Conformance and Fixtures](../../../design/015-intlify-project-prof
 | A later specification admitting a longer language subtag blocking the ICU4X 2.2.0 adapter | `layer.rs`: `an_identifier_icu4x_cannot_parse_blocks_the_adapter`, with conformance data that admits one |
 | A result that a second pass changes blocking the adapter | `layer.rs`: `a_result_steps_3_and_4_change_blocks_the_adapter`, with conformance data built for it |
 | The structure rules in 015's order, and UTS #35's grammar | `layer.rs`: `step_1_names_015s_rules_in_order`. `identifier.rs`: `what_uts_35_does_not_call_well_formed_is_malformed` and the tests beside it |
+
+## The corpus gate
+
+`src/corpus.rs` runs CLDR 48.2.0's corpus, vendored in [`cldr/`](../cldr/README.md), through the committed artifact and writes the registry in [`evidence/gap-registry.json`](../evidence/gap-registry.json). Design 015's [Conformance and Fixtures](../../../design/015-intlify-project-profile-and-locale-policy-design.md#conformance-and-fixtures) asks the following of it:
+
+| 015 requirement | Checked by |
+| --- | --- |
+| All four sets projected into the hyphen-separated direct domain where representable | `corpus.rs`: `every_upstream_case_is_read_once_in_its_set`, `the_committed_registry_is_the_gate_over_the_vendored_corpus`. Node: reads the corpus and projects every case again |
+| Every case outside the domain kept with a machine-readable reason, and no case skipped | `corpus.rs`: `a_line_the_gate_does_not_recognize_stops_it`, `the_domain_comes_from_the_pinned_validity_data`. Node: every case once, in order, with the reason the conformance data gives |
+| Each case compared across the expected result, raw ICU4X 2.2.0, and the layer | `corpus.rs`: `the_registry_records_each_answer_and_reason`, `a_disposition_follows_the_domain_and_both_answers` |
+| A registry of delegated, corrected, outside-domain, and blocking cases, where an unexplained mismatch stops admission and CI | `corpus.rs`: `a_blocking_case_refuses_the_adapter`, `the_committed_registry_is_the_gate_over_the_vendored_corpus`. `vp run corpus:locale:check` in CI. Node: derives each disposition and count from the recorded answers |
+| The corpus revision, path, and SHA-256, with the registry and outcome, as conformance evidence | `corpus.rs`: `the_registry_records_each_answer_and_reason`, `the_corpus_is_read_at_the_release_the_artifact_was_generated_from`. Node: rehashes the vendored corpus |
+| Handwritten regression fixtures supplementing the corpus without overriding it | `layer/cases.json`, run by `layer.rs`: `the_handwritten_015_cases_hold`. The gate never reads them |

@@ -13,9 +13,9 @@ workspace = true
 [features]
 default = []
 # Writes the complete artifact, from ICU4X's compiled data and the vendored
-# CLDR records, and the reader's fixture blobs. Only the generators and the
-# tests that build them link that data; the adapter itself reads nothing but
-# the bytes it is given.
+# CLDR records, and the reader's fixture blobs, and runs the corpus gate over
+# the vendored CLDR corpus. Only the generators, the gate, and their tests
+# link that data; the adapter itself reads nothing but the bytes it is given.
 generate = [
   "icu_locale/compiled_data",
   "dep:icu_locale_data",
@@ -59,4 +59,8 @@ required-features = ["generate"]
 
 [[example]]
 name = "generate_artifact_fixtures"
+required-features = ["generate"]
+
+[[example]]
+name = "generate_gap_registry"
 required-features = ["generate"]
