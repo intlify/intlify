@@ -22,6 +22,8 @@ mod canonicalize;
 #[cfg(feature = "generate")]
 pub mod cldr;
 mod conformance;
+#[cfg(feature = "generate")]
+pub mod corpus;
 mod dataset;
 #[cfg(feature = "generate")]
 pub mod generate;

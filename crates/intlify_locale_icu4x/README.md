@@ -119,6 +119,26 @@ cargo run -p intlify_locale_icu4x --features generate --example generate_locale_
 
 The test suite checks the same freshness under `--all-features`, reads the committed artifact through the reader in every build, and `vp run vectors:locale:check` checks its manifest, payloads, and CLDR sources with the independent Node implementation.
 
+## The corpus gate
+
+The adapter is admitted only if it explains every case of CLDR 48.2.0's locale canonicalization corpus, [`cldr/common/testData/localeIdentifiers/localeCanonicalization.txt`](cldr/common/testData/localeIdentifiers/localeCanonicalization.txt), as design 015's [conformance-gap registry](../../design/015-intlify-project-profile-and-locale-policy-design.md#initial-conformance-gap-registry) requires. The gate reads all four of its sets and joins each case's underscore-separated subtags with hyphens. Whether the input is in revision `"0"`'s domain comes from the validity data alone: every component must have a status the layer admits on input. Each case then gets one disposition:
+
+| Disposition | When |
+| --- | --- |
+| `delegated` | In the domain, and raw ICU4X and the layer both give the result CLDR expects |
+| `corrected` | In the domain, and only the layer gives it |
+| `outside-domain` | Not a locale identifier, or a component the validity data does not admit, and the layer rejects it for that reason |
+| `blocking` | Anything else; a single blocking case refuses the adapter |
+
+The registry of every case, with the corpus's SHA-256, the projection, both answers, and the identities of the artifact it ran against, is in [`evidence/gap-registry.json`](evidence/gap-registry.json). Of the 1,773 cases, 542 are delegated and 1,231 are outside the domain, none corrected or blocking. Every case outside the domain names a language, region, or variant the validity data does not list at all, such as ISO 639-2 codes like `aar`, numeric country codes like `004`, and retired variants like `aaland`. To regenerate the registry, or to check it:
+
+```sh
+cargo run -p intlify_locale_icu4x --features generate --example generate_gap_registry -- --write
+vp run corpus:locale:check
+```
+
+The check fails on a blocking case or a stale registry, and the independent Node implementation then reads the corpus again, rehashes it, and derives every case's domain and disposition from the committed conformance data. The test suite runs the same gate under `--all-features`.
+
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. That crate's measurements also canonicalize through it, over the committed artifact. Still to come in Phase 2 is the gate against CLDR's canonicalization corpus.
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. That crate's measurements also canonicalize through it, over the committed artifact, and CLDR's canonicalization corpus gates it. Still to come in Phase 2 is the check of its exit criteria.

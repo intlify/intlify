@@ -133,6 +133,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run schema:locale:check && vp run vectors:locale:check
 
+      - name: Validate the locale canonicalization corpus gate
+        if: runner.os == 'Linux'
+        run: vp run corpus:locale:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})
