@@ -33,8 +33,10 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
     // Pin the limits used before the measured operation too. These describe
     // fixture preparation, not additional work inside a component interval.
     match (&candidate.prepared, candidate.input_limits) {
-        (Prepared::Locale { .. }, None) => frame.text("no-file-preparation"),
-        (Prepared::Locale { .. }, Some(_)) | (_, None) => {
+        (Prepared::Locale { .. } | Prepared::Icu4xLocale { .. }, None) => {
+            frame.text("no-file-preparation");
+        }
+        (Prepared::Locale { .. } | Prepared::Icu4xLocale { .. }, Some(_)) | (_, None) => {
             return Err(ContextFailure::PreparationLimitsMismatch)
         }
         (_, Some(limits)) => input_limits(&mut frame, limits),
@@ -84,6 +86,27 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             frame.json(
                 &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(core))
                     .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::Icu4xLocale { engine, input } => {
+            let Recipe::Icu4xLocale {
+                input: recipe,
+                engine: declared,
+            } = candidate.declaration.fixture
+            else {
+                return Err(ContextFailure::LocaleInputMismatch);
+            };
+            if input.as_ref() != recipe.spelling() || engine.engine() != declared {
+                return Err(ContextFailure::LocaleInputMismatch);
+            }
+            // The admitted binding, both limits, and the engine state are
+            // pinned with the fixture spelling.
+            frame.text(recipe.spelling());
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale_icu4x::AdmittedInputFacts::observe(
+                    engine,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
             );
         }
         Prepared::LocaleCore(core) => {

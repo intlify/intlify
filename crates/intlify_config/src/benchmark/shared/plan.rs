@@ -154,7 +154,7 @@ impl CaseProjection {
                     scale: Scale::Value,
                     verification_subject: subject(),
                     execution_model: ExecutionModel::Value,
-                    execution_state: prepared_core(operation),
+                    execution_state: prepared_core(operation, declaration.fixture.icu4x_engine()),
                     concurrency: Concurrency::Value,
                     workload: expected.work().clone(),
                     metric: Metric::Value,

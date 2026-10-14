@@ -4,6 +4,7 @@
 use serde_json::{json, Value};
 
 use super::cases::{declarations, registry::Registry};
+use super::descriptor::prepared_core;
 use super::operation::Operation;
 use super::profile::{AdmittedProfile, MeasurementProfile, ProfileIssue};
 
@@ -13,7 +14,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     let profile = AdmittedProfile::smoke(&registry);
     let document = profile.document();
     assert_eq!(document.cases(), declarations());
-    assert_eq!(document.cases().len(), 127);
+    assert_eq!(document.cases().len(), 141);
     for operation in Operation::ALL {
         assert!(document
             .cases()
@@ -47,6 +48,29 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
             .document(),
         document
     );
+}
+
+#[test]
+fn the_profile_declares_exactly_the_execution_states_its_cases_run_in() {
+    let registry = Registry::load().unwrap();
+    let value = serde_json::to_value(AdmittedProfile::smoke(&registry).document()).unwrap();
+    let declared = value["operationStates"].as_array().unwrap();
+    let mut used = Vec::new();
+    for declaration in registry.declarations() {
+        let fixture = registry.prepare(declaration).unwrap();
+        let prepared = fixture.prepared();
+        let state = json!({
+            "operation": prepared.operation(),
+            "execution": prepared_core(prepared.operation(), prepared.icu4x_engine()),
+        });
+        assert!(declared.contains(&state), "{state}");
+        if !used.contains(&state) {
+            used.push(state);
+        }
+    }
+    // Each operation's own state, and both engine states of the ICU4X cases.
+    assert_eq!(declared.len(), 8);
+    assert_eq!(used.len(), declared.len());
 }
 
 #[test]
@@ -238,7 +262,7 @@ mod native {
     }
 
     #[test]
-    fn all_127_cases_use_the_admitted_profile_for_native_capture_and_revalidation() {
+    fn all_cases_use_the_admitted_profile_for_native_capture_and_revalidation() {
         let registry = Registry::load().unwrap();
         let profile = AdmittedProfile::smoke(&registry);
         let clock = MonotonicClock::acquire().unwrap();
@@ -274,7 +298,7 @@ mod native {
         }
         drop(registry);
         drop(profile);
-        assert_eq!(retained.len(), 127);
+        assert_eq!(retained.len(), 141);
         assert!(!serde_json::to_vec(&retained).unwrap().is_empty());
         // This array alone is not a complete Owner Result, admitted Run Plan,
         // or common Measurement Evidence; build/environment and record gates
@@ -323,7 +347,7 @@ mod native {
         }
         for ordinal in [
             Quantity::new(1),
-            Quantity::new(127),
+            Quantity::new(141),
             Quantity::new(u64::MAX),
         ] {
             assert!(matches!(

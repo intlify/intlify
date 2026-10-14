@@ -20,10 +20,11 @@ use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralLimits,
 };
 
+use super::cases::Engine;
 use super::clock::Clock;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
-use super::{locale, locale_core};
+use super::{locale, locale_core, locale_icu4x};
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -101,6 +102,10 @@ pub(super) enum Prepared {
         input: Arc<str>,
     },
     LocaleCore(Box<locale_core::PreparedCore>),
+    Icu4xLocale {
+        engine: locale_icu4x::PreparedEngine,
+        input: Arc<str>,
+    },
 }
 
 pub(super) enum Output {
@@ -131,8 +136,17 @@ impl Prepared {
             Self::Structural { .. } => Operation::StructuralAnalysis,
             Self::Authoring(_) => Operation::AuthoringConstruction,
             Self::Select { .. } => Operation::ProfileSelection,
-            Self::Locale { .. } => Operation::LocaleCanonicalization,
+            Self::Locale { .. } | Self::Icu4xLocale { .. } => Operation::LocaleCanonicalization,
             Self::LocaleCore(_) => Operation::LocaleCoreResolution,
+        }
+    }
+
+    /// The engine state of a case canonicalizing through the ICU4X provider;
+    /// `None` for every other case.
+    pub(super) const fn icu4x_engine(&self) -> Option<Engine> {
+        match self {
+            Self::Icu4xLocale { engine, .. } => Some(engine.engine()),
+            _ => None,
         }
     }
 
@@ -201,6 +215,21 @@ impl Prepared {
                 Ok(Measured {
                     duration: measured.duration,
                     output: Output::LocaleCore(measured.output),
+                })
+            }
+            Self::Icu4xLocale { engine, input } => {
+                // A fresh engine is admitted and bound before the start read
+                // and released after the end read.
+                let measured = engine
+                    .with_engine(|core| {
+                        measure(clock, (core, input.as_ref()), |(core, input)| {
+                            core.canonicalize(input)
+                        })
+                    })
+                    .map_err(|_| MeasurementFailure::PrerequisiteUnavailable)??;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::Locale(measured.output),
                 })
             }
         }

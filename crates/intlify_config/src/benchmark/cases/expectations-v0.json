@@ -15616,6 +15616,1028 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "small",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "10476496ec4897d3196ab3d341c1353c22cb0a3e3ae08e8296fa1038bb67591b",
+      "result": {
+        "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "7c4426b2048cf1c4e4b931623ee237c0eaf0b709910dab42dbcda1f866bcddc9",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "small",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "5e432aea9b694f3cb49cc8446a656f2e24f57524573191b4981637dfef2f7fb6",
+      "result": {
+        "shared": "93748875c35be0ce33b01d5328ad8e61f02c79dc2c3d20516ebb90183171d982",
+        "entry": "efdee3b28783127e28b4866c37c2515b1afd00c3501260d81f3c07ed279231c3"
+      },
+      "logicalWork": "7c4426b2048cf1c4e4b931623ee237c0eaf0b709910dab42dbcda1f866bcddc9",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "alias",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "be9e2feeae23196e2d92d52a7bc4ff0af3b5018e09bc712f36af604948213a9b",
+      "result": {
+        "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
+        "entry": "37b5ad33da489146ca924ffd81668bb30eaa29286211b090ac443cb6e27a5fff"
+      },
+      "logicalWork": "c916b0900e93745a639e6710bbd2069a82e15c560a2e3d1385ed36971ac1baf0",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "alias",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "b0364d6acde1e11c013ad5414e710c0faf66af4981d897c764d1e44116719444",
+      "result": {
+        "shared": "fd913e0ccc16662959d493e92e8a4bce41d1b5d0457b5ae9d0e7fbafa077068e",
+        "entry": "37b5ad33da489146ca924ffd81668bb30eaa29286211b090ac443cb6e27a5fff"
+      },
+      "logicalWork": "c916b0900e93745a639e6710bbd2069a82e15c560a2e3d1385ed36971ac1baf0",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "correction",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "d6d17d37db239641c79ab84451d5a01580cc8c3cc2f608a73f6ea5a8c9102f9a",
+      "result": {
+        "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
+        "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
+      },
+      "logicalWork": "449e7423fc686e2a835b3dad017df4bcbb1c7704c402008ba58f21931a0e7c9b",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "22"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "correction",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "863404ff4d144ebced103da976d47a27117c446afaf486922f1855f4c54c27de",
+      "result": {
+        "shared": "338101ee4bb7a2264dbcb128940e174ef6334e93b2fba2263925b3c4d604473a",
+        "entry": "7e1326704deaa07e27467fe6cfd40bef7c9a667199dfce5f275102259ff0f2a8"
+      },
+      "logicalWork": "449e7423fc686e2a835b3dad017df4bcbb1c7704c402008ba58f21931a0e7c9b",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "22"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "scaled",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "f7a79a4ff1554a93929a8d02bf4045418deacf13e3bd27aa7bd8a34c0a5c726a",
+      "result": {
+        "shared": "60c4601ac4199b79f7566645b05fdd85b78e3147fbe80a06539aeb42021300e1",
+        "entry": "419458a7a5887277d5f71d13317137ede3840a01c744730cbdf3e0bef711ddf5"
+      },
+      "logicalWork": "55cabadf35914c3d611703a1c8eb04c27b527a73e95badf395ebd7e4f91ff1ec",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "scaled",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-canonicalized"
+      },
+      "inputContext": "315f1bdba15f469b0ce5c175dce356f0c899fce983640ba3f1df06ad63b05e5d",
+      "result": {
+        "shared": "60c4601ac4199b79f7566645b05fdd85b78e3147fbe80a06539aeb42021300e1",
+        "entry": "419458a7a5887277d5f71d13317137ede3840a01c744730cbdf3e0bef711ddf5"
+      },
+      "logicalWork": "55cabadf35914c3d611703a1c8eb04c27b527a73e95badf395ebd7e4f91ff1ec",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "invalid-syntax",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "63b0c21349dc1118571cec09b4f768a87a384cd803a648aa588ee66924140ba1",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "9aa1ef29cafae650eba0a24ca284edfd509d1a6fd9debfe33106bed35a1d9314",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "invalid-syntax",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "57e710e81c1f29f0809e1590fefd43b19e34eaebb11ea0659aa4c836fb212ebe",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "9aa1ef29cafae650eba0a24ca284edfd509d1a6fd9debfe33106bed35a1d9314",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "invalid-validity",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "a753ad71b5a1079344dd5ee40d206abd055078c44eabd48cae157c9ab4188cbf",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "c4b7951b8ce67b3c75f317717fed0665c5e03af6629e4c6674c50b0b41e97aa7",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "invalid-validity",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "5f7b44937dd21566de750e8330a689f403239e5bfaeeacb04d2e96e4d645784a",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "c4b7951b8ce67b3c75f317717fed0665c5e03af6629e4c6674c50b0b41e97aa7",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "scaled-invalid",
+            "engine": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "5dc01bcb9c141269e7ead34dc3d3100d0dae4497777f9ac71aed5541b7e5545a",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "8adc2f3ff4e7b6bd0e0fabc87688228edcd9db67e184ad3848a13b4a46108beb",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-canonicalization",
+        "fixture": {
+          "icu4x-locale": {
+            "input": "scaled-invalid",
+            "engine": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "locale-rejected"
+      },
+      "inputContext": "60984121f129ea1431292c816950d094c68cec49d130f489d3aa08c5deb748a4",
+      "result": {
+        "shared": "5e36aff158ceee0d549eed060f5f15b3f66c0d677ae7c6b2176488e47418c448",
+        "entry": null
+      },
+      "logicalWork": "8adc2f3ff4e7b6bd0e0fabc87688228edcd9db67e184ad3848a13b4a46108beb",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-single-locale-work",
+        "profileRevision": "0",
+        "operation": "locale-canonicalization",
+        "facts": [
+          {
+            "kind": "locale-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "raw-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "104"
+            }
+          },
+          {
+            "kind": "canonical-locale-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "locale-not-canonicalized"
+            }
+          },
+          {
+            "kind": "retained-canonical-locale-values",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-correction-suggestions",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
     }
   ]
 }

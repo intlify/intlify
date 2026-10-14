@@ -20,12 +20,15 @@ dev-example = []
 # acquired.
 icu4x = ["dep:intlify_locale_icu4x"]
 # Measurement support is excluded from ordinary configuration consumers. The
-# shared digest feature is enabled here rather than on the ordinary path.
+# shared digest feature is enabled here rather than on the ordinary path. It
+# measures canonicalization through the ICU4X provider as well, so it compiles
+# in the adapter's committed artifact as a measurement fixture.
 benchmark = [
   "dep:blake3",
   "dep:getrandom",
   "dep:intlify_measurement",
   "dep:serde_json",
+  "icu4x",
   "intlify_shared_json/digest"
 ]
 

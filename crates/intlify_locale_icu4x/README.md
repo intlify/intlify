@@ -121,4 +121,4 @@ The test suite checks the same freshness under `--all-features`, reads the commi
 
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. Still to come in Phase 2 is the gate against CLDR's canonicalization corpus.
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. That crate's measurements also canonicalize through it, over the committed artifact. Still to come in Phase 2 is the gate against CLDR's canonicalization corpus.

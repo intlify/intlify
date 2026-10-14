@@ -11,7 +11,7 @@ use crate::profile_fixtures::minimal_config;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(in crate::benchmark) enum Recipe {
     Minimal,
     ReversedMembers,
@@ -44,14 +44,30 @@ pub(in crate::benchmark) enum Recipe {
     DenseInvalid,
     Locale(super::LocaleRecipe),
     LocaleCore(super::LocaleCoreRecipe),
+    Icu4xLocale {
+        input: super::Icu4xRecipe,
+        engine: super::Engine,
+    },
 }
 
 impl Recipe {
+    /// The engine state of a case canonicalizing through the ICU4X provider;
+    /// `None` for every other case.
+    pub(in crate::benchmark) const fn icu4x_engine(self) -> Option<super::Engine> {
+        match self {
+            Self::Icu4xLocale { engine, .. } => Some(engine),
+            _ => None,
+        }
+    }
+
     /// No file reads, ambient config, arbitrary payloads, or network acquisition.
     /// All allocation scales are finite owner fixture constants outside intervals.
     pub(in crate::benchmark) fn source(self) -> Arc<[u8]> {
         if let Self::Locale(recipe) = self {
             return Arc::from(recipe.spelling().as_bytes());
+        }
+        if let Self::Icu4xLocale { input, .. } = self {
+            return Arc::from(input.spelling().as_bytes());
         }
         if let Self::LocaleCore(recipe) = self {
             let mut value = recipe.value();

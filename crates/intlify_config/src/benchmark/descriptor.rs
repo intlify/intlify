@@ -7,8 +7,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::cases::Engine;
 use super::clock::ClockDescription;
 use super::locale::InputFacts;
+use super::locale_icu4x::AdmittedInputFacts;
 use super::operation::{Operation, Prepared};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -160,8 +162,32 @@ pub(super) use intlify_measurement::environment::ClockObservation;
 // supplies is which states its prepared core actually ran in.
 pub(super) use intlify_measurement::execution::{Execution, OutputBuffer};
 
-/// The execution state this owner's prepared core actually runs in.
-pub(super) fn prepared_core(operation: Operation) -> Execution {
+/// The execution state this owner's prepared core actually runs in. `icu4x` is
+/// the engine state of a case canonicalizing through the ICU4X provider.
+pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Execution {
+    if let Some(engine) = icu4x {
+        return Execution {
+            process_state: "reused-process".into(),
+            // A fresh engine is admitted from the artifact bytes before each
+            // invocation; a reused one is admitted once, before the first.
+            engine_state: match engine {
+                Engine::Reused => "reused",
+                Engine::Fresh => "fresh",
+            }
+            .into(),
+            initial_preparation_state: "resident".into(),
+            cache_state: "disabled".into(),
+            runtime_compilation_state: "ahead-of-time".into(),
+            managed_heap_state: "not-applicable".into(),
+            // The conformance layer and ICU4X work in storage of each call's
+            // own, and each call writes a new canonical value.
+            scratch_reuse_state: "fresh".into(),
+            output_buffer_state: OutputBuffer::Applicable {
+                ownership: "caller-owned".into(),
+                reuse: "fresh".into(),
+            },
+        };
+    }
     let locale = operation == Operation::LocaleCanonicalization;
     Execution {
         // The harness invokes prepared calls in its existing process. Its
@@ -196,6 +222,8 @@ pub(super) struct Descriptors {
     pub(super) locale_input: Option<InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) locale_core_input: Option<super::locale_core::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) admitted_locale_input: Option<AdmittedInputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,7 +247,7 @@ impl Descriptors {
             boundary: Boundary::for_operation(operation),
             method: Method::monotonic_invocation(),
             clock_observation: clock.observation(),
-            execution: prepared_core(operation),
+            execution: prepared_core(operation, prepared.icu4x_engine()),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
                 Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
@@ -229,6 +257,7 @@ impl Descriptors {
                 Prepared::LocaleCore(core) => Some(super::locale_core::InputFacts::observe(core)),
                 _ => None,
             },
+            admitted_locale_input: admitted(prepared),
         }
     }
 
@@ -259,7 +288,7 @@ impl Descriptors {
         {
             issues.push(DescriptorIssue::InvalidClockObservation);
         }
-        if self.execution != prepared_core(operation) {
+        if self.execution != prepared_core(operation, prepared.icu4x_engine()) {
             issues.push(DescriptorIssue::ExecutionMismatch);
         }
         let expected_locale = match prepared {
@@ -267,7 +296,8 @@ impl Descriptors {
             Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
             _ => None,
         };
-        if self.locale_input != expected_locale {
+        if self.locale_input != expected_locale || self.admitted_locale_input != admitted(prepared)
+        {
             issues.push(DescriptorIssue::LocaleInputBindingMismatch);
         }
         let expected_core = match prepared {
@@ -278,6 +308,13 @@ impl Descriptors {
             issues.push(DescriptorIssue::LocaleCoreInputBindingMismatch);
         }
         issues
+    }
+}
+
+fn admitted(prepared: &Prepared) -> Option<AdmittedInputFacts> {
+    match prepared {
+        Prepared::Icu4xLocale { engine, .. } => Some(AdmittedInputFacts::observe(engine)),
+        _ => None,
     }
 }
 
