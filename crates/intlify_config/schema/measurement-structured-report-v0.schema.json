@@ -519,7 +519,7 @@
         "executable-not-attested",
         "kernel-release-is-not-build-identity",
         "parallelism-hint-is-not-logical-cpu-count",
-        "finite-provider-has-no-locale-service-profile",
+        "canonicalization-provider-has-no-locale-service-profile",
         "source-control-state-not-attested"
       ],
       "type": "string"

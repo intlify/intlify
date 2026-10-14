@@ -335,7 +335,7 @@ pub fn native_environment(
             )),
             Datum::LocaleService(conditionally_absent!(
                 LocaleService,
-                FiniteProviderHasNoLocaleServiceProfile
+                CanonicalizationProviderHasNoLocaleServiceProfile
             )),
             Datum::Harness(RequiredObservation::Observed {
                 value: labels.harness.versioned(),

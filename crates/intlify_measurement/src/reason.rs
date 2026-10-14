@@ -254,7 +254,10 @@ pub enum MissingObservation {
     ExecutableNotAttested,
     KernelReleaseIsNotBuildIdentity,
     ParallelismHintIsNotLogicalCpuCount,
-    FiniteProviderHasNoLocaleServiceProfile,
+    // The run canonicalizes locales through a provider that its locale
+    // canonicalization specification and dataset pin, which no Locale Service
+    // Profile describes.
+    CanonicalizationProviderHasNoLocaleServiceProfile,
     SourceControlStateNotAttested,
 }
 

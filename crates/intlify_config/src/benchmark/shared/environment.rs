@@ -173,7 +173,7 @@ pub(super) fn project(
             )),
             Datum::LocaleService(conditional_unavailable!(
                 LocaleService,
-                FiniteProviderHasNoLocaleServiceProfile
+                CanonicalizationProviderHasNoLocaleServiceProfile
             )),
             Datum::Harness(RequiredObservation::Observed {
                 value: harness_identity(),
