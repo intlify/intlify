@@ -422,7 +422,7 @@ mod tests {
             Admission::PreInvocation(EnvelopeReason::DuplicateMember) => "duplicate-member",
             Admission::PreInvocation(EnvelopeReason::UnknownMember) => "unknown-member",
             Admission::PreInvocation(EnvelopeReason::OverBoundEnvelope) => "over-bound-envelope",
-            Admission::Specification | Admission::Data => "after-the-boundary",
+            Admission::Data => "after-the-boundary",
         };
         for failure in [
             EnvelopeFailure::OverBound(EnvelopeLimit::Bytes),

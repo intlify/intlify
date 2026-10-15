@@ -142,28 +142,40 @@ fn binding_failures_are_classified_where_015_reports_them() {
         BindingFailure::MissingProviderData.admission(),
         Admission::PreInvocation(EnvelopeReason::MissingInput)
     );
+    // The slot admitted the specification before the data is bound, so data
+    // naming another specification is data that disagrees with it (015-135).
     for parts in [
         vec![Part::SpecificationIdentity],
         vec![Part::SpecificationRevision],
         vec![Part::SpecificationRevision, Part::DatasetDigest],
         vec![Part::DatasetIdentity, Part::SpecificationIdentity],
-    ] {
-        assert_eq!(
-            BindingFailure::Mismatch(parts).admission(),
-            Admission::Specification
-        );
-    }
-    for parts in [
         vec![Part::DatasetIdentity],
         vec![Part::DatasetDigest],
         vec![Part::DatasetIdentity, Part::DatasetDigest],
     ] {
         assert_eq!(BindingFailure::Mismatch(parts).admission(), Admission::Data);
     }
+}
+
+#[test]
+fn another_identity_is_unsupported_and_another_revision_of_it_incompatible() {
+    let supported = VersionedIdentity {
+        identity: "spec",
+        revision: "0",
+    };
+    let assert = |identity, revision| VersionedIdentity { identity, revision }.admit(&supported);
+    assert_eq!(assert("spec", "0"), Ok(()));
     assert_eq!(
-        Admission::from(SpecificationUnsupported),
-        Admission::Specification
+        assert("spec", "1"),
+        Err(SpecificationNotAdmitted::Incompatible)
     );
+    // The identity decides first: another specification's revision says nothing.
+    for (identity, revision) in [("other", "0"), ("other", "1")] {
+        assert_eq!(
+            assert(identity, revision),
+            Err(SpecificationNotAdmitted::Unsupported)
+        );
+    }
 }
 
 fn pins(specification: &'static str, digest: &'static str) -> SemanticPins<&'static str> {
@@ -191,25 +203,44 @@ fn a_supported_specification_names_the_one_dataset_it_admits() {
             .unwrap();
         assert_eq!(expected, &pins(asserted, digest));
     }
-    for asserted in [
-        VersionedIdentity {
-            identity: "third",
-            revision: "0",
-        },
-        VersionedIdentity {
-            identity: "first",
-            revision: "1",
-        },
+    for (identity, revision, reason) in [
+        ("third", "0", SpecificationNotAdmitted::Unsupported),
+        ("first", "1", SpecificationNotAdmitted::Incompatible),
+        ("second", "1", SpecificationNotAdmitted::Incompatible),
     ] {
         assert_eq!(
-            supported.expected(&asserted).err(),
-            Some(SpecificationUnsupported)
+            supported
+                .expected(&VersionedIdentity { identity, revision })
+                .err(),
+            Some(reason)
         );
     }
-    assert!(Supported::<&str>::new(Vec::new())
-        .unwrap()
-        .expected(&fixture_pins().specification)
-        .is_err());
+    // Another entry that is unsupported does not hide one that is incompatible,
+    // whichever comes first.
+    let mut revised = pins("first", "a");
+    revised.specification.revision = "1";
+    for entries in [
+        vec![revised.clone(), pins("second", "b")],
+        vec![pins("second", "b"), revised],
+    ] {
+        assert_eq!(
+            Supported::new(entries)
+                .unwrap()
+                .expected(&VersionedIdentity {
+                    identity: "first",
+                    revision: "0"
+                })
+                .err(),
+            Some(SpecificationNotAdmitted::Incompatible)
+        );
+    }
+    assert_eq!(
+        Supported::<&str>::new(Vec::new())
+            .unwrap()
+            .expected(&fixture_pins().specification)
+            .err(),
+        Some(SpecificationNotAdmitted::Unsupported)
+    );
     for duplicate in [
         vec![pins("first", "a"), pins("first", "a")],
         vec![pins("first", "a"), pins("second", "b"), pins("first", "c")],
@@ -237,25 +268,26 @@ fn revision_0_is_the_one_supported_specification_and_admits_cldr_48_2_0() {
     // The digest is the generated artifact's; the icu4x feature's tests admit
     // that artifact and bind it to this entry.
     assert!(expected.dataset.semantic_digest.starts_with("sha256:"));
-    for asserted in [
-        VersionedIdentity {
-            identity: "intlify-locale-canonicalization",
-            revision: "1",
-        },
-        fixture_pins().specification,
-    ] {
-        assert_eq!(
-            supported.expected(&asserted).err(),
-            Some(SpecificationUnsupported)
-        );
-    }
+    assert_eq!(
+        supported
+            .expected(&VersionedIdentity {
+                identity: "intlify-locale-canonicalization",
+                revision: "1",
+            })
+            .err(),
+        Some(SpecificationNotAdmitted::Incompatible)
+    );
+    assert_eq!(
+        supported.expected(&fixture_pins().specification).err(),
+        Some(SpecificationNotAdmitted::Unsupported)
+    );
 }
 
 #[test]
 fn the_asserted_specification_decides_which_dataset_a_provider_must_carry() {
     let supported = Supported::new(vec![pins("other", "other-digest"), fixture_pins()]).unwrap();
     let bind = |asserted: &VersionedIdentity<&'static str>| {
-        let expected = supported.expected(asserted).map_err(Admission::from)?;
+        let expected = supported.expected(asserted).unwrap();
         Canonicalizer::bind(
             expected,
             Some(FixtureProvider::new()),
@@ -264,21 +296,15 @@ fn the_asserted_specification_decides_which_dataset_a_provider_must_carry() {
         .map_err(|failure| failure.admission())
     };
     assert!(bind(&fixture_pins().specification).is_ok());
+    // A supported specification whose data the provider does not carry: the
+    // provider's data names another specification and dataset.
     assert_eq!(
         bind(&VersionedIdentity {
             identity: "other",
             revision: "0"
         })
         .err(),
-        Some(Admission::Specification)
-    );
-    assert_eq!(
-        bind(&VersionedIdentity {
-            identity: "unsupported",
-            revision: "0"
-        })
-        .err(),
-        Some(Admission::Specification)
+        Some(Admission::Data)
     );
     let mut stale = fixture_pins();
     stale.dataset.semantic_digest = "stale-digest";
