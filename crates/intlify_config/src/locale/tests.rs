@@ -510,3 +510,32 @@ fn canonical_locale_order_is_unsigned_byte_order_and_keeps_prefixes() {
         ["de", "en", "en-US", "en-u-ca-gregory-nu-latn", "ja"]
     );
 }
+
+#[test]
+fn an_ordinary_build_links_neither_icu4x_nor_its_data() {
+    let manifest = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
+    )
+    .unwrap();
+    // Comments may mention ICU4X; only the settings count.
+    let settings: Vec<&str> = manifest
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect();
+    assert!(settings.contains(&"default = []"));
+    // ICU4X comes only with the adapter, which only the icu4x feature adds.
+    assert!(settings.iter().all(|line| !line.starts_with("icu_")));
+    let adapter: Vec<&str> = settings
+        .iter()
+        .copied()
+        .filter(|line| line.contains("intlify_locale_icu4x"))
+        .collect();
+    assert_eq!(
+        adapter,
+        [
+            "icu4x = [\"dep:intlify_locale_icu4x\"]",
+            "intlify_locale_icu4x = { path = \"../intlify_locale_icu4x\", optional = true }",
+        ]
+    );
+}

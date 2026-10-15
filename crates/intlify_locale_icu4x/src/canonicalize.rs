@@ -67,6 +67,47 @@ mod tests {
     }
 
     #[test]
+    fn only_the_generators_link_icu4x_compiled_data() {
+        let manifest = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
+        )
+        .unwrap();
+        // Comments may mention compiled data; only the settings count.
+        let settings: Vec<&str> = manifest
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .collect();
+        let setting = |name: &str| {
+            settings
+                .iter()
+                .find(|line| line.starts_with(&format!("{name} = ")))
+                .copied()
+                .unwrap()
+        };
+        assert_eq!(setting("default"), "default = []");
+        assert!(setting("icu_locale").contains("default-features = false"));
+        assert!(setting("icu_locale_data").contains("optional = true"));
+        // The generate feature is the one place that turns either on.
+        let generate = settings
+            .iter()
+            .position(|line| *line == "generate = [")
+            .unwrap();
+        let end = generate
+            + settings[generate..]
+                .iter()
+                .position(|line| *line == "]")
+                .unwrap();
+        for needle in ["compiled_data", "dep:icu_locale_data"] {
+            let places: Vec<usize> = (0..settings.len())
+                .filter(|&index| settings[index].contains(needle))
+                .collect();
+            assert_eq!(places.len(), 1, "{needle}");
+            assert!(generate < places[0] && places[0] < end, "{needle}");
+        }
+    }
+
+    #[test]
     fn icu4x_canonicalizes_case_aliases_and_order_without_adding_subtags() {
         let blob = committed();
         for (input, expected) in [

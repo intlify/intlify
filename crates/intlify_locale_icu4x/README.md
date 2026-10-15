@@ -141,4 +141,4 @@ The check fails on a blocking case or a stale registry, and the independent Node
 
 ## Current status
 
-This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. That crate's measurements also canonicalize through it, over the committed artifact, and CLDR's canonicalization corpus gates it. Still to come in Phase 2 is the check of its exit criteria.
+This crate reads 017's Locale Canonicalization Data Artifact, rebuilds its dataset, carries the complete artifact of revision `"0"`, applies the conformance layer around ICU4X 2.2.0, and serves as `intlify_config`'s provider behind that crate's `icu4x` feature. That crate's measurements also canonicalize through it, over the committed artifact, and CLDR's canonicalization corpus gates it. With that, Phase 2 is complete: `intlify_config`'s [Phase 2 fixtures](../intlify_config/fixtures/phase2/README.md) map design 015's coverage to the tests in both crates.
