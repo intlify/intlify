@@ -81,6 +81,10 @@ mod structural;
 #[allow(dead_code)]
 mod locale;
 
+// 015 Phase 3's crate-private semantic state; no resolver entry or Profile.
+#[allow(dead_code)]
+mod resolver;
+
 #[cfg(any(test, feature = "benchmark"))]
 #[allow(dead_code)]
 mod benchmark;

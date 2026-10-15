@@ -1,0 +1,666 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
+//! Which checks the resolver evaluated, which it could not, and why. Not 015's
+//! Check or Finding Registry, a Finding Key, a Redacted subject token, or an
+//! evaluation-status record: 015 Phase 5 owns those representations. A unit
+//! here is one check over one subject, an issue key names the blocking result a
+//! unit found, and a unit whose prerequisite is unavailable is recorded as not
+//! evaluated with the keys behind it instead of reporting a cascade issue.
+
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
+
+use super::identity::DeclarationField;
+use super::specification::Slot;
+
+/// 015's resolution phases, declared in rank order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Phase {
+    ResolverBootstrapAdmission,
+    EntryAdmission,
+    StructuralAdmission,
+    ProfileSelection,
+    ResourcePolicyAdmission,
+    SpecificationAdmission,
+    ProjectIdentityResolution,
+    LocaleResolution,
+    LocalePolicyResolution,
+    ArtifactReferenceResolution,
+    DeliveryResolution,
+    TargetResolution,
+    GroupResolution,
+    HydrationValidation,
+    ProfileProjection,
+    ReportingFinalization,
+}
+
+impl Phase {
+    /// 015's stable phase ID.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::ResolverBootstrapAdmission => "resolver-bootstrap-admission",
+            Self::EntryAdmission => "entry-admission",
+            Self::StructuralAdmission => "structural-admission",
+            Self::ProfileSelection => "profile-selection",
+            Self::ResourcePolicyAdmission => "resource-policy-admission",
+            Self::SpecificationAdmission => "specification-admission",
+            Self::ProjectIdentityResolution => "project-identity-resolution",
+            Self::LocaleResolution => "locale-resolution",
+            Self::LocalePolicyResolution => "locale-policy-resolution",
+            Self::ArtifactReferenceResolution => "artifact-reference-resolution",
+            Self::DeliveryResolution => "delivery-resolution",
+            Self::TargetResolution => "target-resolution",
+            Self::GroupResolution => "group-resolution",
+            Self::HydrationValidation => "hydration-validation",
+            Self::ProfileProjection => "profile-projection",
+            Self::ReportingFinalization => "reporting-finalization",
+        }
+    }
+}
+
+/// What one unit checks: 015's subject kind and Logical subject key. Kinds are
+/// declared in rank order, so subjects order by kind and then by key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Subject {
+    /// One slot of the Profile Resolution Specification Input.
+    Slot(Slot),
+    /// The Locale Canonicalization Data Artifact, a singleton.
+    CanonicalizationData,
+    /// One field of the selected profile declaration.
+    DeclarationField(DeclarationField),
+}
+
+/// The check a unit runs, declared in rank order. Each subject kind has one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Check {
+    /// The slot holds an assertion the resolver supports.
+    SupportedAssertion,
+    /// The data is the dataset the admitted specification admits.
+    MatchingData,
+    /// The field is admitted as an opaque semantic identity.
+    OpaqueIdentity,
+}
+
+/// One atomic evaluation unit. Units order as 015 evaluates and commits them:
+/// phase, subject kind, subject key, then check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Unit {
+    pub(crate) phase: Phase,
+    pub(crate) subject: Subject,
+    pub(crate) check: Check,
+}
+
+/// The 015 Finding codes these checks can report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Code {
+    SpecificationInputIncomplete,
+    SpecificationNotAdmitted,
+    LocaleSpecificationNotAdmitted,
+    LocaleDataNotAdmitted,
+    NegotiationSpecificationNotAdmitted,
+    MessageFallbackSpecificationNotAdmitted,
+    CoverageSpecificationNotAdmitted,
+    DeliverySpecificationNotAdmitted,
+}
+
+impl Code {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::SpecificationInputIncomplete => "project-profile-specification-input-incomplete",
+            Self::SpecificationNotAdmitted => "project-profile-specification-not-admitted",
+            Self::LocaleSpecificationNotAdmitted => {
+                "project-profile-locale-specification-not-admitted"
+            }
+            Self::LocaleDataNotAdmitted => "project-profile-locale-data-not-admitted",
+            Self::NegotiationSpecificationNotAdmitted => {
+                "project-profile-negotiation-specification-not-admitted"
+            }
+            Self::MessageFallbackSpecificationNotAdmitted => {
+                "project-profile-message-fallback-specification-not-admitted"
+            }
+            Self::CoverageSpecificationNotAdmitted => {
+                "project-profile-coverage-specification-not-admitted"
+            }
+            Self::DeliverySpecificationNotAdmitted => {
+                "project-profile-delivery-specification-not-admitted"
+            }
+        }
+    }
+}
+
+/// The stable `details.reason` values of those codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Reason {
+    MissingRequiredSlot,
+    Unsupported,
+    Incompatible,
+}
+
+impl Reason {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingRequiredSlot => "missing-required-slot",
+            Self::Unsupported => "unsupported",
+            Self::Incompatible => "incompatible",
+        }
+    }
+}
+
+/// The one blocking result a check found, which leaves the value it would
+/// establish unavailable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Blocking {
+    pub(crate) code: Code,
+    pub(crate) reason: Option<Reason>,
+}
+
+/// The private counterpart of 015's Finding Key: the unit that found a blocking
+/// result, its code, and its reason. In 015 Phase 5 the owning specification
+/// joins it and a Redacted subject token stands for the unit's subject.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct IssueKey {
+    unit: Unit,
+    code: Code,
+    reason: Option<Reason>,
+}
+
+impl IssueKey {
+    pub(crate) const fn unit(self) -> Unit {
+        self.unit
+    }
+
+    pub(crate) const fn code(self) -> Code {
+        self.code
+    }
+
+    pub(crate) const fn reason(self) -> Option<Reason> {
+        self.reason
+    }
+}
+
+impl Ord for IssueKey {
+    /// 015's Finding order: the unit, then the unsigned UTF-8 bytes of the code
+    /// and of the reason, with an absent reason first.
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.unit
+            .cmp(&other.unit)
+            .then_with(|| self.code.as_str().cmp(other.code.as_str()))
+            .then_with(|| {
+                self.reason
+                    .map(Reason::as_str)
+                    .cmp(&other.reason.map(Reason::as_str))
+            })
+    }
+}
+
+impl PartialOrd for IssueKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Why a value a check needs is unavailable: the keys of the blocking results
+/// behind it, canonical and duplicate-free. Never empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Causes(BTreeSet<IssueKey>);
+
+impl Causes {
+    pub(crate) fn union(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
+        self
+    }
+
+    pub(crate) fn keys(&self) -> impl Iterator<Item = &IssueKey> {
+        self.0.iter()
+    }
+}
+
+/// A value a later check needs, or why it is unavailable.
+pub(crate) type Admitted<T> = Result<T, Causes>;
+
+/// Both values, or the causes of every one that is unavailable.
+pub(crate) fn both<A, B>(first: Admitted<A>, second: Admitted<B>) -> Admitted<(A, B)> {
+    match (first, second) {
+        (Ok(first), Ok(second)) => Ok((first, second)),
+        (Err(causes), Ok(_)) | (Ok(_), Err(causes)) => Err(causes),
+        (Err(first), Err(second)) => Err(first.union(second)),
+    }
+}
+
+/// A unit's evaluation status. A unit that found a blocking result was still
+/// evaluated; only an unavailable prerequisite leaves it not evaluated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Status {
+    Evaluated,
+    NotEvaluated(Causes),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EvaluationInvariant {
+    /// A resolver bug: each unit is evaluated at most once.
+    UnitRecordedTwice(Unit),
+}
+
+/// The status of every unit recorded so far and the blocking results found,
+/// each in 015's order whatever order the units ran in.
+#[derive(Debug, Default)]
+pub(crate) struct Evaluation {
+    statuses: BTreeMap<Unit, Status>,
+    issues: BTreeSet<IssueKey>,
+}
+
+impl Evaluation {
+    /// Runs `unit` when its prerequisite is admitted and records its status.
+    /// `evaluate` returns the value the unit establishes or the blocking result
+    /// it found. An unavailable prerequisite becomes the unit's causes: the unit
+    /// reports nothing, and whatever depends on it inherits the same causes.
+    pub(crate) fn check<P, T>(
+        &mut self,
+        unit: Unit,
+        prerequisite: Admitted<P>,
+        evaluate: impl FnOnce(P) -> Result<T, Blocking>,
+    ) -> Result<Admitted<T>, EvaluationInvariant> {
+        if self.statuses.contains_key(&unit) {
+            return Err(EvaluationInvariant::UnitRecordedTwice(unit));
+        }
+        let (status, result) = match prerequisite {
+            Err(causes) => (Status::NotEvaluated(causes.clone()), Err(causes)),
+            Ok(value) => match evaluate(value) {
+                Ok(value) => (Status::Evaluated, Ok(value)),
+                Err(Blocking { code, reason }) => {
+                    let key = IssueKey { unit, code, reason };
+                    self.issues.insert(key);
+                    (Status::Evaluated, Err(Causes(BTreeSet::from([key]))))
+                }
+            },
+        };
+        self.statuses.insert(unit, status);
+        Ok(result)
+    }
+
+    pub(crate) fn status(&self, unit: Unit) -> Option<&Status> {
+        self.statuses.get(&unit)
+    }
+
+    pub(crate) fn statuses(&self) -> impl Iterator<Item = (&Unit, &Status)> {
+        self.statuses.iter()
+    }
+
+    pub(crate) fn issues(&self) -> impl Iterator<Item = &IssueKey> {
+        self.issues.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MISSING: Blocking = Blocking {
+        code: Code::SpecificationInputIncomplete,
+        reason: Some(Reason::MissingRequiredSlot),
+    };
+
+    fn slot(slot: Slot) -> Unit {
+        Unit {
+            phase: Phase::SpecificationAdmission,
+            subject: Subject::Slot(slot),
+            check: Check::SupportedAssertion,
+        }
+    }
+
+    fn data() -> Unit {
+        Unit {
+            phase: Phase::SpecificationAdmission,
+            subject: Subject::CanonicalizationData,
+            check: Check::MatchingData,
+        }
+    }
+
+    fn field(field: DeclarationField) -> Unit {
+        Unit {
+            phase: Phase::ProjectIdentityResolution,
+            subject: Subject::DeclarationField(field),
+            check: Check::OpaqueIdentity,
+        }
+    }
+
+    /// The causes a missing slot leaves, as a later unit would receive them.
+    fn missing(evaluation: &mut Evaluation, unit: Unit) -> Causes {
+        evaluation
+            .check(unit, Ok(()), |()| Err::<(), _>(MISSING))
+            .unwrap()
+            .unwrap_err()
+    }
+
+    #[test]
+    fn phases_keep_015s_ids_in_rank_order() {
+        let phases = [
+            Phase::ResolverBootstrapAdmission,
+            Phase::EntryAdmission,
+            Phase::StructuralAdmission,
+            Phase::ProfileSelection,
+            Phase::ResourcePolicyAdmission,
+            Phase::SpecificationAdmission,
+            Phase::ProjectIdentityResolution,
+            Phase::LocaleResolution,
+            Phase::LocalePolicyResolution,
+            Phase::ArtifactReferenceResolution,
+            Phase::DeliveryResolution,
+            Phase::TargetResolution,
+            Phase::GroupResolution,
+            Phase::HydrationValidation,
+            Phase::ProfileProjection,
+            Phase::ReportingFinalization,
+        ];
+        assert_eq!(
+            phases.map(Phase::id),
+            [
+                "resolver-bootstrap-admission",
+                "entry-admission",
+                "structural-admission",
+                "profile-selection",
+                "resource-policy-admission",
+                "specification-admission",
+                "project-identity-resolution",
+                "locale-resolution",
+                "locale-policy-resolution",
+                "artifact-reference-resolution",
+                "delivery-resolution",
+                "target-resolution",
+                "group-resolution",
+                "hydration-validation",
+                "profile-projection",
+                "reporting-finalization",
+            ]
+        );
+        assert!(phases.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn codes_and_reasons_are_spelled_as_015_registers_them() {
+        assert_eq!(
+            [
+                Code::SpecificationInputIncomplete,
+                Code::SpecificationNotAdmitted,
+                Code::LocaleSpecificationNotAdmitted,
+                Code::LocaleDataNotAdmitted,
+                Code::NegotiationSpecificationNotAdmitted,
+                Code::MessageFallbackSpecificationNotAdmitted,
+                Code::CoverageSpecificationNotAdmitted,
+                Code::DeliverySpecificationNotAdmitted,
+            ]
+            .map(Code::as_str),
+            [
+                "project-profile-specification-input-incomplete",
+                "project-profile-specification-not-admitted",
+                "project-profile-locale-specification-not-admitted",
+                "project-profile-locale-data-not-admitted",
+                "project-profile-negotiation-specification-not-admitted",
+                "project-profile-message-fallback-specification-not-admitted",
+                "project-profile-coverage-specification-not-admitted",
+                "project-profile-delivery-specification-not-admitted",
+            ]
+        );
+        assert_eq!(
+            [
+                Reason::MissingRequiredSlot,
+                Reason::Unsupported,
+                Reason::Incompatible,
+            ]
+            .map(Reason::as_str),
+            ["missing-required-slot", "unsupported", "incompatible"]
+        );
+    }
+
+    #[test]
+    fn an_admitted_prerequisite_is_evaluated_and_a_blocking_result_becomes_the_cause() {
+        let mut evaluation = Evaluation::default();
+        let doubled = evaluation
+            .check(slot(Slot::Coverage), Ok(2), |value| {
+                Ok::<_, Blocking>(value * 2)
+            })
+            .unwrap();
+        assert_eq!(doubled, Ok(4));
+        let causes = missing(&mut evaluation, slot(Slot::DeliveryGraph));
+        let found: Vec<_> = evaluation.issues().copied().collect();
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            (found[0].unit(), found[0].code(), found[0].reason()),
+            (
+                slot(Slot::DeliveryGraph),
+                Code::SpecificationInputIncomplete,
+                Some(Reason::MissingRequiredSlot)
+            )
+        );
+        assert_eq!(causes.keys().collect::<Vec<_>>(), [&found[0]]);
+        for unit in [slot(Slot::Coverage), slot(Slot::DeliveryGraph)] {
+            assert_eq!(evaluation.status(unit), Some(&Status::Evaluated));
+        }
+        assert_eq!(evaluation.status(slot(Slot::LocaleNegotiation)), None);
+    }
+
+    #[test]
+    fn an_unavailable_prerequisite_leaves_the_unit_not_evaluated_and_reports_nothing() {
+        let mut evaluation = Evaluation::default();
+        let causes = missing(&mut evaluation, slot(Slot::LocaleCanonicalization));
+        let mut ran = false;
+        let dependant = evaluation
+            .check(data(), Err::<(), _>(causes.clone()), |()| {
+                ran = true;
+                Ok::<(), Blocking>(())
+            })
+            .unwrap();
+        assert!(!ran);
+        assert_eq!(dependant, Err(causes.clone()));
+        assert_eq!(
+            evaluation.status(data()),
+            Some(&Status::NotEvaluated(causes))
+        );
+        assert_eq!(evaluation.issues().count(), 1);
+    }
+
+    #[test]
+    fn causes_from_several_prerequisites_form_one_canonical_set() {
+        let mut evaluation = Evaluation::default();
+        let placement = missing(&mut evaluation, slot(Slot::DeliveryPlacement));
+        let coverage = missing(&mut evaluation, slot(Slot::Coverage));
+        assert_eq!(both::<_, u8>(Ok(1), Ok(2)), Ok((1, 2)));
+        assert_eq!(
+            both::<(), u8>(Err(placement.clone()), Ok(2)),
+            Err(placement.clone())
+        );
+        assert_eq!(
+            both::<u8, ()>(Ok(1), Err(coverage.clone())),
+            Err(coverage.clone())
+        );
+        let joined = both::<(), ()>(Err(placement.clone()), Err(coverage.clone())).unwrap_err();
+        assert_eq!(
+            joined
+                .keys()
+                .map(|key| key.unit().subject)
+                .collect::<Vec<_>>(),
+            [
+                Subject::Slot(Slot::Coverage),
+                Subject::Slot(Slot::DeliveryPlacement)
+            ]
+        );
+        assert_eq!(joined.clone().union(placement), joined);
+    }
+
+    #[test]
+    fn a_unit_is_recorded_once() {
+        let mut evaluation = Evaluation::default();
+        let causes = missing(&mut evaluation, slot(Slot::Coverage));
+        let mut ran = false;
+        assert_eq!(
+            evaluation
+                .check(slot(Slot::Coverage), Ok(()), |()| {
+                    ran = true;
+                    Ok::<(), Blocking>(())
+                })
+                .err(),
+            Some(EvaluationInvariant::UnitRecordedTwice(slot(Slot::Coverage)))
+        );
+        assert!(!ran);
+        evaluation
+            .check(data(), Err::<(), _>(causes.clone()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            evaluation
+                .check(data(), Err::<(), _>(causes), Ok::<(), Blocking>)
+                .err(),
+            Some(EvaluationInvariant::UnitRecordedTwice(data()))
+        );
+        assert_eq!(evaluation.issues().count(), 1);
+    }
+
+    #[test]
+    fn statuses_and_issues_follow_015s_order_whatever_order_the_units_ran_in() {
+        let bootstrap = Unit {
+            phase: Phase::ResolverBootstrapAdmission,
+            subject: Subject::Slot(Slot::ProjectProfile),
+            check: Check::SupportedAssertion,
+        };
+        let canonical = [
+            bootstrap,
+            slot(Slot::LocaleCanonicalization),
+            slot(Slot::Coverage),
+            slot(Slot::DeliveryPlacement),
+            data(),
+            field(DeclarationField::ProjectId),
+            field(DeclarationField::SelectionScope),
+        ];
+        let mut evaluation = Evaluation::default();
+        for unit in canonical.iter().rev() {
+            missing(&mut evaluation, *unit);
+        }
+        assert_eq!(
+            evaluation
+                .statuses()
+                .map(|(unit, _)| *unit)
+                .collect::<Vec<_>>(),
+            canonical
+        );
+        assert_eq!(
+            evaluation
+                .issues()
+                .map(|key| key.unit())
+                .collect::<Vec<_>>(),
+            canonical
+        );
+    }
+
+    #[test]
+    fn units_order_by_phase_then_subject_then_check() {
+        // Combinations no phase records, so that each key is seen to decide
+        // before the next.
+        let unit = |phase, subject, check| Unit {
+            phase,
+            subject,
+            check,
+        };
+        let ordered = [
+            unit(
+                Phase::SpecificationAdmission,
+                Subject::DeclarationField(DeclarationField::SelectionScope),
+                Check::OpaqueIdentity,
+            ),
+            unit(
+                Phase::ProjectIdentityResolution,
+                Subject::Slot(Slot::ProjectProfile),
+                Check::OpaqueIdentity,
+            ),
+            unit(
+                Phase::ProjectIdentityResolution,
+                Subject::Slot(Slot::Coverage),
+                Check::SupportedAssertion,
+            ),
+            unit(
+                Phase::ProjectIdentityResolution,
+                Subject::CanonicalizationData,
+                Check::SupportedAssertion,
+            ),
+            unit(
+                Phase::ProjectIdentityResolution,
+                Subject::CanonicalizationData,
+                Check::MatchingData,
+            ),
+            unit(
+                Phase::ProjectIdentityResolution,
+                Subject::CanonicalizationData,
+                Check::OpaqueIdentity,
+            ),
+        ];
+        assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn issue_keys_order_by_unit_then_by_the_bytes_of_code_and_reason() {
+        let key = |code, reason| IssueKey {
+            unit: slot(Slot::Coverage),
+            code,
+            reason,
+        };
+        // Declaration order differs from byte order in both enums, so neither
+        // can stand in for the spelling.
+        let mut keys = [
+            key(
+                Code::SpecificationNotAdmitted,
+                Some(Reason::MissingRequiredSlot),
+            ),
+            key(Code::SpecificationNotAdmitted, Some(Reason::Unsupported)),
+            key(Code::SpecificationNotAdmitted, Some(Reason::Incompatible)),
+            key(Code::SpecificationNotAdmitted, None),
+            key(Code::LocaleDataNotAdmitted, Some(Reason::Unsupported)),
+            IssueKey {
+                unit: slot(Slot::LocaleCanonicalization),
+                code: Code::SpecificationNotAdmitted,
+                reason: Some(Reason::Unsupported),
+            },
+        ];
+        keys.sort();
+        assert_eq!(
+            keys.iter()
+                .map(|key| (
+                    key.unit().subject,
+                    key.code().as_str(),
+                    key.reason().map(Reason::as_str)
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    Subject::Slot(Slot::LocaleCanonicalization),
+                    "project-profile-specification-not-admitted",
+                    Some("unsupported")
+                ),
+                (
+                    Subject::Slot(Slot::Coverage),
+                    "project-profile-locale-data-not-admitted",
+                    Some("unsupported")
+                ),
+                (
+                    Subject::Slot(Slot::Coverage),
+                    "project-profile-specification-not-admitted",
+                    None
+                ),
+                (
+                    Subject::Slot(Slot::Coverage),
+                    "project-profile-specification-not-admitted",
+                    Some("incompatible")
+                ),
+                (
+                    Subject::Slot(Slot::Coverage),
+                    "project-profile-specification-not-admitted",
+                    Some("missing-required-slot")
+                ),
+                (
+                    Subject::Slot(Slot::Coverage),
+                    "project-profile-specification-not-admitted",
+                    Some("unsupported")
+                ),
+            ]
+        );
+    }
+}
