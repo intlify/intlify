@@ -50,10 +50,11 @@ Try these changes **one at a time** under `profiles.app`, starting from the supp
 | Set `defaultRequestedLocale` to `"fr"` | `project-profile-default-requested-locale-not-in-project`, because `fr` is not in the requested set. |
 | Set `defaultRequestedLocale` to `"en_US"` | `project-profile-locale-invalid`. |
 | Add `"messageFallback": {"ja": ["EN"]}` | A suggested correction for the fallback candidate: spellings beyond the project's own are canonicalized too. |
+| Add `"localeNegotiation": {"aliases": {"iw-IL": "EN"}}` | Two suggested corrections for one alias: `(key) -> he-IL` renames the key, and `-> en` replaces its value. |
 | Set `defaultRequestedLocale` to `"pt-BR"` | `UnsupportedLocaleInput`: the fixture lacks this locale; this does **not** mean the locale is invalid. Resolution stops there, so this diagnostic has no pointer. |
 | Remove `policies.glossarySet` | `RequiredFieldMissing`. This field must be present, even when its value is `null`. |
 
-Errors include a line and byte column when a source position is available. Locale errors also include a JSON Pointer to each affected spelling; a map key points at its member. On a rejected run, no partial locales are printed; already-known spelling corrections may still be shown. The example never rewrites your file.
+Errors include a line and byte column when a source position is available. Locale errors and corrections also include a JSON Pointer to each affected spelling. A JSON Pointer cannot name an object key, so a key's pointer names its member and is marked `(key)`; a locale error at a key is positioned at the key. On a rejected run, no partial locales are printed; already-known spelling corrections may still be shown. The example never rewrites your file.
 
 ## Select a profile and inspect JSON
 
@@ -66,7 +67,7 @@ cargo run -p intlify_config --features dev-example --example resolve_config -- \
 
 Profile names are matched exactly. The whole file must be structurally valid, including unselected profiles.
 
-`--json` prints a pretty-printed **display object**, not a stable API, formal diagnostic record, or serialized profile. It includes the reached stage, selected profile, project locales (or `null`), spelling corrections, and diagnostics. Source offsets are zero-based UTF-8 byte offsets with an exclusive end; line and byte-column numbers are one-based.
+`--json` prints a pretty-printed **display object**, not a stable API, formal diagnostic record, or serialized profile. It includes the reached stage, selected profile, project locales (or `null`), spelling corrections, and diagnostics. Each correction, and each locale diagnostic with a pointer, has a `target`: `"key"` when the spelling is the key of the member its pointers name, otherwise `"value"`. Source offsets are zero-based UTF-8 byte offsets with an exclusive end; line and byte-column numbers are one-based.
 
 ```sh
 cargo run -p intlify_config --features dev-example --example resolve_config -- --help

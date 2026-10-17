@@ -114,6 +114,15 @@ fn text(value: &Value) -> &str {
     value.as_str().unwrap_or("(not declared)")
 }
 
+/// A pointer whose target is a key names the key's member, so say so.
+fn pointer(value: &Value, target: &Value) -> String {
+    if target == "key" {
+        format!("{} (key)", text(value))
+    } else {
+        text(value).to_owned()
+    }
+}
+
 fn render(result: &Value, json: bool) -> String {
     if json {
         return format!(
@@ -153,7 +162,7 @@ fn render(result: &Value, json: bool) -> String {
         for correction in corrections {
             lines.push(format!(
                 "  {} -> {}",
-                text(&correction["pointer"]),
+                pointer(&correction["pointer"], &correction["target"]),
                 text(&correction["replacement"])
             ));
         }
@@ -170,7 +179,10 @@ fn render(result: &Value, json: bool) -> String {
                 text(&item["message"])
             ));
             if item["pointer"].is_string() {
-                lines.push(format!("    at {}", text(&item["pointer"])));
+                lines.push(format!(
+                    "    at {}",
+                    pointer(&item["pointer"], &item["target"])
+                ));
             }
             if item["position"].is_object() {
                 lines.push(format!(
@@ -181,7 +193,11 @@ fn render(result: &Value, json: bool) -> String {
             if let Some(pointers) = item["relatedPointers"].as_array() {
                 lines.push(format!(
                     "    occurrences: {}",
-                    pointers.iter().map(text).collect::<Vec<_>>().join(", ")
+                    pointers
+                        .iter()
+                        .map(|value| pointer(value, &item["target"]))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ));
             }
             if item["relatedPosition"].is_object() {
