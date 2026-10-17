@@ -376,6 +376,16 @@ struct CoverageRuleShape {
     mode: CoverageMode,
 }
 
+impl CoverageRule {
+    /// The rule's locale selector, when it has one.
+    pub(crate) fn requested_locales(&self) -> Option<&[String]> {
+        self.0
+            .requested_locales
+            .as_option()
+            .map(NonEmptyVec::as_slice)
+    }
+}
+
 impl<'de> Deserialize<'de> for CoverageRule {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let rule = CoverageRuleShape::deserialize(deserializer)?;

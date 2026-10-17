@@ -17,6 +17,7 @@ use crate::input_limits::Bound;
 
 use super::identity::DeclarationField;
 use super::limits::BoundId;
+use super::locales::LocaleSubject;
 use super::specification::Slot;
 
 /// 015's resolution phases, declared in rank order.
@@ -74,6 +75,8 @@ pub(crate) enum Subject {
     CanonicalizationData,
     /// One field of the selected profile declaration.
     DeclarationField(DeclarationField),
+    /// A locale, or a locale bound or set, of the selected declaration.
+    Locale(LocaleSubject),
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
