@@ -374,8 +374,6 @@ fn pin_differences<Id: Eq>(
     .collect()
 }
 
-pub(crate) mod core;
-
 #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
 pub(crate) mod fixtures;
 

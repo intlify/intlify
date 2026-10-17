@@ -1184,20 +1184,20 @@
         "execution": {
           "$ref": "#/definitions/Execution"
         },
-        "localeCoreInput": {
+        "localeInput": {
           "anyOf": [
             {
-              "$ref": "#/definitions/InputFacts2"
+              "$ref": "#/definitions/InputFacts"
             },
             {
               "type": "null"
             }
           ]
         },
-        "localeInput": {
+        "localeResolutionInput": {
           "anyOf": [
             {
-              "$ref": "#/definitions/InputFacts"
+              "$ref": "#/definitions/InputFacts2"
             },
             {
               "type": "null"
@@ -2240,21 +2240,30 @@
     "InputFacts2": {
       "additionalProperties": false,
       "properties": {
-        "activeOccurrenceDomain": {
-          "items": {
-            "type": "string"
-          },
-          "maxItems": 3,
-          "minItems": 3,
-          "type": "array"
-        },
-        "activeOccurrenceLimit": {
+        "identifierByteLimit": {
           "$ref": "#/definitions/UInt64"
         },
         "inputStorage": {
           "type": "string"
         },
+        "localeOccurrenceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "occurrenceDomain": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 10,
+          "type": "array"
+        },
         "ordinaryOutput": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "prerequisites": {
           "type": "string"
         },
         "requestedCardinalityDomain": {
@@ -2276,10 +2285,13 @@
       "required": [
         "scope",
         "selectedProfile",
-        "activeOccurrenceLimit",
-        "activeOccurrenceDomain",
+        "policy",
+        "localeOccurrenceLimit",
+        "occurrenceDomain",
         "requestedLocaleLimit",
         "requestedCardinalityDomain",
+        "identifierByteLimit",
+        "prerequisites",
         "inputStorage",
         "structuralPreparation",
         "ordinaryOutput"
@@ -2358,14 +2370,32 @@
         "structural-units",
         "locale-raw-identifier-bytes",
         "locale-canonical-identifier-bytes",
-        "core-active-occurrences",
-        "core-requested-cardinality",
-        "core-raw-identifier-bytes",
-        "core-canonical-identifier-bytes"
+        "resolution-locale-occurrences",
+        "resolution-requested-locales",
+        "resolution-raw-identifier-bytes",
+        "resolution-canonical-identifier-bytes"
       ],
       "type": "string"
     },
-    "LocaleCoreRecipe": {
+    "LocaleRecipe": {
+      "enum": [
+        "language",
+        "region",
+        "casing",
+        "alias",
+        "canonical-alias",
+        "extension-ordering",
+        "canonical-extensions",
+        "expanding-alias",
+        "canonical-expanded-alias",
+        "invalid-legacy",
+        "invalid-validity",
+        "invalid-extension",
+        "invalid-private"
+      ],
+      "type": "string"
+    },
+    "LocaleResolutionRecipe": {
       "enum": [
         "minimal",
         "source-und",
@@ -2386,30 +2416,19 @@
         "invalid-default",
         "invalid-and-duplicate",
         "default-not-member",
-        "unrelated-fields",
+        "every-role",
         "other-profile",
         "duplicate-reordered",
         "invalid-reordered",
         "expanding-alias",
-        "expanded-alias"
-      ],
-      "type": "string"
-    },
-    "LocaleRecipe": {
-      "enum": [
-        "language",
-        "region",
-        "casing",
-        "alias",
-        "canonical-alias",
-        "extension-ordering",
-        "canonical-extensions",
-        "expanding-alias",
-        "canonical-expanded-alias",
-        "invalid-legacy",
-        "invalid-validity",
-        "invalid-extension",
-        "invalid-private"
+        "expanded-alias",
+        "every-role-reordered",
+        "every-role-aliased",
+        "every-role-invalid",
+        "target-duplicate",
+        "coverage-uncanonicalized",
+        "many-targets",
+        "every-fixture-locale"
       ],
       "type": "string"
     },
@@ -3025,7 +3044,7 @@
         "authoring-construction",
         "profile-selection",
         "locale-canonicalization",
-        "locale-core-resolution"
+        "locale-resolution"
       ],
       "type": "string"
     },
@@ -3263,11 +3282,11 @@
         {
           "additionalProperties": false,
           "properties": {
-            "locale-core": {
-              "$ref": "#/definitions/LocaleCoreRecipe"
+            "locale-resolution": {
+              "$ref": "#/definitions/LocaleResolutionRecipe"
             }
           },
-          "required": ["locale-core"],
+          "required": ["locale-resolution"],
           "type": "object"
         },
         {
@@ -3781,7 +3800,7 @@
         "profile-container-not-admitted",
         "schema-prerequisite-unavailable",
         "locale-not-canonicalized",
-        "locale-core-requested-not-resolved"
+        "locale-resolution-requested-not-resolved"
       ],
       "type": "string"
     },
@@ -3878,14 +3897,14 @@
         "canonical-locale-identifier-bytes",
         "retained-canonical-locale-values",
         "locale-correction-suggestions",
-        "locale-core-occurrences",
-        "locale-core-raw-identifier-bytes",
-        "locale-core-canonical-requested-locales",
-        "locale-core-retained-values",
-        "locale-core-retained-value-bytes",
-        "locale-core-blocking-reasons",
-        "locale-core-related-duplicate-occurrences",
-        "locale-core-corrections"
+        "locale-resolution-occurrences",
+        "locale-resolution-raw-identifier-bytes",
+        "locale-resolution-canonicalized-occurrences",
+        "locale-resolution-canonical-requested-locales",
+        "locale-resolution-evaluation-units",
+        "locale-resolution-not-evaluated-units",
+        "locale-resolution-blocking-issues",
+        "locale-resolution-corrections"
       ],
       "type": "string"
     },
@@ -3906,6 +3925,7 @@
         "retained-record",
         "locale-occurrence",
         "canonical-locale-value",
+        "evaluation-unit",
         "correction-suggestion"
       ],
       "type": "string"

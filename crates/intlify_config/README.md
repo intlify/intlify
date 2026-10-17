@@ -29,7 +29,7 @@ The current implementation includes:
 
 - Shared JSON decoding, error locations, and JSON Schema utilities already used by the existing Intlify CLI.
 - A generated [JSON Schema for project-profile configuration](./schema/project-profile-config-v0.schema.json).
-- Internal configuration validation, named-profile selection, and normalization of the source, requested, and default locales.
+- Internal configuration validation, named-profile selection, and locale resolution: every locale spelling of the selected profile is counted, the spellings outside the coverage rules are canonicalized, requested-locale sets are checked for duplicates, and the source, requested, and default locales are resolved.
 - An optional locale provider over the ICU4X 2.2.0 reference adapter, [`intlify_locale_icu4x`](../intlify_locale_icu4x/README.md), behind the non-default `icu4x` feature. It admits a locale canonicalization data artifact from bytes its caller supplies, and the boundary binds it only when it carries the one supported specification, revision `"0"`, with its CLDR 48.2.0 dataset.
 - Optional developer measurements for the implemented configuration operations. Locale canonicalization is measured through both the finite test provider and the ICU4X provider, which runs once with an engine reused across calls and once with a new engine for each call.
 

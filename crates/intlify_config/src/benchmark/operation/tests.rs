@@ -68,29 +68,27 @@ pub(crate) fn operations() -> [Prepared; 6] {
             ),
             input: Arc::from("EN-us"),
         },
-        core_operation(&minimal_config()),
+        resolution_operation(&minimal_config()),
     ]
 }
 
-pub(crate) fn core_operation(value: &Value) -> Prepared {
+pub(crate) fn resolution_operation(value: &Value) -> Prepared {
     let analysis = analysis(value);
     let config = analysis.construct().unwrap().unwrap();
-    Prepared::LocaleCore(Box::new(locale_core::PreparedCore {
+    let bound = |value| Bound::new(value).unwrap();
+    Prepared::LocaleResolution(Box::new(locale_resolution::PreparedLocales {
         analysis,
         config,
         selected: serde_json::from_value(json!("app")).unwrap(),
-        provider: Arc::new(
+        policy: crate::resolver::locales::fixture_policy(bound(128), bound(128), bound(64)),
+        canonicalizer: Arc::new(
             crate::locale::Canonicalizer::bind(
                 &crate::locale::fixtures::fixture_pins(),
                 Some(crate::locale::fixtures::FixtureProvider::new()),
-                Bound::new(128).unwrap(),
+                bound(128),
             )
             .unwrap(),
         ),
-        limits: crate::locale::core::Limits {
-            max_active_occurrences: Bound::new(128).unwrap(),
-            max_requested_locales: Bound::new(64).unwrap(),
-        },
     }))
 }
 
@@ -126,17 +124,21 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 assert_eq!(result.locale().as_str(), "en-US");
                 assert_eq!(result.suggested_replacement(), Some("en-US"));
             }
-            Output::LocaleCore(result) => {
-                let core = result.value().unwrap();
-                assert_eq!(core.source_default(), None);
+            Output::LocaleResolution(resolved) => {
+                assert_eq!(resolved.evaluation.issues().count(), 0);
+                let locales = resolved.result.as_ref().unwrap();
+                let project = locales.project.as_ref().unwrap();
+                assert_eq!(project.source_default(), None);
                 assert_eq!(
-                    core.requested()
+                    project
+                        .requested()
+                        .as_slice()
                         .iter()
                         .map(crate::locale::CanonicalLocale::as_str)
                         .collect::<Vec<_>>(),
                     ["en"]
                 );
-                assert_eq!(core.requested_default().as_str(), "en");
+                assert_eq!(project.requested_default().as_str(), "en");
             }
             _ => panic!("unexpected owner operation result"),
         }
@@ -267,10 +269,10 @@ fn unavailable_authoring_prerequisites_do_not_produce_a_fake_construction_observ
 }
 
 #[test]
-fn locale_core_requires_complete_preparation_and_declared_selection_before_clock_markers() {
+fn locale_resolution_requires_complete_preparation_and_declared_selection_before_clock_markers() {
     for missing_profile in [false, true] {
-        let mut operation = core_operation(&minimal_config());
-        let Prepared::LocaleCore(prepared) = &mut operation else {
+        let mut operation = resolution_operation(&minimal_config());
+        let Prepared::LocaleResolution(prepared) = &mut operation else {
             unreachable!()
         };
         if missing_profile {

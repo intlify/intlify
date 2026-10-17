@@ -22,7 +22,7 @@ This developer example uses finite fixture locale data, not production locale
 data. It does not produce a LocalizationProjectProfile or resolve Policy/Target
 bodies, fallback, or negotiation. See examples/resolve_config/README.md.
 
-Exit codes: 0 = minimum locale core resolved; 1 = configuration rejected;
+Exit codes: 0 = locales resolved; 1 = configuration rejected;
             2 = usage, file I/O, or internal error.
 ";
 

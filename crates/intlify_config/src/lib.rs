@@ -28,9 +28,9 @@
 //! ```compile_fail
 //! use intlify_config::locale::Canonicalizer;
 //! ```
-//! The minimum locale result is not a consumer Profile or serializable artifact:
+//! Locale resolution's result is not a consumer Profile or serializable artifact:
 //! ```compile_fail
-//! use intlify_config::locale::core::Core;
+//! use intlify_config::resolver::locales::ResolvedLocales;
 //! ```
 //! The vertical-slice harness is test-only, not a production resolver entry:
 //! ```compile_fail

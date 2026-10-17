@@ -358,15 +358,17 @@ impl ResolutionLimits {
 /// The Resource Limit Policy that 015 Phase 4 admitted and found compatible
 /// with the implementation capability, which also confirms the provisional
 /// profile selection. Post-policy phases run only under it. Until Phase 4
-/// exists, only tests construct one.
+/// exists, only tests and the owners of the finite locale fixtures, the
+/// measurements and the developer example, construct one.
 #[derive(Debug, Clone)]
 pub(crate) struct ConfirmedPolicy {
     limits: ResolutionLimits,
 }
 
 impl ConfirmedPolicy {
-    #[cfg(test)]
-    pub(crate) const fn test_owned(limits: ResolutionLimits) -> Self {
+    /// A policy a fixture owner states outright, as Phase 4 would confirm it.
+    #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+    pub(crate) const fn fixture_owned(limits: ResolutionLimits) -> Self {
         Self { limits }
     }
 
@@ -375,13 +377,13 @@ impl ConfirmedPolicy {
     }
 }
 
-/// Finite test bounds, each a distinct value counting up from `first` in 015's
-/// canonical order. Never a product default.
-#[cfg(test)]
-pub(crate) fn test_limits(first: u64) -> ResolutionLimits {
+/// Finite fixture bounds, each a distinct value counting up from `first` in
+/// 015's canonical order. Never a product default.
+#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+pub(crate) fn fixture_limits(first: u64) -> ResolutionLimits {
     let mut next = first;
     let mut bound = || {
-        let value = Bound::new(next).unwrap();
+        let value = Bound::new(next).expect("finite positive fixture bound");
         next += 1;
         value
     };
@@ -465,7 +467,7 @@ mod tests {
 
     #[test]
     fn the_section_has_015s_groups_and_bounds_in_canonical_order() {
-        let paths = test_limits(1)
+        let paths = fixture_limits(1)
             .bounds()
             .map(|(id, _)| format!("{}.{}", id.group.path(), id.name));
         assert_eq!(
@@ -531,13 +533,13 @@ mod tests {
     fn every_bound_reads_its_own_field() {
         // The test bounds count up in field order, so a bound read from another
         // field, or a field read twice, breaks the sequence.
-        let values = test_limits(7).bounds().map(|(_, bound)| bound.get());
+        let values = fixture_limits(7).bounds().map(|(_, bound)| bound.get());
         assert_eq!(values, std::array::from_fn(|index| index as u64 + 7));
     }
 
     #[test]
     fn a_confirmed_policy_keeps_the_limits_it_was_confirmed_with() {
-        let policy = ConfirmedPolicy::test_owned(test_limits(3));
+        let policy = ConfirmedPolicy::fixture_owned(fixture_limits(3));
         assert_eq!(
             policy
                 .limits()
@@ -548,7 +550,7 @@ mod tests {
         );
         assert_eq!(
             policy.limits().bounds().map(|(_, bound)| bound.get()),
-            test_limits(3).bounds().map(|(_, bound)| bound.get())
+            fixture_limits(3).bounds().map(|(_, bound)| bound.get())
         );
     }
 }

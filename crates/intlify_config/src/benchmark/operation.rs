@@ -24,7 +24,7 @@ use super::cases::Engine;
 use super::clock::Clock;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
-use super::{locale, locale_core, locale_icu4x};
+use super::{locale, locale_icu4x, locale_resolution};
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -40,7 +40,7 @@ pub(super) enum Operation {
     AuthoringConstruction,
     ProfileSelection,
     LocaleCanonicalization,
-    LocaleCoreResolution,
+    LocaleResolution,
 }
 
 impl Operation {
@@ -50,14 +50,14 @@ impl Operation {
         Self::AuthoringConstruction,
         Self::ProfileSelection,
         Self::LocaleCanonicalization,
-        Self::LocaleCoreResolution,
+        Self::LocaleResolution,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
             Self::FileMaterialization => "profile_entry_materialize",
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
-            Self::LocaleCanonicalization | Self::LocaleCoreResolution => "profile_locale_resolve",
+            Self::LocaleCanonicalization | Self::LocaleResolution => "profile_locale_resolve",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -67,7 +67,7 @@ impl Operation {
             Self::AuthoringConstruction => "authoring_model_construction",
             Self::ProfileSelection => "named_profile_selection",
             Self::LocaleCanonicalization => "locale_canonicalization",
-            Self::LocaleCoreResolution => "locale_policy_resolution",
+            Self::LocaleResolution => "locale_policy_resolution",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -77,7 +77,7 @@ impl Operation {
             Self::AuthoringConstruction => "minimum-authoring-construction/0",
             Self::ProfileSelection => "minimum-provisional-selection/0",
             Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
-            Self::LocaleCoreResolution => "minimum-project-locale-core/0",
+            Self::LocaleResolution => "locale-resolution/0",
         }
     }
 }
@@ -101,7 +101,7 @@ pub(super) enum Prepared {
         core: Arc<locale::Core>,
         input: Arc<str>,
     },
-    LocaleCore(Box<locale_core::PreparedCore>),
+    LocaleResolution(Box<locale_resolution::PreparedLocales>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -114,7 +114,7 @@ pub(super) enum Output {
     Authoring(Result<Option<Config>, AdmissionInvariant>),
     Select(Result<Selection<PolicyReference>, SelectionInvariant>),
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
-    LocaleCore(crate::locale::core::Resolution),
+    LocaleResolution(locale_resolution::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,7 +126,7 @@ pub(super) enum OutputFailure {
     ObservationEncoding,
     LocaleProviderUnavailable,
     LocaleProviderInvariant,
-    LocaleCoreInvariant,
+    LocaleResolutionInvariant,
 }
 
 impl Prepared {
@@ -137,7 +137,7 @@ impl Prepared {
             Self::Authoring(_) => Operation::AuthoringConstruction,
             Self::Select { .. } => Operation::ProfileSelection,
             Self::Locale { .. } | Self::Icu4xLocale { .. } => Operation::LocaleCanonicalization,
-            Self::LocaleCore(_) => Operation::LocaleCoreResolution,
+            Self::LocaleResolution(_) => Operation::LocaleResolution,
         }
     }
 
@@ -203,18 +203,20 @@ impl Prepared {
                     output: Output::Locale(measured.output),
                 })
             }
-            Self::LocaleCore(prepared) => {
-                let input = prepared
-                    .input()
+            Self::LocaleResolution(prepared) => {
+                let fields = prepared
+                    .fields()
                     .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
                 let measured = measure(
                     clock,
-                    (&input, prepared.provider.as_ref(), prepared.limits),
-                    |(input, provider, limits)| input.resolve(provider, limits),
+                    (&prepared.policy, prepared.canonicalizer.as_ref(), &fields),
+                    |(policy, canonicalizer, fields)| {
+                        locale_resolution::resolve(policy, canonicalizer, fields)
+                    },
                 )?;
                 Ok(Measured {
                     duration: measured.duration,
-                    output: Output::LocaleCore(measured.output),
+                    output: Output::LocaleResolution(measured.output),
                 })
             }
             Self::Icu4xLocale { engine, input } => {
@@ -238,7 +240,7 @@ impl Prepared {
     pub(super) fn prerequisites_admitted(&self) -> bool {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
-            Self::LocaleCore(prepared) => prepared.input().is_some(),
+            Self::LocaleResolution(prepared) => prepared.fields().is_some(),
             _ => true,
         }
     }
@@ -267,7 +269,7 @@ impl Output {
             Self::Select(Err(_)) => Err(OutputFailure::SelectionInvariant),
             Self::Select(Ok(selection)) => observe_selection(selection),
             Self::Locale(result) => locale::observe(result),
-            Self::LocaleCore(result) => locale_core::observe(result),
+            Self::LocaleResolution(resolved) => locale_resolution::observe(resolved),
         }
     }
 }

@@ -11,13 +11,18 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
-use crate::locale::core::{Failure, Input, Issue, Limits, Location};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, Canonicalizer, ProviderFailure};
 use crate::materialize::{
     materialize_file, ByteSpan, InputFailure, MaterializedDocument, NodeKind,
 };
+use crate::model::ProfileDeclaration;
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::resolver::evaluation::{Actual, Code, Evaluation, IssueKey, Subject};
+use crate::resolver::locales::{
+    fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, LocaleKey, LocaleSubject,
+    Location, ResolvedLocales,
+};
 
 use super::eval::IssueKind;
 use super::selection::{Selection, SelectionFailure, SelectorInput};
@@ -26,7 +31,9 @@ use super::{AuthoringSchema, StructuralLimits};
 /// Example-owned capacity, not an admitted Resource Limit Policy or a product default.
 pub const MAX_FILE_BYTES: u64 = 1_000_000;
 
-const NOTICE: &str = "Developer example only: finite fixture locale data; not a LocalizationProjectProfile. Policy/Target bodies, fallback and negotiation are not resolved.";
+const NOTICE: &str = "Developer example only: finite fixture locale data; not a LocalizationProjectProfile. Locale spellings are counted and, except coverage selectors, canonicalized; Policy/Target bodies, fallback, negotiation and coverage are not resolved.";
+
+type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
 fn bound(value: u64) -> Bound {
     Bound::new(value).expect("fixed positive example capacity")
@@ -87,66 +94,131 @@ fn pointer_span(doc: &MaterializedDocument, pointer: &str) -> Option<ByteSpan> {
     Some(doc.node(node).span())
 }
 
-fn locale_pointer(profile: &str, location: Location) -> String {
-    let profile = profile.replace('~', "~0").replace('/', "~1");
-    let field = match location {
-        Location::SourceDefault => "defaultSourceLocale".to_owned(),
-        Location::Requested(index) => format!("requestedLocales/{index}"),
-        Location::RequestedDefault => "defaultRequestedLocale".to_owned(),
+/// The JSON Pointer of the spelling at `location`. A map key has no pointer
+/// of its own, so a key's location points at its member.
+fn locale_pointer(profile: &str, declaration: &Declaration, location: &Location) -> String {
+    let escape = |token: &str| token.replace('~', "~0").replace('/', "~1");
+    let alias = |rank: usize| {
+        declaration
+            .locale_negotiation
+            .as_option()
+            .and_then(|negotiation| negotiation.aliases.as_option())
+            .and_then(|aliases| aliases.keys().nth(rank))
+            .map_or_else(String::new, |key| escape(key))
     };
-    format!("/profiles/{profile}/{field}")
+    let fallback = |rank: usize| {
+        declaration
+            .message_fallback
+            .as_option()
+            .and_then(|fallback| fallback.keys().nth(rank))
+            .map_or_else(String::new, |key| escape(key))
+    };
+    let field = match location {
+        Location::RequestedLocale(index) => format!("requestedLocales/{index}"),
+        Location::DefaultSourceLocale => "defaultSourceLocale".to_owned(),
+        Location::DefaultRequestedLocale => "defaultRequestedLocale".to_owned(),
+        Location::NegotiationAliasKey(rank) | Location::NegotiationAliasValue(rank) => {
+            format!("localeNegotiation/aliases/{}", alias(*rank))
+        }
+        Location::MessageFallbackKey(rank) => format!("messageFallback/{}", fallback(*rank)),
+        Location::MessageFallbackCandidate(rank, position) => {
+            format!("messageFallback/{}/{position}", fallback(*rank))
+        }
+        Location::TargetRequestedLocale(id, index) => {
+            format!(
+                "targetProfiles/{}/requestedLocales/{index}",
+                escape(id.as_str())
+            )
+        }
+        Location::TargetDefaultRequestedLocale(id) => {
+            format!(
+                "targetProfiles/{}/defaultRequestedLocale",
+                escape(id.as_str())
+            )
+        }
+    };
+    format!("/profiles/{}/{field}", escape(profile))
 }
 
-fn locale_issue(issue: &Issue, profile: &str) -> Value {
-    match issue {
-        Issue::Canonicalization { location, reason } => {
-            let (code, message) = match reason {
-                CanonicalizationFailure::Provider(ProviderFailure::UnsupportedInput) => (
-                    "UnsupportedLocaleInput",
-                    "The finite example provider has no entry for this locale; it may still be valid.".to_owned(),
-                ),
-                CanonicalizationFailure::Provider(ProviderFailure::InvalidIdentifier) => (
-                    "InvalidLocaleIdentifier", "This input is explicitly invalid in the finite example provider.".to_owned(),
-                ),
-                CanonicalizationFailure::ByteLimit { .. } => (
-                    "LocaleIdentifierLimit", format!("Example locale identifier limit exceeded: {reason:?}"),
-                ),
-                _ => ("LocaleProviderFailure", format!("Locale provider could not resolve this input: {reason:?}")),
-            };
-            diagnostic(code, message, Some(&locale_pointer(profile, *location)))
-        }
-        Issue::Duplicate {
-            locale,
-            occurrences,
-        } => {
-            let pointers = occurrences
-                .iter()
-                .map(|&i| locale_pointer(profile, Location::Requested(i)))
-                .collect::<Vec<_>>();
-            let mut item = diagnostic("CanonicalLocaleDuplicate", format!("Requested locales resolve to the same canonical locale: {}. Remove the duplicate explicitly.", locale.as_str()), pointers.first().map(String::as_str));
-            item["relatedPointers"] = json!(pointers);
-            item
-        }
-        Issue::DefaultNotRequested { locale } => diagnostic(
-            "DefaultNotRequested",
-            format!(
-                "Default locale {} is not in the canonical requested set.",
-                locale.as_str()
-            ),
-            Some(&locale_pointer(profile, Location::RequestedDefault)),
-        ),
-        Issue::RequestedLimit { limit, actual } => diagnostic(
-            "RequestedLocaleLimit",
-            format!(
-                "The example allows {} requested locales; observed {actual}.",
-                limit.get()
-            ),
-            None,
-        ),
+/// The canonical locale a subject names, when it names one.
+fn canonical(subject: &LocaleSubject) -> Option<&str> {
+    let key = match subject {
+        LocaleSubject::Occurrences | LocaleSubject::RequestedLocales => return None,
+        LocaleSubject::RequestedLocale(key)
+        | LocaleSubject::DefaultSourceLocale(key)
+        | LocaleSubject::DefaultRequestedLocale(key)
+        | LocaleSubject::NegotiationAliasKey(key)
+        | LocaleSubject::NegotiationAliasValue(_, key)
+        | LocaleSubject::MessageFallbackKey(key)
+        | LocaleSubject::MessageFallbackCandidate(_, _, key)
+        | LocaleSubject::TargetRequestedLocale(_, key)
+        | LocaleSubject::TargetDefaultRequestedLocale(_, key) => key,
+    };
+    match key {
+        LocaleKey::Canonical(locale) => Some(locale.as_str()),
+        LocaleKey::Content(_) => None,
     }
 }
 
-/// Run the existing private minimum path and return an unstable display object.
+/// One blocking result as a display item, pointing at every spelling of its
+/// subject. A rejected spelling is never echoed.
+fn locale_issue(
+    issue: &IssueKey,
+    evaluation: &Evaluation,
+    resolved: &ResolvedLocales,
+    profile: &str,
+    declaration: &Declaration,
+) -> Value {
+    let Subject::Locale(subject) = &issue.unit().subject else {
+        return diagnostic(issue.code().as_str(), "Locale resolution failed.", None);
+    };
+    let pointers = resolved
+        .occurrences
+        .iter()
+        .filter(|occurrence| occurrence.subject == *subject)
+        .map(|occurrence| locale_pointer(profile, declaration, &occurrence.location))
+        .collect::<Vec<_>>();
+    let locale = canonical(subject).unwrap_or("(none)");
+    let message = match issue.code() {
+        Code::LocaleInvalid => {
+            "This spelling is not a valid locale identifier in the finite example provider."
+                .to_owned()
+        }
+        Code::LocaleDuplicate => format!(
+            "These spellings name the same canonical locale {locale}. Remove the duplicate explicitly."
+        ),
+        Code::DefaultRequestedLocaleNotInProject => {
+            format!("Default locale {locale} is not one of the project's requested locales.")
+        }
+        Code::ResourceLimitExceeded => evaluation.limit(issue).map_or_else(
+            || "An example locale limit was exceeded.".to_owned(),
+            |exceeded| {
+                let actual = match exceeded.actual {
+                    Actual::Exact(value) => value.to_string(),
+                    Actual::AtLeast(value) => format!("at least {value}"),
+                };
+                format!(
+                    "The example allows {} for {}; observed {actual}.",
+                    exceeded.limit.get(),
+                    exceeded.bound.name
+                )
+            },
+        ),
+        code => format!("Locale resolution reported {}.", code.as_str()),
+    };
+    let mut item = diagnostic(
+        issue.code().as_str(),
+        message,
+        pointers.first().map(String::as_str),
+    );
+    if pointers.len() > 1 {
+        item["relatedPointers"] = json!(pointers);
+    }
+    item
+}
+
+/// Run the existing private path through 015 Phase 7 and return an unstable
+/// display object.
 /// This function is deliberately feature-gated and hidden from normal API docs.
 /// Configuration failures are values; errors indicate an internal invariant.
 pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
@@ -266,52 +338,78 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
     let id = selected.id().as_str();
     output["selectedProfile"] = json!(id);
     output["stage"] = json!("locale");
-    let provider = Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), bound(128))
-        .map_err(|e| format!("Example provider invariant: {e:?}"))?;
-    let input = Input::from_selected(&config, selected.id())
+    let policy = fixture_policy(bound(128), bound(16), bound(8));
+    let provider = Canonicalizer::bind(
+        &fixture_pins(),
+        Some(FixtureProvider::new()),
+        policy
+            .limits()
+            .locale_resolution
+            .max_locale_identifier_bytes,
+    )
+    .map_err(|e| format!("Example provider invariant: {e:?}"))?;
+    let declaration = config
+        .profiles()
+        .get(selected.id())
         .ok_or("Selected example profile is missing")?;
-    let resolution = input.resolve(
-        &provider,
-        Limits {
-            max_active_occurrences: bound(16),
-            max_requested_locales: bound(8),
-        },
-    );
-    output["corrections"] = json!(resolution
-        .corrections()
+    let mut evaluation = Evaluation::default();
+    let resolved = match resolve_locales(
+        &mut evaluation,
+        Ok(&policy),
+        Ok(&provider),
+        &LocaleFields::declared(declaration),
+    ) {
+        Ok(resolved) => resolved,
+        // The finite provider answers only for its own table. A spelling it
+        // lacks stops resolution without telling where; it may be valid.
+        Err(LocaleInvariant::Canonicalization(CanonicalizationFailure::Provider(
+            ProviderFailure::UnsupportedInput,
+        ))) => {
+            output["diagnostics"] = json!([diagnostic(
+                "UnsupportedLocaleInput",
+                "The finite example provider has no entry for a locale in this profile; it may still be valid.",
+                None
+            )]);
+            return Ok(output);
+        }
+        Err(invariant) => {
+            return Err(format!(
+                "Example locale resolution invariant: {invariant:?}"
+            ))
+        }
+    };
+    output["corrections"] = json!(resolved
+        .occurrences
         .iter()
-        .map(|c| json!({
-            "pointer": locale_pointer(id, c.location), "replacement": c.replacement.as_str()
+        .filter(|occurrence| occurrence.corrected)
+        .map(|occurrence| json!({
+            "pointer": locale_pointer(id, declaration, &occurrence.location),
+            "replacement": canonical(&occurrence.subject)
         }))
         .collect::<Vec<_>>());
-    match resolution.value() {
-        Ok(core) => {
-            output["status"] = json!("resolved");
-            output["locales"] = json!({
-                "defaultSourceLocale": core.source_default().map(CanonicalLocale::as_str),
-                "requestedLocales": core.requested().iter().map(CanonicalLocale::as_str).collect::<Vec<_>>(),
-                "defaultRequestedLocale": core.requested_default().as_str()
-            });
-        }
-        Err(failure) => {
-            let errors = match failure {
-                Failure::Issues(issues) => {
-                    issues.iter().map(|issue| locale_issue(issue, id)).collect()
-                }
-                _ => vec![diagnostic(
-                    "LocaleCoreLimit",
-                    format!("Locale core cannot be resolved: {failure:?}"),
-                    None,
-                )],
-            };
-            output["diagnostics"] = json!(errors
-                .into_iter()
-                .map(|item| {
-                    let span = item["pointer"].as_str().and_then(|p| pointer_span(&doc, p));
-                    located(item, source, span)
-                })
-                .collect::<Vec<_>>());
-        }
+    let errors = evaluation
+        .issues()
+        .map(|issue| locale_issue(issue, &evaluation, &resolved, id, declaration))
+        .collect::<Vec<_>>();
+    if errors.is_empty() {
+        let project = resolved
+            .project
+            .as_ref()
+            .map_err(|_| "Example locales have no blocking result but no project locales")?;
+        output["status"] = json!("resolved");
+        output["locales"] = json!({
+            "defaultSourceLocale": project.source_default().map(CanonicalLocale::as_str),
+            "requestedLocales": project.requested().as_slice().iter().map(CanonicalLocale::as_str).collect::<Vec<_>>(),
+            "defaultRequestedLocale": project.requested_default().as_str()
+        });
+    } else {
+        output["diagnostics"] = json!(errors
+            .into_iter()
+            .map(|item| {
+                let span = item["pointer"].as_str().and_then(|p| pointer_span(&doc, p));
+                located(item, source, span)
+            })
+            .collect::<Vec<_>>());
     }
     Ok(output)
 }

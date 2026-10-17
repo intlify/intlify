@@ -43,7 +43,7 @@ pub(in crate::benchmark) enum Recipe {
     InvalidResourceReference,
     DenseInvalid,
     Locale(super::LocaleRecipe),
-    LocaleCore(super::LocaleCoreRecipe),
+    LocaleResolution(super::LocaleResolutionRecipe),
     Icu4xLocale {
         input: super::Icu4xRecipe,
         engine: super::Engine,
@@ -69,13 +69,13 @@ impl Recipe {
         if let Self::Icu4xLocale { input, .. } = self {
             return Arc::from(input.spelling().as_bytes());
         }
-        if let Self::LocaleCore(recipe) = self {
+        if let Self::LocaleResolution(recipe) = self {
             let mut value = recipe.value();
-            if recipe == super::LocaleCoreRecipe::Reordered {
+            if recipe.reverses_members() {
                 reverse_objects(&mut value);
             }
             return Arc::from(
-                serde_json::to_vec(&value).expect("finite owner locale-core fixture"),
+                serde_json::to_vec(&value).expect("finite owner locale-resolution fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {

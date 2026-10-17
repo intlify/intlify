@@ -64,7 +64,7 @@ fn duplicate_locales_report_all_occurrences_without_publishing_a_core() {
     assert_eq!(result["status"], "not-resolved");
     assert!(result["locales"].is_null());
     let issue = &result["diagnostics"][0];
-    assert_eq!(issue["code"], "CanonicalLocaleDuplicate");
+    assert_eq!(issue["code"], "project-profile-locale-duplicate");
     assert_eq!(
         issue["relatedPointers"],
         json!([
@@ -82,7 +82,10 @@ fn default_must_belong_to_requested_locales() {
     let mut config = minimal_config();
     config["profiles"]["app"]["defaultRequestedLocale"] = json!("ja");
     let result = run(&config, None);
-    assert!(has_code(&result, "DefaultNotRequested"));
+    assert!(has_code(
+        &result,
+        "project-profile-default-requested-locale-not-in-project"
+    ));
     assert!(result["locales"].is_null());
 }
 
@@ -90,7 +93,7 @@ fn default_must_belong_to_requested_locales() {
 fn unsupported_fixture_input_is_not_misrepresented_as_invalid() {
     for (input, code) in [
         ("pt-BR", "UnsupportedLocaleInput"),
-        ("en_US", "InvalidLocaleIdentifier"),
+        ("en_US", "project-profile-locale-invalid"),
     ] {
         let mut config = minimal_config();
         config["profiles"]["app"]["requestedLocales"] = json!([input]);
@@ -98,7 +101,72 @@ fn unsupported_fixture_input_is_not_misrepresented_as_invalid() {
         let result = run(&config, None);
         assert!(has_code(&result, code), "{result}");
         assert!(result["locales"].is_null());
+        // One spelling per subject: no related pointers.
+        for item in result["diagnostics"].as_array().unwrap() {
+            assert!(item["relatedPointers"].is_null(), "{item}");
+        }
     }
+}
+
+#[test]
+fn every_locale_role_points_at_its_own_spelling() {
+    let mut config = minimal_config();
+    let app = &mut config["profiles"]["app"];
+    // Each corrected spelling sits second in its map or set.
+    app["localeNegotiation"] = json!({"aliases": {"fr": "fr-FR", "iw-IL": "EN"}});
+    app["messageFallback"] = json!({
+        "EN-us": ["en"],
+        "ja": ["en", "EN", {"kind": "intent-source-locale"}]
+    });
+    app["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", "EN"]);
+    app["targetProfiles"]["browser"]["defaultRequestedLocale"] = json!("EN");
+    let result = run(&config, None);
+    assert_eq!(result["status"], "resolved");
+    assert_eq!(
+        result["corrections"],
+        json!([
+            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "replacement": "he-IL"},
+            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "replacement": "en"},
+            {"pointer": "/profiles/app/messageFallback/EN-us", "replacement": "en-US"},
+            {"pointer": "/profiles/app/messageFallback/ja/1", "replacement": "en"},
+            {"pointer": "/profiles/app/targetProfiles/browser/requestedLocales/1", "replacement": "en"},
+            {"pointer": "/profiles/app/targetProfiles/browser/defaultRequestedLocale", "replacement": "en"}
+        ])
+    );
+}
+
+#[test]
+fn two_spellings_of_one_locale_point_at_each_other() {
+    let mut config = minimal_config();
+    config["profiles"]["app"]["requestedLocales"] = json!(["en", "EN"]);
+    let result = run(&config, None);
+    let issue = &result["diagnostics"][0];
+    assert_eq!(issue["code"], "project-profile-locale-duplicate");
+    assert_eq!(
+        issue["relatedPointers"],
+        json!([
+            "/profiles/app/requestedLocales/0",
+            "/profiles/app/requestedLocales/1"
+        ])
+    );
+}
+
+#[test]
+fn a_limit_names_its_bound_and_points_at_no_spelling() {
+    let mut config = minimal_config();
+    // 16 requested, the default, and the browser target's requested locale.
+    config["profiles"]["app"]["requestedLocales"] = json!(vec!["en"; 16]);
+    let result = run(&config, None);
+    assert_eq!(result["status"], "not-resolved");
+    assert_eq!(result["diagnostics"].as_array().unwrap().len(), 1);
+    let issue = &result["diagnostics"][0];
+    assert_eq!(issue["code"], "project-profile-resource-limit-exceeded");
+    assert_eq!(
+        issue["message"],
+        "The example allows 16 for maxLocaleOccurrences; observed 18."
+    );
+    assert!(issue["pointer"].is_null());
+    assert!(issue["relatedPointers"].is_null());
 }
 
 #[test]

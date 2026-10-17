@@ -19,8 +19,8 @@ use super::super::observation::Observation;
 use super::super::operation::{Operation, Output, Prepared, Schema};
 use super::super::work::LogicalWork;
 use super::{
-    declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind, Recipe,
-    Selector,
+    declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind,
+    LocaleResolutionRecipe, Recipe, Selector,
 };
 
 pub(in crate::benchmark) struct Candidate {
@@ -81,8 +81,8 @@ pub(in crate::benchmark) fn prepare(
         }
         return prepare_locale(declaration);
     }
-    if declaration.operation == Operation::LocaleCoreResolution {
-        return prepare_core(declaration);
+    if declaration.operation == Operation::LocaleResolution {
+        return prepare_resolution(declaration);
     }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
@@ -115,10 +115,10 @@ pub(in crate::benchmark) fn prepare(
             }
             LimitKind::LocaleRawIdentifierBytes
             | LimitKind::LocaleCanonicalIdentifierBytes
-            | LimitKind::CoreActiveOccurrences
-            | LimitKind::CoreRequestedCardinality
-            | LimitKind::CoreRawIdentifierBytes
-            | LimitKind::CoreCanonicalIdentifierBytes => {
+            | LimitKind::ResolutionLocaleOccurrences
+            | LimitKind::ResolutionRequestedLocales
+            | LimitKind::ResolutionRawIdentifierBytes
+            | LimitKind::ResolutionCanonicalIdentifierBytes => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -141,10 +141,10 @@ pub(in crate::benchmark) fn prepare(
             LimitKind::StructuralUnits => structural_limits.max_structural_analysis_units = limit,
             LimitKind::LocaleRawIdentifierBytes
             | LimitKind::LocaleCanonicalIdentifierBytes
-            | LimitKind::CoreActiveOccurrences
-            | LimitKind::CoreRequestedCardinality
-            | LimitKind::CoreRawIdentifierBytes
-            | LimitKind::CoreCanonicalIdentifierBytes => {
+            | LimitKind::ResolutionLocaleOccurrences
+            | LimitKind::ResolutionRequestedLocales
+            | LimitKind::ResolutionRawIdentifierBytes
+            | LimitKind::ResolutionCanonicalIdentifierBytes => {
                 unreachable!()
             }
         }
@@ -185,7 +185,7 @@ pub(in crate::benchmark) fn prepare(
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleCoreResolution => unreachable!(),
+            | Operation::LocaleResolution => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -204,7 +204,9 @@ pub(in crate::benchmark) fn prepare(
         Prepared::Locale { .. } | Prepared::Icu4xLocale { .. } => {
             unreachable!("locale preparation has no file stages")
         }
-        Prepared::LocaleCore(_) => unreachable!("core has complete-root preparation"),
+        Prepared::LocaleResolution(_) => {
+            unreachable!("Phase 7 has complete-root preparation")
+        }
     };
     let kind = match &output {
         Output::Entry(Ok(_)) => ExpectedKind::Materialized,
@@ -338,11 +340,32 @@ fn prepare_icu4x(
     })
 }
 
-fn prepare_core(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use crate::benchmark::locale_core::PreparedCore;
-    use crate::locale::core::Limits;
+/// The independently specified count of a bound over its fixed recipe; never
+/// derived from the resolver under test.
+fn resolution_edge(
+    kind: LimitKind,
+    recipe: LocaleResolutionRecipe,
+) -> Result<u64, PreparationFailure> {
+    use LocaleResolutionRecipe as R;
 
-    let Recipe::LocaleCore(_) = declaration.fixture else {
+    Ok(match (kind, recipe) {
+        // Four requested locales, the default and the source, and the
+        // browser target's requested locale.
+        (LimitKind::ResolutionLocaleOccurrences, R::Multi) => 7,
+        (LimitKind::ResolutionLocaleOccurrences, R::EveryRole) => 21,
+        (LimitKind::ResolutionRequestedLocales, R::Multi) => 4,
+        // `en`, and `und-u-ca-islamicc`'s canonical `und-u-ca-islamic-civil`.
+        (LimitKind::ResolutionRawIdentifierBytes, R::Minimal) => 2,
+        (LimitKind::ResolutionCanonicalIdentifierBytes, R::ExpandingAlias) => 22,
+        _ => return Err(PreparationFailure::UndeclaredCase),
+    })
+}
+
+fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::locale_resolution::{resolve, PreparedLocales};
+    use crate::resolver::locales::fixture_policy;
+
+    let Recipe::LocaleResolution(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
     let (input_limits, structural_limits) = fixture_capacity();
@@ -365,62 +388,61 @@ fn prepare_core(declaration: &Declaration) -> Result<Candidate, PreparationFailu
     let Selection::Selected(selected) = selection else {
         return Err(PreparationFailure::PrerequisiteUnavailable);
     };
-    let mut limits = Limits {
-        max_active_occurrences: Bound::new(128).expect("explicit finite core capacity"),
-        max_requested_locales: Bound::new(64).expect("explicit finite core capacity"),
-    };
-    let mut byte_limit = Bound::new(128).expect("explicit finite identifier capacity");
+    // Explicit finite capacity, not product defaults or an admitted policy.
+    let bound = |value| Bound::new(value).expect("explicit finite resolution capacity");
+    let (mut occurrences, mut requested, mut identifier_bytes) =
+        (bound(128), bound(64), bound(128));
     if let Some((kind, edge)) = declaration.limit {
-        // Independently specified counts of these fixed recipes; do not derive
-        // an expected success/failure threshold from the resolver under test.
-        let exact: u64 = match kind {
-            LimitKind::CoreActiveOccurrences => 6,
-            LimitKind::CoreRequestedCardinality => 4,
-            LimitKind::CoreRawIdentifierBytes => 2,
-            LimitKind::CoreCanonicalIdentifierBytes => 22,
-            _ => return Err(PreparationFailure::UndeclaredCase),
-        };
+        let exact = resolution_edge(kind, recipe)?;
         let bound = Bound::new(match edge {
             LimitEdge::Exact => exact,
             LimitEdge::FirstOver => exact - 1,
         })
         .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
         match kind {
-            LimitKind::CoreActiveOccurrences => limits.max_active_occurrences = bound,
-            LimitKind::CoreRequestedCardinality => limits.max_requested_locales = bound,
-            LimitKind::CoreRawIdentifierBytes | LimitKind::CoreCanonicalIdentifierBytes => {
-                byte_limit = bound;
-            }
+            LimitKind::ResolutionLocaleOccurrences => occurrences = bound,
+            LimitKind::ResolutionRequestedLocales => requested = bound,
+            LimitKind::ResolutionRawIdentifierBytes
+            | LimitKind::ResolutionCanonicalIdentifierBytes => identifier_bytes = bound,
             _ => unreachable!(),
         }
     }
-    let provider = Arc::new(
-        Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), byte_limit)
-            .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+    // Phase 5 binds the canonicalizer under the policy's identifier bound.
+    let policy = fixture_policy(identifier_bytes, occurrences, requested);
+    let canonicalizer = Arc::new(
+        Canonicalizer::bind(
+            &fixture_pins(),
+            Some(FixtureProvider::new()),
+            policy
+                .limits()
+                .locale_resolution
+                .max_locale_identifier_bytes,
+        )
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
     );
-    let core = PreparedCore {
+    let prepared = PreparedLocales {
         analysis,
         config,
         selected: selected.id().clone(),
-        provider,
-        limits,
+        policy,
+        canonicalizer,
     };
-    let input = core
-        .input()
+    let fields = prepared
+        .fields()
         .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-    let output = Output::LocaleCore(input.resolve(core.provider.as_ref(), core.limits));
-    let Output::LocaleCore(result) = &output else {
-        unreachable!()
-    };
-    let kind = if result.value().is_ok() {
-        ExpectedKind::LocaleCoreResolved
-    } else {
-        ExpectedKind::LocaleCoreRejected
+    let resolved = resolve(&prepared.policy, &prepared.canonicalizer, &fields);
+    let kind = match &resolved.result {
+        Ok(_) if resolved.evaluation.issues().next().is_none() => {
+            ExpectedKind::LocaleResolutionComplete
+        }
+        Ok(_) => ExpectedKind::LocaleResolutionBlocked,
+        Err(_) => return Err(PreparationFailure::Observation),
     };
     if declaration.expected_kind != kind {
         return Err(PreparationFailure::UnexpectedOutputKind);
     }
-    let prepared = Prepared::LocaleCore(Box::new(core));
+    let output = Output::LocaleResolution(resolved);
+    let prepared = Prepared::LocaleResolution(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

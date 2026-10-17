@@ -24,7 +24,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 141);
+    assert_eq!(cases.len(), 150);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -37,7 +37,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         assert!(case.fixture.source().len() < 100_000);
         if !matches!(
             case.operation,
-            Operation::ProfileSelection | Operation::LocaleCoreResolution
+            Operation::ProfileSelection | Operation::LocaleResolution
         ) {
             assert_eq!(case.selector, Selector::Absent);
         }
@@ -51,19 +51,26 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         .chain([
             LimitKind::LocaleRawIdentifierBytes,
             LimitKind::LocaleCanonicalIdentifierBytes,
-            LimitKind::CoreActiveOccurrences,
-            LimitKind::CoreRequestedCardinality,
-            LimitKind::CoreRawIdentifierBytes,
-            LimitKind::CoreCanonicalIdentifierBytes,
+            LimitKind::ResolutionLocaleOccurrences,
+            LimitKind::ResolutionRequestedLocales,
+            LimitKind::ResolutionRawIdentifierBytes,
+            LimitKind::ResolutionCanonicalIdentifierBytes,
         ])
     {
+        // Phase 7 counts its occurrences over two recipes: the project's
+        // locales, and every occurrence role.
+        let recipes = if limit == LimitKind::ResolutionLocaleOccurrences {
+            2
+        } else {
+            1
+        };
         for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
             assert_eq!(
                 cases
                     .iter()
                     .filter(|case| case.limit == Some((limit, edge)))
                     .count(),
-                1
+                recipes
             );
         }
     }
@@ -82,7 +89,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
         case.limit.is_none()
             && !matches!(
                 case.operation,
-                Operation::LocaleCanonicalization | Operation::LocaleCoreResolution
+                Operation::LocaleCanonicalization | Operation::LocaleResolution
             )
     }) {
         let source = case.fixture.source();
@@ -144,7 +151,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleCoreResolution => unreachable!(),
+            | Operation::LocaleResolution => unreachable!(),
         }
     }
 }
@@ -224,31 +231,18 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                         actual,
                         ..
                     })) => assert_eq!(*actual, limit.get() + 1),
-                    Output::LocaleCore(result) => {
-                        use crate::locale::core::{Failure, Issue};
-                        match result.value().unwrap_err() {
-                            Failure::OccurrenceLimit { limit, actual } => {
-                                assert_eq!(*actual, limit.get() + 1);
-                            }
-                            Failure::Issues(issues) => {
-                                assert!(!issues.is_empty());
-                                for issue in issues {
-                                    match issue {
-                                        Issue::RequestedLimit { limit, actual }
-                                        | Issue::Canonicalization {
-                                            reason:
-                                                crate::locale::CanonicalizationFailure::ByteLimit {
-                                                    limit,
-                                                    actual,
-                                                    ..
-                                                },
-                                            ..
-                                        } => assert_eq!(*actual, limit.get() + 1),
-                                        _ => panic!("wrong locale-core rejection"),
-                                    }
-                                }
-                            }
-                            Failure::AccountingOverflow => panic!("wrong locale-core rejection"),
+                    Output::LocaleResolution(resolved) => {
+                        // Only the bound itself, one past its value.
+                        let evaluation = &resolved.evaluation;
+                        assert!(evaluation.issues().next().is_some());
+                        for issue in evaluation.issues() {
+                            let exceeded = evaluation.limit(issue).unwrap();
+                            assert_eq!(
+                                exceeded.actual,
+                                crate::resolver::evaluation::Actual::Exact(
+                                    exceeded.limit.get() + 1
+                                )
+                            );
                         }
                     }
                     _ => panic!("first-over must fail its owning stage"),
@@ -256,7 +250,7 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
             }
         }
     }
-    assert_eq!(edges, 32);
+    assert_eq!(edges, 34);
 }
 
 #[test]
@@ -330,5 +324,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 141);
+    assert_eq!(contexts.len(), 150);
 }
