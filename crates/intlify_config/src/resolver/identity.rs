@@ -243,11 +243,11 @@ mod tests {
         let (evaluation, identity) = resolve(&config, "admin");
         assert_eq!(identity, Err(stand_in()));
         assert_eq!(
-            evaluation.status(unit(DeclarationField::ProjectId)),
+            evaluation.status(&unit(DeclarationField::ProjectId)),
             Some(&Status::NotEvaluated(stand_in()))
         );
         assert_eq!(
-            evaluation.status(unit(DeclarationField::SelectionScope)),
+            evaluation.status(&unit(DeclarationField::SelectionScope)),
             Some(&Status::Evaluated)
         );
         assert_eq!(evaluation.issues().count(), 0);
@@ -273,7 +273,7 @@ mod tests {
             DeclarationField::SelectionScope,
         ] {
             assert_eq!(
-                evaluation.status(unit(field)),
+                evaluation.status(&unit(field)),
                 Some(&Status::NotEvaluated(causes.clone()))
             );
         }

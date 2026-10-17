@@ -146,6 +146,7 @@ fn present<V>(asserted: Option<&V>) -> Result<&V, Blocking> {
     asserted.ok_or(Blocking {
         code: Code::SpecificationInputIncomplete,
         reason: Some(Reason::MissingRequiredSlot),
+        limit: None,
     })
 }
 
@@ -156,6 +157,7 @@ const fn not_admitted(code: Code, reason: SpecificationNotAdmitted) -> Blocking 
             SpecificationNotAdmitted::Unsupported => Reason::Unsupported,
             SpecificationNotAdmitted::Incompatible => Reason::Incompatible,
         }),
+        limit: None,
     }
 }
 
@@ -296,6 +298,7 @@ where
             .map_err(|_| Blocking {
                 code: Code::LocaleDataNotAdmitted,
                 reason: None,
+                limit: None,
             })
         },
     )?;
@@ -519,7 +522,7 @@ mod tests {
                 .issues()
                 .map(|key| {
                     (
-                        key.unit(),
+                        key.unit().clone(),
                         key.code().as_str(),
                         key.reason().map(Reason::as_str),
                     )
@@ -536,7 +539,7 @@ mod tests {
                 .statuses()
                 .filter_map(|(unit, status)| match status {
                     Status::Evaluated => None,
-                    Status::NotEvaluated(causes) => Some((*unit, causes.clone())),
+                    Status::NotEvaluated(causes) => Some((unit.clone(), causes.clone())),
                 })
                 .collect()
         }
@@ -544,7 +547,7 @@ mod tests {
 
     /// The causes of the one issue an admission found.
     fn only_cause(admission: &Admission) -> Causes {
-        let keys: Vec<_> = admission.evaluation.issues().copied().collect();
+        let keys: Vec<_> = admission.evaluation.issues().cloned().collect();
         assert_eq!(keys.len(), 1);
         admission
             .set()
@@ -604,7 +607,7 @@ mod tests {
             admission
                 .evaluation
                 .statuses()
-                .map(|(unit, _)| *unit)
+                .map(|(unit, _)| unit.clone())
                 .collect::<Vec<_>>(),
             [
                 [unit(
@@ -717,7 +720,7 @@ mod tests {
         input.message_locale_fallback = Some(identity("intlify-message-locale-fallback", "1"));
         input.delivery_placement = None;
         let admission = Admission::confirmed(&input);
-        let keys: Vec<_> = admission.evaluation.issues().copied().collect();
+        let keys: Vec<_> = admission.evaluation.issues().cloned().collect();
         assert_eq!(keys.len(), 3);
         let causes = admission.set().unwrap_err();
         assert!(causes.keys().eq(keys.iter()));
