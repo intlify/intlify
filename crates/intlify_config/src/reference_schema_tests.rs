@@ -457,11 +457,12 @@ fn formal_schema_work_remains_bounded_before_root_construction() {
 }
 
 #[test]
-fn formal_references_reach_the_same_private_locale_core_without_body_resolution() {
-    use crate::locale::core::{Input, Limits};
+fn formal_references_reach_the_same_locale_resolution_without_body_resolution() {
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
     use crate::model::Presence;
+    use crate::resolver::evaluation::Evaluation;
+    use crate::resolver::locales::{fixture_policy, resolve_locales, LocaleFields};
     use crate::structural::selection::{Selection, SelectorInput};
 
     let mut value = config();
@@ -479,38 +480,44 @@ fn formal_references_reach_the_same_private_locale_core_without_body_resolution(
     else {
         panic!("expected single admitted profile")
     };
+    let declaration = configuration.profiles().get(selected.id()).unwrap();
     assert!(matches!(
-        configuration
-            .profiles()
-            .values()
-            .next()
-            .unwrap()
-            .default_source_locale,
+        declaration.default_source_locale,
         Presence::Absent
     ));
+    let policy = fixture_policy(
+        Bound::new(128).unwrap(),
+        Bound::new(16).unwrap(),
+        Bound::new(8).unwrap(),
+    );
     let provider = Canonicalizer::bind(
         &fixture_pins(),
         Some(FixtureProvider::new()),
-        Bound::new(128).unwrap(),
+        policy
+            .limits()
+            .locale_resolution
+            .max_locale_identifier_bytes,
     )
     .unwrap();
-    let result = Input::from_selected(&configuration, selected.id())
-        .unwrap()
-        .resolve(
-            &provider,
-            Limits {
-                max_active_occurrences: Bound::new(16).unwrap(),
-                max_requested_locales: Bound::new(8).unwrap(),
-            },
-        );
-    let core = result.value().unwrap();
-    assert!(core.source_default().is_none());
+    let mut evaluation = Evaluation::default();
+    let resolved = resolve_locales(
+        &mut evaluation,
+        Ok(&policy),
+        Ok(&provider),
+        &LocaleFields::declared(declaration),
+    )
+    .unwrap();
+    assert_eq!(evaluation.issues().count(), 0);
+    let project = resolved.project.unwrap();
+    assert!(project.source_default().is_none());
     assert_eq!(
-        core.requested()
+        project
+            .requested()
+            .as_slice()
             .iter()
             .map(crate::locale::CanonicalLocale::as_str)
             .collect::<Vec<_>>(),
         ["en-US", "ja"]
     );
-    assert_eq!(core.requested_default().as_str(), "en-US");
+    assert_eq!(project.requested_default().as_str(), "en-US");
 }

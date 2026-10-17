@@ -8,15 +8,18 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::locale::core::{Failure, Issue, Location};
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, ProviderFailure};
 use crate::materialize::InputFailure;
 use crate::profile_fixtures::minimal_config;
+use crate::resolver::evaluation::{Actual, Code, Evaluation, Status, Subject};
+use crate::resolver::locales::{
+    LocaleInvariant, LocaleKey, LocaleSet, LocaleSubject, Location, ResolvedLocales,
+};
 use crate::structural::selection::SelectionFailure;
 use crate::structural::StructuralFailure;
 
 mod harness;
-use harness::{FixtureLimits, FixtureRunner, Outcome, Step};
+use harness::{FixtureLimits, FixtureRunner, Locales, Outcome, Run, Step};
 
 fn source(value: &Value) -> Arc<[u8]> {
     Arc::from(serde_json::to_vec(value).unwrap())
@@ -26,38 +29,77 @@ fn runner() -> FixtureRunner {
     FixtureRunner::new(FixtureLimits::finite())
 }
 
+fn locales(run: Run) -> Locales {
+    let Outcome::Locale(locales) = run.outcome else {
+        panic!("minimum slice did not reach locale resolution")
+    };
+    locales
+}
+
+fn names(set: &LocaleSet) -> Vec<&str> {
+    set.as_slice().iter().map(CanonicalLocale::as_str).collect()
+}
+
+/// Where a spelling differs from its canonical form.
+fn corrected(resolved: &ResolvedLocales) -> Vec<Location> {
+    resolved
+        .occurrences
+        .iter()
+        .filter(|occurrence| occurrence.corrected)
+        .map(|occurrence| occurrence.location.clone())
+        .collect()
+}
+
+/// Each blocking result as its subject's role and locale, and its code.
+fn issues(evaluation: &Evaluation) -> Vec<(String, Code)> {
+    let key = |key: &LocaleKey| match key {
+        LocaleKey::Canonical(locale) => locale.as_str().to_owned(),
+        LocaleKey::Content(content) => content.as_str().to_owned(),
+    };
+    evaluation
+        .issues()
+        .map(|issue| {
+            let Subject::Locale(subject) = &issue.unit().subject else {
+                panic!("only Phase 7 runs in this slice")
+            };
+            let subject = match subject {
+                LocaleSubject::Occurrences => "occurrences".to_owned(),
+                LocaleSubject::RequestedLocale(locale) => format!("requested {}", key(locale)),
+                LocaleSubject::RequestedLocales => "requested set".to_owned(),
+                LocaleSubject::DefaultSourceLocale(locale) => format!("source {}", key(locale)),
+                LocaleSubject::DefaultRequestedLocale(locale) => {
+                    format!("default {}", key(locale))
+                }
+                other => panic!("no minimum fixture declares {other:?}"),
+            };
+            (subject, issue.code())
+        })
+        .collect()
+}
+
 #[test]
-fn strict_bytes_reach_only_the_selected_private_locale_core() {
+fn strict_bytes_reach_only_the_selected_declarations_locale_resolution() {
     let mut value = minimal_config();
     value["profiles"]["app"]["requestedLocales"] = json!(["ja", "EN-us"]);
     value["profiles"]["app"]["defaultRequestedLocale"] = json!("EN-us");
-    let result = runner().run(source(&value), None);
-    assert_eq!(result.steps, Step::ALL);
-    assert_eq!(result.selected.as_ref().unwrap().as_str(), "app");
-    let Outcome::Locale(result) = result.outcome else {
-        panic!("minimum slice did not reach locale resolution")
-    };
-    let core = result.value().unwrap();
-    assert_eq!(core.source_default(), None);
+    let run = runner().run(source(&value), None);
+    assert_eq!(run.steps, Step::ALL);
+    assert_eq!(run.selected.as_ref().unwrap().as_str(), "app");
+    let locales = locales(run);
+    assert!(issues(&locales.evaluation).is_empty());
+    let resolved = locales.result.unwrap();
+    let project = resolved.project.as_ref().unwrap();
+    assert_eq!(project.source_default(), None);
+    assert_eq!(names(project.requested()), ["en-US", "ja"]);
+    assert_eq!(project.requested_default().as_str(), "en-US");
     assert_eq!(
-        core.requested()
-            .iter()
-            .map(CanonicalLocale::as_str)
-            .collect::<Vec<_>>(),
-        ["en-US", "ja"]
-    );
-    assert_eq!(core.requested_default().as_str(), "en-US");
-    assert_eq!(
-        result
-            .corrections()
-            .iter()
-            .map(|item| (item.location, item.replacement.as_str()))
-            .collect::<Vec<_>>(),
+        corrected(&resolved),
         [
-            (Location::Requested(1), "en-US"),
-            (Location::RequestedDefault, "en-US")
+            Location::RequestedLocale(1),
+            Location::DefaultRequestedLocale
         ]
     );
+    assert_eq!(locales.evaluation.notices().count(), 2);
 }
 
 #[test]
@@ -211,52 +253,45 @@ fn named_selection_is_exact_and_failures_never_start_locale_work() {
         };
         assert_eq!(reason, expected);
     }
-    let result = runner().run(source(&multiple), Some("other"));
-    assert_eq!(result.steps, Step::ALL);
-    assert_eq!(result.selected.unwrap().as_str(), "other");
-    let Outcome::Locale(result) = result.outcome else {
-        panic!("selected profile did not resolve")
-    };
-    assert_eq!(result.value().unwrap().requested_default().as_str(), "ja");
+    let run = runner().run(source(&multiple), Some("other"));
+    assert_eq!(run.steps, Step::ALL);
+    assert_eq!(run.selected.as_ref().unwrap().as_str(), "other");
+    let resolved = locales(run).result.unwrap();
+    assert_eq!(resolved.project.unwrap().requested_default().as_str(), "ja");
 }
 
 #[test]
-fn semantic_failures_preserve_the_exact_cause_without_a_partial_locale_core() {
-    enum Expected<'a> {
-        Invalid(Location, ProviderFailure),
-        Duplicate(&'a str),
-        Outside(&'a str),
-    }
-    use Expected::{Duplicate, Invalid, Outside};
+fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
     for (source_default, requested, default, expected) in [
         (
             Some("en_US"),
             vec!["en"],
             "en",
-            Invalid(Location::SourceDefault, ProviderFailure::InvalidIdentifier),
+            ("source en_US", Code::LocaleInvalid),
         ),
         (
             None,
             vec!["en_US"],
             "en",
-            Invalid(Location::Requested(0), ProviderFailure::InvalidIdentifier),
+            ("requested en_US", Code::LocaleInvalid),
         ),
         (
             None,
             vec!["en"],
             "en_US",
-            Invalid(
-                Location::RequestedDefault,
-                ProviderFailure::InvalidIdentifier,
-            ),
+            ("default en_US", Code::LocaleInvalid),
         ),
-        (None, vec!["EN-us", "en-US"], "en-US", Duplicate("en-US")),
-        (None, vec!["en"], "ja", Outside("ja")),
         (
             None,
-            vec!["pt-BR"],
-            "en",
-            Invalid(Location::Requested(0), ProviderFailure::UnsupportedInput),
+            vec!["EN-us", "en-US"],
+            "en-US",
+            ("requested en-US", Code::LocaleDuplicate),
+        ),
+        (
+            None,
+            vec!["en"],
+            "ja",
+            ("default ja", Code::DefaultRequestedLocaleNotInProject),
         ),
     ] {
         let mut value = minimal_config();
@@ -265,39 +300,25 @@ fn semantic_failures_preserve_the_exact_cause_without_a_partial_locale_core() {
         }
         value["profiles"]["app"]["requestedLocales"] = json!(requested);
         value["profiles"]["app"]["defaultRequestedLocale"] = json!(default);
-        let result = runner().run(source(&value), None);
-        assert_eq!(result.steps, Step::ALL);
-        let Outcome::Locale(result) = result.outcome else {
-            panic!("wrong stopping point")
-        };
-        let Failure::Issues(issues) = result.value().unwrap_err() else {
-            panic!("wrong semantic failure")
-        };
-        assert_eq!(issues.len(), 1);
-        match (expected, &issues[0]) {
-            (
-                Invalid(expected_location, provider),
-                Issue::Canonicalization { location, reason },
-            ) => {
-                assert_eq!(*location, expected_location);
-                assert_eq!(*reason, CanonicalizationFailure::Provider(provider));
-            }
-            (
-                Duplicate(expected),
-                Issue::Duplicate {
-                    locale,
-                    occurrences,
-                },
-            ) => {
-                assert_eq!(locale.as_str(), expected);
-                assert_eq!(occurrences, &[0, 1]);
-            }
-            (Outside(expected), Issue::DefaultNotRequested { locale }) => {
-                assert_eq!(locale.as_str(), expected);
-            }
-            _ => panic!("wrong semantic reason"),
-        }
+        let run = runner().run(source(&value), None);
+        assert_eq!(run.steps, Step::ALL);
+        let locales = locales(run);
+        assert_eq!(
+            issues(&locales.evaluation),
+            [(expected.0.to_owned(), expected.1)]
+        );
+        assert!(locales.result.unwrap().project.is_err(), "{expected:?}");
     }
+    // A spelling the finite provider has no answer for is not an author's
+    // error: Phase 7 stops as a resolver defect instead of reporting it.
+    let mut value = minimal_config();
+    value["profiles"]["app"]["requestedLocales"] = json!(["pt-BR"]);
+    assert_eq!(
+        locales(runner().run(source(&value), None)).result,
+        Err(LocaleInvariant::Canonicalization(
+            CanonicalizationFailure::Provider(ProviderFailure::UnsupportedInput)
+        ))
+    );
 }
 
 fn reverse_members(value: &mut Value) {
@@ -322,42 +343,52 @@ fn reverse_members(value: &mut Value) {
 }
 
 #[test]
-fn file_spelling_and_authoring_permutations_preserve_core_meaning_not_corrections() {
+fn file_spelling_and_authoring_permutations_preserve_meaning_and_aliases_only_add_corrections() {
     let context = runner();
     let mut value = minimal_config();
     value["profiles"]["app"]["requestedLocales"] = json!(["en-US", "ja"]);
     value["profiles"]["app"]["defaultRequestedLocale"] = json!("en-US");
     value["profiles"]["app"]["defaultSourceLocale"] = json!("en");
-    let Outcome::Locale(baseline) = context.run(source(&value), None).outcome else {
-        unreachable!()
-    };
+    let baseline = locales(context.run(source(&value), None));
     let mut reordered = value.clone();
     reverse_members(&mut reordered);
     reordered["profiles"]["app"]["requestedLocales"] = json!(["ja", "en-US"]);
     let pretty = serde_json::to_string_pretty(&value).unwrap();
-    let mut aliases = reordered.clone();
-    aliases["profiles"]["app"]["requestedLocales"] = json!(["ja", "EN-us"]);
-    aliases["profiles"]["app"]["defaultRequestedLocale"] = json!("EN-us");
-    aliases["profiles"]["app"]["defaultSourceLocale"] = json!("EN");
     for bytes in [
         source(&value),
         source(&reordered),
         Arc::from(pretty.as_bytes()),
         Arc::from(format!(" \r\n{}\t ", pretty.replace('\n', "\r\n")).into_bytes()),
-        source(&aliases),
     ] {
-        let result = context.run(bytes, None);
-        assert_eq!(result.steps, Step::ALL);
-        let Outcome::Locale(result) = result.outcome else {
-            unreachable!()
-        };
-        assert_eq!(result.value(), baseline.value());
+        let run = context.run(bytes, None);
+        assert_eq!(run.steps, Step::ALL);
+        let locales = locales(run);
+        assert_eq!(locales.evaluation, baseline.evaluation);
+        assert_eq!(
+            locales.result.as_ref().unwrap().project,
+            baseline.result.as_ref().unwrap().project
+        );
     }
-    let Outcome::Locale(aliased) = context.run(source(&aliases), None).outcome else {
-        unreachable!()
-    };
-    assert!(baseline.corrections().is_empty());
-    assert_eq!(aliased.corrections().len(), 3);
+    let mut aliases = reordered.clone();
+    aliases["profiles"]["app"]["requestedLocales"] = json!(["ja", "EN-us"]);
+    aliases["profiles"]["app"]["defaultRequestedLocale"] = json!("EN-us");
+    aliases["profiles"]["app"]["defaultSourceLocale"] = json!("EN");
+    let aliased = locales(context.run(source(&aliases), None));
+    assert_eq!(
+        aliased.result.as_ref().unwrap().project,
+        baseline.result.as_ref().unwrap().project
+    );
+    assert!(corrected(baseline.result.as_ref().unwrap()).is_empty());
+    assert_eq!(baseline.evaluation.notices().count(), 0);
+    assert_eq!(
+        corrected(aliased.result.as_ref().unwrap()),
+        [
+            Location::RequestedLocale(1),
+            Location::DefaultSourceLocale,
+            Location::DefaultRequestedLocale
+        ]
+    );
+    assert_eq!(aliased.evaluation.notices().count(), 3);
     for field in [
         "defaultSourceLocale",
         "defaultRequestedLocale",
@@ -369,11 +400,13 @@ fn file_spelling_and_authoring_permutations_preserve_core_meaning_not_correction
             "defaultRequestedLocale" => json!("ja"),
             _ => json!(["en-US", "ja", "fr"]),
         };
-        let Outcome::Locale(result) = context.run(source(&changed), None).outcome else {
-            unreachable!()
-        };
-        assert!(result.value().is_ok());
-        assert_ne!(result.value(), baseline.value(), "{field}");
+        let changed = locales(context.run(source(&changed), None));
+        let project = changed.result.unwrap().project.unwrap();
+        assert_ne!(
+            Some(&project),
+            baseline.result.as_ref().unwrap().project.as_ref().ok(),
+            "{field}"
+        );
     }
 }
 
@@ -419,24 +452,35 @@ fn resource_edges_stop_at_their_owning_stage_without_later_semantic_work() {
         }
     );
 
-    for maximum in [1, 2] {
+    // The project's requested and default locales, and the browser
+    // target's requested locale.
+    for maximum in [2, 3] {
         let mut limits = FixtureLimits::finite();
-        limits.locale.max_active_occurrences = Bound::new(maximum).unwrap();
-        let result = FixtureRunner::new(limits).run(Arc::clone(&bytes), None);
-        assert_eq!(result.steps, Step::ALL);
-        let Outcome::Locale(result) = result.outcome else {
-            unreachable!()
-        };
-        if maximum == 1 {
+        limits.locale_occurrences = Bound::new(maximum).unwrap();
+        let run = FixtureRunner::new(limits).run(Arc::clone(&bytes), None);
+        assert_eq!(run.steps, Step::ALL);
+        let locales = locales(run);
+        let resolved = locales.result.unwrap();
+        if maximum == 2 {
             assert_eq!(
-                result.value().unwrap_err(),
-                &Failure::OccurrenceLimit {
-                    limit: Bound::new(1).unwrap(),
-                    actual: 2
-                }
+                issues(&locales.evaluation),
+                [("occurrences".to_owned(), Code::ResourceLimitExceeded)]
             );
+            let issue = locales.evaluation.issues().next().unwrap();
+            let exceeded = locales.evaluation.limit(issue).unwrap();
+            assert_eq!(
+                (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
+                ("maxLocaleOccurrences", 2, Actual::Exact(3))
+            );
+            // Every spelling is recorded, and none is canonicalized.
+            assert!(locales.evaluation.statuses().all(|(unit, status)| {
+                unit.subject == Subject::Locale(LocaleSubject::Occurrences)
+                    || matches!(status, Status::NotEvaluated(_))
+            }));
+            assert_eq!(resolved.occurrences.len(), 3);
         } else {
-            assert!(result.value().is_ok());
+            assert!(issues(&locales.evaluation).is_empty());
+            assert_eq!(resolved.occurrences.len(), 3);
         }
     }
 }
@@ -448,25 +492,27 @@ fn owned_results_survive_interleaved_failures_input_release_and_runner_release()
     {
         let context = runner();
         let bytes = source(&minimal_config());
-        let Outcome::Locale(first) = context.run(bytes, None).outcome else {
-            unreachable!()
-        };
-        retained = first;
+        retained = locales(context.run(bytes, None));
         blocked = context.run(source(&json!({"schemaVersion": "1"})), None);
         let raw_failure = context.run(Arc::from(&b"{"[..]), None);
         assert!(matches!(raw_failure.outcome, Outcome::Materialization(_)));
         let mut duplicate = minimal_config();
         duplicate["profiles"]["app"]["requestedLocales"] = json!(["en", "en"]);
-        let Outcome::Locale(failure) = context.run(source(&duplicate), None).outcome else {
-            unreachable!()
-        };
-        assert!(failure.value().is_err());
-        let Outcome::Locale(repeated) = context.run(source(&minimal_config()), None).outcome else {
-            unreachable!()
-        };
+        let failure = locales(context.run(source(&duplicate), None));
+        assert!(!issues(&failure.evaluation).is_empty());
+        let repeated = locales(context.run(source(&minimal_config()), None));
         assert_eq!(repeated, retained);
     }
-    assert_eq!(retained.value().unwrap().requested_default().as_str(), "en");
+    assert_eq!(
+        retained
+            .result
+            .unwrap()
+            .project
+            .unwrap()
+            .requested_default()
+            .as_str(),
+        "en"
+    );
     let Outcome::Structural(analysis) = blocked.outcome else {
         unreachable!()
     };
@@ -497,18 +543,14 @@ fn explicit_parallel_callers_keep_fixture_association_and_results_deterministic(
             })
             .collect::<Vec<_>>();
         for worker in workers {
-            let (expected, result) = worker.join().unwrap();
-            assert_eq!(result.steps, Step::ALL);
-            assert_eq!(result.selected.unwrap().as_str(), "app");
-            let Outcome::Locale(result) = result.outcome else {
-                unreachable!()
-            };
-            assert_eq!(
-                result.value().unwrap().requested_default().as_str(),
-                expected
-            );
-            assert_eq!(result.value().unwrap().requested().len(), 1);
-            assert!(result.corrections().is_empty());
+            let (expected, run) = worker.join().unwrap();
+            assert_eq!(run.steps, Step::ALL);
+            assert_eq!(run.selected.as_ref().unwrap().as_str(), "app");
+            let resolved = locales(run).result.unwrap();
+            let project = resolved.project.as_ref().unwrap();
+            assert_eq!(project.requested_default().as_str(), expected);
+            assert_eq!(names(project.requested()), [expected]);
+            assert!(corrected(&resolved).is_empty());
         }
     });
 }

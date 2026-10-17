@@ -7,12 +7,16 @@
 use std::sync::Arc;
 
 use crate::input_limits::{Bound, InputLimits};
-use crate::locale::core::{Input, Limits, Resolution};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::{materialize_file, MaterializationError};
 use crate::model::ProfileId;
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::resolver::evaluation::Evaluation;
+use crate::resolver::limits::ConfirmedPolicy;
+use crate::resolver::locales::{
+    fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales,
+};
 use crate::structural::selection::{Selection, SelectionFailure, SelectorInput};
 use crate::structural::{AuthoringSchema, StructuralAnalysis, StructuralLimits};
 
@@ -23,7 +27,8 @@ type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
 pub(super) struct FixtureLimits {
     pub(super) input: InputLimits,
     pub(super) structural: StructuralLimits,
-    pub(super) locale: Limits,
+    pub(super) locale_occurrences: Bound,
+    pub(super) requested_locales: Bound,
     pub(super) identifier_bytes: Bound,
 }
 
@@ -36,10 +41,8 @@ impl FixtureLimits {
                 max_profile_id_bytes: Bound::new(64).unwrap(),
                 max_structural_analysis_units: Bound::new(1_000_000).unwrap(),
             },
-            locale: Limits {
-                max_active_occurrences: Bound::new(16).unwrap(),
-                max_requested_locales: Bound::new(8).unwrap(),
-            },
+            locale_occurrences: Bound::new(16).unwrap(),
+            requested_locales: Bound::new(8).unwrap(),
             identifier_bytes: Bound::new(128).unwrap(),
         }
     }
@@ -64,11 +67,18 @@ impl Step {
     ];
 }
 
+/// Phase 7's record of every unit it ran and what it resolved.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Locales {
+    pub(super) evaluation: Evaluation,
+    pub(super) result: Result<ResolvedLocales, LocaleInvariant>,
+}
+
 pub(super) enum Outcome {
     Materialization(MaterializationError),
     Structural(Analysis),
     Selection(SelectionFailure),
-    Locale(Resolution),
+    Locale(Locales),
 }
 
 /// Test-only call trace, not 015 Evidence, Findings, or an admitted outcome.
@@ -81,6 +91,7 @@ pub(super) struct Run {
 pub(super) struct FixtureRunner {
     limits: FixtureLimits,
     schema: Schema,
+    policy: ConfirmedPolicy,
     provider: Canonicalizer<FixtureProvider>,
 }
 
@@ -89,6 +100,11 @@ impl FixtureRunner {
         Self {
             limits,
             schema: Schema::for_model().expect("formal 015/017 configuration schema"),
+            policy: fixture_policy(
+                limits.identifier_bytes,
+                limits.locale_occurrences,
+                limits.requested_locales,
+            ),
             provider: Canonicalizer::bind(
                 &fixture_pins(),
                 Some(FixtureProvider::new()),
@@ -150,13 +166,21 @@ impl FixtureRunner {
             }
         };
         steps.push(Step::Locale);
-        let input = Input::from_selected(&config, selected.id())
+        let declaration = config
+            .profiles()
+            .get(selected.id())
             .expect("exact selected declaration must exist in this complete root");
-        let result = input.resolve(&self.provider, self.limits.locale);
+        let mut evaluation = Evaluation::default();
+        let result = resolve_locales(
+            &mut evaluation,
+            Ok(&self.policy),
+            Ok(&self.provider),
+            &LocaleFields::declared(declaration),
+        );
         Run {
             steps,
             selected: Some(selected.id().clone()),
-            outcome: Outcome::Locale(result),
+            outcome: Outcome::Locale(Locales { evaluation, result }),
         }
     }
 }

@@ -303,7 +303,7 @@ pub(crate) enum EvaluationInvariant {
 /// The status of every unit recorded so far, the blocking results found with
 /// their details, and the non-blocking ones, each in 015's order whatever order
 /// the units ran in.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<LimitExceeded>>,

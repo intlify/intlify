@@ -1,10 +1,10 @@
 # Try configuration resolution
 
-Edit a project-profile configuration and inspect its normalized locales or validation errors from the terminal. This developer example calls `intlify_config`'s existing minimum implementation; it is separate from the Intlify CLI.
+Edit a project-profile configuration and inspect its normalized locales or validation errors from the terminal. This developer example calls `intlify_config`'s existing implementation, up to locale resolution; it is separate from the Intlify CLI.
 
 > [!IMPORTANT]
 >
-> This is not a complete project-profile resolver. It uses a **finite test locale provider**, does not fetch policy or target-profile bodies, and does not produce a `LocalizationProjectProfile`. A successful run means only that structural validation, profile selection, and the minimum locale core succeeded.
+> This is not a complete project-profile resolver. It uses a **finite test locale provider**, does not fetch policy or target-profile bodies, and does not produce a `LocalizationProjectProfile`. A successful run means only that structural validation, profile selection, and locale resolution succeeded: every locale spelling of the profile was counted, every spelling outside the coverage rules was canonicalized, no requested-locale set names a locale twice, and the default requested locale is one of the requested locales.
 
 ## Run the example
 
@@ -46,13 +46,14 @@ Try these changes **one at a time** under `profiles.app`, starting from the supp
 | Change | Expected result |
 | --- | --- |
 | Add `"defaultSourceLocale": "iw-IL"` | The source locale becomes `he-IL`, with a suggested correction. |
-| Set `requestedLocales` to `["en", "EN"]` and `defaultRequestedLocale` to `"en"` | `CanonicalLocaleDuplicate`, with both occurrence paths. Duplicates are not silently removed. |
-| Set `defaultRequestedLocale` to `"fr"` | `DefaultNotRequested`, because `fr` is not in the requested set. |
-| Set `defaultRequestedLocale` to `"en_US"` | `InvalidLocaleIdentifier`. |
-| Set `defaultRequestedLocale` to `"pt-BR"` | `UnsupportedLocaleInput`: the fixture lacks this locale; this does **not** mean the locale is invalid. |
+| Set `requestedLocales` to `["en", "EN"]` and `defaultRequestedLocale` to `"en"` | `project-profile-locale-duplicate`, with both occurrence paths. Duplicates are not silently removed. |
+| Set `defaultRequestedLocale` to `"fr"` | `project-profile-default-requested-locale-not-in-project`, because `fr` is not in the requested set. |
+| Set `defaultRequestedLocale` to `"en_US"` | `project-profile-locale-invalid`. |
+| Add `"messageFallback": {"ja": ["EN"]}` | A suggested correction for the fallback candidate: spellings beyond the project's own are canonicalized too. |
+| Set `defaultRequestedLocale` to `"pt-BR"` | `UnsupportedLocaleInput`: the fixture lacks this locale; this does **not** mean the locale is invalid. Resolution stops there, so this diagnostic has no pointer. |
 | Remove `policies.glossarySet` | `RequiredFieldMissing`. This field must be present, even when its value is `null`. |
 
-Errors include a line and byte column when a source position is available. Locale errors also include a JSON Pointer to the affected field. On a rejected run, no partial locale core is printed; already-known spelling corrections may still be shown. The example never rewrites your file.
+Errors include a line and byte column when a source position is available. Locale errors also include a JSON Pointer to each affected spelling; a map key points at its member. On a rejected run, no partial locales are printed; already-known spelling corrections may still be shown. The example never rewrites your file.
 
 ## Select a profile and inspect JSON
 
@@ -65,13 +66,13 @@ cargo run -p intlify_config --features dev-example --example resolve_config -- \
 
 Profile names are matched exactly. The whole file must be structurally valid, including unselected profiles.
 
-`--json` prints a pretty-printed **display object**, not a stable API, formal diagnostic record, or serialized profile. It includes the reached stage, selected profile, locale core (or `null`), spelling corrections, and diagnostics. Source offsets are zero-based UTF-8 byte offsets with an exclusive end; line and byte-column numbers are one-based.
+`--json` prints a pretty-printed **display object**, not a stable API, formal diagnostic record, or serialized profile. It includes the reached stage, selected profile, project locales (or `null`), spelling corrections, and diagnostics. Source offsets are zero-based UTF-8 byte offsets with an exclusive end; line and byte-column numbers are one-based.
 
 ```sh
 cargo run -p intlify_config --features dev-example --example resolve_config -- --help
 ```
 
-Exit codes are `0` for a resolved minimum locale core, `1` for a rejected configuration or profile selector, and `2` for usage, file I/O, or internal errors. Configuration results go to stdout; usage, I/O, and internal errors go to stderr. `--json` applies to configuration results, not those stderr errors.
+Exit codes are `0` for resolved locales, `1` for a rejected configuration or profile selector, and `2` for usage, file I/O, or internal errors. Configuration results go to stdout; usage, I/O, and internal errors go to stderr. `--json` applies to configuration results, not those stderr errors.
 
 ## Scope and limits
 
@@ -96,9 +97,9 @@ It also recognizes these exact aliases:
 
 Other spellings may be unsupported, including valid locales or casing variants. There is no CLDR download, platform locale lookup, or production locale-data integration.
 
-The sample includes mandatory policy and target-profile references so it passes the real project-profile configuration schema. Their identities and digests are **illustrative placeholders**, not verified artifacts. Only reference structure is checked. The example does not resolve those bodies, negotiate locales, compute fallback, validate target/deployment semantics, or generate runtime output. Keep these fields as supplied when experimenting with the minimum locale core.
+The sample includes mandatory policy and target-profile references so it passes the real project-profile configuration schema. Their identities and digests are **illustrative placeholders**, not verified artifacts. Only reference structure is checked. The example does not resolve those bodies, negotiate locales, compute fallback, validate target/deployment semantics, or generate runtime output. Keep these fields as supplied when experimenting with locale resolution.
 
-The example uses its own fixed safety limits: a 1,000,000-byte file, 100,000 parser tokens/nodes/collection entries, depth 64, 1,000,000 total decoded string bytes, 100,000 bytes per decoded string, 8 profiles, 64 bytes per profile ID, 1,000,000 structural-analysis units, 128 bytes per locale identifier spelling, 16 active locale occurrences, and 8 requested locales. These are developer-example limits, **not** product defaults or an admitted Resource Limit Policy. Oversized files are rejected before parsing; file reads stop after the limit plus one byte.
+The example uses its own fixed safety limits: a 1,000,000-byte file, 100,000 parser tokens/nodes/collection entries, depth 64, 1,000,000 total decoded string bytes, 100,000 bytes per decoded string, 8 profiles, 64 bytes per profile ID, 1,000,000 structural-analysis units, 128 bytes per locale identifier spelling, 16 locale occurrences across every locale-bearing field, and 8 requested locales. These are developer-example limits, **not** product defaults or an admitted Resource Limit Policy. Oversized files are rejected before parsing; file reads stop after the limit plus one byte.
 
 The schema describes the configuration shape, including fields beyond the minimum implementation: [project-profile-config-v0.schema.json](../../schema/project-profile-config-v0.schema.json).
 

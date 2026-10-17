@@ -45,6 +45,14 @@ impl fmt::Debug for Content {
     }
 }
 
+impl Content {
+    /// The spelling itself, for a caller that compares or digests it; never
+    /// for display.
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// What names a locale in its scope: the canonical identity its spellings
 /// share, or, without one, the spelling's content.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -292,8 +300,8 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
 }
 
 /// The project's requested set, checked for repeats and size, the default's
-/// membership in it, and the source default: what the minimum locale core
-/// resolved, now under 015's bounds and with every independent check run.
+/// membership in it, and the source default, with every independent check
+/// run.
 fn project<P: Provider, Target>(
     pass: &mut Pass<'_, '_, P>,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -396,6 +404,23 @@ const fn issue(code: Code) -> Blocking {
     }
 }
 
+/// The confirmed policy a fixture owner runs Phase 7 under: the three bounds
+/// Phase 7 applies as given, and distinct fixture values for the bounds it
+/// never reads.
+#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+pub(crate) fn fixture_policy(
+    identifier_bytes: crate::input_limits::Bound,
+    occurrences: crate::input_limits::Bound,
+    requested: crate::input_limits::Bound,
+) -> ConfirmedPolicy {
+    let mut limits = super::limits::fixture_limits(100);
+    let locale = &mut limits.locale_resolution;
+    locale.max_locale_identifier_bytes = identifier_bytes;
+    locale.max_locale_occurrences = occurrences;
+    locale.max_requested_locales = requested;
+    ConfirmedPolicy::fixture_owned(limits)
+}
+
 /// What the Phase 7 tests share: declarations, bounds, the finite provider,
 /// and stand-ins for causes earlier phases report.
 #[cfg(test)]
@@ -407,7 +432,7 @@ mod fixtures {
     use crate::input_limits::Bound;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::resolver::evaluation::{Reason, Status};
-    use crate::resolver::limits::{test_limits, ResolutionLimits};
+    use crate::resolver::limits::ResolutionLimits;
     use crate::resolver::specification::Slot;
 
     pub(super) type Declaration =
@@ -426,12 +451,9 @@ mod fixtures {
         occurrences: u64,
         requested: u64,
     ) -> ResolutionLimits {
-        let mut limits = test_limits(100);
-        let locale = &mut limits.locale_resolution;
-        locale.max_locale_identifier_bytes = Bound::new(identifier_bytes).unwrap();
-        locale.max_locale_occurrences = Bound::new(occurrences).unwrap();
-        locale.max_requested_locales = Bound::new(requested).unwrap();
-        limits
+        policy(identifier_bytes, occurrences, requested)
+            .limits()
+            .clone()
     }
 
     pub(super) fn policy(
@@ -439,7 +461,11 @@ mod fixtures {
         occurrences: u64,
         requested: u64,
     ) -> ConfirmedPolicy {
-        ConfirmedPolicy::test_owned(limits(identifier_bytes, occurrences, requested))
+        fixture_policy(
+            Bound::new(identifier_bytes).unwrap(),
+            Bound::new(occurrences).unwrap(),
+            Bound::new(requested).unwrap(),
+        )
     }
 
     /// The finite provider bound as Phase 5 binds it, under the identifier

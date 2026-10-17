@@ -385,7 +385,7 @@ mod tests {
     use crate::locale::DatasetPin;
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
     use crate::resolver::evaluation::Status;
-    use crate::resolver::limits::test_limits;
+    use crate::resolver::limits::fixture_limits;
 
     type Id = &'static str;
 
@@ -481,7 +481,7 @@ mod tests {
     }
 
     fn policy() -> ConfirmedPolicy {
-        ConfirmedPolicy::test_owned(test_limits(100))
+        ConfirmedPolicy::fixture_owned(fixture_limits(100))
     }
 
     struct Admission {
@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn the_canonicalizer_takes_the_confirmed_identifier_bound() {
-        let policy = ConfirmedPolicy::test_owned(test_limits(40));
+        let policy = ConfirmedPolicy::fixture_owned(fixture_limits(40));
         let admission = Admission::run(&supported(), &complete(), Ok(&policy));
         assert_eq!(
             admission

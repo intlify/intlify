@@ -96,7 +96,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::locale::{Supported, VersionedIdentity};
     use crate::resolver::evaluation::Status;
-    use crate::resolver::limits::test_limits;
+    use crate::resolver::limits::fixture_limits;
     use crate::resolver::specification::{
         admit_project_profile, SpecificationInput, SupportedSpecifications,
     };
@@ -104,7 +104,7 @@ mod tests {
     use crate::structural::selection::{Selection, SelectorInput};
 
     fn policy() -> ConfirmedPolicy {
-        ConfirmedPolicy::test_owned(test_limits(100))
+        ConfirmedPolicy::fixture_owned(fixture_limits(100))
     }
 
     /// Two declarations, `web` and `admin`, each a copy of the minimal one with
