@@ -67,6 +67,31 @@ fn sample_runs_in_text_and_json_modes_without_modifying_the_file() {
 }
 
 #[test]
+fn text_marks_every_pointer_that_names_a_key() {
+    let result = serde_json::json!({
+        "notice": "", "status": "not-resolved", "stage": "locale",
+        "corrections": [
+            {"pointer": "/aliases/iw-IL", "target": "key", "replacement": "he-IL"},
+            {"pointer": "/aliases/iw-IL", "target": "value", "replacement": "en"}
+        ],
+        "diagnostics": [{
+            "code": "code", "message": "message", "pointer": "/aliases/he-IL",
+            "target": "key", "position": null,
+            "relatedPointers": ["/aliases/he-IL", "/aliases/iw-IL"]
+        }]
+    });
+    let output = render(&result, false);
+    for line in [
+        "  /aliases/iw-IL (key) -> he-IL\n",
+        "  /aliases/iw-IL -> en\n",
+        "    at /aliases/he-IL (key)\n",
+        "    occurrences: /aliases/he-IL (key), /aliases/iw-IL (key)\n",
+    ] {
+        assert!(output.contains(line), "{output}");
+    }
+}
+
+#[test]
 fn rejected_config_has_exit_code_one_and_json_diagnostics() {
     let (code, output) = run([
         sample().into_os_string(),

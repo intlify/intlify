@@ -51,7 +51,7 @@ fn source_locale_is_canonicalized_only_when_declared() {
     assert_eq!(
         result["corrections"],
         json!([{
-            "pointer": "/profiles/app/defaultSourceLocale", "replacement": "he-IL"
+            "pointer": "/profiles/app/defaultSourceLocale", "target": "value", "replacement": "he-IL"
         }])
     );
 }
@@ -112,7 +112,8 @@ fn unsupported_fixture_input_is_not_misrepresented_as_invalid() {
 fn every_locale_role_points_at_its_own_spelling() {
     let mut config = minimal_config();
     let app = &mut config["profiles"]["app"];
-    // Each corrected spelling sits second in its map or set.
+    // Each corrected spelling sits second in its map or set. A key's pointer
+    // names its member, so its target tells it from the member's value.
     app["localeNegotiation"] = json!({"aliases": {"fr": "fr-FR", "iw-IL": "EN"}});
     app["messageFallback"] = json!({
         "EN-us": ["en"],
@@ -125,14 +126,45 @@ fn every_locale_role_points_at_its_own_spelling() {
     assert_eq!(
         result["corrections"],
         json!([
-            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "replacement": "he-IL"},
-            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "replacement": "en"},
-            {"pointer": "/profiles/app/messageFallback/EN-us", "replacement": "en-US"},
-            {"pointer": "/profiles/app/messageFallback/ja/1", "replacement": "en"},
-            {"pointer": "/profiles/app/targetProfiles/browser/requestedLocales/1", "replacement": "en"},
-            {"pointer": "/profiles/app/targetProfiles/browser/defaultRequestedLocale", "replacement": "en"}
+            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "target": "key", "replacement": "he-IL"},
+            {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "target": "value", "replacement": "en"},
+            {"pointer": "/profiles/app/messageFallback/EN-us", "target": "key", "replacement": "en-US"},
+            {"pointer": "/profiles/app/messageFallback/ja/1", "target": "value", "replacement": "en"},
+            {"pointer": "/profiles/app/targetProfiles/browser/requestedLocales/1", "target": "value", "replacement": "en"},
+            {"pointer": "/profiles/app/targetProfiles/browser/defaultRequestedLocale", "target": "value", "replacement": "en"}
         ])
     );
+}
+
+#[test]
+fn a_rejected_key_is_located_at_the_key_and_a_rejected_value_at_the_value() {
+    for (field, map, target) in [
+        (
+            "localeNegotiation",
+            json!({"aliases": {"en_US": "en"}}),
+            "key",
+        ),
+        (
+            "localeNegotiation",
+            json!({"aliases": {"en": "en_US"}}),
+            "value",
+        ),
+        ("messageFallback", json!({"en_US": ["en"]}), "key"),
+    ] {
+        let mut config = minimal_config();
+        config["profiles"]["app"][field] = map;
+        let source = serde_json::to_vec(&config).unwrap();
+        let result = resolve(&source, None).unwrap();
+        let issue = &result["diagnostics"][0];
+        assert_eq!(issue["code"], "project-profile-locale-invalid");
+        assert_eq!(issue["target"], target, "{issue}");
+        // The rejected spelling occurs once in the compact source.
+        let start = source
+            .windows(7)
+            .position(|window| window == br#""en_US""#)
+            .unwrap();
+        assert_eq!(issue["position"]["startByte"], start, "{issue}");
+    }
 }
 
 #[test]
@@ -142,6 +174,7 @@ fn two_spellings_of_one_locale_point_at_each_other() {
     let result = run(&config, None);
     let issue = &result["diagnostics"][0];
     assert_eq!(issue["code"], "project-profile-locale-duplicate");
+    assert_eq!(issue["target"], "value");
     assert_eq!(
         issue["relatedPointers"],
         json!([
@@ -166,6 +199,7 @@ fn a_limit_names_its_bound_and_points_at_no_spelling() {
         "The example allows 16 for maxLocaleOccurrences; observed 18."
     );
     assert!(issue["pointer"].is_null());
+    assert!(issue["target"].is_null());
     assert!(issue["relatedPointers"].is_null());
 }
 
