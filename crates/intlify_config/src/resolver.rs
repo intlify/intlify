@@ -12,4 +12,5 @@
 pub(crate) mod evaluation;
 pub(crate) mod identity;
 pub(crate) mod limits;
+pub(crate) mod locales;
 pub(crate) mod specification;

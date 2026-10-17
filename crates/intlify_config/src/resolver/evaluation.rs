@@ -6,12 +6,18 @@
 //! evaluation-status record: 015 Phase 5 owns those representations. A unit
 //! here is one check over one subject, an issue key names the blocking result a
 //! unit found, and a unit whose prerequisite is unavailable is recorded as not
-//! evaluated with the keys behind it instead of reporting a cascade issue.
+//! evaluated with the keys behind it instead of reporting a cascade issue. A
+//! resource issue keeps the details 015 reports with it, and an evaluated unit
+//! may also find a non-blocking result, which suppresses nothing.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::input_limits::Bound;
+
 use super::identity::DeclarationField;
+use super::limits::BoundId;
+use super::locales::LocaleSubject;
 use super::specification::Slot;
 
 /// 015's resolution phases, declared in rank order.
@@ -61,7 +67,7 @@ impl Phase {
 
 /// What one unit checks: 015's subject kind and Logical subject key. Kinds are
 /// declared in rank order, so subjects order by kind and then by key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
     Slot(Slot),
@@ -69,9 +75,11 @@ pub(crate) enum Subject {
     CanonicalizationData,
     /// One field of the selected profile declaration.
     DeclarationField(DeclarationField),
+    /// A locale, or a locale bound or set, of the selected declaration.
+    Locale(LocaleSubject),
 }
 
-/// The check a unit runs, declared in rank order. Each subject kind has one.
+/// The check a unit runs, declared in rank order within a subject kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Check {
     /// The slot holds an assertion the resolver supports.
@@ -80,11 +88,19 @@ pub(crate) enum Check {
     MatchingData,
     /// The field is admitted as an opaque semantic identity.
     OpaqueIdentity,
+    /// A counted or measured total stays within its bound.
+    WithinBound,
+    /// The spelling is a valid locale and has a canonical form.
+    CanonicalLocale,
+    /// No other spelling in the same set names the same locale.
+    UniqueLocale,
+    /// The locale belongs to the project's requested locales.
+    RequestedMember,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
 /// phase, subject kind, subject key, then check.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Unit {
     pub(crate) phase: Phase,
     pub(crate) subject: Subject,
@@ -102,6 +118,11 @@ pub(crate) enum Code {
     MessageFallbackSpecificationNotAdmitted,
     CoverageSpecificationNotAdmitted,
     DeliverySpecificationNotAdmitted,
+    LocaleInvalid,
+    LocaleNonCanonical,
+    LocaleDuplicate,
+    DefaultRequestedLocaleNotInProject,
+    ResourceLimitExceeded,
 }
 
 impl Code {
@@ -125,6 +146,13 @@ impl Code {
             Self::DeliverySpecificationNotAdmitted => {
                 "project-profile-delivery-specification-not-admitted"
             }
+            Self::LocaleInvalid => "project-profile-locale-invalid",
+            Self::LocaleNonCanonical => "project-profile-locale-non-canonical",
+            Self::LocaleDuplicate => "project-profile-locale-duplicate",
+            Self::DefaultRequestedLocaleNotInProject => {
+                "project-profile-default-requested-locale-not-in-project"
+            }
+            Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
         }
     }
 }
@@ -148,17 +176,45 @@ impl Reason {
 }
 
 /// The one blocking result a check found, which leaves the value it would
-/// establish unavailable.
+/// establish unavailable. A resource bound's result carries the details 015
+/// reports with `project-profile-resource-limit-exceeded`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Blocking {
     pub(crate) code: Code,
     pub(crate) reason: Option<Reason>,
+    pub(crate) limit: Option<LimitExceeded>,
 }
 
-/// The private counterpart of 015's Finding Key: the unit that found a blocking
-/// result, its code, and its reason. In 015 Phase 5 the owning specification
-/// joins it and a Redacted subject token stands for the unit's subject.
+impl Blocking {
+    /// A bound the measured total exceeds.
+    pub(crate) const fn limit(exceeded: LimitExceeded) -> Self {
+        Self {
+            code: Code::ResourceLimitExceeded,
+            reason: None,
+            limit: Some(exceeded),
+        }
+    }
+}
+
+/// 015's details of an exceeded bound: which bound, its value, and the total.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LimitExceeded {
+    pub(crate) bound: BoundId,
+    pub(crate) limit: Bound,
+    pub(crate) actual: Actual,
+}
+
+/// A measured total: exact, or a witness that the total is at least this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Actual {
+    Exact(u64),
+    AtLeast(u64),
+}
+
+/// The private counterpart of 015's Finding Key: the unit that found a result,
+/// its code, and its reason. In 015 Phase 5 the owning specification joins it
+/// and a Redacted subject token stands for the unit's subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct IssueKey {
     unit: Unit,
     code: Code,
@@ -166,15 +222,15 @@ pub(crate) struct IssueKey {
 }
 
 impl IssueKey {
-    pub(crate) const fn unit(self) -> Unit {
-        self.unit
+    pub(crate) const fn unit(&self) -> &Unit {
+        &self.unit
     }
 
-    pub(crate) const fn code(self) -> Code {
+    pub(crate) const fn code(&self) -> Code {
         self.code
     }
 
-    pub(crate) const fn reason(self) -> Option<Reason> {
+    pub(crate) const fn reason(&self) -> Option<Reason> {
         self.reason
     }
 }
@@ -236,18 +292,22 @@ pub(crate) enum Status {
     NotEvaluated(Causes),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EvaluationInvariant {
     /// A resolver bug: each unit is evaluated at most once.
     UnitRecordedTwice(Unit),
+    /// A resolver bug: only an evaluated unit finds a non-blocking result.
+    NoticeWithoutEvaluation(Unit),
 }
 
-/// The status of every unit recorded so far and the blocking results found,
-/// each in 015's order whatever order the units ran in.
+/// The status of every unit recorded so far, the blocking results found with
+/// their details, and the non-blocking ones, each in 015's order whatever order
+/// the units ran in.
 #[derive(Debug, Default)]
 pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
-    issues: BTreeSet<IssueKey>,
+    issues: BTreeMap<IssueKey, Option<LimitExceeded>>,
+    notices: BTreeSet<IssueKey>,
 }
 
 impl Evaluation {
@@ -268,9 +328,17 @@ impl Evaluation {
             Err(causes) => (Status::NotEvaluated(causes.clone()), Err(causes)),
             Ok(value) => match evaluate(value) {
                 Ok(value) => (Status::Evaluated, Ok(value)),
-                Err(Blocking { code, reason }) => {
-                    let key = IssueKey { unit, code, reason };
-                    self.issues.insert(key);
+                Err(Blocking {
+                    code,
+                    reason,
+                    limit,
+                }) => {
+                    let key = IssueKey {
+                        unit: unit.clone(),
+                        code,
+                        reason,
+                    };
+                    self.issues.insert(key.clone(), limit);
                     (Status::Evaluated, Err(Causes(BTreeSet::from([key]))))
                 }
             },
@@ -279,8 +347,22 @@ impl Evaluation {
         Ok(result)
     }
 
-    pub(crate) fn status(&self, unit: Unit) -> Option<&Status> {
-        self.statuses.get(&unit)
+    /// Records a non-blocking result `code` of a unit `check` evaluated. It
+    /// is never a cause: nothing waits on it.
+    pub(crate) fn notice(&mut self, unit: Unit, code: Code) -> Result<(), EvaluationInvariant> {
+        if self.statuses.get(&unit) != Some(&Status::Evaluated) {
+            return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
+        }
+        self.notices.insert(IssueKey {
+            unit,
+            code,
+            reason: None,
+        });
+        Ok(())
+    }
+
+    pub(crate) fn status(&self, unit: &Unit) -> Option<&Status> {
+        self.statuses.get(unit)
     }
 
     pub(crate) fn statuses(&self) -> impl Iterator<Item = (&Unit, &Status)> {
@@ -288,7 +370,16 @@ impl Evaluation {
     }
 
     pub(crate) fn issues(&self) -> impl Iterator<Item = &IssueKey> {
-        self.issues.iter()
+        self.issues.keys()
+    }
+
+    /// The details of a resource issue, which no other issue has.
+    pub(crate) fn limit(&self, key: &IssueKey) -> Option<LimitExceeded> {
+        self.issues.get(key).copied().flatten()
+    }
+
+    pub(crate) fn notices(&self) -> impl Iterator<Item = &IssueKey> {
+        self.notices.iter()
     }
 }
 
@@ -299,6 +390,7 @@ mod tests {
     const MISSING: Blocking = Blocking {
         code: Code::SpecificationInputIncomplete,
         reason: Some(Reason::MissingRequiredSlot),
+        limit: None,
     };
 
     fn slot(slot: Slot) -> Unit {
@@ -389,6 +481,11 @@ mod tests {
                 Code::MessageFallbackSpecificationNotAdmitted,
                 Code::CoverageSpecificationNotAdmitted,
                 Code::DeliverySpecificationNotAdmitted,
+                Code::LocaleInvalid,
+                Code::LocaleNonCanonical,
+                Code::LocaleDuplicate,
+                Code::DefaultRequestedLocaleNotInProject,
+                Code::ResourceLimitExceeded,
             ]
             .map(Code::as_str),
             [
@@ -400,6 +497,11 @@ mod tests {
                 "project-profile-message-fallback-specification-not-admitted",
                 "project-profile-coverage-specification-not-admitted",
                 "project-profile-delivery-specification-not-admitted",
+                "project-profile-locale-invalid",
+                "project-profile-locale-non-canonical",
+                "project-profile-locale-duplicate",
+                "project-profile-default-requested-locale-not-in-project",
+                "project-profile-resource-limit-exceeded",
             ]
         );
         assert_eq!(
@@ -423,21 +525,22 @@ mod tests {
             .unwrap();
         assert_eq!(doubled, Ok(4));
         let causes = missing(&mut evaluation, slot(Slot::DeliveryGraph));
-        let found: Vec<_> = evaluation.issues().copied().collect();
+        let found: Vec<_> = evaluation.issues().cloned().collect();
         assert_eq!(found.len(), 1);
         assert_eq!(
             (found[0].unit(), found[0].code(), found[0].reason()),
             (
-                slot(Slot::DeliveryGraph),
+                &slot(Slot::DeliveryGraph),
                 Code::SpecificationInputIncomplete,
                 Some(Reason::MissingRequiredSlot)
             )
         );
+        assert_eq!(evaluation.limit(&found[0]), None);
         assert_eq!(causes.keys().collect::<Vec<_>>(), [&found[0]]);
         for unit in [slot(Slot::Coverage), slot(Slot::DeliveryGraph)] {
-            assert_eq!(evaluation.status(unit), Some(&Status::Evaluated));
+            assert_eq!(evaluation.status(&unit), Some(&Status::Evaluated));
         }
-        assert_eq!(evaluation.status(slot(Slot::LocaleNegotiation)), None);
+        assert_eq!(evaluation.status(&slot(Slot::LocaleNegotiation)), None);
     }
 
     #[test]
@@ -454,7 +557,7 @@ mod tests {
         assert!(!ran);
         assert_eq!(dependant, Err(causes.clone()));
         assert_eq!(
-            evaluation.status(data()),
+            evaluation.status(&data()),
             Some(&Status::NotEvaluated(causes))
         );
         assert_eq!(evaluation.issues().count(), 1);
@@ -478,7 +581,7 @@ mod tests {
         assert_eq!(
             joined
                 .keys()
-                .map(|key| key.unit().subject)
+                .map(|key| key.unit().subject.clone())
                 .collect::<Vec<_>>(),
             [
                 Subject::Slot(Slot::Coverage),
@@ -534,19 +637,19 @@ mod tests {
         ];
         let mut evaluation = Evaluation::default();
         for unit in canonical.iter().rev() {
-            missing(&mut evaluation, *unit);
+            missing(&mut evaluation, unit.clone());
         }
         assert_eq!(
             evaluation
                 .statuses()
-                .map(|(unit, _)| *unit)
+                .map(|(unit, _)| unit.clone())
                 .collect::<Vec<_>>(),
             canonical
         );
         assert_eq!(
             evaluation
                 .issues()
-                .map(|key| key.unit())
+                .map(|key| key.unit().clone())
                 .collect::<Vec<_>>(),
             canonical
         );
@@ -624,7 +727,7 @@ mod tests {
         assert_eq!(
             keys.iter()
                 .map(|key| (
-                    key.unit().subject,
+                    key.unit().subject.clone(),
                     key.code().as_str(),
                     key.reason().map(Reason::as_str)
                 ))
@@ -662,5 +765,75 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn a_resource_issue_keeps_its_details_beside_its_key() {
+        let exceeded = LimitExceeded {
+            bound: BoundId {
+                group: crate::resolver::limits::Group::LocaleResolution,
+                name: "maxLocaleOccurrences",
+            },
+            limit: Bound::new(3).unwrap(),
+            actual: Actual::Exact(4),
+        };
+        let mut evaluation = Evaluation::default();
+        let causes = evaluation
+            .check(data(), Ok(()), |()| Err::<(), _>(Blocking::limit(exceeded)))
+            .unwrap()
+            .unwrap_err();
+        let key = causes.keys().next().unwrap().clone();
+        assert_eq!(
+            (key.unit(), key.code(), key.reason()),
+            (&data(), Code::ResourceLimitExceeded, None)
+        );
+        assert_eq!(evaluation.limit(&key), Some(exceeded));
+        // Details belong to issues; a key nothing found has none.
+        let other = IssueKey {
+            unit: slot(Slot::Coverage),
+            ..key
+        };
+        assert_eq!(evaluation.limit(&other), None);
+    }
+
+    #[test]
+    fn a_notice_belongs_to_an_evaluated_unit_and_is_never_a_cause() {
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(slot(Slot::Coverage), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        evaluation
+            .notice(slot(Slot::Coverage), Code::LocaleNonCanonical)
+            .unwrap();
+        assert_eq!(
+            evaluation
+                .notices()
+                .map(|key| (key.unit().clone(), key.code(), key.reason()))
+                .collect::<Vec<_>>(),
+            [(slot(Slot::Coverage), Code::LocaleNonCanonical, None)]
+        );
+        assert_eq!(evaluation.issues().count(), 0);
+        assert_eq!(
+            evaluation.status(&slot(Slot::Coverage)),
+            Some(&Status::Evaluated)
+        );
+        // A unit never recorded, or one left not evaluated, found nothing.
+        assert_eq!(
+            evaluation.notice(slot(Slot::LocaleNegotiation), Code::LocaleNonCanonical),
+            Err(EvaluationInvariant::NoticeWithoutEvaluation(slot(
+                Slot::LocaleNegotiation
+            )))
+        );
+        let causes = missing(&mut evaluation, slot(Slot::DeliveryGraph));
+        evaluation
+            .check(data(), Err::<(), _>(causes), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            evaluation.notice(data(), Code::LocaleNonCanonical),
+            Err(EvaluationInvariant::NoticeWithoutEvaluation(data()))
+        );
+        assert_eq!(evaluation.notices().count(), 1);
     }
 }
