@@ -116,7 +116,7 @@ fn expectation_objects_are_closed_and_nullable_fields_must_be_present() {
 #[test]
 fn planning_work_is_complete_and_checked_before_fixture_preparation() {
     let registry = Registry::load().unwrap();
-    assert_eq!(registry.expectations().len(), 141);
+    assert_eq!(registry.expectations().len(), 150);
     for row in registry.expectations() {
         assert_eq!(work_digest(row.work()).unwrap(), row.logical_work);
         let fixture = registry.prepare(row.declaration()).unwrap();
@@ -352,48 +352,47 @@ fn cached_candidate_summaries_cannot_replace_reobservation_of_actual_output() {
 }
 
 #[test]
-fn locale_core_preparation_and_bounds_are_bound_even_when_result_and_work_are_equal() {
-    use crate::benchmark::cases::LocaleCoreRecipe as R;
+fn locale_resolution_preparation_and_bounds_are_bound_even_when_result_and_work_are_equal() {
+    use crate::benchmark::cases::LocaleResolutionRecipe as R;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
+    use crate::resolver::locales::fixture_policy;
 
     let declaration = case(
-        Operation::LocaleCoreResolution,
-        Recipe::LocaleCore(R::Minimal),
+        Operation::LocaleResolution,
+        Recipe::LocaleResolution(R::Minimal),
         Selector::App,
     );
     let other = case(
-        Operation::LocaleCoreResolution,
-        Recipe::LocaleCore(R::OtherProfile),
+        Operation::LocaleResolution,
+        Recipe::LocaleResolution(R::OtherProfile),
         Selector::App,
     );
     let registry = Registry::load().unwrap();
-    for change in 0..5 {
+    let bound = |value| Bound::new(value).unwrap();
+    for change in 0..6 {
         let mut candidate = prepare(&declaration).unwrap();
-        let Prepared::LocaleCore(core) = &mut candidate.prepared else {
+        let Prepared::LocaleResolution(prepared) = &mut candidate.prepared else {
             unreachable!()
         };
         match change {
-            0 => core.limits.max_active_occurrences = Bound::new(127).unwrap(),
-            1 => core.limits.max_requested_locales = Bound::new(63).unwrap(),
-            2 => {
-                core.provider = Arc::new(
-                    Canonicalizer::bind(
-                        &fixture_pins(),
-                        Some(FixtureProvider::new()),
-                        Bound::new(127).unwrap(),
-                    )
-                    .unwrap(),
+            0 => prepared.policy = fixture_policy(bound(128), bound(127), bound(64)),
+            1 => prepared.policy = fixture_policy(bound(128), bound(128), bound(63)),
+            2 => prepared.policy = fixture_policy(bound(127), bound(128), bound(64)),
+            3 => {
+                prepared.canonicalizer = Arc::new(
+                    Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), bound(127))
+                        .unwrap(),
                 );
             }
             _ => {
-                let Prepared::LocaleCore(other) = prepare(&other).unwrap().prepared else {
+                let Prepared::LocaleResolution(other) = prepare(&other).unwrap().prepared else {
                     unreachable!()
                 };
-                if change == 3 {
-                    core.analysis = other.analysis;
+                if change == 4 {
+                    prepared.analysis = other.analysis;
                 } else {
-                    core.config = other.config;
+                    prepared.config = other.config;
                 }
             }
         }
@@ -422,10 +421,10 @@ fn locale_core_preparation_and_bounds_are_bound_even_when_result_and_work_are_eq
         ))
     );
     let mut candidate = prepare(&declaration).unwrap();
-    let Prepared::LocaleCore(core) = &mut candidate.prepared else {
+    let Prepared::LocaleResolution(prepared) = &mut candidate.prepared else {
         unreachable!()
     };
-    core.selected = serde_json::from_value(json!("unknown")).unwrap();
+    prepared.selected = serde_json::from_value(json!("unknown")).unwrap();
     assert_eq!(
         registry.admit_candidate(candidate).err(),
         Some(FixtureFailure::Context(ContextFailure::LocaleInputMismatch))

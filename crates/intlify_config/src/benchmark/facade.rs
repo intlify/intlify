@@ -52,13 +52,13 @@ impl std::fmt::Display for ObservationError {
 impl std::error::Error for ObservationError {}
 
 /// An owned completed capture and its admitted serialized records. No mutable
-/// accessor, deserializer, public constructor, or underlying locale core exists.
+/// accessor, deserializer, public constructor, or underlying locale result exists.
 pub struct CompletedObservation {
     run: RecordedRun,
     artifacts: pipeline::Artifacts,
 }
 
-/// Execute the fixed 141-case, six-boundary native observational smoke profile.
+/// Execute the fixed 150-case, six-boundary native observational smoke profile.
 /// POSIX clock acquisition is supported on Linux/macOS; unsupported acquisition
 /// fails explicitly rather than selecting an undeclared alternative method.
 pub fn observe_smoke() -> Result<CompletedObservation, ObservationError> {
@@ -146,8 +146,8 @@ mod tests {
             summary,
             ObservationSummary {
                 outcome: ObservationOutcome::Complete,
-                planned_cases: 141,
-                measured_cases: 141,
+                planned_cases: 150,
+                measured_cases: 150,
                 non_measured_cases: 0
             }
         );

@@ -28,9 +28,9 @@ mod inventory;
 #[cfg(feature = "benchmark")]
 mod locale;
 #[cfg(feature = "benchmark")]
-mod locale_core;
-#[cfg(feature = "benchmark")]
 mod locale_icu4x;
+#[cfg(feature = "benchmark")]
+mod locale_resolution;
 #[cfg(feature = "benchmark")]
 mod measure;
 #[cfg(feature = "benchmark")]

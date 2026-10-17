@@ -152,7 +152,7 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
         ];
         if matches!(
             operation.operation(),
-            Operation::LocaleCanonicalization | Operation::LocaleCoreResolution
+            Operation::LocaleCanonicalization | Operation::LocaleResolution
         ) {
             paths.extend([
                 "/localeInput",
@@ -162,8 +162,8 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
                 "/localeInput/providerSchema",
             ]);
         }
-        if operation.operation() == Operation::LocaleCoreResolution {
-            paths.push("/localeCoreInput");
+        if operation.operation() == Operation::LocaleResolution {
+            paths.push("/localeResolutionInput");
         }
         for path in paths {
             let mut extra = original.clone();
@@ -364,33 +364,30 @@ fn icu4x_descriptors_record_the_engine_state_and_the_admitted_binding() {
 }
 
 #[test]
-fn locale_core_descriptor_binds_its_subset_bounds_and_actual_reuse() {
-    let mut operation = prepared(Operation::LocaleCoreResolution);
+fn locale_resolution_descriptor_binds_its_bounds_roles_and_actual_reuse() {
+    let mut operation = prepared(Operation::LocaleResolution);
     let descriptors = Descriptors::for_acquisition(&operation, clock(1));
     assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
     assert_eq!(descriptors.execution.cache_state, "disabled");
     let encoded = serde_json::to_value(&descriptors).unwrap();
-    assert_eq!(encoded["localeCoreInput"]["activeOccurrenceLimit"], "128");
-    assert_eq!(encoded["localeCoreInput"]["requestedLocaleLimit"], "64");
-    assert_eq!(
-        encoded["localeCoreInput"]["activeOccurrenceDomain"]
-            .as_array()
-            .unwrap()
-            .len(),
-        3
-    );
-    assert_eq!(encoded["localeCoreInput"]["selectedProfile"], "app");
+    let input = &encoded["localeResolutionInput"];
+    assert_eq!(input["localeOccurrenceLimit"], "128");
+    assert_eq!(input["requestedLocaleLimit"], "64");
+    assert_eq!(input["identifierByteLimit"], "128");
+    assert_eq!(input["occurrenceDomain"].as_array().unwrap().len(), 10);
+    assert_eq!(input["selectedProfile"], "app");
     assert_eq!(encoded["localeInput"]["identifierByteLimit"], "128");
-    let Prepared::LocaleCore(core) = &mut operation else {
+    let Prepared::LocaleResolution(locales) = &mut operation else {
         unreachable!()
     };
-    core.limits.max_active_occurrences = crate::input_limits::Bound::new(127).unwrap();
+    let bound = |value| crate::input_limits::Bound::new(value).unwrap();
+    locales.policy = crate::resolver::locales::fixture_policy(bound(128), bound(127), bound(64));
     assert_eq!(
         descriptors.validate(&operation, clock(1)),
-        [DescriptorIssue::LocaleCoreInputBindingMismatch]
+        [DescriptorIssue::LocaleResolutionInputBindingMismatch]
     );
-    let original = prepared(Operation::LocaleCoreResolution);
-    for field in ["localeCoreInput", "localeInput"] {
+    let original = prepared(Operation::LocaleResolution);
+    for field in ["localeResolutionInput", "localeInput"] {
         let mut missing = encoded.clone();
         missing[field] = Value::Null;
         let decoded: Descriptors = serde_json::from_value(missing).unwrap();

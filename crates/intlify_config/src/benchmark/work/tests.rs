@@ -81,12 +81,13 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
             ] {
                 assert_eq!(fact(&work, kind).stage, WorkStage::OperationResult);
             }
-        } else if prepared.operation() == Operation::LocaleCoreResolution {
+        } else if prepared.operation() == Operation::LocaleResolution {
             assert_eq!(work.facts.len(), 8);
             for item in &work.facts {
                 let expected = if matches!(
                     item.kind,
-                    WorkKind::LocaleCoreOccurrences | WorkKind::LocaleCoreRawIdentifierBytes
+                    WorkKind::LocaleResolutionOccurrences
+                        | WorkKind::LocaleResolutionRawIdentifierBytes
                 ) {
                     WorkStage::PreparedInput
                 } else {
@@ -170,196 +171,148 @@ fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_va
     }
 }
 
+/// Each recipe's vector: occurrences, their raw bytes, the spellings that
+/// reached the provider, the canonical requested locales, units, units not
+/// evaluated, blocking issues, and corrections. Counted by hand from the
+/// recipes and the units Phase 7 records for each subject.
 #[test]
-fn locale_core_work_preserves_each_role_count_and_marks_unresolved_sets_unavailable() {
+fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailable() {
     use crate::benchmark::cases::{
-        declarations, prepare::prepare, LimitEdge, LimitKind, LocaleCoreRecipe as R, Recipe,
+        declarations, prepare::prepare, LimitEdge, LimitKind, LocaleResolutionRecipe as R, Recipe,
     };
     let over = |kind| Some((kind, LimitEdge::FirstOver));
     for (recipe, limit, expected) in [
-        (
-            R::Minimal,
-            None,
-            [
-                Some(2),
-                Some(4),
-                Some(1),
-                Some(2),
-                Some(4),
-                Some(0),
-                Some(0),
-                Some(0),
-            ],
-        ),
-        (
-            R::Multi,
-            None,
-            [
-                Some(6),
-                Some(21),
-                Some(4),
-                Some(6),
-                Some(21),
-                Some(0),
-                Some(0),
-                Some(0),
-            ],
-        ),
-        (
-            R::Aliased,
-            None,
-            [
-                Some(6),
-                Some(21),
-                Some(4),
-                Some(6),
-                Some(21),
-                Some(0),
-                Some(0),
-                Some(5),
-            ],
-        ),
-        (
-            R::ExpandingAlias,
-            None,
-            [
-                Some(2),
-                Some(34),
-                Some(1),
-                Some(2),
-                Some(44),
-                Some(0),
-                Some(0),
-                Some(2),
-            ],
-        ),
-        (
-            R::InvalidSource,
-            None,
-            [
-                Some(3),
-                Some(9),
-                Some(1),
-                Some(0),
-                Some(0),
-                Some(1),
-                Some(0),
-                Some(0),
-            ],
-        ),
+        (R::Minimal, None, [3, 6, 3, 1, 8, 0, 0, 0].map(Some)),
+        (R::Multi, None, [7, 23, 7, 4, 15, 0, 0, 0].map(Some)),
+        (R::Aliased, None, [7, 23, 7, 4, 15, 0, 0, 5].map(Some)),
+        (R::ExpandingAlias, None, [3, 36, 3, 1, 8, 0, 0, 2].map(Some)),
+        (R::InvalidSource, None, [4, 11, 4, 1, 9, 0, 1, 0].map(Some)),
         (
             R::InvalidAndDuplicate,
             None,
             [
-                Some(5),
-                Some(19),
+                Some(6),
+                Some(21),
+                Some(6),
                 None,
-                Some(0),
-                Some(0),
+                Some(11),
                 Some(3),
-                Some(2),
+                Some(3),
                 Some(1),
             ],
         ),
         (
             R::DuplicateHeavy,
             None,
-            [
-                Some(33),
-                Some(66),
-                Some(1),
-                Some(0),
-                Some(0),
-                Some(1),
-                Some(32),
-                Some(0),
-            ],
+            [34, 68, 34, 1, 8, 0, 1, 0].map(Some),
         ),
-        (
-            R::ExactDuplicate,
-            None,
-            [
-                Some(3),
-                Some(6),
-                Some(1),
-                Some(0),
-                Some(0),
-                Some(1),
-                Some(2),
-                Some(0),
-            ],
-        ),
+        (R::ExactDuplicate, None, [4, 8, 4, 1, 8, 0, 1, 0].map(Some)),
+        // Over the occurrence bound, every spelling stands for itself and
+        // waits on the bound.
         (
             R::Multi,
-            over(LimitKind::CoreActiveOccurrences),
+            over(LimitKind::ResolutionLocaleOccurrences),
             [
-                Some(6),
-                Some(21),
+                Some(7),
+                Some(23),
+                Some(0),
                 None,
-                Some(0),
-                Some(0),
+                Some(15),
+                Some(14),
                 Some(1),
-                Some(0),
                 Some(0),
             ],
         ),
         (
             R::Multi,
-            over(LimitKind::CoreRequestedCardinality),
-            [
-                Some(6),
-                Some(21),
-                Some(4),
-                Some(0),
-                Some(0),
-                Some(1),
-                Some(0),
-                Some(0),
-            ],
+            over(LimitKind::ResolutionRequestedLocales),
+            [7, 23, 7, 4, 15, 0, 1, 0].map(Some),
         ),
         (
             R::Minimal,
-            over(LimitKind::CoreRawIdentifierBytes),
+            over(LimitKind::ResolutionRawIdentifierBytes),
             [
-                Some(2),
-                Some(4),
+                Some(3),
+                Some(6),
+                Some(3),
                 None,
-                Some(0),
-                Some(0),
-                Some(2),
-                Some(0),
+                Some(8),
+                Some(4),
+                Some(3),
                 Some(0),
             ],
         ),
         (
             R::ExpandingAlias,
-            over(LimitKind::CoreCanonicalIdentifierBytes),
+            over(LimitKind::ResolutionCanonicalIdentifierBytes),
             [
-                Some(2),
-                Some(34),
+                Some(3),
+                Some(36),
+                Some(3),
                 None,
-                Some(0),
-                Some(0),
+                Some(8),
+                Some(3),
                 Some(2),
-                Some(0),
                 Some(0),
             ],
+        ),
+        // Three of the 21 spellings are coverage selectors, counted only.
+        (R::EveryRole, None, [21, 60, 18, 3, 28, 0, 0, 0].map(Some)),
+        (
+            R::EveryRole,
+            over(LimitKind::ResolutionLocaleOccurrences),
+            [
+                Some(21),
+                Some(60),
+                Some(0),
+                None,
+                Some(28),
+                Some(27),
+                Some(1),
+                Some(0),
+            ],
+        ),
+        (
+            R::EveryRoleAliased,
+            None,
+            [21, 60, 18, 3, 28, 0, 0, 11].map(Some),
+        ),
+        (
+            R::EveryRoleInvalid,
+            None,
+            [21, 81, 18, 3, 28, 1, 6, 0].map(Some),
+        ),
+        (
+            R::TargetDuplicate,
+            None,
+            [22, 65, 19, 3, 28, 0, 1, 1].map(Some),
+        ),
+        (
+            R::CoverageUncanonicalized,
+            None,
+            [21, 60, 18, 3, 28, 0, 0, 0].map(Some),
+        ),
+        (R::ManyTargets, None, [34, 68, 34, 1, 70, 0, 0, 0].map(Some)),
+        (
+            R::EveryFixtureLocale,
+            None,
+            [27, 204, 27, 13, 56, 0, 0, 0].map(Some),
         ),
     ] {
         let declaration = declarations()
             .into_iter()
-            .find(|case| case.fixture == Recipe::LocaleCore(recipe) && case.limit == limit)
+            .find(|case| case.fixture == Recipe::LocaleResolution(recipe) && case.limit == limit)
             .unwrap();
         let work = prepare(&declaration).unwrap().logical_work;
         assert_eq!(
             work.profile_identity,
-            "intlify-config-minimum-project-locale-core-work"
+            "intlify-config-locale-resolution-work"
         );
         assert_eq!(work.facts.len(), expected.len());
         for (item, value) in work.facts.iter().zip(expected) {
             let expected = value.map_or(
                 WorkValue::Unavailable {
-                    reason: UnavailableWork::LocaleCoreRequestedNotResolved,
+                    reason: UnavailableWork::LocaleResolutionRequestedNotResolved,
                 },
                 WorkValue::exact,
             );

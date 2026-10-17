@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the six active minimum boundaries.
+//! Finite owner case declarations for the six active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -12,8 +12,8 @@ use super::operation::Operation;
 
 mod inputs;
 pub(super) use inputs::Recipe;
-mod core_inputs;
-pub(super) use core_inputs::LocaleCoreRecipe;
+mod resolution_inputs;
+pub(super) use resolution_inputs::LocaleResolutionRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -38,10 +38,10 @@ pub(super) enum LimitKind {
     StructuralUnits,
     LocaleRawIdentifierBytes,
     LocaleCanonicalIdentifierBytes,
-    CoreActiveOccurrences,
-    CoreRequestedCardinality,
-    CoreRawIdentifierBytes,
-    CoreCanonicalIdentifierBytes,
+    ResolutionLocaleOccurrences,
+    ResolutionRequestedLocales,
+    ResolutionRawIdentifierBytes,
+    ResolutionCanonicalIdentifierBytes,
 }
 
 impl LimitKind {
@@ -89,8 +89,8 @@ pub(super) enum ExpectedKind {
     SelectionUnavailable,
     LocaleCanonicalized,
     LocaleRejected,
-    LocaleCoreResolved,
-    LocaleCoreRejected,
+    LocaleResolutionComplete,
+    LocaleResolutionBlocked,
 }
 
 #[derive(
@@ -289,7 +289,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::StructuralAnalysis => ExpectedKind::StructuralComplete,
                 Operation::AuthoringConstruction => ExpectedKind::AuthoringComplete,
                 Operation::ProfileSelection => ExpectedKind::Selected,
-                Operation::LocaleCanonicalization | Operation::LocaleCoreResolution => {
+                Operation::LocaleCanonicalization | Operation::LocaleResolution => {
                     unreachable!()
                 }
             };
@@ -474,43 +474,31 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
-    // Append the project locale-core slice without changing any of the 94 rows.
-    for recipe in LocaleCoreRecipe::ALL {
-        cases.push(declaration(
-            Operation::LocaleCoreResolution,
-            Recipe::LocaleCore(recipe),
-            Selector::App,
-            if recipe.resolves() {
-                ExpectedKind::LocaleCoreResolved
-            } else {
-                ExpectedKind::LocaleCoreRejected
-            },
-        ));
-    }
-    for (limit, recipe) in [
-        (LimitKind::CoreActiveOccurrences, LocaleCoreRecipe::Multi),
-        (LimitKind::CoreRequestedCardinality, LocaleCoreRecipe::Multi),
-        (LimitKind::CoreRawIdentifierBytes, LocaleCoreRecipe::Minimal),
-        (
-            LimitKind::CoreCanonicalIdentifierBytes,
-            LocaleCoreRecipe::ExpandingAlias,
-        ),
-    ] {
-        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
-            let mut case = declaration(
-                Operation::LocaleCoreResolution,
-                Recipe::LocaleCore(recipe),
-                Selector::App,
-                if edge == LimitEdge::Exact {
-                    ExpectedKind::LocaleCoreResolved
-                } else {
-                    ExpectedKind::LocaleCoreRejected
-                },
-            );
-            case.limit = Some((limit, edge));
-            cases.push(case);
-        }
-    }
+    // Append 015 Phase 7 without changing any of the 94 rows.
+    let (before, after) =
+        LocaleResolutionRecipe::ALL.split_at(LocaleResolutionRecipe::BEFORE_ICU4X);
+    resolution_cases(
+        &mut cases,
+        before,
+        &[
+            (
+                LimitKind::ResolutionLocaleOccurrences,
+                LocaleResolutionRecipe::Multi,
+            ),
+            (
+                LimitKind::ResolutionRequestedLocales,
+                LocaleResolutionRecipe::Multi,
+            ),
+            (
+                LimitKind::ResolutionRawIdentifierBytes,
+                LocaleResolutionRecipe::Minimal,
+            ),
+            (
+                LimitKind::ResolutionCanonicalIdentifierBytes,
+                LocaleResolutionRecipe::ExpandingAlias,
+            ),
+        ],
+    );
     // Append canonicalization through the ICU4X provider without changing any
     // of the 127 rows. Each input runs once reused and once fresh, so the two
     // engine states can be compared on the same input.
@@ -528,7 +516,54 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ));
         }
     }
+    // Append Phase 7 over every occurrence role without changing any of the
+    // 141 rows.
+    resolution_cases(
+        &mut cases,
+        after,
+        &[(
+            LimitKind::ResolutionLocaleOccurrences,
+            LocaleResolutionRecipe::EveryRole,
+        )],
+    );
     cases
+}
+
+/// One Phase 7 case per recipe, then the exact and first-over edges of each
+/// bound on its recipe.
+fn resolution_cases(
+    cases: &mut Vec<Declaration>,
+    recipes: &[LocaleResolutionRecipe],
+    edges: &[(LimitKind, LocaleResolutionRecipe)],
+) {
+    for &recipe in recipes {
+        cases.push(declaration(
+            Operation::LocaleResolution,
+            Recipe::LocaleResolution(recipe),
+            Selector::App,
+            if recipe.completes() {
+                ExpectedKind::LocaleResolutionComplete
+            } else {
+                ExpectedKind::LocaleResolutionBlocked
+            },
+        ));
+    }
+    for &(limit, recipe) in edges {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::LocaleResolution,
+                Recipe::LocaleResolution(recipe),
+                Selector::App,
+                if edge == LimitEdge::Exact {
+                    ExpectedKind::LocaleResolutionComplete
+                } else {
+                    ExpectedKind::LocaleResolutionBlocked
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -538,4 +573,4 @@ mod tests;
 mod locale_tests;
 
 #[cfg(test)]
-mod core_tests;
+mod resolution_tests;

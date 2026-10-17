@@ -221,7 +221,7 @@ pub(super) struct Descriptors {
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) locale_input: Option<InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
-    pub(super) locale_core_input: Option<super::locale_core::InputFacts>,
+    pub(super) locale_resolution_input: Option<super::locale_resolution::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) admitted_locale_input: Option<AdmittedInputFacts>,
 }
@@ -235,7 +235,7 @@ pub(super) enum DescriptorIssue {
     InvalidClockObservation,
     ExecutionMismatch,
     LocaleInputBindingMismatch,
-    LocaleCoreInputBindingMismatch,
+    LocaleResolutionInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -250,11 +250,15 @@ impl Descriptors {
             execution: prepared_core(operation, prepared.icu4x_engine()),
             locale_input: match prepared {
                 Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
-                Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
+                Prepared::LocaleResolution(prepared) => {
+                    Some(InputFacts::observe(&prepared.canonicalizer))
+                }
                 _ => None,
             },
-            locale_core_input: match prepared {
-                Prepared::LocaleCore(core) => Some(super::locale_core::InputFacts::observe(core)),
+            locale_resolution_input: match prepared {
+                Prepared::LocaleResolution(prepared) => {
+                    Some(super::locale_resolution::InputFacts::observe(prepared))
+                }
                 _ => None,
             },
             admitted_locale_input: admitted(prepared),
@@ -293,19 +297,23 @@ impl Descriptors {
         }
         let expected_locale = match prepared {
             Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
-            Prepared::LocaleCore(core) => Some(InputFacts::observe(&core.provider)),
+            Prepared::LocaleResolution(prepared) => {
+                Some(InputFacts::observe(&prepared.canonicalizer))
+            }
             _ => None,
         };
         if self.locale_input != expected_locale || self.admitted_locale_input != admitted(prepared)
         {
             issues.push(DescriptorIssue::LocaleInputBindingMismatch);
         }
-        let expected_core = match prepared {
-            Prepared::LocaleCore(core) => Some(super::locale_core::InputFacts::observe(core)),
+        let expected_resolution = match prepared {
+            Prepared::LocaleResolution(prepared) => {
+                Some(super::locale_resolution::InputFacts::observe(prepared))
+            }
             _ => None,
         };
-        if self.locale_core_input != expected_core {
-            issues.push(DescriptorIssue::LocaleCoreInputBindingMismatch);
+        if self.locale_resolution_input != expected_resolution {
+            issues.push(DescriptorIssue::LocaleResolutionInputBindingMismatch);
         }
         issues
     }
