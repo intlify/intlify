@@ -22,6 +22,28 @@ pub(crate) struct VersionedIdentity<Id> {
     pub(crate) revision: Id,
 }
 
+/// Why a resolver does not admit an asserted specification: 015's
+/// `unsupported` for another identity, and `incompatible` for the supported
+/// identity at another revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SpecificationNotAdmitted {
+    Unsupported,
+    Incompatible,
+}
+
+impl<Id: Eq> VersionedIdentity<Id> {
+    /// Admits this assertion when it is exactly the `supported` value.
+    pub(crate) fn admit(&self, supported: &Self) -> Result<(), SpecificationNotAdmitted> {
+        if self.identity != supported.identity {
+            Err(SpecificationNotAdmitted::Unsupported)
+        } else if self.revision != supported.revision {
+            Err(SpecificationNotAdmitted::Incompatible)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// One dataset as 017 names it. There is no dataset revision: the semantic
 /// digest identifies the content whatever payload format carried it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,16 +87,6 @@ pub(crate) struct Supported<Id> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DuplicateSpecification;
 
-/// The invocation asserts a specification this resolver does not support.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SpecificationUnsupported;
-
-impl From<SpecificationUnsupported> for Admission {
-    fn from(_: SpecificationUnsupported) -> Self {
-        Self::Specification
-    }
-}
-
 impl<Id: Eq> Supported<Id> {
     pub(crate) fn new(entries: Vec<SemanticPins<Id>>) -> Result<Self, DuplicateSpecification> {
         for (index, entry) in entries.iter().enumerate() {
@@ -89,15 +101,23 @@ impl<Id: Eq> Supported<Id> {
     }
 
     /// The pins a provider must carry when the invocation's
-    /// `locale-canonicalization` slot asserts `asserted`.
+    /// `locale-canonicalization` slot asserts `asserted`. An assertion no entry
+    /// admits is `incompatible` when some entry has its identity.
     pub(crate) fn expected(
         &self,
         asserted: &VersionedIdentity<Id>,
-    ) -> Result<&SemanticPins<Id>, SpecificationUnsupported> {
-        self.entries
-            .iter()
-            .find(|entry| &entry.specification == asserted)
-            .ok_or(SpecificationUnsupported)
+    ) -> Result<&SemanticPins<Id>, SpecificationNotAdmitted> {
+        let mut reason = SpecificationNotAdmitted::Unsupported;
+        for entry in &self.entries {
+            match asserted.admit(&entry.specification) {
+                Ok(()) => return Ok(entry),
+                Err(SpecificationNotAdmitted::Incompatible) => {
+                    reason = SpecificationNotAdmitted::Incompatible;
+                }
+                Err(SpecificationNotAdmitted::Unsupported) => {}
+            }
+        }
+        Err(reason)
     }
 }
 
@@ -152,15 +172,6 @@ pub(crate) enum BindingPart {
     DatasetDigest,
 }
 
-impl BindingPart {
-    const fn is_specification(self) -> bool {
-        matches!(
-            self,
-            Self::SpecificationIdentity | Self::SpecificationRevision
-        )
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BindingFailure {
     MissingProviderData,
@@ -171,11 +182,8 @@ impl BindingFailure {
     pub(crate) fn admission(&self) -> Admission {
         match self {
             Self::MissingProviderData => Admission::PreInvocation(EnvelopeReason::MissingInput),
-            // A specification admits its dataset, so a specification that
-            // disagrees decides the class even when the dataset differs too.
-            Self::Mismatch(parts) if parts.iter().any(|part| part.is_specification()) => {
-                Admission::Specification
-            }
+            // The slot already admitted the asserted specification, so data
+            // naming another specification or dataset is data that disagrees.
             Self::Mismatch(_) => Admission::Data,
         }
     }
@@ -193,13 +201,13 @@ pub(crate) enum EnvelopeReason {
 }
 
 /// Where 015 reports a failure to admit canonicalization data. These are private
-/// classes, not Findings: the Finding Registry belongs to 015 Phase 5.
+/// classes, not Findings: the Finding Registry belongs to 015 Phase 5. An
+/// asserted specification the resolver does not support is the
+/// `locale-canonicalization` slot's failure, never the data's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Admission {
     /// The pre-invocation boundary; the resolver is not invoked.
     PreInvocation(EnvelopeReason),
-    /// `project-profile-locale-specification-not-admitted`.
-    Specification,
     /// `project-profile-locale-data-not-admitted`.
     Data,
 }
