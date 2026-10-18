@@ -178,7 +178,8 @@ fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_va
 #[test]
 fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailable() {
     use crate::benchmark::cases::{
-        declarations, prepare::prepare, LimitEdge, LimitKind, LocaleResolutionRecipe as R, Recipe,
+        declarations, prepare::prepare, Engine, LimitEdge, LimitKind, LocaleResolutionRecipe as R,
+        Recipe,
     };
     let over = |kind| Some((kind, LimitEdge::FirstOver));
     for (recipe, limit, expected) in [
@@ -327,6 +328,30 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
             let mut changed = work.clone();
             changed.facts[index].observation = WorkValue::exact(u64::MAX);
             assert!(!changed.matches_expected(&work));
+        }
+    }
+    // The ICU4X scales, through either engine: 256 targets of one locale,
+    // two units each beyond the first; and 128 locales requested by the
+    // project and its target, two units each in both sets.
+    for (input, expected) in [
+        (R::OccurrenceScale, [258, 516, 258, 1, 518, 0, 0, 0]),
+        (R::CanonicalScale, [257, 514, 257, 128, 516, 0, 0, 0]),
+    ] {
+        for engine in [Engine::Reused, Engine::Fresh] {
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| case.fixture == Recipe::Icu4xLocaleResolution { input, engine })
+                .unwrap();
+            let work = prepare(&declaration).unwrap().logical_work;
+            assert_eq!(work.facts.len(), expected.len());
+            for (item, value) in work.facts.iter().zip(expected) {
+                assert_eq!(
+                    item.observation,
+                    WorkValue::exact(value),
+                    "{input:?}, {engine:?}, {:?}",
+                    item.kind
+                );
+            }
         }
     }
 }

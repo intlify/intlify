@@ -362,11 +362,13 @@ fn resolution_edge(
 }
 
 fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use crate::benchmark::locale_resolution::{resolve, PreparedLocales};
+    use crate::benchmark::locale_resolution::{resolve, Canonicalizers, PreparedLocales};
     use crate::resolver::locales::fixture_policy;
 
-    let Recipe::LocaleResolution(recipe) = declaration.fixture else {
-        return Err(PreparationFailure::UndeclaredCase);
+    let (recipe, engine) = match declaration.fixture {
+        Recipe::LocaleResolution(recipe) => (recipe, None),
+        Recipe::Icu4xLocaleResolution { input, engine } => (input, Some(engine)),
+        _ => return Err(PreparationFailure::UndeclaredCase),
     };
     let (input_limits, structural_limits) = fixture_capacity();
     let doc = materialize_file(declaration.fixture.source(), input_limits)
@@ -389,9 +391,13 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
         return Err(PreparationFailure::PrerequisiteUnavailable);
     };
     // Explicit finite capacity, not product defaults or an admitted policy.
+    // The scales hold 258 spellings and 128 requested locales.
     let bound = |value| Bound::new(value).expect("explicit finite resolution capacity");
-    let (mut occurrences, mut requested, mut identifier_bytes) =
-        (bound(128), bound(64), bound(128));
+    let (mut occurrences, mut requested, mut identifier_bytes) = if recipe.scales() {
+        (bound(512), bound(256), bound(128))
+    } else {
+        (bound(128), bound(64), bound(128))
+    };
     if let Some((kind, edge)) = declaration.limit {
         let exact = resolution_edge(kind, recipe)?;
         let bound = Bound::new(match edge {
@@ -409,17 +415,20 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     }
     // Phase 5 binds the canonicalizer under the policy's identifier bound.
     let policy = fixture_policy(identifier_bytes, occurrences, requested);
-    let canonicalizer = Arc::new(
-        Canonicalizer::bind(
-            &fixture_pins(),
-            Some(FixtureProvider::new()),
-            policy
-                .limits()
-                .locale_resolution
-                .max_locale_identifier_bytes,
-        )
-        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
-    );
+    let limit = policy
+        .limits()
+        .locale_resolution
+        .max_locale_identifier_bytes;
+    let canonicalizer = match engine {
+        None => Canonicalizers::Finite(Arc::new(
+            Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), limit)
+                .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+        )),
+        Some(engine) => Canonicalizers::Icu4x(
+            PreparedEngine::prepare(engine, limit)
+                .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+        ),
+    };
     let prepared = PreparedLocales {
         analysis,
         config,
@@ -430,7 +439,13 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     let fields = prepared
         .fields()
         .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-    let resolved = resolve(&prepared.policy, &prepared.canonicalizer, &fields);
+    // The reference output comes from the engine the case measures.
+    let resolved = match &prepared.canonicalizer {
+        Canonicalizers::Finite(core) => resolve(&prepared.policy, core.as_ref(), &fields),
+        Canonicalizers::Icu4x(engine) => engine
+            .with_engine(|core| resolve(&prepared.policy, core, &fields))
+            .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+    };
     let kind = match &resolved.result {
         Ok(_) if resolved.evaluation.issues().next().is_none() => {
             ExpectedKind::LocaleResolutionComplete

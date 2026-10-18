@@ -8,6 +8,7 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use crate::benchmark::clock::tests::ScriptedClock;
+use crate::benchmark::locale_resolution::Canonicalizers;
 use crate::benchmark::operation::{Operation, Output};
 use crate::input_limits::Bound;
 use crate::materialize::materialize_file;
@@ -116,7 +117,7 @@ fn expectation_objects_are_closed_and_nullable_fields_must_be_present() {
 #[test]
 fn planning_work_is_complete_and_checked_before_fixture_preparation() {
     let registry = Registry::load().unwrap();
-    assert_eq!(registry.expectations().len(), 150);
+    assert_eq!(registry.expectations().len(), 160);
     for row in registry.expectations() {
         assert_eq!(work_digest(row.work()).unwrap(), row.logical_work);
         let fixture = registry.prepare(row.declaration()).unwrap();
@@ -380,10 +381,10 @@ fn locale_resolution_preparation_and_bounds_are_bound_even_when_result_and_work_
             1 => prepared.policy = fixture_policy(bound(128), bound(128), bound(63)),
             2 => prepared.policy = fixture_policy(bound(127), bound(128), bound(64)),
             3 => {
-                prepared.canonicalizer = Arc::new(
+                prepared.canonicalizer = Canonicalizers::Finite(Arc::new(
                     Canonicalizer::bind(&fixture_pins(), Some(FixtureProvider::new()), bound(127))
                         .unwrap(),
-                );
+                ));
             }
             _ => {
                 let Prepared::LocaleResolution(other) = prepare(&other).unwrap().prepared else {

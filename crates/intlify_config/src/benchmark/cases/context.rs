@@ -5,6 +5,8 @@
 //! actual immutable operation input; it is not a common Measurement Case ID or
 //! shared-artifact digest. No acquisition, clock, run, or physical ID enters it.
 
+use crate::benchmark::locale_icu4x::PreparedEngine;
+use crate::benchmark::locale_resolution::Canonicalizers;
 use crate::benchmark::observation::{document, Digest, Frame};
 use crate::benchmark::operation::Prepared;
 use crate::input_limits::InputLimits;
@@ -110,7 +112,13 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             );
         }
         Prepared::LocaleResolution(prepared) => {
-            if !matches!(candidate.declaration.fixture, Recipe::LocaleResolution(_))
+            // The declared provider and engine state are the prepared ones.
+            let declared = match candidate.declaration.fixture {
+                Recipe::LocaleResolution(_) => None,
+                Recipe::Icu4xLocaleResolution { engine, .. } => Some(engine),
+                _ => return Err(ContextFailure::LocaleInputMismatch),
+            };
+            if declared != prepared.icu4x().map(PreparedEngine::engine)
                 || candidate.declaration.selector != super::Selector::App
                 || prepared.selected.as_str() != "app"
                 || prepared.fields().is_none()
@@ -121,12 +129,15 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             frame.json(
                 &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
             );
-            frame.json(
-                &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(
-                    &prepared.canonicalizer,
-                ))
-                .map_err(|_| ContextFailure::Encoding)?,
-            );
+            let canonicalizer = match &prepared.canonicalizer {
+                Canonicalizers::Finite(core) => {
+                    serde_json::to_value(crate::benchmark::locale::InputFacts::observe(core))
+                }
+                Canonicalizers::Icu4x(engine) => serde_json::to_value(
+                    crate::benchmark::locale_icu4x::AdmittedInputFacts::observe(engine),
+                ),
+            };
+            frame.json(&canonicalizer.map_err(|_| ContextFailure::Encoding)?);
             frame.json(
                 &serde_json::to_value(crate::benchmark::locale_resolution::InputFacts::observe(
                     prepared,

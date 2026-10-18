@@ -396,6 +396,73 @@ fn locale_resolution_descriptor_binds_its_bounds_roles_and_actual_reuse() {
 }
 
 #[test]
+fn icu4x_resolution_descriptors_bind_the_admitted_provider_beside_the_resolution_input() {
+    use crate::benchmark::cases::{
+        declarations, prepare::prepare, Engine, LocaleResolutionRecipe, Recipe,
+    };
+
+    let prepared = |fixture| {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == fixture)
+            .unwrap();
+        prepare(&declaration).unwrap().prepared
+    };
+    let input = LocaleResolutionRecipe::EveryRole;
+    let finite = prepared(Recipe::LocaleResolution(input));
+    let reused = prepared(Recipe::Icu4xLocaleResolution {
+        input,
+        engine: Engine::Reused,
+    });
+    let fresh = prepared(Recipe::Icu4xLocaleResolution {
+        input,
+        engine: Engine::Fresh,
+    });
+    let record = |operation| Descriptors::for_acquisition(operation, clock(1));
+    for (operation, engine, reuse) in [
+        (
+            &reused,
+            "reused",
+            "resident-admitted-provider-reused-between-invocations",
+        ),
+        (
+            &fresh,
+            "fresh",
+            "artifact-admitted-and-bound-before-each-invocation",
+        ),
+    ] {
+        let descriptors = record(operation);
+        assert!(descriptors.validate(operation, clock(1)).is_empty());
+        assert_eq!(
+            descriptors.boundary,
+            Boundary::for_operation(Operation::LocaleResolution)
+        );
+        assert_eq!(descriptors.execution.engine_state, engine);
+        let encoded = serde_json::to_value(&descriptors).unwrap();
+        assert_eq!(encoded["localeInput"], Value::Null);
+        assert_eq!(encoded["admittedLocaleInput"]["providerReuse"], reuse);
+        assert_eq!(
+            descriptors.locale_resolution_input,
+            record(&finite).locale_resolution_input
+        );
+    }
+    // Phase 7's own state is the one its reused engine runs in, so only the
+    // provider's facts tell the finite record from the ICU4X one.
+    assert_eq!(record(&reused).execution, record(&finite).execution);
+    assert_eq!(
+        record(&finite).validate(&reused, clock(1)),
+        [DescriptorIssue::LocaleInputBindingMismatch]
+    );
+    assert_eq!(
+        record(&fresh).validate(&reused, clock(1)),
+        [
+            DescriptorIssue::ExecutionMismatch,
+            DescriptorIssue::LocaleInputBindingMismatch
+        ]
+    );
+}
+
+#[test]
 fn simultaneous_descriptor_issues_have_stable_registry_order() {
     let operation = &prepared(Operation::FileMaterialization);
     let mut broken = Descriptors::for_acquisition(operation, clock(2));
