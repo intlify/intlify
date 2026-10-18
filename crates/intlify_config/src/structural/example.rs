@@ -81,21 +81,43 @@ fn located(mut item: Value, source: &[u8], span: Option<ByteSpan>) -> Value {
     item
 }
 
-fn pointer_span(doc: &MaterializedDocument, pointer: &str) -> Option<ByteSpan> {
+/// The span of the value `pointer` names, or of its member's key when `key`.
+fn pointer_span(doc: &MaterializedDocument, pointer: &str, key: bool) -> Option<ByteSpan> {
     let mut node = doc.root();
-    for token in pointer.strip_prefix('/')?.split('/') {
-        let key = token.replace("~1", "/").replace("~0", "~");
+    let mut tokens = pointer.strip_prefix('/')?.split('/').peekable();
+    while let Some(token) = tokens.next() {
+        let name = token.replace("~1", "/").replace("~0", "~");
         node = match doc.node(node).kind() {
-            NodeKind::Object(members) => members.get(&key)?.value(),
-            NodeKind::Array(items) => *items.get(key.parse::<usize>().ok()?)?,
+            NodeKind::Object(members) => {
+                let member = members.get(&name)?;
+                if key && tokens.peek().is_none() {
+                    return Some(member.key_span());
+                }
+                member.value()
+            }
+            NodeKind::Array(items) => *items.get(name.parse::<usize>().ok()?)?,
             _ => return None,
         };
     }
     Some(doc.node(node).span())
 }
 
+/// What the pointer of the spelling at `location` names. A JSON Pointer
+/// names a member's value and has no form for its key, so a map key's
+/// pointer names its member and the display marks the key as the target.
+fn target(location: &Location) -> &'static str {
+    if matches!(
+        location,
+        Location::NegotiationAliasKey(_) | Location::MessageFallbackKey(_)
+    ) {
+        "key"
+    } else {
+        "value"
+    }
+}
+
 /// The JSON Pointer of the spelling at `location`. A map key has no pointer
-/// of its own, so a key's location points at its member.
+/// of its own, so a key's location points at its member (see [`target`]).
 fn locale_pointer(profile: &str, declaration: &Declaration, location: &Location) -> String {
     let escape = |token: &str| token.replace('~', "~0").replace('/', "~1");
     let alias = |rank: usize| {
@@ -172,11 +194,15 @@ fn locale_issue(
     let Subject::Locale(subject) = &issue.unit().subject else {
         return diagnostic(issue.code().as_str(), "Locale resolution failed.", None);
     };
-    let pointers = resolved
+    let locations = resolved
         .occurrences
         .iter()
         .filter(|occurrence| occurrence.subject == *subject)
-        .map(|occurrence| locale_pointer(profile, declaration, &occurrence.location))
+        .map(|occurrence| &occurrence.location)
+        .collect::<Vec<_>>();
+    let pointers = locations
+        .iter()
+        .map(|location| locale_pointer(profile, declaration, location))
         .collect::<Vec<_>>();
     let locale = canonical(subject).unwrap_or("(none)");
     let message = match issue.code() {
@@ -211,6 +237,11 @@ fn locale_issue(
         message,
         pointers.first().map(String::as_str),
     );
+    // The spellings of one subject share one role, so one target covers
+    // every pointer.
+    if let Some(location) = locations.first() {
+        item["target"] = json!(target(location));
+    }
     if pointers.len() > 1 {
         item["relatedPointers"] = json!(pointers);
     }
@@ -384,6 +415,7 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         .filter(|occurrence| occurrence.corrected)
         .map(|occurrence| json!({
             "pointer": locale_pointer(id, declaration, &occurrence.location),
+            "target": target(&occurrence.location),
             "replacement": canonical(&occurrence.subject)
         }))
         .collect::<Vec<_>>());
@@ -406,7 +438,10 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         output["diagnostics"] = json!(errors
             .into_iter()
             .map(|item| {
-                let span = item["pointer"].as_str().and_then(|p| pointer_span(&doc, p));
+                let key = item["target"] == "key";
+                let span = item["pointer"]
+                    .as_str()
+                    .and_then(|p| pointer_span(&doc, p, key));
                 located(item, source, span)
             })
             .collect::<Vec<_>>());
