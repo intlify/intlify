@@ -1,0 +1,25 @@
+name: /dev/null
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  commit:
+    name: Commit to /dev/null
+    # Only pull requests that kazupon opens from a branch of this repository.
+    # Renovate, other bots, and other people's pull requests are skipped.
+    # Fork pull requests get no secrets, so they are skipped too.
+    if: >-
+      github.event.pull_request.user.login == 'kazupon' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Commit to /dev/null
+        uses: nunomaduro/dev-null.sh/.github/actions/commit@569fc285dd560f3df12cd9672fbc18fe791d5144 # production
+        with:
+          body: |
+            Opened ${{ github.repository }}#${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}
+            ${{ github.event.pull_request.html_url }}
+          ssh-key: ${{ secrets.DEVNULL_SSH_KEY }}
