@@ -244,7 +244,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::OpaqueIdentity
         | Check::DistinctFromSource
         | Check::UniqueCandidate
-        | Check::EffectiveMode => return Err(OutputFailure::LocaleResolutionInvariant),
+        | Check::EffectiveMode
+        | Check::VocabularyMember
+        | Check::UniqueSurfaceClass
+        | Check::UniqueDomain => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }
@@ -537,6 +540,7 @@ mod tests {
             Subject::CanonicalizationData,
             Subject::Negotiation(crate::resolver::negotiation::NegotiationSubject::Aliases),
             Subject::Fallback(crate::resolver::fallback::FallbackSubject::Sources),
+            Subject::Coverage(crate::resolver::coverage::CoverageSubject::Rules),
             Subject::DeliveryPlacement,
         ] {
             let foreign = Unit {
@@ -555,6 +559,9 @@ mod tests {
             Check::DistinctFromSource,
             Check::UniqueCandidate,
             Check::EffectiveMode,
+            Check::VocabularyMember,
+            Check::UniqueSurfaceClass,
+            Check::UniqueDomain,
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),

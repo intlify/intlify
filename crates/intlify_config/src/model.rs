@@ -355,7 +355,12 @@ pub(crate) struct Coverage {
     pub(crate) rules: Presence<Vec<CoverageRule>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+// The variants follow the unsigned byte order of their spellings, so the
+// derived order is the order of those spellings. A plain comment: schemars
+// would take a doc comment as the generated schema's description.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum CoverageMode {
     DirectRequired,
@@ -383,6 +388,19 @@ impl CoverageRule {
             .requested_locales
             .as_option()
             .map(NonEmptyVec::as_slice)
+    }
+
+    /// The rule's surface-class selector, when it has one.
+    pub(crate) fn intent_surface_classes(&self) -> Option<&[String]> {
+        self.0
+            .intent_surface_classes
+            .as_option()
+            .map(NonEmptyVec::as_slice)
+    }
+
+    /// The mode the rule selects where it decides a cell.
+    pub(crate) const fn mode(&self) -> CoverageMode {
+        self.0.mode
     }
 }
 

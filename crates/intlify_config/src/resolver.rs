@@ -5,10 +5,11 @@
 //! `LocalizationProjectProfile`, a checked or blocked outcome, Resolution
 //! Evidence, or a registry: each resolution phase records which of its checks it
 //! evaluated and why the others were not, and hands later phases the values it
-//! admitted. Phases that need construction authority or a confirmed Resource
-//! Limit Policy take them as values that only tests build until the phases
-//! producing them exist.
+//! admitted. Phases that need construction authority, a confirmed Resource
+//! Limit Policy, or an admitted vocabulary take them as values that only tests
+//! build until the phases producing them exist.
 
+pub(crate) mod coverage;
 pub(crate) mod delivery;
 pub(crate) mod evaluation;
 pub(crate) mod fallback;
@@ -17,3 +18,4 @@ pub(crate) mod limits;
 pub(crate) mod locales;
 pub(crate) mod negotiation;
 pub(crate) mod specification;
+pub(crate) mod vocabulary;
