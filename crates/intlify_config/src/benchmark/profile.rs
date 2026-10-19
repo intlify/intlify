@@ -111,7 +111,8 @@ impl MeasurementProfile {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
             },
-            scope: "internal-configuration-locale-resolution-and-icu4x-canonicalization".into(),
+            scope: "internal-configuration-locale-resolution-and-canonicalization-with-icu4x"
+                .into(),
             fixture_registry: registry.binding().clone(),
             cases: registry.declarations().cloned().collect(),
             case_requirement: "all-required-unconditional".into(),
@@ -135,20 +136,33 @@ impl MeasurementProfile {
                 cancellation: "external-process-termination-no-complete-result".into(),
                 failed_capture: "stop-case-retain-diagnostic-prefix-only".into(),
             },
-            // Every state a case runs in: each operation's own, and both
-            // engine states of canonicalization through the ICU4X provider.
+            // Every state a case runs in, once: each operation's own, and both
+            // engine states of canonicalization and Phase 7 through the
+            // ICU4X provider. Phase 7's own state is the one its reused
+            // engine runs in.
             operation_states: Operation::ALL
                 .into_iter()
                 .map(|operation| (operation, None))
                 .chain(
-                    [Engine::Reused, Engine::Fresh]
-                        .map(|engine| (Operation::LocaleCanonicalization, Some(engine))),
+                    [
+                        Operation::LocaleCanonicalization,
+                        Operation::LocaleResolution,
+                    ]
+                    .into_iter()
+                    .flat_map(|operation| {
+                        [Engine::Reused, Engine::Fresh].map(|engine| (operation, Some(engine)))
+                    }),
                 )
                 .map(|(operation, icu4x)| OperationState {
                     operation,
                     execution: crate::benchmark::descriptor::prepared_core(operation, icu4x),
                 })
-                .collect(),
+                .fold(Vec::new(), |mut states, state| {
+                    if !states.contains(&state) {
+                        states.push(state);
+                    }
+                    states
+                }),
             ordering: "fixture-registry-order-no-interleaving".into(),
             // Zero elapsed time can be an honest observation. Smoke checks
             // reported positive granularity but imposes no duration ratio.

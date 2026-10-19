@@ -22,6 +22,8 @@ use crate::structural::{
 
 use super::cases::Engine;
 use super::clock::Clock;
+use super::locale_icu4x::PreparedEngine;
+use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{locale, locale_icu4x, locale_resolution};
@@ -143,9 +145,10 @@ impl Prepared {
 
     /// The engine state of a case canonicalizing through the ICU4X provider;
     /// `None` for every other case.
-    pub(super) const fn icu4x_engine(&self) -> Option<Engine> {
+    pub(super) fn icu4x_engine(&self) -> Option<Engine> {
         match self {
             Self::Icu4xLocale { engine, .. } => Some(engine.engine()),
+            Self::LocaleResolution(prepared) => prepared.icu4x().map(PreparedEngine::engine),
             _ => None,
         }
     }
@@ -207,13 +210,28 @@ impl Prepared {
                 let fields = prepared
                     .fields()
                     .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let measured = measure(
-                    clock,
-                    (&prepared.policy, prepared.canonicalizer.as_ref(), &fields),
-                    |(policy, canonicalizer, fields)| {
-                        locale_resolution::resolve(policy, canonicalizer, fields)
-                    },
-                )?;
+                let measured = match &prepared.canonicalizer {
+                    Canonicalizers::Finite(core) => measure(
+                        clock,
+                        (&prepared.policy, core.as_ref(), &fields),
+                        |(policy, canonicalizer, fields)| {
+                            locale_resolution::resolve(policy, canonicalizer, fields)
+                        },
+                    )?,
+                    // A fresh engine is admitted and bound before the start
+                    // read and released after the end read.
+                    Canonicalizers::Icu4x(engine) => engine
+                        .with_engine(|core| {
+                            measure(
+                                clock,
+                                (&prepared.policy, core, &fields),
+                                |(policy, canonicalizer, fields)| {
+                                    locale_resolution::resolve(policy, canonicalizer, fields)
+                                },
+                            )
+                        })
+                        .map_err(|_| MeasurementFailure::PrerequisiteUnavailable)??,
+                };
                 Ok(Measured {
                     duration: measured.duration,
                     output: Output::LocaleResolution(measured.output),

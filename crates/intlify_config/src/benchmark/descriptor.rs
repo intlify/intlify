@@ -248,13 +248,7 @@ impl Descriptors {
             method: Method::monotonic_invocation(),
             clock_observation: clock.observation(),
             execution: prepared_core(operation, prepared.icu4x_engine()),
-            locale_input: match prepared {
-                Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
-                Prepared::LocaleResolution(prepared) => {
-                    Some(InputFacts::observe(&prepared.canonicalizer))
-                }
-                _ => None,
-            },
+            locale_input: finite(prepared),
             locale_resolution_input: match prepared {
                 Prepared::LocaleResolution(prepared) => {
                     Some(super::locale_resolution::InputFacts::observe(prepared))
@@ -295,14 +289,7 @@ impl Descriptors {
         if self.execution != prepared_core(operation, prepared.icu4x_engine()) {
             issues.push(DescriptorIssue::ExecutionMismatch);
         }
-        let expected_locale = match prepared {
-            Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
-            Prepared::LocaleResolution(prepared) => {
-                Some(InputFacts::observe(&prepared.canonicalizer))
-            }
-            _ => None,
-        };
-        if self.locale_input != expected_locale || self.admitted_locale_input != admitted(prepared)
+        if self.locale_input != finite(prepared) || self.admitted_locale_input != admitted(prepared)
         {
             issues.push(DescriptorIssue::LocaleInputBindingMismatch);
         }
@@ -319,9 +306,23 @@ impl Descriptors {
     }
 }
 
+/// The finite provider's facts, for a case canonicalizing through it.
+fn finite(prepared: &Prepared) -> Option<InputFacts> {
+    match prepared {
+        Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
+        Prepared::LocaleResolution(prepared) => {
+            prepared.finite().map(|core| InputFacts::observe(core))
+        }
+        _ => None,
+    }
+}
+
+/// The admitted artifact's facts, for a case canonicalizing through the
+/// ICU4X provider.
 fn admitted(prepared: &Prepared) -> Option<AdmittedInputFacts> {
     match prepared {
         Prepared::Icu4xLocale { engine, .. } => Some(AdmittedInputFacts::observe(engine)),
+        Prepared::LocaleResolution(prepared) => prepared.icu4x().map(AdmittedInputFacts::observe),
         _ => None,
     }
 }

@@ -81,14 +81,14 @@ pub(crate) fn resolution_operation(value: &Value) -> Prepared {
         config,
         selected: serde_json::from_value(json!("app")).unwrap(),
         policy: crate::resolver::locales::fixture_policy(bound(128), bound(128), bound(64)),
-        canonicalizer: Arc::new(
+        canonicalizer: locale_resolution::Canonicalizers::Finite(Arc::new(
             crate::locale::Canonicalizer::bind(
                 &crate::locale::fixtures::fixture_pins(),
                 Some(crate::locale::fixtures::FixtureProvider::new()),
                 bound(128),
             )
             .unwrap(),
-        ),
+        )),
     }))
 }
 
@@ -197,6 +197,62 @@ fn a_fresh_engine_that_binds_otherwise_fails_before_the_start_read() {
     let clock = ScriptedClock::nanos([0, 1]);
     assert!(matches!(
         prepared.once(&clock),
+        Err(MeasurementFailure::PrerequisiteUnavailable)
+    ));
+    assert_eq!(clock.remaining(), 2);
+}
+
+fn icu4x_resolution_operation(engine: Engine) -> Prepared {
+    let mut operation = resolution_operation(&minimal_config());
+    let Prepared::LocaleResolution(prepared) = &mut operation else {
+        unreachable!()
+    };
+    prepared.canonicalizer = locale_resolution::Canonicalizers::Icu4x(
+        locale_icu4x::PreparedEngine::prepare(engine, Bound::new(128).unwrap()).unwrap(),
+    );
+    operation
+}
+
+#[test]
+fn both_icu4x_engines_run_phase_7_between_the_same_markers_as_the_finite_provider() {
+    let finite = resolution_operation(&minimal_config())
+        .once(&ScriptedClock::nanos([0, 1]))
+        .unwrap()
+        .output
+        .observe()
+        .unwrap();
+    for engine in [Engine::Reused, Engine::Fresh] {
+        let prepared = icu4x_resolution_operation(engine);
+        assert_eq!(prepared.operation(), Operation::LocaleResolution);
+        assert_eq!(prepared.icu4x_engine(), Some(engine));
+        assert!(prepared.prerequisites_admitted());
+        // A fresh engine is admitted before the start read, so the two reads
+        // still enclose only Phase 7.
+        let clock = ScriptedClock::nanos([100, 137]);
+        let measured = prepared.once(&clock).unwrap();
+        assert_eq!(measured.duration, Quantity::new(37));
+        assert_eq!(clock.remaining(), 0);
+        assert_eq!(measured.output.observe().unwrap(), finite);
+    }
+}
+
+#[test]
+fn a_fresh_phase_7_engine_that_binds_otherwise_fails_before_the_start_read() {
+    let mut operation = icu4x_resolution_operation(Engine::Fresh);
+    let Prepared::LocaleResolution(prepared) = &mut operation else {
+        unreachable!()
+    };
+    let locale_resolution::Canonicalizers::Icu4x(locale_icu4x::PreparedEngine::Fresh {
+        binding,
+        ..
+    }) = &mut prepared.canonicalizer
+    else {
+        unreachable!()
+    };
+    binding.pins.dataset.semantic_digest = format!("sha256:{}", "0".repeat(64));
+    let clock = ScriptedClock::nanos([0, 1]);
+    assert!(matches!(
+        operation.once(&clock),
         Err(MeasurementFailure::PrerequisiteUnavailable)
     ));
     assert_eq!(clock.remaining(), 2);

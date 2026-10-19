@@ -526,6 +526,22 @@ pub(super) fn declarations() -> Vec<Declaration> {
             LocaleResolutionRecipe::EveryRole,
         )],
     );
+    // Append Phase 7 through the ICU4X provider without changing any of the
+    // 150 rows. Each input runs once reused and once fresh.
+    for input in LocaleResolutionRecipe::ICU4X {
+        for engine in [Engine::Reused, Engine::Fresh] {
+            cases.push(declaration(
+                Operation::LocaleResolution,
+                Recipe::Icu4xLocaleResolution { input, engine },
+                Selector::App,
+                if input.completes() {
+                    ExpectedKind::LocaleResolutionComplete
+                } else {
+                    ExpectedKind::LocaleResolutionBlocked
+                },
+            ));
+        }
+    }
     cases
 }
 

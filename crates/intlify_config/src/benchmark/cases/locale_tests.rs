@@ -9,7 +9,7 @@ use crate::locale::{CanonicalizationFailure, ProviderFailure};
 #[test]
 fn canonicalization_cases_extend_the_catalog_without_changing_the_original_inventory() {
     let cases = declarations();
-    assert_eq!(cases.len(), 150);
+    assert_eq!(cases.len(), 160);
     assert!(cases[..77]
         .iter()
         .all(|case| case.operation != Operation::LocaleCanonicalization));
@@ -176,10 +176,10 @@ fn icu4x_cases_follow_the_original_catalog_with_both_engines_for_each_input() {
     use crate::benchmark::operation::Prepared;
 
     let cases = declarations();
-    // Only Phase 7's later rows follow them.
+    // Only Phase 7's later finite rows follow them, before its own ICU4X rows.
     assert!(cases[..127]
         .iter()
-        .chain(&cases[141..])
+        .chain(&cases[141..150])
         .all(|case| case.fixture.icu4x_engine().is_none()));
     assert_eq!(cases[127..141].len(), 2 * Icu4xRecipe::ALL.len());
     for (pair, input) in cases[127..141].chunks(2).zip(Icu4xRecipe::ALL) {

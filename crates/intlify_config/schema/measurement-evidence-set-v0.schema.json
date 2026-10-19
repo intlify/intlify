@@ -2428,7 +2428,9 @@
         "target-duplicate",
         "coverage-uncanonicalized",
         "many-targets",
-        "every-fixture-locale"
+        "every-fixture-locale",
+        "occurrence-scale",
+        "canonical-scale"
       ],
       "type": "string"
     },
@@ -3307,6 +3309,26 @@
             }
           },
           "required": ["icu4x-locale"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "icu4x-locale-resolution": {
+              "additionalProperties": false,
+              "properties": {
+                "engine": {
+                  "$ref": "#/definitions/Engine"
+                },
+                "input": {
+                  "$ref": "#/definitions/LocaleResolutionRecipe"
+                }
+              },
+              "required": ["input", "engine"],
+              "type": "object"
+            }
+          },
+          "required": ["icu4x-locale-resolution"],
           "type": "object"
         }
       ]

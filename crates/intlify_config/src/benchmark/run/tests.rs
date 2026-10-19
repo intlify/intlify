@@ -29,14 +29,14 @@ fn failed_clock_capture() -> ProfileCollectionFailure {
 #[test]
 fn native_run_collects_all_planned_cases_and_roundtrips_as_one_bound_result() {
     let prepared = PreparedRun::acquire().unwrap();
-    assert_eq!(prepared.plan.cases.len(), 150);
-    assert_eq!(prepared.fixtures.len(), 150);
+    assert_eq!(prepared.plan.cases.len(), 160);
+    assert_eq!(prepared.fixtures.len(), 160);
     assert!(prepared.fixtures.iter().all(Result::is_ok));
     let plan = prepared.plan.clone();
     let recorded = prepared.collect().unwrap();
     assert_eq!(recorded.record.result.plan, plan);
     assert_eq!(recorded.record.result.outcome, OwnerOutcome::Complete);
-    assert_eq!(recorded.record.result.attempts.len(), 150);
+    assert_eq!(recorded.record.result.attempts.len(), 160);
     assert!(recorded.validate(&recorded.record).is_empty());
     let bytes = recorded.encode().unwrap();
     let storage = tempfile::tempdir().unwrap();
@@ -52,7 +52,7 @@ fn native_run_collects_all_planned_cases_and_roundtrips_as_one_bound_result() {
         .is_ok());
     drop(recorded);
     // Retained results do not borrow the fixture operations, context, or clock.
-    assert_eq!(decoded.document().result.attempts.len(), 150);
+    assert_eq!(decoded.document().result.attempts.len(), 160);
     assert_eq!(serde_json::to_vec(decoded.document()).unwrap(), bytes);
 }
 
@@ -97,7 +97,7 @@ fn missing_duplicate_reordered_unknown_or_rebound_attempts_are_not_complete_runs
             r.result.attempts.swap(0, 1);
         },
         |r: &mut OwnerRecord| {
-            r.result.attempts[0].ordinal = Quantity::new(150);
+            r.result.attempts[0].ordinal = Quantity::new(160);
         },
         |r: &mut OwnerRecord| {
             r.result.attempts[0].binding.case = r.result.plan.run;
@@ -169,15 +169,15 @@ fn collection_failure_retains_the_case_and_all_later_attempts_without_success_pr
             context.collect(ordinal, fixture, binding)
         })
         .unwrap();
-    assert_eq!(visited.len(), 150);
-    assert_eq!(recorded.record.result.attempts.len(), 150);
+    assert_eq!(visited.len(), 160);
+    assert_eq!(recorded.record.result.attempts.len(), 160);
     assert_eq!(recorded.record.result.outcome, OwnerOutcome::Incomplete);
     assert!(matches!(
         recorded.record.result.attempts[3].result,
         AttemptResult::CollectionFailed(_)
     ));
     assert!(matches!(
-        recorded.record.result.attempts[149].result,
+        recorded.record.result.attempts[159].result,
         AttemptResult::Measured(_)
     ));
     let decoded = recorded
@@ -201,9 +201,9 @@ fn preparation_failure_is_a_harness_failure_not_an_expected_configuration_failur
             context.collect(ordinal, fixture, binding)
         })
         .unwrap();
-    assert_eq!(visited.len(), 149);
+    assert_eq!(visited.len(), 159);
     assert!(!visited.contains(&Quantity::new(2)));
-    assert_eq!(recorded.record.result.attempts.len(), 150);
+    assert_eq!(recorded.record.result.attempts.len(), 160);
     assert_eq!(recorded.record.result.outcome, OwnerOutcome::Invalid);
     assert!(recorded.validate(&recorded.record).is_empty());
     let decoded = recorded
@@ -264,9 +264,9 @@ fn common_projection_keeps_failed_cases_diagnostic_and_invalid_precedence() {
                 Outcome::Incomplete
             }
         );
-        assert_eq!(admitted.planned_cases, 150);
+        assert_eq!(admitted.planned_cases, 160);
         assert_eq!(admitted.non_measured_cases, if invalid { 2 } else { 1 });
-        assert_eq!(admitted.measured_cases + admitted.non_measured_cases, 150);
+        assert_eq!(admitted.measured_cases + admitted.non_measured_cases, 160);
         let evaluation: Value = serde_json::from_slice(&artifacts.evaluation).unwrap();
         let failed = &evaluation["body"]["cases"][3]["result"];
         assert_eq!(failed["kind"], "unavailable");

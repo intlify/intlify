@@ -43,6 +43,8 @@ pub(in crate::benchmark) enum LocaleResolutionRecipe {
     CoverageUncanonicalized,
     ManyTargets,
     EveryFixtureLocale,
+    OccurrenceScale,
+    CanonicalScale,
 }
 
 impl LocaleResolutionRecipe {
@@ -84,6 +86,21 @@ impl LocaleResolutionRecipe {
     /// How many recipes have rows before the ICU4X rows; the rest follow them.
     pub(super) const BEFORE_ICU4X: usize = 25;
 
+    /// The recipes resolved through the ICU4X provider: three the finite
+    /// provider also answers, then the two scales only ICU4X has data for.
+    pub(super) const ICU4X: [Self; 5] = [
+        Self::EveryRole,
+        Self::EveryRoleAliased,
+        Self::EveryRoleInvalid,
+        Self::OccurrenceScale,
+        Self::CanonicalScale,
+    ];
+
+    /// Whether the recipe needs more room than the other recipes' capacity.
+    pub(super) const fn scales(self) -> bool {
+        matches!(self, Self::OccurrenceScale | Self::CanonicalScale)
+    }
+
     /// Whether no Phase 7 unit finds a blocking result.
     pub(super) const fn completes(self) -> bool {
         !matches!(
@@ -119,8 +136,10 @@ impl LocaleResolutionRecipe {
             | Self::EveryRoleInvalid
             | Self::TargetDuplicate
             | Self::CoverageUncanonicalized => return self.every_role_value(),
-            Self::ManyTargets => return many_targets(),
+            Self::ManyTargets => return many_targets(32, 2),
             Self::EveryFixtureLocale => return every_fixture_locale(),
+            Self::OccurrenceScale => return many_targets(256, 3),
+            Self::CanonicalScale => return canonical_scale(),
             _ => {}
         }
         let mut value = minimal_config();
@@ -264,13 +283,13 @@ impl LocaleResolutionRecipe {
     }
 }
 
-/// 32 targets requesting one locale each: occurrences scale, the canonical
-/// locales do not.
-fn many_targets() -> Value {
+/// `count` targets requesting one locale each, named with `width` digits:
+/// occurrences scale, the canonical locales do not.
+fn many_targets(count: usize, width: usize) -> Value {
     let mut value = minimal_config();
     let app = &mut value["profiles"]["app"];
-    let ids = (0..32)
-        .map(|index| format!("t{index:02}"))
+    let ids = (0..count)
+        .map(|index| format!("t{index:0width$}"))
         .collect::<Vec<_>>();
     app["targetProfiles"] = ids
         .iter()
@@ -307,6 +326,29 @@ fn every_fixture_locale() -> Value {
     let mut value = minimal_config();
     let app = &mut value["profiles"]["app"];
     app["requestedLocales"] = json!(locales.iter().rev().collect::<Vec<_>>());
+    app["targetProfiles"]["browser"]["requestedLocales"] = json!(locales);
+    value
+}
+
+/// The first 128 two-letter ISO 639-1 languages but `bh`, which CLDR
+/// replaces: each is its own canonical form in revision "0". They are codes,
+/// not words, so the spell checker skips the lines it would misread.
+pub(super) const SCALE_LANGUAGES: &str = concat!(
+    "aa ab ae af ak am an ar as av ay az ba be bg bi bm bn bo br bs ca ce ch ",
+    "co cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ", // spellchecker:disable-line
+    "ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it ",
+    "iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo ",
+    "lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny ", // spellchecker:disable-line
+    "oc oj om or os pa pi pl"
+);
+
+/// The 128 languages, requested by the project and by its target: 257
+/// spellings, and as many canonical locales as requested ones.
+fn canonical_scale() -> Value {
+    let locales = SCALE_LANGUAGES.split(' ').collect::<Vec<_>>();
+    let mut value = minimal_config();
+    let app = &mut value["profiles"]["app"];
+    app["requestedLocales"] = json!(locales);
     app["targetProfiles"]["browser"]["requestedLocales"] = json!(locales);
     value
 }

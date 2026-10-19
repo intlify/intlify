@@ -2,6 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use super::prepare::prepare;
+use super::resolution_inputs::SCALE_LANGUAGES;
 use super::*;
 use crate::benchmark::locale_resolution::Resolved;
 use crate::benchmark::operation::Output;
@@ -15,6 +16,13 @@ fn case(recipe: LocaleResolutionRecipe) -> Declaration {
     declarations()
         .into_iter()
         .find(|case| case.fixture == Recipe::LocaleResolution(recipe) && case.limit.is_none())
+        .unwrap()
+}
+
+fn icu4x_case(input: LocaleResolutionRecipe, engine: Engine) -> Declaration {
+    declarations()
+        .into_iter()
+        .find(|case| case.fixture == Recipe::Icu4xLocaleResolution { input, engine })
         .unwrap()
 }
 
@@ -79,7 +87,7 @@ fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
 #[test]
 fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let cases = declarations();
-    assert_eq!(cases.len(), 150);
+    assert_eq!(cases.len(), 160);
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()
@@ -93,7 +101,11 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
         .iter()
         .all(|case| case.operation == Operation::LocaleCanonicalization));
     assert!(resolution(&cases[141..]));
-    for (rows, edges) in [(&cases[94..127], 8), (&cases[141..], 2)] {
+    for (rows, edges) in [
+        (&cases[94..127], 8),
+        (&cases[141..150], 2),
+        (&cases[150..], 0),
+    ] {
         assert_eq!(
             rows.iter().filter(|case| case.limit.is_some()).count(),
             edges
@@ -565,6 +577,151 @@ fn the_input_context_refuses_a_candidate_bound_to_another_input() {
             observe(&candidate),
             Err(ContextFailure::LocaleInputMismatch),
             "change {change}"
+        );
+    }
+}
+
+#[test]
+fn icu4x_resolution_cases_follow_every_finite_row_with_both_engines_for_each_input() {
+    let cases = declarations();
+    let expected = LocaleResolutionRecipe::ICU4X
+        .into_iter()
+        .flat_map(|input| {
+            [Engine::Reused, Engine::Fresh]
+                .map(|engine| Recipe::Icu4xLocaleResolution { input, engine })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        cases[150..]
+            .iter()
+            .map(|case| case.fixture)
+            .collect::<Vec<_>>(),
+        expected
+    );
+    for case in &cases[150..] {
+        assert_eq!(case.operation, Operation::LocaleResolution);
+        assert_eq!(case.selector, Selector::App);
+        let Recipe::Icu4xLocaleResolution { input, .. } = case.fixture else {
+            unreachable!()
+        };
+        // The scales are no finite rows; every other input is one.
+        assert_eq!(
+            LocaleResolutionRecipe::ALL.contains(&input),
+            !input.scales(),
+            "{input:?}"
+        );
+    }
+    assert!(cases[..150]
+        .iter()
+        .all(|case| !matches!(case.fixture, Recipe::Icu4xLocaleResolution { .. })));
+}
+
+/// The finite table agrees with the ICU4X provider on every row (PR 4d), and
+/// these recipes spell only its rows: either provider and either engine give
+/// one semantic observation and one logical work.
+#[test]
+fn either_provider_resolves_a_finite_recipe_to_one_observation_and_work() {
+    for input in [R::EveryRole, R::EveryRoleAliased, R::EveryRoleInvalid] {
+        let finite = prepare(&case(input)).unwrap();
+        for engine in [Engine::Reused, Engine::Fresh] {
+            let icu4x = prepare(&icu4x_case(input, engine)).unwrap();
+            assert_eq!(
+                icu4x.observation, finite.observation,
+                "{input:?}, {engine:?}"
+            );
+            assert_eq!(
+                icu4x.logical_work, finite.logical_work,
+                "{input:?}, {engine:?}"
+            );
+        }
+    }
+}
+
+/// The engine state is a fact of the input, never of the result: for every
+/// input, the scales included, both engines give one semantic observation and
+/// one logical work, and the checked-in rows pin the same equivalence.
+#[test]
+fn fresh_and_reused_engines_agree_on_phase_7_for_every_input() {
+    use super::context::observe;
+
+    let registry = super::registry::Registry::load().unwrap();
+    for input in R::ICU4X {
+        let reused = prepare(&icu4x_case(input, Engine::Reused)).unwrap();
+        let fresh = prepare(&icu4x_case(input, Engine::Fresh)).unwrap();
+        assert_eq!(reused.observation, fresh.observation, "{input:?}");
+        assert_eq!(reused.logical_work, fresh.logical_work, "{input:?}");
+        assert_ne!(observe(&reused).unwrap(), observe(&fresh).unwrap());
+        let reused = registry
+            .prepare(&icu4x_case(input, Engine::Reused))
+            .unwrap();
+        let fresh = registry.prepare(&icu4x_case(input, Engine::Fresh)).unwrap();
+        assert_eq!(reused.expected(), fresh.expected(), "{input:?}");
+        assert_eq!(reused.expected_work(), fresh.expected_work(), "{input:?}");
+        assert_ne!(reused.input_context(), fresh.input_context());
+    }
+}
+
+/// 256 targets of one locale scale the spellings alone; 128 languages
+/// requested twice scale the canonical locales with them. Each language is
+/// its own canonical form, so neither scale suggests a correction.
+#[test]
+fn the_scales_grow_spellings_and_canonical_locales_through_icu4x() {
+    let languages = SCALE_LANGUAGES.split(' ').collect::<Vec<_>>();
+    for engine in [Engine::Reused, Engine::Fresh] {
+        let spellings = resolved(&icu4x_case(R::OccurrenceScale, engine));
+        let canonical = resolved(&icu4x_case(R::CanonicalScale, engine));
+        for (scale, total, project_requested, target_requested, target_count) in [
+            (&spellings, 258, vec!["en"], vec!["en"], 256),
+            (&canonical, 257, languages.clone(), languages.clone(), 1),
+        ] {
+            let locales = locales(scale);
+            assert!(issues(scale).is_empty());
+            assert_eq!(scale.evaluation.notices().count(), 0);
+            assert_eq!(locales.occurrence_total, Some(Actual::Exact(total)));
+            let project = locales.project.as_ref().unwrap();
+            assert_eq!(names(project.requested().as_slice()), project_requested);
+            assert_eq!(project.requested_default().as_str(), "en");
+            let targets = locales.targets.as_ref().unwrap();
+            assert_eq!(targets.len(), target_count);
+            for target in targets {
+                assert_eq!(
+                    names(target.requested.as_ref().unwrap().as_slice()),
+                    target_requested
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_input_context_refuses_a_provider_or_engine_other_than_the_declared_one() {
+    use super::context::{observe, ContextFailure};
+
+    let finite = prepare(&case(R::EveryRole)).unwrap();
+    let icu4x = |engine| prepare(&icu4x_case(R::EveryRole, engine)).unwrap();
+    for (mut candidate, declared) in [
+        // ICU4X prepared, the finite recipe declared.
+        (icu4x(Engine::Reused), finite.declaration.clone()),
+        // A reused engine prepared, a fresh one declared.
+        (
+            icu4x(Engine::Reused),
+            icu4x_case(R::EveryRole, Engine::Fresh),
+        ),
+        (
+            icu4x(Engine::Fresh),
+            icu4x_case(R::EveryRole, Engine::Reused),
+        ),
+        // The finite provider prepared, ICU4X declared.
+        (
+            prepare(&case(R::EveryRole)).unwrap(),
+            icu4x_case(R::EveryRole, Engine::Reused),
+        ),
+    ] {
+        assert!(observe(&candidate).is_ok());
+        candidate.declaration = declared;
+        assert_eq!(
+            observe(&candidate),
+            Err(ContextFailure::LocaleInputMismatch)
         );
     }
 }

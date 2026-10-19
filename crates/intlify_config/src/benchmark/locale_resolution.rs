@@ -2,15 +2,17 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015 Phase 7 over the selected declaration of a complete configuration:
-//! every locale spelling counted, canonicalized through the finite provider,
-//! and checked under a fixture-owned confirmed policy. Neither the result nor
-//! its observation is a Profile or a shared artifact.
+//! every locale spelling counted, canonicalized through the finite provider
+//! or the ICU4X provider, and checked under a fixture-owned confirmed policy.
+//! Neither the result nor its observation is a Profile or a shared artifact.
 
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::locale::{CanonicalLocale, CanonicalizationFailure, ProviderFailure};
+use crate::locale::{
+    CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider, ProviderFailure,
+};
 use crate::model::ProfileId;
 use crate::references::TargetProfileReference;
 use crate::resolver::evaluation::{
@@ -23,9 +25,18 @@ use crate::resolver::locales::{
 };
 
 use super::locale;
+use super::locale_icu4x::PreparedEngine;
 use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
+
+/// The canonicalizer Phase 7 runs under: the finite provider's, or the
+/// ICU4X provider's engine, which a case reuses or admits fresh before each
+/// invocation.
+pub(super) enum Canonicalizers {
+    Finite(Arc<locale::Core>),
+    Icu4x(PreparedEngine),
+}
 
 /// A case's complete configuration, its selected declaration, and the policy
 /// and canonicalizer Phase 7 runs under.
@@ -34,10 +45,26 @@ pub(super) struct PreparedLocales {
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
-    pub(super) canonicalizer: Arc<locale::Core>,
+    pub(super) canonicalizer: Canonicalizers,
 }
 
 impl PreparedLocales {
+    /// The finite provider's canonicalizer, when the case runs under it.
+    pub(super) const fn finite(&self) -> Option<&Arc<locale::Core>> {
+        match &self.canonicalizer {
+            Canonicalizers::Finite(core) => Some(core),
+            Canonicalizers::Icu4x(_) => None,
+        }
+    }
+
+    /// The ICU4X provider's engine, when the case runs under it.
+    pub(super) const fn icu4x(&self) -> Option<&PreparedEngine> {
+        match &self.canonicalizer {
+            Canonicalizers::Icu4x(engine) => Some(engine),
+            Canonicalizers::Finite(_) => None,
+        }
+    }
+
     /// The selected declaration's locale fields, borrowed before the interval.
     pub(super) fn fields(&self) -> Option<LocaleFields<'_, TargetProfileReference>> {
         if !self.analysis.is_complete() {
@@ -58,10 +85,10 @@ pub(super) struct Resolved {
 }
 
 /// Phase 7 over a fresh evaluation: what preparation and every timed
-/// invocation run.
-pub(super) fn resolve(
+/// invocation run, through either provider.
+pub(super) fn resolve<P: Provider>(
     policy: &ConfirmedPolicy,
-    canonicalizer: &locale::Core,
+    canonicalizer: &Canonicalizer<P>,
     fields: &LocaleFields<'_, TargetProfileReference>,
 ) -> Resolved {
     let mut evaluation = Evaluation::default();
