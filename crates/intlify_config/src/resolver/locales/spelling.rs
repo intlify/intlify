@@ -21,7 +21,7 @@ use super::super::evaluation::{
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
     issue, unit, AliasLocales, Content, FallbackLocale, FallbackLocales, LocaleInvariant,
-    LocaleKey, LocaleOccurrence, LocaleSet, LocaleSubject, Location, TargetLocales,
+    LocaleKey, LocaleOccurrence, LocaleSet, LocaleSubject, Location, Spelled, TargetLocales,
 };
 
 /// Where a spelling sits before its own key is known: its subject's kind and
@@ -56,12 +56,6 @@ impl Scope {
             }
         }
     }
-}
-
-/// A spelling's subject key, and its canonical locale or why it has none.
-pub(super) struct Spelled {
-    pub(super) key: LocaleKey,
-    pub(super) locale: Admitted<CanonicalLocale>,
 }
 
 /// The canonicalization of every spelling, which waits on the canonicalizer
@@ -191,10 +185,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
         Ok(keys
             .into_iter()
             .zip(values)
-            .map(|(key, value)| AliasLocales {
-                key: key.locale,
-                value: value.locale,
-            })
+            .map(|(key, value)| AliasLocales { key, value })
             .collect())
     }
 
@@ -237,13 +228,13 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             .values()
             .zip(keys)
             .map(|(sequence, key)| FallbackLocales {
-                key: key.locale,
+                key,
                 candidates: sequence
                     .as_slice()
                     .iter()
                     .map(|candidate| match candidate {
                         FallbackCandidate::Locale(_) => FallbackLocale::Literal(
-                            literals.next().expect("one result per literal").locale,
+                            literals.next().expect("one result per literal"),
                         ),
                         FallbackCandidate::IntentSource(_) => FallbackLocale::IntentSource,
                     })
@@ -377,7 +368,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::super::fixtures::{
-        canonical, canonicalizer, content, issues, key, notices, stand_in, target, units, waits_on,
+        canonical, canonicalizer, content, issues, key, notices, spelled, stand_in, target, units,
+        waits_on,
     };
     use super::*;
     use crate::input_limits::Bound;
@@ -658,16 +650,18 @@ mod tests {
             resolved,
             [
                 AliasLocales {
-                    key: Ok(canonical("en")),
-                    value: Ok(canonical("fr-FR")),
+                    key: spelled("en"),
+                    value: spelled("fr-FR"),
                 },
                 AliasLocales {
-                    key: Ok(canonical("de")),
+                    key: spelled("de"),
                     value: resolved[1].value.clone(),
                 },
             ]
         );
-        assert!(resolved[1].value.is_err());
+        // A rejected destination keeps its spelling as its subject key.
+        assert_eq!(resolved[1].value.key, content("zz"));
+        assert!(resolved[1].value.locale.is_err());
         let sequences: BTreeMap<String, NonEmptyVec<FallbackCandidate>> =
             serde_json::from_value(serde_json::json!({
                 "ja": ["EN", {"kind": "intent-source-locale"}, "de"],
@@ -679,19 +673,20 @@ mod tests {
         assert_eq!(pass.fallback(None).unwrap(), []);
         let occurrences = pass.into_occurrences();
         assert_eq!(fallback.len(), 2);
-        assert_eq!(fallback[0].key, Ok(canonical("ja")));
+        assert_eq!(fallback[0].key, spelled("ja"));
         assert_eq!(
             fallback[0].candidates,
             [
-                FallbackLocale::Literal(Ok(canonical("en"))),
+                FallbackLocale::Literal(spelled("en")),
                 FallbackLocale::IntentSource,
-                FallbackLocale::Literal(Ok(canonical("de"))),
+                FallbackLocale::Literal(spelled("de")),
             ]
         );
-        assert!(fallback[1].key.is_err());
+        assert_eq!(fallback[1].key.key, content("zz"));
+        assert!(fallback[1].key.locale.is_err());
         assert_eq!(
             fallback[1].candidates,
-            [FallbackLocale::Literal(Ok(canonical("en")))]
+            [FallbackLocale::Literal(spelled("en"))]
         );
         assert_eq!(
             occurrences

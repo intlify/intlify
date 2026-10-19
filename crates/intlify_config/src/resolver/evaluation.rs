@@ -15,9 +15,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::input_limits::Bound;
 
+use super::fallback::FallbackSubject;
 use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
+use super::negotiation::NegotiationSubject;
 use super::specification::Slot;
 
 /// 015's resolution phases, declared in rank order.
@@ -77,6 +79,12 @@ pub(crate) enum Subject {
     DeclarationField(DeclarationField),
     /// A locale, or a locale bound or set, of the selected declaration.
     Locale(LocaleSubject),
+    /// The declaration's negotiation aliases, or one alias key or destination.
+    Negotiation(NegotiationSubject),
+    /// The declaration's message fallback, or one source or its candidates.
+    Fallback(FallbackSubject),
+    /// The declaration's delivery placement, a singleton.
+    DeliveryPlacement,
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -96,6 +104,12 @@ pub(crate) enum Check {
     UniqueLocale,
     /// The locale belongs to the project's requested locales.
     RequestedMember,
+    /// A literal fallback candidate is not its own sequence's source.
+    DistinctFromSource,
+    /// A fallback candidate occurs once in its sequence.
+    UniqueCandidate,
+    /// The placement resolves to its effective mode.
+    EffectiveMode,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -122,6 +136,10 @@ pub(crate) enum Code {
     LocaleNonCanonical,
     LocaleDuplicate,
     DefaultRequestedLocaleNotInProject,
+    NegotiationAliasDuplicate,
+    NegotiationAliasDestinationNotRequested,
+    MessageFallbackSourceNotRequested,
+    MessageFallbackSequenceInvalid,
     ResourceLimitExceeded,
 }
 
@@ -152,6 +170,16 @@ impl Code {
             Self::DefaultRequestedLocaleNotInProject => {
                 "project-profile-default-requested-locale-not-in-project"
             }
+            Self::NegotiationAliasDuplicate => "project-profile-negotiation-alias-duplicate",
+            Self::NegotiationAliasDestinationNotRequested => {
+                "project-profile-negotiation-alias-destination-not-requested"
+            }
+            Self::MessageFallbackSourceNotRequested => {
+                "project-profile-message-fallback-source-not-requested"
+            }
+            Self::MessageFallbackSequenceInvalid => {
+                "project-profile-message-fallback-sequence-invalid"
+            }
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
         }
     }
@@ -163,6 +191,11 @@ pub(crate) enum Reason {
     MissingRequiredSlot,
     Unsupported,
     Incompatible,
+    SameDestination,
+    ConflictingDestination,
+    LiteralSelfReference,
+    LiteralDuplicate,
+    IntentSourceDuplicate,
 }
 
 impl Reason {
@@ -171,6 +204,11 @@ impl Reason {
             Self::MissingRequiredSlot => "missing-required-slot",
             Self::Unsupported => "unsupported",
             Self::Incompatible => "incompatible",
+            Self::SameDestination => "same-destination",
+            Self::ConflictingDestination => "conflicting-destination",
+            Self::LiteralSelfReference => "literal-self-reference",
+            Self::LiteralDuplicate => "literal-duplicate",
+            Self::IntentSourceDuplicate => "intent-source-duplicate",
         }
     }
 }
@@ -193,6 +231,21 @@ impl Blocking {
             reason: None,
             limit: Some(exceeded),
         }
+    }
+}
+
+/// Whether `count` submitted items stay within `limit`, or the issue 015
+/// reports with that exact count when they do not.
+pub(crate) fn within(bound: BoundId, limit: Bound, count: usize) -> Result<(), Blocking> {
+    let count = u64::try_from(count).expect("an in-memory count fits u64");
+    if count <= limit.get() {
+        Ok(())
+    } else {
+        Err(Blocking::limit(LimitExceeded {
+            bound,
+            limit,
+            actual: Actual::Exact(count),
+        }))
     }
 }
 
@@ -485,6 +538,10 @@ mod tests {
                 Code::LocaleNonCanonical,
                 Code::LocaleDuplicate,
                 Code::DefaultRequestedLocaleNotInProject,
+                Code::NegotiationAliasDuplicate,
+                Code::NegotiationAliasDestinationNotRequested,
+                Code::MessageFallbackSourceNotRequested,
+                Code::MessageFallbackSequenceInvalid,
                 Code::ResourceLimitExceeded,
             ]
             .map(Code::as_str),
@@ -501,6 +558,10 @@ mod tests {
                 "project-profile-locale-non-canonical",
                 "project-profile-locale-duplicate",
                 "project-profile-default-requested-locale-not-in-project",
+                "project-profile-negotiation-alias-duplicate",
+                "project-profile-negotiation-alias-destination-not-requested",
+                "project-profile-message-fallback-source-not-requested",
+                "project-profile-message-fallback-sequence-invalid",
                 "project-profile-resource-limit-exceeded",
             ]
         );
@@ -509,9 +570,23 @@ mod tests {
                 Reason::MissingRequiredSlot,
                 Reason::Unsupported,
                 Reason::Incompatible,
+                Reason::SameDestination,
+                Reason::ConflictingDestination,
+                Reason::LiteralSelfReference,
+                Reason::LiteralDuplicate,
+                Reason::IntentSourceDuplicate,
             ]
             .map(Reason::as_str),
-            ["missing-required-slot", "unsupported", "incompatible"]
+            [
+                "missing-required-slot",
+                "unsupported",
+                "incompatible",
+                "same-destination",
+                "conflicting-destination",
+                "literal-self-reference",
+                "literal-duplicate",
+                "intent-source-duplicate",
+            ]
         );
     }
 
@@ -794,6 +869,25 @@ mod tests {
             ..key
         };
         assert_eq!(evaluation.limit(&other), None);
+    }
+
+    #[test]
+    fn a_count_holds_at_its_bound_and_one_more_is_reported_exactly() {
+        let bound = BoundId {
+            group: crate::resolver::limits::Group::LocaleResolution,
+            name: "maxFallbackSources",
+        };
+        let limit = Bound::new(2).unwrap();
+        assert_eq!(within(bound, limit, 0), Ok(()));
+        assert_eq!(within(bound, limit, 2), Ok(()));
+        assert_eq!(
+            within(bound, limit, 3),
+            Err(Blocking::limit(LimitExceeded {
+                bound,
+                limit,
+                actual: Actual::Exact(3),
+            }))
+        );
     }
 
     #[test]

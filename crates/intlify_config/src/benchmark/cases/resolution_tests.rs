@@ -308,7 +308,7 @@ fn every_role_hands_each_locale_policy_input_to_the_later_phases() {
         .as_ref()
         .unwrap()
         .iter()
-        .map(|alias| (canonical(&alias.key), canonical(&alias.value)))
+        .map(|alias| (canonical(&alias.key.locale), canonical(&alias.value.locale)))
         .collect::<Vec<_>>();
     assert_eq!(aliases, [("en-US", "en"), ("fr", "fr-FR")]);
     let fallback = locales
@@ -321,11 +321,11 @@ fn every_role_hands_each_locale_policy_input_to_the_later_phases() {
                 .candidates
                 .iter()
                 .map(|candidate| match candidate {
-                    FallbackLocale::Literal(literal) => canonical(literal),
+                    FallbackLocale::Literal(literal) => canonical(&literal.locale),
                     FallbackLocale::IntentSource => "intent-source-locale",
                 })
                 .collect::<Vec<_>>();
-            (canonical(&source.key), candidates)
+            (canonical(&source.key.locale), candidates)
         })
         .collect::<Vec<_>>();
     assert_eq!(

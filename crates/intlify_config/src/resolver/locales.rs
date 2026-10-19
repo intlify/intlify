@@ -29,7 +29,7 @@ use super::evaluation::{
 };
 use super::limits::ConfirmedPolicy;
 
-use spelling::{set, unique, Pass, Scope, Spelled};
+use spelling::{set, unique, Pass, Scope};
 
 mod bound;
 mod spelling;
@@ -130,7 +130,7 @@ pub(crate) struct LocaleOccurrence {
 pub(crate) struct LocaleSet(Vec<CanonicalLocale>);
 
 impl LocaleSet {
-    fn new(mut locales: Vec<CanonicalLocale>) -> Self {
+    pub(crate) fn new(mut locales: Vec<CanonicalLocale>) -> Self {
         locales.sort_unstable();
         locales.dedup();
         Self(locales)
@@ -176,24 +176,32 @@ impl<'a, Target> LocaleFields<'a, Target> {
     }
 }
 
+/// One spelling as Phase 7 left it: its subject key, and its canonical locale
+/// or why it has none. A later phase names the same subject with the key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Spelled {
+    pub(crate) key: LocaleKey,
+    pub(crate) locale: Admitted<CanonicalLocale>,
+}
+
 /// An alias's key and destination as Phase 7 left them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasLocales {
-    pub(crate) key: Admitted<CanonicalLocale>,
-    pub(crate) value: Admitted<CanonicalLocale>,
+    pub(crate) key: Spelled,
+    pub(crate) value: Spelled,
 }
 
 /// A fallback candidate as Phase 7 left it, in its declared position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FallbackLocale {
-    Literal(Admitted<CanonicalLocale>),
+    Literal(Spelled),
     IntentSource,
 }
 
 /// A fallback key and its whole sequence as Phase 7 left them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FallbackLocales {
-    pub(crate) key: Admitted<CanonicalLocale>,
+    pub(crate) key: Spelled,
     pub(crate) candidates: Vec<FallbackLocale>,
 }
 
@@ -421,10 +429,10 @@ pub(crate) fn fixture_policy(
     ConfirmedPolicy::fixture_owned(limits)
 }
 
-/// What the Phase 7 tests share: declarations, bounds, the finite provider,
-/// and stand-ins for causes earlier phases report.
+/// What the tests of Phase 7 and the phases after it share: declarations,
+/// bounds, the finite provider, and stand-ins for causes earlier phases report.
 #[cfg(test)]
-mod fixtures {
+pub(crate) mod fixtures {
     use serde_json::Value;
 
     use super::*;
@@ -435,18 +443,18 @@ mod fixtures {
     use crate::resolver::limits::ResolutionLimits;
     use crate::resolver::specification::Slot;
 
-    pub(super) type Declaration =
+    pub(crate) type Declaration =
         ProfileDeclaration<FixturePolicyReference, FixtureTargetReference>;
 
     /// The `app` declaration of `config` once `edit` changed it.
-    pub(super) fn declaration(config: &Value, edit: impl FnOnce(&mut Value)) -> Declaration {
+    pub(crate) fn declaration(config: &Value, edit: impl FnOnce(&mut Value)) -> Declaration {
         let mut app = config["profiles"]["app"].clone();
         edit(&mut app);
         serde_json::from_value(app).unwrap()
     }
 
     /// Distinct test bounds, with Phase 7's three set as given.
-    pub(super) fn limits(
+    pub(crate) fn limits(
         identifier_bytes: u64,
         occurrences: u64,
         requested: u64,
@@ -456,7 +464,7 @@ mod fixtures {
             .clone()
     }
 
-    pub(super) fn policy(
+    pub(crate) fn policy(
         identifier_bytes: u64,
         occurrences: u64,
         requested: u64,
@@ -470,7 +478,7 @@ mod fixtures {
 
     /// The finite provider bound as Phase 5 binds it, under the identifier
     /// bound the policy sets.
-    pub(super) fn canonicalizer(identifier_bytes: u64) -> Canonicalizer<FixtureProvider> {
+    pub(crate) fn canonicalizer(identifier_bytes: u64) -> Canonicalizer<FixtureProvider> {
         Canonicalizer::bind(
             &fixture_pins(),
             Some(FixtureProvider::new()),
@@ -480,7 +488,7 @@ mod fixtures {
     }
 
     /// The canonical locale the finite provider gives `spelling`.
-    pub(super) fn canonical(spelling: &str) -> CanonicalLocale {
+    pub(crate) fn canonical(spelling: &str) -> CanonicalLocale {
         canonicalizer(64)
             .canonicalize(spelling)
             .unwrap()
@@ -488,22 +496,30 @@ mod fixtures {
     }
 
     /// A canonical subject key.
-    pub(super) fn key(spelling: &str) -> LocaleKey {
+    pub(crate) fn key(spelling: &str) -> LocaleKey {
         LocaleKey::Canonical(canonical(spelling))
     }
 
     /// A subject key for a spelling without a canonical identity.
-    pub(super) fn content(raw: &str) -> LocaleKey {
+    pub(crate) fn content(raw: &str) -> LocaleKey {
         LocaleKey::Content(Content(Arc::from(raw)))
     }
 
-    pub(super) fn target(id: &str) -> TargetId {
+    /// What Phase 7 hands on for a spelling with a canonical identity.
+    pub(crate) fn spelled(spelling: &str) -> Spelled {
+        Spelled {
+            key: key(spelling),
+            locale: Ok(canonical(spelling)),
+        }
+    }
+
+    pub(crate) fn target(id: &str) -> TargetId {
         serde_json::from_value(Value::from(id)).unwrap()
     }
 
     /// Causes a caller passes for a value an earlier phase left unavailable.
     /// Those phases' keys arrive with them, so a Phase 5 slot's key stands in.
-    pub(super) fn stand_in(slot: Slot) -> Causes {
+    pub(crate) fn stand_in(slot: Slot) -> Causes {
         Evaluation::default()
             .check(
                 Unit {
@@ -525,12 +541,12 @@ mod fixtures {
     }
 
     /// The units behind `causes`.
-    pub(super) fn units(causes: &Causes) -> Vec<Unit> {
+    pub(crate) fn units(causes: &Causes) -> Vec<Unit> {
         causes.keys().map(|key| key.unit().clone()).collect()
     }
 
     /// Every issue as its unit, code, and details, in 015's order.
-    pub(super) fn issues(
+    pub(crate) fn issues(
         evaluation: &Evaluation,
     ) -> Vec<(
         Unit,
@@ -550,7 +566,7 @@ mod fixtures {
     }
 
     /// Every unit that suggests a canonical form.
-    pub(super) fn notices(evaluation: &Evaluation) -> Vec<Unit> {
+    pub(crate) fn notices(evaluation: &Evaluation) -> Vec<Unit> {
         evaluation
             .notices()
             .map(|key| {
@@ -562,7 +578,7 @@ mod fixtures {
 
     /// The units a unit left not evaluated waits on, or `None` when it was
     /// evaluated.
-    pub(super) fn waits_on(evaluation: &Evaluation, unit: &Unit) -> Option<Vec<Unit>> {
+    pub(crate) fn waits_on(evaluation: &Evaluation, unit: &Unit) -> Option<Vec<Unit>> {
         match evaluation.status(unit).expect("the unit was recorded") {
             Status::Evaluated => None,
             Status::NotEvaluated(causes) => Some(units(causes)),
@@ -575,8 +591,8 @@ mod tests {
     use serde_json::json;
 
     use super::fixtures::{
-        canonical, canonicalizer, content, declaration, issues, key, notices, policy, stand_in,
-        target, units, waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, issues, key, notices, policy, spelled,
+        stand_in, target, units, waits_on, Declaration,
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
@@ -746,16 +762,16 @@ mod tests {
         assert_eq!(
             resolved.negotiation_aliases,
             Ok(vec![AliasLocales {
-                key: Ok(canonical("fr")),
-                value: Ok(canonical("fr-FR")),
+                key: spelled("fr"),
+                value: spelled("fr-FR"),
             }])
         );
         assert_eq!(
             resolved.message_fallback,
             Ok(vec![FallbackLocales {
-                key: Ok(canonical("ja")),
+                key: spelled("ja"),
                 candidates: vec![
-                    FallbackLocale::Literal(Ok(canonical("en"))),
+                    FallbackLocale::Literal(spelled("en")),
                     FallbackLocale::IntentSource,
                 ],
             }])
@@ -1015,11 +1031,24 @@ mod tests {
                         | LocaleSubject::TargetDefaultRequestedLocale(_, LocaleKey::Content(_))
                 )
         }));
-        let over = units(&resolved.requested_set.clone().unwrap_err());
-        assert_eq!(over, [occurrence_unit()]);
-        assert_eq!(units(&resolved.project.unwrap_err()), over);
+        let over = resolved.requested_set.clone().unwrap_err();
+        assert_eq!(units(&over), [occurrence_unit()]);
+        assert_eq!(resolved.project.unwrap_err(), over);
+        // Each spelling stands for itself and waits on the bound.
         let aliases = resolved.negotiation_aliases.unwrap();
-        assert!(aliases[0].key.is_err() && aliases[0].value.is_err());
+        assert_eq!(
+            aliases[0],
+            AliasLocales {
+                key: Spelled {
+                    key: content("fr"),
+                    locale: Err(over.clone()),
+                },
+                value: Spelled {
+                    key: content("fr-FR"),
+                    locale: Err(over),
+                },
+            }
+        );
         let targets = resolved.targets.unwrap();
         assert!(targets[0].requested.is_err() && targets[0].default.is_err());
         assert_eq!(targets[1].default, Ok(None));

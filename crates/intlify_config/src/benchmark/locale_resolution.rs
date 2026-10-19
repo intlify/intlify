@@ -239,9 +239,12 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::CanonicalLocale => 1,
         Check::UniqueLocale => 2,
         Check::RequestedMember => 3,
-        Check::SupportedAssertion | Check::MatchingData | Check::OpaqueIdentity => {
-            return Err(OutputFailure::LocaleResolutionInvariant)
-        }
+        Check::SupportedAssertion
+        | Check::MatchingData
+        | Check::OpaqueIdentity
+        | Check::DistinctFromSource
+        | Check::UniqueCandidate
+        | Check::EffectiveMode => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }
@@ -336,8 +339,8 @@ fn project(frame: &mut Frame, project: &ProjectLocales) -> Result<(), OutputFail
 fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFailure> {
     frame.uint(count(aliases.len())?);
     for alias in aliases {
-        admitted(frame, &alias.key, locale)?;
-        admitted(frame, &alias.value, locale)?;
+        admitted(frame, &alias.key.locale, locale)?;
+        admitted(frame, &alias.value.locale, locale)?;
     }
     Ok(())
 }
@@ -345,13 +348,13 @@ fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFail
 fn fallback(frame: &mut Frame, sources: &[FallbackLocales]) -> Result<(), OutputFailure> {
     frame.uint(count(sources.len())?);
     for source in sources {
-        admitted(frame, &source.key, locale)?;
+        admitted(frame, &source.key.locale, locale)?;
         frame.uint(count(source.candidates.len())?);
         for candidate in &source.candidates {
             match candidate {
                 FallbackLocale::Literal(literal) => {
                     frame.uint(0);
-                    admitted(frame, literal, locale)?;
+                    admitted(frame, &literal.locale, locale)?;
                 }
                 FallbackLocale::IntentSource => frame.uint(1),
             }
@@ -530,18 +533,28 @@ mod tests {
     #[test]
     fn only_phase_7_units_frame() {
         let mut frame = Frame::new("locale-resolution-test");
-        let foreign = Unit {
-            subject: Subject::CanonicalizationData,
-            ..locale_unit(LocaleSubject::Occurrences, Check::WithinBound)
-        };
-        assert_eq!(
-            unit(&mut frame, &foreign),
-            Err(OutputFailure::LocaleResolutionInvariant)
-        );
+        for subject in [
+            Subject::CanonicalizationData,
+            Subject::Negotiation(crate::resolver::negotiation::NegotiationSubject::Aliases),
+            Subject::Fallback(crate::resolver::fallback::FallbackSubject::Sources),
+            Subject::DeliveryPlacement,
+        ] {
+            let foreign = Unit {
+                subject,
+                ..locale_unit(LocaleSubject::Occurrences, Check::WithinBound)
+            };
+            assert_eq!(
+                unit(&mut frame, &foreign),
+                Err(OutputFailure::LocaleResolutionInvariant)
+            );
+        }
         for check in [
             Check::SupportedAssertion,
             Check::MatchingData,
             Check::OpaqueIdentity,
+            Check::DistinctFromSource,
+            Check::UniqueCandidate,
+            Check::EffectiveMode,
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),

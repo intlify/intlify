@@ -220,3 +220,75 @@ fn object_member_order_does_not_change_logical_work() {
     assert!(original.admitted && reversed.admitted);
     assert_eq!(original.units, reversed.units);
 }
+
+/// The `app` declaration's member `name` as materialized from `doc`.
+fn declaration_member(doc: &MaterializedDocument, name: &str) -> NodeId {
+    let profiles = member(doc, doc.root(), "profiles");
+    member(doc, member(doc, profiles, "app"), name)
+}
+
+#[test]
+fn delivery_admits_duplicate_placement_alone_and_no_override_graph_or_output() {
+    let program = program();
+    for delivery in [json!({}), json!({"placement": "duplicate"})] {
+        let mut value = complete_config();
+        value["profiles"]["app"]["delivery"] = delivery;
+        assert!(run(&program, &materialize(&value)).admitted);
+    }
+    // Another mode is an invalid value at `placement`, never `duplicate`.
+    for mode in ["hoist", "Duplicate", "unknown"] {
+        let mut value = complete_config();
+        value["profiles"]["app"]["delivery"]["placement"] = json!(mode);
+        let doc = materialize(&value);
+        let placement = member(&doc, declaration_member(&doc, "delivery"), "placement");
+        let result = run(&program, &doc);
+        assert_eq!(
+            result
+                .issues
+                .iter()
+                .map(|issue| (issue.kind, issue.subject, issue.role))
+                .collect::<Vec<_>>(),
+            [(IssueKind::ValueInvalid, placement, LocationRole::Value)],
+            "{mode}"
+        );
+    }
+    // An override, a graph member, or a physical output is no delivery member.
+    for (name, extra) in [
+        ("targetPlacement", json!({"browser": "duplicate"})),
+        ("nodes", json!([["main"]])),
+        ("edges", json!([])),
+        ("outputDirectory", json!("dist")),
+    ] {
+        let mut value = complete_config();
+        value["profiles"]["app"]["delivery"][name] = extra;
+        let doc = materialize(&value);
+        let delivery = declaration_member(&doc, "delivery");
+        let result = run(&program, &doc);
+        assert_eq!(
+            result
+                .issues
+                .iter()
+                .map(|issue| (issue.kind, issue.subject, issue.role))
+                .collect::<Vec<_>>(),
+            [(IssueKind::UnknownField, delivery, LocationRole::MemberKey)],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn an_explicitly_empty_fallback_sequence_is_an_invalid_value_where_it_is_declared() {
+    let mut value = complete_config();
+    value["profiles"]["app"]["messageFallback"]["ja"] = json!([]);
+    let doc = materialize(&value);
+    let sequence = member(&doc, declaration_member(&doc, "messageFallback"), "ja");
+    let result = run(&program(), &doc);
+    assert_eq!(
+        result
+            .issues
+            .iter()
+            .map(|issue| (issue.kind, issue.subject, issue.role))
+            .collect::<Vec<_>>(),
+        [(IssueKind::ValueInvalid, sequence, LocationRole::Value)]
+    );
+}
