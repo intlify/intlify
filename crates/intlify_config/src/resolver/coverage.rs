@@ -250,7 +250,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         coverage.clone(),
     )
     .map(|((policy, _), _)| policy);
-    let ruled = count(
+    let rules_bounded = count(
         evaluation,
         &declared,
         CoverageSubject::Rules,
@@ -258,7 +258,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         |limits| limits.max_coverage_rules,
         rules.len(),
     )?;
-    let localed = count(
+    let locale_items_bounded = count(
         evaluation,
         &declared,
         CoverageSubject::LocaleSelectors,
@@ -269,7 +269,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
             .map(|rule| rule.requested_locales().map_or(0, <[String]>::len))
             .sum(),
     )?;
-    let surfaced = count(
+    let surface_items_bounded = count(
         evaluation,
         &declared,
         CoverageSubject::SurfaceSelectors,
@@ -286,16 +286,26 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
                 canonicalizer.map_err(Causes::clone),
                 locales.occurrence_bound.clone(),
             ),
-            both(ruled.clone(), localed.clone()),
+            both(rules_bounded.clone(), locale_items_bounded.clone()),
         )
         .map(|((canonicalizer, ()), _)| canonicalizer),
-        naming: both(vocabulary.clone(), both(ruled.clone(), surfaced.clone()))
-            .map(|(vocabulary, _)| vocabulary),
+        naming: both(
+            vocabulary.clone(),
+            both(rules_bounded.clone(), surface_items_bounded.clone()),
+        )
+        .map(|(vocabulary, _)| vocabulary),
         requested: requested.clone(),
         vocabulary: vocabulary.clone(),
     };
     let (normalized, domains) = normalize(evaluation, &selectors, rules)?;
-    let checked = both(both(both(ruled, localed), surfaced), normalized).map(|_| ());
+    let checked = both(
+        both(
+            both(rules_bounded, locale_items_bounded),
+            surface_items_bounded,
+        ),
+        normalized,
+    )
+    .map(|_| ());
     let span = both(requested, vocabulary);
     let sized = evaluation.check(
         unit(CoverageSubject::Cells, Check::WithinBound),
@@ -1432,7 +1442,7 @@ mod tests {
                 ),
             ]
         );
-        let localed = count_unit(CoverageSubject::LocaleSelectors);
+        let locale_items = count_unit(CoverageSubject::LocaleSelectors);
         let over = resolve_under(
             &declaration,
             Bounds {
@@ -1442,7 +1452,7 @@ mod tests {
             &vocabulary(),
         );
         assert_eq!(
-            exceeded(&over.evaluation, &localed),
+            exceeded(&over.evaluation, &locale_items),
             exactly(MAX_COVERAGE_LOCALE_SELECTOR_OCCURRENCES, 2, 3)
         );
         assert_eq!(
@@ -1450,7 +1460,7 @@ mod tests {
                 &over.evaluation,
                 &locale_unit(&rule(&locales_only), content("fr"), Check::CanonicalLocale)
             ),
-            Some(vec![localed])
+            Some(vec![locale_items])
         );
         assert_eq!(
             waits_on(
@@ -1459,7 +1469,7 @@ mod tests {
             ),
             None
         );
-        let surfaced = count_unit(CoverageSubject::SurfaceSelectors);
+        let surface_items = count_unit(CoverageSubject::SurfaceSelectors);
         let over = resolve_under(
             &declaration,
             Bounds {
@@ -1469,7 +1479,7 @@ mod tests {
             &vocabulary(),
         );
         assert_eq!(
-            exceeded(&over.evaluation, &surfaced),
+            exceeded(&over.evaluation, &surface_items),
             exactly(MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES, 2, 3)
         );
         assert_eq!(
@@ -1477,7 +1487,7 @@ mod tests {
                 &over.evaluation,
                 &unknown_unit(&rule(&surfaces), "nav", Check::VocabularyMember)
             ),
-            Some(vec![surfaced])
+            Some(vec![surface_items])
         );
         assert_eq!(
             waits_on(
