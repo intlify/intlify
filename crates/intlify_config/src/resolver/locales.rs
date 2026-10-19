@@ -29,7 +29,7 @@ use super::evaluation::{
 };
 use super::limits::ConfirmedPolicy;
 
-use spelling::{set, unique, Pass, Scope, Spelled};
+use spelling::{set, unique, Pass, Scope};
 
 mod bound;
 mod spelling;
@@ -176,24 +176,32 @@ impl<'a, Target> LocaleFields<'a, Target> {
     }
 }
 
+/// One spelling as Phase 7 left it: its subject key, and its canonical locale
+/// or why it has none. A later phase names the same subject with the key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Spelled {
+    pub(crate) key: LocaleKey,
+    pub(crate) locale: Admitted<CanonicalLocale>,
+}
+
 /// An alias's key and destination as Phase 7 left them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasLocales {
-    pub(crate) key: Admitted<CanonicalLocale>,
-    pub(crate) value: Admitted<CanonicalLocale>,
+    pub(crate) key: Spelled,
+    pub(crate) value: Spelled,
 }
 
 /// A fallback candidate as Phase 7 left it, in its declared position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FallbackLocale {
-    Literal(Admitted<CanonicalLocale>),
+    Literal(Spelled),
     IntentSource,
 }
 
 /// A fallback key and its whole sequence as Phase 7 left them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FallbackLocales {
-    pub(crate) key: Admitted<CanonicalLocale>,
+    pub(crate) key: Spelled,
     pub(crate) candidates: Vec<FallbackLocale>,
 }
 
@@ -497,6 +505,14 @@ mod fixtures {
         LocaleKey::Content(Content(Arc::from(raw)))
     }
 
+    /// What Phase 7 hands on for a spelling with a canonical identity.
+    pub(super) fn spelled(spelling: &str) -> Spelled {
+        Spelled {
+            key: key(spelling),
+            locale: Ok(canonical(spelling)),
+        }
+    }
+
     pub(super) fn target(id: &str) -> TargetId {
         serde_json::from_value(Value::from(id)).unwrap()
     }
@@ -575,8 +591,8 @@ mod tests {
     use serde_json::json;
 
     use super::fixtures::{
-        canonical, canonicalizer, content, declaration, issues, key, notices, policy, stand_in,
-        target, units, waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, issues, key, notices, policy, spelled,
+        stand_in, target, units, waits_on, Declaration,
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
@@ -746,16 +762,16 @@ mod tests {
         assert_eq!(
             resolved.negotiation_aliases,
             Ok(vec![AliasLocales {
-                key: Ok(canonical("fr")),
-                value: Ok(canonical("fr-FR")),
+                key: spelled("fr"),
+                value: spelled("fr-FR"),
             }])
         );
         assert_eq!(
             resolved.message_fallback,
             Ok(vec![FallbackLocales {
-                key: Ok(canonical("ja")),
+                key: spelled("ja"),
                 candidates: vec![
-                    FallbackLocale::Literal(Ok(canonical("en"))),
+                    FallbackLocale::Literal(spelled("en")),
                     FallbackLocale::IntentSource,
                 ],
             }])
@@ -1015,11 +1031,24 @@ mod tests {
                         | LocaleSubject::TargetDefaultRequestedLocale(_, LocaleKey::Content(_))
                 )
         }));
-        let over = units(&resolved.requested_set.clone().unwrap_err());
-        assert_eq!(over, [occurrence_unit()]);
-        assert_eq!(units(&resolved.project.unwrap_err()), over);
+        let over = resolved.requested_set.clone().unwrap_err();
+        assert_eq!(units(&over), [occurrence_unit()]);
+        assert_eq!(resolved.project.unwrap_err(), over);
+        // Each spelling stands for itself and waits on the bound.
         let aliases = resolved.negotiation_aliases.unwrap();
-        assert!(aliases[0].key.is_err() && aliases[0].value.is_err());
+        assert_eq!(
+            aliases[0],
+            AliasLocales {
+                key: Spelled {
+                    key: content("fr"),
+                    locale: Err(over.clone()),
+                },
+                value: Spelled {
+                    key: content("fr-FR"),
+                    locale: Err(over),
+                },
+            }
+        );
         let targets = resolved.targets.unwrap();
         assert!(targets[0].requested.is_err() && targets[0].default.is_err());
         assert_eq!(targets[1].default, Ok(None));

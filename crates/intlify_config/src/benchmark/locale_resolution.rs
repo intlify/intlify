@@ -336,8 +336,8 @@ fn project(frame: &mut Frame, project: &ProjectLocales) -> Result<(), OutputFail
 fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFailure> {
     frame.uint(count(aliases.len())?);
     for alias in aliases {
-        admitted(frame, &alias.key, locale)?;
-        admitted(frame, &alias.value, locale)?;
+        admitted(frame, &alias.key.locale, locale)?;
+        admitted(frame, &alias.value.locale, locale)?;
     }
     Ok(())
 }
@@ -345,13 +345,13 @@ fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFail
 fn fallback(frame: &mut Frame, sources: &[FallbackLocales]) -> Result<(), OutputFailure> {
     frame.uint(count(sources.len())?);
     for source in sources {
-        admitted(frame, &source.key, locale)?;
+        admitted(frame, &source.key.locale, locale)?;
         frame.uint(count(source.candidates.len())?);
         for candidate in &source.candidates {
             match candidate {
                 FallbackLocale::Literal(literal) => {
                     frame.uint(0);
-                    admitted(frame, literal, locale)?;
+                    admitted(frame, &literal.locale, locale)?;
                 }
                 FallbackLocale::IntentSource => frame.uint(1),
             }
