@@ -239,9 +239,12 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::CanonicalLocale => 1,
         Check::UniqueLocale => 2,
         Check::RequestedMember => 3,
-        Check::SupportedAssertion | Check::MatchingData | Check::OpaqueIdentity => {
-            return Err(OutputFailure::LocaleResolutionInvariant)
-        }
+        Check::SupportedAssertion
+        | Check::MatchingData
+        | Check::OpaqueIdentity
+        | Check::DistinctFromSource
+        | Check::UniqueCandidate
+        | Check::EffectiveMode => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }
@@ -530,18 +533,28 @@ mod tests {
     #[test]
     fn only_phase_7_units_frame() {
         let mut frame = Frame::new("locale-resolution-test");
-        let foreign = Unit {
-            subject: Subject::CanonicalizationData,
-            ..locale_unit(LocaleSubject::Occurrences, Check::WithinBound)
-        };
-        assert_eq!(
-            unit(&mut frame, &foreign),
-            Err(OutputFailure::LocaleResolutionInvariant)
-        );
+        for subject in [
+            Subject::CanonicalizationData,
+            Subject::Negotiation(crate::resolver::negotiation::NegotiationSubject::Aliases),
+            Subject::Fallback(crate::resolver::fallback::FallbackSubject::Sources),
+            Subject::DeliveryPlacement,
+        ] {
+            let foreign = Unit {
+                subject,
+                ..locale_unit(LocaleSubject::Occurrences, Check::WithinBound)
+            };
+            assert_eq!(
+                unit(&mut frame, &foreign),
+                Err(OutputFailure::LocaleResolutionInvariant)
+            );
+        }
         for check in [
             Check::SupportedAssertion,
             Check::MatchingData,
             Check::OpaqueIdentity,
+            Check::DistinctFromSource,
+            Check::UniqueCandidate,
+            Check::EffectiveMode,
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),
