@@ -12,8 +12,8 @@ workspace = true
 
 [features]
 default = []
-# Domain-separated digests need a hash implementation. Ordinary configuration
-# decoding and duplicate-aware reading paths must not pull one in.
+# Domain-separated digests need a hash implementation, so they are opt-in: a
+# consumer that only decodes or reads duplicate-aware JSON pulls none in.
 digest = ["dep:sha2"]
 
 [dependencies]

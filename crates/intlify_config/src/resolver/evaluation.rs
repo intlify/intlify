@@ -74,6 +74,8 @@ impl Phase {
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
     Slot(Slot),
+    /// The Intent Surface-Class Vocabulary Artifact, a singleton.
+    Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.
     CanonicalizationData,
     /// One field of the selected profile declaration.
@@ -98,6 +100,11 @@ pub(crate) enum Check {
     SupportedAssertion,
     /// The data is the dataset the admitted specification admits.
     MatchingData,
+    /// The artifact's integrity holds and its members are valid, unique, and
+    /// sorted.
+    IntactArtifact,
+    /// The artifact is the one its slot asserts.
+    AssertedArtifact,
     /// The field is admitted as an opaque semantic identity.
     OpaqueIdentity,
     /// A counted or measured total stays within its bound.
@@ -142,6 +149,7 @@ pub(crate) enum Code {
     MessageFallbackSpecificationNotAdmitted,
     CoverageSpecificationNotAdmitted,
     DeliverySpecificationNotAdmitted,
+    IntentSurfaceClassVocabularyNotAdmitted,
     LocaleInvalid,
     LocaleNonCanonical,
     LocaleDuplicate,
@@ -177,6 +185,9 @@ impl Code {
             Self::DeliverySpecificationNotAdmitted => {
                 "project-profile-delivery-specification-not-admitted"
             }
+            Self::IntentSurfaceClassVocabularyNotAdmitted => {
+                "project-profile-intent-surface-class-vocabulary-not-admitted"
+            }
             Self::LocaleInvalid => "project-profile-locale-invalid",
             Self::LocaleNonCanonical => "project-profile-locale-non-canonical",
             Self::LocaleDuplicate => "project-profile-locale-duplicate",
@@ -207,6 +218,13 @@ pub(crate) enum Reason {
     MissingRequiredSlot,
     Unsupported,
     Incompatible,
+    BodyIntegrityInvalid,
+    MemberInvalid,
+    MemberDuplicate,
+    NonCanonicalOrder,
+    IdentityMismatch,
+    RevisionMismatch,
+    DigestMismatch,
     SameDestination,
     ConflictingDestination,
     LiteralSelfReference,
@@ -223,6 +241,13 @@ impl Reason {
             Self::MissingRequiredSlot => "missing-required-slot",
             Self::Unsupported => "unsupported",
             Self::Incompatible => "incompatible",
+            Self::BodyIntegrityInvalid => "body-integrity-invalid",
+            Self::MemberInvalid => "member-invalid",
+            Self::MemberDuplicate => "member-duplicate",
+            Self::NonCanonicalOrder => "non-canonical-order",
+            Self::IdentityMismatch => "identity-mismatch",
+            Self::RevisionMismatch => "revision-mismatch",
+            Self::DigestMismatch => "digest-mismatch",
             Self::SameDestination => "same-destination",
             Self::ConflictingDestination => "conflicting-destination",
             Self::LiteralSelfReference => "literal-self-reference",
@@ -556,6 +581,7 @@ mod tests {
                 Code::MessageFallbackSpecificationNotAdmitted,
                 Code::CoverageSpecificationNotAdmitted,
                 Code::DeliverySpecificationNotAdmitted,
+                Code::IntentSurfaceClassVocabularyNotAdmitted,
                 Code::LocaleInvalid,
                 Code::LocaleNonCanonical,
                 Code::LocaleDuplicate,
@@ -579,6 +605,7 @@ mod tests {
                 "project-profile-message-fallback-specification-not-admitted",
                 "project-profile-coverage-specification-not-admitted",
                 "project-profile-delivery-specification-not-admitted",
+                "project-profile-intent-surface-class-vocabulary-not-admitted",
                 "project-profile-locale-invalid",
                 "project-profile-locale-non-canonical",
                 "project-profile-locale-duplicate",
@@ -598,6 +625,13 @@ mod tests {
                 Reason::MissingRequiredSlot,
                 Reason::Unsupported,
                 Reason::Incompatible,
+                Reason::BodyIntegrityInvalid,
+                Reason::MemberInvalid,
+                Reason::MemberDuplicate,
+                Reason::NonCanonicalOrder,
+                Reason::IdentityMismatch,
+                Reason::RevisionMismatch,
+                Reason::DigestMismatch,
                 Reason::SameDestination,
                 Reason::ConflictingDestination,
                 Reason::LiteralSelfReference,
@@ -612,6 +646,13 @@ mod tests {
                 "missing-required-slot",
                 "unsupported",
                 "incompatible",
+                "body-integrity-invalid",
+                "member-invalid",
+                "member-duplicate",
+                "non-canonical-order",
+                "identity-mismatch",
+                "revision-mismatch",
+                "digest-mismatch",
                 "same-destination",
                 "conflicting-destination",
                 "literal-self-reference",

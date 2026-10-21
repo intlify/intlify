@@ -4,13 +4,14 @@
 //! 015's Profile Resolution Specification Input and its admission. Phase 0
 //! checks the `project-profile` assertion against the Active Project Profile
 //! Specification; Phase 5 checks the other seven slots against what the
-//! resolver supports and binds the canonicalization data to the admitted
-//! specification. Not a wire decoder: 017 defines no wire form, and an adapter
-//! that reads one rejects a duplicate, unknown, malformed, or over-bound member
-//! before invocation. Not the vocabulary artifact's admission, and not
+//! resolver supports, admits the vocabulary artifact against its slot, and
+//! binds the canonicalization data to the admitted specification. Not a wire
+//! decoder: 017 defines no wire form, and an adapter that reads one rejects a
+//! duplicate, unknown, malformed, or over-bound member before invocation. Not
 //! construction authority: until 015 Phase 5 constructs the supported values,
 //! tests supply them.
 
+use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::locale::{
     Canonicalizer, Provider, SemanticPins, SpecificationNotAdmitted, Supported, VersionedIdentity,
 };
@@ -20,6 +21,7 @@ use super::evaluation::{
     Subject, Unit,
 };
 use super::limits::ConfirmedPolicy;
+use super::vocabulary::{admit_vocabulary, SurfaceVocabulary, ASSERTED, INTACT};
 
 /// 015's eight fixed slots, declared in their canonical order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -128,7 +130,7 @@ pub(crate) const DATA: Unit = Unit {
 };
 
 /// The units Phase 5 records, in their canonical order.
-pub(crate) const PHASE_5: [Unit; 8] = [
+pub(crate) const PHASE_5: [Unit; 10] = [
     unit(Phase::SpecificationAdmission, Slot::LocaleCanonicalization),
     unit(Phase::SpecificationAdmission, Slot::LocaleNegotiation),
     unit(Phase::SpecificationAdmission, Slot::MessageLocaleFallback),
@@ -139,6 +141,8 @@ pub(crate) const PHASE_5: [Unit; 8] = [
     ),
     unit(Phase::SpecificationAdmission, Slot::DeliveryGraph),
     unit(Phase::SpecificationAdmission, Slot::DeliveryPlacement),
+    INTACT,
+    ASSERTED,
     DATA,
 ];
 
@@ -197,7 +201,8 @@ pub(crate) fn admit_project_profile<Id: Clone + Eq>(
     )
 }
 
-/// What Phase 5 admitted: each remaining slot's member, and the canonicalizer
+/// What Phase 5 admitted: each remaining slot's member, the surface classes of
+/// the vocabulary artifact admitted against its slot, and the canonicalizer
 /// bound to the admitted canonicalization specification's dataset. A later
 /// phase depends only on the members it uses.
 pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
@@ -208,25 +213,28 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
     pub(crate) intent_surface_class_vocabulary: Admitted<VocabularyAssertion<Id>>,
     pub(crate) delivery_graph: Admitted<VersionedIdentity<Id>>,
     pub(crate) delivery_placement: Admitted<VersionedIdentity<Id>>,
+    pub(crate) vocabulary: Admitted<SurfaceVocabulary>,
     pub(crate) canonicalizer: Admitted<Canonicalizer<P>>,
 }
 
-/// Phase 5's slots and canonicalization data, which run only under the
-/// Resource Limit Policy Phase 4 confirmed. `data` is the canonicalization data
-/// the pre-invocation boundary already admitted as an envelope; here it must
-/// carry the dataset the admitted specification admits.
+/// Phase 5's slots, vocabulary, and canonicalization data, which run only under
+/// the Resource Limit Policy Phase 4 confirmed. `vocabulary` and `data` are the
+/// artifacts the pre-invocation boundary already admitted as envelopes; here
+/// the vocabulary must be intact and the one its slot asserts, and the data
+/// must carry the dataset the admitted specification admits.
 pub(crate) fn admit_specifications<Id, P>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
     input: &SpecificationInput<Id>,
     policy: Result<&ConfirmedPolicy, &Causes>,
+    vocabulary: &FormalVocabulary,
     data: P,
 ) -> Result<AdmittedSpecifications<Id, P>, EvaluationInvariant>
 where
-    Id: Clone + Eq,
+    Id: Clone + Eq + AsRef<str>,
     P: Provider<Identity = Id>,
 {
-    let [canonicalization, negotiation, fallback, coverage, vocabulary, graph, placement, _] =
+    let [canonicalization, negotiation, fallback, coverage, asserted_vocabulary, graph, placement, ..] =
         PHASE_5;
     let confirmed = || policy.map(|_| ()).map_err(Causes::clone);
     let pins = evaluation.check(canonicalization, confirmed(), |()| {
@@ -260,11 +268,12 @@ where
         input.coverage.as_ref(),
         &supported.coverage,
     )?;
-    // The vocabulary artifact is admitted against this assertion with the
-    // coverage it serves; the slot itself only has to be present.
-    let intent_surface_class_vocabulary = evaluation.check(vocabulary, confirmed(), |()| {
-        present(input.intent_surface_class_vocabulary.as_ref()).cloned()
-    })?;
+    // The slot has no fixed value, so it only has to be present: the
+    // vocabulary artifact is admitted against what it asserts.
+    let intent_surface_class_vocabulary =
+        evaluation.check(asserted_vocabulary, confirmed(), |()| {
+            present(input.intent_surface_class_vocabulary.as_ref()).cloned()
+        })?;
     let delivery_graph = specification_slot(
         evaluation,
         graph,
@@ -280,6 +289,12 @@ where
         confirmed(),
         input.delivery_placement.as_ref(),
         &supported.delivery_placement,
+    )?;
+    let vocabulary = admit_vocabulary(
+        evaluation,
+        confirmed(),
+        intent_surface_class_vocabulary.as_ref(),
+        vocabulary,
     )?;
     let canonicalizer = evaluation.check(
         DATA,
@@ -310,6 +325,7 @@ where
         intent_surface_class_vocabulary,
         delivery_graph,
         delivery_placement,
+        vocabulary,
         canonicalizer,
     })
 }
@@ -381,11 +397,13 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::artifacts::vectors::{self, formal};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::DatasetPin;
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
     use crate::resolver::evaluation::Status;
     use crate::resolver::limits::fixture_limits;
+    use crate::resolver::locales::fixtures::units;
 
     type Id = &'static str;
 
@@ -445,9 +463,9 @@ mod tests {
 
     fn vocabulary() -> VocabularyAssertion<Id> {
         VocabularyAssertion {
-            identity: "storefront-surfaces",
-            revision: "1",
-            semantic_digest: "sha256:test-only-vocabulary-digest",
+            identity: vectors::IDENTITY,
+            revision: vectors::REVISION,
+            semantic_digest: vectors::SEMANTIC_DIGEST,
         }
     }
 
@@ -503,6 +521,7 @@ mod tests {
                 supported,
                 input,
                 policy,
+                &formal(),
                 FixtureProvider::new(),
             )
             .unwrap();
@@ -592,6 +611,8 @@ mod tests {
                 Subject::Slot(Slot::IntentSurfaceClassVocabulary),
                 Subject::Slot(Slot::DeliveryGraph),
                 Subject::Slot(Slot::DeliveryPlacement),
+                Subject::Vocabulary,
+                Subject::Vocabulary,
                 Subject::CanonicalizationData,
             ]
         );
@@ -633,6 +654,10 @@ mod tests {
                 delivery_placement: input.delivery_placement.unwrap(),
             })
         );
+        assert_eq!(
+            admission.specifications.vocabulary,
+            Ok(SurfaceVocabulary::fixture_owned(&vectors::MEMBERS))
+        );
         let canonicalizer = admission.specifications.canonicalizer.as_ref().unwrap();
         assert_eq!(canonicalizer.binding().pins, fixture_pins());
     }
@@ -668,7 +693,10 @@ mod tests {
                 Some("missing-required-slot")
             )]
         );
-        only_cause(&admission);
+        let causes = only_cause(&admission);
+        // The artifact is still read; only its comparison waits on the slot.
+        assert_eq!(admission.not_evaluated(), [(ASSERTED, causes.clone())]);
+        assert_eq!(admission.specifications.vocabulary, Err(causes));
     }
 
     #[test]
@@ -698,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    fn the_vocabulary_slot_only_has_to_be_present() {
+    fn the_vocabulary_slot_admits_any_assertion_and_the_artifact_answers_it() {
         let mut input = complete();
         input.intent_surface_class_vocabulary = Some(VocabularyAssertion {
             identity: "any-vocabulary",
@@ -706,11 +734,23 @@ mod tests {
             semantic_digest: "sha256:any",
         });
         let admission = Admission::confirmed(&input);
-        assert_eq!(admission.issues(), []);
+        // The slot has no fixed value, so the Set forms; the artifact is not
+        // the one it asserts.
+        assert_eq!(
+            admission.issues(),
+            [(
+                ASSERTED,
+                "project-profile-intent-surface-class-vocabulary-not-admitted",
+                Some("identity-mismatch")
+            )]
+        );
         assert_eq!(
             admission.specifications.intent_surface_class_vocabulary,
             Ok(input.intent_surface_class_vocabulary.unwrap())
         );
+        assert!(admission.set().is_ok());
+        let causes = admission.specifications.vocabulary.unwrap_err();
+        assert_eq!(units(&causes), [ASSERTED]);
     }
 
     #[test]

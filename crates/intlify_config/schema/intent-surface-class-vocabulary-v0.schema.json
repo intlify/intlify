@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ArtifactKind": {
+      "enum": ["intent-surface-class-vocabulary"],
+      "type": "string"
+    },
+    "IntegrityDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "RevisionZero": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "Token": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    }
+  },
+  "description": "One Intent Surface-Class Vocabulary Artifact: the complete finite set of\nsurface classes that coverage and authoring may use.",
+  "properties": {
+    "identity": {
+      "$ref": "#/definitions/Token"
+    },
+    "integrityDigest": {
+      "$ref": "#/definitions/IntegrityDigest"
+    },
+    "kind": {
+      "$ref": "#/definitions/ArtifactKind"
+    },
+    "members": {
+      "description": "The surface classes, sorted by unsigned UTF-8 bytes and each named once.\nThe set may be empty.",
+      "items": {
+        "$ref": "#/definitions/Token"
+      },
+      "type": "array"
+    },
+    "revision": {
+      "$ref": "#/definitions/Token"
+    },
+    "schemaRevision": {
+      "$ref": "#/definitions/RevisionZero"
+    }
+  },
+  "required": ["kind", "schemaRevision", "identity", "revision", "members", "integrityDigest"],
+  "title": "IntentSurfaceClassVocabularyArtifact",
+  "type": "object"
+}

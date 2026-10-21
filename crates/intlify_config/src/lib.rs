@@ -28,6 +28,10 @@
 //! ```compile_fail
 //! use intlify_config::locale::Canonicalizer;
 //! ```
+//! The vocabulary artifact's reader is not a public artifact API:
+//! ```compile_fail
+//! use intlify_config::artifacts::vocabulary::FormalVocabulary;
+//! ```
 //! Locale resolution's result is not a consumer Profile or serializable artifact:
 //! ```compile_fail
 //! use intlify_config::resolver::locales::ResolvedLocales;
@@ -58,6 +62,12 @@ pub mod schema;
 #[doc(hidden)]
 pub use structural::example as example_support;
 
+// Developer-only generation of the committed 017 vocabulary vectors. No codec,
+// reader, or admission becomes public.
+#[cfg(feature = "vectors")]
+#[doc(hidden)]
+pub use artifacts::vectors as vector_support;
+
 /// Non-default developer measurements only; no configuration resolver or Profile API.
 #[cfg(feature = "benchmark")]
 pub use benchmark::facade as measurement;
@@ -68,6 +78,10 @@ pub use benchmark::facade as measurement;
 mod model;
 #[allow(dead_code)]
 mod references;
+
+// The 017 representations the resolver admits; no artifact API is reserved.
+#[allow(dead_code)]
+mod artifacts;
 
 // Separate from the compatibility decoder: strict 015 entry is still internal.
 #[allow(dead_code)]
