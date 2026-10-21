@@ -13,6 +13,9 @@ use serde_json::Value;
 use crate::input_limits::{Bound, ValueLimits};
 use crate::structural::StructuralLimits;
 
+use super::bootstrap::AdmittedResourcePolicy;
+use super::resource_policy::Rechecked;
+
 /// The member of a Resource Limit Policy's content that carries the section.
 pub(crate) const SECTION: &str = "projectProfileResolution";
 
@@ -553,17 +556,24 @@ impl ResolutionLimits {
     }
 }
 
-/// The Resource Limit Policy that 015 Phase 4 admitted and found compatible
-/// with the implementation capability, which also confirms the provisional
-/// profile selection. Post-policy phases run only under it. Until Phase 4
-/// exists, only tests and the owners of the finite locale fixtures, the
-/// measurements and the developer example, construct one.
+/// The Resource Limit Policy that 015 Phase 4 admitted, found compatible with
+/// the implementation capability, and rechecked the protected input under,
+/// which also confirms the provisional profile selection. Post-policy phases
+/// run only under it. Besides Phase 4, only tests and the owners of the finite
+/// locale fixtures, the measurements and the developer example state one.
 #[derive(Debug, Clone)]
 pub(crate) struct ConfirmedPolicy {
     limits: ResolutionLimits,
 }
 
 impl ConfirmedPolicy {
+    /// The admitted policy, once every recheck under it held.
+    pub(crate) fn confirmed(policy: &AdmittedResourcePolicy, _: Rechecked) -> Self {
+        Self {
+            limits: policy.limits().clone(),
+        }
+    }
+
     /// A policy a fixture owner states outright, as Phase 4 would confirm it.
     #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
     pub(crate) const fn fixture_owned(limits: ResolutionLimits) -> Self {

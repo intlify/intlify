@@ -79,8 +79,9 @@ pub(crate) enum Subject {
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.
     CanonicalizationData,
-    /// A Resource Limit Policy bound over the collection or the selected
-    /// declaration's references, or the selected `resourceLimits` reference.
+    /// A Resource Limit Policy bound over the configuration, the collection,
+    /// or the selected declaration's references, or the selected
+    /// `resourceLimits` reference.
     ResourcePolicy(PolicySubject),
     /// One field of the selected profile declaration.
     DeclarationField(DeclarationField),
