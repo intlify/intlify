@@ -1,8 +1,9 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Private, provisional profile selection. No policy recheck, retained selector
-//! projection, final Finding, or checked Profile is produced here.
+//! Private, provisional profile selection. No retained selector projection,
+//! final Finding, or checked Profile is produced here; Phase 4 rechecks the
+//! selector under the final projection authority.
 
 use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
 use serde::Deserialize;
@@ -106,6 +107,44 @@ impl SelectorInput {
     }
 }
 
+/// 015's String Length Fact of a string selector under the final projection
+/// authority. `OverLimit` keeps no length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StringLengthFact {
+    Exact(u64),
+    OverLimit,
+}
+
+impl SelectorInput {
+    /// The String Length Fact under `authority`: none for an absent or
+    /// non-string selector, `Exact(n)` for a string of `n` bytes within
+    /// `authority`, and otherwise `OverLimit`. A string past the bound it was
+    /// observed under kept no length, so it has a fact only under an authority
+    /// no larger than that bound.
+    pub(crate) fn length_fact(
+        &self,
+        authority: Bound,
+    ) -> Result<Option<StringLengthFact>, SelectionInvariant> {
+        Ok(match &self.kind {
+            SelectorKind::Absent | SelectorKind::InvalidType(_) => None,
+            SelectorKind::String(value) => {
+                let length = u64::try_from(value.len()).expect("bounded selector length");
+                Some(if length <= authority.get() {
+                    StringLengthFact::Exact(length)
+                } else {
+                    StringLengthFact::OverLimit
+                })
+            }
+            SelectorKind::OverLimitString if authority.get() <= self.bound.get() => {
+                Some(StringLengthFact::OverLimit)
+            }
+            SelectorKind::OverLimitString => {
+                return Err(SelectionInvariant::BootstrapBoundMismatch);
+            }
+        })
+    }
+}
+
 /// Content-free internal observations, not final selector Evidence or Findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SelectionFailure {
@@ -166,7 +205,8 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
     ) -> Result<Selection<Policy>, SelectionInvariant> {
         if input.bound != self.limits.max_profile_id_bytes {
             // A marker observed under one bound cannot be reinterpreted as a
-            // complete string under another. Policy recheck is not implemented.
+            // complete string under another. Provisional selection runs under
+            // the bound the selector was observed under.
             return Err(SelectionInvariant::BootstrapBoundMismatch);
         }
         let name = match &input.kind {
