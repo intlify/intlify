@@ -29,6 +29,7 @@ use super::evaluation::{
 };
 use super::limits::ConfirmedPolicy;
 
+pub(crate) use spelling::canonicalize;
 use spelling::{set, unique, Pass, Scope};
 
 mod bound;
@@ -46,6 +47,11 @@ impl fmt::Debug for Content {
 }
 
 impl Content {
+    /// A spelling that stands for itself.
+    pub(crate) fn new(spelling: &str) -> Self {
+        Self(Arc::from(spelling))
+    }
+
     /// The spelling itself, for a caller that compares or digests it; never
     /// for display.
     pub(crate) fn as_str(&self) -> &str {
@@ -242,6 +248,9 @@ impl ProjectLocales {
 pub(crate) struct ResolvedLocales {
     /// The total the occurrence bound measured, when it measured one.
     pub(crate) occurrence_total: Option<Actual>,
+    /// The occurrence bound's result, which canonicalizing any spelling waits
+    /// on: Phase 8 canonicalizes the coverage selectors Phase 7 only counted.
+    pub(crate) occurrence_bound: Admitted<()>,
     /// Every spelling Phase 7 reached, in location order.
     pub(crate) occurrences: Vec<LocaleOccurrence>,
     /// The project's canonical requested locales, even when one repeats or
@@ -280,7 +289,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
     let (occurrence_total, bounded) = bound::occurrences(evaluation, policy, fields)?;
     let mut pass = Pass::new(
         evaluation,
-        both(canonicalizer.map_err(Causes::clone), bounded)
+        both(canonicalizer.map_err(Causes::clone), bounded.clone())
             .map(|(canonicalizer, ())| canonicalizer),
     );
     let (requested_set, project) = project(&mut pass, policy, fields)?;
@@ -298,6 +307,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
     };
     Ok(ResolvedLocales {
         occurrence_total,
+        occurrence_bound: bounded,
         occurrences: pass.into_occurrences(),
         requested_set,
         project,

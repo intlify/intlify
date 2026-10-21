@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::input_limits::Bound;
 
+use super::coverage::CoverageSubject;
 use super::fallback::FallbackSubject;
 use super::identity::DeclarationField;
 use super::limits::BoundId;
@@ -83,6 +84,9 @@ pub(crate) enum Subject {
     Negotiation(NegotiationSubject),
     /// The declaration's message fallback, or one source or its candidates.
     Fallback(FallbackSubject),
+    /// The declaration's coverage rules, a rule's selector item, a normalized
+    /// domain, or the decision table and one of its cells.
+    Coverage(CoverageSubject),
     /// The declaration's delivery placement, a singleton.
     DeliveryPlacement,
 }
@@ -108,8 +112,14 @@ pub(crate) enum Check {
     DistinctFromSource,
     /// A fallback candidate occurs once in its sequence.
     UniqueCandidate,
-    /// The placement resolves to its effective mode.
+    /// The placement, or a coverage cell, resolves to its effective mode.
     EffectiveMode,
+    /// The surface class is a member of the admitted vocabulary.
+    VocabularyMember,
+    /// No other item in the same selector names the same surface class.
+    UniqueSurfaceClass,
+    /// No other rule normalizes to the same domain.
+    UniqueDomain,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -140,6 +150,9 @@ pub(crate) enum Code {
     NegotiationAliasDestinationNotRequested,
     MessageFallbackSourceNotRequested,
     MessageFallbackSequenceInvalid,
+    CoverageRuleInvalid,
+    CoverageRuleDuplicate,
+    CoverageRuleConflict,
     ResourceLimitExceeded,
 }
 
@@ -180,6 +193,9 @@ impl Code {
             Self::MessageFallbackSequenceInvalid => {
                 "project-profile-message-fallback-sequence-invalid"
             }
+            Self::CoverageRuleInvalid => "project-profile-coverage-rule-invalid",
+            Self::CoverageRuleDuplicate => "project-profile-coverage-rule-duplicate",
+            Self::CoverageRuleConflict => "project-profile-coverage-rule-conflict",
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
         }
     }
@@ -196,6 +212,9 @@ pub(crate) enum Reason {
     LiteralSelfReference,
     LiteralDuplicate,
     IntentSourceDuplicate,
+    LocaleNotRequested,
+    SurfaceClassUnknown,
+    SurfaceClassDuplicate,
 }
 
 impl Reason {
@@ -209,6 +228,9 @@ impl Reason {
             Self::LiteralSelfReference => "literal-self-reference",
             Self::LiteralDuplicate => "literal-duplicate",
             Self::IntentSourceDuplicate => "intent-source-duplicate",
+            Self::LocaleNotRequested => "locale-not-requested",
+            Self::SurfaceClassUnknown => "surface-class-unknown",
+            Self::SurfaceClassDuplicate => "surface-class-duplicate",
         }
     }
 }
@@ -542,6 +564,9 @@ mod tests {
                 Code::NegotiationAliasDestinationNotRequested,
                 Code::MessageFallbackSourceNotRequested,
                 Code::MessageFallbackSequenceInvalid,
+                Code::CoverageRuleInvalid,
+                Code::CoverageRuleDuplicate,
+                Code::CoverageRuleConflict,
                 Code::ResourceLimitExceeded,
             ]
             .map(Code::as_str),
@@ -562,6 +587,9 @@ mod tests {
                 "project-profile-negotiation-alias-destination-not-requested",
                 "project-profile-message-fallback-source-not-requested",
                 "project-profile-message-fallback-sequence-invalid",
+                "project-profile-coverage-rule-invalid",
+                "project-profile-coverage-rule-duplicate",
+                "project-profile-coverage-rule-conflict",
                 "project-profile-resource-limit-exceeded",
             ]
         );
@@ -575,6 +603,9 @@ mod tests {
                 Reason::LiteralSelfReference,
                 Reason::LiteralDuplicate,
                 Reason::IntentSourceDuplicate,
+                Reason::LocaleNotRequested,
+                Reason::SurfaceClassUnknown,
+                Reason::SurfaceClassDuplicate,
             ]
             .map(Reason::as_str),
             [
@@ -586,6 +617,9 @@ mod tests {
                 "literal-self-reference",
                 "literal-duplicate",
                 "intent-source-duplicate",
+                "locale-not-requested",
+                "surface-class-unknown",
+                "surface-class-duplicate",
             ]
         );
     }

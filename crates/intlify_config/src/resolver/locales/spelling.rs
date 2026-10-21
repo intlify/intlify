@@ -294,7 +294,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
 
 /// Validates and canonicalizes one spelling: its canonical locale and whether
 /// the spelling differs from it, or the issue an author can fix.
-fn canonicalize<P: Provider>(
+pub(crate) fn canonicalize<P: Provider>(
     canonicalizer: &Canonicalizer<P>,
     raw: &str,
 ) -> Result<Result<(CanonicalLocale, bool), Blocking>, LocaleInvariant> {
