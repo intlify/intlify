@@ -161,6 +161,9 @@ pub(crate) enum Code {
     CoverageRuleInvalid,
     CoverageRuleDuplicate,
     CoverageRuleConflict,
+    ArtifactReferenceNotAdmitted,
+    ArtifactCollectionNotAdmitted,
+    ResourcePolicyNotAdmitted,
     ResourceLimitExceeded,
 }
 
@@ -207,6 +210,11 @@ impl Code {
             Self::CoverageRuleInvalid => "project-profile-coverage-rule-invalid",
             Self::CoverageRuleDuplicate => "project-profile-coverage-rule-duplicate",
             Self::CoverageRuleConflict => "project-profile-coverage-rule-conflict",
+            Self::ArtifactReferenceNotAdmitted => "project-profile-artifact-reference-not-admitted",
+            Self::ArtifactCollectionNotAdmitted => {
+                "project-profile-artifact-collection-not-admitted"
+            }
+            Self::ResourcePolicyNotAdmitted => "project-profile-resource-policy-not-admitted",
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
         }
     }
@@ -233,6 +241,16 @@ pub(crate) enum Reason {
     LocaleNotRequested,
     SurfaceClassUnknown,
     SurfaceClassDuplicate,
+    RoleKindMismatch,
+    SpecificationRevisionUnsupported,
+    SpecificationRevisionMismatch,
+    KindMismatch,
+    NotFound,
+    ConflictingContent,
+    DuplicateEnvelope,
+    BodySchemaInvalid,
+    ProjectProfileResolutionMissing,
+    ProjectProfileResolutionInvalid,
 }
 
 impl Reason {
@@ -256,6 +274,16 @@ impl Reason {
             Self::LocaleNotRequested => "locale-not-requested",
             Self::SurfaceClassUnknown => "surface-class-unknown",
             Self::SurfaceClassDuplicate => "surface-class-duplicate",
+            Self::RoleKindMismatch => "role-kind-mismatch",
+            Self::SpecificationRevisionUnsupported => "specification-revision-unsupported",
+            Self::SpecificationRevisionMismatch => "specification-revision-mismatch",
+            Self::KindMismatch => "kind-mismatch",
+            Self::NotFound => "not-found",
+            Self::ConflictingContent => "conflicting-content",
+            Self::DuplicateEnvelope => "duplicate-envelope",
+            Self::BodySchemaInvalid => "body-schema-invalid",
+            Self::ProjectProfileResolutionMissing => "project-profile-resolution-missing",
+            Self::ProjectProfileResolutionInvalid => "project-profile-resolution-invalid",
         }
     }
 }
@@ -593,6 +621,9 @@ mod tests {
                 Code::CoverageRuleInvalid,
                 Code::CoverageRuleDuplicate,
                 Code::CoverageRuleConflict,
+                Code::ArtifactReferenceNotAdmitted,
+                Code::ArtifactCollectionNotAdmitted,
+                Code::ResourcePolicyNotAdmitted,
                 Code::ResourceLimitExceeded,
             ]
             .map(Code::as_str),
@@ -617,6 +648,9 @@ mod tests {
                 "project-profile-coverage-rule-invalid",
                 "project-profile-coverage-rule-duplicate",
                 "project-profile-coverage-rule-conflict",
+                "project-profile-artifact-reference-not-admitted",
+                "project-profile-artifact-collection-not-admitted",
+                "project-profile-resource-policy-not-admitted",
                 "project-profile-resource-limit-exceeded",
             ]
         );
@@ -640,6 +674,16 @@ mod tests {
                 Reason::LocaleNotRequested,
                 Reason::SurfaceClassUnknown,
                 Reason::SurfaceClassDuplicate,
+                Reason::RoleKindMismatch,
+                Reason::SpecificationRevisionUnsupported,
+                Reason::SpecificationRevisionMismatch,
+                Reason::KindMismatch,
+                Reason::NotFound,
+                Reason::ConflictingContent,
+                Reason::DuplicateEnvelope,
+                Reason::BodySchemaInvalid,
+                Reason::ProjectProfileResolutionMissing,
+                Reason::ProjectProfileResolutionInvalid,
             ]
             .map(Reason::as_str),
             [
@@ -661,6 +705,16 @@ mod tests {
                 "locale-not-requested",
                 "surface-class-unknown",
                 "surface-class-duplicate",
+                "role-kind-mismatch",
+                "specification-revision-unsupported",
+                "specification-revision-mismatch",
+                "kind-mismatch",
+                "not-found",
+                "conflicting-content",
+                "duplicate-envelope",
+                "body-schema-invalid",
+                "project-profile-resolution-missing",
+                "project-profile-resolution-invalid",
             ]
         );
     }

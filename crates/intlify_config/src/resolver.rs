@@ -9,6 +9,7 @@
 //! Limit Policy take them as values that only tests build until the phases
 //! producing them exist.
 
+pub(crate) mod bootstrap;
 pub(crate) mod coverage;
 pub(crate) mod delivery;
 pub(crate) mod evaluation;
