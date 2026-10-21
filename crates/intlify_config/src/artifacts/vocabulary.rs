@@ -19,7 +19,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::SemanticDigest;
+use super::{count, depth, SemanticDigest};
 
 /// The one artifact kind this reader implements.
 pub(crate) const ARTIFACT_KIND: &str = "intent-surface-class-vocabulary";
@@ -216,39 +216,6 @@ pub(crate) fn read(
         return Err(EnvelopeFailure::UnknownMember);
     }
     Ok(FormalVocabulary(artifact))
-}
-
-fn count(length: usize) -> u64 {
-    u64::try_from(length).expect("an in-memory length fits u64")
-}
-
-/// The deepest nesting of objects and arrays, counted outside strings without
-/// decoding anything.
-fn depth(bytes: &[u8]) -> u64 {
-    let (mut depth, mut deepest) = (0_u64, 0_u64);
-    let (mut quoted, mut escaped) = (false, false);
-    for &byte in bytes {
-        if quoted {
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == b'"' {
-                quoted = false;
-            }
-            continue;
-        }
-        match byte {
-            b'"' => quoted = true,
-            b'{' | b'[' => {
-                depth += 1;
-                deepest = deepest.max(depth);
-            }
-            b'}' | b']' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    deepest
 }
 
 /// The member limits, counted on the decoded value whatever its shape: a

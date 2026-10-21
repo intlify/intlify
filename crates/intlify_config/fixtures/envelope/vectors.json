@@ -1,0 +1,1152 @@
+{
+  "note": "Members of a Submitted Profile Resolution Artifact Collection, read by intlify_config. An independent implementation decides from each member alone what it declares, whether it establishes an exact-reference tuple and which, whether its integrity holds, and its canonical bytes; checks the members whose semantic digests must agree or differ, the spellings that must frame to one canonical body, the members that must stay unequal, and the texts a JSON number makes unrepresentable; orders the members within one tuple and the members without a tuple by their canonical bodies; and checks that each reference names its member's tuple. The contents are test values.",
+  "integrityDomain": "localization-artifact-integrity",
+  "kinds": [
+    {
+      "kind": "approval-policy",
+      "governingSpecification": "intlify-design-021",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "glossary-set",
+      "governingSpecification": "intlify-design-022",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "provider-routing-policy",
+      "governingSpecification": "intlify-design-022",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "resource-limit-policy",
+      "governingSpecification": "intlify-design-018",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "selection-policy",
+      "governingSpecification": "intlify-design-021",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "source-admission-policy",
+      "governingSpecification": "intlify-design-018",
+      "semanticDomain": "policy-semantic-digest"
+    },
+    {
+      "kind": "target-profile",
+      "governingSpecification": "intlify-design-024",
+      "semanticDomain": "target-profile-semantic-digest"
+    },
+    {
+      "kind": "trust-policy",
+      "governingSpecification": "intlify-design-018",
+      "semanticDomain": "policy-semantic-digest"
+    }
+  ],
+  "members": [
+    {
+      "id": "approval-policy",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "glossary-set",
+      "member": {
+        "kind": "glossary-set",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-022",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-glossary",
+          "revision": "1",
+          "content": {}
+        },
+        "integrityDigest": "sha256:380221b6fe0eb94de990c1ec895cce37a830dc6a3600209b70b3fdb808d38fcf"
+      },
+      "declaration": "glossary-set",
+      "tuple": {
+        "kind": "glossary-set",
+        "identity": "storefront-glossary",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 433
+    },
+    {
+      "id": "provider-routing-policy",
+      "member": {
+        "kind": "provider-routing-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-022",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-routing",
+          "revision": "1",
+          "content": {
+            "adapter": {
+              "identity": "intlify-provider-fixture",
+              "revision": "0"
+            },
+            "configuration": {
+              "identity": "storefront-routing",
+              "semanticDigest": "sha256:2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }
+          }
+        },
+        "integrityDigest": "sha256:34bc15e79e73923b43be58d5ee43f3fb99ff8555d123514ee6664fbd79f707a7"
+      },
+      "declaration": "provider-routing-policy",
+      "tuple": {
+        "kind": "provider-routing-policy",
+        "identity": "storefront-routing",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 739
+    },
+    {
+      "id": "resource-limit-policy",
+      "member": {
+        "kind": "resource-limit-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-limits",
+          "revision": "1",
+          "content": {
+            "projectProfileResolution": {
+              "configurationInput": {
+                "maxConfigurationBytes": "1048576"
+              }
+            }
+          }
+        },
+        "integrityDigest": "sha256:02b0d5fc2e31adb38bb88f9781773323bf4462c893a5daa5c11bc01de4d65b62"
+      },
+      "declaration": "resource-limit-policy",
+      "tuple": {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:ecc1e929a5ed4b81023db2423509f588ad90e23367825445554c7bafe4d37ae2"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 580
+    },
+    {
+      "id": "selection-policy",
+      "member": {
+        "kind": "selection-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-selection",
+          "revision": "1",
+          "content": {
+            "mode": "explicit"
+          }
+        },
+        "integrityDigest": "sha256:1d8fac7811b14227ceacdb5ba14f3d46ee3250a5d147bc7b14546ffae39ca85d"
+      },
+      "declaration": "selection-policy",
+      "tuple": {
+        "kind": "selection-policy",
+        "identity": "storefront-selection",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 468
+    },
+    {
+      "id": "source-admission-policy",
+      "member": {
+        "kind": "source-admission-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-source-admission",
+          "revision": "1",
+          "content": {
+            "sourceApproval": "authenticated-sufficient"
+          }
+        },
+        "integrityDigest": "sha256:0dfe3883200be55788c679a8ae293ab2d7f15c07d5c0ee4a207a202b855c197c"
+      },
+      "declaration": "source-admission-policy",
+      "tuple": {
+        "kind": "source-admission-policy",
+        "identity": "storefront-source-admission",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 508
+    },
+    {
+      "id": "target-profile",
+      "member": {
+        "kind": "target-profile",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-024",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-web",
+          "revision": "1",
+          "content": {
+            "host": {
+              "kind": "javascript-esm-dom-text",
+              "grammar": {
+                "identity": "ecmascript",
+                "revision": "2025"
+              },
+              "moduleProfile": {
+                "identity": "intlify-esm-module",
+                "revision": "0"
+              }
+            },
+            "mode": "runtime-backed",
+            "adapter": {
+              "identity": "intlify-vanilla-dom",
+              "revision": "0"
+            },
+            "execution": {
+              "specification": {
+                "identity": "intlify-design-023",
+                "revision": "0"
+              },
+              "profile": {
+                "identity": "intlify-text-interpolation-minimum",
+                "revision": "0"
+              }
+            },
+            "mf2Specification": {
+              "identity": "unicode-mf2",
+              "revision": "48"
+            },
+            "codecs": {
+              "bindingTable": {
+                "identity": "intlify-binding-table",
+                "revision": "0"
+              },
+              "localePayload": {
+                "identity": "intlify-locale-payload",
+                "revision": "0"
+              },
+              "descriptor": {
+                "identity": "intlify-target-descriptor",
+                "revision": "0"
+              },
+              "sourceMap": {
+                "identity": "ecma-426-source-map",
+                "revision": "3"
+              }
+            },
+            "locale": {
+              "selection": "direct-only",
+              "services": "absent",
+              "directions": [
+                {
+                  "locale": "en",
+                  "direction": "LTR"
+                },
+                {
+                  "locale": "ja",
+                  "direction": "LTR"
+                }
+              ]
+            },
+            "delivery": {
+              "unit": "main",
+              "loading": "eager"
+            },
+            "limits": {
+              "maxMessages": "1000",
+              "maxUses": "10000",
+              "maxLocales": "8",
+              "maxFiles": "64",
+              "maxFileBytes": "1048576",
+              "maxOutputBytes": "8388608",
+              "maxParameterBytes": "4096",
+              "maxTextBytes": "65536"
+            }
+          }
+        },
+        "integrityDigest": "sha256:23b178d1ec9e44427833b6f3adda0450cd9a358abfc4f90963ee152957e6bf96"
+      },
+      "declaration": "target-profile",
+      "tuple": {
+        "kind": "target-profile",
+        "identity": "storefront-web",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 2382
+    },
+    {
+      "id": "trust-policy",
+      "member": {
+        "kind": "trust-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-trust",
+          "revision": "1",
+          "content": {}
+        },
+        "integrityDigest": "sha256:e0ccb2ae455bb0752040e80b7a14903de30293b5602ea7d45957a10a0aaa18a5"
+      },
+      "declaration": "trust-policy",
+      "tuple": {
+        "kind": "trust-policy",
+        "identity": "storefront-trust",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:3d5bc246bf3129fcb7a2063aacf9326e1088c21470daf06d6a4b2fcd5785c064"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 430
+    },
+    {
+      "id": "resource-limit-policy-without-section",
+      "member": {
+        "kind": "resource-limit-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-limits",
+          "revision": "1",
+          "content": {}
+        },
+        "integrityDigest": "sha256:ad43d7cb1ef94ad356d477f76b89a60f6b316d081e13d210f5681c76800c4dff"
+      },
+      "declaration": "resource-limit-policy",
+      "tuple": {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:c2db5d2147345607ca7f43b89131daad5c2297e15aa551e902ce853fd01e44b3"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 440
+    },
+    {
+      "id": "resource-limit-policy-non-object-section",
+      "member": {
+        "kind": "resource-limit-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-limits",
+          "revision": "1",
+          "content": {
+            "projectProfileResolution": "default"
+          }
+        },
+        "integrityDigest": "sha256:a71fdb8d77f4ce2d78eeb5e2de7b441a82b65d81612273d061746440632d5686"
+      },
+      "declaration": "resource-limit-policy",
+      "tuple": {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:a7fd10edff091dbd221fc81ee953016004a19f0a0080f4f2521972ab9e313f8b"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 489
+    },
+    {
+      "id": "resource-limit-policy-invalid-section",
+      "member": {
+        "kind": "resource-limit-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-limits",
+          "revision": "1",
+          "content": {
+            "projectProfileResolution": {
+              "configurationInput": {
+                "maxConfigurationBytes": "0"
+              }
+            }
+          }
+        },
+        "integrityDigest": "sha256:b8484842f3868d01d56eeff94dd6bbc9957e1d61bbaebdd97fbdf8676b598391"
+      },
+      "declaration": "resource-limit-policy",
+      "tuple": {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:dea7dec7f7b7e5fb9b3f168e377e2b4ee99b4e7b95d3d0ff9654f23c158f7ab4"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 574
+    },
+    {
+      "id": "approval-policy-renamed",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval-renamed",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:a8adc05d08adebd78b8d1612047ec1bd29b55a1a4db1a8ae24899cd30c9bd315"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval-renamed",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 487
+    },
+    {
+      "id": "approval-policy-revised",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "2",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:beb10cd76cd74625867fd8a90d2abd35069d4aea4bc447410af91357d8c1da28"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "2",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "approval-policy-other-content",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "not-required"
+          }
+        },
+        "integrityDigest": "sha256:3f48673c021df987a87d188d05d147b5a9c03d3526802bdef99c23219e5714b1"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:06be9dcfc3a57f0da0106ed9145df236f959d952b0ad63ea6be0dbc74004d427"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 483
+    },
+    {
+      "id": "approval-policy-specification-revised",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "1"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:4c8a2384b1f68b8064ccd70b60cc589800833c4fdfc8346967f3f64732247007"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "1",
+        "semanticDigest": "sha256:483fb59eecf45aafc044bf68be8458770c85674e923a6753f8efbaf98b03232c"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "approval-policy-stale-integrity",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "not-required"
+          }
+        },
+        "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:06be9dcfc3a57f0da0106ed9145df236f959d952b0ad63ea6be0dbc74004d427"
+      },
+      "integrityHolds": false,
+      "canonicalBytes": 483
+    },
+    {
+      "id": "approval-policy-invalid-content",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "sometimes"
+          }
+        },
+        "integrityDigest": "sha256:4a13c695918f93db676a3e4e942342eb8da5d9df62e29a1b2c16a0242b07e89a"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:f5b88486d7f38c5a1e6ae463ce1394e15623922e44d463b0029de1cc28030fe0"
+      },
+      "integrityHolds": true,
+      "canonicalBytes": 480
+    },
+    {
+      "id": "approval-policy-other-integrity-digest",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:0707070707070707070707070707070707070707070707070707070707070707"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "integrityHolds": false,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "approval-policy-another-integrity-digest",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "integrityHolds": false,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "missing-body",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 301
+    },
+    {
+      "id": "missing-integrity-digest",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        }
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 375
+    },
+    {
+      "id": "missing-schema-revision",
+      "member": {
+        "kind": "approval-policy",
+        "integrityDigest": "sha256:a8f0316518eb4ccd94166c17981814981d40966e66b68abe3fb0257d191e6e16",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        }
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 446
+    },
+    {
+      "id": "missing-specification",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "integrityDigest": "sha256:efca5ce989c023eb5f0f3f3423b97dc207b190d39b14d45d59b41087c7ad0fe4",
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        }
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 369
+    },
+    {
+      "id": "missing-content",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1"
+        },
+        "integrityDigest": "sha256:7729d1d43a18a034ad99ca5f66e403630f50f731989d21eb3bdf337151f8b814"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 403
+    },
+    {
+      "id": "unknown-member",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:6f1bc477c9a9606f1c6bc3d739f8cfb5fec8e71f1bf5de33fc0034f12be59308",
+        "description": "approval"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 516
+    },
+    {
+      "id": "unknown-specification-member",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0",
+          "note": "x"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:e45d8278e4cb7339f87909c78b277a861968647fa91a40164ffea24db3f709c7"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 502
+    },
+    {
+      "id": "unknown-body-member",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          },
+          "note": "x"
+        },
+        "integrityDigest": "sha256:88eb25f9bea95ef8b8d92555894c4695772f49832021d2123d7b6ad77831036c"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 502
+    },
+    {
+      "id": "wrong-governing-specification",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-018",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:32bcf1bc9fac4b06c147cdf0f5e639180640cf94b55f2943c269ff3aa2bac89d"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 479
+    },
+    {
+      "id": "malformed-identity",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "Storefront",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:fd73c8ac75f0e05404ed0153ab4487bfad4c090f27337c3b29daff7b7dedc6ae"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 470
+    },
+    {
+      "id": "malformed-specification-revision",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": ""
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:ee613a335527945f624bdfcd1056f31b98e9328a6dcb15a1359b4541f69df5da"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 478
+    },
+    {
+      "id": "non-object-content",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": ["required"]
+        },
+        "integrityDigest": "sha256:cb8461b507f12f6e0426922764ba95ef12ef869e97192c4c153f3ccca4b65e5f"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 453
+    },
+    {
+      "id": "malformed-integrity-digest",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:00"
+      },
+      "declaration": "approval-policy",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 417
+    },
+    {
+      "id": "non-object-member",
+      "member": ["approval-policy"],
+      "declaration": null,
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 41
+    },
+    {
+      "id": "no-kind",
+      "member": {
+        "schemaRevision": "0"
+      },
+      "declaration": null,
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 50
+    },
+    {
+      "id": "non-string-kind",
+      "member": {
+        "kind": null,
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:eaef6b1de2b954716c383b52a27716e7f7993cb02b3b5d283de0a4c66c2928cb"
+      },
+      "declaration": null,
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 464
+    },
+    {
+      "id": "unsupported-kind",
+      "member": {
+        "kind": "localized-message",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:b5078a150d8e30c8ae179fb2e41a4b173edd0c73cdb016b72d2c427c35a5853f"
+      },
+      "declaration": "unsupported",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 481
+    },
+    {
+      "id": "vocabulary-kind",
+      "member": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:fc6314f6412aa37c289d16aa51771f03ed6534a90925bafd1c833f76aea56476"
+      },
+      "declaration": "unsupported",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 495
+    },
+    {
+      "id": "unsupported-schema-revision",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "1",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:1ebd4ba477e7787f134841593b9ec83f563793a556d5665c5adf21d4759fe0db"
+      },
+      "declaration": "unsupported",
+      "tuple": null,
+      "integrityHolds": null,
+      "canonicalBytes": 479
+    }
+  ],
+  "sameSemanticDigest": [
+    ["approval-policy", "approval-policy-renamed"],
+    ["approval-policy", "approval-policy-revised"],
+    ["approval-policy", "approval-policy-other-integrity-digest"]
+  ],
+  "differentSemanticDigest": [
+    ["approval-policy", "approval-policy-other-content"],
+    ["approval-policy", "approval-policy-specification-revised"],
+    ["glossary-set", "trust-policy"],
+    ["resource-limit-policy", "resource-limit-policy-without-section"]
+  ],
+  "spellings": [
+    "{\"kind\":\"approval-policy\",\"schemaRevision\":\"0\",\"specification\":{\"identity\":\"intlify-design-021\",\"revision\":\"0\"},\"body\":{\"identity\":\"storefront-approval\",\"revision\":\"1\",\"content\":{\"localizedApproval\":\"required\"}},\"integrityDigest\":\"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\"}",
+    "{\n  \"kind\": \"approval-policy\",\n  \"schemaRevision\": \"0\",\n  \"specification\": {\n    \"identity\": \"intlify-design-021\",\n    \"revision\": \"0\"\n  },\n  \"body\": {\n    \"identity\": \"storefront-approval\",\n    \"revision\": \"1\",\n    \"content\": {\n      \"localizedApproval\": \"required\"\n    }\n  },\n  \"integrityDigest\": \"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\"\n}",
+    "{\"integrityDigest\":\"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\",\"body\":{\"identity\":\"storefront-approval\",\"revision\":\"1\",\"content\":{\"localizedApproval\":\"required\"}},\"specification\":{\"identity\":\"intlify-design-021\",\"revision\":\"0\"},\"schemaRevision\":\"0\",\"kind\":\"approval-policy\"}",
+    "{\"kind\":\"approval-policy\",\"schemaRevision\":\"0\",\"specification\":{\"identity\":\"intlify-design-021\",\"revision\":\"0\"},\"body\":{\"identity\":\"storefront-approval\",\"revision\":\"\\u0031\",\"content\":{\"localizedApproval\":\"required\"}},\"integrityDigest\":\"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\"}"
+  ],
+  "unequalBodies": [
+    ["approval-policy", "approval-policy-other-integrity-digest"],
+    ["approval-policy", "approval-policy-stale-integrity"]
+  ],
+  "unrepresentable": [
+    "{\"kind\":\"approval-policy\",\"schemaRevision\":\"0\",\"specification\":{\"identity\":\"intlify-design-021\",\"revision\":\"0\"},\"body\":{\"identity\":\"storefront-approval\",\"revision\":1,\"content\":{\"localizedApproval\":\"required\"}},\"integrityDigest\":\"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\"}",
+    "{\"kind\":\"approval-policy\",\"schemaRevision\":\"0\",\"specification\":{\"identity\":\"intlify-design-021\",\"revision\":\"0\"},\"body\":{\"identity\":\"storefront-approval\",\"revision\":\"1\",\"content\":{\"limit\":0,\"localizedApproval\":\"required\"}},\"integrityDigest\":\"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186\"}"
+  ],
+  "withinOneTuple": [
+    "approval-policy-other-integrity-digest",
+    "approval-policy",
+    "approval-policy-another-integrity-digest"
+  ],
+  "withoutTuple": [
+    "non-object-member",
+    "no-kind",
+    "missing-body",
+    "missing-specification",
+    "missing-integrity-digest",
+    "missing-content",
+    "malformed-integrity-digest",
+    "missing-schema-revision",
+    "non-object-content",
+    "non-string-kind",
+    "malformed-identity",
+    "malformed-specification-revision",
+    "unsupported-schema-revision",
+    "wrong-governing-specification",
+    "unsupported-kind",
+    "vocabulary-kind",
+    "unknown-specification-member",
+    "unknown-body-member",
+    "unknown-member"
+  ],
+  "references": [
+    {
+      "resolves": "approval-policy",
+      "reference": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+      },
+      "canonicalBytes": 269
+    },
+    {
+      "resolves": "target-profile",
+      "reference": {
+        "kind": "target-profile",
+        "identity": "storefront-web",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      },
+      "canonicalBytes": 263
+    }
+  ]
+}

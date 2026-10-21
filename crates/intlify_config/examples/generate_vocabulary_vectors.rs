@@ -25,7 +25,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let document = match intlify_config::vector_support::document() {
+    let document = match intlify_config::vector_support::vocabulary::document() {
         Ok(document) => document,
         Err(error) => {
             eprintln!("the vectors could not be built: {error}");

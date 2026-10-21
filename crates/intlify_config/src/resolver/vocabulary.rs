@@ -124,7 +124,9 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::artifacts::vectors::{formal, IDENTITY, MEMBERS, REVISION, SEMANTIC_DIGEST};
+    use crate::artifacts::vectors::vocabulary::{
+        formal, IDENTITY, MEMBERS, REVISION, SEMANTIC_DIGEST,
+    };
     use crate::artifacts::vocabulary::{
         read, IntentSurfaceClassVocabularyArtifact, VocabularyLimits,
     };
