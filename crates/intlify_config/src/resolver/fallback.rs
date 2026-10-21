@@ -304,7 +304,7 @@ const fn issue(code: Code, reason: Option<Reason>) -> Blocking {
     Blocking {
         code,
         reason,
-        limit: None,
+        details: None,
     }
 }
 

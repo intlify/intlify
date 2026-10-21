@@ -575,6 +575,29 @@ impl ConfirmedPolicy {
     }
 }
 
+/// The Admitted Implementation Capability's `policyComparable` bounds: before a
+/// Resource Limit Policy is admitted, the sole authority for the work they
+/// name, and then the values Phase 4 compares the policy with. 015
+/// Implementation Phase 5 builds the capability boundary; until then only tests
+/// and fixture owners construct one, and `bootstrapOnly` waits with it.
+#[derive(Debug, Clone)]
+pub(crate) struct ImplementationCapability {
+    policy_comparable: ResolutionLimits,
+}
+
+impl ImplementationCapability {
+    /// A capability a fixture owner states outright, as the capability
+    /// boundary would admit it.
+    #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+    pub(crate) const fn fixture_owned(policy_comparable: ResolutionLimits) -> Self {
+        Self { policy_comparable }
+    }
+
+    pub(crate) const fn policy_comparable(&self) -> &ResolutionLimits {
+        &self.policy_comparable
+    }
+}
+
 /// Finite fixture bounds, each a distinct value counting up from `first` in
 /// 015's canonical order. Never a product default.
 #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]

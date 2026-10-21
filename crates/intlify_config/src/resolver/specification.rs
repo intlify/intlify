@@ -150,7 +150,7 @@ fn present<V>(asserted: Option<&V>) -> Result<&V, Blocking> {
     asserted.ok_or(Blocking {
         code: Code::SpecificationInputIncomplete,
         reason: Some(Reason::MissingRequiredSlot),
-        limit: None,
+        details: None,
     })
 }
 
@@ -161,7 +161,7 @@ const fn not_admitted(code: Code, reason: SpecificationNotAdmitted) -> Blocking 
             SpecificationNotAdmitted::Unsupported => Reason::Unsupported,
             SpecificationNotAdmitted::Incompatible => Reason::Incompatible,
         }),
-        limit: None,
+        details: None,
     }
 }
 
@@ -313,7 +313,7 @@ where
             .map_err(|_| Blocking {
                 code: Code::LocaleDataNotAdmitted,
                 reason: None,
-                limit: None,
+                details: None,
             })
         },
     )?;

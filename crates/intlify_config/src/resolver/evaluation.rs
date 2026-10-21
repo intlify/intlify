@@ -21,6 +21,7 @@ use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
+use super::resource_policy::PolicySubject;
 use super::specification::Slot;
 
 /// 015's resolution phases, declared in rank order.
@@ -78,6 +79,9 @@ pub(crate) enum Subject {
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.
     CanonicalizationData,
+    /// A Resource Limit Policy bound over the collection or the selected
+    /// declaration's references, or the selected `resourceLimits` reference.
+    ResourcePolicy(PolicySubject),
     /// One field of the selected profile declaration.
     DeclarationField(DeclarationField),
     /// A locale, or a locale bound or set, of the selected declaration.
@@ -107,6 +111,9 @@ pub(crate) enum Check {
     AssertedArtifact,
     /// The field is admitted as an opaque semantic identity.
     OpaqueIdentity,
+    /// A counted or measured total stays within the capability's value of its
+    /// bound, before a Resource Limit Policy is admitted.
+    WithinCapability,
     /// A counted or measured total stays within its bound.
     WithinBound,
     /// The spelling is a valid locale and has a canonical form.
@@ -127,6 +134,11 @@ pub(crate) enum Check {
     UniqueSurfaceClass,
     /// No other rule normalizes to the same domain.
     UniqueDomain,
+    /// Exactly one submitted artifact is the Resource Limit Policy the
+    /// reference names, and its body is admitted.
+    BootstrapCandidate,
+    /// The admitted policy needs no bound past the capability's value.
+    CompatiblePolicy,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -164,6 +176,7 @@ pub(crate) enum Code {
     ArtifactReferenceNotAdmitted,
     ArtifactCollectionNotAdmitted,
     ResourcePolicyNotAdmitted,
+    ResourcePolicyCapabilityIncompatible,
     ResourceLimitExceeded,
 }
 
@@ -215,6 +228,9 @@ impl Code {
                 "project-profile-artifact-collection-not-admitted"
             }
             Self::ResourcePolicyNotAdmitted => "project-profile-resource-policy-not-admitted",
+            Self::ResourcePolicyCapabilityIncompatible => {
+                "project-profile-resource-policy-capability-incompatible"
+            }
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
         }
     }
@@ -289,13 +305,13 @@ impl Reason {
 }
 
 /// The one blocking result a check found, which leaves the value it would
-/// establish unavailable. A resource bound's result carries the details 015
-/// reports with `project-profile-resource-limit-exceeded`.
+/// establish unavailable. A resource bound's result, and a policy that needs
+/// more than the capability allows, carry the details 015 reports with them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Blocking {
     pub(crate) code: Code,
     pub(crate) reason: Option<Reason>,
-    pub(crate) limit: Option<LimitExceeded>,
+    pub(crate) details: Option<Details>,
 }
 
 impl Blocking {
@@ -304,9 +320,26 @@ impl Blocking {
         Self {
             code: Code::ResourceLimitExceeded,
             reason: None,
-            limit: Some(exceeded),
+            details: Some(Details::Limit(exceeded)),
         }
     }
+
+    /// A Resource Limit Policy that needs more of a bound than the capability
+    /// makes available.
+    pub(crate) const fn shortfall(shortfall: Shortfall) -> Self {
+        Self {
+            code: Code::ResourcePolicyCapabilityIncompatible,
+            reason: None,
+            details: Some(Details::Shortfall(shortfall)),
+        }
+    }
+}
+
+/// The details 015 reports with an issue that has them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Details {
+    Limit(LimitExceeded),
+    Shortfall(Shortfall),
 }
 
 /// Whether `count` submitted items stay within `limit`, or the issue 015
@@ -330,6 +363,16 @@ pub(crate) struct LimitExceeded {
     pub(crate) bound: BoundId,
     pub(crate) limit: Bound,
     pub(crate) actual: Actual,
+}
+
+/// 015's details of a policy the capability cannot run: the first bound, in
+/// canonical order, that the policy requires more of than the capability's
+/// `policyComparable` value makes available.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Shortfall {
+    pub(crate) bound: BoundId,
+    pub(crate) required: Bound,
+    pub(crate) available: Bound,
 }
 
 /// A measured total: exact, or a witness that the total is at least this.
@@ -434,7 +477,7 @@ pub(crate) enum EvaluationInvariant {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
-    issues: BTreeMap<IssueKey, Option<LimitExceeded>>,
+    issues: BTreeMap<IssueKey, Option<Details>>,
     notices: BTreeSet<IssueKey>,
 }
 
@@ -459,14 +502,14 @@ impl Evaluation {
                 Err(Blocking {
                     code,
                     reason,
-                    limit,
+                    details,
                 }) => {
                     let key = IssueKey {
                         unit: unit.clone(),
                         code,
                         reason,
                     };
-                    self.issues.insert(key.clone(), limit);
+                    self.issues.insert(key.clone(), details);
                     (Status::Evaluated, Err(Causes(BTreeSet::from([key]))))
                 }
             },
@@ -503,7 +546,18 @@ impl Evaluation {
 
     /// The details of a resource issue, which no other issue has.
     pub(crate) fn limit(&self, key: &IssueKey) -> Option<LimitExceeded> {
-        self.issues.get(key).copied().flatten()
+        match self.issues.get(key) {
+            Some(Some(Details::Limit(exceeded))) => Some(*exceeded),
+            _ => None,
+        }
+    }
+
+    /// The details of a policy the capability cannot run.
+    pub(crate) fn shortfall(&self, key: &IssueKey) -> Option<Shortfall> {
+        match self.issues.get(key) {
+            Some(Some(Details::Shortfall(shortfall))) => Some(*shortfall),
+            _ => None,
+        }
     }
 
     pub(crate) fn notices(&self) -> impl Iterator<Item = &IssueKey> {
@@ -518,7 +572,7 @@ mod tests {
     const MISSING: Blocking = Blocking {
         code: Code::SpecificationInputIncomplete,
         reason: Some(Reason::MissingRequiredSlot),
-        limit: None,
+        details: None,
     };
 
     fn slot(slot: Slot) -> Unit {
@@ -624,6 +678,7 @@ mod tests {
                 Code::ArtifactReferenceNotAdmitted,
                 Code::ArtifactCollectionNotAdmitted,
                 Code::ResourcePolicyNotAdmitted,
+                Code::ResourcePolicyCapabilityIncompatible,
                 Code::ResourceLimitExceeded,
             ]
             .map(Code::as_str),
@@ -651,6 +706,7 @@ mod tests {
                 "project-profile-artifact-reference-not-admitted",
                 "project-profile-artifact-collection-not-admitted",
                 "project-profile-resource-policy-not-admitted",
+                "project-profile-resource-policy-capability-incompatible",
                 "project-profile-resource-limit-exceeded",
             ]
         );

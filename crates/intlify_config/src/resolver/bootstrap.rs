@@ -59,7 +59,7 @@ const fn issue(code: Code, reason: Reason) -> Blocking {
     Blocking {
         code,
         reason: Some(reason),
-        limit: None,
+        details: None,
     }
 }
 
