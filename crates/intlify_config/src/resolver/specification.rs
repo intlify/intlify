@@ -397,7 +397,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::artifacts::vectors::{self, formal};
+    use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::DatasetPin;
     use crate::model::CONFIGURATION_SCHEMA_VERSION;

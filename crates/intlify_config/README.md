@@ -73,6 +73,12 @@ vp run schema:vocabulary:check
 vp run vectors:vocabulary:check
 ```
 
+Check the artifact envelope vectors against an independent implementation:
+
+```sh
+vp run vectors:envelope:check
+```
+
 On Linux or macOS, run the measurement smoke check:
 
 ```sh
@@ -81,7 +87,7 @@ vp run bench:config:smoke
 
 The smoke check exercises the implemented operations, saves measurement records to a new temporary directory, and validates the saved records. It prints the output location. It checks the measurement workflow, not whether the crate meets a performance budget. Measurement support is disabled in normal library builds. When enabled, it also enables the `icu4x` feature and compiles in the adapter's committed locale canonicalization data as measurement input.
 
-For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md). For locale canonicalization, see the [Phase 2 fixtures](./fixtures/phase2/README.md). For the vocabulary artifact, see the [vocabulary fixtures](./fixtures/vocabulary/README.md).
+For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md). For locale canonicalization, see the [Phase 2 fixtures](./fixtures/phase2/README.md). For the vocabulary artifact, see the [vocabulary fixtures](./fixtures/vocabulary/README.md). For the members of the artifact collection, see the [envelope fixtures](./fixtures/envelope/README.md).
 
 ## Further reading
 

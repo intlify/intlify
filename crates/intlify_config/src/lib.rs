@@ -62,8 +62,8 @@ pub mod schema;
 #[doc(hidden)]
 pub use structural::example as example_support;
 
-// Developer-only generation of the committed 017 vocabulary vectors. No codec,
-// reader, or admission becomes public.
+// Developer-only generation of the committed 017 vectors. No codec, reader, or
+// admission becomes public.
 #[cfg(feature = "vectors")]
 #[doc(hidden)]
 pub use artifacts::vectors as vector_support;

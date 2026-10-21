@@ -4,12 +4,18 @@
 //! Closed 017 reference values for the 015 configuration schema, revision 0.
 //! These types prove structure only. No acquisition, body digest computation,
 //! artifact-version support, role validation, or trust is implied by decoding.
+//! A reference names its exact tuple and has 017's canonical bytes; matching it
+//! to a submitted artifact is 015's.
 
 use std::borrow::Cow;
 
+use intlify_shared_json::encoding::encode;
+use intlify_shared_json::token::Token;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use crate::artifacts::envelope::{ArtifactKind, ExactTuple};
+use crate::artifacts::{count, SemanticDigest as DigestValue};
 use crate::model::{valid_identity, ID_PATTERN};
 
 pub(crate) const SEMANTIC_DIGEST_PATTERN: &str = "^sha256:[0-9a-f]{64}$";
@@ -108,4 +114,86 @@ pub(crate) struct TargetProfileReference {
     revision: ReferenceRevision,
     specification_revision: ReferenceRevision,
     semantic_digest: SemanticDigest,
+}
+
+impl PolicyKind {
+    const fn artifact_kind(self) -> ArtifactKind {
+        match self {
+            Self::ResourceLimitPolicy => ArtifactKind::ResourceLimitPolicy,
+            Self::TrustPolicy => ArtifactKind::TrustPolicy,
+            Self::SourceAdmissionPolicy => ArtifactKind::SourceAdmissionPolicy,
+            Self::ApprovalPolicy => ArtifactKind::ApprovalPolicy,
+            Self::SelectionPolicy => ArtifactKind::SelectionPolicy,
+            Self::ProviderRoutingPolicy => ArtifactKind::ProviderRoutingPolicy,
+            Self::GlossarySet => ArtifactKind::GlossarySet,
+        }
+    }
+}
+
+/// The exact tuple a reference names, from parts its decoding validated.
+fn tuple(
+    kind: ArtifactKind,
+    identity: &str,
+    revision: &str,
+    specification_revision: &str,
+    semantic_digest: &str,
+) -> ExactTuple {
+    let token = |text| Token::new(text).expect("a decoded reference token is a token");
+    ExactTuple {
+        kind,
+        identity: token(identity),
+        revision: token(revision),
+        specification_revision: token(specification_revision),
+        semantic_digest: DigestValue::from_validated(semantic_digest)
+            .expect("a decoded reference digest is a digest"),
+    }
+}
+
+/// The length of the reference's canonical value framing, whatever its
+/// transport spelling.
+fn canonical_bytes(reference: &impl Serialize) -> u64 {
+    let value = serde_json::to_value(reference).expect("a reference serializes");
+    count(
+        encode(&value)
+            .expect("a five-member reference frames")
+            .len(),
+    )
+}
+
+impl PolicyReference {
+    /// The exact tuple this reference names: its kind, identity, revision,
+    /// specification revision, and semantic digest.
+    pub(crate) fn tuple(&self) -> ExactTuple {
+        tuple(
+            self.kind.artifact_kind(),
+            &self.identity.0,
+            &self.revision.0,
+            &self.specification_revision.0,
+            &self.semantic_digest.0,
+        )
+    }
+
+    /// The canonical bytes 015's `artifactAdmission` reference bounds count.
+    pub(crate) fn canonical_bytes(&self) -> u64 {
+        canonical_bytes(self)
+    }
+}
+
+impl TargetProfileReference {
+    /// The exact tuple this reference names: its kind, identity, revision,
+    /// specification revision, and semantic digest.
+    pub(crate) fn tuple(&self) -> ExactTuple {
+        tuple(
+            ArtifactKind::TargetProfile,
+            &self.identity.0,
+            &self.revision.0,
+            &self.specification_revision.0,
+            &self.semantic_digest.0,
+        )
+    }
+
+    /// The canonical bytes 015's `artifactAdmission` reference bounds count.
+    pub(crate) fn canonical_bytes(&self) -> u64 {
+        canonical_bytes(self)
+    }
 }
