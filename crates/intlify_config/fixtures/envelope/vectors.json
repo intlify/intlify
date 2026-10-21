@@ -1,5 +1,5 @@
 {
-  "note": "Members of a Submitted Profile Resolution Artifact Collection, read by intlify_config. An independent implementation decides from each member alone what it declares, whether it establishes an exact-reference tuple and which, whether its integrity holds, and its canonical bytes; checks the members whose semantic digests must agree or differ, the spellings that must frame to one canonical body, the members that must stay unequal, and the texts a JSON number makes unrepresentable; orders the members within one tuple and the members without a tuple by their canonical bodies; and checks that each reference names its member's tuple. The contents are test values.",
+  "note": "Members of a Submitted Profile Resolution Artifact Collection, read by intlify_config. An independent implementation decides from each member alone what it declares, whether it establishes an exact-reference tuple and which, whether its integrity holds, how its body admission ends, and its canonical bytes; checks the members whose semantic digests must agree or differ, the spellings that must frame to one canonical body, the members that must stay unequal, and the texts a JSON number makes unrepresentable; orders the members within one tuple and the members without a tuple by their canonical bodies; decides for each change to an admitted member's content whether the result is still the kind's closed content; and checks that each reference names its member's tuple. The contents are test values.",
   "integrityDomain": "localization-artifact-integrity",
   "kinds": [
     {
@@ -71,6 +71,7 @@
         "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 479
     },
     {
@@ -98,6 +99,7 @@
         "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 433
     },
     {
@@ -134,6 +136,7 @@
         "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 739
     },
     {
@@ -167,6 +170,7 @@
         "semanticDigest": "sha256:ecc1e929a5ed4b81023db2423509f588ad90e23367825445554c7bafe4d37ae2"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 580
     },
     {
@@ -196,6 +200,7 @@
         "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 468
     },
     {
@@ -225,6 +230,7 @@
         "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 508
     },
     {
@@ -329,6 +335,7 @@
         "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 2382
     },
     {
@@ -356,6 +363,7 @@
         "semanticDigest": "sha256:3d5bc246bf3129fcb7a2063aacf9326e1088c21470daf06d6a4b2fcd5785c064"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 430
     },
     {
@@ -383,6 +391,7 @@
         "semanticDigest": "sha256:c2db5d2147345607ca7f43b89131daad5c2297e15aa551e902ce853fd01e44b3"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 440
     },
     {
@@ -412,6 +421,7 @@
         "semanticDigest": "sha256:a7fd10edff091dbd221fc81ee953016004a19f0a0080f4f2521972ab9e313f8b"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 489
     },
     {
@@ -445,6 +455,7 @@
         "semanticDigest": "sha256:dea7dec7f7b7e5fb9b3f168e377e2b4ee99b4e7b95d3d0ff9654f23c158f7ab4"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 574
     },
     {
@@ -474,6 +485,7 @@
         "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 487
     },
     {
@@ -503,6 +515,7 @@
         "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 479
     },
     {
@@ -532,6 +545,7 @@
         "semanticDigest": "sha256:06be9dcfc3a57f0da0106ed9145df236f959d952b0ad63ea6be0dbc74004d427"
       },
       "integrityHolds": true,
+      "admission": "admitted",
       "canonicalBytes": 483
     },
     {
@@ -561,6 +575,7 @@
         "semanticDigest": "sha256:483fb59eecf45aafc044bf68be8458770c85674e923a6753f8efbaf98b03232c"
       },
       "integrityHolds": true,
+      "admission": "specification-revision-unsupported",
       "canonicalBytes": 479
     },
     {
@@ -590,6 +605,7 @@
         "semanticDigest": "sha256:06be9dcfc3a57f0da0106ed9145df236f959d952b0ad63ea6be0dbc74004d427"
       },
       "integrityHolds": false,
+      "admission": "integrity-invalid",
       "canonicalBytes": 483
     },
     {
@@ -619,6 +635,7 @@
         "semanticDigest": "sha256:f5b88486d7f38c5a1e6ae463ce1394e15623922e44d463b0029de1cc28030fe0"
       },
       "integrityHolds": true,
+      "admission": "content-invalid",
       "canonicalBytes": 480
     },
     {
@@ -648,6 +665,7 @@
         "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
       },
       "integrityHolds": false,
+      "admission": "integrity-invalid",
       "canonicalBytes": 479
     },
     {
@@ -677,7 +695,201 @@
         "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
       },
       "integrityHolds": false,
+      "admission": "integrity-invalid",
       "canonicalBytes": 479
+    },
+    {
+      "id": "approval-policy-revised-specification-invalid-content",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "1"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "sometimes"
+          }
+        },
+        "integrityDigest": "sha256:57e9a184913f18316c6e46da8717057a18c2490c7c582827c0b6314512eb2e7b"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "1",
+        "semanticDigest": "sha256:3bbe2b435227d016b68dfe8909e35967ab48c7c1cc719c7cb64f41c10d2d0d5e"
+      },
+      "integrityHolds": true,
+      "admission": "specification-revision-unsupported",
+      "canonicalBytes": 480
+    },
+    {
+      "id": "approval-policy-stale-integrity-revised-specification",
+      "member": {
+        "kind": "approval-policy",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-021",
+          "revision": "1"
+        },
+        "body": {
+          "identity": "storefront-approval",
+          "revision": "1",
+          "content": {
+            "localizedApproval": "required"
+          }
+        },
+        "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+      },
+      "declaration": "approval-policy",
+      "tuple": {
+        "kind": "approval-policy",
+        "identity": "storefront-approval",
+        "revision": "1",
+        "specificationRevision": "1",
+        "semanticDigest": "sha256:483fb59eecf45aafc044bf68be8458770c85674e923a6753f8efbaf98b03232c"
+      },
+      "integrityHolds": false,
+      "admission": "integrity-invalid",
+      "canonicalBytes": 479
+    },
+    {
+      "id": "glossary-set-specification-revised",
+      "member": {
+        "kind": "glossary-set",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-022",
+          "revision": "1"
+        },
+        "body": {
+          "identity": "storefront-glossary",
+          "revision": "1",
+          "content": {}
+        },
+        "integrityDigest": "sha256:52f00061390342819093040f2fa86d14187fa59bc0a21f587626fc660941d593"
+      },
+      "declaration": "glossary-set",
+      "tuple": {
+        "kind": "glossary-set",
+        "identity": "storefront-glossary",
+        "revision": "1",
+        "specificationRevision": "1",
+        "semanticDigest": "sha256:464ae0e6f1fe23e4526a3deec176e04ccb6bad1b0d61a042e5332cd6c6c967b3"
+      },
+      "integrityHolds": true,
+      "admission": "specification-revision-unsupported",
+      "canonicalBytes": 433
+    },
+    {
+      "id": "target-profile-invalid-content",
+      "member": {
+        "kind": "target-profile",
+        "schemaRevision": "0",
+        "specification": {
+          "identity": "intlify-design-024",
+          "revision": "0"
+        },
+        "body": {
+          "identity": "storefront-web",
+          "revision": "1",
+          "content": {
+            "host": {
+              "kind": "javascript-esm-dom-text",
+              "grammar": {
+                "identity": "ecmascript",
+                "revision": "2025"
+              },
+              "moduleProfile": {
+                "identity": "intlify-esm-module",
+                "revision": "0"
+              }
+            },
+            "mode": "jit",
+            "adapter": {
+              "identity": "intlify-vanilla-dom",
+              "revision": "0"
+            },
+            "execution": {
+              "specification": {
+                "identity": "intlify-design-023",
+                "revision": "0"
+              },
+              "profile": {
+                "identity": "intlify-text-interpolation-minimum",
+                "revision": "0"
+              }
+            },
+            "mf2Specification": {
+              "identity": "unicode-mf2",
+              "revision": "48"
+            },
+            "codecs": {
+              "bindingTable": {
+                "identity": "intlify-binding-table",
+                "revision": "0"
+              },
+              "localePayload": {
+                "identity": "intlify-locale-payload",
+                "revision": "0"
+              },
+              "descriptor": {
+                "identity": "intlify-target-descriptor",
+                "revision": "0"
+              },
+              "sourceMap": {
+                "identity": "ecma-426-source-map",
+                "revision": "3"
+              }
+            },
+            "locale": {
+              "selection": "direct-only",
+              "services": "absent",
+              "directions": [
+                {
+                  "locale": "en",
+                  "direction": "LTR"
+                },
+                {
+                  "locale": "ja",
+                  "direction": "LTR"
+                }
+              ]
+            },
+            "delivery": {
+              "unit": "main",
+              "loading": "eager"
+            },
+            "limits": {
+              "maxMessages": "1000",
+              "maxUses": "10000",
+              "maxLocales": "8",
+              "maxFiles": "64",
+              "maxFileBytes": "1048576",
+              "maxOutputBytes": "8388608",
+              "maxParameterBytes": "4096",
+              "maxTextBytes": "65536"
+            }
+          }
+        },
+        "integrityDigest": "sha256:e69df91731ea73e101abbebdb2f37e5a97a882c9bcb69a68d11967fc9438d8c6"
+      },
+      "declaration": "target-profile",
+      "tuple": {
+        "kind": "target-profile",
+        "identity": "storefront-web",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:55aa0b705f80fa357d51f1f9ac78ac314ec292d29e1f54de397cd896f9be1994"
+      },
+      "integrityHolds": true,
+      "admission": "content-invalid",
+      "canonicalBytes": 2371
     },
     {
       "id": "missing-body",
@@ -693,6 +905,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 301
     },
     {
@@ -715,6 +928,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 375
     },
     {
@@ -737,6 +951,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 446
     },
     {
@@ -756,6 +971,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 369
     },
     {
@@ -776,6 +992,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 403
     },
     {
@@ -800,6 +1017,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 516
     },
     {
@@ -824,6 +1042,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 502
     },
     {
@@ -848,6 +1067,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 502
     },
     {
@@ -871,6 +1091,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 479
     },
     {
@@ -894,6 +1115,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 470
     },
     {
@@ -917,6 +1139,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 478
     },
     {
@@ -938,6 +1161,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 453
     },
     {
@@ -961,6 +1185,7 @@
       "declaration": "approval-policy",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 417
     },
     {
@@ -969,6 +1194,7 @@
       "declaration": null,
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 41
     },
     {
@@ -979,6 +1205,7 @@
       "declaration": null,
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 50
     },
     {
@@ -1002,6 +1229,7 @@
       "declaration": null,
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 464
     },
     {
@@ -1025,6 +1253,7 @@
       "declaration": "unsupported",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 481
     },
     {
@@ -1048,6 +1277,7 @@
       "declaration": "unsupported",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 495
     },
     {
@@ -1071,6 +1301,7 @@
       "declaration": "unsupported",
       "tuple": null,
       "integrityHolds": null,
+      "admission": null,
       "canonicalBytes": 479
     }
   ],
@@ -1125,6 +1356,435 @@
     "unknown-body-member",
     "unknown-member"
   ],
+  "contents": [
+    {
+      "id": "approval-not-required",
+      "base": "approval-policy",
+      "pointer": "/localizedApproval",
+      "admitted": true,
+      "value": "not-required"
+    },
+    {
+      "id": "approval-other-spelling",
+      "base": "approval-policy",
+      "pointer": "/localizedApproval",
+      "admitted": false,
+      "value": "Required"
+    },
+    {
+      "id": "approval-missing",
+      "base": "approval-policy",
+      "pointer": "/localizedApproval",
+      "admitted": false
+    },
+    {
+      "id": "approval-unknown-member",
+      "base": "approval-policy",
+      "pointer": "/mode",
+      "admitted": false,
+      "value": "explicit"
+    },
+    {
+      "id": "selection-other-mode",
+      "base": "selection-policy",
+      "pointer": "/mode",
+      "admitted": false,
+      "value": "implicit"
+    },
+    {
+      "id": "selection-unknown-member",
+      "base": "selection-policy",
+      "pointer": "/note",
+      "admitted": false,
+      "value": "x"
+    },
+    {
+      "id": "source-admission-required",
+      "base": "source-admission-policy",
+      "pointer": "/sourceApproval",
+      "admitted": true,
+      "value": "required"
+    },
+    {
+      "id": "source-admission-other-value",
+      "base": "source-admission-policy",
+      "pointer": "/sourceApproval",
+      "admitted": false,
+      "value": "authenticated"
+    },
+    {
+      "id": "routing-other-adapter",
+      "base": "provider-routing-policy",
+      "pointer": "/adapter",
+      "admitted": true,
+      "value": {
+        "identity": "intlify-provider-other",
+        "revision": "3"
+      }
+    },
+    {
+      "id": "routing-adapter-not-a-pair",
+      "base": "provider-routing-policy",
+      "pointer": "/adapter",
+      "admitted": false,
+      "value": "intlify-provider"
+    },
+    {
+      "id": "routing-uppercase-digest",
+      "base": "provider-routing-policy",
+      "pointer": "/configuration/semanticDigest",
+      "admitted": false,
+      "value": "sha256:2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A2A"
+    },
+    {
+      "id": "routing-malformed-configuration",
+      "base": "provider-routing-policy",
+      "pointer": "/configuration/identity",
+      "admitted": false,
+      "value": "Routing"
+    },
+    {
+      "id": "routing-configuration-unknown-member",
+      "base": "provider-routing-policy",
+      "pointer": "/configuration/note",
+      "admitted": false,
+      "value": "x"
+    },
+    {
+      "id": "routing-unknown-member",
+      "base": "provider-routing-policy",
+      "pointer": "/fallback",
+      "admitted": false,
+      "value": "none"
+    },
+    {
+      "id": "target-aot",
+      "base": "target-profile",
+      "pointer": "/mode",
+      "admitted": true,
+      "value": "aot"
+    },
+    {
+      "id": "target-other-mode",
+      "base": "target-profile",
+      "pointer": "/mode",
+      "admitted": false,
+      "value": "jit"
+    },
+    {
+      "id": "target-other-host-kind",
+      "base": "target-profile",
+      "pointer": "/host/kind",
+      "admitted": false,
+      "value": "javascript-cjs-dom-text"
+    },
+    {
+      "id": "target-other-execution-specification",
+      "base": "target-profile",
+      "pointer": "/execution/specification",
+      "admitted": false,
+      "value": {
+        "identity": "intlify-design-023",
+        "revision": "1"
+      }
+    },
+    {
+      "id": "target-other-execution-profile",
+      "base": "target-profile",
+      "pointer": "/execution/profile",
+      "admitted": false,
+      "value": {
+        "identity": "intlify-text-interpolation",
+        "revision": "0"
+      }
+    },
+    {
+      "id": "target-other-source-map",
+      "base": "target-profile",
+      "pointer": "/codecs/sourceMap",
+      "admitted": false,
+      "value": {
+        "identity": "ecma-426-source-map",
+        "revision": "2"
+      }
+    },
+    {
+      "id": "target-other-locale-selection",
+      "base": "target-profile",
+      "pointer": "/locale/selection",
+      "admitted": false,
+      "value": "fallback"
+    },
+    {
+      "id": "target-other-locale-services",
+      "base": "target-profile",
+      "pointer": "/locale/services",
+      "admitted": false,
+      "value": "present"
+    },
+    {
+      "id": "target-other-delivery-unit",
+      "base": "target-profile",
+      "pointer": "/delivery/unit",
+      "admitted": false,
+      "value": "secondary"
+    },
+    {
+      "id": "target-other-delivery-loading",
+      "base": "target-profile",
+      "pointer": "/delivery/loading",
+      "admitted": false,
+      "value": "lazy"
+    },
+    {
+      "id": "target-other-grammar",
+      "base": "target-profile",
+      "pointer": "/host/grammar",
+      "admitted": true,
+      "value": {
+        "identity": "ecmascript",
+        "revision": "2022"
+      }
+    },
+    {
+      "id": "target-grammar-not-a-pair",
+      "base": "target-profile",
+      "pointer": "/host/grammar",
+      "admitted": false,
+      "value": {
+        "identity": "es"
+      }
+    },
+    {
+      "id": "target-malformed-module-profile",
+      "base": "target-profile",
+      "pointer": "/host/moduleProfile",
+      "admitted": false,
+      "value": {
+        "identity": "Intlify-ESM",
+        "revision": "0"
+      }
+    },
+    {
+      "id": "target-unknown-member",
+      "base": "target-profile",
+      "pointer": "/hydration",
+      "admitted": false,
+      "value": "none"
+    },
+    {
+      "id": "target-missing-delivery",
+      "base": "target-profile",
+      "pointer": "/delivery",
+      "admitted": false
+    },
+    {
+      "id": "target-host-unknown-member",
+      "base": "target-profile",
+      "pointer": "/host/note",
+      "admitted": false,
+      "value": "x"
+    },
+    {
+      "id": "target-no-directions",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": true,
+      "value": []
+    },
+    {
+      "id": "target-every-direction",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": true,
+      "value": [
+        {
+          "locale": "ar",
+          "direction": "RTL"
+        },
+        {
+          "locale": "en",
+          "direction": "LTR"
+        },
+        {
+          "locale": "zxx",
+          "direction": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "target-directions-by-utf8-bytes",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": true,
+      "value": [
+        {
+          "locale": "ａ",
+          "direction": "LTR"
+        },
+        {
+          "locale": "𝐚",
+          "direction": "LTR"
+        }
+      ]
+    },
+    {
+      "id": "target-directions-by-utf16-units",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "𝐚",
+          "direction": "LTR"
+        },
+        {
+          "locale": "ａ",
+          "direction": "LTR"
+        }
+      ]
+    },
+    {
+      "id": "target-directions-unsorted",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "ja",
+          "direction": "LTR"
+        },
+        {
+          "locale": "en",
+          "direction": "LTR"
+        }
+      ]
+    },
+    {
+      "id": "target-directions-repeated",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "en",
+          "direction": "LTR"
+        },
+        {
+          "locale": "en",
+          "direction": "LTR"
+        }
+      ]
+    },
+    {
+      "id": "target-directions-repeated-otherwise",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "en",
+          "direction": "LTR"
+        },
+        {
+          "locale": "en",
+          "direction": "RTL"
+        }
+      ]
+    },
+    {
+      "id": "target-direction-empty-locale",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "",
+          "direction": "LTR"
+        }
+      ]
+    },
+    {
+      "id": "target-direction-lowercase",
+      "base": "target-profile",
+      "pointer": "/locale/directions",
+      "admitted": false,
+      "value": [
+        {
+          "locale": "en",
+          "direction": "ltr"
+        }
+      ]
+    },
+    {
+      "id": "target-limit-one",
+      "base": "target-profile",
+      "pointer": "/limits/maxLocales",
+      "admitted": true,
+      "value": "1"
+    },
+    {
+      "id": "target-limit-maximum",
+      "base": "target-profile",
+      "pointer": "/limits/maxOutputBytes",
+      "admitted": true,
+      "value": "18446744073709551615"
+    },
+    {
+      "id": "target-limit-zero",
+      "base": "target-profile",
+      "pointer": "/limits/maxMessages",
+      "admitted": false,
+      "value": "0"
+    },
+    {
+      "id": "target-limit-leading-zero",
+      "base": "target-profile",
+      "pointer": "/limits/maxUses",
+      "admitted": false,
+      "value": "010000"
+    },
+    {
+      "id": "target-limit-over",
+      "base": "target-profile",
+      "pointer": "/limits/maxFileBytes",
+      "admitted": false,
+      "value": "18446744073709551616"
+    },
+    {
+      "id": "target-limit-missing",
+      "base": "target-profile",
+      "pointer": "/limits/maxTextBytes",
+      "admitted": false
+    },
+    {
+      "id": "glossary-any-object",
+      "base": "glossary-set",
+      "pointer": "/terms",
+      "admitted": true,
+      "value": [
+        {
+          "source": "cart"
+        }
+      ]
+    },
+    {
+      "id": "resource-limit-any-object",
+      "base": "resource-limit-policy",
+      "pointer": "/projectProfileResolution",
+      "admitted": true,
+      "value": "default"
+    },
+    {
+      "id": "trust-any-object",
+      "base": "trust-policy",
+      "pointer": "/roots",
+      "admitted": true,
+      "value": {
+        "publisher": "storefront"
+      }
+    }
+  ],
   "references": [
     {
       "resolves": "approval-policy",
@@ -1138,6 +1798,61 @@
       "canonicalBytes": 269
     },
     {
+      "resolves": "glossary-set",
+      "reference": {
+        "kind": "glossary-set",
+        "identity": "storefront-glossary",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+      },
+      "canonicalBytes": 266
+    },
+    {
+      "resolves": "provider-routing-policy",
+      "reference": {
+        "kind": "provider-routing-policy",
+        "identity": "storefront-routing",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+      },
+      "canonicalBytes": 276
+    },
+    {
+      "resolves": "resource-limit-policy",
+      "reference": {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:ecc1e929a5ed4b81023db2423509f588ad90e23367825445554c7bafe4d37ae2"
+      },
+      "canonicalBytes": 273
+    },
+    {
+      "resolves": "selection-policy",
+      "reference": {
+        "kind": "selection-policy",
+        "identity": "storefront-selection",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+      },
+      "canonicalBytes": 271
+    },
+    {
+      "resolves": "source-admission-policy",
+      "reference": {
+        "kind": "source-admission-policy",
+        "identity": "storefront-source-admission",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+      },
+      "canonicalBytes": 285
+    },
+    {
       "resolves": "target-profile",
       "reference": {
         "kind": "target-profile",
@@ -1145,6 +1860,17 @@
         "revision": "1",
         "specificationRevision": "0",
         "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      },
+      "canonicalBytes": 263
+    },
+    {
+      "resolves": "trust-policy",
+      "reference": {
+        "kind": "trust-policy",
+        "identity": "storefront-trust",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:3d5bc246bf3129fcb7a2063aacf9326e1088c21470daf06d6a4b2fcd5785c064"
       },
       "canonicalBytes": 263
     }

@@ -4,13 +4,12 @@
 //! Design 017's `LocalizationArtifact` envelope as a member of 015's Submitted
 //! Profile Resolution Artifact Collection: the eight kinds the collection
 //! admits, what a member declares, the exact reference it establishes, its
-//! canonical submitted body, and whether its integrity holds.
+//! canonical submitted body, and the admission of its body.
 //!
 //! These are facts about one member, not checks. Whether a member is
 //! unsupported, an invalid envelope, a duplicate, or in conflict is 015's to
-//! decide and report, and a member's content is admitted by the design that
-//! owns it, after its integrity. No member declares its semantic digest: the
-//! digest of a tuple is computed from the submitted content.
+//! decide and report. No member declares its semantic digest: the digest of a
+//! tuple is computed from the submitted content.
 
 use intlify_shared_json::encoding::{
     encode, hash, hash_with_excluded_member, Domain, EncodingFailure,
@@ -18,10 +17,18 @@ use intlify_shared_json::encoding::{
 use intlify_shared_json::token::{valid_hex256, IntegrityDigest, Token};
 use serde_json::{Map, Value};
 
-use super::{count, SemanticDigest};
+use super::content::{self, Content};
+use super::{closed, count, token, SemanticDigest};
 
 /// The one schema revision every admitted kind has.
 pub(crate) const SCHEMA_REVISION: &str = "0";
+
+/// The one specification revision a body is admitted under. 017 registers
+/// each kind under revision "0" of its governing design, and 015 revision "0"
+/// supports specification revision "0" of every Policy kind and of the Target
+/// Profile. Another revision still establishes a tuple, so that 015 can tell a
+/// reference which revision a candidate has.
+pub(crate) const SPECIFICATION_REVISION: &str = "0";
 
 /// The digest domain 017 registers for a localization artifact's integrity.
 pub(crate) const INTEGRITY_DOMAIN: &str = "localization-artifact-integrity";
@@ -238,17 +245,6 @@ impl FormalMember {
     }
 }
 
-/// The object `value` is when it has exactly `members`.
-fn closed<'a>(value: &'a Value, members: &[&str]) -> Option<&'a Map<String, Value>> {
-    value.as_object().filter(|object| {
-        object.len() == members.len() && members.iter().all(|member| object.contains_key(*member))
-    })
-}
-
-fn token(value: &Value) -> Option<Token> {
-    value.as_str().and_then(|text| Token::new(text).ok())
-}
-
 /// `H(the kind's domain, { kind, specificationRevision, content })` over the
 /// submitted content: the name and revision are left out, so the digest pins
 /// the content rather than what it is called.
@@ -272,6 +268,19 @@ fn semantic_digest(
     .expect("the boundary framed the whole member, so a part of it frames")
 }
 
+/// Why the body of a member that establishes a tuple is not admitted, in the
+/// order body admission meets them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BodyFailure {
+    /// The integrity digest is not the digest of the rest of the member.
+    IntegrityInvalid,
+    /// The body is under a revision of its governing specification other than
+    /// the one supported, for which no content is defined.
+    SpecificationRevisionUnsupported,
+    /// The content is not the kind's closed content.
+    ContentInvalid,
+}
+
 /// A member that establishes its exact-reference tuple.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Envelope<'a> {
@@ -281,7 +290,7 @@ pub(crate) struct Envelope<'a> {
     integrity_digest: &'a str,
 }
 
-impl Envelope<'_> {
+impl<'a> Envelope<'a> {
     pub(crate) const fn tuple(&self) -> &ExactTuple {
         &self.tuple
     }
@@ -309,6 +318,21 @@ impl Envelope<'_> {
         .expect("the boundary framed the whole member, so a part of it frames")
         .as_str()
             == self.integrity_digest
+    }
+
+    /// Body admission: the integrity first, then the specification revision,
+    /// and only then the content, which is read as the kind's closed content
+    /// where 017 defines one. The content of a Resource Limit Policy, a Trust
+    /// Policy, or a Glossary Set is 018's or 022's to admit and passes on as
+    /// the object it is.
+    pub(crate) fn admit(&self) -> Result<Content<'a>, BodyFailure> {
+        if !self.integrity_holds() {
+            return Err(BodyFailure::IntegrityInvalid);
+        }
+        if self.tuple.specification_revision.as_str() != SPECIFICATION_REVISION {
+            return Err(BodyFailure::SpecificationRevisionUnsupported);
+        }
+        content::read(self.tuple.kind, self.content).ok_or(BodyFailure::ContentInvalid)
     }
 }
 
@@ -354,10 +378,17 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::artifacts::content::LocalizedApproval;
     use crate::references::{PolicyReference, TargetProfileReference};
 
     fn member(value: Value) -> FormalMember {
         FormalMember::new(value).unwrap()
+    }
+
+    /// Body admission of `value`, which establishes a tuple, without the
+    /// content it reads.
+    fn admission(value: Value) -> Result<(), BodyFailure> {
+        member(value).envelope().unwrap().admit().map(|_| ())
     }
 
     fn approval() -> Value {
@@ -583,7 +614,11 @@ mod tests {
         let envelope = stale.envelope().unwrap();
         assert!(!envelope.integrity_holds());
         assert_eq!(envelope.tuple().identity, tuple.identity);
-        // A content no approval policy has is not looked at here.
+        assert_eq!(
+            envelope.admit().map(|_| ()),
+            Err(BodyFailure::IntegrityInvalid)
+        );
+        // A content no approval policy has fails only at body admission.
         let invalid = member(sealed(edited(
             &valid,
             "/body/content",
@@ -592,9 +627,100 @@ mod tests {
         let envelope = invalid.envelope().unwrap();
         assert!(envelope.integrity_holds());
         assert_eq!(envelope.tuple().kind, ArtifactKind::ApprovalPolicy);
+        assert_eq!(
+            envelope.admit().map(|_| ()),
+            Err(BodyFailure::ContentInvalid)
+        );
         // A revision of the governing specification other than "0" is kept.
         let revised = tuple_of(edited(&valid, "/specification/revision", Some(json!("1"))));
         assert_eq!(revised.unwrap().specification_revision.as_str(), "1");
+    }
+
+    #[test]
+    fn every_admitted_kind_admits_its_closed_content() {
+        for kind in ArtifactKind::ALL {
+            let value = envelope_of(kind, "storefront", "1", content::sample(kind));
+            assert_eq!(admission(value), Ok(()), "{kind:?}");
+        }
+        let approval = member(approval());
+        assert_eq!(
+            approval.envelope().unwrap().admit(),
+            Ok(Content::Approval(LocalizedApproval::Required))
+        );
+        // A content 018 or 022 admits passes on as the submitted object.
+        let trust = member(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "trust",
+            "1",
+            json!({"roots": ["a"]}),
+        ));
+        let envelope = trust.envelope().unwrap();
+        assert_eq!(envelope.admit(), Ok(Content::External(envelope.content())));
+    }
+
+    #[test]
+    fn body_admission_checks_the_integrity_then_the_specification_revision_then_the_content() {
+        let valid = approval();
+        let invalid_content = Some(json!({"localizedApproval": "sometimes"}));
+        let revised = Some(json!("1"));
+        assert_eq!(admission(valid.clone()), Ok(()));
+        assert_eq!(
+            admission(sealed(edited(
+                &valid,
+                "/body/content",
+                invalid_content.clone()
+            ))),
+            Err(BodyFailure::ContentInvalid)
+        );
+        assert_eq!(
+            admission(sealed(edited(
+                &valid,
+                "/specification/revision",
+                revised.clone()
+            ))),
+            Err(BodyFailure::SpecificationRevisionUnsupported)
+        );
+        assert_eq!(
+            admission(edited(&valid, "/body/revision", Some(json!("2")))),
+            Err(BodyFailure::IntegrityInvalid)
+        );
+        // No content is read under a revision that defines none.
+        let both = sealed(edited(
+            &edited(&valid, "/specification/revision", revised),
+            "/body/content",
+            invalid_content,
+        ));
+        assert_eq!(
+            admission(both.clone()),
+            Err(BodyFailure::SpecificationRevisionUnsupported)
+        );
+        // And nothing is read past an integrity that fails.
+        let mut stale = both;
+        stale["body"]["identity"] = json!("renamed-approval");
+        assert_eq!(admission(stale), Err(BodyFailure::IntegrityInvalid));
+    }
+
+    #[test]
+    fn only_specification_revision_zero_is_admitted_for_every_kind() {
+        for kind in ArtifactKind::ALL {
+            let base = envelope_of(kind, "storefront", "1", content::sample(kind));
+            for revision in ["1", "00", "0.0", "0-rc"] {
+                let value = sealed(edited(
+                    &base,
+                    "/specification/revision",
+                    Some(json!(revision)),
+                ));
+                // The tuple keeps the revision, so 015 can tell a reference
+                // which revision a candidate is under.
+                let tuple = tuple_of(value.clone()).unwrap();
+                assert_eq!(tuple.specification_revision.as_str(), revision);
+                assert_eq!(
+                    admission(value),
+                    Err(BodyFailure::SpecificationRevisionUnsupported),
+                    "{kind:?} {revision}"
+                );
+            }
+        }
     }
 
     #[test]

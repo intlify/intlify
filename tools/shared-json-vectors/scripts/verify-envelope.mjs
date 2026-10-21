@@ -3,10 +3,12 @@
  *
  * The Rust crate writes members of a Submitted Profile Resolution Artifact
  * Collection with what each declares, the exact-reference tuple it
- * establishes, whether its integrity holds, and its canonical bytes, and the
- * digests, spellings, orders, and references that depend on them. This script
- * shares no code with it: it decides each of these from design 017's rules and
- * its own framing and digest, so a disagreement says which of the two is wrong.
+ * establishes, whether its integrity holds, how its body admission ends, and
+ * its canonical bytes, and the digests, spellings, orders, content changes, and
+ * references that depend on them. This script shares no code with it: it
+ * decides each of these from design 017's rules and its own framing, digest,
+ * and reading of the closed contents, so a disagreement says which of the two
+ * is wrong.
  */
 
 import { readFileSync } from 'node:fs'
@@ -38,6 +40,84 @@ const TOKEN = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/
 
 /** The complete `sha256:` digest spelling. */
 const DIGEST = /^sha256:[0-9a-f]{64}$/
+
+/** The one specification revision a body is admitted under. */
+const SPECIFICATION_REVISION = '0'
+
+/** The largest `UInt64`. */
+const MAX_UINT64 = 18446744073709551615n
+
+/**
+ * The closed contents of design 017's Policy and Target Profile bodies, as
+ * data that `conforms` reads: an object lists its members, `oneOf` its
+ * spellings, and `ordered` an array of entries strictly ascending by the
+ * UTF-8 bytes of one member. The other three kinds have no entry: 018 and 022
+ * admit their contents.
+ */
+const token = { type: 'token' }
+const pair = { type: 'object', members: { identity: token, revision: token } }
+const oneOf = (...values) => ({ type: 'oneOf', values })
+const pinned = (identity, revision) => ({
+  type: 'object',
+  members: { identity: oneOf(identity), revision: oneOf(revision) }
+})
+const object = members => ({ type: 'object', members })
+const positive = { type: 'positive' }
+const LIMIT_NAMES = [
+  'maxMessages',
+  'maxUses',
+  'maxLocales',
+  'maxFiles',
+  'maxFileBytes',
+  'maxOutputBytes',
+  'maxParameterBytes',
+  'maxTextBytes'
+]
+const CONTENTS = new Map([
+  ['approval-policy', object({ localizedApproval: oneOf('required', 'not-required') })],
+  ['selection-policy', object({ mode: oneOf('explicit') })],
+  [
+    'source-admission-policy',
+    object({ sourceApproval: oneOf('required', 'authenticated-sufficient') })
+  ],
+  [
+    'provider-routing-policy',
+    object({
+      adapter: pair,
+      configuration: object({ identity: token, semanticDigest: { type: 'digest' } })
+    })
+  ],
+  [
+    'target-profile',
+    object({
+      host: object({ kind: oneOf('javascript-esm-dom-text'), grammar: pair, moduleProfile: pair }),
+      mode: oneOf('runtime-backed', 'aot'),
+      adapter: pair,
+      execution: object({
+        specification: pinned('intlify-design-023', '0'),
+        profile: pinned('intlify-text-interpolation-minimum', '0')
+      }),
+      mf2Specification: pair,
+      codecs: object({
+        bindingTable: pair,
+        localePayload: pair,
+        descriptor: pair,
+        sourceMap: pinned('ecma-426-source-map', '3')
+      }),
+      locale: object({
+        selection: oneOf('direct-only'),
+        services: oneOf('absent'),
+        directions: {
+          type: 'ordered',
+          by: 'locale',
+          entry: object({ locale: { type: 'text' }, direction: oneOf('LTR', 'RTL', 'unknown') })
+        }
+      }),
+      delivery: object({ unit: oneOf('main'), loading: oneOf('eager') }),
+      limits: object(Object.fromEntries(LIMIT_NAMES.map(name => [name, positive])))
+    })
+  ]
+])
 
 /**
  * Whether a value is a JSON object.
@@ -158,6 +238,84 @@ function integrityHolds(member) {
 }
 
 /**
+ * Whether a value conforms to a closed content description.
+ *
+ * @param description - An entry of `CONTENTS` or a part of one.
+ * @param value - A JSON value.
+ * @returns Whether the value is what the description allows.
+ */
+function conforms(description, value) {
+  switch (description.type) {
+    case 'object': {
+      const names = Object.keys(description.members)
+      return (
+        closed(value, names) !== null &&
+        names.every(name => conforms(description.members[name], value[name]))
+      )
+    }
+    case 'oneOf': {
+      return typeof value === 'string' && description.values.includes(value)
+    }
+    case 'token': {
+      return isToken(value)
+    }
+    case 'digest': {
+      return typeof value === 'string' && DIGEST.test(value)
+    }
+    case 'text': {
+      return typeof value === 'string' && value.length > 0
+    }
+    case 'positive': {
+      return typeof value === 'string' && /^[1-9]\d*$/.test(value) && BigInt(value) <= MAX_UINT64
+    }
+    case 'ordered': {
+      if (!Array.isArray(value) || !value.every(entry => conforms(description.entry, entry))) {
+        return false
+      }
+      const keys = value.map(entry => Buffer.from(entry[description.by], 'utf8'))
+      return keys.every((key, index) => index === 0 || Buffer.compare(keys[index - 1], key) < 0)
+    }
+    default: {
+      throw new Error(`no such description: ${description.type}`)
+    }
+  }
+}
+
+/**
+ * Whether a content is the closed content of its kind.
+ *
+ * @param kind - An admitted kind.
+ * @param content - A content object.
+ * @returns Whether design 017's closed content admits it, or true for a kind
+ *   whose content 018 or 022 admits.
+ */
+function contentAdmitted(kind, content) {
+  const description = CONTENTS.get(kind)
+  return description === undefined || conforms(description, content)
+}
+
+/**
+ * How the body admission of a member ends.
+ *
+ * @param member - A collection member.
+ * @returns null without a tuple; otherwise the first of the integrity, the
+ *   specification revision, and the content to fail, or "admitted".
+ */
+function admission(member) {
+  const established = tuple(member)
+  if (established === null) {
+    return null
+  }
+  if (!integrityHolds(member)) {
+    return 'integrity-invalid'
+  }
+  if (established.specificationRevision !== SPECIFICATION_REVISION) {
+    return 'specification-revision-unsupported'
+  }
+  return contentAdmitted(established.kind, member.body.content) ? 'admitted' : 'content-invalid'
+}
+
+/**
  * Whether a JSON value holds a number anywhere.
  *
  * @param value - A JSON value.
@@ -228,6 +386,10 @@ function checkMembers(vectors, fail) {
     if (holds !== vector.integrityHolds) {
       fail(`${vector.id}: integrity ${holds}, committed ${vector.integrityHolds}`)
     }
+    const ends = admission(member)
+    if (ends !== vector.admission) {
+      fail(`${vector.id}: body admission ${ends}, committed ${vector.admission}`)
+    }
     const bytes = encode(member).length
     if (bytes !== vector.canonicalBytes) {
       fail(`${vector.id}: ${bytes} canonical bytes, committed ${vector.canonicalBytes}`)
@@ -236,7 +398,8 @@ function checkMembers(vectors, fail) {
 }
 
 /**
- * Check the pairs, spellings, refusals, orders, and references.
+ * Check the pairs, spellings, refusals, orders, content changes, and
+ * references.
  *
  * @param vectors - The vectors document.
  * @param fail - Records one failed check.
@@ -283,6 +446,22 @@ function checkRelations(vectors, fail) {
       `the members without a tuple are not these, in this order: ${vectors.withoutTuple.join(', ')}`
     )
   }
+  for (const vector of vectors.contents) {
+    const base = members.get(vector.base)
+    const content = structuredClone(base.body.content)
+    const names = vector.pointer.split('/').slice(1)
+    const name = names.pop()
+    const parent = names.reduce((node, part) => node[part], content)
+    if ('value' in vector) {
+      parent[name] = vector.value
+    } else {
+      delete parent[name]
+    }
+    const admitted = contentAdmitted(base.kind, content)
+    if (admitted !== vector.admitted) {
+      fail(`${vector.id}: content admitted ${admitted}, committed ${vector.admitted}`)
+    }
+  }
   for (const vector of vectors.references) {
     if (!sameTuple(vector.reference, tuples.get(vector.resolves))) {
       fail(`the reference does not name the tuple of ${vector.resolves}`)
@@ -320,5 +499,5 @@ if (failures > 0) {
   process.exit(1)
 }
 console.log(
-  `${vectors.members.length} members and ${vectors.references.length} references agree with an independent implementation`
+  `${vectors.members.length} members, ${vectors.contents.length} content changes, and ${vectors.references.length} references agree with an independent implementation`
 )

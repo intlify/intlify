@@ -3,18 +3,22 @@
 
 //! The envelope vectors an independent implementation checks. For each member
 //! they record what it declares, the tuple it establishes, whether its
-//! integrity holds, and its canonical bytes; then the members whose semantic
-//! digests must agree or differ, transport spellings whose canonical bodies
-//! must agree, members that must stay unequal, texts the boundary refuses, the
-//! orders of members within one tuple and without one, and references with
-//! their tuples and canonical bytes. The contents are test values, not
-//! artifacts any project admits.
+//! integrity holds, how its body admission ends, and its canonical bytes; then
+//! the members whose semantic digests must agree or differ, transport
+//! spellings whose canonical bodies must agree, members that must stay
+//! unequal, texts the boundary refuses, the orders of members within one tuple
+//! and without one, changes to an admitted content with whether the result is
+//! still the kind's closed content, and references with their tuples and
+//! canonical bytes. The contents are test values, not artifacts any project
+//! admits.
 
 use serde_json::{json, Value};
 
 use crate::artifacts::collection::{read_collection, CollectionFailure, CollectionLimits};
+use crate::artifacts::content::{self, sample};
 use crate::artifacts::envelope::{
-    envelope_of, sealed, ArtifactKind, Declaration, ExactTuple, FormalMember, INTEGRITY_DOMAIN,
+    envelope_of, sealed, ArtifactKind, BodyFailure, Declaration, Envelope, ExactTuple,
+    FormalMember, INTEGRITY_DOMAIN,
 };
 use crate::artifacts::SemanticDigest;
 use crate::references::{PolicyReference, TargetProfileReference};
@@ -27,135 +31,39 @@ const ROOM: CollectionLimits = CollectionLimits {
     depth: u64::MAX,
 };
 
-fn target_profile() -> Value {
-    let versioned =
-        |identity: &str, revision: &str| json!({"identity": identity, "revision": revision});
-    json!({
-        "host": {
-            "kind": "javascript-esm-dom-text",
-            "grammar": versioned("ecmascript", "2025"),
-            "moduleProfile": versioned("intlify-esm-module", "0"),
-        },
-        "mode": "runtime-backed",
-        "adapter": versioned("intlify-vanilla-dom", "0"),
-        "execution": {
-            "specification": versioned("intlify-design-023", "0"),
-            "profile": versioned("intlify-text-interpolation-minimum", "0"),
-        },
-        "mf2Specification": versioned("unicode-mf2", "48"),
-        "codecs": {
-            "bindingTable": versioned("intlify-binding-table", "0"),
-            "localePayload": versioned("intlify-locale-payload", "0"),
-            "descriptor": versioned("intlify-target-descriptor", "0"),
-            "sourceMap": versioned("ecma-426-source-map", "3"),
-        },
-        "locale": {
-            "selection": "direct-only",
-            "services": "absent",
-            "directions": [
-                {"locale": "en", "direction": "LTR"},
-                {"locale": "ja", "direction": "LTR"},
-            ],
-        },
-        "delivery": {"unit": "main", "loading": "eager"},
-        "limits": {
-            "maxMessages": "1000",
-            "maxUses": "10000",
-            "maxLocales": "8",
-            "maxFiles": "64",
-            "maxFileBytes": "1048576",
-            "maxOutputBytes": "8388608",
-            "maxParameterBytes": "4096",
-            "maxTextBytes": "65536",
-        },
-    })
-}
-
 fn approval() -> Value {
     envelope_of(
         ArtifactKind::ApprovalPolicy,
         "storefront-approval",
         "1",
-        json!({"localizedApproval": "required"}),
+        sample(ArtifactKind::ApprovalPolicy),
     )
 }
 
-/// One sealed envelope of each admitted kind, in kind order.
+/// One sealed envelope of each admitted kind, in kind order, with its sample
+/// content.
 fn admitted() -> Vec<(&'static str, Value)> {
-    let routing = json!({
-        "adapter": {"identity": "intlify-provider-fixture", "revision": "0"},
-        "configuration": {
-            "identity": "storefront-routing",
-            "semanticDigest": SemanticDigest::from_hash([0x2a; 32]).as_str(),
-        },
-    });
-    let section = json!({"configurationInput": {"maxConfigurationBytes": "1048576"}});
-    vec![
-        ("approval-policy", approval()),
+    [
+        (ArtifactKind::ApprovalPolicy, "storefront-approval"),
+        (ArtifactKind::GlossarySet, "storefront-glossary"),
+        (ArtifactKind::ProviderRoutingPolicy, "storefront-routing"),
+        (ArtifactKind::ResourceLimitPolicy, "storefront-limits"),
+        (ArtifactKind::SelectionPolicy, "storefront-selection"),
         (
-            "glossary-set",
-            envelope_of(
-                ArtifactKind::GlossarySet,
-                "storefront-glossary",
-                "1",
-                json!({}),
-            ),
+            ArtifactKind::SourceAdmissionPolicy,
+            "storefront-source-admission",
         ),
-        (
-            "provider-routing-policy",
-            envelope_of(
-                ArtifactKind::ProviderRoutingPolicy,
-                "storefront-routing",
-                "1",
-                routing,
-            ),
-        ),
-        (
-            "resource-limit-policy",
-            envelope_of(
-                ArtifactKind::ResourceLimitPolicy,
-                "storefront-limits",
-                "1",
-                json!({"projectProfileResolution": section}),
-            ),
-        ),
-        (
-            "selection-policy",
-            envelope_of(
-                ArtifactKind::SelectionPolicy,
-                "storefront-selection",
-                "1",
-                json!({"mode": "explicit"}),
-            ),
-        ),
-        (
-            "source-admission-policy",
-            envelope_of(
-                ArtifactKind::SourceAdmissionPolicy,
-                "storefront-source-admission",
-                "1",
-                json!({"sourceApproval": "authenticated-sufficient"}),
-            ),
-        ),
-        (
-            "target-profile",
-            envelope_of(
-                ArtifactKind::TargetProfile,
-                "storefront-web",
-                "1",
-                target_profile(),
-            ),
-        ),
-        (
-            "trust-policy",
-            envelope_of(
-                ArtifactKind::TrustPolicy,
-                "storefront-trust",
-                "1",
-                json!({}),
-            ),
-        ),
+        (ArtifactKind::TargetProfile, "storefront-web"),
+        (ArtifactKind::TrustPolicy, "storefront-trust"),
     ]
+    .into_iter()
+    .map(|(kind, identity)| {
+        (
+            kind.spelling(),
+            envelope_of(kind, identity, "1", sample(kind)),
+        )
+    })
+    .collect()
 }
 
 /// `value` with the member at `pointer` set, or removed for `None`; sealed
@@ -178,9 +86,13 @@ fn edited(value: &Value, pointer: &str, replacement: Option<Value>, reseal: bool
     }
 }
 
-/// Members that are envelopes of the approval policy in every respect but one.
+/// Members that are envelopes of the approval policy in every respect but one,
+/// and members with two failing parts, which body admission meets in order.
 fn variants() -> Vec<(&'static str, Value)> {
     let base = approval();
+    let of = |kind: ArtifactKind, identity: &str| envelope_of(kind, identity, "1", sample(kind));
+    let glossary = of(ArtifactKind::GlossarySet, "storefront-glossary");
+    let target = of(ArtifactKind::TargetProfile, "storefront-web");
     let limits = |content: Value| {
         envelope_of(
             ArtifactKind::ResourceLimitPolicy,
@@ -257,6 +169,29 @@ fn variants() -> Vec<(&'static str, Value)> {
         (
             "approval-policy-another-integrity-digest",
             edited(&base, "/integrityDigest", digest(0xf0), false),
+        ),
+        // Body admission reads the integrity, then the specification
+        // revision, and only then the content.
+        (
+            "approval-policy-revised-specification-invalid-content",
+            edited(
+                &edited(&base, "/specification/revision", Some(json!("1")), false),
+                "/body/content/localizedApproval",
+                Some(json!("sometimes")),
+                true,
+            ),
+        ),
+        (
+            "approval-policy-stale-integrity-revised-specification",
+            edited(&base, "/specification/revision", Some(json!("1")), false),
+        ),
+        (
+            "glossary-set-specification-revised",
+            edited(&glossary, "/specification/revision", Some(json!("1")), true),
+        ),
+        (
+            "target-profile-invalid-content",
+            edited(&target, "/body/content/mode", Some(json!("jit")), true),
         ),
     ]
 }
@@ -362,8 +297,19 @@ fn framed(value: &Value) -> Result<FormalMember, String> {
     FormalMember::new(value.clone()).map_err(|failure| format!("{failure:?}"))
 }
 
+/// How the body admission of a member with a tuple ends.
+fn admission(envelope: &Envelope<'_>) -> &'static str {
+    match envelope.admit() {
+        Ok(_) => "admitted",
+        Err(BodyFailure::IntegrityInvalid) => "integrity-invalid",
+        Err(BodyFailure::SpecificationRevisionUnsupported) => "specification-revision-unsupported",
+        Err(BodyFailure::ContentInvalid) => "content-invalid",
+    }
+}
+
 /// What one member declares, the tuple it establishes, whether its integrity
-/// holds, and its canonical bytes, all read back through this crate.
+/// holds, how its body admission ends, and its canonical bytes, all read back
+/// through this crate.
 fn record(id: &str, value: &Value) -> Result<Value, String> {
     let member = framed(value)?;
     let declaration = match member.declaration() {
@@ -378,6 +324,7 @@ fn record(id: &str, value: &Value) -> Result<Value, String> {
         "declaration": declaration,
         "tuple": envelope.as_ref().map_or(Value::Null, |envelope| tuple_value(envelope.tuple())),
         "integrityHolds": envelope.as_ref().map_or(Value::Null, |envelope| json!(envelope.integrity_holds())),
+        "admission": envelope.as_ref().map_or(Value::Null, |envelope| json!(admission(envelope))),
         "canonicalBytes": member.canonical_bytes(),
     }))
 }
@@ -442,14 +389,343 @@ fn unrepresentable() -> Result<Vec<String>, String> {
     Ok(texts)
 }
 
+/// One change to the sample content of `kind`: the member at `pointer` set to
+/// `value`, or removed for `None`, and whether the changed content is meant to
+/// be the kind's closed content.
+type ContentCase = (
+    &'static str,
+    ArtifactKind,
+    &'static str,
+    Option<Value>,
+    bool,
+);
+
+/// Changes that keep or break each rule of the five closed contents once, and
+/// objects that the contents of 018 and 022 pass on as. The unit tests of the
+/// content module try every rule more ways.
+fn content_cases() -> Vec<ContentCase> {
+    let of = |kind| {
+        move |id, pointer, value, admitted| -> ContentCase { (id, kind, pointer, value, admitted) }
+    };
+    let (approval, selection) = (
+        of(ArtifactKind::ApprovalPolicy),
+        of(ArtifactKind::SelectionPolicy),
+    );
+    let (source, routing) = (
+        of(ArtifactKind::SourceAdmissionPolicy),
+        of(ArtifactKind::ProviderRoutingPolicy),
+    );
+    let target = of(ArtifactKind::TargetProfile);
+    let set = |value: Value| Some(value);
+    let pair =
+        |identity: &str, revision: &str| set(json!({"identity": identity, "revision": revision}));
+    let entry = |locale: &str, direction: &str| json!({"locale": locale, "direction": direction});
+    let directions = |entries: &[Value]| set(Value::Array(entries.to_vec()));
+    let (fullwidth, mathematical) = ("\u{ff41}", "\u{1d41a}");
+    vec![
+        // The three one-member Policy contents.
+        approval(
+            "approval-not-required",
+            "/localizedApproval",
+            set(json!("not-required")),
+            true,
+        ),
+        approval(
+            "approval-other-spelling",
+            "/localizedApproval",
+            set(json!("Required")),
+            false,
+        ),
+        approval("approval-missing", "/localizedApproval", None, false),
+        approval(
+            "approval-unknown-member",
+            "/mode",
+            set(json!("explicit")),
+            false,
+        ),
+        selection(
+            "selection-other-mode",
+            "/mode",
+            set(json!("implicit")),
+            false,
+        ),
+        selection("selection-unknown-member", "/note", set(json!("x")), false),
+        source(
+            "source-admission-required",
+            "/sourceApproval",
+            set(json!("required")),
+            true,
+        ),
+        source(
+            "source-admission-other-value",
+            "/sourceApproval",
+            set(json!("authenticated")),
+            false,
+        ),
+        // The Provider routing.
+        routing(
+            "routing-other-adapter",
+            "/adapter",
+            pair("intlify-provider-other", "3"),
+            true,
+        ),
+        routing(
+            "routing-adapter-not-a-pair",
+            "/adapter",
+            set(json!("intlify-provider")),
+            false,
+        ),
+        routing(
+            "routing-uppercase-digest",
+            "/configuration/semanticDigest",
+            set(json!(format!("sha256:{}", "2A".repeat(32)))),
+            false,
+        ),
+        routing(
+            "routing-malformed-configuration",
+            "/configuration/identity",
+            set(json!("Routing")),
+            false,
+        ),
+        routing(
+            "routing-configuration-unknown-member",
+            "/configuration/note",
+            set(json!("x")),
+            false,
+        ),
+        routing(
+            "routing-unknown-member",
+            "/fallback",
+            set(json!("none")),
+            false,
+        ),
+        // The Target Profile's mode and each value 017 fixes.
+        target("target-aot", "/mode", set(json!("aot")), true),
+        target("target-other-mode", "/mode", set(json!("jit")), false),
+        target(
+            "target-other-host-kind",
+            "/host/kind",
+            set(json!("javascript-cjs-dom-text")),
+            false,
+        ),
+        target(
+            "target-other-execution-specification",
+            "/execution/specification",
+            pair("intlify-design-023", "1"),
+            false,
+        ),
+        target(
+            "target-other-execution-profile",
+            "/execution/profile",
+            pair("intlify-text-interpolation", "0"),
+            false,
+        ),
+        target(
+            "target-other-source-map",
+            "/codecs/sourceMap",
+            pair("ecma-426-source-map", "2"),
+            false,
+        ),
+        target(
+            "target-other-locale-selection",
+            "/locale/selection",
+            set(json!("fallback")),
+            false,
+        ),
+        target(
+            "target-other-locale-services",
+            "/locale/services",
+            set(json!("present")),
+            false,
+        ),
+        target(
+            "target-other-delivery-unit",
+            "/delivery/unit",
+            set(json!("secondary")),
+            false,
+        ),
+        target(
+            "target-other-delivery-loading",
+            "/delivery/loading",
+            set(json!("lazy")),
+            false,
+        ),
+        // An identity 017 leaves open, whose support 024 decides, and objects
+        // that are closed.
+        target(
+            "target-other-grammar",
+            "/host/grammar",
+            pair("ecmascript", "2022"),
+            true,
+        ),
+        target(
+            "target-grammar-not-a-pair",
+            "/host/grammar",
+            set(json!({"identity": "es"})),
+            false,
+        ),
+        target(
+            "target-malformed-module-profile",
+            "/host/moduleProfile",
+            pair("Intlify-ESM", "0"),
+            false,
+        ),
+        target(
+            "target-unknown-member",
+            "/hydration",
+            set(json!("none")),
+            false,
+        ),
+        target("target-missing-delivery", "/delivery", None, false),
+        target(
+            "target-host-unknown-member",
+            "/host/note",
+            set(json!("x")),
+            false,
+        ),
+        // Directions.
+        target(
+            "target-no-directions",
+            "/locale/directions",
+            directions(&[]),
+            true,
+        ),
+        target(
+            "target-every-direction",
+            "/locale/directions",
+            directions(&[
+                entry("ar", "RTL"),
+                entry("en", "LTR"),
+                entry("zxx", "unknown"),
+            ]),
+            true,
+        ),
+        target(
+            "target-directions-by-utf8-bytes",
+            "/locale/directions",
+            directions(&[entry(fullwidth, "LTR"), entry(mathematical, "LTR")]),
+            true,
+        ),
+        target(
+            "target-directions-by-utf16-units",
+            "/locale/directions",
+            directions(&[entry(mathematical, "LTR"), entry(fullwidth, "LTR")]),
+            false,
+        ),
+        target(
+            "target-directions-unsorted",
+            "/locale/directions",
+            directions(&[entry("ja", "LTR"), entry("en", "LTR")]),
+            false,
+        ),
+        target(
+            "target-directions-repeated",
+            "/locale/directions",
+            directions(&[entry("en", "LTR"), entry("en", "LTR")]),
+            false,
+        ),
+        target(
+            "target-directions-repeated-otherwise",
+            "/locale/directions",
+            directions(&[entry("en", "LTR"), entry("en", "RTL")]),
+            false,
+        ),
+        target(
+            "target-direction-empty-locale",
+            "/locale/directions",
+            directions(&[entry("", "LTR")]),
+            false,
+        ),
+        target(
+            "target-direction-lowercase",
+            "/locale/directions",
+            directions(&[entry("en", "ltr")]),
+            false,
+        ),
+        // Limits.
+        target(
+            "target-limit-one",
+            "/limits/maxLocales",
+            set(json!("1")),
+            true,
+        ),
+        target(
+            "target-limit-maximum",
+            "/limits/maxOutputBytes",
+            set(json!("18446744073709551615")),
+            true,
+        ),
+        target(
+            "target-limit-zero",
+            "/limits/maxMessages",
+            set(json!("0")),
+            false,
+        ),
+        target(
+            "target-limit-leading-zero",
+            "/limits/maxUses",
+            set(json!("010000")),
+            false,
+        ),
+        target(
+            "target-limit-over",
+            "/limits/maxFileBytes",
+            set(json!("18446744073709551616")),
+            false,
+        ),
+        target("target-limit-missing", "/limits/maxTextBytes", None, false),
+        // Contents 018 and 022 admit pass on as any object.
+        of(ArtifactKind::GlossarySet)(
+            "glossary-any-object",
+            "/terms",
+            set(json!([{"source": "cart"}])),
+            true,
+        ),
+        of(ArtifactKind::ResourceLimitPolicy)(
+            "resource-limit-any-object",
+            "/projectProfileResolution",
+            set(json!("default")),
+            true,
+        ),
+        of(ArtifactKind::TrustPolicy)(
+            "trust-any-object",
+            "/roots",
+            set(json!({"publisher": "storefront"})),
+            true,
+        ),
+    ]
+}
+
+/// Each content case with this crate's decision, which must be the one the
+/// case means.
+fn contents() -> Result<Vec<Value>, String> {
+    content_cases()
+        .into_iter()
+        .map(|(id, kind, pointer, value, meant)| {
+            let changed = edited(&sample(kind), pointer, value.clone(), false);
+            let object = changed.as_object().ok_or(format!("{id} is no object"))?;
+            let admitted = content::read(kind, object).is_some();
+            if admitted != meant {
+                return Err(format!("{id}: admitted {admitted}, meant {meant}"));
+            }
+            let mut case = json!({
+                "id": id,
+                "base": kind.spelling(),
+                "pointer": pointer,
+                "admitted": admitted,
+            });
+            if let Some(value) = value {
+                case["value"] = value;
+            }
+            Ok(case)
+        })
+        .collect()
+}
+
+/// A reference to each admitted kind's member, read back through this crate.
 fn references(members: &[(&'static str, Value)]) -> Result<Vec<Value>, String> {
     let mut references = Vec::new();
-    for id in ["approval-policy", "target-profile"] {
-        let value = &members
-            .iter()
-            .find(|(member, _)| *member == id)
-            .ok_or(format!("no member {id}"))?
-            .1;
+    for (id, value) in members {
         let member = framed(value)?;
         let tuple = member
             .envelope()
@@ -519,12 +795,13 @@ pub fn document() -> Result<Value, String> {
         "note": "Members of a Submitted Profile Resolution Artifact Collection, read by intlify_config. \
                  An independent implementation decides from each member alone what it declares, \
                  whether it establishes an exact-reference tuple and which, whether its integrity \
-                 holds, and its canonical bytes; checks the members whose semantic digests must agree \
-                 or differ, the spellings that must frame to one canonical body, the members that \
-                 must stay unequal, and the texts a JSON number makes unrepresentable; orders the \
-                 members within one tuple and the members without a tuple by their canonical bodies; \
-                 and checks that each reference names its member's tuple. The contents are test \
-                 values.",
+                 holds, how its body admission ends, and its canonical bytes; checks the members \
+                 whose semantic digests must agree or differ, the spellings that must frame to one \
+                 canonical body, the members that must stay unequal, and the texts a JSON number \
+                 makes unrepresentable; orders the members within one tuple and the members without \
+                 a tuple by their canonical bodies; decides for each change to an admitted member's \
+                 content whether the result is still the kind's closed content; and checks that each \
+                 reference names its member's tuple. The contents are test values.",
         "integrityDomain": INTEGRITY_DOMAIN,
         "kinds": kinds,
         "members": members,
@@ -547,6 +824,7 @@ pub fn document() -> Result<Value, String> {
         "unrepresentable": unrepresentable()?,
         "withinOneTuple": ordered(&one_tuple)?,
         "withoutTuple": ordered(&without)?,
+        "contents": contents()?,
         "references": references(&admitted)?,
     }))
 }
@@ -601,5 +879,48 @@ mod tests {
                 > 0
         );
         assert!(count(&|case| case["integrityHolds"] == false) > 0);
+        for outcome in [
+            "admitted",
+            "integrity-invalid",
+            "specification-revision-unsupported",
+            "content-invalid",
+        ] {
+            assert!(count(&|case| case["admission"] == outcome) > 0, "{outcome}");
+        }
+    }
+
+    #[test]
+    fn the_content_cases_keep_and_break_each_closed_content() {
+        let vectors = committed();
+        let members = vectors["members"].as_array().unwrap();
+        let cases = vectors["contents"].as_array().unwrap();
+        for kind in ArtifactKind::ALL {
+            // Every case changes the content of the kind's admitted member.
+            let base = members
+                .iter()
+                .find(|case| case["id"] == kind.spelling())
+                .unwrap();
+            assert_eq!(base["admission"], "admitted", "{kind:?}");
+            let side = |admitted: bool| {
+                cases
+                    .iter()
+                    .any(|case| case["base"] == kind.spelling() && case["admitted"] == admitted)
+            };
+            // A content 018 or 022 admits is any object, so nothing breaks it.
+            let external = matches!(
+                kind,
+                ArtifactKind::GlossarySet
+                    | ArtifactKind::ResourceLimitPolicy
+                    | ArtifactKind::TrustPolicy
+            );
+            assert_eq!(side(false), !external, "{kind:?}");
+            assert!(side(true) || !external, "{kind:?}");
+        }
+        let references = vectors["references"].as_array().unwrap();
+        let named: Vec<&Value> = references
+            .iter()
+            .map(|reference| &reference["reference"]["kind"])
+            .collect();
+        assert_eq!(named, ArtifactKind::ALL.map(ArtifactKind::spelling));
     }
 }
