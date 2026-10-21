@@ -249,7 +249,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::EffectiveMode
         | Check::VocabularyMember
         | Check::UniqueSurfaceClass
-        | Check::UniqueDomain => return Err(OutputFailure::LocaleResolutionInvariant),
+        | Check::UniqueDomain
+        | Check::WithinCapability
+        | Check::BootstrapCandidate
+        | Check::CompatiblePolicy => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }

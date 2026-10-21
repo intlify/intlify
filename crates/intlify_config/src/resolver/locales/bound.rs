@@ -9,13 +9,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::input_limits::Bound;
 use crate::model::FallbackCandidate;
 
 use super::super::evaluation::{
-    both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, LimitExceeded,
+    both, Actual, Admitted, Causes, Check, Evaluation, EvaluationInvariant,
 };
 use super::super::limits::{BoundId, ConfirmedPolicy, Group};
+use super::super::tally::{actual, measure, total, within, Tally};
 use super::{unit, LocaleFields, LocaleSet, LocaleSubject};
 
 const fn locale_bound(name: &'static str) -> BoundId {
@@ -28,60 +28,6 @@ const fn locale_bound(name: &'static str) -> BoundId {
 pub(super) const MAX_LOCALE_IDENTIFIER_BYTES: BoundId = locale_bound("maxLocaleIdentifierBytes");
 const MAX_LOCALE_OCCURRENCES: BoundId = locale_bound("maxLocaleOccurrences");
 const MAX_REQUESTED_LOCALES: BoundId = locale_bound("maxRequestedLocales");
-
-/// A count kept with checked arithmetic. `None` is a count past `u64`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Tally(Option<u64>);
-
-impl Tally {
-    fn of(count: usize) -> Self {
-        Self(u64::try_from(count).ok())
-    }
-
-    fn plus(self, other: Self) -> Self {
-        Self(
-            self.0
-                .zip(other.0)
-                .and_then(|(left, right)| left.checked_add(right)),
-        )
-    }
-}
-
-fn total(tallies: impl IntoIterator<Item = Tally>) -> Tally {
-    tallies.into_iter().fold(Tally::of(0), Tally::plus)
-}
-
-/// A total, or, past `u64`, the smallest witness that it exceeds `limit`.
-fn actual(tally: Tally, limit: Bound) -> Actual {
-    // `Bound` excludes `u64::MAX`, so the witness is representable.
-    tally
-        .0
-        .map_or(Actual::AtLeast(limit.get() + 1), Actual::Exact)
-}
-
-/// What a count proves against `limit` while part of what it counts may be
-/// unavailable: an exact total when nothing is, a witness when what is
-/// visible already exceeds `limit` (the rest can only add), and otherwise
-/// nothing, with the causes of the missing part.
-fn measure(tally: Tally, unavailable: Option<Causes>, limit: Bound) -> Admitted<Actual> {
-    match (actual(tally, limit), unavailable) {
-        (actual, None) => Ok(actual),
-        (Actual::Exact(total), Some(causes)) if total <= limit.get() => Err(causes),
-        (_, Some(_)) => Ok(Actual::AtLeast(limit.get() + 1)),
-    }
-}
-
-/// The bound's issue when `actual` exceeds `limit`.
-fn within(bound: BoundId, limit: Bound, actual: Actual) -> Result<(), Blocking> {
-    match actual {
-        Actual::Exact(total) if total <= limit.get() => Ok(()),
-        actual => Err(Blocking::limit(LimitExceeded {
-            bound,
-            limit,
-            actual,
-        })),
-    }
-}
 
 /// Each field's locale spellings as `maxLocaleOccurrences` counts them: an
 /// alias key and its destination, a fallback key and its literal candidates
@@ -216,7 +162,8 @@ mod tests {
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
-    use crate::resolver::evaluation::{Code, Unit};
+    use crate::input_limits::Bound;
+    use crate::resolver::evaluation::{Code, LimitExceeded, Unit};
     use crate::resolver::specification::Slot;
 
     /// One change to a declaration.
@@ -241,65 +188,6 @@ mod tests {
         )
         .unwrap()
         .0
-    }
-
-    #[test]
-    fn counts_are_checked_and_one_past_u64_is_past_every_bound() {
-        assert_eq!(Tally::of(2).plus(Tally::of(3)), Tally(Some(5)));
-        assert_eq!(Tally(Some(u64::MAX)).plus(Tally::of(1)), Tally(None));
-        assert_eq!(Tally(None).plus(Tally::of(0)), Tally(None));
-        assert_eq!(Tally::of(0).plus(Tally(None)), Tally(None));
-        assert_eq!(total([]), Tally(Some(0)));
-        assert_eq!(
-            total([Tally::of(1), Tally::of(2), Tally::of(3)]),
-            Tally(Some(6))
-        );
-        assert_eq!(actual(Tally(Some(9)), bound(7)), Actual::Exact(9));
-        assert_eq!(actual(Tally(None), bound(7)), Actual::AtLeast(8));
-    }
-
-    #[test]
-    fn a_missing_part_is_measured_only_once_what_is_visible_exceeds_the_bound() {
-        let causes = stand_in(Slot::Coverage);
-        assert_eq!(
-            measure(Tally(Some(3)), None, bound(5)),
-            Ok(Actual::Exact(3))
-        );
-        assert_eq!(
-            measure(Tally(Some(9)), None, bound(5)),
-            Ok(Actual::Exact(9))
-        );
-        assert_eq!(
-            measure(Tally(Some(5)), Some(causes.clone()), bound(5)),
-            Err(causes.clone())
-        );
-        assert_eq!(
-            measure(Tally(Some(6)), Some(causes.clone()), bound(5)),
-            Ok(Actual::AtLeast(6))
-        );
-        assert_eq!(
-            measure(Tally(None), Some(causes), bound(5)),
-            Ok(Actual::AtLeast(6))
-        );
-        assert_eq!(measure(Tally(None), None, bound(5)), Ok(Actual::AtLeast(6)));
-    }
-
-    #[test]
-    fn a_bound_admits_its_exact_value_and_reports_the_first_over() {
-        assert_eq!(
-            within(MAX_LOCALE_OCCURRENCES, bound(5), Actual::Exact(5)),
-            Ok(())
-        );
-        for actual in [Actual::Exact(6), Actual::AtLeast(6)] {
-            assert_eq!(
-                within(MAX_LOCALE_OCCURRENCES, bound(5), actual),
-                Err(Blocking::limit(LimitExceeded {
-                    bound: MAX_LOCALE_OCCURRENCES,
-                    limit: bound(5),
-                    actual,
-                }))
-            );
-        }
     }
 
     #[test]

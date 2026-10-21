@@ -83,7 +83,7 @@ const fn not_admitted(reason: Reason) -> Blocking {
     Blocking {
         code: Code::IntentSurfaceClassVocabularyNotAdmitted,
         reason: Some(reason),
-        limit: None,
+        details: None,
     }
 }
 

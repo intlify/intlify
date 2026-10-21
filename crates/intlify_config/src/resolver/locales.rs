@@ -418,7 +418,7 @@ const fn issue(code: Code) -> Blocking {
     Blocking {
         code,
         reason: None,
-        limit: None,
+        details: None,
     }
 }
 
@@ -542,7 +542,7 @@ pub(crate) mod fixtures {
                     Err::<(), _>(Blocking {
                         code: Code::SpecificationInputIncomplete,
                         reason: Some(Reason::MissingRequiredSlot),
-                        limit: None,
+                        details: None,
                     })
                 },
             )

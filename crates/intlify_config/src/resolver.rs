@@ -18,5 +18,7 @@ pub(crate) mod identity;
 pub(crate) mod limits;
 pub(crate) mod locales;
 pub(crate) mod negotiation;
+pub(crate) mod resource_policy;
 pub(crate) mod specification;
+pub(crate) mod tally;
 pub(crate) mod vocabulary;
