@@ -241,6 +241,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::RequestedMember => 3,
         Check::SupportedAssertion
         | Check::MatchingData
+        | Check::IntactArtifact
+        | Check::AssertedArtifact
         | Check::OpaqueIdentity
         | Check::DistinctFromSource
         | Check::UniqueCandidate
@@ -537,6 +539,7 @@ mod tests {
     fn only_phase_7_units_frame() {
         let mut frame = Frame::new("locale-resolution-test");
         for subject in [
+            Subject::Vocabulary,
             Subject::CanonicalizationData,
             Subject::Negotiation(crate::resolver::negotiation::NegotiationSubject::Aliases),
             Subject::Fallback(crate::resolver::fallback::FallbackSubject::Sources),
@@ -555,6 +558,8 @@ mod tests {
         for check in [
             Check::SupportedAssertion,
             Check::MatchingData,
+            Check::IntactArtifact,
+            Check::AssertedArtifact,
             Check::OpaqueIdentity,
             Check::DistinctFromSource,
             Check::UniqueCandidate,

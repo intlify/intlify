@@ -22,6 +22,14 @@ pub fn project_profile_config_schema() -> Result<Value, serde_json::Error> {
     >()
 }
 
+/// Generate the closed Intent Surface-Class Vocabulary Artifact schema that
+/// design 017 asks the adopting implementation to materialize.
+///
+/// This helper exposes schema data, not the artifact's reader or admission.
+pub fn intent_surface_class_vocabulary_schema() -> Result<Value, serde_json::Error> {
+    draft7_schema::<crate::artifacts::vocabulary::IntentSurfaceClassVocabularyArtifact>()
+}
+
 /// Workspace-only schema data for the adopted minimum measurement Run Plan.
 /// Does not expose plan issuance, a partial resolver, or measurement samples.
 #[cfg(feature = "benchmark")]

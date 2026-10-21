@@ -1,0 +1,185 @@
+{
+  "note": "Intent Surface-Class Vocabulary Artifacts sealed by intlify_config. An independent implementation recomputes each integrity digest over its artifact without the top-level integrityDigest and each semantic digest over kind, schemaRevision, and members; checks that renaming or revising a vocabulary keeps its semantic digest while changing one member or emptying it changes the digest; and decides for every refused artifact which of 017's reader steps 3 to 6 fails first. None of these vocabularies is one a project admits.",
+  "integrityDomain": "intent-surface-class-vocabulary-integrity",
+  "semanticDomain": "intent-surface-class-vocabulary-semantic-digest",
+  "vocabularies": [
+    {
+      "id": "fixture",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "nav"],
+        "integrityDigest": "sha256:ab6e3af789421cb109d49ec02e73733d65ea4e8774a168dd71d64908bc116085"
+      },
+      "integrityPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+    },
+    {
+      "id": "empty",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": [],
+        "integrityDigest": "sha256:8dad640a1dbdcf48f9714f8e326315d795dec9ad58fe3bc0333e066c179a40ac"
+      },
+      "integrityPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": []
+      },
+      "semanticPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "members": []
+      },
+      "semanticDigest": "sha256:f2993e0378a30c8ff1f2bc3aa3d44dda9575cdd995af41d079d3c2f0f0787d5e"
+    },
+    {
+      "id": "renamed",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-renamed-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "nav"],
+        "integrityDigest": "sha256:0e1f138c056258ca7565f0446388154606bcd333b959d476f233692356c0bcdc"
+      },
+      "integrityPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-renamed-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+    },
+    {
+      "id": "revised",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "1",
+        "members": ["checkout", "internal-tool", "nav"],
+        "integrityDigest": "sha256:b4c36c07bfdb8f8a2364b7bb01c52cf49fa628786f7d74b06d73dadac074f199"
+      },
+      "integrityPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "1",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "members": ["checkout", "internal-tool", "nav"]
+      },
+      "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+    },
+    {
+      "id": "member-changed",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "navigation"],
+        "integrityDigest": "sha256:7ba61f1c3933ad6eae4861578e8c0c0e10b0affb5b43c2bd60984d87c187d47f"
+      },
+      "integrityPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "navigation"]
+      },
+      "semanticPreimage": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "members": ["checkout", "internal-tool", "navigation"]
+      },
+      "semanticDigest": "sha256:655b926b147de4e8e9810ab85dcd320df50be2d78af7b15aabfdd277d558d050"
+    }
+  ],
+  "sameSemanticDigest": [
+    ["fixture", "renamed"],
+    ["fixture", "revised"]
+  ],
+  "differentSemanticDigest": [
+    ["fixture", "member-changed"],
+    ["fixture", "empty"]
+  ],
+  "refused": [
+    {
+      "id": "stale-integrity",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal-tool", "navigation"],
+        "integrityDigest": "sha256:ab6e3af789421cb109d49ec02e73733d65ea4e8774a168dd71d64908bc116085"
+      },
+      "reason": "body-integrity-invalid"
+    },
+    {
+      "id": "member-not-a-token",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "internal tool", "nav"],
+        "integrityDigest": "sha256:327f9eaeaf63eedc8c0bf1bf6c21b65267dd4abf8685722ee4922a6ed3dacd44"
+      },
+      "reason": "member-invalid"
+    },
+    {
+      "id": "repeat-not-adjacent",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["checkout", "nav", "checkout"],
+        "integrityDigest": "sha256:16723c9875136730da8ea42d08af775631cd555746b2e325365fa3f6d3f2763d"
+      },
+      "reason": "member-duplicate"
+    },
+    {
+      "id": "unsorted",
+      "artifact": {
+        "kind": "intent-surface-class-vocabulary",
+        "schemaRevision": "0",
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "members": ["nav", "checkout", "internal-tool"],
+        "integrityDigest": "sha256:f9370a72b38108725b35b2076f071b97c4a04f1147504265c817658d6e09d861"
+      },
+      "reason": "non-canonical-order"
+    }
+  ]
+}
