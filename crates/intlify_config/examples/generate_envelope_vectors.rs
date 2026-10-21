@@ -4,10 +4,11 @@
 //! Write the artifact envelope vectors an independent implementation checks.
 //!
 //! The vectors hold collection members with what each declares, the tuple it
-//! establishes, whether its integrity holds, and its canonical bytes, with the
-//! digests, spellings, orders, and references that depend on them. The Node
-//! checker decides every one of these from the members itself, so a
-//! disagreement says whether this crate or the checker is wrong.
+//! establishes, whether its integrity holds, how its body admission ends, and
+//! its canonical bytes, with the digests, spellings, orders, content changes,
+//! and references that depend on them. The Node checker decides every one of
+//! these from the members itself, so a disagreement says whether this crate or
+//! the checker is wrong.
 
 use std::path::PathBuf;
 use std::process::ExitCode;

@@ -7,11 +7,13 @@
 //! checks over what a reader returns and every Finding, in `resolver`. Nothing
 //! here acquires bytes; the caller hands them over.
 
-use intlify_shared_json::token::hex;
+use intlify_shared_json::token::{hex, Token};
+use serde_json::{Map, Value};
 
 use crate::references::{valid_semantic_digest, SEMANTIC_DIGEST_PATTERN};
 
 pub(crate) mod collection;
+pub(crate) mod content;
 pub(crate) mod envelope;
 pub(crate) mod vocabulary;
 
@@ -35,6 +37,21 @@ impl SemanticDigest {
 /// An in-memory length as the `u64` the limits are written in.
 pub(crate) fn count(length: usize) -> u64 {
     u64::try_from(length).expect("an in-memory length fits u64")
+}
+
+/// Whether `object` has exactly `members`, in any order.
+pub(crate) fn exactly(object: &Map<String, Value>, members: &[&str]) -> bool {
+    object.len() == members.len() && members.iter().all(|member| object.contains_key(*member))
+}
+
+/// The object `value` is when it has exactly `members`.
+pub(crate) fn closed<'a>(value: &'a Value, members: &[&str]) -> Option<&'a Map<String, Value>> {
+    value.as_object().filter(|object| exactly(object, members))
+}
+
+/// The token `value` spells, when it is a string in the token grammar.
+pub(crate) fn token(value: &Value) -> Option<Token> {
+    value.as_str().and_then(|text| Token::new(text).ok())
 }
 
 /// The deepest nesting of objects and arrays, counted outside strings without
