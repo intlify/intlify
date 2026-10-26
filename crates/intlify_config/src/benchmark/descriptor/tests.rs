@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 6);
-    assert_eq!(identities.len(), 6);
+    assert_eq!(pairs.len(), 7);
+    assert_eq!(identities.len(), 7);
 }
 
 #[test]
@@ -392,6 +392,54 @@ fn locale_resolution_descriptor_binds_its_bounds_roles_and_actual_reuse() {
         missing[field] = Value::Null;
         let decoded: Descriptors = serde_json::from_value(missing).unwrap();
         assert!(!decoded.validate(&original, clock(1)).is_empty());
+    }
+}
+
+#[test]
+fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
+    use crate::resolver::limits::ImplementationCapability;
+
+    let mut operation = prepared(Operation::ResourcePolicyBootstrap);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    let input = &encoded["resourcePolicyInput"];
+    assert_eq!(input["selectedProfile"], "app");
+    assert_eq!(input["submittedMembers"], "1");
+    assert_eq!(input["artifactLimit"], "1000");
+    assert_eq!(input["profileIdByteLimit"], "256");
+    for field in [
+        "localeInput",
+        "localeResolutionInput",
+        "admittedLocaleInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    let Prepared::ResourcePolicy(policy) = &mut operation else {
+        unreachable!()
+    };
+    let mut limits = policy.capability.policy_comparable().clone();
+    limits.artifact_admission.max_artifacts = crate::input_limits::Bound::new(999).unwrap();
+    policy.capability = ImplementationCapability::fixture_owned(limits);
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::ResourcePolicyInputBindingMismatch]
+    );
+    let original = prepared(Operation::ResourcePolicyBootstrap);
+    let mut missing = encoded;
+    missing["resourcePolicyInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::ResourcePolicyInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .resource_policy_input
+                .is_some(),
+            operation.operation() == Operation::ResourcePolicyBootstrap
+        );
     }
 }
 

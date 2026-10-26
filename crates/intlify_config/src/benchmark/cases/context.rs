@@ -23,6 +23,7 @@ pub(in crate::benchmark) enum ContextFailure {
     SelectorMismatch,
     PreparationLimitsMismatch,
     LocaleInputMismatch,
+    PolicyInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -140,6 +141,42 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             frame.json(&canonicalizer.map_err(|_| ContextFailure::Encoding)?);
             frame.json(
                 &serde_json::to_value(crate::benchmark::locale_resolution::InputFacts::observe(
+                    prepared,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::ResourcePolicy(prepared) => {
+            let expected = selector_input(
+                candidate.declaration.selector,
+                prepared.analysis.benchmark_profile_id_bound(),
+            );
+            if !matches!(candidate.declaration.fixture, Recipe::ResourcePolicy(_))
+                || candidate.declaration.selector != super::Selector::App
+                || !prepared.selector.benchmark_matches_fixture(&expected)
+                || prepared.selected.as_str() != "app"
+                || prepared.inputs().is_none()
+            {
+                return Err(ContextFailure::PolicyInputMismatch);
+            }
+            // The complete configuration, whose reference names the policy;
+            // every member in submission order; and every capability bound.
+            frame.digest(prepared.analysis.benchmark_observation().identity());
+            frame.json(
+                &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
+            );
+            let members = prepared.collection.members();
+            frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+            for member in members {
+                frame.bytes(member.canonical_body());
+            }
+            for (id, bound) in prepared.capability.policy_comparable().bounds() {
+                frame.text(id.group.path());
+                frame.text(id.name);
+                frame.uint(bound.get());
+            }
+            frame.json(
+                &serde_json::to_value(crate::benchmark::resource_policy::InputFacts::observe(
                     prepared,
                 ))
                 .map_err(|_| ContextFailure::Encoding)?,

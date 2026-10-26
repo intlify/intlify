@@ -2,9 +2,9 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Versioned workload facts for input/structural/selection, single-locale
-//! canonicalization, and 015 Phase 7 locale resolution. These are not physical
-//! metrics, formal Resource Policy observations, or whole-profile locale-policy
-//! / target work.
+//! canonicalization, 015 Phase 7 locale resolution, and 015 Phase 4 resource
+//! policy admission. These are not physical metrics, formal Resource Policy
+//! observations, or whole-profile locale-policy / target work.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +16,7 @@ use crate::structural::selection::SelectorByteObservation;
 use super::operation::{Analysis, Operation, Output, Prepared};
 use super::quantity::Quantity;
 
+mod policy;
 mod resolution;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -48,6 +49,16 @@ pub(super) enum WorkKind {
     LocaleResolutionNotEvaluatedUnits,
     LocaleResolutionBlockingIssues,
     LocaleResolutionCorrections,
+    ResourcePolicyArtifactOccurrences,
+    ResourcePolicyPolicyArtifacts,
+    ResourcePolicyTargetProfileArtifacts,
+    ResourcePolicyDistinctArtifactBodies,
+    ResourcePolicyArtifactCanonicalBytes,
+    ResourcePolicyReferences,
+    ResourcePolicyReferenceCanonicalBytes,
+    ResourcePolicyEvaluationUnits,
+    ResourcePolicyNotEvaluatedUnits,
+    ResourcePolicyBlockingIssues,
 }
 
 impl WorkKind {
@@ -87,10 +98,24 @@ impl WorkKind {
         Self::LocaleResolutionCorrections,
     ];
 
+    const RESOURCE_POLICY: [Self; 10] = [
+        Self::ResourcePolicyArtifactOccurrences,
+        Self::ResourcePolicyPolicyArtifacts,
+        Self::ResourcePolicyTargetProfileArtifacts,
+        Self::ResourcePolicyDistinctArtifactBodies,
+        Self::ResourcePolicyArtifactCanonicalBytes,
+        Self::ResourcePolicyReferences,
+        Self::ResourcePolicyReferenceCanonicalBytes,
+        Self::ResourcePolicyEvaluationUnits,
+        Self::ResourcePolicyNotEvaluatedUnits,
+        Self::ResourcePolicyBlockingIssues,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
             Operation::LocaleResolution => &Self::LOCALE_RESOLUTION,
+            Operation::ResourcePolicyBootstrap => &Self::RESOURCE_POLICY,
             _ => &Self::INPUT,
         }
     }
@@ -114,15 +139,24 @@ impl WorkKind {
             Self::RetainedAdmissionIssues
             | Self::RetainedSchemaFragments
             | Self::RetainedSchemaIssuesIncludingAlternatives
-            | Self::LocaleResolutionBlockingIssues => WorkUnit::RetainedRecord,
+            | Self::LocaleResolutionBlockingIssues
+            | Self::ResourcePolicyBlockingIssues => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocaleResolutionOccurrences
             | Self::LocaleResolutionCanonicalizedOccurrences => WorkUnit::LocaleOccurrence,
             Self::RetainedCanonicalLocaleValues
             | Self::LocaleResolutionCanonicalRequestedLocales => WorkUnit::CanonicalLocaleValue,
-            Self::LocaleResolutionEvaluationUnits | Self::LocaleResolutionNotEvaluatedUnits => {
-                WorkUnit::EvaluationUnit
-            }
+            Self::LocaleResolutionEvaluationUnits
+            | Self::LocaleResolutionNotEvaluatedUnits
+            | Self::ResourcePolicyEvaluationUnits
+            | Self::ResourcePolicyNotEvaluatedUnits => WorkUnit::EvaluationUnit,
+            Self::ResourcePolicyArtifactOccurrences
+            | Self::ResourcePolicyPolicyArtifacts
+            | Self::ResourcePolicyTargetProfileArtifacts => WorkUnit::ArtifactOccurrence,
+            Self::ResourcePolicyDistinctArtifactBodies => WorkUnit::CanonicalArtifactBody,
+            Self::ResourcePolicyArtifactCanonicalBytes
+            | Self::ResourcePolicyReferenceCanonicalBytes => WorkUnit::CanonicalOctet,
+            Self::ResourcePolicyReferences => WorkUnit::ArtifactReference,
             Self::LocaleCorrectionSuggestions | Self::LocaleResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
             }
@@ -146,6 +180,10 @@ enum WorkUnit {
     CanonicalLocaleValue,
     EvaluationUnit,
     CorrectionSuggestion,
+    ArtifactOccurrence,
+    CanonicalArtifactBody,
+    CanonicalOctet,
+    ArtifactReference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -215,6 +253,9 @@ impl LogicalWork {
             profile_identity: match prepared.operation() {
                 Operation::LocaleCanonicalization => "intlify-config-minimum-single-locale-work",
                 Operation::LocaleResolution => "intlify-config-locale-resolution-work",
+                Operation::ResourcePolicyBootstrap => {
+                    "intlify-config-resource-policy-bootstrap-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -274,6 +315,9 @@ impl LogicalWork {
             ) => work.single_locale(input, result)?,
             (Prepared::LocaleResolution(prepared), Output::LocaleResolution(resolved)) => {
                 work.locales(prepared, resolved)?;
+            }
+            (Prepared::ResourcePolicy(prepared), Output::ResourcePolicy(resolved)) => {
+                work.policy(prepared, resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

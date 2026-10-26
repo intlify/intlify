@@ -80,7 +80,7 @@
     },
     "CaseProjection": {
       "additionalProperties": false,
-      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these six internal duration boundaries and are absent, not guessed.",
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these seven internal duration boundaries and are absent, not guessed.",
       "properties": {
         "category": {
           "$ref": "#/definitions/Category"
@@ -263,7 +263,10 @@
         "resolution-locale-occurrences",
         "resolution-requested-locales",
         "resolution-raw-identifier-bytes",
-        "resolution-canonical-identifier-bytes"
+        "resolution-canonical-identifier-bytes",
+        "bootstrap-artifacts",
+        "recheck-artifacts",
+        "recheck-profile-id-bytes"
       ],
       "type": "string"
     },
@@ -448,7 +451,8 @@
         "authoring-construction",
         "profile-selection",
         "locale-canonicalization",
-        "locale-resolution"
+        "locale-resolution",
+        "resource-policy-bootstrap"
       ],
       "type": "string"
     },
@@ -636,8 +640,43 @@
           },
           "required": ["icu4x-locale-resolution"],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "resource-policy": {
+              "$ref": "#/definitions/ResourcePolicyRecipe"
+            }
+          },
+          "required": ["resource-policy"],
+          "type": "object"
         }
       ]
+    },
+    "ResourcePolicyRecipe": {
+      "enum": [
+        "policy-only",
+        "mixed",
+        "mixed-reordered",
+        "many-artifacts",
+        "repeated-bodies",
+        "role-kind-mismatch",
+        "specification-revision-unsupported",
+        "conflicting-content",
+        "duplicate-envelope",
+        "body-integrity-invalid",
+        "body-schema-invalid",
+        "section-missing",
+        "section-invalid",
+        "digest-mismatch",
+        "specification-revision-mismatch",
+        "revision-mismatch",
+        "kind-mismatch",
+        "identity-mismatch",
+        "not-found",
+        "capability-incompatible"
+      ],
+      "type": "string"
     },
     "RevisionZero": {
       "description": "The revision-zero identity schema.",
@@ -788,7 +827,17 @@
         "locale-resolution-evaluation-units",
         "locale-resolution-not-evaluated-units",
         "locale-resolution-blocking-issues",
-        "locale-resolution-corrections"
+        "locale-resolution-corrections",
+        "resource-policy-artifact-occurrences",
+        "resource-policy-policy-artifacts",
+        "resource-policy-target-profile-artifacts",
+        "resource-policy-distinct-artifact-bodies",
+        "resource-policy-artifact-canonical-bytes",
+        "resource-policy-references",
+        "resource-policy-reference-canonical-bytes",
+        "resource-policy-evaluation-units",
+        "resource-policy-not-evaluated-units",
+        "resource-policy-blocking-issues"
       ],
       "type": "string"
     },
@@ -810,7 +859,11 @@
         "locale-occurrence",
         "canonical-locale-value",
         "evaluation-unit",
-        "correction-suggestion"
+        "correction-suggestion",
+        "artifact-occurrence",
+        "canonical-artifact-body",
+        "canonical-octet",
+        "artifact-reference"
       ],
       "type": "string"
     },

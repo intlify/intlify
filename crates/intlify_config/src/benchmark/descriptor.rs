@@ -224,6 +224,8 @@ pub(super) struct Descriptors {
     pub(super) locale_resolution_input: Option<super::locale_resolution::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) admitted_locale_input: Option<AdmittedInputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) resource_policy_input: Option<super::resource_policy::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -236,6 +238,7 @@ pub(super) enum DescriptorIssue {
     ExecutionMismatch,
     LocaleInputBindingMismatch,
     LocaleResolutionInputBindingMismatch,
+    ResourcePolicyInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -256,6 +259,7 @@ impl Descriptors {
                 _ => None,
             },
             admitted_locale_input: admitted(prepared),
+            resource_policy_input: policy(prepared),
         }
     }
 
@@ -302,6 +306,9 @@ impl Descriptors {
         if self.locale_resolution_input != expected_resolution {
             issues.push(DescriptorIssue::LocaleResolutionInputBindingMismatch);
         }
+        if self.resource_policy_input != policy(prepared) {
+            issues.push(DescriptorIssue::ResourcePolicyInputBindingMismatch);
+        }
         issues
     }
 }
@@ -323,6 +330,16 @@ fn admitted(prepared: &Prepared) -> Option<AdmittedInputFacts> {
     match prepared {
         Prepared::Icu4xLocale { engine, .. } => Some(AdmittedInputFacts::observe(engine)),
         Prepared::LocaleResolution(prepared) => prepared.icu4x().map(AdmittedInputFacts::observe),
+        _ => None,
+    }
+}
+
+/// The capability, selection, and collection facts of a Phase 4 case.
+fn policy(prepared: &Prepared) -> Option<super::resource_policy::InputFacts> {
+    match prepared {
+        Prepared::ResourcePolicy(prepared) => {
+            Some(super::resource_policy::InputFacts::observe(prepared))
+        }
         _ => None,
     }
 }

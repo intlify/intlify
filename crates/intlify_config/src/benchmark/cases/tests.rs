@@ -24,7 +24,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 160);
+    assert_eq!(cases.len(), 186);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -37,7 +37,9 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         assert!(case.fixture.source().len() < 100_000);
         if !matches!(
             case.operation,
-            Operation::ProfileSelection | Operation::LocaleResolution
+            Operation::ProfileSelection
+                | Operation::LocaleResolution
+                | Operation::ResourcePolicyBootstrap
         ) {
             assert_eq!(case.selector, Selector::Absent);
         }
@@ -55,6 +57,9 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
             LimitKind::ResolutionRequestedLocales,
             LimitKind::ResolutionRawIdentifierBytes,
             LimitKind::ResolutionCanonicalIdentifierBytes,
+            LimitKind::BootstrapArtifacts,
+            LimitKind::RecheckArtifacts,
+            LimitKind::RecheckProfileIdBytes,
         ])
     {
         // Phase 7 counts its occurrences over two recipes: the project's
@@ -89,7 +94,9 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
         case.limit.is_none()
             && !matches!(
                 case.operation,
-                Operation::LocaleCanonicalization | Operation::LocaleResolution
+                Operation::LocaleCanonicalization
+                    | Operation::LocaleResolution
+                    | Operation::ResourcePolicyBootstrap
             )
     }) {
         let source = case.fixture.source();
@@ -151,7 +158,8 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleResolution => unreachable!(),
+            | Operation::LocaleResolution
+            | Operation::ResourcePolicyBootstrap => unreachable!(),
         }
     }
 }
@@ -245,12 +253,28 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                             );
                         }
                     }
+                    Output::ResourcePolicy(resolved) => {
+                        // Only the bound itself, one past its value; the
+                        // selector keeps only that smallest witness.
+                        use crate::resolver::evaluation::Actual;
+
+                        let evaluation = &resolved.evaluation;
+                        assert!(evaluation.issues().next().is_some());
+                        for issue in evaluation.issues() {
+                            let exceeded = evaluation.limit(issue).unwrap();
+                            assert!(matches!(
+                                exceeded.actual,
+                                Actual::Exact(actual) | Actual::AtLeast(actual)
+                                    if actual == exceeded.limit.get() + 1
+                            ));
+                        }
+                    }
                     _ => panic!("first-over must fail its owning stage"),
                 }
             }
         }
     }
-    assert_eq!(edges, 34);
+    assert_eq!(edges, 40);
 }
 
 #[test]
@@ -324,5 +348,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 160);
+    assert_eq!(contexts.len(), 186);
 }

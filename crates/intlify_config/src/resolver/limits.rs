@@ -541,7 +541,7 @@ impl ResolutionLimits {
     }
 
     /// The section that sets exactly these bounds, for fixtures.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn section(&self) -> Value {
         let mut section = serde_json::json!({"diagnostics": {}});
         for (id, bound) in self.bounds() {

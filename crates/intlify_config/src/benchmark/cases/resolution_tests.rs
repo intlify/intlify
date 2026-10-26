@@ -87,7 +87,7 @@ fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
 #[test]
 fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let cases = declarations();
-    assert_eq!(cases.len(), 160);
+    assert_eq!(cases.len(), 186);
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()
@@ -100,11 +100,11 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     assert!(cases[127..141]
         .iter()
         .all(|case| case.operation == Operation::LocaleCanonicalization));
-    assert!(resolution(&cases[141..]));
+    assert!(resolution(&cases[141..160]));
     for (rows, edges) in [
         (&cases[94..127], 8),
         (&cases[141..150], 2),
-        (&cases[150..], 0),
+        (&cases[150..160], 0),
     ] {
         assert_eq!(
             rows.iter().filter(|case| case.limit.is_some()).count(),
@@ -592,13 +592,13 @@ fn icu4x_resolution_cases_follow_every_finite_row_with_both_engines_for_each_inp
         })
         .collect::<Vec<_>>();
     assert_eq!(
-        cases[150..]
+        cases[150..160]
             .iter()
             .map(|case| case.fixture)
             .collect::<Vec<_>>(),
         expected
     );
-    for case in &cases[150..] {
+    for case in &cases[150..160] {
         assert_eq!(case.operation, Operation::LocaleResolution);
         assert_eq!(case.selector, Selector::App);
         let Recipe::Icu4xLocaleResolution { input, .. } = case.fixture else {

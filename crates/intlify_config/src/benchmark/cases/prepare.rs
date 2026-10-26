@@ -7,10 +7,12 @@
 
 use std::sync::Arc;
 
+use crate::artifacts::collection::{read_collection, CollectionLimits};
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
+use crate::resolver::limits::ImplementationCapability;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 
@@ -18,9 +20,10 @@ use super::super::locale_icu4x::PreparedEngine;
 use super::super::observation::Observation;
 use super::super::operation::{Operation, Output, Prepared, Schema};
 use super::super::work::LogicalWork;
+use super::policy_inputs::capacity;
 use super::{
     declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind,
-    LocaleResolutionRecipe, Recipe, Selector,
+    LocaleResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
 };
 
 pub(in crate::benchmark) struct Candidate {
@@ -45,7 +48,7 @@ pub(in crate::benchmark) enum PreparationFailure {
 
 /// The numbers are explicit owner fixture capacity, not resolver defaults or a
 /// substitute for an admitted Implementation Capability / Resource Limit Policy.
-fn fixture_capacity() -> (InputLimits, StructuralLimits) {
+pub(super) fn fixture_capacity() -> (InputLimits, StructuralLimits) {
     let bound = |value| Bound::new(value).expect("finite positive fixture capacity");
     (
         InputLimits {
@@ -84,6 +87,9 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::LocaleResolution {
         return prepare_resolution(declaration);
     }
+    if declaration.operation == Operation::ResourcePolicyBootstrap {
+        return prepare_policy(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -118,7 +124,10 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionLocaleOccurrences
             | LimitKind::ResolutionRequestedLocales
             | LimitKind::ResolutionRawIdentifierBytes
-            | LimitKind::ResolutionCanonicalIdentifierBytes => {
+            | LimitKind::ResolutionCanonicalIdentifierBytes
+            | LimitKind::BootstrapArtifacts
+            | LimitKind::RecheckArtifacts
+            | LimitKind::RecheckProfileIdBytes => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -144,9 +153,10 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionLocaleOccurrences
             | LimitKind::ResolutionRequestedLocales
             | LimitKind::ResolutionRawIdentifierBytes
-            | LimitKind::ResolutionCanonicalIdentifierBytes => {
-                unreachable!()
-            }
+            | LimitKind::ResolutionCanonicalIdentifierBytes
+            | LimitKind::BootstrapArtifacts
+            | LimitKind::RecheckArtifacts
+            | LimitKind::RecheckProfileIdBytes => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -185,7 +195,8 @@ pub(in crate::benchmark) fn prepare(
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleResolution => unreachable!(),
+            | Operation::LocaleResolution
+            | Operation::ResourcePolicyBootstrap => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -204,8 +215,8 @@ pub(in crate::benchmark) fn prepare(
         Prepared::Locale { .. } | Prepared::Icu4xLocale { .. } => {
             unreachable!("locale preparation has no file stages")
         }
-        Prepared::LocaleResolution(_) => {
-            unreachable!("Phase 7 has complete-root preparation")
+        Prepared::LocaleResolution(_) | Prepared::ResourcePolicy(_) => {
+            unreachable!("Phases 7 and 4 have complete-root preparation")
         }
     };
     let kind = match &output {
@@ -458,6 +469,134 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     }
     let output = Output::LocaleResolution(resolved);
     let prepared = Prepared::LocaleResolution(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: Some(input_limits),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// The independently specified count of a bound over its fixed recipe; never
+/// derived from the resolver under test.
+fn policy_edge(kind: LimitKind, recipe: ResourcePolicyRecipe) -> Result<u64, PreparationFailure> {
+    use ResourcePolicyRecipe as R;
+
+    Ok(match (kind, recipe) {
+        // The selected policy, a Target Profile, and an Approval Policy; and
+        // the bytes of the selector and the only declared Profile ID, `app`.
+        (LimitKind::BootstrapArtifacts | LimitKind::RecheckArtifacts, R::Mixed)
+        | (LimitKind::RecheckProfileIdBytes, R::PolicyOnly) => 3,
+        _ => return Err(PreparationFailure::UndeclaredCase),
+    })
+}
+
+/// The caller's finite limits on the collection at 015's pre-invocation
+/// boundary: explicit owner capacity, not the `artifactAdmission` bounds.
+const COLLECTION_LIMITS: CollectionLimits = CollectionLimits {
+    members: 1_000,
+    member_bytes: 1_000_000,
+    total_bytes: 10_000_000,
+    depth: 64,
+};
+
+fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::resource_policy::{resolve, PreparedPolicy};
+
+    let Recipe::ResourcePolicy(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let (input_limits, structural_limits) = fixture_capacity();
+    let mut capability = capacity();
+    let mut policy = capability.clone();
+    if let Some((kind, edge)) = declaration.limit {
+        let exact = policy_edge(kind, recipe)?;
+        let bound = Bound::new(match edge {
+            LimitEdge::Exact => exact,
+            LimitEdge::FirstOver => exact - 1,
+        })
+        .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
+        match kind {
+            LimitKind::BootstrapArtifacts => {
+                // A compatible policy needs no more than the capability.
+                capability.artifact_admission.max_artifacts = bound;
+                policy.artifact_admission.max_artifacts = bound;
+            }
+            LimitKind::RecheckArtifacts => policy.artifact_admission.max_artifacts = bound,
+            LimitKind::RecheckProfileIdBytes => {
+                policy.configuration_input.structural.max_profile_id_bytes = bound;
+            }
+            _ => unreachable!(),
+        }
+    }
+    let fixture = recipe.fixture(&policy);
+    let source =
+        serde_json::to_vec(&fixture.config).map_err(|_| PreparationFailure::CoreInvariant)?;
+    let doc = materialize_file(Arc::from(source), input_limits)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let analysis = Schema::for_model()
+        .map_err(|_| PreparationFailure::CoreInvariant)?
+        .analyze(Arc::new(doc), structural_limits)
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let config = analysis
+        .construct()
+        .map_err(|_| PreparationFailure::CoreInvariant)?
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    // The selector is observed under the bound the structural stage ran
+    // under, the capability's `maxProfileIdBytes`.
+    let selector = selector_input(declaration.selector, structural_limits.max_profile_id_bytes);
+    let selection = analysis
+        .select(&selector)
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let Selection::Selected(selected) = selection else {
+        return Err(PreparationFailure::PrerequisiteUnavailable);
+    };
+    let selected = selected.id().clone();
+    let members = fixture
+        .members
+        .iter()
+        .map(serde_json::to_vec)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let collection = read_collection(Some(&bytes), &COLLECTION_LIMITS)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let profile_ids = config
+        .profiles()
+        .iter()
+        .map(|(id, _)| u64::try_from(id.as_str().len()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let prepared = PreparedPolicy {
+        analysis,
+        config,
+        selected,
+        selector,
+        capability: ImplementationCapability::fixture_owned(capability),
+        collection,
+        profile_ids,
+    };
+    let inputs = prepared
+        .inputs()
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let resolved = resolve(&prepared.capability, &prepared.collection, &inputs);
+    let kind = match &resolved.result {
+        Ok(outcome) if outcome.confirmed.is_ok() => ExpectedKind::ResourcePolicyConfirmed,
+        Ok(_) => ExpectedKind::ResourcePolicyBlocked,
+        Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::ResourcePolicy(resolved);
+    let prepared = Prepared::ResourcePolicy(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

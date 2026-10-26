@@ -95,6 +95,16 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 };
                 assert_eq!(item.stage, expected);
             }
+        } else if prepared.operation() == Operation::ResourcePolicyBootstrap {
+            assert_eq!(work.facts.len(), 10);
+            for (index, item) in work.facts.iter().enumerate() {
+                let expected = if index < 7 {
+                    WorkStage::PreparedInput
+                } else {
+                    WorkStage::OperationResult
+                };
+                assert_eq!(item.stage, expected, "{:?}", item.kind);
+            }
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
