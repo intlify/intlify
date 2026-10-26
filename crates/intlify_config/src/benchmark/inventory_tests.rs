@@ -621,7 +621,7 @@ fn all_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_at
     };
     let evaluation = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(evaluation.outcome(), Outcome::Complete);
-    assert_eq!(evaluation.successful_references().len(), 160);
+    assert_eq!(evaluation.successful_references().len(), 186);
     assert!(evaluation.issues().is_empty());
     evidence.reverse();
     let reversed = plan.evaluate(&submitted, &evidence, &[]);
@@ -637,7 +637,7 @@ fn all_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_at
     };
     let incomplete = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(incomplete.outcome(), Outcome::Incomplete);
-    assert_eq!(incomplete.successful_references().len(), 159);
+    assert_eq!(incomplete.successful_references().len(), 185);
     submitted.cases.remove(0);
     let missing = plan.evaluate(&submitted, &evidence, &[]);
     assert_eq!(missing.outcome(), Outcome::Invalid);

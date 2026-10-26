@@ -18511,6 +18511,2996 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "policy-only"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "6d74d72d36b3231872b8b4145c99570e50a16651a1a4399aaf874bcad525ff70",
+      "result": {
+        "shared": "ac88eb31bfda5c04107bae8e7627d12ea8344005c35950618e4a42011b29d46b",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "b47bb3357a79ff554fe73efd5febde9f1d7aeb59febc081c46912ee382a4bca0",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "b78e553fe4cc0fae90adf904869d09c5e40b13e0c091431bfbec5b4b521406bd",
+      "result": {
+        "shared": "3a391807e589b1d2165a07bc60a3a953663d86d7ebb61a674e4875c022f6bb97",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "bdd87cf57871440ede064720d62b45226ec24913d4f728d046ee98c11a186ff6",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4007"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "278a92baa9018c7f2b6abd3f48b4bc64a672c885060933d456af4f272676e519",
+      "result": {
+        "shared": "3a391807e589b1d2165a07bc60a3a953663d86d7ebb61a674e4875c022f6bb97",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "bdd87cf57871440ede064720d62b45226ec24913d4f728d046ee98c11a186ff6",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4007"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "many-artifacts"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "fb34d5b2187ad6574b031ee45030b579e6a93bf0f5456ede8f6d8a3d8d9e5e16",
+      "result": {
+        "shared": "7798848baadea499c4ed8632385c3a623b148f49bbe701a3d05792a089a06d94",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "7a7d46754f083731499b153f9f2b3bf9de1a70ab2016ed3768132d7e5b90c649",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "63"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "30566"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "163"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "repeated-bodies"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "38e8863c8339d72bb12aa90b22f823a992c8e016b9e462607fc02201fec14da4",
+      "result": {
+        "shared": "758ee5d719fca730d121ef47ff957f972e71de2a1db0ecf0173f7a97d81ec048",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "4b08b6f71103cf3987d0afde30c8d3a3fc60147cb2d6c470cffa0b5f88d7843c",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "33"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "32"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16858"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "39"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "role-kind-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "f5e3e4c0a9194fbb0b8e346ea6658e78d4e97422a98d561e679e5a3a36a9d7a9",
+      "result": {
+        "shared": "b175cd169a41076e09dbc8ec98481d8ef741e3908934c1abc447ee51053fcb66",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "ff5ec8d7e5b3409defff250532fd5ef887b21481b602843751e3c5113b1adb45",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1599"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "specification-revision-unsupported"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "53046a36e0ac24da4d8544b74fbc701784aa4a5b408ca188c9fa0f0d874ce187",
+      "result": {
+        "shared": "e57936a53105a2cf862aed39369577e6f83dad42e4d2837c779f64f831463290",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "f4b193cb09cb5cb38b8e9ef81d58e8ffbd817b54a39c45fbfce1fd75c8f1122f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "conflicting-content"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "6448ab731c3aaae5f70d451f2efc1fa1708d72930aae61cc7718a7577e094266",
+      "result": {
+        "shared": "f78217a295e4bb9acf47934f10645c7d608c07a7cf1ddc0f2c02252d0181ad4e",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "6980de9defeaa05bf40ddfb6e7c9f3ce882699e25373cbe1fbeb693f68e1aea8",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6195"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "39"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "duplicate-envelope"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "3744c84448447e281192a372f5ae15434be2221d931ee7324de3359930663e2c",
+      "result": {
+        "shared": "c437089aa41d3033fd64983e589c4ca1f7594d7002b414d6fbc073f97dd9c315",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "131134b8369eb01bc8da3b8cab2787eac70a8b0b7515652fa4108ddaa3e46d6f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6196"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "body-integrity-invalid"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "5b939a08042aee9186f1dffbc81a49cb9b4bc93b53457af2906420298b244400",
+      "result": {
+        "shared": "4d92520ea9aa22eee779a13f97f05a12f589323a15b1a290eadc434530bb9444",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "f4b193cb09cb5cb38b8e9ef81d58e8ffbd817b54a39c45fbfce1fd75c8f1122f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "body-schema-invalid"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "dea9e09d889ad79709d6b5cf7ef9e7480d0a2c5768f27c9e95d534fd9eeaea15",
+      "result": {
+        "shared": "03d8297b850ab9c39eaa7ea6afda4a59c98a48cb601ff0f56e6d6b0f083cf097",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "d9cceeca260502488377e6f8e343758f3eb290dd4000fade1b015fa6d1b7af0c",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "section-missing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "f01c0c5455a727a45e995b948473deec6702b5c9fac1eee269cc0007ced95680",
+      "result": {
+        "shared": "a5d6e1a08cd6a6caec2980513b3f5abe1a4737c0c667d40861ccee1d98c58d8d",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "6f85142056414d93cc6e0688da7bd8d459dae5006c5132021ac1189d2bea6d2c",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "440"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "section-invalid"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "a661d9570364e9bead96d7b001a6f605167795b88422c019a4d98461d7acd0f6",
+      "result": {
+        "shared": "8d24d948f38e26f8e3e6eed9ff2c880fa0ea27ae7f2577dd7db40ad9891262e3",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "d73e284dee33b1647ba1d9179cbe32d348e42370783e661fba2fce6c1a1c1018",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3095"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "digest-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "93829a8e57b06be5acc7861cdcbe9798f06cde61cf4502573b337d5d48ef5164",
+      "result": {
+        "shared": "657dfe4642cf0453431f365bb36ecb24232118b04e07dd568f61bfbf4ccd7188",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "228519246f4f244877e58e9f4917b67f413cd49340b8b583bc35df6492c255bd",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3097"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "specification-revision-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "cfa5ba41867e014c027cc9a1c2dc2d3c22e7755a0e4443242c3a774d2dc96b81",
+      "result": {
+        "shared": "4101369e125871abff1d4f44b982635ee647b0c37553fbc1ba30dc218e6242de",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "f4b193cb09cb5cb38b8e9ef81d58e8ffbd817b54a39c45fbfce1fd75c8f1122f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "revision-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "5f9b0bb4d2f874750b706a923d0e01a4b55486dd0b396e85b1c500558a965e86",
+      "result": {
+        "shared": "f7043580a45b17f75bfc2ec06d3038de008c147dc784f6142722d063e3021e75",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "f4b193cb09cb5cb38b8e9ef81d58e8ffbd817b54a39c45fbfce1fd75c8f1122f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "kind-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "a233f39005911643ec1071b0f522a870769a5e56c1430ceaa6dc34c43dd6ba5a",
+      "result": {
+        "shared": "74042352919d757133e97fee9156d889e9347d232d36aab296b69d4d6ef691aa",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "1fdefd08dc70b0c28982cf8157f88f736906d03ceea0f759df508c9a6870a900",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "431"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "identity-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "ea16948d7bb9d74179a2b6b19a681b2521dccc2dfd0ee8803f1dd6ad9aa9acb7",
+      "result": {
+        "shared": "619abecc662d688a324eb990171a549d647a76d49f9a32ae2c9b8349a28d3d8f",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "595cec1337128bdbee9ce617a48307abacec17c849398fb7acc25a3dff7579fd",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3104"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "not-found"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "7954ba21b4f728f0d819be1247661484eb7a835bd589d771b30564e66c2c41a4",
+      "result": {
+        "shared": "0f4b2e801c1b8ae9a59f393049633ed6f9c920dc3f114a74e430266a10e5f4ad",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "dcce65d900123fd40bf29e02c342ed03cbf5fc6ba0b523d3632835ba2087e11a",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "430"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "capability-incompatible"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "cc1e95c67f23b22eb85d7433c4411f07af6ee9030cd5832dfcf8679c550758ce",
+      "result": {
+        "shared": "4e11d3f422559a0c46f523f517b4c39969b3cd1071a44a07975f84e64676f24d",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "2e7ca276930471b6165ee45681fd5bfc70bef7aef1c9bf966a65c5e52ae6c80f",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "22"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": ["bootstrap-artifacts", "exact"],
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "3687389f1e17c90d85bae5fe560f8c7947fc362771729bb819370eeca7c4682d",
+      "result": {
+        "shared": "45e914136eeeab702e815418e02af1cabf0f2b83b6cb970e7149b2cc313bfb1d",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "60a2dd08bfb3ca5223f8a79737ad05a255e83fff60e630b26ac261172d3230c7",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4004"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": ["bootstrap-artifacts", "first-over"],
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "73161c36223f6cb6224d40c53222eac5467ada751f18fe070f47c4fdaff32114",
+      "result": {
+        "shared": "8c98f6a83e6ed41cd26b78c94a3a86c00f027f0acd90e03471e022cc9c4ac528",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "a57d20a46d0e16ead959d82e6b2365b38b09ae0a2bcc3bc4ee900529d5a9d4a5",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4004"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": ["recheck-artifacts", "exact"],
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "1bcc3364b34b76868f8323a45f5f5a7d14a449388fb130799c137d0fde3e8a4d",
+      "result": {
+        "shared": "45e914136eeeab702e815418e02af1cabf0f2b83b6cb970e7149b2cc313bfb1d",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "60a2dd08bfb3ca5223f8a79737ad05a255e83fff60e630b26ac261172d3230c7",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4004"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": ["recheck-artifacts", "first-over"],
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "ea74df52b880d2da507629745b3e79f0a4ef813cc8ec955667fa6d1b7f0482c1",
+      "result": {
+        "shared": "ff97b73aee02f20fcb9b642fc33fa95cff00cbd137d46b9d78940ce58adbfc83",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "a050313387c4ed169eaecb20f834a4e2abd39446e65d73715ef9942560935c24",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4004"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "41"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "policy-only"
+        },
+        "fixtureRevision": "0",
+        "limit": ["recheck-profile-id-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "resource-policy-confirmed"
+      },
+      "inputContext": "b69fb773b82a02213c742d9626587335955e68d6b48799a46e602ff8d0824160",
+      "result": {
+        "shared": "bbc9bd593f62ef29bc4bbd096de90f263c3d2a2c110f4377a6a5ed7954acf899",
+        "entry": "ed81bda3021f505b5170681dca6c7d26944f713498a04fdf272f709c3ff490b2"
+      },
+      "logicalWork": "80f34935f8651ef2b57c18f7bf30647c4a7cd0d6b4bf263cb3d25cfdbc3238f3",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3096"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resource-policy-bootstrap",
+        "fixture": {
+          "resource-policy": "policy-only"
+        },
+        "fixtureRevision": "0",
+        "limit": ["recheck-profile-id-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "resource-policy-blocked"
+      },
+      "inputContext": "679e9660b77572c591e0546987b3d69112d4012355366ab814267435dc548e01",
+      "result": {
+        "shared": "7c12bf2214805d47627f541d1725b7374df9394c16792e71beab73ce4fb7d685",
+        "entry": "512784e499e670528c601b3c3661dc45425de95ba7b06efdda986ca56fdc7640"
+      },
+      "logicalWork": "2570b73362acfae751991716a90f45579c469d719be42f8cab23c4ac2c9099ee",
+      "work": {
+        "profileIdentity": "intlify-config-resource-policy-bootstrap-work",
+        "profileRevision": "0",
+        "operation": "resource-policy-bootstrap",
+        "facts": [
+          {
+            "kind": "resource-policy-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resource-policy-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3096"
+            }
+          },
+          {
+            "kind": "resource-policy-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resource-policy-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1608"
+            }
+          },
+          {
+            "kind": "resource-policy-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "resource-policy-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resource-policy-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          }
+        ]
+      }
     }
   ]
 }

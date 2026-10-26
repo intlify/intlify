@@ -338,7 +338,7 @@ impl<'a> Envelope<'a> {
 
 /// The member with its integrity digest computed over the rest, or as it is
 /// when it has no top-level `integrityDigest` to fill in.
-#[cfg(any(test, feature = "vectors"))]
+#[cfg(any(test, feature = "vectors", feature = "benchmark"))]
 pub(crate) fn sealed(mut member: Value) -> Value {
     if member.get("integrityDigest").is_some() {
         let digest = hash_with_excluded_member(
@@ -355,7 +355,7 @@ pub(crate) fn sealed(mut member: Value) -> Value {
 
 /// A sealed envelope of `kind` under its governing specification's revision
 /// "0".
-#[cfg(any(test, feature = "vectors"))]
+#[cfg(any(test, feature = "vectors", feature = "benchmark"))]
 pub(crate) fn envelope_of(
     kind: ArtifactKind,
     identity: &str,

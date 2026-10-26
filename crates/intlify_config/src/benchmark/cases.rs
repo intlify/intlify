@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the six active boundaries.
+//! Finite owner case declarations for the seven active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -14,6 +14,8 @@ mod inputs;
 pub(super) use inputs::Recipe;
 mod resolution_inputs;
 pub(super) use resolution_inputs::LocaleResolutionRecipe;
+mod policy_inputs;
+pub(super) use policy_inputs::ResourcePolicyRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -42,6 +44,9 @@ pub(super) enum LimitKind {
     ResolutionRequestedLocales,
     ResolutionRawIdentifierBytes,
     ResolutionCanonicalIdentifierBytes,
+    BootstrapArtifacts,
+    RecheckArtifacts,
+    RecheckProfileIdBytes,
 }
 
 impl LimitKind {
@@ -91,6 +96,8 @@ pub(super) enum ExpectedKind {
     LocaleRejected,
     LocaleResolutionComplete,
     LocaleResolutionBlocked,
+    ResourcePolicyConfirmed,
+    ResourcePolicyBlocked,
 }
 
 #[derive(
@@ -289,9 +296,9 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::StructuralAnalysis => ExpectedKind::StructuralComplete,
                 Operation::AuthoringConstruction => ExpectedKind::AuthoringComplete,
                 Operation::ProfileSelection => ExpectedKind::Selected,
-                Operation::LocaleCanonicalization | Operation::LocaleResolution => {
-                    unreachable!()
-                }
+                Operation::LocaleCanonicalization
+                | Operation::LocaleResolution
+                | Operation::ResourcePolicyBootstrap => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -542,6 +549,43 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ));
         }
     }
+    // Append 015 Phase 4 without changing any of the 160 rows: every recipe,
+    // then the exact and first-over edges of the capability's and the
+    // policy's `maxArtifacts` and the policy's `maxProfileIdBytes`.
+    let expected = |confirms| {
+        if confirms {
+            ExpectedKind::ResourcePolicyConfirmed
+        } else {
+            ExpectedKind::ResourcePolicyBlocked
+        }
+    };
+    for recipe in ResourcePolicyRecipe::ALL {
+        cases.push(declaration(
+            Operation::ResourcePolicyBootstrap,
+            Recipe::ResourcePolicy(recipe),
+            Selector::App,
+            expected(recipe.confirms()),
+        ));
+    }
+    for (limit, recipe) in [
+        (LimitKind::BootstrapArtifacts, ResourcePolicyRecipe::Mixed),
+        (LimitKind::RecheckArtifacts, ResourcePolicyRecipe::Mixed),
+        (
+            LimitKind::RecheckProfileIdBytes,
+            ResourcePolicyRecipe::PolicyOnly,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::ResourcePolicyBootstrap,
+                Recipe::ResourcePolicy(recipe),
+                Selector::App,
+                expected(edge == LimitEdge::Exact),
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
     cases
 }
 
@@ -590,3 +634,6 @@ mod locale_tests;
 
 #[cfg(test)]
 mod resolution_tests;
+
+#[cfg(test)]
+mod policy_tests;

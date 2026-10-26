@@ -86,6 +86,10 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             );
             assert_eq!(project.requested_default().as_str(), "en");
         }
+        Output::ResourcePolicy(resolved) => {
+            assert_eq!(resolved.evaluation.issues().count(), 0);
+            assert!(resolved.result.as_ref().unwrap().confirmed.is_ok());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

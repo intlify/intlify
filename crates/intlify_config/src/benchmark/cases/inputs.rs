@@ -52,6 +52,7 @@ pub(in crate::benchmark) enum Recipe {
         input: super::LocaleResolutionRecipe,
         engine: super::Engine,
     },
+    ResourcePolicy(super::ResourcePolicyRecipe),
 }
 
 impl Recipe {
@@ -84,6 +85,14 @@ impl Recipe {
             }
             return Arc::from(
                 serde_json::to_vec(&value).expect("finite owner locale-resolution fixture"),
+            );
+        }
+        if let Self::ResourcePolicy(recipe) = self {
+            // The configuration under the default bounds; a bound edge
+            // rewrites the policy, and with it the reference, in preparation.
+            let fixture = recipe.fixture(&super::policy_inputs::capacity());
+            return Arc::from(
+                serde_json::to_vec(&fixture.config).expect("finite owner resource-policy fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {

@@ -26,7 +26,7 @@ use super::locale_icu4x::PreparedEngine;
 use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
-use super::{locale, locale_icu4x, locale_resolution};
+use super::{locale, locale_icu4x, locale_resolution, resource_policy};
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -43,16 +43,18 @@ pub(super) enum Operation {
     ProfileSelection,
     LocaleCanonicalization,
     LocaleResolution,
+    ResourcePolicyBootstrap,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 6] = [
+    pub(super) const ALL: [Self; 7] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
         Self::ProfileSelection,
         Self::LocaleCanonicalization,
         Self::LocaleResolution,
+        Self::ResourcePolicyBootstrap,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -60,6 +62,7 @@ impl Operation {
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
             Self::LocaleCanonicalization | Self::LocaleResolution => "profile_locale_resolve",
+            Self::ResourcePolicyBootstrap => "profile_artifact_admit",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -70,6 +73,7 @@ impl Operation {
             Self::ProfileSelection => "named_profile_selection",
             Self::LocaleCanonicalization => "locale_canonicalization",
             Self::LocaleResolution => "locale_policy_resolution",
+            Self::ResourcePolicyBootstrap => "resource_policy_bootstrap",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -80,6 +84,7 @@ impl Operation {
             Self::ProfileSelection => "minimum-provisional-selection/0",
             Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
             Self::LocaleResolution => "locale-resolution/0",
+            Self::ResourcePolicyBootstrap => "resource-policy-bootstrap/0",
         }
     }
 }
@@ -104,6 +109,7 @@ pub(super) enum Prepared {
         input: Arc<str>,
     },
     LocaleResolution(Box<locale_resolution::PreparedLocales>),
+    ResourcePolicy(Box<resource_policy::PreparedPolicy>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -117,6 +123,7 @@ pub(super) enum Output {
     Select(Result<Selection<PolicyReference>, SelectionInvariant>),
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
     LocaleResolution(locale_resolution::Resolved),
+    ResourcePolicy(resource_policy::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,6 +136,7 @@ pub(super) enum OutputFailure {
     LocaleProviderUnavailable,
     LocaleProviderInvariant,
     LocaleResolutionInvariant,
+    ResourcePolicyInvariant,
 }
 
 impl Prepared {
@@ -140,6 +148,7 @@ impl Prepared {
             Self::Select { .. } => Operation::ProfileSelection,
             Self::Locale { .. } | Self::Icu4xLocale { .. } => Operation::LocaleCanonicalization,
             Self::LocaleResolution(_) => Operation::LocaleResolution,
+            Self::ResourcePolicy(_) => Operation::ResourcePolicyBootstrap,
         }
     }
 
@@ -237,6 +246,22 @@ impl Prepared {
                     output: Output::LocaleResolution(measured.output),
                 })
             }
+            Self::ResourcePolicy(prepared) => {
+                let inputs = prepared
+                    .inputs()
+                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let measured = measure(
+                    clock,
+                    (&prepared.capability, &prepared.collection, &inputs),
+                    |(capability, collection, inputs)| {
+                        resource_policy::resolve(capability, collection, inputs)
+                    },
+                )?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::ResourcePolicy(measured.output),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start read
                 // and released after the end read.
@@ -259,6 +284,7 @@ impl Prepared {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
             Self::LocaleResolution(prepared) => prepared.fields().is_some(),
+            Self::ResourcePolicy(prepared) => prepared.inputs().is_some(),
             _ => true,
         }
     }
@@ -288,6 +314,7 @@ impl Output {
             Self::Select(Ok(selection)) => observe_selection(selection),
             Self::Locale(result) => locale::observe(result),
             Self::LocaleResolution(resolved) => locale_resolution::observe(resolved),
+            Self::ResourcePolicy(resolved) => resource_policy::observe(resolved),
         }
     }
 }

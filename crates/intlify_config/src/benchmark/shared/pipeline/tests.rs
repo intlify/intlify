@@ -28,7 +28,7 @@ fn reseal(value: &mut Value) -> Vec<u8> {
 }
 
 #[test]
-fn actual_owner_run_projects_all_six_pairs_and_raw_samples_through_report_admission() {
+fn actual_owner_run_projects_all_seven_pairs_and_raw_samples_through_report_admission() {
     let run = capture();
     let artifacts = produce(&run).unwrap();
     let checked = validate(&run, &artifacts).unwrap();
@@ -39,7 +39,7 @@ fn actual_owner_run_projects_all_six_pairs_and_raw_samples_through_report_admiss
             checked.measured_cases,
             checked.non_measured_cases
         ),
-        (160, 160, 0)
+        (186, 186, 0)
     );
     let evidence = value(artifacts.evidence.as_ref().unwrap());
     let evaluation = value(&artifacts.evaluation);
@@ -98,7 +98,7 @@ fn actual_owner_run_projects_all_six_pairs_and_raw_samples_through_report_admiss
         assert_eq!(row["metric"], "wall_duration");
         assert_eq!(row["unit"], "nanosecond");
     }
-    assert_eq!(pairs.len(), 6);
+    assert_eq!(pairs.len(), 7);
     assert_eq!(
         report["body"]["sections"][0]["numericPolicy"],
         "observational-only-no-numeric-decisions"
@@ -141,7 +141,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
         assert_eq!(admitted.outcome, outcome);
         assert_eq!(
             (admitted.measured_cases, admitted.non_measured_cases),
-            (0, 160)
+            (0, 186)
         );
         assert!(artifacts.evidence.is_none());
         let evaluation = value(&artifacts.evaluation);
@@ -155,7 +155,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            160
+            186
         );
         let report = value(&artifacts.report);
         assert_eq!(report["body"]["sections"][0]["rows"], json!([]));
@@ -164,7 +164,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            160
+            186
         );
     }
 }

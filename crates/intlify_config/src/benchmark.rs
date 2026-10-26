@@ -40,6 +40,8 @@ mod operation;
 #[cfg(feature = "benchmark")]
 mod profile;
 #[cfg(feature = "benchmark")]
+mod resource_policy;
+#[cfg(feature = "benchmark")]
 mod run;
 #[cfg(feature = "benchmark")]
 mod sample;

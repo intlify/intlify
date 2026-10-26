@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 6] {
+pub(crate) fn operations() -> [Prepared; 7] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -69,7 +69,24 @@ pub(crate) fn operations() -> [Prepared; 6] {
             input: Arc::from("EN-us"),
         },
         resolution_operation(&minimal_config()),
+        policy_operation(),
     ]
+}
+
+/// Phase 4 over the fixture's policy alone, as its case prepares it.
+pub(crate) fn policy_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, Recipe, ResourcePolicyRecipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| {
+            case.fixture == Recipe::ResourcePolicy(ResourcePolicyRecipe::PolicyOnly)
+                && case.limit.is_none()
+        })
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 pub(crate) fn resolution_operation(value: &Value) -> Prepared {
@@ -139,6 +156,10 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                     ["en"]
                 );
                 assert_eq!(project.requested_default().as_str(), "en");
+            }
+            Output::ResourcePolicy(resolved) => {
+                assert_eq!(resolved.evaluation.issues().count(), 0);
+                assert!(resolved.result.as_ref().unwrap().confirmed.is_ok());
             }
             _ => panic!("unexpected owner operation result"),
         }
