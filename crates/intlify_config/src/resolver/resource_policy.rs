@@ -24,7 +24,7 @@ use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLeng
 
 use super::bootstrap::{admit_candidate, AdmittedResourcePolicy, ResourcePolicyVerification};
 use super::evaluation::{
-    both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
+    and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
     Shortfall, Subject, Unit,
 };
 use super::limits::{
@@ -358,11 +358,6 @@ fn measured(
     evaluation.check(unit, measured, |(limit, actual)| {
         within(bound, limit, actual)
     })
-}
-
-/// Whether both hold, or the causes of each that does not.
-fn and(first: Admitted<()>, second: Admitted<()>) -> Admitted<()> {
-    both(first, second).map(|((), ())| ())
 }
 
 /// The eight `configurationInput` bounds over what Phases 1 to 3 measured,
